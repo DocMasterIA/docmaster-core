@@ -46,16 +46,6 @@
                         </svg>
                     </div>
 
-                    <!-- Notifications -->
-                    <button class="relative p-3 text-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-all duration-200">
-                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5zM10.5 3.5L7 7h3v10l4-4V7h3l-3.5-3.5z"/>
-                        </svg>
-                        <span class="absolute -top-1 -right-1 h-5 w-5 bg-gradient-to-r from-blue-600 to-blue-700 rounded-full flex items-center justify-center">
-                            <span class="text-white text-xs font-bold">3</span>
-                        </span>
-                    </button>
-
                     <!-- Profile -->
                     <div class="flex items-center space-x-3 bg-white rounded-xl p-2 shadow-sm border border-slate-200">
                         <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3" alt="Perfil do usuário" class="h-10 w-10 rounded-lg object-cover ring-2 ring-blue-300" onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;" />
@@ -70,10 +60,24 @@
                             </svg>
                         </a>
                     </div>
+
+                        <form method="POST" action="{% url 'logout' %}">
+                        {% csrf_token %}
+                        <button type="submit" 
+                            class="text-red-600 hover:text-red-800 p-2 rounded-lg transition-colors duration-200"
+                            title="Sair">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1"/>
+                            </svg>
+                        </button>
+                    </form>
+
                 </div>
             </div>
         </div>
     </header>
+
   <!-- Main -->
   <main class="max-w-8xl mx-auto px-6 lg:px-8 py-8 space-y-8">
     <!-- Breadcrumb / Title -->

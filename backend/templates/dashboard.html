@@ -35,7 +35,18 @@
                     <a href="/" class="px-4 py-2 text-blue-700 font-semibold bg-blue-50 rounded-xl border-2 border-blue-200 backdrop-blur-sm">Dashboard</a>
                     <a href="/gerador_documentos" class="px-4 py-2 text-slate-700 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-all duration-200">Geração de Documentos</a>
                     <a href="/area_do_usuario" class="px-4 py-2 text-slate-700 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-all duration-200">Área de Usuário</a>
-                </nav>
+                    {% if request.user.is_staff or request.user.is_superuser %}
+                                    <a href="/admin" 
+                                    class="flex items-center gap-2 px-4 py-2 text-yellow-800 font-semibold bg-yellow-50 hover:bg-yellow-100 rounded-xl border border-yellow-300 shadow-sm transition-all duration-200">
+                                        <!-- Ícone SVG de engrenagem -->
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.023c1.532-.885 3.275.858 2.39 2.39a1.724 1.724 0 001.023 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.023 2.573c.885 1.532-.858 3.275-2.39 2.39a1.724 1.724 0 00-2.573 1.023c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.023c-1.532.885-3.275-.858-2.39-2.39a1.724 1.724 0 00-1.023-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.023-2.573c-.885-1.532.858-3.275 2.39-2.39.996.575 2.23.25 2.573-1.023z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                        Área Admin
+                                    </a>
+                                    {% endif %}                
+                    </nav>
 
                 <!-- Right -->
                 <div class="flex items-center space-x-4">
@@ -393,11 +404,7 @@
         <div class="max-w-8xl mx-auto px-6 lg:px-8 py-8">
             <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between">
                 <div class="flex items-center space-x-4 mb-4 lg:mb-0">
-                    <div class="h-10 w-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow">
-                        <svg class="h-6 w-6 text-white" viewBox="0 0 32 32" fill="currentColor">
-                            <path d="M16 2L4 8v16l12 6 12-6V8L16 2zm0 2.5L25.5 9 16 13.5 6.5 9 16 4.5zM6 10.5l9 4.5v11l-9-4.5v-11zm11 15.5v-11l9-4.5v11L17 26z"/>
-                        </svg>
-                    </div>
+                    
                     <div>
                         <p class="font-bold text-slate-900">MDLicitatech</p>
                         <p class="text-sm text-slate-600">Plataforma Executiva B2G</p>
@@ -408,7 +415,7 @@
                     <div class="flex items-center justify-end space-x-4 mt-2">
                         <div class="flex items-center space-x-2">
                             <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                            <span class="text-xs text-slate-600">Versão 2.1.4</span>
+                            <span class="text-xs text-slate-600">Versão 0.0.1</span>
                         </div>
                         <div class="flex items-center space-x-2">
                             <div class="w-2 h-2 bg-blue-600 rounded-full"></div>

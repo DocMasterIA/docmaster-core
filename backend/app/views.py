@@ -19,6 +19,11 @@ def LoginView(request):
 
     return render(request, "login_portal.html")
 
+def LogoutView(request):
+    logout(request)
+    messages.info(request, "Você saiu da sua conta.")
+    return redirect(reverse("login_panel"))
+
 def DashboardView(request):
     return render(request, "dashboard.html")
 
@@ -27,6 +32,7 @@ def AreaDoUsuarioView(request):
 
 def DocumentGeneratorView(request):
     return render(request, "document_generator.html")
+
 
 def RegisterView(request):
     return render(request,"register_portal.html")

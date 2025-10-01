@@ -1,9 +1,11 @@
+{% load static %}
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modern Login Portal - LicitaPro</title>
+    <title>Portal de Login - MDLicitaTech</title>
     <link rel="stylesheet" href="css/main.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -117,7 +119,6 @@
         .logo-icon {
             width: 48px;
             height: 48px;
-            background: linear-gradient(135deg, var(--gov-blue), var(--netflix-red));
             border-radius: 12px;
             display: flex;
             align-items: center;
@@ -535,11 +536,9 @@
     <header class="netflix-header">
         <div class="logo-container">
             <div class="logo-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
-                    <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-                </svg>
+                <img src="{% static 'logo_licita.png' %}">
             </div>
-            <div class="logo-text">LicitaPro</div>
+            <div class="logo-text">MDLicitaTech</div>
         </div>
         <div class="security-badge">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -600,11 +599,11 @@
                 </button>
             </form>
 
-            <div class="divider">
+            <!-- <div class="divider">
                 <span>OU</span>
-            </div>
+            </div> -->
 
-            <div class="social-login">
+            <!-- <div class="social-login">
                 <button class="social-button">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
@@ -618,8 +617,8 @@
                     </svg>
                     Certificado
                 </button>
-            </div>
-
+            </div> -->
+<!-- 
             <button class="biometric-button">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/>
@@ -634,7 +633,7 @@
                     <path d="M19.1 4.9l-1.4 1.4"/>
                 </svg>
                 Autenticação Biométrica
-            </button>
+            </button> -->
 
             <div class="signup-link">
                 Novo na plataforma? <a href="#" onclick="showSignup()">Cadastre-se agora</a>

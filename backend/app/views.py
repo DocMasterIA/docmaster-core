@@ -4,3 +4,6 @@ from django.http import request
 
 def LoginView(request):
     return render(request,"login_portal.html")
+
+def RegisterView(request):
+    return render(request,"register_portal.html")

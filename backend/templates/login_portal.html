@@ -578,7 +578,7 @@
                         class="form-input" 
                         placeholder=" " 
                         required
-                        value="AdminLicita2025!"
+                        value="12345"
                     >
                     <label class="floating-label" for="password">Senha</label>
                 </div>
@@ -707,13 +707,6 @@
             
             // Simulate authentication
             setTimeout(() => {
-                // Check credentials
-                const validCredentials = [
-                    {email: 'admin@licitapro.gov.br', password: 'AdminLicita2025!'},
-                    {email: 'carlos.silva@consultoria.com.br', password: 'Consultor123!'},
-                    {email: 'maria.santos@prefeitura.sp.gov.br', password: 'GovUser2025!'}
-                ];
-                
                 const isValid = validCredentials.some(cred => 
                     cred.email === email && cred.password === password
                 );
@@ -731,11 +724,7 @@
             }, 2000);
         });
 
-        // Show signup (placeholder)
-        function showSignup() {
-            alert('Funcionalidade de cadastro em desenvolvimento. Use uma das contas demo para acessar a plataforma.');
-        }
-
+ 
         // Add subtle animations on scroll
         window.addEventListener('scroll', function() {
             const scrolled = window.pageYOffset;
@@ -751,20 +740,7 @@
                 document.getElementById('loginForm').dispatchEvent(new Event('submit'));
             }
             
-            // Demo account shortcuts
-            if (e.altKey) {
-                switch(e.key) {
-                    case '1':
-                        fillCredentials('admin@licitapro.gov.br', 'AdminLicita2025!');
-                        break;
-                    case '2':
-                        fillCredentials('carlos.silva@consultoria.com.br', 'Consultor123!');
-                        break;
-                    case '3':
-                        fillCredentials('maria.santos@prefeitura.sp.gov.br', 'GovUser2025!');
-                        break;
-                }
-            }
+       
         });
 
         // Progressive Web App features

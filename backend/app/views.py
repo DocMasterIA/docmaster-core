@@ -22,6 +22,9 @@ def LoginView(request):
 def DashboardView(request):
     return render(request, "dashboard.html")
 
+def AreaDoUsuarioView(request):
+    return render(request,"area_do_usuario.html")
+
 def DocumentGeneratorView(request):
     return render(request, "document_generator.html")
 

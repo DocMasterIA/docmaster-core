@@ -1,0 +1,436 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Unified Red Executive Color Palette - Authority & Presence */
+  --color-primary: #B91C1C; /* Executive Red - Ultimate Authority */
+  --color-primary-50: #FEF2F2; /* Light Red Base */
+  --color-primary-100: #FEE2E2; /* Soft Red */
+  --color-primary-200: #FECACA; /* Medium Soft Red */
+  --color-primary-300: #FCA5A5; /* Light Red */
+  --color-primary-400: #F87171; /* Medium Red */
+  --color-primary-500: #EF4444; /* Standard Red */
+  --color-primary-600: #DC2626; /* Corporate Red */
+  --color-primary-700: #B91C1C; /* Executive Red - Main Brand */
+  --color-primary-800: #991B1B; /* Deep Red */
+  --color-primary-900: #7F1D1D; /* Executive Dark Red */
+
+  /* Secondary Slate - Professional Supporting Elements */
+  --color-secondary: #475569; /* Slate Gray - Support */
+  --color-secondary-50: #F8FAFC; /* Pure White Base */
+  --color-secondary-100: #F1F5F9; /* Light Steel */
+  --color-secondary-200: #E2E8F0; /* Soft Steel */
+  --color-secondary-300: #CBD5E1; /* Medium Steel */
+  --color-secondary-400: #94A3B8; /* Steel Gray */
+  --color-secondary-500: #64748B; /* Professional Steel */
+  --color-secondary-600: #475569; /* Dark Steel */
+  --color-secondary-700: #334155; /* Charcoal Steel */
+  --color-secondary-800: #1E293B; /* Deep Slate */
+  --color-secondary-900: #0F172A; /* Executive Black */
+
+  /* Accent Red - Power & Authority (Same as Primary) */
+  --color-accent: #B91C1C; /* Corporate Red - Command Presence */
+  --color-accent-50: #FEF2F2; /* Light Red Tint */
+  --color-accent-100: #FEE2E2; /* Soft Red */
+  --color-accent-200: #FECACA; /* Medium Red */
+  --color-accent-300: #FCA5A5; /* Light Red */
+  --color-accent-400: #F87171; /* Medium Red */
+  --color-accent-500: #EF4444; /* Standard Red */
+  --color-accent-600: #DC2626; /* Corporate Red */
+  --color-accent-700: #B91C1C; /* Authority Red */
+  --color-accent-800: #991B1B; /* Deep Red */
+  --color-accent-900: #7F1D1D; /* Executive Red */
+
+  /* Success Green - Achievement */
+  --color-success: #059669; /* Forest Green - Success */
+  --color-success-50: #ECFDF5; /* Light Green */
+  --color-success-100: #D1FAE5; /* Soft Green */
+  --color-success-500: #059669; /* Forest Green */
+  --color-success-600: #047857; /* Deep Forest */
+  --color-success-700: #065F46; /* Dark Forest */
+
+  /* Warning - Minimal Yellow */
+  --color-warning: #D97706; /* Amber Warning */
+  --color-warning-50: #FFFBEB; /* Light Amber */
+  --color-warning-100: #FEF3C7; /* Soft Amber */
+  --color-warning-500: #D97706; /* Amber Warning */
+  --color-warning-600: #B45309; /* Deep Amber */
+
+  /* Error Red - Authority (Same as Primary) */
+  --color-error: #DC2626; /* Corporate Red - Command */
+  --color-error-50: #FEF2F2; /* Light Red */
+  --color-error-100: #FEE2E2; /* Soft Red */
+  --color-error-500: #DC2626; /* Corporate Red */
+  --color-error-600: #B91C1C; /* Deep Red */
+
+  /* Executive Neutral Palette */
+  --color-neutral-50: #F8FAFC; /* Pure White */
+  --color-neutral-100: #F1F5F9; /* Light Steel */
+  --color-neutral-200: #E2E8F0; /* Soft Steel */
+  --color-neutral-300: #CBD5E1; /* Medium Steel */
+  --color-neutral-400: #94A3B8; /* Steel Gray */
+  --color-neutral-500: #64748B; /* Professional Steel */
+  --color-neutral-600: #475569; /* Dark Steel */
+  --color-neutral-700: #334155; /* Charcoal Steel */
+  --color-neutral-800: #1E293B; /* Deep Slate */
+  --color-neutral-900: #0F172A; /* Executive Black */
+
+  /* Red Executive Gradients */
+  --gradient-primary: linear-gradient(135deg, #B91C1C 0%, #DC2626 50%, #991B1B 100%);
+  --gradient-secondary: linear-gradient(135deg, #B91C1C 0%, #7F1D1D 100%);
+  --gradient-accent: linear-gradient(135deg, #B91C1C 0%, #7F1D1D 100%);
+  --gradient-background: linear-gradient(135deg, #0F172A 0%, #1E293B 25%, #B91C1C 75%, #7F1D1D 100%);
+  
+  /* Executive Shadows with Red Tints */
+  --shadow-sm: 0 1px 2px 0 rgba(185, 28, 28, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(185, 28, 28, 0.15), 0 2px 4px -2px rgba(185, 28, 28, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(185, 28, 28, 0.2), 0 4px 6px -4px rgba(185, 28, 28, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(185, 28, 28, 0.25), 0 8px 10px -6px rgba(185, 28, 28, 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgba(185, 28, 28, 0.4);
+  --shadow-inner: inset 0 2px 4px 0 rgba(185, 28, 28, 0.1);
+}
+
+@layer base {
+  body {
+    font-family: 'Inter', sans-serif;
+    color: var(--color-neutral-900);
+    background: var(--color-neutral-50);
+    font-feature-settings: 'cv11', 'ss01';
+    font-variant-numeric: oldstyle-nums;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    color: var(--color-neutral-900);
+    letter-spacing: -0.025em;
+  }
+
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@layer components {
+  /* Unified Red Theme Components */
+
+  /* Button Styles with Red Theme */
+  .btn-primary {
+    @apply bg-gradient-to-r from-primary-700 to-primary-600 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary-600/50 focus:ring-offset-2 transition-all duration-300 ease-in-out transform hover:scale-[1.02] hover:from-primary-800 hover:to-primary-700 active:scale-[0.98];
+  }
+
+  .btn-secondary {
+    @apply bg-secondary-100 hover:bg-secondary-200 text-secondary-900 font-semibold px-6 py-3 rounded-xl border border-secondary-300 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-600/50 focus:ring-offset-2 transition-all duration-300 ease-in-out;
+  }
+
+  /* Form Input Styles with Red Focus */
+  .form-input {
+    @apply block w-full px-4 py-3 border border-secondary-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600 bg-white text-secondary-900 placeholder:text-secondary-500 transition-all duration-200;
+  }
+
+  /* Card Styles */
+  .card {
+    @apply bg-white shadow-lg rounded-2xl border border-secondary-200 p-6 transition-all duration-300 hover:shadow-xl;
+  }
+
+  /* Executive Background Gradients with Red */
+  .gradient-bg {
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 25%, #B91C1C 65%, #7F1D1D 100%);
+    position: relative;
+  }
+  
+  .gradient-bg::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.98) 0%, rgba(30, 41, 59, 0.95) 25%, rgba(185, 28, 28, 0.15) 65%, rgba(127, 29, 29, 0.98) 100%);
+    z-index: 1;
+  }
+
+  /* Executive Floating Elements with Red */
+  .floating-elements::after {
+    content: '';
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(185, 28, 28, 0.08) 0%, transparent 70%);
+    top: 8%;
+    right: 8%;
+    border-radius: 50%;
+    animation: float 8s ease-in-out infinite;
+    z-index: 1;
+  }
+
+  .floating-elements::before {
+    content: '';
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(185, 28, 28, 0.06) 0%, transparent 70%);
+    bottom: 15%;
+    left: 12%;
+    border-radius: 50%;
+    animation: float 10s ease-in-out infinite reverse;
+    z-index: 1;
+  }
+
+  /* Executive Glass Card */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.97);
+    backdrop-filter: blur(25px);
+    border: 1px solid rgba(185, 28, 28, 0.15);
+    box-shadow: 
+      0 32px 64px -12px rgba(185, 28, 28, 0.25),
+      0 0 0 1px rgba(255, 255, 255, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+
+  /* Executive Form Inputs with Red Theme */
+  .form-input-modern {
+    @apply w-full px-5 py-4 bg-slate-800/90 border border-slate-600 rounded-2xl shadow-sm 
+           focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600 
+           transition-all duration-300 ease-in-out placeholder:text-slate-400 
+           backdrop-blur-sm font-medium text-white;
+  }
+
+  .form-input-modern:focus {
+    background: rgba(30, 41, 59, 0.95);
+    transform: translateY(-1px);
+    box-shadow: 
+      0 12px 20px -3px rgba(185, 28, 28, 0.1),
+      0 4px 8px -4px rgba(185, 28, 28, 0.08),
+      0 0 0 3px rgba(185, 28, 28, 0.15);
+  }
+
+  /* Executive Button with Red Theme */
+  .btn-modern {
+    @apply w-full bg-gradient-to-r from-primary-700 to-primary-600 text-white font-bold py-5 px-8 rounded-2xl shadow-xl hover:shadow-2xl focus:outline-none focus:ring-primary-600/50 focus:ring-offset-2 transition-all duration-300 ease-in-out transform hover:scale-[1.02] hover:from-primary-800 hover:to-primary-700 active:scale-[0.98] tracking-wide;
+  }
+
+  /* Executive Security Badge with Red Theme */
+  .security-badge {
+    @apply flex items-center px-4 py-2 bg-white/25 backdrop-blur-md rounded-full 
+           text-sm font-bold text-white border border-primary-400/40 transition-all duration-300
+           hover:bg-white/35 shadow-lg;
+  }
+
+  /* Executive Biometric Scanner with Red Theme */
+  .biometric-scanner {
+    background: linear-gradient(135deg, rgba(185, 28, 28, 0.12) 0%, rgba(15, 23, 42, 0.12) 100%);
+    border: 2px solid rgba(185, 28, 28, 0.25);
+    backdrop-filter: blur(15px);
+  }
+
+  .biometric-scanner:hover {
+    background: linear-gradient(135deg, rgba(185, 28, 28, 0.18) 0%, rgba(15, 23, 42, 0.18) 100%);
+    border-color: rgba(185, 28, 28, 0.35);
+    box-shadow: 0 0 30px rgba(185, 28, 28, 0.2);
+  }
+
+  /* Executive Pulse Animation with Red */
+  .pulse-ring {
+    position: relative;
+  }
+
+  .pulse-ring::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border: 3px solid rgba(185, 28, 28, 0.4);
+    border-radius: inherit;
+    animation: pulse-ring 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Executive Slide Animation */
+  .slide-in {
+    animation: slideInUp 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    opacity: 0;
+    transform: translateY(30px);
+  }
+
+  /* Transition Utility Classes */
+  .transition-micro {
+    @apply transition-all duration-200 ease-in-out;
+  }
+}
+
+@layer utilities {
+  .text-gradient-modern {
+    background: linear-gradient(135deg, #B91C1C 0%, #7F1D1D 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-red {
+    background: linear-gradient(135deg, #B91C1C 0%, #7F1D1D 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .shadow-modern {
+    box-shadow: 
+      0 12px 20px -3px rgba(185, 28, 28, 0.15),
+      0 4px 8px -4px rgba(185, 28, 28, 0.1);
+  }
+
+  .shadow-modern-lg {
+    box-shadow: 
+      0 32px 64px -12px rgba(185, 28, 28, 0.25),
+      0 0 0 1px rgba(255, 255, 255, 0.12);
+  }
+
+  .backdrop-blur-modern {
+    backdrop-filter: blur(25px);
+  }
+
+  .transition-modern {
+    transition: all 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .transform-gpu {
+    transform: translateZ(0);
+  }
+}
+
+/* Executive Animations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-25px) scale(1.02);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+/* Executive Focus States with Red */
+*:focus-visible {
+  outline: 3px solid rgba(185, 28, 28, 0.6);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
+/* Executive Selection with Red */
+::selection {
+  background: rgba(185, 28, 28, 0.2);
+  color: var(--color-neutral-900);
+}
+
+/* Executive Scrollbar with Red Theme */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-neutral-100);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #B91C1C, #7F1D1D);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #991B1B, #DC2626);
+}
+
+/* Executive Responsive Design */
+@media (max-width: 768px) {
+  .glass-card {
+    backdrop-filter: blur(20px);
+    background: rgba(255, 255, 255, 0.95);
+  }
+  
+  .floating-elements::after,
+  .floating-elements::before {
+    opacity: 0.6;
+    transform: scale(0.8);
+  }
+}
+
+/* Executive High-contrast mode */
+@media (prefers-contrast: high) {
+  .glass-card {
+    background: rgba(255, 255, 255, 0.99);
+    border: 2px solid var(--color-primary-600);
+  }
+  
+  .form-input-modern {
+    background: rgba(15, 23, 42, 0.95);
+    border-width: 2px;
+    border-color: var(--color-primary-600);
+  }
+}
+
+/* Executive Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .floating-elements::after,
+  .floating-elements::before,
+  .pulse-ring::before {
+    animation: none;
+  }
+  
+  .slide-in {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Executive Print styles */
+@media print {
+  .gradient-bg,
+  .floating-elements::after,
+  .floating-elements::before {
+    display: none;
+  }
+  
+  .glass-card {
+    background: white;
+    border: 2px solid var(--color-neutral-400);
+    box-shadow: none;
+  }
+}

@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Analytics Center - MDLicitatech</title>
+    <link rel="stylesheet" href="../css/main.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<script type="module" src="https://static.rocket.new/rocket-web.js?_cfg=https%3A%2F%2Flicitapro9362back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.8"></script>
+</head>
+<body class="bg-background min-h-screen">
+    <!-- Header Navigation -->
+    <header class="bg-white shadow-government border-b border-primary-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo -->
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-8 w-8 text-primary" viewBox="0 0 32 32" fill="currentColor">
+                            <path d="M16 2L4 8v16l12 6 12-6V8L16 2zm0 2.5L25.5 9 16 13.5 6.5 9 16 4.5zM6 10.5l9 4.5v11l-9-4.5v-11zm11 15.5v-11l9-4.5v11L17 26z"/>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <h1 class="text-xl font-bold text-primary">MDLicitatech</h1>
+                        <p class="text-xs text-primary-600">Plataforma Profissional</p>
+                    </div>
+                </div>
+
+                <!-- Navigation Menu -->
+                <nav class="hidden md:flex space-x-8">
+                    <a href="dashboard.html" class="text-secondary-600 hover:text-primary transition-micro">Dashboard</a>
+                    <a href="document_generator.html" class="text-secondary-600 hover:text-primary transition-micro">Documentos</a>
+                    <a href="legal_database.html" class="text-secondary-600 hover:text-primary transition-micro">Base Legal</a>
+                    <a href="project_workspace.html" class="text-secondary-600 hover:text-primary transition-micro">Projetos</a>
+                    <a href="ai_assistant.html" class="text-secondary-600 hover:text-primary transition-micro">IA Assistente</a>
+                    <a href="analytics_center.html" class="text-primary font-semibold border-b-2 border-primary pb-1">Analytics</a>
+                </nav>
+
+                <!-- User Menu -->
+                <div class="flex items-center space-x-4">
+                    <!-- Notifications -->
+                    <button class="relative p-2 text-secondary-600 hover:text-primary transition-micro">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5zM10.5 3.5L7 7h3v10l4-4V7h3l-3.5-3.5z"/>
+                        </svg>
+                        <span class="absolute top-0 right-0 h-2 w-2 bg-primary rounded-full"></span>
+                    </button>
+
+                    <!-- User Profile -->
+                    <div class="flex items-center space-x-3">
+                        <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3" alt="Perfil do usuário" class="h-8 w-8 rounded-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;" />
+                        <div class="hidden md:block">
+                            <p class="text-sm font-medium text-secondary-900">Dr. Carlos Silva</p>
+                            <p class="text-xs text-secondary-600">Consultor Sênior</p>
+                        </div>
+                        <a href="account_management.html" class="text-secondary-600 hover:text-primary transition-micro">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Page Header -->
+        <section class="mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-3xl font-bold text-secondary-900">Analytics Center</h2>
+                    <p class="text-secondary-600 mt-1">Análise de Performance e Otimização de Processos</p>
+                </div>
+                <div class="flex space-x-3">
+                    <button class="bg-white hover:bg-primary-50 text-primary border border-primary-200 px-4 py-2 rounded-lg font-medium transition-micro flex items-center space-x-2">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <span>Exportar Relatório</span>
+                    </button>
+                    <button class="bg-primary hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium transition-micro flex items-center space-x-2">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                        <span>Personalizar Dashboard</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Time Period Filter -->
+        <section class="mb-8">
+            <div class="bg-white rounded-lg shadow-government p-6">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <h3 class="text-lg font-semibold text-secondary-900">Período de Análise</h3>
+                        <div class="flex space-x-2">
+                            <button class="px-3 py-1 text-sm bg-primary text-white rounded-md">30 dias</button>
+                            <button class="px-3 py-1 text-sm text-secondary-600 hover:bg-secondary-100 rounded-md">90 dias</button>
+                            <button class="px-3 py-1 text-sm text-secondary-600 hover:bg-secondary-100 rounded-md">6 meses</button>
+                            <button class="px-3 py-1 text-sm text-secondary-600 hover:bg-secondary-100 rounded-md">1 ano</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <input type="date" value="2025-08-24" class="px-4 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm" />
+                        <span class="text-secondary-600">até</span>
+                        <input type="date" value="2025-09-24" class="px-4 py-2 border border-secondary-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm" />
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Key Performance Metrics -->
+        <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-government p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-secondary-600">Taxa de Sucesso</p>
+                        <p class="text-3xl font-bold text-success-600">94.2%</p>
+                        <p class="text-xs text-success-600 mt-1">↑ +2.1% vs período anterior</p>
+                    </div>
+                    <div class="w-12 h-12 bg-success-100 rounded-lg flex items-center justify-center">
+                        <svg class="h-6 w-6 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-government p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-secondary-600">Tempo Médio de Processo</p>
+                        <p class="text-3xl font-bold text-primary">18.5 dias</p>
+                        <p class="text-xs text-success-600 mt-1">↓ -3.2 dias vs período anterior</p>
+                    </div>
+                    <div class="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
+                        <svg class="h-6 w-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-government p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-secondary-600">Economia Gerada</p>
+                        <p class="text-3xl font-bold text-accent-600">R$ 2.8M</p>
+                        <p class="text-xs text-accent-600 mt-1">↑ +15.3% vs período anterior</p>
+                    </div>
+                    <div class="w-12 h-12 bg-accent-100 rounded-lg flex items-center justify-center">
+                        <svg class="h-6 w-6 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-government p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-secondary-600">Conformidade</p>
+                        <p class="text-3xl font-bold text-warning-600">98.7%</p>
+                        <p class="text-xs text-success-600 mt-1">↑ +0.5% vs período anterior</p>
+                    </div>
+                    <div class="w-12 h-12 bg-warning-100 rounded-lg flex items-center justify-center">
+                        <svg class="h-6 w-6 text-warning-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Analytics Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Left Column - Charts -->
+            <div class="lg:col-span-2 space-y-8">
+                <!-- Performance Trends -->
+                <section class="bg-white rounded-lg shadow-government p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-lg font-semibold text-secondary-900">Tendências de Performance</h3>
+                        <div class="flex space-x-2">
+                            <button class="px-3 py-1 text-sm bg-primary text-white rounded-md">Sucessos</button>
+                            <button class="px-3 py-1 text-sm text-secondary-600 hover:bg-secondary-100 rounded-md">Tempo</button>
+                            <button class="px-3 py-1 text-sm text-secondary-600 hover:bg-secondary-100 rounded-md">Economia</button>
+                        </div>
+                    </div>
+                    <div class="h-80 bg-secondary-50 rounded-lg flex items-center justify-center">
+                        <svg class="w-full h-full" viewBox="0 0 800 300" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Chart Background -->
+                            <rect width="800" height="300" fill="#F8FAFC"/>
+                            
+                            <!-- Grid Lines -->
+                            <defs>
+                                <pattern id="grid" width="80" height="60" patternUnits="userSpaceOnUse">
+                                    <path d="M 80 0 L 0 0 0 60" fill="none" stroke="#E2E8F0" stroke-width="1"/>
+                                </pattern>
+                            </defs>
+                            <rect width="800" height="300" fill="url(#grid)"/>
+                            
+                            <!-- Success Rate Line -->
+                            <polyline fill="none" stroke="#B91C1C" stroke-width="3" points="50,250 130,220 210,200 290,180 370,160 450,140 530,130 610,120 690,110 770,100"/>
+                            
+                            <!-- Data Points -->
+                            <circle cx="50" cy="250" r="4" fill="#B91C1C"/>
+                            <circle cx="130" cy="220" r="4" fill="#B91C1C"/>
+                            <circle cx="210" cy="200" r="4" fill="#B91C1C"/>
+                            <circle cx="290" cy="180" r="4" fill="#B91C1C"/>
+                            <circle cx="370" cy="160" r="4" fill="#B91C1C"/>
+                            <circle cx="450" cy="140" r="4" fill="#B91C1C"/>
+                            <circle cx="530" cy="130" r="4" fill="#B91C1C"/>
+                            <circle cx="610" cy="120" r="4" fill="#B91C1C"/>
+                            <circle cx="690" cy="110" r="4" fill="#B91C1C"/>
+                            <circle cx="770" cy="100" r="4" fill="#B91C1C"/>
+                            
+                            <!-- Labels -->
+                            <text x="50" y="290" text-anchor="middle" class="text-xs fill-secondary-600">Jan</text>
+                            <text x="210" y="290" text-anchor="middle" class="text-xs fill-secondary-600">Mar</text>
+                            <text x="370" y="290" text-anchor="middle" class="text-xs fill-secondary-600">Mai</text>
+                            <text x="530" y="290" text-anchor="middle" class="text-xs fill-secondary-600">Jul</text>
+                            <text x="690" y="290" text-anchor="middle" class="text-xs fill-secondary-600">Set</text>
+                        </svg>
+                    </div>
+                </section>
+
+                <!-- Process Efficiency Analysis -->
+                <section class="bg-white rounded-lg shadow-government p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-lg font-semibold text-secondary-900">Análise de Eficiência por Processo</h3>
+                        <button class="text-primary hover:text-primary-700 text-sm font-medium">Ver detalhes</button>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between p-4 bg-secondary-50 rounded-lg">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-10 h-10 bg-success-100 rounded-lg flex items-center justify-center">
+                                    <svg class="h-5 w-5 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h4 class="font-medium text-secondary-900">Pregão Eletrônico</h4>
+                                    <p class="text-sm text-secondary-600">15 processos concluídos</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-24 bg-secondary-200 rounded-full h-2">
+                                        <div class="bg-success-600 h-2 rounded-full" style="width: 96%"></div>
+                                    </div>
+                                    <span class="text-sm font-medium text-success-600">96%</span>
+                                </div>
+                                <p class="text-xs text-secondary-600 mt-1">Tempo médio: 14.2 dias</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 bg-secondary-50 rounded-lg">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                                    <svg class="h-5 w-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h4 class="font-medium text-secondary-900">Concorrência</h4>
+                                    <p class="text-sm text-secondary-600">8 processos concluídos</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-24 bg-secondary-200 rounded-full h-2">
+                                        <div class="bg-primary h-2 rounded-full" style="width: 92%"></div>
+                                    </div>
+                                    <span class="text-sm font-medium text-primary">92%</span>
+                                </div>
+                                <p class="text-xs text-secondary-600 mt-1">Tempo médio: 28.5 dias</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 bg-secondary-50 rounded-lg">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-10 h-10 bg-accent-100 rounded-lg flex items-center justify-center">
+                                    <svg class="h-5 w-5 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h4 class="font-medium text-secondary-900">Dispensa de Licitação</h4>
+                                    <p class="text-sm text-secondary-600">12 processos concluídos</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-24 bg-secondary-200 rounded-full h-2">
+                                        <div class="bg-accent-600 h-2 rounded-full" style="width: 98%"></div>
+                                    </div>
+                                    <span class="text-sm font-medium text-accent-600">98%</span>
+                                </div>
+                                <p class="text-xs text-secondary-600 mt-1">Tempo médio: 8.1 dias</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ROI Calculator -->
+                <section class="bg-white rounded-lg shadow-government p-6">
+                    <h3 class="text-lg font-semibold text-secondary-900 mb-6">Calculadora de ROI</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="text-center p-4 bg-primary-50 rounded-lg">
+                            <div class="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                                <svg class="h-6 w-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <p class="text-2xl font-bold text-primary">340h</p>
+                            <p class="text-sm text-primary-700">Tempo Economizado</p>
+                        </div>
+                        <div class="text-center p-4 bg-success-50 rounded-lg">
+                            <div class="w-12 h-12 bg-success-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                                <svg class="h-6 w-6 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/>
+                                </svg>
+                            </div>
+                            <p class="text-2xl font-bold text-success-600">R$ 85.000</p>
+                            <p class="text-sm text-success-700">Valor Economizado</p>
+                        </div>
+                        <div class="text-center p-4 bg-accent-50 rounded-lg">
+                            <div class="w-12 h-12 bg-accent-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                                <svg class="h-6 w-6 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                                </svg>
+                            </div>
+                            <p class="text-2xl font-bold text-accent-600">425%</p>
+                            <p class="text-sm text-accent-700">ROI Calculado</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Right Column - Insights & Actions -->
+            <div class="space-y-8">
+                <!-- Optimization Opportunities -->
+                <section class="bg-white rounded-lg shadow-government p-6">
+                    <h3 class="text-lg font-semibold text-secondary-900 mb-6">Oportunidades de Otimização</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-start space-x-3 p-3 bg-warning-50 rounded-lg border border-warning-200">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-warning-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-warning-900">Revisão de Templates</p>
+                                <p class="text-xs text-warning-700">3 templates podem ser otimizados para reduzir tempo de criação</p>
+                                <button class="text-xs text-warning-600 hover:text-warning-800 mt-1">Revisar agora</button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-start space-x-3 p-3 bg-primary-50 rounded-lg border border-primary-200">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-primary mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-primary-900">Automação de Processos</p>
+                                <p class="text-xs text-primary-700">Identifique etapas que podem ser automatizadas</p>
+                                <button class="text-xs text-primary-600 hover:text-primary-800 mt-1">Explorar IA</button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-start space-x-3 p-3 bg-success-50 rounded-lg border border-success-200">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-success-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-success-900">Melhores Práticas</p>
+                                <p class="text-xs text-success-700">Aplique padrões de alta performance em novos projetos</p>
+                                <button class="text-xs text-success-600 hover:text-success-800 mt-1">Ver guia</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Team Performance -->
+                <section class="bg-white rounded-lg shadow-government p-6">
+                    <h3 class="text-lg font-semibold text-secondary-900 mb-6">Performance da Equipe</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <img src="https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2" alt="Ana Santos" class="h-8 w-8 rounded-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;" />
+                                <div>
+                                    <p class="text-sm font-medium text-secondary-900">Ana Santos</p>
+                                    <p class="text-xs text-secondary-600">Analista Sênior</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-bold text-success-600">98%</p>
+                                <p class="text-xs text-secondary-600">8 processos</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <img src="https://images.pixabay.com/photos/2016/11/21/12/42/beard-1845166_1280.jpg" alt="Roberto Lima" class="h-8 w-8 rounded-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;" />
+                                <div>
+                                    <p class="text-sm font-medium text-secondary-900">Roberto Lima</p>
+                                    <p class="text-xs text-secondary-600">Consultor Pleno</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-bold text-primary">95%</p>
+                                <p class="text-xs text-secondary-600">12 processos</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <img src="https://images.unsplash.com/photo-1494790108755-2616b612b1e5?q=80&w=2787&auto=format&fit=crop&ixlib=rb-4.0.3" alt="Mariana Costa" class="h-8 w-8 rounded-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;" />
+                                <div>
+                                    <p class="text-sm font-medium text-secondary-900">Mariana Costa</p>
+                                    <p class="text-xs text-secondary-600">Analista Júnior</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-bold text-warning-600">89%</p>
+                                <p class="text-xs text-secondary-600">6 processos</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Compliance Tracking -->
+                <section class="bg-white rounded-lg shadow-government p-6">
+                    <h3 class="text-lg font-semibold text-secondary-900 mb-6">Rastreamento de Conformidade</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between p-3 bg-success-50 rounded-lg">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-success-100 rounded-full flex items-center justify-center">
+                                    <svg class="h-4 w-4 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-success-900">Lei 14.133/2021</p>
+                                    <p class="text-xs text-success-700">100% conforme</p>
+                                </div>
+                            </div>
+                            <span class="text-xs bg-success-100 text-success-800 px-2 py-1 rounded-full">Auditado</span>
+                        </div>
+
+                        <div class="flex items-center justify-between p-3 bg-primary-50 rounded-lg">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
+                                    <svg class="h-4 w-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-primary-900">TCU Súmula 177</p>
+                                    <p class="text-xs text-primary-700">98% conforme</p>
+                                </div>
+                            </div>
+                            <span class="text-xs bg-primary-100 text-primary-800 px-2 py-1 rounded-full">Verificado</span>
+                        </div>
+
+                        <div class="flex items-center justify-between p-3 bg-warning-50 rounded-lg">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-warning-100 rounded-full flex items-center justify-center">
+                                    <svg class="h-4 w-4 text-warning-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-warning-900">LGPD</p>
+                                    <p class="text-xs text-warning-700">Revisão necessária</p>
+                                </div>
+                            </div>
+                            <span class="text-xs bg-warning-100 text-warning-800 px-2 py-1 rounded-full">Pendente</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Quick Actions -->
+                <section class="bg-white rounded-lg shadow-government p-6">
+                    <h3 class="text-lg font-semibold text-secondary-900 mb-6">Ações Rápidas</h3>
+                    <div class="space-y-3">
+                        <a href="project_workspace.html" class="flex items-center p-3 bg-secondary-50 rounded-lg hover:bg-secondary-100 transition-micro">
+                            <div class="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center mr-3">
+                                <svg class="h-4 w-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                </svg>
+                            </div>
+                            <span class="text-sm font-medium text-secondary-900">Gerar Relatório Detalhado</span>
+                        </a>
+
+                        <a href="ai_assistant.html" class="flex items-center p-3 bg-secondary-50 rounded-lg hover:bg-secondary-100 transition-micro">
+                            <div class="w-8 h-8 bg-accent-100 rounded-lg flex items-center justify-center mr-3">
+                                <svg class="h-4 w-4 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <span class="text-sm font-medium text-secondary-900">Análise Preditiva IA</span>
+                        </a>
+
+                        <a href="dashboard.html" class="flex items-center p-3 bg-secondary-50 rounded-lg hover:bg-secondary-100 transition-micro">
+                            <div class="w-8 h-8 bg-warning-100 rounded-lg flex items-center justify-center mr-3">
+                                <svg class="h-4 w-4 text-warning-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <span class="text-sm font-medium text-secondary-900">Configurar Alertas</span>
+                        </a>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-primary-200 mt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <svg class="h-6 w-6 text-primary" viewBox="0 0 32 32" fill="currentColor">
+                        <path d="M16 2L4 8v16l12 6 12-6V8L16 2zm0 2.5L25.5 9 16 13.5 6.5 9 16 4.5zM6 10.5l9 4.5v11l-9-4.5v-11zm11 15.5v-11l9-4.5v11L17 26z"/>
+                    </svg>
+                    <div>
+                        <p class="text-sm font-semibold text-primary-900">MDLicitatech</p>
+                        <p class="text-xs text-primary-600">Plataforma Profissional B2G</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs text-secondary-600">© 2025 MDLicitatech. Todos os direitos reservados.</p>
+                    <p class="text-xs text-secondary-500">Versão 2.1.4 | Status: Operacional</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+<script id="dhws-dataInjector" src="../public/dhws-data-injector.js"></script>
+</body>
+</html>

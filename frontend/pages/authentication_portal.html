@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portal de Autenticação - LicitaPro</title>
+    <link rel="stylesheet" href="../css/main.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<script type="module" src="https://static.rocket.new/rocket-web.js?_cfg=https%3A%2F%2Flicitapro9362back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.8"></script>
+</head>
+<body class="bg-background min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-government border-b border-secondary-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo -->
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-8 w-8 text-primary" viewBox="0 0 32 32" fill="currentColor">
+                            <path d="M16 2L4 8v16l12 6 12-6V8L16 2zm0 2.5L25.5 9 16 13.5 6.5 9 16 4.5zM6 10.5l9 4.5v11l-9-4.5v-11zm11 15.5v-11l9-4.5v11L17 26z"/>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <h1 class="text-xl font-bold text-primary">LicitaPro</h1>
+                        <p class="text-xs text-secondary-600">Portal de Autenticação Segura</p>
+                    </div>
+                </div>
+
+                <!-- Security Indicators -->
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <svg class="h-5 w-5 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.707-4.293a1 1 0 010 1.414L9.414 18.414a1 1 0 01-1.414 0L4.293 14.707a1 1 0 010-1.414z"/>
+                        </svg>
+                        <span class="text-sm text-success-600 font-medium">Conexão Segura</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <svg class="h-5 w-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                        <span class="text-sm text-primary font-medium">SSL 256-bit</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-md w-full space-y-8">
+            <!-- Authentication Card -->
+            <div class="card">
+                <!-- Header Section -->
+                <div class="text-center mb-8">
+                    <div class="mx-auto h-12 w-12 bg-primary-100 rounded-full flex items-center justify-center mb-4">
+                        <svg class="h-6 w-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                    </div>
+                    <h2 class="text-3xl font-bold text-secondary-900">Acesso Seguro</h2>
+                    <p class="mt-2 text-sm text-secondary-600">
+                        Entre com suas credenciais para acessar a plataforma profissional
+                    </p>
+                </div>
+
+                <!-- Login Form -->
+                <form class="space-y-6" id="loginForm">
+                    <!-- Email Field -->
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-secondary-700 mb-2">
+                            Email Institucional
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg class="h-5 w-5 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"/>
+                                </svg>
+                            </div>
+                            <input id="email" name="email" type="email" required class="form-input pl-10" placeholder="seu.email@instituicao.gov.br" value="admin@licitapro.gov.br" />
+                        </div>
+                    </div>
+
+                    <!-- Password Field -->
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-secondary-700 mb-2">
+                            Senha
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg class="h-5 w-5 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                </svg>
+                            </div>
+                            <input id="password" name="password" type="password" required class="form-input pl-10 pr-10" placeholder="Digite sua senha" value="AdminLicita2025!" />
+                            <button type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center" onclick="togglePassword()">
+                                <svg id="eyeIcon" class="h-5 w-5 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Two-Factor Authentication -->
+                    <div id="mfaSection" class="hidden">
+                        <label for="mfaCode" class="block text-sm font-medium text-secondary-700 mb-2">
+                            Código de Autenticação (2FA)
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg class="h-5 w-5 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                                </svg>
+                            </div>
+                            <input id="mfaCode" name="mfaCode" type="text" class="form-input pl-10 text-center font-mono tracking-widest" placeholder="000000" maxlength="6" />
+                        </div>
+                        <p class="mt-2 text-xs text-secondary-600">
+                            Digite o código de 6 dígitos do seu aplicativo autenticador
+                        </p>
+                    </div>
+
+                    <!-- Remember Me & Forgot Password -->
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <input id="remember-me" name="remember-me" type="checkbox" class="h-4 w-4 text-primary focus:ring-primary border-secondary-300 rounded" />
+                            <label for="remember-me" class="ml-2 block text-sm text-secondary-700">
+                                Lembrar-me
+                            </label>
+                        </div>
+                        <div class="text-sm">
+                            <a href="javascript:void(0)" class="font-medium text-primary hover:text-primary-700 transition-micro">
+                                Esqueceu a senha?
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Login Button -->
+                    <div>
+                        <button type="submit" class="w-full btn-primary flex justify-center items-center space-x-2">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+                            </svg>
+                            <span>Entrar na Plataforma</span>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Alternative Login Methods -->
+                <div class="mt-6">
+                    <div class="relative">
+                        <div class="absolute inset-0 flex items-center">
+                            <div class="w-full border-t border-secondary-200"></div>
+                        </div>
+                        <div class="relative flex justify-center text-sm">
+                            <span class="px-2 bg-white text-secondary-600">Ou entre com</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 grid grid-cols-2 gap-3">
+                        <button type="button" class="w-full inline-flex justify-center py-2 px-4 border border-secondary-300 rounded-md shadow-sm bg-white text-sm font-medium text-secondary-700 hover:bg-secondary-50 transition-micro">
+                            <svg class="h-5 w-5 text-primary" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                            </svg>
+                            <span class="ml-2">Gov.br</span>
+                        </button>
+
+                        <button type="button" class="w-full inline-flex justify-center py-2 px-4 border border-secondary-300 rounded-md shadow-sm bg-white text-sm font-medium text-secondary-700 hover:bg-secondary-50 transition-micro">
+                            <svg class="h-5 w-5 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"/>
+                            </svg>
+                            <span class="ml-2">Certificado</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Registration Link -->
+                <div class="mt-6 text-center">
+                    <p class="text-sm text-secondary-600">
+                        Não possui uma conta? 
+                        <a href="javascript:void(0)" class="font-medium text-primary hover:text-primary-700 transition-micro" onclick="showRegistration()">
+                            Solicitar Acesso
+                        </a>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Registration Form (Hidden by default) -->
+            <div class="card hidden" id="registrationForm">
+                <div class="text-center mb-6">
+                    <h3 class="text-2xl font-bold text-secondary-900">Solicitar Acesso</h3>
+                    <p class="mt-2 text-sm text-secondary-600">
+                        Preencha os dados para solicitar acesso à plataforma
+                    </p>
+                </div>
+
+                <form class="space-y-4">
+                    <!-- Organization Type -->
+                    <div>
+                        <label for="orgType" class="block text-sm font-medium text-secondary-700 mb-2">
+                            Tipo de Organização
+                        </label>
+                        <select id="orgType" name="orgType" class="form-input">
+                            <option value>Selecione o tipo</option>
+                            <option value="government">Órgão Público</option>
+                            <option value="consultant">Consultoria Especializada</option>
+                            <option value="law-firm">Escritório de Advocacia</option>
+                            <option value="contractor">Empresa Contratante</option>
+                        </select>
+                    </div>
+
+                    <!-- Full Name -->
+                    <div>
+                        <label for="fullName" class="block text-sm font-medium text-secondary-700 mb-2">
+                            Nome Completo
+                        </label>
+                        <input id="fullName" name="fullName" type="text" required class="form-input" placeholder="Seu nome completo" />
+                    </div>
+
+                    <!-- Email -->
+                    <div>
+                        <label for="regEmail" class="block text-sm font-medium text-secondary-700 mb-2">
+                            Email Institucional
+                        </label>
+                        <input id="regEmail" name="regEmail" type="email" required class="form-input" placeholder="seu.email@instituicao.gov.br" />
+                    </div>
+
+                    <!-- Organization -->
+                    <div>
+                        <label for="organization" class="block text-sm font-medium text-secondary-700 mb-2">
+                            Organização
+                        </label>
+                        <input id="organization" name="organization" type="text" required class="form-input" placeholder="Nome da sua organização" />
+                    </div>
+
+                    <!-- Role -->
+                    <div>
+                        <label for="role" class="block text-sm font-medium text-secondary-700 mb-2">
+                            Cargo/Função
+                        </label>
+                        <input id="role" name="role" type="text" required class="form-input" placeholder="Seu cargo ou função" />
+                    </div>
+
+                    <!-- Terms -->
+                    <div class="flex items-start">
+                        <input id="terms" name="terms" type="checkbox" required class="h-4 w-4 text-primary focus:ring-primary border-secondary-300 rounded mt-1" />
+                        <label for="terms" class="ml-2 block text-sm text-secondary-700">
+                            Concordo com os 
+                            <a href="javascript:void(0)" class="text-primary hover:text-primary-700">Termos de Uso</a> 
+                            e 
+                            <a href="javascript:void(0)" class="text-primary hover:text-primary-700">Política de Privacidade</a>
+                        </label>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="w-full btn-primary">
+                        Solicitar Acesso
+                    </button>
+
+                    <!-- Back to Login -->
+                    <div class="text-center">
+                        <button type="button" class="text-sm text-secondary-600 hover:text-primary transition-micro" onclick="showLogin()">
+                            ← Voltar ao Login
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Security Certifications -->
+            <div class="mt-8">
+                <div class="bg-white rounded-lg shadow-sm border border-secondary-200 p-4">
+                    <h4 class="text-sm font-semibold text-secondary-900 mb-3 text-center">Certificações de Segurança</h4>
+                    <div class="flex justify-center items-center space-x-6">
+                        <div class="flex items-center space-x-2">
+                            <svg class="h-6 w-6 text-success-600" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+                            </svg>
+                            <span class="text-xs text-secondary-700">LGPD</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <svg class="h-6 w-6 text-primary" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM12 17c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM15.1 8H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                            </svg>
+                            <span class="text-xs text-secondary-700">SSL 256</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <svg class="h-6 w-6 text-accent-600" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                            <span class="text-xs text-secondary-700">Gov.br</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <svg class="h-6 w-6 text-warning-600" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <span class="text-xs text-secondary-700">ISO 27001</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Demo Accounts -->
+            <div class="mt-6">
+                <div class="bg-secondary-50 rounded-lg p-4 border border-secondary-200">
+                    <h4 class="text-sm font-semibold text-secondary-900 mb-3">Contas de Demonstração</h4>
+                    <div class="space-y-2 text-xs">
+                        <div class="flex justify-between items-center">
+                            <span class="text-secondary-700">Administrador:</span>
+                            <code class="bg-white px-2 py-1 rounded text-secondary-800">admin@licitapro.gov.br</code>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-secondary-700">Consultor:</span>
+                            <code class="bg-white px-2 py-1 rounded text-secondary-800">carlos.silva@consultoria.com.br</code>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-secondary-700">Governo:</span>
+                            <code class="bg-white px-2 py-1 rounded text-secondary-800">maria.santos@prefeitura.sp.gov.br</code>
+                        </div>
+                        <p class="text-secondary-600 mt-2">Senha padrão para todas as contas de demonstração</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-secondary-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <svg class="h-6 w-6 text-primary" viewBox="0 0 32 32" fill="currentColor">
+                        <path d="M16 2L4 8v16l12 6 12-6V8L16 2zm0 2.5L25.5 9 16 13.5 6.5 9 16 4.5zM6 10.5l9 4.5v11l-9-4.5v-11zm11 15.5v-11l9-4.5v11L17 26z"/>
+                    </svg>
+                    <div>
+                        <p class="text-sm font-semibold text-secondary-900">LicitaPro</p>
+                        <p class="text-xs text-secondary-600">Portal de Autenticação Segura</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs text-secondary-600">© 2025 LicitaPro. Todos os direitos reservados.</p>
+                    <p class="text-xs text-secondary-500">Segurança Governamental | LGPD Compliance</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Toggle password visibility
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const eyeIcon = document.getElementById('eyeIcon');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                eyeIcon.innerHTML = `
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"/>
+                `;
+            } else {
+                passwordInput.type = 'password';
+                eyeIcon.innerHTML = `
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                `;
+            }
+        }
+
+        // Show registration form
+        function showRegistration() {
+            document.querySelector('.card:not(.hidden)').classList.add('hidden');
+            document.getElementById('registrationForm').classList.remove('hidden');
+        }
+
+        // Show login form
+        function showLogin() {
+            document.getElementById('registrationForm').classList.add('hidden');
+            document.querySelector('.card:not(#registrationForm)').classList.remove('hidden');
+        }
+
+        // Handle login form submission
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            // Simulate authentication process
+            if (email && password) {
+                // Show MFA section for demo
+                const mfaSection = document.getElementById('mfaSection');
+                if (mfaSection.classList.contains('hidden')) {
+                    mfaSection.classList.remove('hidden');
+                    return;
+                }
+                
+                // Simulate successful login
+                setTimeout(() => {
+                    window.location.href = 'dashboard.html';
+                }, 1000);
+            }
+        });
+
+        // Auto-fill demo credentials
+        function fillDemoCredentials(type) {
+            const emailInput = document.getElementById('email');
+            const passwordInput = document.getElementById('password');
+            
+            switch(type) {
+                case 'admin':
+                    emailInput.value = 'admin@licitapro.gov.br';
+                    passwordInput.value = 'AdminLicita2025!';
+                    break;
+                case 'consultant':
+                    emailInput.value = 'carlos.silva@consultoria.com.br';
+                    passwordInput.value = 'Consultor123!';
+                    break;
+                case 'government':
+                    emailInput.value = 'maria.santos@prefeitura.sp.gov.br';
+                    passwordInput.value = 'GovUser2025!';
+                    break;
+            }
+        }
+
+        // Add click handlers for demo accounts
+        document.addEventListener('DOMContentLoaded', function() {
+            const demoAccounts = document.querySelectorAll('code');
+            demoAccounts.forEach((account, index) => {
+                account.style.cursor = 'pointer';
+                account.addEventListener('click', function() {
+                    const types = ['admin', 'consultant', 'government'];
+                    fillDemoCredentials(types[index]);
+                });
+            });
+        });
+    </script>
+<script id="dhws-dataInjector" src="../public/dhws-data-injector.js"></script>
+</body>
+</html>

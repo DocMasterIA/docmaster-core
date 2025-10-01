@@ -17,10 +17,13 @@ def LoginView(request):
         else:
             messages.error(request, "E-mail ou senha inválidos.")
 
-    return render(request, "users/login_portal.html")
+    return render(request, "login_portal.html")
 
 def DashboardView(request):
     return render(request, "dashboard.html")
+
+def DocumentGeneratorView(request):
+    return render(request, "document_generator.html")
 
 def RegisterView(request):
     return render(request,"register_portal.html")

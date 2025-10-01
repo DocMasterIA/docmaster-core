@@ -118,11 +118,51 @@ TIME_ZONE = "America/Sao_Paulo"
 USE_I18N = True
 USE_TZ = True
 
+from django.templatetags.static import static
+
+UNFOLD = {
+    # Título e cabeçalho
+    "SITE_TITLE": "Painel MDLicitaTech",
+    "SITE_HEADER": "Painel MDLicitaTech",
+    "SITE_URL": "/",  # para onde o logo do header aponta
+    "SITE_ICON": lambda request: static("logo_licita.png"),
+    "STYLES": [lambda request: static("css/admin.css")],
+
+    # # Temas (dark/light)
+    # "THEMES": [
+    #     {
+    #         "theme": "light",
+    #         "primary": "indigo",
+    #         "accent": "pink",
+    #         "gray": "neutral",
+    #         "font": "inter",
+    #     },
+    #     {
+    #         "theme": "dark",
+    #         "primary": "indigo",
+    #         "accent": "pink",
+    #         "gray": "neutral",
+    #         "font": "inter",
+    #     },
+    # ],
+
+    # Rodapé
+    "FOOTER": "© 2025 Minha Empresa",
+
+    # # Extras opcionais
+    # "COLORS": {
+    #     "brand": "#4F46E5",  # cor principal personalizada
+    # },
+}
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "static/"
+
+STATICFILES_DIRS = [BASE_DIR / "static"] 
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

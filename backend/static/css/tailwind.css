@@ -5,93 +5,94 @@
 @tailwind utilities;
 
 :root {
-  /* Unified Red Executive Color Palette - Authority & Presence */
-  --color-primary: #B91C1C; /* Executive Red - Ultimate Authority */
-  --color-primary-50: #FEF2F2; /* Light Red Base */
-  --color-primary-100: #FEE2E2; /* Soft Red */
-  --color-primary-200: #FECACA; /* Medium Soft Red */
-  --color-primary-300: #FCA5A5; /* Light Red */
-  --color-primary-400: #F87171; /* Medium Red */
-  --color-primary-500: #EF4444; /* Standard Red */
-  --color-primary-600: #DC2626; /* Corporate Red */
-  --color-primary-700: #B91C1C; /* Executive Red - Main Brand */
-  --color-primary-800: #991B1B; /* Deep Red */
-  --color-primary-900: #7F1D1D; /* Executive Dark Red */
+  /* Unified Blue Executive Color Palette - Authority & Presence */
+  --color-primary: #1E3A8A; /* Executive Blue - Ultimate Authority */
+  --color-primary-50: #EFF6FF; /* Light Blue Base */
+  --color-primary-100: #DBEAFE; /* Soft Blue */
+  --color-primary-200: #BFDBFE; /* Medium Soft Blue */
+  --color-primary-300: #93C5FD; /* Light Blue */
+  --color-primary-400: #60A5FA; /* Medium Blue */
+  --color-primary-500: #3B82F6; /* Standard Blue */
+  --color-primary-600: #2563EB; /* Corporate Blue */
+  --color-primary-700: #1D4ED8; /* Executive Blue - Main Brand */
+  --color-primary-800: #1E40AF; /* Deep Blue */
+  --color-primary-900: #1E3A8A; /* Executive Dark Blue */
 
-  /* Secondary Slate - Professional Supporting Elements */
-  --color-secondary: #475569; /* Slate Gray - Support */
-  --color-secondary-50: #F8FAFC; /* Pure White Base */
-  --color-secondary-100: #F1F5F9; /* Light Steel */
-  --color-secondary-200: #E2E8F0; /* Soft Steel */
-  --color-secondary-300: #CBD5E1; /* Medium Steel */
-  --color-secondary-400: #94A3B8; /* Steel Gray */
-  --color-secondary-500: #64748B; /* Professional Steel */
-  --color-secondary-600: #475569; /* Dark Steel */
-  --color-secondary-700: #334155; /* Charcoal Steel */
-  --color-secondary-800: #1E293B; /* Deep Slate */
-  --color-secondary-900: #0F172A; /* Executive Black */
+  /* Secondary Slate - Professional Supporting Elements (mantido) */
+  --color-secondary: #475569;
+  --color-secondary-50: #F8FAFC;
+  --color-secondary-100: #F1F5F9;
+  --color-secondary-200: #E2E8F0;
+  --color-secondary-300: #CBD5E1;
+  --color-secondary-400: #94A3B8;
+  --color-secondary-500: #64748B;
+  --color-secondary-600: #475569;
+  --color-secondary-700: #334155;
+  --color-secondary-800: #1E293B;
+  --color-secondary-900: #0F172A;
 
-  /* Accent Red - Power & Authority (Same as Primary) */
-  --color-accent: #B91C1C; /* Corporate Red - Command Presence */
-  --color-accent-50: #FEF2F2; /* Light Red Tint */
-  --color-accent-100: #FEE2E2; /* Soft Red */
-  --color-accent-200: #FECACA; /* Medium Red */
-  --color-accent-300: #FCA5A5; /* Light Red */
-  --color-accent-400: #F87171; /* Medium Red */
-  --color-accent-500: #EF4444; /* Standard Red */
-  --color-accent-600: #DC2626; /* Corporate Red */
-  --color-accent-700: #B91C1C; /* Authority Red */
-  --color-accent-800: #991B1B; /* Deep Red */
-  --color-accent-900: #7F1D1D; /* Executive Red */
+  /* Accent Blue - Power & Authority (Same as Primary) */
+  --color-accent: #1E3A8A;
+  --color-accent-50: #EFF6FF;
+  --color-accent-100: #DBEAFE;
+  --color-accent-200: #BFDBFE;
+  --color-accent-300: #93C5FD;
+  --color-accent-400: #60A5FA;
+  --color-accent-500: #3B82F6;
+  --color-accent-600: #2563EB;
+  --color-accent-700: #1D4ED8;
+  --color-accent-800: #1E40AF;
+  --color-accent-900: #1E3A8A;
 
-  /* Success Green - Achievement */
-  --color-success: #059669; /* Forest Green - Success */
-  --color-success-50: #ECFDF5; /* Light Green */
-  --color-success-100: #D1FAE5; /* Soft Green */
-  --color-success-500: #059669; /* Forest Green */
-  --color-success-600: #047857; /* Deep Forest */
-  --color-success-700: #065F46; /* Dark Forest */
+  /* Success Green - Achievement (mantido) */
+  --color-success: #059669;
+  --color-success-50: #ECFDF5;
+  --color-success-100: #D1FAE5;
+  --color-success-500: #059669;
+  --color-success-600: #047857;
+  --color-success-700: #065F46;
 
-  /* Warning - Minimal Yellow */
-  --color-warning: #D97706; /* Amber Warning */
-  --color-warning-50: #FFFBEB; /* Light Amber */
-  --color-warning-100: #FEF3C7; /* Soft Amber */
-  --color-warning-500: #D97706; /* Amber Warning */
-  --color-warning-600: #B45309; /* Deep Amber */
+  /* Warning - Minimal Yellow (mantido) */
+  --color-warning: #D97706;
+  --color-warning-50: #FFFBEB;
+  --color-warning-100: #FEF3C7;
+  --color-warning-500: #D97706;
+  --color-warning-600: #B45309;
 
-  /* Error Red - Authority (Same as Primary) */
-  --color-error: #DC2626; /* Corporate Red - Command */
-  --color-error-50: #FEF2F2; /* Light Red */
-  --color-error-100: #FEE2E2; /* Soft Red */
-  --color-error-500: #DC2626; /* Corporate Red */
-  --color-error-600: #B91C1C; /* Deep Red */
+  /* Error Red → agora Error Blue (diferenciar de Primary se quiser) */
+  --color-error: #2563EB; /* Corporate Blue - Command */
+  --color-error-50: #EFF6FF;
+  --color-error-100: #DBEAFE;
+  --color-error-500: #2563EB;
+  --color-error-600: #1E40AF;
 
-  /* Executive Neutral Palette */
-  --color-neutral-50: #F8FAFC; /* Pure White */
-  --color-neutral-100: #F1F5F9; /* Light Steel */
-  --color-neutral-200: #E2E8F0; /* Soft Steel */
-  --color-neutral-300: #CBD5E1; /* Medium Steel */
-  --color-neutral-400: #94A3B8; /* Steel Gray */
-  --color-neutral-500: #64748B; /* Professional Steel */
-  --color-neutral-600: #475569; /* Dark Steel */
-  --color-neutral-700: #334155; /* Charcoal Steel */
-  --color-neutral-800: #1E293B; /* Deep Slate */
-  --color-neutral-900: #0F172A; /* Executive Black */
+  /* Executive Neutral Palette (mantido) */
+  --color-neutral-50: #F8FAFC;
+  --color-neutral-100: #F1F5F9;
+  --color-neutral-200: #E2E8F0;
+  --color-neutral-300: #CBD5E1;
+  --color-neutral-400: #94A3B8;
+  --color-neutral-500: #64748B;
+  --color-neutral-600: #475569;
+  --color-neutral-700: #334155;
+  --color-neutral-800: #1E293B;
+  --color-neutral-900: #0F172A;
 
-  /* Red Executive Gradients */
-  --gradient-primary: linear-gradient(135deg, #B91C1C 0%, #DC2626 50%, #991B1B 100%);
-  --gradient-secondary: linear-gradient(135deg, #B91C1C 0%, #7F1D1D 100%);
-  --gradient-accent: linear-gradient(135deg, #B91C1C 0%, #7F1D1D 100%);
-  --gradient-background: linear-gradient(135deg, #0F172A 0%, #1E293B 25%, #B91C1C 75%, #7F1D1D 100%);
-  
-  /* Executive Shadows with Red Tints */
-  --shadow-sm: 0 1px 2px 0 rgba(185, 28, 28, 0.1);
-  --shadow-md: 0 4px 6px -1px rgba(185, 28, 28, 0.15), 0 2px 4px -2px rgba(185, 28, 28, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(185, 28, 28, 0.2), 0 4px 6px -4px rgba(185, 28, 28, 0.1);
-  --shadow-xl: 0 20px 25px -5px rgba(185, 28, 28, 0.25), 0 8px 10px -6px rgba(185, 28, 28, 0.1);
-  --shadow-2xl: 0 25px 50px -12px rgba(185, 28, 28, 0.4);
-  --shadow-inner: inset 0 2px 4px 0 rgba(185, 28, 28, 0.1);
+  /* Blue Executive Gradients */
+  --gradient-primary: linear-gradient(135deg, #1D4ED8 0%, #2563EB 50%, #1E40AF 100%);
+  --gradient-secondary: linear-gradient(135deg, #1E3A8A 0%, #1E40AF 100%);
+  --gradient-accent: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%);
+  --gradient-background: linear-gradient(135deg, #0F172A 0%, #1E293B 25%, #2563EB 75%, #1E3A8A 100%);
+
+  /* Executive Shadows with Blue Tints */
+  --shadow-sm: 0 1px 2px 0 rgba(37, 99, 235, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(37, 99, 235, 0.15), 0 2px 4px -2px rgba(37, 99, 235, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(37, 99, 235, 0.2), 0 4px 6px -4px rgba(37, 99, 235, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(37, 99, 235, 0.25), 0 8px 10px -6px rgba(37, 99, 235, 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgba(37, 99, 235, 0.4);
+  --shadow-inner: inset 0 2px 4px 0 rgba(37, 99, 235, 0.1);
 }
+
 
 @layer base {
   body {

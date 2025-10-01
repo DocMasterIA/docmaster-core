@@ -1,9 +1,26 @@
-from django.shortcuts import render
-from django.http import request
-# Create your views here.
+from django.contrib.auth import authenticate, login, logout
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.urls import reverse
 
 def LoginView(request):
-    return render(request,"login_portal.html")
+    if request.method == "POST":
+        email = request.POST.get("email")
+        password = request.POST.get("password")
+
+        user = authenticate(request, email=email, password=password)
+
+        if user is not None:
+            login(request, user)
+            messages.success(request, "Login realizado com sucesso!")
+            return redirect(reverse("dashboard"))
+        else:
+            messages.error(request, "E-mail ou senha inválidos.")
+
+    return render(request, "users/login_portal.html")
+
+def DashboardView(request):
+    return render(request, "dashboard.html")
 
 def RegisterView(request):
     return render(request,"register_portal.html")

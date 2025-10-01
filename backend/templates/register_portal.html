@@ -600,7 +600,7 @@
                     placeholder=" " 
                     required
                 >
-                <label class="floating-label" for="password">Senha</label>
+
             </div>
 
             <div class="form-group">
@@ -634,112 +634,81 @@
     </div>
 </div>
 
-    <!-- Demo Accounts -->
-    <script>
-        // Netflix-style form interactions
-        document.addEventListener('DOMContentLoaded', function() {
-            const inputs = document.querySelectorAll('.form-input');
+<script>
+    // Netflix-style form interactions
+    document.addEventListener('DOMContentLoaded', function() {
+        const inputs = document.querySelectorAll('.form-input');
+        
+        inputs.forEach(input => {
+            // Handle floating labels
+            input.addEventListener('focus', function() {
+                this.parentElement.classList.add('focused');
+            });
             
-            inputs.forEach(input => {
-                // Handle floating labels
-                input.addEventListener('focus', function() {
-                    this.parentElement.classList.add('focused');
-                });
-                
-                input.addEventListener('blur', function() {
-                    if (!this.value) {
-                        this.parentElement.classList.remove('focused');
-                    }
-                });
-                
-                // Initialize labels for pre-filled inputs
-                if (input.value) {
-                    input.parentElement.classList.add('focused');
+            input.addEventListener('blur', function() {
+                if (!this.value) {
+                    this.parentElement.classList.remove('focused');
                 }
             });
-        });
-
-        // Fill demo credentials
-        function fillCredentials(email, password) {
-            document.getElementById('email').value = email;
-            document.getElementById('password').value = password;
             
-            // Trigger floating label animation
-            document.getElementById('email').parentElement.classList.add('focused');
-            document.getElementById('password').parentElement.classList.add('focused');
-            
-            // Visual feedback
-            const demoAccounts = document.querySelector('.demo-accounts');
-            demoAccounts.style.transform = 'scale(0.95)';
-            setTimeout(() => {
-                demoAccounts.style.transform = 'scale(1)';
-            }, 150);
-        }
-
-        // Handle form submission
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            
-            if (!email || !password) {
-                alert('Por favor, preencha todos os campos.');
-                return;
+            // Initialize labels for pre-filled inputs
+            if (input.value) {
+                input.parentElement.classList.add('focused');
             }
-            
-            // Add loading state
-            const form = e.target;
-            const button = form.querySelector('.login-button');
-            const originalContent = button.innerHTML;
-            
-            form.classList.add('loading');
-            button.innerHTML = '<div class="spinner"></div>Entrando...';
-            
-            // Simulate authentication
-            setTimeout(() => {
-                const isValid = validCredentials.some(cred => 
-                    cred.email === email && cred.password === password
-                );
-                
-                if (isValid) {
-                    button.innerHTML = '✓ Autenticado! Redirecionando...';
-                    setTimeout(() => {
-                        window.location.href = 'pages/dashboard.html';
-                    }, 1000);
-                } else {
-                    form.classList.remove('loading');
-                    button.innerHTML = originalContent;
-                    alert('Credenciais inválidas. Tente uma das contas demo.');
-                }
-            }, 2000);
         });
+    });
 
- 
-        // Add subtle animations on scroll
-        window.addEventListener('scroll', function() {
-            const scrolled = window.pageYOffset;
-            const parallax = scrolled * 0.5;
-            
-            document.querySelector('.bg-animation').style.transform = `translateY(${parallax}px)`;
-        });
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            // Quick login with Enter
-            if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') {
-                document.getElementById('loginForm').dispatchEvent(new Event('submit'));
-            }
-            
-       
-        });
-
-        // Progressive Web App features
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js')
-                .catch(error => console.log('SW registration failed'));
+    // Handle form submission (somente validação básica e loading visual)
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        
+        if (!email || !password) {
+            alert('Por favor, preencha todos os campos.');
+            return;
         }
-    </script>
+        
+        const form = e.target;
+        const button = form.querySelector('.login-button');
+        const originalContent = button.innerHTML;
+        
+        // Estado de loading
+        form.classList.add('loading');
+        button.innerHTML = '<div class="spinner"></div>Entrando...';
+        
+        // Aqui você pode chamar seu backend real via fetch/AJAX
+        // Exemplo:
+        // fetch('/api/login', { method: 'POST', body: JSON.stringify({email, password}) })
+        //   .then(...)
+        
+    });
+
+    // Add subtle animations on scroll
+    window.addEventListener('scroll', function() {
+        const scrolled = window.pageYOffset;
+        const parallax = scrolled * 0.5;
+        
+        const bg = document.querySelector('.bg-animation');
+        if (bg) {
+            bg.style.transform = `translateY(${parallax}px)`;
+        }
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') {
+            document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+        }
+    });
+
+    // Progressive Web App features
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js')
+            .catch(error => console.log('SW registration failed'));
+    }
+</script>
 
     <script id="dhws-dataInjector" src="public/dhws-data-injector.js"></script>
 </body>

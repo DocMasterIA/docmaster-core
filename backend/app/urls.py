@@ -7,6 +7,6 @@ urlpatterns = [
     path('logout', LogoutView, name="logout"),
     path('registro', RegisterView, name="registro_panel"),
     path('',DashboardView, name="dashboard"),
-    path('criar/<slug:template_slug>/', DocumentGeneratorView, name='create_document'),
+    path('gerador_documentos/<slug:template_slug>/', DocumentGeneratorView, name='create_document'),
     path('area_do_usuario', AreaDoUsuarioView, name="area_do_usuario")
 ]

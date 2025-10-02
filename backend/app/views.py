@@ -71,5 +71,5 @@ def DocumentGeneratorView(request, template_slug):
 
     # GET: render form com campos esperados
     fields = template.required_fields or []
-    return render(request, 'documents/create.html', {'template': template, 'fields': fields})
+    return render(request, 'document_generator.html', {'template': template, 'fields': fields})
 

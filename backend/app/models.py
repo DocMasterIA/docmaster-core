@@ -70,3 +70,51 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
+
+from django.conf import settings
+import uuid
+
+class Template(models.Model):
+    """
+    Template mestre: um arquivo .docx com placeholders Jinja ou HTML template.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=180)
+    slug = models.SlugField(unique=True)
+    description = models.TextField(blank=True)
+    file = models.FileField(upload_to='templates/docx/')  # .docx com placeholders
+    preview_html = models.TextField(blank=True)
+    required_fields = models.JSONField(default=list)  # lista de placeholder names obrigatórios
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+
+class Clause(models.Model):
+    """
+    Cláusulas padrões reutilizáveis.
+    """
+    name = models.CharField(max_length=150)
+    content = models.TextField()
+    tags = models.JSONField(default=list, blank=True)
+
+    def __str__(self):
+        return self.name
+
+
+class DocumentInstance(models.Model):
+    """
+    Documento gerado ou rascunho do usuário.
+    """
+    STATUS = (('draft','Rascunho'),('final','Finalizado'))
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    template = models.ForeignKey(Template, on_delete=models.PROTECT)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    data = models.JSONField()  # map campo -> valor preenchido
+    content_html = models.TextField(blank=True)  # rendered HTML preview
+    file_docx = models.FileField(upload_to='documents/docx/', blank=True, null=True)
+    file_pdf = models.FileField(upload_to='documents/pdf/', blank=True, null=True)
+    status = models.CharField(max_length=10, choices=STATUS, default='draft')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)

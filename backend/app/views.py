@@ -38,44 +38,68 @@ from django.contrib.auth.decorators import login_required
 from .models import Template, DocumentInstance
 from .services import save_file_to_field, generate_docx_and_pdf_from_template_model
 from django.core.files import File
-import os
+import os, traceback
 
 @login_required
 def DocumentGeneratorView(request, template_slug):
     template = get_object_or_404(Template, slug=template_slug)
 
-    if request.method == "POST":
-        # coleta dados do form; aqui capturamos tudo menos csrf
-        data = {k: v for k, v in request.POST.items() if k != "csrfmiddlewaretoken"}
+    # campos mínimos esperados (ou pegue do template.required_fields)
+    expected = template.required_fields or ['tipo_documento','modalidade','objeto','orgao','valor_estimado']
 
-        # (opcional) construir HTML preview com render_to_string:
-        # preview_html = render_to_string('documents/preview_base.html', {'context': data, 'template': template})
-        preview_html = data.get("_preview_html", "")  # ou gere na view
+    if request.method == 'POST':
+        # coleta dados do POST (inclui action)
+        data = {k: v for k, v in request.POST.items() if k not in ['csrfmiddlewaretoken']}
+        action = data.pop('action', None)
 
-        # Salvar rascunho no banco (sem arquivos)
-        inst = DocumentInstance.objects.create(
-            template=template, owner=request.user, data=data, content_html=preview_html, status='draft'
-        )
+        # validação mínima
+        missing = [f for f in expected if not data.get(f)]
+        if missing:
+            messages.error(request, f"Preencha os campos obrigatórios: {', '.join(missing)}")
+            return render(request, 'document_generator.html', {'template': template, 'form_data': data})
 
-        # Se o usuário pediu para finalizar, gerar arquivos
-        if "finalize" in request.POST:
+        # Caso de edição: tente recuperar instance_id para atualizar rascunho
+        instance_id = request.POST.get('instance_id') or request.GET.get('instance')
+        inst = None
+        if instance_id:
             try:
-                # gera arquivos temporários
-                docx_path, pdf_path = generate_docx_and_pdf_from_template_model(template, {**data, "_preview_html": preview_html})
-                # salva nos FileFields do DocumentInstance
-                save_file_to_field(inst, "file_docx", docx_path, save_instance=False)
-                save_file_to_field(inst, "file_pdf", pdf_path, save_instance=False)
-                inst.status = "final"
+                inst = DocumentInstance.objects.get(pk=instance_id, owner=request.user)
+            except DocumentInstance.DoesNotExist:
+                inst = None
+
+        if inst:
+            inst.data = data
+            inst.save()
+        else:
+            inst = DocumentInstance.objects.create(template=template, owner=request.user, data=data, status='draft')
+
+        # Se o usuário clicou em "finalize" (ou 'generate'), geramos os arquivos
+        if action in ('finalize', 'generate'):
+            try:
+                # Gere docx e pdf (caminhos temporários)
+                docx_path, pdf_path = generate_docx_and_pdf_from_template_model(template, data)
+
+                # Salva os arquivos no model (usa DEFAULT_FILE_STORAGE)
+                save_file_to_field(inst, 'file_docx', docx_path, save_instance=False)
+                save_file_to_field(inst, 'file_pdf', pdf_path, save_instance=False)
+
+                inst.status = 'final'
                 inst.save()
-                messages.success(request, "Documento gerado com sucesso.")
-                return redirect("document_detail", pk=inst.pk)
+
+                messages.success(request, 'Documento gerado com sucesso.')
+                return redirect('document_detail', pk=inst.pk)
+
             except Exception as e:
-                messages.error(request, f"Erro gerando arquivos: {e}")
-                # keep inst as draft for user to retry
+                traceback.print_exc()
+                messages.error(request, f"Erro ao gerar arquivo: {e}")
+                # mantem rascunho para o usuário tentar novamente
 
-        # caso seja apenas preview, redireciona para a página de edição/preview
-        return render(request, "document_generator.html", {"template": template, "instance": inst, "preview_html": preview_html, "form_data": data})
+        # Se só salvou/next, redireciona para o passo seguinte de edição
+        if action == 'next':
+            return redirect('document_step2', pk=inst.pk)
 
-    # GET -> mostra form com campos
-    fields = template.required_fields or []
-    return render(request, "document_generator.html", {"template": template, "fields": fields})
+        messages.success(request, 'Rascunho salvo.')
+        return redirect('document_edit', pk=inst.pk)
+
+    # GET
+    return render(request, 'document_generator.html', {'template': template, 'form_data': {}, 'modalidades': None})

@@ -35,7 +35,6 @@ from django.contrib import admin, messages
 from django.utils.html import format_html, mark_safe
 from django.core.files import File
 import os, tempfile
-from .models import Template, Clause, DocumentInstance, Snippet, Rule
 from .services import render_docx_from_template, convert_html_to_pdf
 
 # ------------------ TEMPLATE ------------------

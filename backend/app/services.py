@@ -7,11 +7,11 @@ from django.conf import settings
 from django.core.files import File
 from docxtpl import DocxTemplate
 from weasyprint import HTML  # se usar WeasyPrint para PDF (pode trocar)
-from typing import Tuple
 from jinja2 import Template as JinjaTemplate
 from .models import Snippet, Rule
 from collections import defaultdict
 import logging
+import subprocess
 
 # util: garante pasta dentro do MEDIA_ROOT
 def _ensure_media_subdir(*parts) -> str:
@@ -53,21 +53,6 @@ def convert_html_to_pdf(html_string: str, out_path: str) -> str:
     HTML(string=html_string).write_pdf(out_path)
     return out_path
 
-def save_file_to_field(instance, field_name: str, file_path: str, save_instance: bool = True):
-    """
-    Salva um arquivo do disk em um FileField do modelo.
-    Ex: save_file_to_field(doc_inst, 'file_docx', '/tmp/my.docx')
-    """
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(file_path)
-    with open(file_path, "rb") as f:
-        django_file = File(f)
-        basename = os.path.basename(file_path)
-        getattr(instance, field_name).save(basename, django_file, save=save_instance)
-
-import subprocess
-import os
-
 def generate_pdf_from_docx(docx_path):
     pdf_path = os.path.splitext(docx_path)[0] + ".pdf"
     subprocess.run([
@@ -78,8 +63,6 @@ def generate_pdf_from_docx(docx_path):
         docx_path
     ], check=True)
     return pdf_path
-
-
 
 logger = logging.getLogger(__name__)
 
@@ -162,3 +145,31 @@ def assemble_document_context(base_data: dict) -> dict:
     context['conclusion'] = assembled.get('conclusion', '')
 
     return context
+
+def get_snippets_for_data(data):
+    """
+    Retorna um dict de snippets organizados por área ('intro', 'clause', 'conclusion')
+    com base nos dados do formulário e nas regras cadastradas.
+    """
+    from .models import Rule  # ou ajuste o import conforme seu app
+
+    all_snippets = []
+
+    # percorre todas as regras que batem com o data
+    for rule in Rule.objects.all().order_by('order'):
+        field_value = data.get(rule.field_name)
+        if not field_value:
+            continue
+
+        # match_value == '*' é default
+        if rule.match_value == '*' or str(rule.match_value) == str(field_value):
+            all_snippets.extend(rule.snippets.filter(active=True))
+
+    # organiza por área
+    snippets_by_area = {
+        'snippets_intro': [s for s in all_snippets if s.area == 'intro'],
+        'snippets_clause': [s for s in all_snippets if s.area == 'clause'],
+        'snippets_conclusion': [s for s in all_snippets if s.area == 'conclusion'],
+    }
+
+    return snippets_by_area

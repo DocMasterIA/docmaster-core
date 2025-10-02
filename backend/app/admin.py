@@ -4,7 +4,8 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from .models import User, Template, Clause, DocumentInstance
+from .models import User, Template, Clause, DocumentInstance,Snippet, Rule
+
 from .services import render_docx_from_template, convert_html_to_pdf  # seus serviços
 from django.core.files import File
 import os
@@ -164,3 +165,35 @@ class DocumentInstanceAdmin(admin.ModelAdmin):
                 self.message_user(request, f"Erro ao regenerar {id_}: {err}", messages.ERROR)
     action_regenerate_files.short_description = "Regenerar DOCX/PDF"
 
+
+
+@admin.register(Snippet)
+class SnippetAdmin(admin.ModelAdmin):
+    list_display = ("name", "area", "short_content", "active", "order")
+    list_filter = ("area", "active")
+    search_fields = ("name", "content", "slug")
+    ordering = ("order", "name")
+    readonly_fields = ()
+    fieldsets = (
+        (None, {"fields": ("name", "slug", "area", "content")}),
+        ("Configurações", {"fields": ("tags", "active", "order")}),
+    )
+
+    def short_content(self, obj):
+        txt = (obj.content or "").strip()
+        return txt[:80] + ("..." if len(txt) > 80 else "")
+    short_content.short_description = "Conteúdo resumido"
+
+
+@admin.register(Rule)
+class RuleAdmin(admin.ModelAdmin):
+    list_display = ("field_name", "match_value", "snippets_list", "order")
+    list_filter = ("field_name", "match_value")
+    search_fields = ("field_name", "match_value")
+    ordering = ("order",)
+
+    filter_horizontal = ("snippets",)  # permite selecionar múltiplos snippets com interface melhor
+
+    def snippets_list(self, obj):
+        return ", ".join([s.name for s in obj.snippets.all()])
+    snippets_list.short_description = "Snippets"

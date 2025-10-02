@@ -65,15 +65,18 @@ def save_file_to_field(instance, field_name: str, file_path: str, save_instance:
         basename = os.path.basename(file_path)
         getattr(instance, field_name).save(basename, django_file, save=save_instance)
 
-from docx2pdf import convert
+import subprocess
 import os
 
-def generate_pdf_from_docx(docx_path, output_dir=None):
-    if output_dir is None:
-        output_dir = os.path.dirname(docx_path)
-    pdf_filename = os.path.splitext(os.path.basename(docx_path))[0] + '.pdf'
-    pdf_path = os.path.join(output_dir, pdf_filename)
-    convert(docx_path, pdf_path)
+def generate_pdf_from_docx(docx_path):
+    pdf_path = os.path.splitext(docx_path)[0] + ".pdf"
+    subprocess.run([
+        "libreoffice",
+        "--headless",
+        "--convert-to", "pdf",
+        "--outdir", os.path.dirname(docx_path),
+        docx_path
+    ], check=True)
     return pdf_path
 
 

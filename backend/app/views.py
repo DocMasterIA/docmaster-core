@@ -36,7 +36,7 @@ def AreaDoUsuarioView(request):
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from .models import Template, DocumentInstance
-from .services import render_docx_from_template, render_preview_html, convert_html_to_pdf
+from .services import save_file_to_field, generate_docx_and_pdf_from_template_model
 from django.core.files import File
 import os
 
@@ -44,32 +44,38 @@ import os
 def DocumentGeneratorView(request, template_slug):
     template = get_object_or_404(Template, slug=template_slug)
 
-    if request.method == 'POST':
-        # coletar campos dinamicamente do POST
-        data = {k: v for k, v in request.POST.items() if k not in ['csrfmiddlewaretoken']}
-        # gerar preview html
-        preview = render_preview_html(template, data)
-        # se for ação "Gerar PDF/DOCX"
-        if 'finalize' in request.POST:
-            docx_path = render_docx_from_template(template, data)
-            # converter preview HTML para PDF
-            pdf_path = os.path.splitext(docx_path)[0] + '.pdf'
-            convert_html_to_pdf(preview, pdf_path)
-            # salvar DocumentInstance
-            inst = DocumentInstance.objects.create(
-                template=template, owner=request.user, data=data, content_html=preview, status='final'
-            )
-            # anexar arquivos gerados
-            with open(docx_path, 'rb') as f:
-                inst.file_docx.save(os.path.basename(docx_path), File(f), save=False)
-            with open(pdf_path, 'rb') as f:
-                inst.file_pdf.save(os.path.basename(pdf_path), File(f), save=False)
-            inst.save()
-            return redirect('document_detail', pk=inst.pk)
-        # se for apenas preview
-        return render(request, 'documents/create.html', {'template': template, 'preview': preview, 'form_data': data})
+    if request.method == "POST":
+        # coleta dados do form; aqui capturamos tudo menos csrf
+        data = {k: v for k, v in request.POST.items() if k != "csrfmiddlewaretoken"}
 
-    # GET: render form com campos esperados
+        # (opcional) construir HTML preview com render_to_string:
+        # preview_html = render_to_string('documents/preview_base.html', {'context': data, 'template': template})
+        preview_html = data.get("_preview_html", "")  # ou gere na view
+
+        # Salvar rascunho no banco (sem arquivos)
+        inst = DocumentInstance.objects.create(
+            template=template, owner=request.user, data=data, content_html=preview_html, status='draft'
+        )
+
+        # Se o usuário pediu para finalizar, gerar arquivos
+        if "finalize" in request.POST:
+            try:
+                # gera arquivos temporários
+                docx_path, pdf_path = generate_docx_and_pdf_from_template_model(template, {**data, "_preview_html": preview_html})
+                # salva nos FileFields do DocumentInstance
+                save_file_to_field(inst, "file_docx", docx_path, save_instance=False)
+                save_file_to_field(inst, "file_pdf", pdf_path, save_instance=False)
+                inst.status = "final"
+                inst.save()
+                messages.success(request, "Documento gerado com sucesso.")
+                return redirect("document_detail", pk=inst.pk)
+            except Exception as e:
+                messages.error(request, f"Erro gerando arquivos: {e}")
+                # keep inst as draft for user to retry
+
+        # caso seja apenas preview, redireciona para a página de edição/preview
+        return render(request, "document_generator.html", {"template": template, "instance": inst, "preview_html": preview_html, "form_data": data})
+
+    # GET -> mostra form com campos
     fields = template.required_fields or []
-    return render(request, 'document_generator.html', {'template': template, 'fields': fields})
-
+    return render(request, "document_generator.html", {"template": template, "fields": fields})

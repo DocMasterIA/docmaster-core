@@ -31,10 +31,6 @@ class UserAdmin(BaseUserAdmin):
         }),
     )
 
-
-
-
-
 @admin.register(Template)
 class TemplateAdmin(admin.ModelAdmin):
     list_display = ("name", "slug", "created_at", "preview_available")
@@ -45,6 +41,7 @@ class TemplateAdmin(admin.ModelAdmin):
         ("Configuração", {"fields": ("required_fields", "preview_html")}),
         ("Metadados", {"fields": ("created_at",)}),
     )
+    
 
     def preview_available(self, obj):
         return bool(obj.preview_html)
@@ -119,7 +116,7 @@ class DocumentInstanceAdmin(admin.ModelAdmin):
             return format_html('<a href="{}" target="_blank">Download .pdf</a>', url)
         return "-"
     file_pdf_link.short_description = "PDF"
-    
+
     # Ações administrativas -------------------------------------------------
     def action_make_final(self, request, queryset):
         updated = queryset.update(status="final")

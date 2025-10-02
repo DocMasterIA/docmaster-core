@@ -71,6 +71,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
 
+from django.db import models
 from django.conf import settings
 import uuid
 
@@ -84,7 +85,7 @@ class Template(models.Model):
     description = models.TextField(blank=True)
     file = models.FileField(upload_to='templates/docx/')  # .docx com placeholders
     preview_html = models.TextField(blank=True)
-    required_fields = models.JSONField(default=list)  # lista de placeholder names obrigatórios
+    required_fields = models.JSONField(default=list, blank=True)  # lista de placeholder names obrigatórios
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -97,7 +98,7 @@ class Clause(models.Model):
     """
     name = models.CharField(max_length=150)
     content = models.TextField()
-    tags = models.JSONField(default=list, blank=True)
+    tags = models.JSONField(default=list, blank=True)  # lista de tags para busca/organização
 
     def __str__(self):
         return self.name
@@ -107,17 +108,25 @@ class DocumentInstance(models.Model):
     """
     Documento gerado ou rascunho do usuário.
     """
-    STATUS = (('draft','Rascunho'),('final','Finalizado'))
+    STATUS_CHOICES = (
+        ('draft','Rascunho'),
+        ('final','Finalizado'),
+    )
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     template = models.ForeignKey(Template, on_delete=models.PROTECT)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    data = models.JSONField()  # map campo -> valor preenchido
-    content_html = models.TextField(blank=True)  # rendered HTML preview
+    data = models.JSONField(default=dict)  # mapeamento campo -> valor preenchido
+    content_html = models.TextField(blank=True)  # preview HTML renderizado
     file_docx = models.FileField(upload_to='documents/docx/', blank=True, null=True)
     file_pdf = models.FileField(upload_to='documents/pdf/', blank=True, null=True)
-    status = models.CharField(max_length=10, choices=STATUS, default='draft')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.template.name} ({self.owner.email})"
+
 
 class Snippet(models.Model):
     """
@@ -128,6 +137,7 @@ class Snippet(models.Model):
         ('clause','Cláusula'),
         ('conclusion','Conclusão'),
     ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=180)
     area = models.CharField(max_length=40, choices=KEY_AREAS, default='clause')
@@ -137,8 +147,12 @@ class Snippet(models.Model):
     active = models.BooleanField(default=True)
     order = models.IntegerField(default=100)
 
+    class Meta:
+        ordering = ['order', 'name']
+
     def __str__(self):
         return self.name
+
 
 class Rule(models.Model):
     """
@@ -147,9 +161,12 @@ class Rule(models.Model):
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     field_name = models.CharField(max_length=80)  # ex: 'modalidade'
-    match_value = models.CharField(max_length=180)  # ex: 'concorrencia' or '*' para default
+    match_value = models.CharField(max_length=180)  # ex: 'concorrencia' ou '*' para default
     snippets = models.ManyToManyField(Snippet, blank=True)
     order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['order']
 
     def __str__(self):
         return f"{self.field_name} == {self.match_value}"

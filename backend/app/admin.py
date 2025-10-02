@@ -30,7 +30,14 @@ class UserAdmin(BaseUserAdmin):
             "fields": ("email", "password1", "password2", "role", "is_staff", "is_active"),
         }),
     )
+from django.contrib import admin, messages
+from django.utils.html import format_html, mark_safe
+from django.core.files import File
+import os, tempfile
+from .models import Template, Clause, DocumentInstance, Snippet, Rule
+from .services import render_docx_from_template, convert_html_to_pdf
 
+# ------------------ TEMPLATE ------------------
 @admin.register(Template)
 class TemplateAdmin(admin.ModelAdmin):
     list_display = ("name", "slug", "created_at", "preview_available")
@@ -41,14 +48,13 @@ class TemplateAdmin(admin.ModelAdmin):
         ("Configuração", {"fields": ("required_fields", "preview_html")}),
         ("Metadados", {"fields": ("created_at",)}),
     )
-    
 
     def preview_available(self, obj):
         return bool(obj.preview_html)
     preview_available.boolean = True
     preview_available.short_description = "Preview"
 
-
+# ------------------ CLAUSE ------------------
 @admin.register(Clause)
 class ClauseAdmin(admin.ModelAdmin):
     list_display = ("name", "short_content", "tags_display")
@@ -66,30 +72,23 @@ class ClauseAdmin(admin.ModelAdmin):
         return ", ".join(obj.tags)
     tags_display.short_description = "Tags"
 
-
+# ------------------ DOCUMENT INSTANCE ------------------
 @admin.register(DocumentInstance)
 class DocumentInstanceAdmin(admin.ModelAdmin):
     list_display = ("id_short", "template", "owner_email", "status", "created_at", "file_docx_link", "file_pdf_link")
     list_filter = ("status", "template", "created_at")
     search_fields = ("owner__email", "template__name", "data")
-    # tornamos esses itens readonly porque alguns não são campos do modelo
-    readonly_fields = (
-        "created_at",
-        "updated_at",
-        "content_html",
-        "data_pretty",
-        "file_docx_link",
-        "file_pdf_link",
-    )
+    readonly_fields = ("created_at", "updated_at", "content_html", "file_docx_link", "data_pretty", "file_pdf_link")
     actions = ("action_make_final", "action_make_draft", "action_regenerate_files")
 
     fieldsets = (
         (None, {"fields": ("template", "owner", "status")}),
-        ("Dados preenchidos", {"fields": ("data_pretty",)}),
+        ("Dados preenchidos", {"fields": ("data",)}),
         ("Preview / Arquivos gerados", {"fields": ("content_html", "file_docx_link", "file_pdf_link")}),
         ("Metadados", {"fields": ("created_at", "updated_at")}),
     )
 
+    # ------------------ DISPLAY HELPERS ------------------
     def id_short(self, obj):
         return str(obj.id)[:8]
     id_short.short_description = "ID"
@@ -98,26 +97,24 @@ class DocumentInstanceAdmin(admin.ModelAdmin):
         return obj.owner.email
     owner_email.short_description = "Usuário"
 
+    @admin.display(description="Dados (JSON)", ordering="created_at")
     def data_pretty(self, obj):
         import json
-        return mark_safe("<pre style='max-height:300px;overflow:auto;'>%s</pre>" % json.dumps(obj.data, ensure_ascii=False, indent=2))
-    data_pretty.short_description = "Dados (JSON)"
+        return mark_safe("<textarea style='width:100%;height:250px;'>%s</textarea>" % json.dumps(obj.data, ensure_ascii=False, indent=2))
 
     def file_docx_link(self, obj):
-        if obj and obj.file_docx:
-            url = obj.file_docx.url
-            return format_html('<a href="{}" target="_blank">Download .docx</a>', url)
+        if obj.file_docx:
+            return format_html('<a href="{}" target="_blank">Download .docx</a>', obj.file_docx.url)
         return "-"
     file_docx_link.short_description = "DOCX"
 
     def file_pdf_link(self, obj):
-        if obj and obj.file_pdf:
-            url = obj.file_pdf.url
-            return format_html('<a href="{}" target="_blank">Download .pdf</a>', url)
+        if obj.file_pdf:
+            return format_html('<a href="{}" target="_blank">Download .pdf</a>', obj.file_pdf.url)
         return "-"
     file_pdf_link.short_description = "PDF"
 
-    # Ações administrativas -------------------------------------------------
+    # ------------------ ACTIONS ------------------
     def action_make_final(self, request, queryset):
         updated = queryset.update(status="final")
         self.message_user(request, f"{updated} documento(s) marcado(s) como FINAL.", messages.SUCCESS)
@@ -129,10 +126,6 @@ class DocumentInstanceAdmin(admin.ModelAdmin):
     action_make_draft.short_description = "Reverter para RASCUNHO"
 
     def action_regenerate_files(self, request, queryset):
-        """
-        Regenera os arquivos DOCX/PDF a partir do template e do JSON 'data'.
-        Usa os serviços render_docx_from_template e convert_html_to_pdf.
-        """
         success = 0
         failures = []
         for inst in queryset:
@@ -140,23 +133,16 @@ class DocumentInstanceAdmin(admin.ModelAdmin):
                 ctx = inst.data or {}
                 tpl = inst.template
 
-                # gera docx temporário
-                tmp_docx_path = render_docx_from_template(tpl, ctx, out_dir=tempfile.gettempdir())
+                tmp_docx_path = render_docx_from_template(tpl.file.path, ctx, out_dir=tempfile.gettempdir())
 
-                # tenta gerar preview html (se tiver content_html já gravado, usa)
                 preview_html = inst.content_html or ""
 
-                # gera pdf ao lado do docx
                 tmp_pdf_path = os.path.splitext(tmp_docx_path)[0] + ".pdf"
-                # preferimos converter via HTML preview quando possível
                 if preview_html:
                     convert_html_to_pdf(preview_html, tmp_pdf_path)
                 else:
-                    # fallback: gerar um PDF simples a partir do docx não é trivial; aqui só copia
-                    # recomenda-se implementar um convert_docx_to_pdf service (LibreOffice headless, etc.)
                     open(tmp_pdf_path, "wb").close()
 
-                # salva os arquivos nos FileFields do DocumentInstance
                 with open(tmp_docx_path, "rb") as f:
                     inst.file_docx.save(os.path.basename(tmp_docx_path), File(f), save=False)
                 with open(tmp_pdf_path, "rb") as f:
@@ -165,12 +151,8 @@ class DocumentInstanceAdmin(admin.ModelAdmin):
                 inst.save()
                 success += 1
 
-                # limpa arquivos temporários (opcional)
-                try:
-                    os.remove(tmp_docx_path)
-                    os.remove(tmp_pdf_path)
-                except OSError:
-                    pass
+                os.remove(tmp_docx_path)
+                os.remove(tmp_pdf_path)
 
             except Exception as e:
                 failures.append((str(inst.id), str(e)))
@@ -180,6 +162,5 @@ class DocumentInstanceAdmin(admin.ModelAdmin):
         if failures:
             for id_, err in failures:
                 self.message_user(request, f"Erro ao regenerar {id_}: {err}", messages.ERROR)
-
-    action_regenerate_files.short_description = "Regenerar DOCX/PDF a partir do template"
+    action_regenerate_files.short_description = "Regenerar DOCX/PDF"
 

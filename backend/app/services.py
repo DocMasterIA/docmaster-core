@@ -8,6 +8,10 @@ from django.core.files import File
 from docxtpl import DocxTemplate
 from weasyprint import HTML  # se usar WeasyPrint para PDF (pode trocar)
 from typing import Tuple
+from jinja2 import Template as JinjaTemplate
+from .models import Snippet, Rule
+from collections import defaultdict
+import logging
 
 # util: garante pasta dentro do MEDIA_ROOT
 def _ensure_media_subdir(*parts) -> str:
@@ -61,25 +65,97 @@ def save_file_to_field(instance, field_name: str, file_path: str, save_instance:
         basename = os.path.basename(file_path)
         getattr(instance, field_name).save(basename, django_file, save=save_instance)
 
-def generate_docx_and_pdf_from_template_model(template_model, context: dict, owner=None) -> Tuple[str, str]:
+from docx2pdf import convert
+import os
+
+def generate_pdf_from_docx(docx_path, output_dir=None):
+    if output_dir is None:
+        output_dir = os.path.dirname(docx_path)
+    pdf_filename = os.path.splitext(os.path.basename(docx_path))[0] + '.pdf'
+    pdf_path = os.path.join(output_dir, pdf_filename)
+    convert(docx_path, pdf_path)
+    return pdf_path
+
+
+
+logger = logging.getLogger(__name__)
+
+def get_label_for_choice(field_name, value):
     """
-    Helper que recebe um Template model (que tem .file.path) e gera docx e pdf,
-    retornando (docx_path, pdf_path).
+    Mapas simples para label legível (pode extrair de DB se tiver)
     """
-    tpl_path = template_model.file.path
-    tmp_dir = tempfile.mkdtemp(prefix="mdlic_")
-    docx_path = render_docx_from_template(tpl_path, context, dest_dir=tmp_dir)
+    maps = {
+        'modalidade': {
+            'pregao_eletronico': 'Pregão Eletrônico',
+            'concorrencia': 'Concorrência',
+            'tomada_precos': 'Tomada de Preços',
+            'convite': 'Convite',
+            'dispensa': 'Dispensa de Licitação',
+            'etp': 'Estudo Técnico Preliminar'
+        }
+    }
+    return maps.get(field_name, {}).get(value, value)
 
-    # generate preview HTML in view or fallback empty string
-    # here we try to use a minimal HTML preview from context (the view should generate better)
-    preview_html = context.get("_preview_html", "")
-    pdf_path = os.path.splitext(docx_path)[0] + ".pdf"
+def select_snippets_for_data(data: dict):
+    """
+    Seleciona snippets seguindo regras simples.
+    - Busca regras com field_name em data and match_value == data[field_name]
+    - Também pega regras com match_value == '*' (default)
+    - Retorna dict area -> list[Snippet ordered]
+    """
+    area_map = defaultdict(list)
+    # carregar todas as regras ordenadas por order
+    rules = Rule.objects.all().order_by('order')
+    for r in rules:
+        field = r.field_name
+        match_val = r.match_value
+        value = data.get(field)
+        if value is None and match_val != '*':
+            continue
+        if match_val == '*' or str(value) == str(match_val):
+            for s in r.snippets.all().order_by('order'):
+                if s.active:
+                    area_map[s.area].append(s)
+    return area_map
 
-    if preview_html:
-        convert_html_to_pdf(preview_html, pdf_path)
-    else:
-        # fallback: try to convert docx -> pdf via LibreOffice (optional) or create empty pdf
-        # Implementação simples: criar pdf vazio (melhore para produção)
-        open(pdf_path, "wb").close()
+def render_snippet(snippet: Snippet, context: dict) -> str:
+    """
+    Renderiza um snippet com Jinja2 usando o contexto.
+    """
+    try:
+        jtpl = JinjaTemplate(snippet.content)
+        return jtpl.render(**context)
+    except Exception as e:
+        logger.exception("Erro renderizando snippet %s: %s", snippet.slug, e)
+        return f"[ERRO AO RENDERIZAR {snippet.slug}]"
 
-    return docx_path, pdf_path
+def assemble_document_context(base_data: dict) -> dict:
+    """
+    Monta o context final para o template principal.
+    Retorna um dict com campos simples (objeto, orgao, etc.) + blocos como 'intro' e 'clausulas_padroes'.
+    """
+    data = dict(base_data)  # copia
+    # adicionar labels legíveis
+    for fld in list(data.keys()):
+        data[f"{fld}_label"] = get_label_for_choice(fld, data.get(fld))
+
+    # selecionar snippets por regra
+    area_map = select_snippets_for_data(data)
+
+    # renderizar e concatenar por area (ordem definida pelos snippet.order)
+    assembled = {}
+    for area, snippets in area_map.items():
+        parts = []
+        for sn in snippets:
+            parts.append(render_snippet(sn, data))
+        # junta com duas quebras de linha entre cláusulas
+        assembled[area] = "\n\n".join(parts)
+
+    # construir context que o docxtpl espera
+    context = dict(data)
+    # por convenção: intro, clausulas_padroes, conclusion
+    context['intro'] = assembled.get('intro', '')
+    context['clausulas_padroes'] = assembled.get('clause', '')
+    context['conclusion'] = assembled.get('conclusion', '')
+
+    return context

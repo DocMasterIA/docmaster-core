@@ -36,9 +36,11 @@ def AreaDoUsuarioView(request):
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from .models import Template, DocumentInstance
-from .services import save_file_to_field, generate_docx_and_pdf_from_template_model
+from .services import save_file_to_field, assemble_document_context, render_docx_from_template, generate_pdf_from_docx
 from django.core.files import File
 import os, traceback
+from django.template.loader import render_to_string
+import tempfile
 
 @login_required
 def DocumentGeneratorView(request, template_slug):
@@ -76,15 +78,21 @@ def DocumentGeneratorView(request, template_slug):
         # Se o usuário clicou em "finalize" (ou 'generate'), geramos os arquivos
         if action in ('finalize', 'generate'):
             try:
-                # Gere docx e pdf (caminhos temporários)
-                docx_path, pdf_path = generate_docx_and_pdf_from_template_model(template, data)
 
-                # Salva os arquivos no model (usa DEFAULT_FILE_STORAGE)
-                save_file_to_field(inst, 'file_docx', docx_path, save_instance=False)
-                save_file_to_field(inst, 'file_pdf', pdf_path, save_instance=False)
+                context = assemble_document_context(data)
 
-                inst.status = 'final'
-                inst.save()
+                context['_preview_html'] = render_to_string('documents/preview_base.html', {'context': context, 'template': template})
+
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    docx_path = render_docx_from_template(inst.template.file.path, context, dest_dir=tmpdir)
+                    pdf_path = generate_pdf_from_docx(docx_path)
+
+                    # Salva os arquivos no model
+                    save_file_to_field(inst, 'file_docx', docx_path, save_instance=False)
+                    save_file_to_field(inst, 'file_pdf', pdf_path, save_instance=False)
+
+                    inst.status = 'final'
+                    inst.save()
 
                 messages.success(request, 'Documento gerado com sucesso.')
                 return redirect('document_detail', pk=inst.pk)

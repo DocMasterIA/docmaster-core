@@ -175,3 +175,32 @@ def get_snippets_for_data(data):
     return snippets_by_area
 
 
+
+from docx import Document
+import re, json
+
+def extract_docx_structure(path):
+    """
+    Retorna uma lista ordenada de blocos com metadados para enviar ao LLM.
+    Cada bloco: {'index': int, 'type': 'heading'|'paragraph'|'table', 'text': str, 'style': 'Heading 1'...}
+    """
+    doc = Document(path)
+    blocks = []
+    idx = 0
+    for p in doc.paragraphs:
+        style = getattr(p.style, "name", "")
+        bl_type = 'heading' if style and style.lower().startswith('heading') else 'paragraph'
+        blocks.append({"index": idx, "type": bl_type, "style": style, "text": p.text})
+        idx += 1
+
+    # tabelas: inserir como blocos com tipo 'table' onde text = concatenacao de celulas
+    for t in doc.tables:
+        # converte tabela em texto resumido
+        rows = []
+        for r in t.rows:
+            cells = [c.text.strip() for c in r.cells]
+            rows.append(" | ".join(cells))
+        blocks.append({"index": idx, "type": "table", "text": "\n".join(rows)})
+        idx += 1
+
+    return {"blocks": blocks, "n_blocks": idx}

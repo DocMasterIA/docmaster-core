@@ -320,30 +320,25 @@ function buildPreviewUrl(id){
 }
 
 // === updatePreviewCard: atualiza o card de preview no lado direito ===
-function updatePreviewCard(t){
-  const previewHeading = document.getElementById('previewHeading');
-  const previewSub = document.getElementById('previewSub');
-  const previewExcerpt = document.getElementById('previewExcerpt');
-  const previewBtn = document.getElementById('previewBtn');
+function updatePreviewCard(template){
+    const heading = document.getElementById("previewHeading");
+    const sub = document.getElementById("previewSub");
+    const excerpt = document.getElementById("previewExcerpt");
+    const previewBtn = document.getElementById("previewBtn");
 
-  if(!t){
-    previewHeading.textContent = "Modelo de Documento";
-    previewSub.textContent = "Selecione um template para ver detalhes e pré-visualizar.";
-    previewExcerpt.innerHTML = "Nenhum template selecionado.";
-    if(previewBtn) previewBtn.classList.add('hidden');
-    return;
-  }
+    heading.textContent = template.name;
+    sub.textContent = `Modelo de Documento - ${template.name}`;
+    excerpt.innerHTML = `
+        <p class="text-sm text-slate-700">Pré-visualização do documento:</p>
+        <img src="${template.preview_image}" class="w-full mt-2 rounded-xl blur-sm" />
+    `;
 
-  previewHeading.textContent = `Modelo de Documento — ${safeText(t.name || t.title || '')}`;
-  previewSub.textContent = t.created_at ? `Criado em ${safeText(t.created_at)}` : "Template cadastrado";
-  previewExcerpt.textContent = t.excerpt || t.description || "Clique em 'Pré-visualizar' para abrir o template em nova aba.";
-
-  // configura botão de preview: usa preview_url vindo da API se existir, senão usa convenção
-  const previewUrl = t.preview_url || buildPreviewUrl(t.id);
-  if(previewBtn){
-    previewBtn.classList.remove('hidden');
-    previewBtn.onclick = () => window.open(previewUrl, '_blank');
-  }
+    if (template.preview_image){
+        previewBtn.classList.remove("hidden");
+        previewBtn.onclick = () => window.open(`/templates/preview/${template.id}/`, "_blank");
+    } else {
+        previewBtn.classList.add("hidden");
+    }
 }
 
 // === onTemplateSelected já existente (apenas garanto que chama updatePreviewCard) ===

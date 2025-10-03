@@ -31,15 +31,15 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    'unfold',
-    "unfold.contrib.filters",  # optional, if special filters are needed
-    "unfold.contrib.forms",  # optional, if special form elements are needed
-    "unfold.contrib.inlines",  # optional, if special inlines are needed
-    "unfold.contrib.import_export",  # optional, if django-import-export package is used
-    "unfold.contrib.guardian",  # optional, if django-guardian package is used
-    "unfold.contrib.simple_history",  # optional, if django-simple-history package is used
-    "unfold.contrib.location_field",  # optional, if django-location-field package is used
-    "unfold.contrib.constance",  # optional, if django-constance package is used
+    # 'unfold',
+    # "unfold.contrib.filters",  # optional, if special filters are needed
+    # "unfold.contrib.forms",  # optional, if special form elements are needed
+    # "unfold.contrib.inlines",  # optional, if special inlines are needed
+    # "unfold.contrib.import_export",  # optional, if django-import-export package is used
+    # "unfold.contrib.guardian",  # optional, if django-guardian package is used
+    # "unfold.contrib.simple_history",  # optional, if django-simple-history package is used
+    # "unfold.contrib.location_field",  # optional, if django-location-field package is used
+    # "unfold.contrib.constance",  # optional, if django-constance package is used
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -121,13 +121,13 @@ USE_TZ = True
 
 from django.templatetags.static import static
 
-UNFOLD = {
-    # Título e cabeçalho
-    "SITE_TITLE": "Painel MDLicitaTech",
-    "SITE_HEADER": "Painel MDLicitaTech",
-    "SITE_URL": "/",  # para onde o logo do header aponta
-    "SITE_ICON": lambda request: static("logo_licita.png"),
-    "STYLES": [lambda request: static("css/admin.css")],
+# UNFOLD = {
+#     # Título e cabeçalho
+#     "SITE_TITLE": "Painel MDLicitaTech",
+#     "SITE_HEADER": "Painel MDLicitaTech",
+#     "SITE_URL": "/",  # para onde o logo do header aponta
+#     "SITE_ICON": lambda request: static("logo_licita.png"),
+#     "STYLES": [lambda request: static("css/admin.css")],
 
     # # Temas (dark/light)
     # "THEMES": [
@@ -148,13 +148,13 @@ UNFOLD = {
     # ],
 
     # Rodapé
-    "FOOTER": "© 2025 Minha Empresa",
+#     "FOOTER": "© 2025 Minha Empresa",
 
-    # # Extras opcionais
-    # "COLORS": {
-    #     "brand": "#4F46E5",  # cor principal personalizada
-    # },
-}
+#     # # Extras opcionais
+#     # "COLORS": {
+#     #     "brand": "#4F46E5",  # cor principal personalizada
+#     # },
+# }
 
 
 # Static files (CSS, JavaScript, Images)
@@ -165,6 +165,11 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"] 
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+import os
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

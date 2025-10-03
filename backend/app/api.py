@@ -51,9 +51,33 @@ def upload_template_and_request_mapping_api(request):
 
 @login_required
 def get_template_list_api(request):
-    qs = Template.objects.all().order_by("-created_at")
-    items = [{"id": str(t.id), "name": t.name, "has_schema": hasattr(t, "schema")} for t in qs]
+    template_id = request.GET.get("id")
+    if template_id:
+        try:
+            t = Template.objects.get(id=template_id)
+            item = {
+                "id": str(t.id),
+                "name": t.name,
+                "has_schema": hasattr(t, "schema"),
+                "preview_image": t.preview_image.url if t.preview_image else None,
+            }
+            return JsonResponse({"template": item})
+        except Template.DoesNotExist:
+            return JsonResponse({"error": "Template não encontrado"}, status=404)
+
+    # fallback: lista de templates
+    qs = Template.objects.all().order_by("-created_at")[:10]
+    items = [
+        {
+            "id": str(t.id),
+            "name": t.name,
+            "has_schema": hasattr(t, "schema"),
+            "preview_image": t.preview_image.url if t.preview_image else None,
+        }
+        for t in qs
+    ]
     return JsonResponse({"templates": items})
+
 
 @login_required
 @csrf_exempt  # se for API token-based, prefira auth token em header e remova csrf_exempt

@@ -3,29 +3,68 @@ from pathlib import Path
 from docx2pdf import convert  # converte docx -> pdf
 from pdf2image import convert_from_path  # converte pdf -> imagens
 from django.conf import settings
+import subprocess
+from PIL import Image, ImageFilter
+from django.conf import settings
+from django.core.files.base import ContentFile
 
 
 def generate_docx_preview(template):
     """
-    Gera imagem PNG borrada do primeiro page do docx para preview.
-    Retorna caminho relativo da imagem.
+    Gera uma miniatura PNG borrada do template .docx usando LibreOffice + pdf2image + Pillow
+    Salva no campo `preview_image` do template.
     """
     if not template.file:
         return None
 
-    preview_dir = Path(settings.MEDIA_ROOT) / "previews"
-    preview_dir.mkdir(parents=True, exist_ok=True)
+    # Paths temporários
+    tmp_dir = Path(settings.MEDIA_ROOT) / "tmp_previews"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
 
-    docx_path = template.file.path
-    pdf_path = preview_dir / f"{template.id}.pdf"
-    img_path = preview_dir / f"{template.id}.png"
+    docx_path = Path(template.file.path)
+    pdf_path = tmp_dir / f"{docx_path.stem}.pdf"
 
-    # 1️ converte docx -> pdf
-    convert(docx_path, str(pdf_path))  # docx2pdf
+    # 1️⃣ Converter DOCX -> PDF via LibreOffice
+    try:
+        subprocess.run([
+            "libreoffice",
+            "--headless",
+            "--convert-to", "pdf",
+            "--outdir", str(tmp_dir),
+            str(docx_path)
+        ], check=True)
+    except subprocess.CalledProcessError:
+        print("Erro ao converter DOCX para PDF")
+        return None
 
-    # 2️converte PDF -> imagem (primeira página)
-    pages = convert_from_path(str(pdf_path), first_page=1, last_page=1, dpi=150)
-    if pages:
-        pages[0].save(img_path, "PNG")
-        return f"previews/{img_path.name}"
-    return None
+    if not pdf_path.exists():
+        print("PDF não foi gerado")
+        return None
+
+    # 2️⃣ Converter PDF -> imagem
+    try:
+        images = convert_from_path(str(pdf_path), first_page=1, last_page=1, dpi=150)
+        if not images:
+            return None
+        img = images[0]
+
+        # 3️⃣ Aplicar efeito borrado
+        img = img.filter(ImageFilter.GaussianBlur(radius=4))
+
+        # 4️⃣ Salvar PNG no campo preview_image
+        preview_filename = f"{docx_path.stem}_preview.png"
+        preview_path = f"previews/{preview_filename}"
+
+        # Salva no storage do Django
+        from django.core.files.storage import default_storage
+        from io import BytesIO
+        buffer = BytesIO()
+        img.save(buffer, format="PNG")
+        buffer.seek(0)
+        template.preview_image.save(preview_filename, ContentFile(buffer.read()), save=True)
+
+        return preview_path
+
+    except Exception as e:
+        print("Erro ao gerar imagem do PDF:", e)
+        return None

@@ -7,6 +7,7 @@ class Template(models.Model):
     name = models.CharField(max_length=180)
     slug = models.SlugField(unique=True, null=True, blank=True)
     file = models.FileField(upload_to='templates/docx/')
+    preview_image = models.ImageField(upload_to="previews/", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
 class TemplateSchema(models.Model):

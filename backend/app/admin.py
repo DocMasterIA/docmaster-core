@@ -37,14 +37,23 @@ from django.core.files import File
 import os, tempfile
 from backend.app.services.render import render_docx_from_template
 from backend.app.services.services import convert_html_to_pdf
+from backend.app.services.preview import generate_docx_preview
+
+@admin.action(description="Gerar preview do template selecionado")
+def generate_preview(modeladmin, request, queryset):
+    for tpl in queryset:
+        generate_docx_preview(tpl)
 
 @admin.register(Template)
 class TemplateAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "created_at")
+    list_display = ("name", "slug", "created_at", "preview_image")
     search_fields = ("name", "slug")
     prepopulated_fields = {"slug": ("name",)}
     readonly_fields = ("created_at",)
     ordering = ("-created_at",)
+
+    actions = [generate_preview]
+
 
 @admin.register(TemplateSchema)
 class TemplateSchemaAdmin(admin.ModelAdmin):

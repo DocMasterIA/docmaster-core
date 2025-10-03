@@ -54,8 +54,9 @@ def create_document_from_ai(template, owner, ai_data):
       - campos como tipo_documento, modalidade, objeto, orgao, valor_estimado, etc.
       - snippets: {"intro": [...], "clause": [...], "conclusion": [...]}
     """
-    from .models import DocumentInstance
-    from .services import render_docx_from_template, generate_pdf_from_docx
+    from app.models import DocumentInstance
+    from .services import generate_pdf_from_docx
+    from .render import render_docx_from_template
 
     # Cria draft inicial
     inst = DocumentInstance.objects.create(

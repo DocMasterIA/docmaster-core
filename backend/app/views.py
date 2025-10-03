@@ -2,6 +2,8 @@ from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.urls import reverse
+from backend.app.models import Template
+from django.contrib.auth.decorators import login_required
 
 def LoginView(request):
     if request.method == "POST":
@@ -33,3 +35,28 @@ def DashboardView(request):
 def AreaDoUsuarioView(request):
     return render(request,"area_do_usuario.html")
 
+
+@login_required
+def UploadTemplateView(request):
+    if request.method == "POST":
+        form = TemplateUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            template = form.save(commit=False)
+            template.owner = request.user
+            template.save()
+            messages.success(request, "Template enviado com sucesso!")
+            # redirecionar para a página de mapeamento via IA depois
+            # return redirect("map_template_fields", template_id=template.id)
+        else:
+            messages.error(request, "Erro ao enviar template. Verifique os campos.")
+    else:
+        form = TemplateUploadForm()
+
+    return render(request, "upload_template.html", {"form": form})
+
+from django.contrib.auth.decorators import login_required
+
+@login_required
+def GetTemplatesView(request):
+    templates = Template.objects.filter(owner=request.user).order_by("created_at")
+    return render(request, "template_list.html", {"templates": templates})

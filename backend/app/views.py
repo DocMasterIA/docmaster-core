@@ -3,6 +3,7 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.urls import reverse
 from backend.app.models import Template
+from backend.app.forms import TemplateUploadForm
 from django.contrib.auth.decorators import login_required
 
 def LoginView(request):

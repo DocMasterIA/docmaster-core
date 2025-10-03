@@ -85,3 +85,7 @@ def save_template_schema(template, mapping_json, strategy='index'):
     )
     return schema_obj
 
+
+
+def assemble_document_context():
+    pass

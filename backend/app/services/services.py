@@ -85,7 +85,28 @@ def save_template_schema(template, mapping_json, strategy='index'):
     )
     return schema_obj
 
+def assemble_document_context(data: dict) -> dict:
+    """
+    Monta o contexto para renderização do template.
+    Recebe um dict com os dados do documento (form ou IA)
+    e retorna um dict pronto para renderização do Jinja2 ou outro renderizador.
+    """
+    context = {}
 
+    # Campos básicos que devem existir no template
+    context["tipo_documento"] = data.get("tipo_documento", "")
+    context["modalidade"] = data.get("modalidade", "")
+    context["objeto"] = data.get("objeto", "")
+    context["orgao"] = data.get("orgao", "")
+    context["valor_estimado"] = data.get("valor_estimado", "")
+    context["prazo_execucao"] = data.get("prazo_execucao", "")
+    context["responsavel"] = data.get("responsavel", "")
+    context["observacoes"] = data.get("observacoes", "")
 
-def assemble_document_context():
-    pass
+    # Qualquer campo extra que venha da IA pode ser injetado diretamente
+    # Isso garante modularidade: o template pode ter {{ campo_extra }} sem quebrar
+    for key, value in data.items():
+        if key not in context:
+            context[key] = value
+
+    return context

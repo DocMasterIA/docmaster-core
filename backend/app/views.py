@@ -25,14 +25,17 @@ def LoginView(request):
 def RegisterView(request):
     return render(request,"register_portal.html")
 
+@login_required
 def LogoutView(request):
     logout(request)
     messages.info(request, "Você saiu da sua conta.")
     return redirect(reverse("login_panel"))
 
+@login_required
 def DashboardView(request):
     return render(request, "dashboard.html")
 
+@login_required
 def AreaDoUsuarioView(request):
     return render(request,"area_do_usuario.html")
 
@@ -61,3 +64,7 @@ from django.contrib.auth.decorators import login_required
 def GetTemplatesView(request):
     templates = Template.objects.filter(owner=request.user).order_by("created_at")
     return render(request, "template_list.html", {"templates": templates})
+
+@login_required
+def DocumentGeneratorView(request):
+    return render(request, "document_generator.html")

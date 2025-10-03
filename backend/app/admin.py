@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from backend.app.models import User, Template, DocumentInstance
+from backend.app.models import User, Template, DocumentInstance, TemplateSchema, SchemaAudit
 from backend.app.services.render import render_docx_from_template
 from backend.app.services.services import convert_html_to_pdf  # seus serviços
 from django.core.files import File
@@ -38,23 +38,35 @@ import os, tempfile
 from backend.app.services.render import render_docx_from_template
 from backend.app.services.services import convert_html_to_pdf
 
-# ------------------ TEMPLATE ------------------
 @admin.register(Template)
 class TemplateAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "created_at", "preview_available")
-    search_fields = ("name", "slug", "description")
+    list_display = ("name", "slug", "created_at")
+    search_fields = ("name", "slug")
+    prepopulated_fields = {"slug": ("name",)}
     readonly_fields = ("created_at",)
-    fieldsets = (
-        (None, {"fields": ("name", "slug", "description", "file")}),
-        ("Configuração", {"fields": ("required_fields", "preview_html")}),
-        ("Metadados", {"fields": ("created_at",)}),
-    )
+    ordering = ("-created_at",)
 
-    def preview_available(self, obj):
-        return bool(obj.preview_html)
-    preview_available.boolean = True
-    preview_available.short_description = "Preview"
+@admin.register(TemplateSchema)
+class TemplateSchemaAdmin(admin.ModelAdmin):
+    list_display = ("template_name", "strategy", "created_at")
+    search_fields = ("template__name",)
+    readonly_fields = ("created_at",)
+    ordering = ("-created_at",)
 
+    def template_name(self, obj):
+        return obj.template.name
+    template_name.short_description = "Template"
+
+@admin.register(SchemaAudit)
+class SchemaAuditAdmin(admin.ModelAdmin):
+    list_display = ("schema_template_name", "user", "created_at")
+    search_fields = ("schema__template__name", "user__username")
+    readonly_fields = ("created_at", "payload")
+    ordering = ("-created_at",)
+
+    def schema_template_name(self, obj):
+        return obj.schema.template.name
+    schema_template_name.short_description = "Template"
 
 # ------------------ DOCUMENT INSTANCE ------------------
 @admin.register(DocumentInstance)

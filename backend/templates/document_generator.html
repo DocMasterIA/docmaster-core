@@ -32,7 +32,7 @@
                 <!-- Nav -->
                 <nav class="hidden xl:flex space-x-1">
                     <a href="/" class="px-4 py-2 text-slate-700 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-all duration-200">Dashboard</a>
-                    <a href="/gerador_documentos" class="px-4 py-2 text-blue-700 font-semibold bg-blue-50 rounded-xl border-2 border-blue-200 backdrop-blur-sm">Geração de Documentos</a>
+                    <a href="/gerador_de_documentos" class="px-4 py-2 text-blue-700 font-semibold bg-blue-50 rounded-xl border-2 border-blue-200 backdrop-blur-sm">Geração de Documentos</a>
                     <a href="/area_do_usuario" class="px-4 py-2 text-slate-700 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-all duration-200">Área de Usuário</a>
                     {% if request.user.is_staff or request.user.is_superuser %}
                                     <a href="/admin" 
@@ -101,16 +101,6 @@
                         <h2 class="text-4xl font-bold text-slate-900 mb-2">Gerador de Documentos</h2>
                         <p class="text-slate-600 font-medium">Crie documentos profissionais com conformidade governamental</p>
                     </div>
-                    <div class="flex space-x-3">
-                        <button class="group bg-white hover:bg-slate-50 border border-slate-300 hover:border-blue-400 text-slate-700 hover:text-blue-700 font-semibold px-6 py-3 rounded-xl shadow-sm transition-all duration-300">
-                            <div class="flex items-center space-x-2">
-                                <svg class="h-5 w-5 group-hover:text-blue-600 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                </svg>
-                                <span>Importar Template</span>
-                            </div>
-                        </button>
-                    </div>
                 </div>
             </div>
         </section>
@@ -127,19 +117,31 @@
                                 <h3 class="text-xl font-bold text-slate-900">Assistente de Criação</h3>
                                 <p class="text-sm text-slate-500 mt-1">Guia executivo para documentação profissional</p>
                             </div>
-                            <div class="flex items-center space-x-2">
-                                <span class="text-sm text-slate-500">Passo 1 de 4</span>
-                                <div class="w-24 bg-slate-200 rounded-full h-2">
-                                    <div class="bg-gradient-to-r from-blue-600 to-blue-700 h-2 rounded-full" style="width: 25%"></div>
-                                </div>
-                            </div>
+                         
                         </div>
                     </div>
-
-                    <!-- Step 1 -->
-<form method="post" id="docForm" action="{% url 'create_document' template.slug %}">
+<!-- Step 1 -->
+<form method="post" id="docForm">
     {% csrf_token %}
     <div class="p-6 space-y-6">
+
+        <!-- Dropdown de Templates -->
+        <div class="relative">
+            <label class="block text-sm font-medium text-slate-700 mb-2">Escolha o template</label>
+            <input type="text" id="template-search" placeholder="Selecione um template..."
+                   class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200">
+            <ul id="template-results" class="border rounded-xl mt-1 max-h-40 overflow-y-auto hidden bg-white z-50 absolute w-full shadow-lg"></ul>
+            <input type="hidden" name="template_id" id="template-id">
+
+            <div class="mt-2">
+                <a href="{% url 'dashboard' %}" 
+                   class="inline-block bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-xl shadow-sm hover:bg-slate-50 transition-all duration-200">
+                    Ver Biblioteca de Templates
+                </a>
+            </div>
+        </div>
+
+        <!-- Prompt de Inteligência Artificial -->
         <div>
             <label class="block text-sm font-medium text-slate-700 mb-2">
                 Prompt de Inteligência Artificial
@@ -149,6 +151,7 @@
                       placeholder="Digite aqui o prompt que será enviado para a IA...">{% if form_data.ia_prompt %}{{ form_data.ia_prompt }}{% endif %}</textarea>
         </div>
 
+        <!-- Botões -->
         <div class="flex justify-end space-x-3">
             <button type="submit" name="action" value="generate"
                     class="group relative overflow-hidden bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-600 text-white font-semibold px-6 py-3 rounded-xl shadow-md transition-all duration-300 transform hover:-translate-y-0.5">
@@ -166,262 +169,377 @@
     </div>
 </form>
 
+<script>
+const input = document.getElementById("template-search");
+const results = document.getElementById("template-results");
+const templateIdInput = document.getElementById("template-id");
+
+let currentFetchAbort = null;
+let focusedIndex = -1; // para navegação por teclado
+
+function escapeHtml(str){ return String(str).replace(/[&<>"']/g, (s)=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' })[s]); }
+
+async function fetchTemplates(query="") {
+  if (currentFetchAbort) currentFetchAbort.abort();
+  currentFetchAbort = new AbortController();
+  const url = `/api/documentos_modelos/?q=${encodeURIComponent(query)}`;
+  try {
+    const resp = await fetch(url, { signal: currentFetchAbort.signal });
+    if (!resp.ok) return [];
+    const json = await resp.json();
+    return Array.isArray(json.templates) ? json.templates.slice(0,10) : [];
+  } catch(err) {
+    if (err.name === 'AbortError') return [];
+    console.error("fetchTemplates error", err);
+    return [];
+  } finally { currentFetchAbort = null; }
+}
+
+function renderResults(templates){
+  results.innerHTML = "";
+  focusedIndex = -1;
+  if(!templates.length){
+    results.innerHTML = '<li class="p-2 text-gray-400">Nenhum template encontrado</li>';
+    results.classList.remove('hidden');
+    return;
+  }
+  // monta items e adiciona handlers delegados
+  results.innerHTML = templates.map((t, idx) => {
+    const name = escapeHtml(t.name || '—');
+    const id = escapeHtml(t.id);
+    return `<li class="result-item p-2 hover:bg-blue-100 cursor-pointer flex items-center justify-between" data-id="${id}" data-name="${name}" data-idx="${idx}">
+      <div class="flex items-center gap-2">
+        <span class="w-8 h-8 flex items-center justify-center rounded bg-blue-50">
+          <svg class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/></svg>
+        </span>
+        <span class="font-semibold text-blue-700">${name}</span>
+      </div>
+      <button type="button" data-id="${id}" class="preview-btn text-sm text-white bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded">Pré-visualizar</button>
+    </li>`;
+  }).join("");
+  results.classList.remove('hidden');
+}
+
+// delegação de clique
+results.addEventListener('click', (e) => {
+  const previewBtn = e.target.closest('.preview-btn');
+  if (previewBtn){
+    const id = previewBtn.dataset.id;
+    window.open(`/templates/preview/${encodeURIComponent(id)}/`, '_blank');
+    return;
+  }
+  const li = e.target.closest('.result-item');
+  if (!li) return;
+  const id = li.dataset.id;
+  const name = li.dataset.name;
+  onTemplateSelected(id, name);
+});
+
+// seleção por teclado (Arrow + Enter)
+input.addEventListener('keydown', (e) => {
+  const items = results.querySelectorAll('.result-item');
+  if (!items.length) return;
+  if (e.key === 'ArrowDown'){
+    e.preventDefault();
+    focusedIndex = Math.min(focusedIndex + 1, items.length - 1);
+    items.forEach((it,i)=> it.classList.toggle('bg-blue-50', i===focusedIndex));
+    items[focusedIndex].scrollIntoView({block:'nearest'});
+  } else if (e.key === 'ArrowUp'){
+    e.preventDefault();
+    focusedIndex = Math.max(focusedIndex - 1, 0);
+    items.forEach((it,i)=> it.classList.toggle('bg-blue-50', i===focusedIndex));
+    items[focusedIndex].scrollIntoView({block:'nearest'});
+  } else if (e.key === 'Enter'){
+    e.preventDefault();
+    if (focusedIndex >= 0 && items[focusedIndex]){
+      const it = items[focusedIndex];
+      onTemplateSelected(it.dataset.id, it.dataset.name);
+    } else {
+      // se nenhum selecionado, tenta selecionar o primeiro
+      if (items[0]) onTemplateSelected(items[0].dataset.id, items[0].dataset.name);
+    }
+  }
+});
+
+// mostra recentes ao focar
+input.addEventListener('focus', async () => {
+  const templates = await fetchTemplates('');
+  renderResults(templates);
+});
+
+// filtra com debounce
+let debounceTimer = null;
+input.addEventListener('input', async () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(async () => {
+    const q = input.value.trim();
+    const templates = await fetchTemplates(q);
+    renderResults(templates);
+  }, 160);
+});
+
+// fecha dropdown se clicar fora
+document.addEventListener('click', (e) => {
+  if (!input.contains(e.target) && !results.contains(e.target)) results.classList.add('hidden');
+});
+
+// função principal: chamada ao selecionar um template
+async function onTemplateSelected(id, name){
+  // atualiza form
+  input.value = name;
+  templateIdInput.value = id;
+  results.classList.add('hidden');
+
+  // tenta obter metadados do template para o preview
+  try {
+    const resp = await fetch(`/api/documentos_modelos/?id=${encodeURIComponent(id)}`);
+    if (resp.ok){
+      const json = await resp.json();
+      let t = null;
+      if (json.template) t = json.template;
+      else if (Array.isArray(json.templates) && json.templates.length) t = json.templates[0];
+      if (!t) t = { id, name };
+      updatePreviewCard(t);
+      return;
+    }
+  } catch(err){
+    console.debug('preview fetch failed', err);
+  }
+
+  // fallback simples
+  updatePreviewCard({ id, name });
+}
+</script>
+
+<script>
+// === helpers ===
+function safeText(s){ return s ? String(s) : ''; }
+function buildPreviewUrl(id){
+  // convenção fallback (ajuste se sua rota difere)
+  return `/templates/preview/${encodeURIComponent(id)}/`;
+}
+
+// === updatePreviewCard: atualiza o card de preview no lado direito ===
+function updatePreviewCard(t){
+  const previewHeading = document.getElementById('previewHeading');
+  const previewSub = document.getElementById('previewSub');
+  const previewExcerpt = document.getElementById('previewExcerpt');
+  const previewBtn = document.getElementById('previewBtn');
+
+  if(!t){
+    previewHeading.textContent = "Modelo de Documento";
+    previewSub.textContent = "Selecione um template para ver detalhes e pré-visualizar.";
+    previewExcerpt.innerHTML = "Nenhum template selecionado.";
+    if(previewBtn) previewBtn.classList.add('hidden');
+    return;
+  }
+
+  previewHeading.textContent = `Modelo de Documento — ${safeText(t.name || t.title || '')}`;
+  previewSub.textContent = t.created_at ? `Criado em ${safeText(t.created_at)}` : "Template cadastrado";
+  previewExcerpt.textContent = t.excerpt || t.description || "Clique em 'Pré-visualizar' para abrir o template em nova aba.";
+
+  // configura botão de preview: usa preview_url vindo da API se existir, senão usa convenção
+  const previewUrl = t.preview_url || buildPreviewUrl(t.id);
+  if(previewBtn){
+    previewBtn.classList.remove('hidden');
+    previewBtn.onclick = () => window.open(previewUrl, '_blank');
+  }
+}
+
+// === onTemplateSelected já existente (apenas garanto que chama updatePreviewCard) ===
+async function onTemplateSelected(id, name){
+  const input = document.getElementById("template-search");
+  const templateIdInput = document.getElementById("template-id");
+  if (input) input.value = name;
+  if (templateIdInput) templateIdInput.value = id;
+  const results = document.getElementById("template-results");
+  if (results) results.classList.add('hidden');
+
+  // tenta carregamento de metadados pelo endpoint
+  try{
+    const resp = await fetch(`/api/documentos_modelos/?id=${encodeURIComponent(id)}`);
+    if(resp.ok){
+      const json = await resp.json();
+      let t = null;
+      if(json.template) t = json.template;
+      else if(Array.isArray(json.templates) && json.templates.length) t = json.templates[0];
+      if(!t) t = { id, name };
+      updatePreviewCard(t);
+      return;
+    }
+  }catch(e){
+    console.debug("preview fetch failed:", e);
+  }
+
+  // fallback
+  updatePreviewCard({ id, name });
+}
+
+// === pequeno ajuste: expõe a função globalmente caso algum outro trecho do seu código chame selectTemplate ===
+window.onTemplateSelected = onTemplateSelected;
+</script>
+
+
                 </section>
                 <!-- Recent Documents -->
-                <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="p-6 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="text-xl font-bold text-slate-900">Documentos Recentes</h3>
-                                <p class="text-sm text-slate-500 mt-1">Histórico de documentação executiva</p>
-                            </div>
-                            <a href="project_workspace.html" class="inline-flex items-center px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold rounded-xl border border-blue-200 transition-colors duration-200">
-                                <span class="mr-2">Ver todos</span>
-                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                                </svg>
-                            </a>
-                        </div>
-                    </div>
-                    <div class="p-6 space-y-4">
-                        <div class="group bg-gradient-to-r from-slate-50 to-white hover:from-blue-50 hover:to-white rounded-xl p-4 border border-slate-200 hover:border-blue-200 transition-all duration-300 cursor-pointer">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center space-x-4">
-                                    <div class="h-12 w-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-md">
-                                        <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <h4 class="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">TR - Equipamentos de TI</h4>
-                                        <p class="text-sm text-slate-500">Última edição: 24/09/2025 às 10:30</p>
-                                    </div>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">Rascunho</span>
-                                    <button class="text-slate-500 hover:text-blue-600 transition-colors duration-200">
-                                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="group bg-gradient-to-r from-slate-50 to-white hover:from-emerald-50 hover:to-white rounded-xl p-4 border border-slate-200 hover:border-emerald-200 transition-all duration-300 cursor-pointer">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center space-x-4">
-                                    <div class="h-12 w-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-md">
-                                        <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <h4 class="font-semibold text-slate-900 group-hover:text-emerald-700 transition-colors">ETP - Consultoria Jurídica</h4>
-                                        <p class="text-sm text-slate-500">Última edição: 23/09/2025 às 16:45</p>
-                                    </div>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Finalizado</span>
-                                    <button class="text-slate-500 hover:text-emerald-600 transition-colors duration-200">
-                                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="group bg-gradient-to-r from-slate-50 to-white hover:from-violet-50 hover:to-white rounded-xl p-4 border border-slate-200 hover:border-violet-200 transition-all duration-300 cursor-pointer">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center space-x-4">
-                                    <div class="h-12 w-12 bg-gradient-to-br from-violet-500 to-violet-600 rounded-xl flex items-center justify-center shadow-md">
-                                        <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <h4 class="font-semibold text-slate-900 group-hover:text-violet-700 transition-colors">DFD - Obras de Infraestrutura</h4>
-                                        <p class="text-sm text-slate-500">Última edição: 22/09/2025 às 14:20</p>
-                                    </div>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">Em revisão</span>
-                                    <button class="text-slate-500 hover:text-violet-600 transition-colors duration-200">
-                                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
             </div>
 
-            <!-- Right column -->
-            <div class="space-y-8">
-                <!-- Template Library -->
-                <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="p-6 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <h3 class="text-lg font-bold text-slate-900">Biblioteca de Templates</h3>
-                                <p class="text-sm text-slate-500 mt-1">Modelos executivos pré-aprovados</p>
-                            </div>
-                            <button class="text-blue-700 hover:text-blue-600 text-sm font-medium flex items-center space-x-1">
-                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                                </svg>
-                                <span>Buscar</span>
-                            </button>
-                        </div>
-                    </div>
+<div class="space-y-8">
+  <!-- Template Library / Preview Card -->
+  <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="p-6 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-bold text-slate-900">Pré Visualização de Documento</h3>
+          <p class="text-sm text-slate-500 mt-1">Veja o Modelo de Documento antes de gerar</p>
+        </div>
+        <div class="flex items-center gap-3">
+        </div>
+      </div>
+    </div>
 
-                    <!-- Filters -->
-                    <div class="p-4 border-b border-slate-200">
-                        <div class="flex flex-wrap gap-2">
-                            <button class="px-3 py-1 text-xs font-medium bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full shadow-sm">Todos</button>
-                            <button class="px-3 py-1 text-xs font-medium bg-white border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors duration-200">Termo de Referência</button>
-                            <button class="px-3 py-1 text-xs font-medium bg-white border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors duration-200">ETP</button>
-                            <button class="px-3 py-1 text-xs font-medium bg-white border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors duration-200">DFD</button>
-                        </div>
-                    </div>
+    <!-- Preview Card / Lista resumida -->
+    <div class="p-6 grid grid-cols-1 gap-4">
+      <!-- small help / quick list -->
+      <div id="quickList" class="grid grid-cols-1 gap-2">
+        <!-- se quiser, aqui podemos preencher os 3 últimos templates como links rápidos (opcional) -->
+      </div>
 
-                    <div class="p-6 space-y-3">
-                        <div class="flex items-center justify-between p-3 bg-white hover:bg-slate-50 rounded-xl transition-colors duration-200 cursor-pointer group border border-slate-200">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center shadow-sm">
-                                    <svg class="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-sm font-medium text-slate-900 group-hover:text-blue-700 transition-colors">TR - Equipamentos TI</p>
-                                    <p class="text-xs text-slate-500">Usado 24 vezes</p>
-                                </div>
-                            </div>
-                            <svg class="h-4 w-4 text-slate-400 group-hover:text-blue-600 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                            </svg>
-                        </div>
-
-                        <div class="flex items-center justify-between p-3 bg-white hover:bg-slate-50 rounded-xl transition-colors duration-200 cursor-pointer group border border-slate-200">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-8 h-8 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-sm">
-                                    <svg class="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-sm font-medium text-slate-900 group-hover:text-emerald-700 transition-colors">ETP - Consultoria</p>
-                                    <p class="text-xs text-slate-500">Usado 18 vezes</p>
-                                </div>
-                            </div>
-                            <svg class="h-4 w-4 text-slate-400 group-hover:text-emerald-600 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                            </svg>
-                        </div>
-
-                        <div class="flex items-center justify-between p-3 bg-white hover:bg-slate-50 rounded-xl transition-colors duration-200 cursor-pointer group border border-slate-200">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-8 h-8 bg-gradient-to-br from-amber-500 to-amber-600 rounded-lg flex items-center justify-center shadow-sm">
-                                    <svg class="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-sm font-medium text-slate-900 group-hover:text-amber-700 transition-colors">DFD - Obras Públicas</p>
-                                    <p class="text-xs text-slate-500">Usado 12 vezes</p>
-                                </div>
-                            </div>
-                            <svg class="h-4 w-4 text-slate-400 group-hover:text-amber-600 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                            </svg>
-                        </div>
-
-                        <div class="flex items-center justify-between p-3 bg-white hover:bg-slate-50 rounded-xl transition-colors duration-200 cursor-pointer group border border-slate-200">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-8 h-8 bg-gradient-to-br from-violet-500 to-violet-600 rounded-lg flex items-center justify-center shadow-sm">
-                                    <svg class="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p class="text-sm font-medium text-slate-900 group-hover:text-violet-700 transition-colors">TR - Serviços Gerais</p>
-                                    <p class="text-xs text-slate-500">Usado 9 vezes</p>
-                                </div>
-                            </div>
-                            <svg class="h-4 w-4 text-slate-400 group-hover:text-violet-600 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                            </svg>
-                        </div>
-                    </div>
-                </section>
-
-
-                <!-- Export Options -->
-                <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="p-6 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
-                        <h3 class="text-lg font-bold text-slate-900">Opções de Exportação</h3>
-                        <p class="text-sm text-slate-500 mt-1">Formatos profissionais disponíveis</p>
-                    </div>
-                    <div class="p-6 space-y-3">
-                        <button class="w-full flex items-center justify-between p-4 bg-white hover:bg-slate-50 rounded-xl transition-colors duration-200 group border border-slate-200">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center shadow-sm">
-                                    <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                    </svg>
-                                </div>
-                                <div class="text-left">
-                                    <p class="text-sm font-medium text-slate-900 group-hover:text-blue-700 transition-colors">PDF Oficial</p>
-                                    <p class="text-xs text-slate-500">Com assinatura digital executiva</p>
-                                </div>
-                            </div>
-                            <svg class="h-5 w-5 text-slate-400 group-hover:text-blue-600 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/>
-                            </svg>
-                        </button>
-
-                        <button class="w-full flex items-center justify-between p-4 bg-white hover:bg-slate-50 rounded-xl transition-colors duration-200 group border border-slate-200">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-sm">
-                                    <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                    </svg>
-                                </div>
-                                <div class="text-left">
-                                    <p class="text-sm font-medium text-slate-900 group-hover:text-blue-700 transition-colors">Word (.docx)</p>
-                                    <p class="text-xs text-slate-500">Para edição executiva adicional</p>
-                                </div>
-                            </div>
-                            <svg class="h-5 w-5 text-slate-400 group-hover:text-blue-600 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/>
-                            </svg>
-                        </button>
-
-                        <button class="w-full flex items-center justify-between p-4 bg-white hover:bg-slate-50 rounded-xl transition-colors duration-200 group border border-slate-200">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-sm">
-                                    <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                                    </svg>
-                                </div>
-                                <div class="text-left">
-                                    <p class="text-sm font-medium text-slate-900 group-hover:text-emerald-700 transition-colors">Template Personalizado</p>
-                                    <p class="text-xs text-slate-500">Salvar como modelo executivo</p>
-                                </div>
-                            </div>
-                            <svg class="h-5 w-5 text-slate-400 group-hover:text-emerald-600 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/>
-                            </svg>
-                        </button>
-                    </div>
-                </section>
-
-                <!-- Version Control -->
+      <!-- Preview card -->
+      <div id="previewContainer" class="relative">
+        <div id="previewCard" class="w-full p-6 rounded-2xl shadow-md bg-white/60 backdrop-blur-sm border border-white/30 transition-all">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h4 id="previewHeading" class="text-lg font-bold text-slate-900">Modelo de Documento</h4>
+              <p id="previewSub" class="text-sm text-slate-500 mt-1">Selecione um template para ver detalhes e pré-visualizar.</p>
             </div>
+
+            <div>
+              <span class="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-blue-50">
+                <svg class="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M6 2h9l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/>
+                </svg>
+              </span>
+            </div>
+          </div>
+
+          <div id="previewExcerpt" class="mt-4 text-sm text-slate-700 leading-relaxed">
+            Nenhum template selecionado. Depois de escolher um template, você poderá:
+            <ul class="list-disc ml-5 mt-2 text-slate-600">
+              <li>Ver informações do template</li>
+              <li>Pré-visualizar o .docx</li>
+              <li>Gerar o documento com IA</li>
+            </ul>
+          </div>
+
+          <div class="mt-6 flex justify-end gap-2">
+            <button id="previewBtn" type="button" class="hidden inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-300 shadow-sm text-sm font-semibold hover:bg-slate-50">
+              Pré-visualizar
+            </button>
+            <a id="libraryBtn" href="{% url 'dashboard' %}" class="inline-block px-4 py-2 rounded-xl bg-transparent text-sm border border-white/30 text-slate-700 hover:bg-white/5">
+              Biblioteca
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+<!-- <script>
+/*
+  Funções de integração para o preview card.
+  - use onTemplateSelected(id,name) ao selecionar no dropdown
+  - se quiser manter selectTemplate, faça selectTemplate = onTemplateSelected
+*/
+
+const previewHeading = document.getElementById('previewHeading');
+const previewSub = document.getElementById('previewSub');
+const previewExcerpt = document.getElementById('previewExcerpt');
+const previewBtn = document.getElementById('previewBtn');
+const quickList = document.getElementById('quickList');
+const previewContainer = document.getElementById('previewContainer');
+
+// atualiza o card (t: {id,name,preview_url,created_at,excerpt})
+function updatePreviewCard(t) {
+  if (!t) {
+    previewHeading.textContent = "Modelo de Documento";
+    previewSub.textContent = "Selecione um template para ver detalhes e pré-visualizar.";
+    previewExcerpt.innerHTML = "Nenhum template selecionado.";
+    previewBtn.classList.add('hidden');
+    return;
+  }
+
+  previewHeading.textContent = `Modelo de Documento — ${t.name || 'Sem nome'}`;
+  previewSub.textContent = t.created_at ? `Criado em ${t.created_at}` : 'Template cadastrado';
+  previewExcerpt.textContent = t.excerpt || "Clique em 'Pré-visualizar' para abrir o template em nova aba.";
+
+  // habilita botão de preview com URL se existir, senão usa convenção
+  const previewUrl = t.preview_url || `/templates/preview/${encodeURIComponent(t.id)}/`;
+  previewBtn.onclick = () => window.open(previewUrl, '_blank');
+  previewBtn.classList.remove('hidden');
+}
+
+// wrapper público: chamado ao selecionar template no dropdown
+async function onTemplateSelected(id, name) {
+  // preencha os campos do formulário (hidden)
+  const searchInput = document.getElementById('template-search');
+  const hiddenInput = document.getElementById('template-id');
+  if (searchInput) searchInput.value = name;
+  if (hiddenInput) hiddenInput.value = id;
+
+  // tenta pegar metadados pela API (se existir)
+  try {
+    const resp = await fetch(`/api/documentos_modelos/?id=${encodeURIComponent(id)}`);
+    if (resp.ok) {
+      const j = await resp.json();
+      // aqui suportamos dois formatos possíveis: { template: {...} } ou { templates: [...] }
+      let t = null;
+      if (j.template) t = j.template;
+      else if (Array.isArray(j.templates) && j.templates.length) t = j.templates[0];
+      // fallback cria objeto mínimo
+      if (!t) t = { id, name };
+      updatePreviewCard(t);
+      return;
+    }
+  } catch (err) {
+    console.debug('Erro buscando metadados do template:', err);
+  }
+
+  // fallback simples
+  updatePreviewCard({ id, name });
+}
+
+// Se você ainda usa a função selectTemplate, faça ela apontar para onTemplateSelected
+// ex: window.selectTemplate = onTemplateSelected;
+
+// opcional: preencher quickList com 3 últimos templates (se quiser)
+(async function loadQuickList(){
+  try {
+    const resp = await fetch('/api/documentos_modelos/?q=');
+    if (!resp.ok) return;
+    const j = await resp.json();
+    const templates = j.templates || [];
+    // pega até 3
+    const small = templates.slice(0,3);
+    quickList.innerHTML = small.map(t => `
+      <a href="#" onclick="onTemplateSelected('${t.id}','${t.name}'); return false;" class="block px-3 py-2 rounded-lg hover:bg-slate-50 border border-transparent">
+        <div class="flex items-center gap-3">
+          <span class="inline-flex items-center justify-center w-10 h-10 rounded bg-blue-50">
+            <svg class="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/></svg>
+          </span>
+          <div>
+            <div class="font-semibold text-slate-800">${(t.name||'—')}</div>
+            <div class="text-xs text-slate-500 mt-0.5">${t.created_at ? t.created_at : ''}</div>
+          </div>
+        </div>
+      </a>
+    `).join('');
+  } catch(e){ console.debug('quickList load fail', e); }
+})();
+</script>
+ -->
+  </section>
+</div>
         </div>
     </main>
 

@@ -8,6 +8,8 @@ from backend.app.models import Template, TemplateSchema
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import get_object_or_404
 import os
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_GET
 
 
 
@@ -83,3 +85,30 @@ def generate_document_with_values_api(request):
 
     except Exception as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+@require_GET
+@login_required
+def template_list_api(request):
+    """
+    Retorna até 10 templates em JSON.
+    Se `q` vazio => retorna 10 templates mais recentes (do usuário ou todos, ajustar).
+    """
+    q = request.GET.get("q", "").strip()
+    # Se quiser limitar a templates do usuário: use owner=request.user
+    base_qs = Template.objects.all().order_by("-created_at")
+
+    if q:
+        qs = base_qs.filter(name__icontains=q)[:10]
+    else:
+        qs = base_qs[:10]
+
+    data = []
+    for t in qs:
+        data.append({
+            "id": str(t.id),
+            "name": t.name,
+            # opcional: adicionar url de preview se tiver view
+            # "preview_url": request.build_absolute_uri(reverse('template_preview', args=[t.id])),
+        })
+
+    return JsonResponse({"templates": data})

@@ -59,3 +59,12 @@ def render_docx_by_index(template_path, out_path, mapping_schema, values: dict):
 
     doc.save(out_path)
     return out_path
+
+def render_docx_with_tokens(template_path: str, output_path: str, values: dict):
+    """
+    Gera um DOCX a partir de um template com marcações {{ }} via docxtpl.
+    """
+    tpl = DocxTemplate(template_path)
+    tpl.render(values)
+    tpl.save(output_path)
+    return output_path

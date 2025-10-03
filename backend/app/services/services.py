@@ -76,7 +76,7 @@ def validate_mapping_response(resp):
             return False, f"Field inválido: {f}"
     return True, None
 
-from app.models import TemplateSchema
+from backend.app.models import TemplateSchema
 
 def save_template_schema(template, mapping_json, strategy='index'):
     schema_obj, _ = TemplateSchema.objects.update_or_create(

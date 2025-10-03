@@ -3,7 +3,7 @@
 from docx import Document
 import uuid
 from pathlib import Path
-from services import _ensure_media_subdir
+from .services import _ensure_media_subdir
 from docxtpl import DocxTemplate
 import os 
 

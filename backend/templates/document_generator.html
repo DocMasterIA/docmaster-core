@@ -139,96 +139,34 @@
                     <!-- Step 1 -->
 <form method="post" id="docForm" action="{% url 'create_document' template.slug %}">
     {% csrf_token %}
-    <div id="step-1" class="p-6 space-y-6">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-2">Tipo de Documento</label>
-                <select name="tipo_documento" required
-                        class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200">
-                    <option value="">Selecione o tipo</option>
-                    <option value="termo_referencia" {% if form_data.tipo_documento == "termo_referencia" %}selected{% endif %}>Termo de Referência</option>
-                    <option value="etp" {% if form_data.tipo_documento == "etp" %}selected{% endif %}>Estudo Técnico Preliminar (ETP)</option>
-                    <option value="dfd" {% if form_data.tipo_documento == "dfd" %}selected{% endif %}>Documento de Formalização de Demanda (DFD)</option>
-                </select>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-2">Modalidade Licitatória</label>
-                <select name="modalidade" required
-                        class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200">
-                    <option value="">Selecione a modalidade</option>
-                    {% for m in modalidades %}
-                        <option value="{{ m.0 }}" {% if form_data.modalidade == m.0 %}selected{% endif %}>{{ m.1 }}</option>
-                    {% empty %}
-                        <option value="pregao_eletronico" {% if form_data.modalidade == "pregao_eletronico" %}selected{% endif %}>Pregão Eletrônico</option>
-                        <option value="concorrencia" {% if form_data.modalidade == "concorrencia" %}selected{% endif %}>Concorrência</option>
-                        <option value="tomada_precos" {% if form_data.modalidade == "tomada_precos" %}selected{% endif %}>Tomada de Preços</option>
-                        <option value="convite" {% if form_data.modalidade == "convite" %}selected{% endif %}>Convite</option>
-                        <option value="dispensa" {% if form_data.modalidade == "dispensa" %}selected{% endif %}>Dispensa de Licitação</option>
-                    {% endfor %}
-                </select>
-            </div>
-        </div>
-
+    <div class="p-6 space-y-6">
         <div>
-            <label class="block text-sm font-medium text-slate-700 mb-2">Objeto da Contratação</label>
-            <textarea name="objeto"
-                      class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-700 h-24 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 placeholder:text-slate-400"
-                      placeholder="Descreva o objeto da contratação...">{% if form_data.objeto %}{{ form_data.objeto }}{% endif %}</textarea>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-2">Órgão Contratante</label>
-                <input type="text" name="orgao" value="{{ form_data.orgao|default:'' }}"
-                       class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 placeholder:text-slate-400"
-                       placeholder="Nome do órgão" />
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-2">Valor Estimado</label>
-                <input type="text" name="valor_estimado" value="{{ form_data.valor_estimado|default:'' }}"
-                       class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 placeholder:text-slate-400"
-                       placeholder="R$ 0,00" />
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-2">Prazo de Execução</label>
-                <input type="text" name="prazo_execucao" value="{{ form_data.prazo_execucao|default:'' }}"
-                       class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200"
-                       placeholder="Ex: 30 dias" />
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-2">Responsável</label>
-                <input type="text" name="responsavel" value="{{ form_data.responsavel|default:'' }}"
-                       class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200"
-                       placeholder="Setor ou pessoa responsável" />
-            </div>
-        </div>
-
-        <div>
-            <label class="block text-sm font-medium text-slate-700 mb-2">Observações</label>
-            <textarea name="observacoes"
-                      class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-700 h-20 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200"
-                      placeholder="Observações adicionais...">{% if form_data.observacoes %}{{ form_data.observacoes }}{% endif %}</textarea>
+            <label class="block text-sm font-medium text-slate-700 mb-2">
+                Prompt de Inteligência Artificial
+            </label>
+            <textarea name="ia_prompt" required
+                      class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-700 h-40 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 placeholder:text-slate-400"
+                      placeholder="Digite aqui o prompt que será enviado para a IA...">{% if form_data.ia_prompt %}{{ form_data.ia_prompt }}{% endif %}</textarea>
         </div>
 
         <div class="flex justify-end space-x-3">
-            <button type="submit" name="action" value="save"
-                    class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-semibold px-6 py-3 rounded-xl shadow-sm transition-all duration-300">
-                Salvar Rascunho
-            </button>
-
-            <button type="submit" name="action" value="finalize"
+            <button type="submit" name="action" value="generate"
                     class="group relative overflow-hidden bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-600 text-white font-semibold px-6 py-3 rounded-xl shadow-md transition-all duration-300 transform hover:-translate-y-0.5">
                 <div class="absolute inset-0 bg-gradient-to-r from-white/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <span class="relative">Próximo Passo</span>
+                <span class="relative">Gerar Documento</span>
             </button>
+
+            {% if document_ready %}
+                <a href="{{ document_download_url }}"
+                   class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-semibold px-6 py-3 rounded-xl shadow-sm transition-all duration-300">
+                    Download do Documento
+                </a>
+            {% endif %}
         </div>
     </div>
 </form>
 
+                </section>
                 <!-- Recent Documents -->
                 <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <div class="p-6 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
@@ -421,24 +359,6 @@
                     </div>
                 </section>
 
-                <!-- Preview -->
-                <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="p-6 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
-                        <h3 class="text-lg font-bold text-slate-900">Pré-visualização Executiva</h3>
-                        <p class="text-sm text-slate-500 mt-1">Preview do documento em tempo real</p>
-                    </div>
-                    <div class="p-6">
-                        <div class="bg-white rounded-xl p-6 border-2 border-dashed border-slate-300">
-                            <div class="text-center">
-                                <svg class="h-12 w-12 text-slate-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                </svg>
-                                <p class="text-slate-500 text-sm font-medium">Pré-visualização aparecerá aqui</p>
-                                <p class="text-slate-400 text-xs mt-2">Complete o formulário para começar</p>
-                            </div>
-                        </div>
-                    </div>
-                </section>
 
                 <!-- Export Options -->
                 <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -501,46 +421,6 @@
                 </section>
 
                 <!-- Version Control -->
-                <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="p-6 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200">
-                        <h3 class="text-lg font-bold text-slate-900">Controle de Versão</h3>
-                        <p class="text-sm text-slate-500 mt-1">Histórico executivo de alterações</p>
-                    </div>
-                    <div class="p-6 space-y-3">
-                        <div class="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-white rounded-xl border border-green-200">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-3 h-3 bg-green-500 rounded-full shadow-sm animate-pulse"></div>
-                                <div>
-                                    <p class="text-sm font-medium text-green-700">Versão 1.0</p>
-                                    <p class="text-xs text-green-600">24/09/2025 - 12:27</p>
-                                </div>
-                            </div>
-                            <span class="text-xs font-medium text-green-700 bg-green-50 px-3 py-1 rounded-full border border-green-200">Atual</span>
-                        </div>
-
-                        <div class="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-3 h-3 bg-slate-400 rounded-full shadow-sm"></div>
-                                <div>
-                                    <p class="text-sm font-medium text-slate-800">Versão 0.9</p>
-                                    <p class="text-xs text-slate-500">23/09/2025 - 16:45</p>
-                                </div>
-                            </div>
-                            <button class="text-xs font-medium text-blue-700 hover:text-blue-600 transition-colors duration-200">Restaurar</button>
-                        </div>
-
-                        <div class="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-3 h-3 bg-slate-400 rounded-full shadow-sm"></div>
-                                <div>
-                                    <p class="text-sm font-medium text-slate-800">Versão 0.8</p>
-                                    <p class="text-xs text-slate-500">22/09/2025 - 14:20</p>
-                                </div>
-                            </div>
-                            <button class="text-xs font-medium text-blue-700 hover:text-blue-600 transition-colors duration-200">Restaurar</button>
-                        </div>
-                    </div>
-                </section>
             </div>
         </div>
     </main>

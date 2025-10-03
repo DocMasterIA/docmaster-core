@@ -173,3 +173,5 @@ def get_snippets_for_data(data):
     }
 
     return snippets_by_area
+
+

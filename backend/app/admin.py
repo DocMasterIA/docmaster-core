@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from .models import User, Template, Clause, DocumentInstance,Snippet, Rule
+from .models import User, Template, DocumentInstance,Snippet, Rule
 
 from .services import render_docx_from_template, convert_html_to_pdf  # seus serviços
 from django.core.files import File
@@ -54,23 +54,6 @@ class TemplateAdmin(admin.ModelAdmin):
     preview_available.boolean = True
     preview_available.short_description = "Preview"
 
-# ------------------ CLAUSE ------------------
-@admin.register(Clause)
-class ClauseAdmin(admin.ModelAdmin):
-    list_display = ("name", "short_content", "tags_display")
-    search_fields = ("name", "content")
-    list_filter = ("tags",)
-
-    def short_content(self, obj):
-        txt = (obj.content or "").strip()
-        return txt[:120] + ("..." if len(txt) > 120 else "")
-    short_content.short_description = "Conteúdo"
-
-    def tags_display(self, obj):
-        if not obj.tags:
-            return "-"
-        return ", ".join(obj.tags)
-    tags_display.short_description = "Tags"
 
 # ------------------ DOCUMENT INSTANCE ------------------
 @admin.register(DocumentInstance)

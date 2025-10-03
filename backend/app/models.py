@@ -76,32 +76,42 @@ from django.conf import settings
 import uuid
 
 class Template(models.Model):
-    """
-    Template mestre: um arquivo .docx com placeholders Jinja ou HTML template.
-    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=180)
-    slug = models.SlugField(unique=True)
-    description = models.TextField(blank=True)
-    file = models.FileField(upload_to='templates/docx/')  # .docx com placeholders
-    preview_html = models.TextField(blank=True)
-    required_fields = models.JSONField(default=list, blank=True)  # lista de placeholder names obrigatórios
+    slug = models.SlugField(unique=True, null=True, blank=True)
+    file = models.FileField(upload_to='templates/docx/')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class TemplateSchema(models.Model):
+    """
+    Manifesto/mapeamento gerado pela IA (ou manual) para um Template.
+    schema: lista de campos com block indices ou token strategy
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    template = models.OneToOneField(Template, on_delete=models.CASCADE, related_name='schema')
+    strategy = models.CharField(max_length=32, choices=(('tokens','tokens'),('index','index')), default='index')
+    schema = models.JSONField()  # lista de fields: [{key,label,block_indices,type,required}]
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.name
+        return f"Schema {self.template.name}"
 
+class SchemaAudit(models.Model):
+    schema = models.ForeignKey(TemplateSchema, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    payload = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
 
-class Clause(models.Model):
-    """
-    Cláusulas padrões reutilizáveis.
-    """
-    name = models.CharField(max_length=150)
-    content = models.TextField()
-    tags = models.JSONField(default=list, blank=True)  # lista de tags para busca/organização
+# class Clause(models.Model):
+#     """
+#     Cláusulas padrões reutilizáveis.
+#     """
+#     name = models.CharField(max_length=150)
+#     content = models.TextField()
+#     tags = models.JSONField(default=list, blank=True)  # lista de tags para busca/organização
 
-    def __str__(self):
-        return self.name
+#     def __str__(self):
+#         return self.name
 
 
 class DocumentInstance(models.Model):

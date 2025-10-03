@@ -1,0 +1,200 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gerador de Documentos - MDLicitatech</title>
+    <link rel="stylesheet" href="{% static 'css/main.css' %}" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script type="module" src="https://static.rocket.new/rocket-web.js?_cfg=https%3A%2F%2Flicitapro9362back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.8"></script>
+</head>
+<body class="bg-gradient-to-br from-white via-white to-slate-50 min-h-screen font-inter text-slate-800">
+    <!-- Header -->
+    <header class="backdrop-blur-xl bg-white/95 shadow border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-8xl mx-auto px-6 lg:px-8">
+            <div class="flex justify-between items-center h-20">
+                <!-- Logo -->
+                <div class="flex items-center group">
+                    <div class="flex-shrink-0 relative">
+                        <div class="absolute inset-0 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl blur opacity-20 group-hover:opacity-20 transition-all duration-300"></div>
+                        <div class="relative h-12 w-12 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-md">
+                            <img src="{% static 'logo_licita.png' %}">
+                        </div>
+                    </div>
+                    <div class="ml-4">
+                        <h1 class="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-900 bg-clip-text text-transparent">MDLicitatech</h1>
+                        <p class="text-xs text-slate-500 font-medium">Plataforma Executiva</p>
+                    </div>
+                </div>
+
+                <!-- Nav -->
+                <nav class="hidden xl:flex space-x-1">
+                    <a href="/" class="px-4 py-2 text-slate-700 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-all duration-200">Dashboard</a>
+                    <a href="/gerador_de_documentos" class="px-4 py-2 text-blue-700 font-semibold bg-blue-50 rounded-xl border-2 border-blue-200 backdrop-blur-sm">Geração de Documentos</a>
+                    <a href="/area_do_usuario" class="px-4 py-2 text-slate-700 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-all duration-200">Área de Usuário</a>
+                    {% if request.user.is_staff or request.user.is_superuser %}
+                                    <a href="/admin" 
+                                    class="flex items-center gap-2 px-4 py-2 text-yellow-800 font-semibold bg-yellow-50 hover:bg-yellow-100 rounded-xl border border-yellow-300 shadow-sm transition-all duration-200">
+                                        <!-- Ícone SVG de engrenagem -->
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.023c1.532-.885 3.275.858 2.39 2.39a1.724 1.724 0 001.023 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.023 2.573c.885 1.532-.858 3.275-2.39 2.39a1.724 1.724 0 00-2.573 1.023c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.023c-1.532.885-3.275-.858-2.39-2.39a1.724 1.724 0 00-1.023-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.023-2.573c-.885-1.532.858-3.275 2.39-2.39.996.575 2.23.25 2.573-1.023z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                        Área Admin
+                                    </a>
+                                    {% endif %}          
+                </nav>
+
+                <!-- Right -->
+                <div class="flex items-center space-x-4">
+                    <!-- Search -->
+                    <div class="hidden md:block relative">
+                        <input type="text" placeholder="Buscar projetos..." class="w-64 pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300" />
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+
+                    <!-- Profile -->
+                    <div class="flex items-center space-x-3 bg-white rounded-xl p-2 shadow-sm border border-slate-200">
+                        <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3" alt="Perfil do usuário" class="h-10 w-10 rounded-lg object-cover ring-2 ring-blue-300" onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;" />
+                        <div class="hidden lg:block">
+                            <p class="text-sm font-semibold text-slate-900">Dr. Carlos Silva</p>
+                            <p class="text-xs text-slate-500">Consultor Executivo</p>
+                        </div>
+                        <a href="/area_do_usuario" class="text-slate-500 hover:text-blue-700 transition-colors duration-200">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                        </a>
+                    </div>
+
+                        <form method="POST" action="{% url 'logout' %}">
+                        {% csrf_token %}
+                        <button type="submit" 
+                            class="text-red-600 hover:text-red-800 p-2 rounded-lg transition-colors duration-200"
+                            title="Sair">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1"/>
+                            </svg>
+                        </button>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+    </header>
+
+
+    <!-- Main -->
+    <main class="max-w-8xl mx-auto px-6 lg:px-8 py-8 space-y-8">
+        <div class="p-6">
+    <h1 class="text-2xl font-bold text-slate-900 mb-2">Biblioteca de Templates</h1>
+    <p class="text-slate-500 mb-4">Encontre e visualize rapidamente os modelos disponíveis</p>
+
+    <!-- Barra de pesquisa -->
+    <div class="mb-6">
+        <input type="text" id="templateSearch" placeholder="Pesquisar templates..."
+               class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200">
+    </div>
+
+    <div id="templatesGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 relative">
+        {% for tpl in templates %}
+        <div class="relative group rounded-xl overflow-hidden shadow-lg cursor-pointer template-card" data-name="{{ tpl.name|lower }}">
+            <!-- Título acima da imagem -->
+            <div class="text-center mb-1">
+                <h3 class="text-sm font-semibold text-slate-700 truncate">{{ tpl.name }}</h3>
+            </div>
+
+            <!-- Imagem borrada de preview -->
+            {% if tpl.preview_image %}
+            <img src="{{ tpl.preview_image.url }}" alt="{{ tpl.name }}" 
+                 class="w-full h-48 object-cover filter blur-sm transition-transform duration-300 group-hover:scale-105" />
+            {% else %}
+            <div class="w-full h-48 bg-slate-200 flex items-center justify-center text-slate-400 font-semibold">
+                Sem Preview
+            </div>
+            {% endif %}
+
+            <!-- Overlay com botão de pré-visualizar -->
+            <div class="absolute inset-0 bg-black/20 flex items-end p-4">
+                <div class="w-full flex justify-center">
+                    <button onclick="window.open('/templates/preview/{{ tpl.id }}/', '_blank')"
+                        class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1 rounded transition-colors duration-200">
+                        Pré-visualizar
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- Mensagem de “não encontrado” -->
+        <h3 id="noMatchMessage" class="absolute inset-0 flex items-center justify-center text-slate-400 text-lg font-semibold hidden">
+            Nenhum template encontrado
+        </h3>
+    </div>
+</div>
+
+<script>
+const searchInput = document.getElementById('templateSearch');
+const cards = Array.from(document.querySelectorAll('.template-card'));
+const noMatchMsg = document.getElementById('noMatchMessage');
+
+searchInput.addEventListener('input', () => {
+    const query = searchInput.value.toLowerCase().trim();
+    let anyVisible = false;
+
+    cards.forEach(card => {
+        const name = card.dataset.name;
+        if(name.includes(query)){
+            card.style.display = 'block';
+            anyVisible = true;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+
+    noMatchMsg.style.display = anyVisible ? 'none' : 'flex';
+});
+</script>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white/90 backdrop-blur-xl border-t border-slate-200 mt-16">
+        <div class="max-w-8xl mx-auto px-6 lg:px-8 py-8">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex items-center space-x-4 mb-4 lg:mb-0">
+                    <div class="h-10 w-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-md">
+                        <svg class="h-6 w-6 text-white" viewBox="0 0 32 32" fill="currentColor">
+                            <path d="M16 2L4 8v16l12 6 12-6V8L16 2zm0 2.5L25.5 9 16 13.5 6.5 9 16 4.5zM6 10.5l9 4.5v11l-9-4.5v-11zm11 15.5v-11l9-4.5v11L17 26z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="font-bold text-slate-900">MDLicitatech</p>
+                        <p class="text-sm text-slate-500">Plataforma Executiva B2G</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm text-slate-700">© 2025 MDLicitatech. Todos os direitos reservados.</p>
+                    <div class="flex items-center justify-end space-x-4 mt-2">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                            <span class="text-xs text-slate-500">Versão 2.1.4</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-2 h-2 bg-blue-600 rounded-full"></div>
+                            <span class="text-xs text-slate-500">Status: Operacional</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html> 

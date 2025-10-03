@@ -66,7 +66,7 @@ from django.contrib.auth.decorators import login_required
 
 @login_required
 def GetTemplatesView(request):
-    templates = Template.objects.filter(owner=request.user).order_by("created_at")
+    templates = Template.objects.all()
     return render(request, "template_list.html", {"templates": templates})
 
 @login_required

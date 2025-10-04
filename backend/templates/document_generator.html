@@ -154,16 +154,23 @@
 
         <!-- Dropdown de Templates -->
         <div class="relative">
-            <label class="block text-sm font-medium text-slate-700 mb-2">Escolha o template</label>
-            <input type="text" id="template-search" placeholder="Selecione um template..."
+            <label class="block text-sm font-medium text-slate-700 mb-2">Escolha o Documento Base</label>
+            <input type="text" id="template-search" placeholder="Selecione um documento base..."
                    class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200" value="{% if selected_template %}{{ selected_template.name }}{% endif %}">
             <ul id="template-results" class="border rounded-xl mt-1 max-h-40 overflow-y-auto hidden bg-white z-50 absolute w-full shadow-lg"></ul>
-            <input type="hidden" name="template_id" id="template-id" value="{{ selected_template.id }}">
+            <input type="hidden" name="template_id" id="template-id" value="{% if selected_template %}{{ selected_template.id }}{% endif %}">
 
+            {% if selected_template %}
+            <script>
+                document.addEventListener("DOMContentLoaded", () => {
+                    onTemplateSelected("{{ selected_template.id }}", "{{ selected_template.name|escapejs }}");
+                });
+            </script>
+            {% endif %}
             <div class="mt-2">
                 <a href="{% url 'biblioteca_documentos' %}" 
                    class="inline-block bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-xl shadow-sm hover:bg-slate-50 transition-all duration-200">
-                    Ver Biblioteca de Templates
+                    Ver Biblioteca de Documentos
                 </a>
             </div>
         </div>

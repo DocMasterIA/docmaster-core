@@ -1,7 +1,7 @@
 from backend.app.services.services import extract_docx_structure, validate_mapping_response, save_template_schema, generate_pdf_from_docx
 from backend.app.services.ia import call_llm_for_mapping
 from backend.app.services.render import render_docx_by_index, render_docx_with_tokens
-from backend.app.services.preview import generate_docx_preview
+from backend.app.services.preview import generate_docx_preview, generate_docx_preview_pdf
 from django.contrib.auth.decorators import login_required
 import json, tempfile, traceback
 from django.http import JsonResponse, FileResponse
@@ -141,3 +141,16 @@ def template_list_api(request):
         })
 
     return JsonResponse({"templates": data})
+
+@login_required
+def template_preview_pdf_api(request, template_id):
+    tpl = get_object_or_404(Template, id=template_id)
+    if tpl.preview_pdf and tpl.preview_pdf.name:
+        url = tpl.preview_pdf.url
+        return JsonResponse({"ok": True, "pdf_url": url})
+
+    # se não existir, gera
+    url = generate_docx_preview_pdf(tpl)
+    if url:
+        return JsonResponse({"ok": True, "pdf_url": url})
+    return JsonResponse({"ok": False, "error": "Não foi possível gerar preview PDF"}, status=500)

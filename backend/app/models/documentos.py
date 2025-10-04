@@ -2,6 +2,9 @@ from django.db import models
 from django.conf import settings
 import uuid
 
+class TemplateTag(models.Model):
+    tag = models.CharField(max_length=20)
+
 class Template(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=180)
@@ -9,6 +12,14 @@ class Template(models.Model):
     file = models.FileField(upload_to='templates/docx/')
     preview_image = models.ImageField(upload_to="previews/", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    preview_pdf = models.FileField(upload_to='templates/previews_pdf/', null=True, blank=True)
+
+    template_tag = models.ForeignKey(
+        TemplateTag,
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True
+    )
 
 class TemplateSchema(models.Model):
     """

@@ -113,18 +113,18 @@
             <!-- Imagem borrada de preview -->
             {% if tpl.preview_image %}
             <img src="{{ tpl.preview_image.url }}" alt="{{ tpl.name }}" 
-                 class="w-full h-48 object-cover filter blur-sm transition-transform duration-300 group-hover:scale-105" />
+                 class="w-full h-38 object-cover filter blur-sm transition-transform duration-300 group-hover:scale-105" />
             {% else %}
-            <div class="w-full h-48 bg-slate-200 flex items-center justify-center text-slate-400 font-semibold">
+            <div class="w-full h-38 bg-slate-200 flex items-center justify-center text-slate-400 font-semibold">
                 Sem Preview
             </div>
             {% endif %}
 
             <!-- Overlay com botão de pré-visualizar -->
-            <div class="absolute inset-0 bg-black/20 flex items-end p-4">
+            <div class="absolute inset-0 bg-black/80 flex items-end p-4">
                 <div class="w-full flex justify-center">
                     <button onclick="window.open('/templates/preview/{{ tpl.id }}/', '_blank')"
-                        class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1 rounded transition-colors duration-200">
+                        class="bg-blue-600 hover:bg-blue-700 text-black text-sm px-3 py-1 rounded transition-colors duration-200">
                         Pré-visualizar
                     </button>
                 </div>

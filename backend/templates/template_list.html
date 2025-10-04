@@ -5,10 +5,28 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Gerador de Documentos - MDLicitatech</title>
+
+    
     <link rel="stylesheet" href="{% static 'css/main.css' %}" />
+
+            <style>
+        #pdfModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(0,0,0,0.6);
+            z-index: 9999; /* garante que fique sobre tudo */
+        }
+    </style>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script type="module" src="https://static.rocket.new/rocket-web.js?_cfg=https%3A%2F%2Flicitapro9362back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.8"></script>
+
 </head>
 <body class="bg-gradient-to-br from-white via-white to-slate-50 min-h-screen font-inter text-slate-800">
     <!-- Header -->
@@ -123,10 +141,11 @@
             <!-- Overlay com botão de pré-visualizar -->
             <div class="absolute inset-0 bg-black/80 flex items-end p-4">
                 <div class="w-full flex justify-center">
-                    <button onclick="window.open('/templates/preview/{{ tpl.id }}/', '_blank')"
-                        class="bg-blue-600 hover:bg-blue-700 text-black text-sm px-3 py-1 rounded transition-colors duration-200">
-                        Pré-visualizar
-                    </button>
+                <button type="button"
+                    onclick="openPdfModalWithTemplate('{{ tpl.id }}', '{{ tpl.name|escapejs }}')"
+                    class="bg-blue-600 hover:bg-blue-700 text-black text-sm px-3 py-1 rounded transition-colors duration-200">
+                    Pré-visualizar
+                </button>
                 </div>
             </div>
         </div>
@@ -136,8 +155,198 @@
         <h3 id="noMatchMessage" class="absolute inset-0 flex items-center justify-center text-slate-400 text-lg font-semibold hidden">
             Nenhum template encontrado
         </h3>
+
+
     </div>
 </div>
+
+<!-- pdf.js CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.9.179/pdf.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // utilitária
+  const _ = id => document.getElementById(id);
+  // -- cria um stub global de segurança (ajuda a evitar o erro "is not a function")
+  if (!window.openPdfModalWithTemplate) {
+    window.openPdfModalWithTemplate = function(...args){
+      console.warn('openPdfModalWithTemplate chamado antes de inicializar o módulo PDF. Args:', args);
+      // nada mais aqui; quando o módulo for inicializado abaixo, o stub será sobrescrito.
+    };
+  }
+
+  // verifica elementos exigidos para o modal
+  const modalExists = !!(_('pdfModal') && _('pdfCanvas'));
+  if (!modalExists) {
+    console.warn('PDF modal elements not found — pdf modal script ficará em modo degradado.');
+  }
+
+  // só inicializa o player se pdf.js está presente e os elementos existem
+  if (modalExists && window.pdfjsLib) {
+    // configura worker (obrigatório)
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.9.179/pdf.worker.min.js";
+    }
+
+    // elementos
+    const pdfModal = _('pdfModal');
+    const pdfCanvas = _('pdfCanvas');
+    const canvasCtx = pdfCanvas.getContext('2d');
+    const pageNumEl = _('pageNum');
+    const pageCountEl = _('pageCount');
+    const prevBtn = _('prevPage');
+    const nextBtn = _('nextPage');
+    const gotoInput = _('gotoInput');
+    const gotoBtn = _('gotoBtn');
+    const thumbnails = _('thumbnails');
+    const pdfModalTitle = _('pdfModalTitle');
+    const pdfMeta = _('pdfMeta');
+    const closeBtn = _('btnClosePdf');
+
+    let pdfDoc = null;
+    let currentPage = 1;
+    let totalPages = 0;
+    let scale = (window.innerWidth && window.innerWidth < 768) ? 0.9 : 1.25;
+
+    async function loadTemplatePreviewPdf(templateId){
+      try {
+        const resp = await fetch(`/api/documentos_modelos/${encodeURIComponent(templateId)}/pdf/`);
+        if (!resp.ok) throw new Error('status ' + resp.status);
+        const data = await resp.json();
+        if (!data || !data.ok || !data.pdf_url) throw new Error(data?.error || 'preview indisponível');
+        await loadPdf(data.pdf_url);
+        pdfMeta.textContent = '';
+      } catch (err){
+        console.error('loadTemplatePreviewPdf error', err);
+        pdfMeta.textContent = 'Erro ao carregar preview';
+      }
+    }
+
+    async function loadPdf(url){
+      thumbnails.innerHTML = '';
+      try {
+        const loadingTask = pdfjsLib.getDocument({ url });
+        pdfDoc = await loadingTask.promise;
+        totalPages = pdfDoc.numPages;
+        pageCountEl.textContent = totalPages;
+        currentPage = 1;
+        await renderPage(currentPage);
+        for (let p = 1; p <= totalPages; p++){
+          setTimeout(()=> generateThumbnail(p), 50 * p);
+        }
+      } catch (e){
+        console.error('loadPdf error', e);
+        pdfMeta.textContent = 'Erro ao carregar arquivo PDF';
+      }
+    }
+
+    async function renderPage(pageNo){
+      if (!pdfDoc) return;
+      const page = await pdfDoc.getPage(pageNo);
+      const containerWidth = pdfCanvas.parentElement.clientWidth || window.innerWidth * 0.7;
+      let vp = page.getViewport({ scale });
+      if (vp.width > containerWidth) {
+        const factor = containerWidth / vp.width;
+        vp = page.getViewport({ scale: scale * factor });
+      }
+      pdfCanvas.width = Math.floor(vp.width);
+      pdfCanvas.height = Math.floor(vp.height);
+      await page.render({ canvasContext: canvasCtx, viewport: vp }).promise;
+      pageNumEl.textContent = pageNo;
+    }
+
+    async function generateThumbnail(pageNo){
+      try {
+        const page = await pdfDoc.getPage(pageNo);
+        const thumbScale = 0.18;
+        const vp = page.getViewport({ scale: thumbScale });
+        const cvs = document.createElement('canvas');
+        cvs.width = Math.floor(vp.width);
+        cvs.height = Math.floor(vp.height);
+        const ctx = cvs.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport: vp }).promise;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'cursor-pointer border rounded overflow-hidden';
+        wrapper.style.width = `${cvs.width}px`;
+        wrapper.style.height = `${cvs.height}px`;
+        wrapper.title = `Ir para página ${pageNo}`;
+        wrapper.appendChild(cvs);
+        wrapper.addEventListener('click', () => {
+          currentPage = pageNo;
+          renderPage(currentPage);
+        });
+        thumbnails.appendChild(wrapper);
+      } catch (e){
+        console.warn('thumb error', e);
+      }
+    }
+
+    function openPdfModalWithTemplateInternal(templateId, templateName){
+      pdfModal.classList.remove('hidden');
+      pdfModal.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+      pdfModalTitle.textContent = templateName || 'Preview';
+      pdfMeta.textContent = 'Carregando preview...';
+      loadTemplatePreviewPdf(templateId);
+    }
+
+    function closePdfModal(){
+      pdfModal.classList.add('hidden');
+      pdfModal.classList.remove('flex');
+      document.body.style.overflow = '';
+      pdfDoc = null;
+      thumbnails.innerHTML = '';
+      try { canvasCtx.clearRect(0, 0, pdfCanvas.width, pdfCanvas.height); } catch(e){}
+      pageNumEl.textContent = '0';
+      pageCountEl.textContent = '0';
+      pdfMeta.textContent = '';
+    }
+
+    prevBtn?.addEventListener('click', () => {
+      if (!pdfDoc || currentPage <= 1) return;
+      currentPage--;
+      renderPage(currentPage);
+    });
+    nextBtn?.addEventListener('click', () => {
+      if (!pdfDoc || currentPage >= totalPages) return;
+      currentPage++;
+      renderPage(currentPage);
+    });
+    gotoBtn?.addEventListener('click', () => {
+      const v = parseInt(gotoInput.value, 10);
+      if (!pdfDoc || isNaN(v) || v < 1 || v > totalPages) return;
+      currentPage = v;
+      renderPage(currentPage);
+    });
+    closeBtn?.addEventListener('click', closePdfModal);
+    pdfModal.addEventListener('click', (e) => { if (e.target === pdfModal) closePdfModal(); });
+
+    // expõe a função real no global, sobrescrevendo o stub
+    window.openPdfModalWithTemplate = openPdfModalWithTemplateInternal;
+    window.closePdfModal = closePdfModal;
+
+  } // fim se modalExists && pdfjsLib
+
+  // ------------- adiciona listeners nos botões de preview (recomendado) -------------
+  // funciona mesmo se inline onclick existir; aqui delegamos por classe 'tpl-preview-btn'
+  document.querySelectorAll('.tpl-preview-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const id = btn.datasetTplId || btn.dataset.tplId || btn.getAttribute('data-id') || btn.getAttribute('data-template-id');
+      const name = btn.datasetTplName || btn.dataset.tplName || btn.getAttribute('data-name') || btn.getAttribute('data-template-name') || '';
+      if (!id) return console.warn('botao preview sem data-id');
+      if (typeof window.openPdfModalWithTemplate === 'function') {
+        window.openPdfModalWithTemplate(id, name);
+      } else {
+        console.warn('openPdfModalWithTemplate não está pronta ainda — tente novamente em alguns segundos.');
+      }
+    });
+  });
+
+}); // DOMContentLoaded
+</script>
+
 
 <script>
 const searchInput = document.getElementById('templateSearch');
@@ -162,7 +371,8 @@ searchInput.addEventListener('input', () => {
 });
 </script>
 
-    </main>
+</main>
+
 
     <!-- Footer -->
     <footer class="bg-white/90 backdrop-blur-xl border-t border-slate-200 mt-16">
@@ -195,6 +405,46 @@ searchInput.addEventListener('input', () => {
             </div>
         </div>
     </footer>
+
+        <div id="pdfModal" 
+        class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/60">
+        <div class="w-[90%] max-w-5xl bg-white rounded-xl overflow-hidden shadow-lg">
+            <div class="flex items-center justify-between p-4 border-b">
+            <div class="flex items-center gap-3">
+                <h3 id="pdfModalTitle" class="text-lg font-semibold">Preview</h3>
+                <span id="pdfMeta" class="text-sm text-slate-500"></span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="btnClosePdf" class="px-3 py-1 rounded bg-slate-100 hover:bg-slate-200">Fechar</button>
+            </div>
+            </div>
+
+            <div class="p-4 grid grid-cols-1 md:grid-cols-[1fr,220px] gap-4">
+            <div>
+                <div class="flex items-center gap-2 mb-3">
+                <button id="prevPage" class="px-3 py-1 rounded bg-white border">Anterior</button>
+                <button id="nextPage" class="px-3 py-1 rounded bg-white border">Próximo</button>
+                <div class="ml-4 text-sm text-slate-600">Página <span id="pageNum">0</span> de <span id="pageCount">0</span></div>
+                <div class="ml-auto">
+                    <input id="gotoInput" type="number" min="1" class="w-20 px-2 py-1 border rounded" placeholder="Ir p/">
+                    <button id="gotoBtn" class="px-2 py-1 rounded bg-white border">Ir</button>
+                </div>
+                </div>
+
+                <div id="pdfViewer" class="border rounded p-2 flex items-center justify-center" style="min-height:500px">
+                <!-- canvas será injetado aqui -->
+                <canvas id="pdfCanvas"></canvas>
+                </div>
+            </div>
+
+            <aside class="hidden md:block">
+                <h4 class="text-sm font-semibold mb-2">Miniaturas</h4>
+                <div id="thumbnails" class="space-y-2 overflow-auto max-h-[420px]"></div>
+            </aside>
+            </div>
+        </div>
+        </div>
+
 
 </body>
 </html> 

@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 import uuid
+from backend.app.services.preview import generate_docx_preview_pdf, generate_docx_preview
 
 class TemplateTag(models.Model):
     tag = models.CharField(max_length=20)
@@ -20,6 +21,15 @@ class Template(models.Model):
         blank=True,
         null=True
     )
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)  # salva o modelo primeiro
+        # se ainda não tem preview_pdf, gera automaticamente
+        if self.file and not self.preview_pdf:
+            generate_docx_preview_pdf(self)
+        if self.file and not self.preview_image:
+            generate_docx_preview(self)
+
 
 class TemplateSchema(models.Model):
     """

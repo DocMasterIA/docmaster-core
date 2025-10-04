@@ -67,6 +67,9 @@
 
                 <!-- Right -->
                 <div class="flex items-center space-x-4">
+
+                    
+                    
                     <!-- Search -->
                     <div class="hidden md:block relative">
                         <input type="text" placeholder="Buscar projetos..." class="w-64 pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300" />
@@ -110,6 +113,18 @@
 
     <!-- Main -->
     <main class="max-w-8xl mx-auto px-6 lg:px-8 py-8 space-y-8">
+                <button class="group relative overflow-hidden bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-600 text-white font-semibold px-6 py-3 rounded-xl shadow transition-all duration-300 transform hover:-translate-y-0.5"
+                         onclick="history.back()" >
+                    <div class="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <div class="relative flex items-center space-x-2">
+                            <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                        </svg>
+                        <span>Voltar</span>
+                        </a>
+                    </div>
+                </button>
+
         <div class="p-6">
     <h1 class="text-2xl font-bold text-slate-900 mb-2">Biblioteca de Templates</h1>
     <p class="text-slate-500 mb-4">Encontre e visualize rapidamente os modelos disponíveis</p>
@@ -208,6 +223,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let totalPages = 0;
     let scale = (window.innerWidth && window.innerWidth < 768) ? 0.9 : 1.25;
 
+    const btnUseTemplate = document.getElementById('btnUseTemplate');
+    let currentTemplateId = null; // vai armazenar o template selecionado
+
     async function loadTemplatePreviewPdf(templateId){
       try {
         const resp = await fetch(`/api/documentos_modelos/${encodeURIComponent(templateId)}/pdf/`);
@@ -285,8 +303,21 @@ async function renderPage(pageNo){
       document.body.style.overflow = 'hidden';
       pdfModalTitle.textContent = templateName || 'Preview';
       pdfMeta.textContent = 'Carregando preview...';
+
+      currentTemplateId = templateId;
+      console.log('Template aberto:', currentTemplateId);
+
       loadTemplatePreviewPdf(templateId);
     }
+
+    btnUseTemplate.addEventListener('click', () => {
+    if (!currentTemplateId) return;
+
+    // redireciona para a DocumentGeneratorView com o template selecionado
+    // ex.: /gerador_de_documentos/?template=<id>
+    window.location.href = `/gerador_de_documentos/?template_id=${currentTemplateId}`;
+    });
+
 
     function closePdfModal(){
       pdfModal.classList.add('hidden');
@@ -299,6 +330,8 @@ async function renderPage(pageNo){
       pageCountEl.textContent = '0';
       pdfMeta.textContent = '';
     }
+
+    
 
     prevBtn?.addEventListener('click', () => {
       if (!pdfDoc || currentPage <= 1) return;
@@ -411,7 +444,13 @@ searchInput.addEventListener('input', () => {
         <h3 id="pdfModalTitle" class="text-lg font-semibold">Preview</h3>
         <span id="pdfMeta" class="text-sm text-slate-500"></span>
       </div>
-      <button id="btnClosePdf" class="px-3 py-1 rounded bg-slate-100 hover:bg-slate-200">Fechar</button>
+            
+        <div class="flex items-center gap-2">
+            <button id="btnUseTemplate" class="px-3 py-1 rounded bg-green-600 text-black hover:bg-green-700 shadow-md">
+            Usar como base
+            </button>
+            <button id="btnClosePdf" class="px-3 py-1 rounded bg-slate-100 hover:bg-slate-200">Fechar</button>
+        </div>
     </div>
 
     <!-- Body -->

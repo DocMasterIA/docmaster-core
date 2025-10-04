@@ -79,11 +79,28 @@ def DocumentGeneratorView(request):
     # --- lista de templates disponíveis ---
     templates = Template.objects.all()
 
+    print(request.GET)
+    selected_template_id = request.GET.get("template_id")
+    selected_template = None
+    if selected_template_id:
+        try:
+            selected_template = Template.objects.get(pk=selected_template_id)
+            print(f"Tem TemplateID {selected_template_id}")
+
+        except Template.DoesNotExist:
+            selected_template = None
+
+
     if request.method == "POST":
         template_id = request.POST.get("template_id")
+
+        if not template_id:
+            messages.error(request, "É necessário selecionar um template antes de gerar o documento.")
+            return render(request, "document_generator.html", {"templates": templates})
+
         template = get_object_or_404(Template, pk=template_id)
 
-        prompt = request.POST.get("prompt_ia", "").strip()
+        prompt = request.POST.get("ia_prompt", "").strip()
         if not prompt:
             messages.error(request, "É necessário fornecer o prompt da IA.")
             return render(request, "document_generator.html", {"templates": templates})
@@ -147,5 +164,6 @@ def DocumentGeneratorView(request):
     # GET: renderiza lista de templates e formulário de prompt
     return render(request, "document_generator.html", {
         "templates": templates,
-        "form_data": {}
+        "form_data": {},
+        "selected_template": selected_template
     })

@@ -5,10 +5,37 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Gerador de Documentos - MDLicitatech</title>
+      <style>
+        #pdfModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(0,0,0,0.6);
+            z-index: 9999; /* garante que fique sobre tudo */
+        }
+    </style>
     <link rel="stylesheet" href="{% static 'css/main.css' %}" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script type="module" src="https://static.rocket.new/rocket-web.js?_cfg=https%3A%2F%2Flicitapro9362back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.8"></script>
+
+    <script>
+  // Stub global seguro
+  window.loadTemplatePreviewPdf = function(...args){
+      console.warn("loadTemplatePreviewPdf chamado antes da inicialização completa. Args:", args);
+  };
+</script>
+
+<script>
+  // Stub global seguro
+  window.renderPage = function(...args){
+      console.warn("renderPage chamado antes da inicialização completa. Args:", args);
+  };
+</script>
 </head>
 <body class="bg-gradient-to-br from-white via-white to-slate-50 min-h-screen font-inter text-slate-800">
     <!-- Header -->
@@ -129,9 +156,9 @@
         <div class="relative">
             <label class="block text-sm font-medium text-slate-700 mb-2">Escolha o template</label>
             <input type="text" id="template-search" placeholder="Selecione um template..."
-                   class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200">
+                   class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200" value="{% if selected_template %}{{ selected_template.name }}{% endif %}">
             <ul id="template-results" class="border rounded-xl mt-1 max-h-40 overflow-y-auto hidden bg-white z-50 absolute w-full shadow-lg"></ul>
-            <input type="hidden" name="template_id" id="template-id">
+            <input type="hidden" name="template_id" id="template-id" value="{{ selected_template.id }}">
 
             <div class="mt-2">
                 <a href="{% url 'biblioteca_documentos' %}" 
@@ -214,7 +241,6 @@ function renderResults(templates){
         </span>
         <span class="font-semibold text-blue-700">${name}</span>
       </div>
-      <button type="button" data-id="${id}" class="preview-btn text-sm text-white bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded">Pré-visualizar</button>
     </li>`;
   }).join("");
   results.classList.remove('hidden');
@@ -225,7 +251,6 @@ results.addEventListener('click', (e) => {
   const previewBtn = e.target.closest('.preview-btn');
   if (previewBtn){
     const id = previewBtn.dataset.id;
-    window.open(`/templates/preview/${encodeURIComponent(id)}/`, '_blank');
     return;
   }
   const li = e.target.closest('.result-item');
@@ -335,7 +360,6 @@ function updatePreviewCard(template){
 
     if (template.preview_image){
         previewBtn.classList.remove("hidden");
-        previewBtn.onclick = () => window.open(`/templates/preview/${template.id}/`, "_blank");
     } else {
         previewBtn.classList.add("hidden");
     }
@@ -428,114 +452,238 @@ window.onTemplateSelected = onTemplateSelected;
           </div>
 
           <div class="mt-6 flex justify-end gap-2">
-            <button id="previewBtn" type="button" class="hidden inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-300 shadow-sm text-sm font-semibold hover:bg-slate-50">
-              Pré-visualizar
-            </button>
-            <a id="libraryBtn" href="{% url 'dashboard' %}" class="inline-block px-4 py-2 rounded-xl bg-transparent text-sm border border-white/30 text-slate-700 hover:bg-white/5">
+                <button id="previewBtn" type="button"
+                    class="bg-blue-600 hover:bg-blue-700 text-black text-sm px-3 py-1 rounded transition-colors duration-200"
+                    onclick="openPdfModalWithTemplate(
+                        document.getElementById('template-id').value,
+                        document.getElementById('template-search').value
+                    )">
+                    Pré-visualizar
+                </button>
+            <a id="libraryBtn" href="{% url 'biblioteca_documentos' %}" class="inline-block px-4 py-2 rounded-xl bg-transparent text-sm border border-white/30 text-slate-700 hover:bg-white/5">
               Biblioteca
             </a>
           </div>
         </div>
       </div>
     </div>
-
-
-<!-- <script>
-/*
-  Funções de integração para o preview card.
-  - use onTemplateSelected(id,name) ao selecionar no dropdown
-  - se quiser manter selectTemplate, faça selectTemplate = onTemplateSelected
-*/
-
-const previewHeading = document.getElementById('previewHeading');
-const previewSub = document.getElementById('previewSub');
-const previewExcerpt = document.getElementById('previewExcerpt');
-const previewBtn = document.getElementById('previewBtn');
-const quickList = document.getElementById('quickList');
-const previewContainer = document.getElementById('previewContainer');
-
-// atualiza o card (t: {id,name,preview_url,created_at,excerpt})
-function updatePreviewCard(t) {
-  if (!t) {
-    previewHeading.textContent = "Modelo de Documento";
-    previewSub.textContent = "Selecione um template para ver detalhes e pré-visualizar.";
-    previewExcerpt.innerHTML = "Nenhum template selecionado.";
-    previewBtn.classList.add('hidden');
-    return;
-  }
-
-  previewHeading.textContent = `Modelo de Documento — ${t.name || 'Sem nome'}`;
-  previewSub.textContent = t.created_at ? `Criado em ${t.created_at}` : 'Template cadastrado';
-  previewExcerpt.textContent = t.excerpt || "Clique em 'Pré-visualizar' para abrir o template em nova aba.";
-
-  // habilita botão de preview com URL se existir, senão usa convenção
-  const previewUrl = t.preview_url || `/templates/preview/${encodeURIComponent(t.id)}/`;
-  previewBtn.onclick = () => window.open(previewUrl, '_blank');
-  previewBtn.classList.remove('hidden');
-}
-
-// wrapper público: chamado ao selecionar template no dropdown
-async function onTemplateSelected(id, name) {
-  // preencha os campos do formulário (hidden)
-  const searchInput = document.getElementById('template-search');
-  const hiddenInput = document.getElementById('template-id');
-  if (searchInput) searchInput.value = name;
-  if (hiddenInput) hiddenInput.value = id;
-
-  // tenta pegar metadados pela API (se existir)
-  try {
-    const resp = await fetch(`/api/documentos_modelos/?id=${encodeURIComponent(id)}`);
-    if (resp.ok) {
-      const j = await resp.json();
-      // aqui suportamos dois formatos possíveis: { template: {...} } ou { templates: [...] }
-      let t = null;
-      if (j.template) t = j.template;
-      else if (Array.isArray(j.templates) && j.templates.length) t = j.templates[0];
-      // fallback cria objeto mínimo
-      if (!t) t = { id, name };
-      updatePreviewCard(t);
-      return;
-    }
-  } catch (err) {
-    console.debug('Erro buscando metadados do template:', err);
-  }
-
-  // fallback simples
-  updatePreviewCard({ id, name });
-}
-
-// Se você ainda usa a função selectTemplate, faça ela apontar para onTemplateSelected
-// ex: window.selectTemplate = onTemplateSelected;
-
-// opcional: preencher quickList com 3 últimos templates (se quiser)
-(async function loadQuickList(){
-  try {
-    const resp = await fetch('/api/documentos_modelos/?q=');
-    if (!resp.ok) return;
-    const j = await resp.json();
-    const templates = j.templates || [];
-    // pega até 3
-    const small = templates.slice(0,3);
-    quickList.innerHTML = small.map(t => `
-      <a href="#" onclick="onTemplateSelected('${t.id}','${t.name}'); return false;" class="block px-3 py-2 rounded-lg hover:bg-slate-50 border border-transparent">
-        <div class="flex items-center gap-3">
-          <span class="inline-flex items-center justify-center w-10 h-10 rounded bg-blue-50">
-            <svg class="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/></svg>
-          </span>
-          <div>
-            <div class="font-semibold text-slate-800">${(t.name||'—')}</div>
-            <div class="text-xs text-slate-500 mt-0.5">${t.created_at ? t.created_at : ''}</div>
-          </div>
-        </div>
-      </a>
-    `).join('');
-  } catch(e){ console.debug('quickList load fail', e); }
-})();
-</script>
- -->
-  </section>
+    </section>
+    </div>
 </div>
-        </div>
+
+           <!-- JS -->
+<script>
+    function startDocumentCreation(type) {
+        console.log('Starting document creation for:', type);
+    }
+    function nextStep() {
+        console.log('Moving to next step');
+    }
+    setInterval(function() {
+        console.log('Auto-saving draft...');
+    }, 30000);
+</script>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.9.179/pdf.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // utilitária
+  const _ = id => document.getElementById(id);
+
+
+  // -- cria um stub global de segurança (ajuda a evitar o erro "is not a function")
+  if (!window.openPdfModalWithTemplate) {
+    window.openPdfModalWithTemplate = function(...args){
+      console.warn('openPdfModalWithTemplate chamado antes de inicializar o módulo PDF. Args:', args);
+      // nada mais aqui; quando o módulo for inicializado abaixo, o stub será sobrescrito.
+    };
+  }
+
+  // verifica elementos exigidos para o modal
+  const modalExists = !!(_('pdfModal') && _('pdfCanvas'));
+  if (!modalExists) {
+    console.warn('PDF modal elements not found — pdf modal script ficará em modo degradado.');
+  }
+
+  // só inicializa o player se pdf.js está presente e os elementos existem
+  if (modalExists && window.pdfjsLib) {
+    // configura worker (obrigatório)
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.9.179/pdf.worker.min.js";
+    }
+
+    // elementos
+    const pdfModal = _('pdfModal');
+    const pdfCanvas = _('pdfCanvas');
+    const canvasCtx = pdfCanvas.getContext('2d');
+    const pageNumEl = _('pageNum');
+    const pageCountEl = _('pageCount');
+    const prevBtn = _('prevPage');
+    const nextBtn = _('nextPage');
+    const gotoInput = _('gotoInput');
+    const gotoBtn = _('gotoBtn');
+    const thumbnails = _('thumbnails');
+    const pdfModalTitle = _('pdfModalTitle');
+    const pdfMeta = _('pdfMeta');
+    const closeBtn = _('btnClosePdf');
+
+    let pdfDoc = null;
+    let currentPage = 1;
+    let totalPages = 0;
+    let scale = (window.innerWidth && window.innerWidth < 768) ? 0.9 : 1.25;
+
+
+    async function loadTemplatePreviewPdf(templateId){
+      try {
+        const resp = await fetch(`/api/documentos_modelos/${encodeURIComponent(templateId)}/pdf/`);
+        if (!resp.ok) throw new Error('status ' + resp.status);
+        const data = await resp.json();
+        if (!data || !data.ok || !data.pdf_url) throw new Error(data?.error || 'preview indisponível');
+        await loadPdf(data.pdf_url);
+        pdfMeta.textContent = '';
+      } catch (err){
+        console.error('loadTemplatePreviewPdf error', err);
+        pdfMeta.textContent = 'Erro ao carregar preview';
+      }
+    }
+
+    async function loadPdf(url){
+      thumbnails.innerHTML = '';
+      try {
+        const loadingTask = pdfjsLib.getDocument({ url });
+        pdfDoc = await loadingTask.promise;
+        totalPages = pdfDoc.numPages;
+        pageCountEl.textContent = totalPages;
+        currentPage = 1;
+        await renderPage(currentPage);
+        for (let p = 1; p <= totalPages; p++){
+          setTimeout(()=> generateThumbnail(p), 50 * p);
+        }
+      } catch (e){
+        console.error('loadPdf error', e);
+        pdfMeta.textContent = 'Erro ao carregar arquivo PDF';
+      }
+    }
+
+async function renderPage(pageNo){
+  if (!pdfDoc) return;
+  const page = await pdfDoc.getPage(pageNo);
+
+  const viewport = page.getViewport({ scale: 1 }); // scale = 1 fixo
+  pdfCanvas.width = 800;
+  pdfCanvas.height = 750;
+
+  await page.render({ canvasContext: canvasCtx, viewport }).promise;
+  pageNumEl.textContent = pageNo;
+}
+
+    async function generateThumbnail(pageNo){
+      try {
+        const page = await pdfDoc.getPage(pageNo);
+        const thumbScale = 0.18;
+        const vp = page.getViewport({ scale: thumbScale });
+        const cvs = document.createElement('canvas');
+        cvs.width = Math.floor(vp.width);
+        cvs.height = Math.floor(vp.height);
+        const ctx = cvs.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport: vp }).promise;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'cursor-pointer border rounded overflow-hidden';
+        wrapper.style.width = `${cvs.width}px`;
+        wrapper.style.height = `${cvs.height}px`;
+        wrapper.title = `Ir para página ${pageNo}`;
+        wrapper.appendChild(cvs);
+        wrapper.addEventListener('click', () => {
+          currentPage = pageNo;
+          renderPage(currentPage);
+        });
+        thumbnails.appendChild(wrapper);
+      } catch (e){
+        console.warn('thumb error', e);
+      }
+    }
+
+    function openPdfModalWithTemplateInternal(templateId, templateName){
+      pdfModal.classList.remove('hidden');
+      pdfModal.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+      pdfModalTitle.textContent = templateName || 'Preview';
+      pdfMeta.textContent = 'Carregando preview...';
+
+      currentTemplateId = templateId;
+      console.log('Template aberto:', currentTemplateId);
+
+      loadTemplatePreviewPdf(templateId);
+    }
+
+
+    function closePdfModal(){
+      pdfModal.classList.add('hidden');
+      pdfModal.classList.remove('flex');
+      document.body.style.overflow = '';
+      pdfDoc = null;
+      thumbnails.innerHTML = '';
+      try { canvasCtx.clearRect(0, 0, pdfCanvas.width, pdfCanvas.height); } catch(e){}
+      pageNumEl.textContent = '0';
+      pageCountEl.textContent = '0';
+      pdfMeta.textContent = '';
+    }
+
+    
+
+    prevBtn?.addEventListener('click', () => {
+      if (!pdfDoc || currentPage <= 1) return;
+      currentPage--;
+      renderPage(currentPage);
+    });
+    nextBtn?.addEventListener('click', () => {
+      if (!pdfDoc || currentPage >= totalPages) return;
+      currentPage++;
+      renderPage(currentPage);
+    });
+    gotoBtn?.addEventListener('click', () => {
+      const v = parseInt(gotoInput.value, 10);
+      if (!pdfDoc || isNaN(v) || v < 1 || v > totalPages) return;
+      currentPage = v;
+      renderPage(currentPage);
+    });
+    closeBtn?.addEventListener('click', closePdfModal);
+    pdfModal.addEventListener('click', (e) => { if (e.target === pdfModal) closePdfModal(); });
+
+    // expõe a função real no global, sobrescrevendo o stub
+    window.openPdfModalWithTemplate = openPdfModalWithTemplateInternal;
+    window.closePdfModal = closePdfModal;7
+
+  } // fim se modalExists && pdfjsLib
+
+  // ------------- adiciona listeners nos botões de preview (recomendado) -------------
+  // funciona mesmo se inline onclick existir; aqui delegamos por classe 'tpl-preview-btn'
+  document.querySelectorAll('.tpl-preview-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const id = btn.datasetTplId || btn.dataset.tplId || btn.getAttribute('data-id') || btn.getAttribute('data-template-id');
+      const name = btn.datasetTplName || btn.dataset.tplName || btn.getAttribute('data-name') || btn.getAttribute('data-template-name') || '';
+      if (!id) return console.warn('botao preview sem data-id');
+      if (typeof window.openPdfModalWithTemplate === 'function') {
+        window.openPdfModalWithTemplate(id, name);
+      } else {
+        console.warn('openPdfModalWithTemplate não está pronta ainda — tente novamente em alguns segundos.');
+      }
+    });
+  });
+
+    window.openPdfModalWithTemplate = openPdfModalWithTemplateInternal;
+    window.closePdfModal = closePdfModal;
+    window.loadTemplatePreviewPdf = loadTemplatePreviewPdf;
+    window.renderPage = renderPage;
+
+
+}); // DOMContentLoaded
+</script>
+
     </main>
 
     <!-- Footer -->
@@ -570,18 +718,47 @@ async function onTemplateSelected(id, name) {
         </div>
     </footer>
 
-    <!-- JS -->
-    <script>
-        function startDocumentCreation(type) {
-            console.log('Starting document creation for:', type);
-        }
-        function nextStep() {
-            console.log('Moving to next step');
-        }
-        setInterval(function() {
-            console.log('Auto-saving draft...');
-        }, 30000);
-    </script>
-    <script id="dhws-dataInjector" src="../public/dhws-data-injector.js"></script>
+        <div id="pdfModal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/60">
+  <div class="w-[80%] max-w-4xl h-[80vh] bg-white rounded-xl shadow-lg flex flex-col overflow-hidden">
+    <!-- Header -->
+    <div class="flex items-center justify-between p-4 border-b">
+      <div class="flex items-center gap-3">
+        <h3 id="pdfModalTitle" class="text-lg font-semibold">Preview</h3>
+        <span id="pdfMeta" class="text-sm text-slate-500"></span>
+      </div>
+            
+        <div class="flex items-center gap-2">
+            <button id="btnClosePdf" class="px-3 py-1 rounded bg-slate-100 hover:bg-slate-200">Fechar</button>
+        </div>
+    </div>
+
+    <!-- Body -->
+    <div class="flex flex-1 gap-4 p-4 overflow-hidden">
+      <!-- PDF Viewer -->
+      <div class="flex-1 flex flex-col overflow-hidden">
+        <div class="flex items-center gap-2 mb-3">
+          <button id="prevPage" class="px-3 py-1 rounded bg-white border">Anterior</button>
+          <button id="nextPage" class="px-3 py-1 rounded bg-white border">Próximo</button>
+          <div class="ml-4 text-sm text-slate-600">Página <span id="pageNum">0</span> de <span id="pageCount">0</span></div>
+          <div class="ml-auto flex items-center gap-1">
+            <input id="gotoInput" type="number" min="1" class="w-20 px-2 py-1 border rounded" placeholder="Ir p/">
+            <button id="gotoBtn" class="px-2 py-1 rounded bg-white border">Ir</button>
+          </div>
+        </div>
+
+        <div id="pdfViewer" class="flex-1 border rounded p-2 flex items-center justify-center overflow-hidden">
+          <canvas id="pdfCanvas" style="max-width: 100%; max-height: 100%; display: block;"></canvas>
+        </div>
+      </div>
+
+      <!-- Miniaturas -->
+      <aside class="w-56 hidden md:block overflow-auto">
+        <h4 class="text-sm font-semibold mb-2">Miniaturas</h4>
+        <div id="thumbnails" class="space-y-2"></div>
+      </aside>
+    </div>
+  </div>
+</div>
+
 </body>
 </html> 

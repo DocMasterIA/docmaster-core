@@ -59,18 +59,27 @@
 
                     <!-- Profile -->
                     <div class="flex items-center space-x-3 bg-white rounded-xl p-2 shadow-sm border border-slate-200">
-                        <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3" alt="Perfil do usuário" class="h-10 w-10 rounded-lg object-cover ring-2 ring-blue-300" onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;" />
+                        <img src="{{ user.profile_photo.url }}" 
+                            alt="Perfil do usuário" 
+                            class="h-10 w-10 rounded-lg object-cover ring-2 ring-blue-300" 
+                            onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop'; this.onerror=null;" />
+
                         <div class="hidden lg:block">
-                            <p class="text-sm font-semibold text-slate-900">Dr. Carlos Silva</p>
-                            <p class="text-xs text-slate-500">Consultor Executivo</p>
+                            <p class="text-sm font-semibold text-slate-900">{{ user.full_name }}</p>
+                            <p class="text-xs text-slate-500">
+                                {% if user.role == 'ADMIN' %}Administrador{% elif user.role == 'SERVIDOR' %}Servidor Público{% else %}Empresa{% endif %}
+                            </p>
                         </div>
-                        <a href="/area_do_usuario" class="text-slate-500 hover:text-blue-700 transition-colors duration-200">
+
+                        <a href="{% url 'area_do_usuario' %}" class="text-slate-500 hover:text-blue-700 transition-colors duration-200">
                             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                             </svg>
                         </a>
                     </div>
+
 
                         <form method="POST" action="{% url 'logout' %}">
                         {% csrf_token %}
@@ -145,14 +154,14 @@
 
       <div>
         <label for="first_name" class="block text-sm font-medium text-slate-700 mb-1">Nome</label>
-        <input id="first_name" name="first_name" type="text" value="{{ user.first_name }}" 
+        <input id="first_name" name="first_name" type="text" value="{{ form.first_name.value }}" 
                class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" 
                placeholder="Seu nome" required />
       </div>
 
       <div>
         <label for="last_name" class="block text-sm font-medium text-slate-700 mb-1">Sobrenome</label>
-        <input id="last_name" name="last_name" type="text" value="{{ user.last_name }}" 
+        <input id="last_name" name="last_name" type="text" value="{{ form.last_name.value }}"
                class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" 
                placeholder="Seu sobrenome" required />
       </div>
@@ -392,9 +401,17 @@ document.getElementById('photo').addEventListener('change', function(event){
     // Submit do perfil (exemplo; ajuste para seu endpoint Django)
     const form = document.getElementById('profileForm');
     form?.addEventListener('submit', (e) => {
-      e.preventDefault();
-      console.log('Enviar dados do perfil');
-      alert('Dados salvos (demo). Conecte o form à sua view Django.');
+        // Não previne o envio real
+        // Se quiser, pode adicionar validação JS aqui antes de enviar
+        const firstName = document.getElementById('first_name').value.trim();
+        const lastName = document.getElementById('last_name').value.trim();
+        if (!firstName || !lastName) {
+            e.preventDefault();
+            alert('Preencha todos os campos obrigatórios.');
+            return;
+        }
+
+        // Aqui o form será enviado normalmente para Django
     });
   </script>
   <script id="dhws-dataInjector" src="../public/dhws-data-injector.js"></script>

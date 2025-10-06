@@ -99,23 +99,18 @@ def AreaDoUsuarioView(request):
     user = request.user
 
     if request.method == "POST":
-        first_name = request.POST.get("first_name", "").strip()
-        last_name = request.POST.get("last_name", "").strip()
-        photo = request.FILES.get("profile_photo")
-
-        if first_name and last_name:
-            user.first_name = first_name
-            user.last_name = last_name
-            if photo:
-                user.profile_photo = photo
-            user.save()
-            messages.success(request, "Perfil atualizado com sucesso!")
+        form = UserProfileForm(request.POST, request.FILES, instance=user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Dados atualizados com sucesso!")
+            return redirect("area_do_usuario")  # ou use o nome da URL
         else:
-            messages.error(request, "Nome e sobrenome são obrigatórios!")
+            messages.error(request, "Erro ao atualizar os dados. Verifique os campos.")
 
-        return redirect("area_do_usuario")
+    else:
+        form = UserProfileForm(instance=user)
 
-    return render(request, "area_do_usuario.html")
+    return render(request, "area_do_usuario.html", {"form": form})
 
 @login_required
 def UploadTemplateView(request):

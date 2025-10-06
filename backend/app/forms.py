@@ -2,6 +2,8 @@ from django import forms
 from backend.app.models import Template
 from django.contrib.auth import authenticate
 from django.utils.translation import gettext_lazy as _
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 
 class TemplateUploadForm(forms.ModelForm):
     class Meta:
@@ -84,3 +86,44 @@ class LoginForm(forms.Form):
 
     def get_user(self):
         return self.user_cache
+
+User = get_user_model()
+
+class RegisterForm(forms.ModelForm):
+    password1 = forms.CharField(
+        label="Senha",
+        widget=forms.PasswordInput,
+        min_length=8,
+        help_text="Mínimo 8 caracteres."
+    )
+    password2 = forms.CharField(
+        label="Confirme a senha",
+        widget=forms.PasswordInput
+    )
+
+    class Meta:
+        model = User
+        fields = ['email', 'first_name', 'last_name', 'role', 'organization']
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if User.objects.filter(email=email).exists():
+            raise ValidationError("Este e-mail já está cadastrado.")
+        return email
+
+    def clean(self):
+        cleaned_data = super().clean()
+        p1 = cleaned_data.get('password1')
+        p2 = cleaned_data.get('password2')
+
+        if p1 and p2 and p1 != p2:
+            raise ValidationError("As senhas não conferem.")
+
+        return cleaned_data
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.set_password(self.cleaned_data['password1'])
+        if commit:
+            user.save()
+        return user

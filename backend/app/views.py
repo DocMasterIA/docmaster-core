@@ -95,7 +95,7 @@ def DocumentGeneratorView(request):
         template_id = request.POST.get("template_id")
 
         if not template_id:
-            messages.error(request, "É necessário selecionar um template antes de gerar o documento.")
+            messages.error(request, "É necessário selecionar um documento base antes de gerar o documento.")
             return render(request, "document_generator.html", {"templates": templates})
 
         template = get_object_or_404(Template, pk=template_id)

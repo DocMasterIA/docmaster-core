@@ -15,20 +15,21 @@ import uuid
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     ordering = ("email",)
-    list_display = ("email", "first_name", "last_name", "role", "is_staff", "is_active", "date_joined")
+    list_display = ("email", "first_name", "last_name", "profile_photo", "role", "is_staff", "is_active", "date_joined")
     list_filter = ("role", "is_staff", "is_active")
     search_fields = ("email", "first_name", "last_name", "organization")
 
     fieldsets = (
         (None, {"fields": ("email", "password")}),
         (_("Informações pessoais"), {"fields": ("first_name", "last_name", "organization", "role")}),
+        (_("Perfil"), {"fields": ("profile_photo",)}),  # tupla de um elemento
         (_("Permissões"), {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
         (_("Datas importantes"), {"fields": ("last_login", "date_joined")}),
     )
     add_fieldsets = (
         (None, {
             "classes": ("wide",),
-            "fields": ("email", "password1", "password2", "role", "is_staff", "is_active"),
+            "fields": ("email", "profile_photo","password1", "password2", "role", "is_staff", "is_active"),
         }),
     )
 from django.contrib import admin, messages

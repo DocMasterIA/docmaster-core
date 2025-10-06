@@ -558,79 +558,77 @@
             <p class="login-subtitle">Crie sua conta para acessar a plataforma governamental de licitações</p>
         </div>
 
-        <form id="registerForm">
-            <div class="form-group">
-                <input 
-                    type="text" 
-                    id="first_name" 
-                    class="form-input" 
-                    placeholder=" " 
-                    required
-                >
-                <label class="floating-label" for="first_name">Nome</label>
-            </div>
+        <form id="registerForm" method="post" action="{% url 'registro_panel' %}" novalidate>
+    {% csrf_token %}
 
-            <div class="form-group">
-                <input 
-                    type="text" 
-                    id="last_name" 
-                    class="form-input" 
-                    placeholder=" " 
-                    required
-                >
-                <label class="floating-label" for="last_name">Sobrenome</label>
-            </div>
+    <div class="form-group">
+        <input type="text" name="first_name" id="first_name" class="form-input" placeholder=" " value="{{ form.first_name.value|default:'' }}" required>
+        <label class="floating-label" for="first_name">Nome</label>
+        {% if form.first_name.errors %}
+            <p class="text-xs text-red-600 mt-1">{{ form.first_name.errors|join:", " }}</p>
+        {% endif %}
+    </div>
 
-            <div class="form-group">
-                <input 
-                    type="email" 
-                    id="email" 
-                    class="form-input" 
-                    placeholder=" " 
-                    required
-                >
-                <label class="floating-label" for="email">Email</label>
-            </div>
+    <div class="form-group">
+        <input type="text" name="last_name" id="last_name" class="form-input" placeholder=" " value="{{ form.last_name.value|default:'' }}" required>
+        <label class="floating-label" for="last_name">Sobrenome</label>
+        {% if form.last_name.errors %}
+            <p class="text-xs text-red-600 mt-1">{{ form.last_name.errors|join:", " }}</p>
+        {% endif %}
+    </div>
 
-            <div class="form-group">
-                <input 
-                    type="password" 
-                    id="password" 
-                    class="form-input" 
-                    placeholder=" " 
-                    required
-                >
+    <div class="form-group">
+        <input type="email" name="email" id="email" class="form-input" placeholder=" " value="{{ form.email.value|default:'' }}" required>
+        <label class="floating-label" for="email">Email</label>
+        {% if form.email.errors %}
+            <p class="text-xs text-red-600 mt-1">{{ form.email.errors|join:", " }}</p>
+        {% endif %}
+    </div>
 
-            </div>
+    <div class="form-group">
+        <input type="password" name="password1" id="password1" class="form-input" placeholder=" " required>
+        <label class="floating-label" for="password1">Senha</label>
+        {% if form.password1.errors %}
+            <p class="text-xs text-red-600 mt-1">{{ form.password1.errors|join:", " }}</p>
+        {% endif %}
+    </div>
 
-            <div class="form-group">
-                <select id="role" class="form-input" required>
-                    <option value="" disabled selected>Selecione</option>
-                    <option value="servidor">Servidor Público</option>
-                    <option value="empresa">Empresa</option>
-                </select>
-                <label class="floating-label" for="role">Perfil de Acesso</label>
-            </div>
+    <div class="form-group">
+        <input type="password" name="password2" id="password2" class="form-input" placeholder=" " required>
+        <label class="floating-label" for="password2">Confirme a senha</label>
+        {% if form.password2.errors %}
+            <p class="text-xs text-red-600 mt-1">{{ form.password2.errors|join:", " }}</p>
+        {% endif %}
+    </div>
 
-            <div class="form-group">
-                <input 
-                    type="text" 
-                    id="organization" 
-                    class="form-input" 
-                    placeholder=" " 
-                    required
-                >
-                <label class="floating-label" for="organization">Seu Órgão / Empresa</label>
-            </div>
+    <div class="form-group">
+        <select name="role" id="role" class="form-input" required>
+            <option value="" disabled selected>Selecione</option>
+            <option value="SERVIDOR" {% if form.role.value == "SERVIDOR" %}selected{% endif %}>Servidor Público</option>
+            <option value="EMPRESA" {% if form.role.value == "EMPRESA" %}selected{% endif %}>Empresa</option>
+        </select>
+        <label class="floating-label" for="role">Perfil de Acesso</label>
+        {% if form.role.errors %}
+            <p class="text-xs text-red-600 mt-1">{{ form.role.errors|join:", " }}</p>
+        {% endif %}
+    </div>
 
-            <button type="submit" class="login-button">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" 
-                     stroke="currentColor" stroke-width="2">
-                    <path d="M12 5v14M5 12h14"/>
-                </svg>
-                Criar Conta
-            </button>
-        </form>
+    <div class="form-group">
+        <input type="text" name="organization" id="organization" class="form-input" placeholder=" " value="{{ form.organization.value|default:'' }}" required>
+        <label class="floating-label" for="organization">Seu Órgão / Empresa</label>
+        {% if form.organization.errors %}
+            <p class="text-xs text-red-600 mt-1">{{ form.organization.errors|join:", " }}</p>
+        {% endif %}
+    </div>
+
+    <button type="submit" class="login-button mt-6 w-full inline-flex items-center justify-center gap-2">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14"/>
+        </svg>
+        Criar Conta
+    </button>
+</form>
+
     </div>
 </div>
 

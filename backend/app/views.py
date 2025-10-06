@@ -11,7 +11,7 @@ from django.contrib.auth.decorators import login_required
 import os, traceback, tempfile
 from django.contrib.auth import login as auth_login
 from django.views.decorators.http import require_http_methods
-from backend.app.forms import LoginForm, RegisterForm
+from backend.app.forms import LoginForm, RegisterForm, UserProfileForm
 from backend.app.utils.utils import get_client_ip, is_locked, clear_failed_attempts, record_failed_attempt
 
 @require_http_methods(["GET","POST"])
@@ -96,8 +96,26 @@ def DashboardView(request):
 
 @login_required
 def AreaDoUsuarioView(request):
-    return render(request,"area_do_usuario.html")
+    user = request.user
 
+    if request.method == "POST":
+        first_name = request.POST.get("first_name", "").strip()
+        last_name = request.POST.get("last_name", "").strip()
+        photo = request.FILES.get("profile_photo")
+
+        if first_name and last_name:
+            user.first_name = first_name
+            user.last_name = last_name
+            if photo:
+                user.profile_photo = photo
+            user.save()
+            messages.success(request, "Perfil atualizado com sucesso!")
+        else:
+            messages.error(request, "Nome e sobrenome são obrigatórios!")
+
+        return redirect("area_do_usuario")
+
+    return render(request, "area_do_usuario.html")
 
 @login_required
 def UploadTemplateView(request):

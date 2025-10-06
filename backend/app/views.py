@@ -11,7 +11,7 @@ from django.contrib.auth.decorators import login_required
 import os, traceback, tempfile
 from django.contrib.auth import login as auth_login
 from django.views.decorators.http import require_http_methods
-from backend.app.forms import LoginForm
+from backend.app.forms import LoginForm, RegisterForm
 from backend.app.utils.utils import get_client_ip, is_locked, clear_failed_attempts, record_failed_attempt
 
 @require_http_methods(["GET","POST"])
@@ -68,7 +68,21 @@ def LoginView(request):
     return render(request, "login_portal.html", {"form": form})
 
 def RegisterView(request):
-    return render(request,"register_portal.html")
+    if request.method == "POST":
+        form = RegisterForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            messages.success(request, "Cadastro realizado com sucesso! Faça login para continuar.")
+            return redirect('login_panel')
+        else:
+            # envia todos os erros do form para messages
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, error)
+    else:
+        form = RegisterForm()
+
+    return render(request, "register_portal.html", {"form": form})
 
 @login_required
 def LogoutView(request):

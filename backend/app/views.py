@@ -9,22 +9,63 @@ from backend.app.services.services import assemble_document_context, generate_pd
 from backend.app.services.render import render_docx_from_template
 from django.contrib.auth.decorators import login_required
 import os, traceback, tempfile
+from django.contrib.auth import login as auth_login
+from django.views.decorators.http import require_http_methods
+from backend.app.forms import LoginForm
+from backend.app.utils.utils import get_client_ip, is_locked, clear_failed_attempts, record_failed_attempt
 
+@require_http_methods(["GET","POST"])
 def LoginView(request):
-    if request.method == "POST":
-        email = request.POST.get("email")
-        password = request.POST.get("password")
+    # se já autenticated, redireciona
+    if request.user.is_authenticated:
+        return redirect(reverse("dashboard"))
 
-        user = authenticate(request, email=email, password=password)
+    form = LoginForm(request=request, data=request.POST or None)
 
-        if user is not None:
-            login(request, user)
-            messages.success(request, "Login realizado com sucesso!")
-            return redirect(reverse("dashboard"))
+    ip = get_client_ip(request)
+    ip_key = f"ip:{ip}"
+
+    # bloqueio por IP rápido
+    if is_locked(ip_key):
+        messages.error(request, "Muitas tentativas deste IP. Tente novamente mais tarde.")
+        return render(request, "login_portal.html", {"form": form})
+
+    if request.method == "POST" and form.is_valid():
+        user = form.get_user()
+
+        # bloqueio por usuário também
+        user_key = f"user:{user.get_username()}"
+        if is_locked(user_key):
+            messages.error(request, "Conta bloqueada temporariamente por tentativas inválidas.")
+            return render(request, "login_portal.html", {"form": form})
+
+        # sucesso: limpa tentativas
+        clear_failed_attempts(ip_key)
+        clear_failed_attempts(user_key)
+
+        # login
+        auth_login(request, user)
+
+        # session: lembrar (persistente) ou sessão expira com o browser
+        if form.cleaned_data.get("remember"):
+            # 30 dias por exemplo
+            request.session.set_expiry(60 * 60 * 24 * 30)
         else:
-            messages.error(request, "E-mail ou senha inválidos.")
+            # expira quando fecha o browser (ou defina SESSION_COOKIE_AGE)
+            request.session.set_expiry(0)
 
-    return render(request, "login_portal.html")
+        messages.success(request, "Login realizado com sucesso!")
+        return redirect(reverse("dashboard"))
+
+    # se form inválido (POST) -> contabiliza falha
+    if request.method == "POST" and not form.is_valid():
+        # incrementa falhas por ip e por username se houver
+        record_failed_attempt(ip_key)
+        username_field = request.POST.get("email_or_username")
+        if username_field:
+            record_failed_attempt(f"user:{username_field}")
+
+    return render(request, "login_portal.html", {"form": form})
 
 def RegisterView(request):
     return render(request,"register_portal.html")

@@ -80,18 +80,27 @@
 
                     <!-- Profile -->
                     <div class="flex items-center space-x-3 bg-white rounded-xl p-2 shadow-sm border border-slate-200">
-                        <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3" alt="Perfil do usuário" class="h-10 w-10 rounded-lg object-cover ring-2 ring-blue-300" onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;" />
+                        <img src="{{ user.profile_photo.url }}" 
+                            alt="Perfil do usuário" 
+                            class="h-10 w-10 rounded-lg object-cover ring-2 ring-blue-300" 
+                            onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop'; this.onerror=null;" />
+
                         <div class="hidden lg:block">
-                            <p class="text-sm font-semibold text-slate-900">Dr. Carlos Silva</p>
-                            <p class="text-xs text-slate-500">Consultor Executivo</p>
+                            <p class="text-sm font-semibold text-slate-900">{{ user.full_name }}</p>
+                            <p class="text-xs text-slate-500">
+                                {% if user.role == 'ADMIN' %}Administrador{% elif user.role == 'SERVIDOR' %}Servidor Público{% else %}Empresa{% endif %}
+                            </p>
                         </div>
-                        <a href="/area_do_usuario" class="text-slate-500 hover:text-blue-700 transition-colors duration-200">
+
+                        <a href="{% url 'area_do_usuario' %}" class="text-slate-500 hover:text-blue-700 transition-colors duration-200">
                             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                             </svg>
                         </a>
                     </div>
+
 
                         <form method="POST" action="{% url 'logout' %}">
                         {% csrf_token %}

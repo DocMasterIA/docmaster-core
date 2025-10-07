@@ -191,7 +191,6 @@ def DocumentGeneratorView(request):
                 Q(role_can_access="TODOS") | Q(role_can_access=user_role)
             ).order_by("-created_at")
 
-
     selected_template_id = request.GET.get("template_id")
     selected_template = None
     if selected_template_id:

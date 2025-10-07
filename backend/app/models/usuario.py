@@ -73,27 +73,44 @@ class User(AbstractBaseUser, PermissionsMixin):
     REQUIRED_FIELDS = []  # ao criar superuser, só pedirá email e senha
 
     def save(self, *args, **kwargs):
-            # apagar foto antiga se houver mudança
+        # pegar instância antiga (se existir) para comparar nomes
+        old = None
+        if self.pk:
             try:
-                this = User.objects.get(pk=self.pk)
-                if this.profile_photo and this.profile_photo != self.profile_photo:
-                    if os.path.isfile(this.profile_photo.path):
-                        os.remove(this.profile_photo.path)
+                old = User.objects.get(pk=self.pk)
             except User.DoesNotExist:
-                pass  # usuário novo, sem foto antiga
+                old = None
 
-            # redimensionar a imagem para 300x300
-            if self.profile_photo:
+        # se existe novo arquivo (ou foi removido via form)
+        has_new_file = bool(self.profile_photo and getattr(self.profile_photo, "file", None))
+
+        # se trocaram de arquivo (comparando nome) — delete o antigo via storage
+        if old and old.profile_photo and (not self.profile_photo or old.profile_photo.name != self.profile_photo.name):
+            try:
+                # usa o storage do campo — funciona com S3, GCS, local, etc.
+                old.profile_photo.delete(save=False)
+            except Exception:
+                # não falhar por causa da deleção
+                pass
+
+        # se houver um arquivo novo, redimensiona antes de salvar
+        if has_new_file:
+            try:
                 img = Image.open(self.profile_photo)
-                img = img.convert('RGB')
+                img = img.convert("RGB")
                 img = img.resize((300, 300), Image.LANCZOS)
 
                 buffer = BytesIO()
-                img.save(buffer, format='JPEG', quality=95)
-                self.profile_photo.save(f'{self.id}.jpg', ContentFile(buffer.getvalue()), save=False)
+                img.save(buffer, format="JPEG", quality=95)
+                # monte um nome que evita colisão (ex: id.jpg se tiver id, senão timestamp/nome)
+                filename = f"{self.pk or 'tmp'}_{os.path.splitext(self.profile_photo.name)[0]}.jpg"
+                self.profile_photo.save(filename, ContentFile(buffer.getvalue()), save=False)
+            except Exception:
+                # se redimensionamento falhar, não bloqueie o save (opcional: log)
+                pass
 
-            super().save(*args, **kwargs)
-            
+        super().save(*args, **kwargs)
+
     class Meta:
         verbose_name = "usuário"
         verbose_name_plural = "usuários"

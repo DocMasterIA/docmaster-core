@@ -227,136 +227,73 @@ document.getElementById('photo').addEventListener('change', function(event){
 
 
       <!-- Coluna direita: Documentos e Histórico -->
-      <section class="lg:col-span-2 space-y-8">
-        <!-- Abas -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="px-6 pt-6">
-            <div class="flex items-center gap-2">
-              <button data-tab="documents" class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-blue-50 text-blue-700 border border-blue-200">Meus Documentos</button>
-              <button data-tab="history" class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-white text-slate-700 border border-slate-300 hover:bg-slate-50">Histórico</button>
+<section class="lg:col-span-2 space-y-8">
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="px-6 pt-6 flex items-center gap-2">
+      <div class="px-4 py-2 rounded-xl text-sm font-medium bg-blue-50 text-blue-700 border border-blue-200">Meus Documentos</div>
+      <form method="get" class="ml-auto">
+        <input type="text" name="q" value="{{ query }}" placeholder="Buscar por título..."
+               class="pl-9 pr-3 py-2.5 bg-white border border-slate-300 rounded-xl text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"/>
+        <button type="submit" class="hidden">Buscar</button>
+      </form>
+    </div>
+
+    <div class="p-6">
+      <div id="tab-documents" class="tab-panel grid grid-cols-1 gap-4 divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden">
+
+        {% for doc in page_obj %}
+        <div class="p-4 flex items-center justify-between bg-white hover:bg-slate-50">
+          <div class="flex items-center gap-4">
+            <div>
+              <p class="font-medium text-slate-900">{{ doc.template.name }}</p>
+              <p class="text-xs text-slate-500">
+                Atualizado em {{ doc.updated_at|date:"d/m/Y H:i" }} • Status: 
+                <span class="{% if doc.status == 'draft' %}text-amber-700{% else %}text-green-700{% endif %}">
+                  {{ doc.get_status_display }}
+                </span>
+              </p>
             </div>
           </div>
-
-          <!-- Conteúdo das abas -->
-          <div class="p-6">
-            <!-- Documentos -->
-            <div id="tab-documents" class="tab-panel grid grid-cols-1 gap-4">
-              <!-- Filtros -->
-              <div class="flex flex-wrap items-center gap-3 pb-2">
-                <div class="relative">
-                  <input type="text" placeholder="Buscar por título..." class="pl-9 pr-3 py-2.5 bg-white border border-slate-300 rounded-xl text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
-                  <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                </div>
-                <select class="px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
-                  <option>Todos os tipos</option>
-                  <option>TR</option>
-                  <option>ETP</option>
-                  <option>DFD</option>
-                </select>
-                <select class="px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
-                  <option>Status: Todos</option>
-                  <option>Rascunho</option>
-                  <option>Em revisão</option>
-                  <option>Finalizado</option>
-                </select>
-              </div>
-
-              <!-- Lista (cards tipo tabela) -->
-              <div class="divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden">
-                <!-- Item -->
-                <div class="p-4 flex items-center justify-between bg-white hover:bg-slate-50">
-                  <div class="flex items-center gap-4">
-                    <div class="h-10 w-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
-                      <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                    </div>
-                    <div>
-                      <p class="font-medium text-slate-900">TR - Equipamentos de TI</p>
-                      <p class="text-xs text-slate-500">Atualizado em 24/09/2025 • Status: <span class="text-amber-700">Rascunho</span></p>
-                    </div>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <a href="document_generator.html" class="px-3 py-1.5 text-sm rounded-xl border border-slate-300 text-slate-700 bg-white hover:bg-slate-50">Abrir</a>
-                    <button class="px-3 py-1.5 text-sm rounded-xl bg-blue-600 text-white hover:bg-blue-700">Exportar PDF</button>
-                  </div>
-                </div>
-                <!-- Item -->
-                <div class="p-4 flex items-center justify-between bg-white hover:bg-slate-50">
-                  <div class="flex items-center gap-4">
-                    <div class="h-10 w-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-sm">
-                      <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                    </div>
-                    <div>
-                      <p class="font-medium text-slate-900">ETP - Consultoria Jurídica</p>
-                      <p class="text-xs text-slate-500">Atualizado em 23/09/2025 • Status: <span class="text-emerald-700">Finalizado</span></p>
-                    </div>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <a href="document_generator.html" class="px-3 py-1.5 text-sm rounded-xl border border-slate-300 text-slate-700 bg-white hover:bg-slate-50">Abrir</a>
-                    <button class="px-3 py-1.5 text-sm rounded-xl bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200">Baixar .docx</button>
-                  </div>
-                </div>
-                <!-- Item -->
-                <div class="p-4 flex items-center justify-between bg-white hover:bg-slate-50">
-                  <div class="flex items-center gap-4">
-                    <div class="h-10 w-10 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center shadow-sm">
-                      <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-                    </div>
-                    <div>
-                      <p class="font-medium text-slate-900">DFD - Obras de Infraestrutura</p>
-                      <p class="text-xs text-slate-500">Atualizado em 22/09/2025 • Status: <span class="text-blue-700">Em revisão</span></p>
-                    </div>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <a href="document_generator.html" class="px-3 py-1.5 text-sm rounded-xl border border-slate-300 text-slate-700 bg-white hover:bg-slate-50">Abrir</a>
-                    <button class="px-3 py-1.5 text-sm rounded-xl bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200">Detalhes</button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Paginação -->
-              <div class="flex items-center justify-between pt-4">
-                <p class="text-sm text-slate-500">Mostrando 1–3 de 45</p>
-                <div class="flex items-center gap-2">
-                  <button class="px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">Anterior</button>
-                  <button class="px-3 py-1.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700">Próximo</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Histórico -->
-            <div id="tab-history" class="tab-panel hidden">
-              <div class="space-y-3">
-                <!-- Linha do tempo simples -->
-                <div class="flex items-start gap-3">
-                  <div class="mt-1 h-2 w-2 rounded-full bg-emerald-600"></div>
-                  <div>
-                    <p class="text-sm text-slate-700"><span class="font-medium">24/09/2025 12:27</span> — Documento <span class="font-medium">TR - Equipamentos de TI</span> alterado para <span class="text-emerald-700 font-medium">Finalizado</span>.</p>
-                    <p class="text-xs text-slate-500">Por {{ user.get_full_name|default:'Você' }}</p>
-                  </div>
-                </div>
-                <div class="flex items-start gap-3">
-                  <div class="mt-1 h-2 w-2 rounded-full bg-amber-600"></div>
-                  <div>
-                    <p class="text-sm text-slate-700"><span class="font-medium">23/09/2025 16:45</span> — Revisão iniciada em <span class="font-medium">DFD - Obras de Infraestrutura</span>.</p>
-                    <p class="text-xs text-slate-500">Projeto Obras Públicas</p>
-                  </div>
-                </div>
-                <div class="flex items-start gap-3">
-                  <div class="mt-1 h-2 w-2 rounded-full bg-slate-400"></div>
-                  <div>
-                    <p class="text-sm text-slate-700"><span class="font-medium">22/09/2025 14:20</span> — Novo documento criado: <span class="font-medium">ETP - Consultoria Jurídica</span>.</p>
-                    <p class="text-xs text-slate-500">Base Legal • ETP</p>
-                  </div>
-                </div>
-              </div>
-
-              <div class="pt-4">
-                <button class="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 bg-white hover:bg-slate-50">Exportar histórico (.csv)</button>
-              </div>
-            </div>
+          <div class="flex items-center gap-2">
+            {% if doc.file_docx %}
+            <a href="{{ doc.file_docx.url }}" target="_blank"
+               class="px-3 py-1.5 text-sm rounded-xl border border-slate-300 text-slate-700 bg-white hover:bg-slate-50">Abrir DOCX</a>
+            {% endif %}
+            {% if doc.file_pdf %}
+            <a href="{{ doc.file_pdf.url }}" download
+               class="px-3 py-1.5 text-sm rounded-xl border border-slate-300 text-slate-700 bg-white hover:bg-slate-50">Exportar PDF</a>
+            {% endif %}
           </div>
         </div>
-      </section>
+        {% empty %}
+        <p class="text-sm text-slate-500 p-4">Nenhum documento encontrado.</p>
+        {% endfor %}
+
+      </div>
+
+      <!-- Paginação -->
+      <div class="flex items-center justify-between pt-4">
+        <p class="text-sm text-slate-500">
+          Mostrando {{ page_obj.start_index }}–{{ page_obj.end_index }} de {{ page_obj.paginator.count }}
+        </p>
+        <div class="flex items-center gap-2">
+          {% if page_obj.has_previous %}
+          <a href="?q={{ query }}&page={{ page_obj.previous_page_number }}" class="px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">Anterior</a>
+          {% else %}
+          <button disabled class="px-3 py-1.5 rounded-xl border border-slate-300 bg-slate-100 text-slate-400">Anterior</button>
+          {% endif %}
+
+          {% if page_obj.has_next %}
+          <a href="?q={{ query }}&page={{ page_obj.next_page_number }}" class="px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">Próximo</a>
+          {% else %}
+          <button disabled class="px-3 py-1.5 rounded-xl border border-slate-300 bg-slate-100 text-slate-400">Próximo</button>
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
     </div>
   </main>
 

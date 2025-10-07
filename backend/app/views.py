@@ -13,6 +13,7 @@ from django.contrib.auth import login as auth_login
 from django.views.decorators.http import require_http_methods
 from backend.app.forms import LoginForm, RegisterForm, UserProfileForm
 from backend.app.utils.utils import get_client_ip, is_locked, clear_failed_attempts, record_failed_attempt
+from django.core.paginator import Paginator
 
 @require_http_methods(["GET","POST"])
 def LoginView(request):
@@ -97,6 +98,19 @@ def DashboardView(request):
 @login_required
 def AreaDoUsuarioView(request):
     user = request.user
+    query = request.GET.get("q", "")  # busca por título/template
+
+    docs = DocumentInstance.objects.filter(owner=user)
+    if query:
+        docs = docs.filter(template__name__icontains=query)
+
+    docs = docs.order_by("-updated_at")  # mais recentes primeiro
+
+        # Paginação (10 documentos por página)
+    paginator = Paginator(docs, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
 
     if request.method == "POST":
         form = UserProfileForm(request.POST, request.FILES, instance=user)
@@ -110,7 +124,7 @@ def AreaDoUsuarioView(request):
     else:
         form = UserProfileForm(instance=user)
 
-    return render(request, "area_do_usuario.html", {"form": form})
+    return render(request, "area_do_usuario.html", {"form": form, "page_obj": page_obj, "query": query,})
 
 @login_required
 def UploadTemplateView(request):

@@ -81,16 +81,16 @@ class SchemaAuditAdmin(admin.ModelAdmin):
 # ------------------ DOCUMENT INSTANCE ------------------
 @admin.register(DocumentInstance)
 class DocumentInstanceAdmin(admin.ModelAdmin):
-    list_display = ("id_short", "template", "owner_email", "status", "created_at", "file_docx_link", "file_pdf_link")
+    list_display = ("id_short", "template", "owner_email", "status", "created_at", "file_docx", "file_pdf")
     list_filter = ("status", "template", "created_at")
     search_fields = ("owner__email", "template__name", "data")
-    readonly_fields = ("created_at", "updated_at", "content_html", "file_docx_link", "data_pretty", "file_pdf_link")
+    readonly_fields = ("created_at", "updated_at", "content_html","data_pretty",)
     actions = ("action_make_final", "action_make_draft", "action_regenerate_files")
 
     fieldsets = (
         (None, {"fields": ("template", "owner", "status")}),
         ("Dados preenchidos", {"fields": ("data",)}),
-        ("Preview / Arquivos gerados", {"fields": ("content_html", "file_docx_link", "file_pdf_link")}),
+        ("Preview / Arquivos gerados", {"fields": ("content_html", "file_docx", "file_pdf")}),
         ("Metadados", {"fields": ("created_at", "updated_at")}),
     )
 

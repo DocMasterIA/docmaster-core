@@ -129,17 +129,19 @@
     <!-- Avatar upload -->
     <div class="flex items-center gap-4">
       <div class="relative">
-        <img id="avatarPreview" src="{{ user.profile_photo.url|default:'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=2940&auto=format&fit=crop' }}" 
+        <img id="avatarPreview" src="{{ user.profile_photo.url }}" 
              alt="Avatar" 
              class="h-20 w-20 rounded-xl object-cover ring-2 ring-blue-500/40" />
 
         <!-- Label que abre o file picker -->
-        <label for="photo" class="absolute -bottom-2 -right-2 h-9 w-9 rounded-xl bg-blue-500 hover:bg-blue-700 text-white flex items-center justify-center shadow cursor-pointer">
-          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L7.5 20.5H4v-3.5L16.732 3.732z"/>
-          </svg>
-        </label>
+        <label for="photo"
+        class="flex items-center justify-center cursor-pointer shadow
+              px-1.5 py-1 text-sm rounded-md w-auto min-w-0">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+        </svg>
+      </label>
       </div>
       <div>
         <p class="text-sm text-slate-600">Formatos: JPG ou PNG. Até 5MB.</p>

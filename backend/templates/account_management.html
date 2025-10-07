@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gerenciamento de Conta - LicitaPro</title>
+    <link rel="stylesheet" href="../css/main.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<script type="module" src="https://static.rocket.new/rocket-web.js?_cfg=https%3A%2F%2Flicitapro9362back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.8"></script>
+</head>
+<body class="bg-background min-h-screen">
+    <!-- Header Navigation -->
+    <header class="bg-white shadow-government border-b border-secondary-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo -->
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-8 w-8 text-primary" viewBox="0 0 32 32" fill="currentColor">
+                            <path d="M16 2L4 8v16l12 6 12-6V8L16 2zm0 2.5L25.5 9 16 13.5 6.5 9 16 4.5zM6 10.5l9 4.5v11l-9-4.5v-11zm11 15.5v-11l9-4.5v11L17 26z"/>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <h1 class="text-xl font-bold text-primary">LicitaPro</h1>
+                        <p class="text-xs text-secondary-600">Plataforma Profissional</p>
+                    </div>
+                </div>
+
+                <!-- Navigation Menu -->
+                <nav class="hidden md:flex space-x-8">
+                    <a href="dashboard.html" class="text-secondary-600 hover:text-primary transition-micro">Dashboard</a>
+                    <a href="document_generator.html" class="text-secondary-600 hover:text-primary transition-micro">Documentos</a>
+                    <a href="legal_database.html" class="text-secondary-600 hover:text-primary transition-micro">Base Legal</a>
+                    <a href="project_workspace.html" class="text-secondary-600 hover:text-primary transition-micro">Projetos</a>
+                    <a href="ai_assistant.html" class="text-secondary-600 hover:text-primary transition-micro">IA Assistente</a>
+                    <a href="analytics_center.html" class="text-secondary-600 hover:text-primary transition-micro">Analytics</a>
+                </nav>
+
+                <!-- User Menu -->
+                <div class="flex items-center space-x-4">
+                    <!-- Notifications -->
+                    <button class="relative p-2 text-secondary-600 hover:text-primary transition-micro">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5zM10.5 3.5L7 7h3v10l4-4V7h3l-3.5-3.5z"/>
+                        </svg>
+                        <span class="absolute top-0 right-0 h-2 w-2 bg-error rounded-full"></span>
+                    </button>
+
+                    <!-- User Profile -->
+                    <div class="flex items-center space-x-3">
+                        <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3" alt="Perfil do usuário" class="h-8 w-8 rounded-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;" />
+                        <div class="hidden md:block">
+                            <p class="text-sm font-medium text-secondary-900">Dr. Carlos Silva</p>
+                            <p class="text-xs text-secondary-600">Consultor Sênior</p>
+                        </div>
+                        <a href="account_management.html" class="text-primary font-semibold">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Page Header -->
+        <section class="mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-3xl font-bold text-secondary-900">Gerenciamento de Conta</h2>
+                    <p class="text-secondary-600 mt-1">Configure seu perfil, assinatura e preferências organizacionais</p>
+                </div>
+                <div class="flex space-x-3">
+                    <button class="btn-secondary flex items-center space-x-2">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <span>Exportar Dados</span>
+                    </button>
+                    <button class="btn-primary flex items-center space-x-2">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+                        </svg>
+                        <span>Salvar Alterações</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Account Management Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <!-- Sidebar Navigation -->
+            <div class="lg:col-span-1">
+                <nav class="card space-y-2">
+                    <h3 class="text-lg font-semibold text-secondary-900 mb-4">Configurações</h3>
+                    <a href="#profile" class="flex items-center space-x-3 p-3 bg-primary-50 text-primary-700 rounded-lg font-medium">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                        </svg>
+                        <span>Perfil do Usuário</span>
+                    </a>
+                    <a href="#subscription" class="flex items-center space-x-3 p-3 text-secondary-600 hover:bg-secondary-50 rounded-lg transition-micro">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                        </svg>
+                        <span>Assinatura</span>
+                    </a>
+                    <a href="#security" class="flex items-center space-x-3 p-3 text-secondary-600 hover:bg-secondary-50 rounded-lg transition-micro">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                        <span>Segurança</span>
+                    </a>
+                    <a href="#team" class="flex items-center space-x-3 p-3 text-secondary-600 hover:bg-secondary-50 rounded-lg transition-micro">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                        </svg>
+                        <span>Equipe</span>
+                    </a>
+                    <a href="#notifications" class="flex items-center space-x-3 p-3 text-secondary-600 hover:bg-secondary-50 rounded-lg transition-micro">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5zM10.5 3.5L7 7h3v10l4-4V7h3l-3.5-3.5z"/>
+                        </svg>
+                        <span>Notificações</span>
+                    </a>
+                    <a href="#integrations" class="flex items-center space-x-3 p-3 text-secondary-600 hover:bg-secondary-50 rounded-lg transition-micro">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                        <span>Integrações</span>
+                    </a>
+                </nav>
+            </div>
+
+            <!-- Main Content Area -->
+            <div class="lg:col-span-3 space-y-8">
+                <!-- User Profile Section -->
+                <section id="profile" class="card">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-lg font-semibold text-secondary-900">Perfil do Usuário</h3>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-100 text-success-800">
+                            Verificado
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Profile Photo -->
+                        <div class="md:col-span-1">
+                            <div class="flex flex-col items-center">
+                                <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3" alt="Foto do perfil" class="h-32 w-32 rounded-full object-cover border-4 border-white shadow-government-lg" onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;" />
+                                <button class="mt-4 btn-secondary text-sm">
+                                    Alterar Foto
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Profile Information -->
+                        <div class="md:col-span-2 space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-secondary-700 mb-1">Nome Completo</label>
+                                    <input type="text" value="Dr. Carlos Silva" class="form-input" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-secondary-700 mb-1">Cargo/Função</label>
+                                    <input type="text" value="Consultor Sênior" class="form-input" />
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-secondary-700 mb-1">Email</label>
+                                    <input type="email" value="carlos.silva@licitapro.com" class="form-input" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-secondary-700 mb-1">Telefone</label>
+                                    <input type="tel" value="+55 11 99999-9999" class="form-input" />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-secondary-700 mb-1">Organização</label>
+                                <input type="text" value="Silva & Associados Consultoria" class="form-input" />
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-secondary-700 mb-1">Especialização</label>
+                                <select class="form-input">
+                                    <option>Licitações e Contratos Públicos</option>
+                                    <option>Direito Administrativo</option>
+                                    <option>Consultoria Jurídica</option>
+                                    <option>Gestão Pública</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Subscription Management -->
+                <section id="subscription" class="card">
+                    <h3 class="text-lg font-semibold text-secondary-900 mb-6">Gerenciamento de Assinatura</h3>
+                    
+                    <div class="bg-primary-50 border border-primary-200 rounded-lg p-6 mb-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h4 class="text-lg font-semibold text-primary-900">Plano Profissional</h4>
+                                <p class="text-sm text-primary-700">Acesso completo a todas as funcionalidades</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-2xl font-bold text-primary-900">R$ 299</p>
+                                <p class="text-sm text-primary-700">/mês</p>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <svg class="h-5 w-5 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <span class="text-sm text-primary-700">Renovação automática em 24/10/2025</span>
+                            </div>
+                            <button class="btn-secondary text-sm">Gerenciar Plano</button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-secondary-50 rounded-lg p-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
+                                    <svg class="h-4 w-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-secondary-900">Documentos</p>
+                                    <p class="text-xs text-secondary-600">Ilimitados</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-secondary-50 rounded-lg p-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-accent-100 rounded-lg flex items-center justify-center">
+                                    <svg class="h-4 w-4 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-secondary-900">Usuários</p>
+                                    <p class="text-xs text-secondary-600">Até 10</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-secondary-50 rounded-lg p-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-warning-100 rounded-lg flex items-center justify-center">
+                                    <svg class="h-4 w-4 text-warning-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-secondary-900">IA Assistente</p>
+                                    <p class="text-xs text-secondary-600">Premium</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-secondary-200 pt-6">
+                        <h4 class="text-md font-semibold text-secondary-900 mb-4">Histórico de Pagamentos</h4>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between p-3 bg-secondary-50 rounded-lg">
+                                <div>
+                                    <p class="text-sm font-medium text-secondary-900">Setembro 2025</p>
+                                    <p class="text-xs text-secondary-600">Plano Profissional</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-sm font-semibold text-secondary-900">R$ 299,00</p>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-success-100 text-success-800">
+                                        Pago
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center justify-between p-3 bg-secondary-50 rounded-lg">
+                                <div>
+                                    <p class="text-sm font-medium text-secondary-900">Agosto 2025</p>
+                                    <p class="text-xs text-secondary-600">Plano Profissional</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-sm font-semibold text-secondary-900">R$ 299,00</p>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-success-100 text-success-800">
+                                        Pago
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Security Settings -->
+                <section id="security" class="card">
+                    <h3 class="text-lg font-semibold text-secondary-900 mb-6">Configurações de Segurança</h3>
+                    
+                    <div class="space-y-6">
+                        <!-- Password Change -->
+                        <div class="border-b border-secondary-200 pb-6">
+                            <h4 class="text-md font-semibold text-secondary-900 mb-4">Alterar Senha</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-secondary-700 mb-1">Senha Atual</label>
+                                    <input type="password" class="form-input" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-secondary-700 mb-1">Nova Senha</label>
+                                    <input type="password" class="form-input" />
+                                </div>
+                            </div>
+                            <button class="btn-primary mt-4">Atualizar Senha</button>
+                        </div>
+
+                        <!-- Two-Factor Authentication -->
+                        <div class="border-b border-secondary-200 pb-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h4 class="text-md font-semibold text-secondary-900">Autenticação de Dois Fatores</h4>
+                                    <p class="text-sm text-secondary-600">Adicione uma camada extra de segurança à sua conta</p>
+                                </div>
+                                <div class="flex items-center">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-100 text-success-800 mr-3">
+                                        Ativo
+                                    </span>
+                                    <button class="btn-secondary text-sm">Configurar</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Session Management -->
+                        <div class="border-b border-secondary-200 pb-6">
+                            <h4 class="text-md font-semibold text-secondary-900 mb-4">Gerenciamento de Sessões</h4>
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between p-3 bg-secondary-50 rounded-lg">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
+                                            <svg class="h-4 w-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-medium text-secondary-900">Desktop - Chrome</p>
+                                            <p class="text-xs text-secondary-600">São Paulo, Brasil • Ativo agora</p>
+                                        </div>
+                                    </div>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-success-100 text-success-800">
+                                        Atual
+                                    </span>
+                                </div>
+
+                                <div class="flex items-center justify-between p-3 bg-secondary-50 rounded-lg">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-8 h-8 bg-secondary-100 rounded-lg flex items-center justify-center">
+                                            <svg class="h-4 w-4 text-secondary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-medium text-secondary-900">Mobile - Safari</p>
+                                            <p class="text-xs text-secondary-600">São Paulo, Brasil • Há 2 horas</p>
+                                        </div>
+                                    </div>
+                                    <button class="text-error-600 hover:text-error-700 text-sm font-medium">Encerrar</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Security Audit Log -->
+                        <div>
+                            <h4 class="text-md font-semibold text-secondary-900 mb-4">Log de Auditoria</h4>
+                            <div class="space-y-3">
+                                <div class="flex items-start space-x-3 p-3 bg-secondary-50 rounded-lg">
+                                    <div class="flex-shrink-0">
+                                        <div class="w-8 h-8 bg-success-100 rounded-full flex items-center justify-center">
+                                            <svg class="h-4 w-4 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="text-sm text-secondary-900">Login realizado com sucesso</p>
+                                        <p class="text-xs text-secondary-600">Hoje às 08:30 • IP: 192.168.1.100</p>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-start space-x-3 p-3 bg-secondary-50 rounded-lg">
+                                    <div class="flex-shrink-0">
+                                        <div class="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
+                                            <svg class="h-4 w-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="text-sm text-secondary-900">Perfil atualizado</p>
+                                        <p class="text-xs text-secondary-600">Ontem às 14:22</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Team Management -->
+                <section id="team" class="card">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-lg font-semibold text-secondary-900">Gerenciamento de Equipe</h3>
+                        <button class="btn-primary flex items-center space-x-2">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                            </svg>
+                            <span>Convidar Membro</span>
+                        </button>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between p-4 bg-secondary-50 rounded-lg">
+                            <div class="flex items-center space-x-4">
+                                <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3" alt="Dr. Carlos Silva" class="h-10 w-10 rounded-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;" />
+                                <div>
+                                    <h4 class="font-medium text-secondary-900">Dr. Carlos Silva</h4>
+                                    <p class="text-sm text-secondary-600">carlos.silva@licitapro.com</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                                    Administrador
+                                </span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-success-100 text-success-800">
+                                    Você
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 bg-secondary-50 rounded-lg">
+                            <div class="flex items-center space-x-4">
+                                <img src="https://images.pexels.com/photos/3785077/pexels-photo-3785077.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2" alt="Ana Santos" class="h-10 w-10 rounded-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;" />
+                                <div>
+                                    <h4 class="font-medium text-secondary-900">Ana Santos</h4>
+                                    <p class="text-sm text-secondary-600">ana.santos@licitapro.com</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-accent-100 text-accent-800">
+                                    Editor
+                                </span>
+                                <button class="text-secondary-600 hover:text-secondary-700">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 bg-secondary-50 rounded-lg">
+                            <div class="flex items-center space-x-4">
+                                <img src="https://images.pixabay.com/photo/2016/11/21/12/42/beard-1845166_1280.jpg" alt="Roberto Lima" class="h-10 w-10 rounded-full object-cover" onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;" />
+                                <div>
+                                    <h4 class="font-medium text-secondary-900">Roberto Lima</h4>
+                                    <p class="text-sm text-secondary-600">roberto.lima@licitapro.com</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary-100 text-secondary-800">
+                                    Visualizador
+                                </span>
+                                <button class="text-secondary-600 hover:text-secondary-700">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Notification Preferences -->
+                <section id="notifications" class="card">
+                    <h3 class="text-lg font-semibold text-secondary-900 mb-6">Preferências de Notificação</h3>
+                    
+                    <div class="space-y-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h4 class="text-sm font-medium text-secondary-900">Alertas Regulamentares</h4>
+                                <p class="text-xs text-secondary-600">Receba notificações sobre mudanças na legislação</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" checked class="sr-only peer" />
+                                <div class="w-11 h-6 bg-secondary-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-secondary-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h4 class="text-sm font-medium text-secondary-900">Lembretes de Prazo</h4>
+                                <p class="text-xs text-secondary-600">Notificações sobre prazos de projetos</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" checked class="sr-only peer" />
+                                <div class="w-11 h-6 bg-secondary-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-secondary-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h4 class="text-sm font-medium text-secondary-900">Atualizações do Sistema</h4>
+                                <p class="text-xs text-secondary-600">Informações sobre novas funcionalidades</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" class="sr-only peer" />
+                                <div class="w-11 h-6 bg-secondary-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-secondary-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h4 class="text-sm font-medium text-secondary-900">Newsletter Semanal</h4>
+                                <p class="text-xs text-secondary-600">Resumo semanal de atividades e insights</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" checked class="sr-only peer" />
+                                <div class="w-11 h-6 bg-secondary-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-secondary-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Integration Settings -->
+                <section id="integrations" class="card">
+                    <h3 class="text-lg font-semibold text-secondary-900 mb-6">Integrações</h3>
+                    
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between p-4 bg-secondary-50 rounded-lg">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                                    <svg class="h-5 w-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h4 class="font-medium text-secondary-900">Portal ComprasNet</h4>
+                                    <p class="text-sm text-secondary-600">Integração com sistema governamental</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-100 text-success-800">
+                                    Conectado
+                                </span>
+                                <button class="btn-secondary text-sm">Configurar</button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 bg-secondary-50 rounded-lg">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-10 h-10 bg-accent-100 rounded-lg flex items-center justify-center">
+                                    <svg class="h-5 w-5 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h4 class="font-medium text-secondary-900">API TCU</h4>
+                                    <p class="text-sm text-secondary-600">Acesso à base de jurisprudência</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-100 text-success-800">
+                                    Ativo
+                                </span>
+                                <button class="btn-secondary text-sm">Configurar</button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 bg-secondary-50 rounded-lg">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-10 h-10 bg-warning-100 rounded-lg flex items-center justify-center">
+                                    <svg class="h-5 w-5 text-warning-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h4 class="font-medium text-secondary-900">Single Sign-On (SSO)</h4>
+                                    <p class="text-sm text-secondary-600">Autenticação organizacional</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary-100 text-secondary-800">
+                                    Disponível
+                                </span>
+                                <button class="btn-primary text-sm">Ativar</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-secondary-200 mt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <svg class="h-6 w-6 text-primary" viewBox="0 0 32 32" fill="currentColor">
+                        <path d="M16 2L4 8v16l12 6 12-6V8L16 2zm0 2.5L25.5 9 16 13.5 6.5 9 16 4.5zM6 10.5l9 4.5v11l-9-4.5v-11zm11 15.5v-11l9-4.5v11L17 26z"/>
+                    </svg>
+                    <div>
+                        <p class="text-sm font-semibold text-secondary-900">LicitaPro</p>
+                        <p class="text-xs text-secondary-600">Plataforma Profissional B2G</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs text-secondary-600">© 2025 LicitaPro. Todos os direitos reservados.</p>
+                    <p class="text-xs text-secondary-500">Versão 2.1.4 | Status: Operacional</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+<script id="dhws-dataInjector" src="../public/dhws-data-injector.js"></script>
+</body>
+</html>

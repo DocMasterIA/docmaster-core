@@ -231,11 +231,18 @@ document.getElementById('photo').addEventListener('change', function(event){
   <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
     <div class="px-6 pt-6 flex items-center gap-2">
       <div class="px-4 py-2 rounded-xl text-sm font-medium bg-blue-50 text-blue-700 border border-blue-200">Meus Documentos</div>
-      <form method="get" class="ml-auto">
-        <input type="text" name="q" value="{{ query }}" placeholder="Buscar por título..."
-               class="pl-9 pr-3 py-2.5 bg-white border border-slate-300 rounded-xl text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"/>
-        <button type="submit" class="hidden">Buscar</button>
-      </form>
+      <form method="get" class="ml-auto relative w-max">
+      <input type="text" name="q" value="{{ query }}" placeholder="Buscar por título..."
+            class="pl-10 pr-3 py-2.5 bg-white border border-slate-300 rounded-xl text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"/>
+      
+      <button type="submit" class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 flex items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1110.5 3a7.5 7.5 0 016.15 13.65z"/>
+        </svg>
+        <span class="sr-only">Buscar</span>
+      </button>
+    </form>
     </div>
 
     <div class="p-6">
@@ -294,6 +301,7 @@ document.getElementById('photo').addEventListener('change', function(event){
     </div>
   </div>
 </section>
+
     </div>
   </main>
 

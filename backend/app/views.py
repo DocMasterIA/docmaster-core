@@ -14,6 +14,7 @@ from django.views.decorators.http import require_http_methods
 from backend.app.forms import LoginForm, RegisterForm, UserProfileForm
 from backend.app.utils.utils import get_client_ip, is_locked, clear_failed_attempts, record_failed_attempt
 from django.core.paginator import Paginator
+from django.views.decorators.cache import never_cache
 
 @require_http_methods(["GET","POST"])
 def LoginView(request):
@@ -91,10 +92,12 @@ def LogoutView(request):
     messages.info(request, "Você saiu da sua conta.")
     return redirect(reverse("login_panel"))
 
+@never_cache
 @login_required
 def DashboardView(request):
     return render(request, "dashboard.html")
 
+@never_cache
 @login_required
 def AreaDoUsuarioView(request):
     user = request.user
@@ -107,7 +110,7 @@ def AreaDoUsuarioView(request):
     docs = docs.order_by("-updated_at")  # mais recentes primeiro
 
         # Paginação (10 documentos por página)
-    paginator = Paginator(docs, 10)
+    paginator = Paginator(docs, 5)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
@@ -126,6 +129,7 @@ def AreaDoUsuarioView(request):
 
     return render(request, "area_do_usuario.html", {"form": form, "page_obj": page_obj, "query": query,})
 
+@never_cache
 @login_required
 def UploadTemplateView(request):
     if request.method == "POST":
@@ -146,11 +150,13 @@ def UploadTemplateView(request):
 
 from django.contrib.auth.decorators import login_required
 
+@never_cache
 @login_required
 def GetTemplatesView(request):
     templates = Template.objects.all()
     return render(request, "template_list.html", {"templates": templates})
 
+@never_cache
 @login_required
 def DocumentGeneratorView(request):
     from django.core.files import File

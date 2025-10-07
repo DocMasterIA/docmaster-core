@@ -14,7 +14,7 @@ class Template(models.Model):
     preview_image = models.ImageField(upload_to="previews/", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     preview_pdf = models.FileField(upload_to='templates/previews_pdf/', null=True, blank=True)
-
+    role_can_access = models.IntegerField(default=1)
     template_tag = models.ForeignKey(
         TemplateTag,
         on_delete=models.CASCADE,

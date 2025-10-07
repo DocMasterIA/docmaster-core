@@ -110,8 +110,6 @@
             <p class="text-slate-600">Gerencie seus dados pessoais e acesse seus documentos e histórico.</p>
           </div>
           <div class="flex items-center gap-3">
-            <a href="dashboard.html" class="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 bg-white hover:bg-slate-50">Voltar ao Dashboard</a>
-            <button form="profileForm" class="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold shadow hover:from-blue-700 hover:to-blue-600">Salvar alterações</button>
           </div>
         </div>
       </div>
@@ -144,6 +142,7 @@
       </label>
       </div>
       <div>
+        <h3 class="text-sm text-slate-600">{{user.full_name}}</h3>
         <p class="text-sm text-slate-600">Formatos: JPG ou PNG. Até 5MB.</p>
         <p class="text-xs text-slate-500">Dica: use uma imagem quadrada para melhor resultado.</p>
       </div>
@@ -197,6 +196,9 @@
             <div class="mt-1 text-slate-700 text-sm">{% if user.is_staff %}Admin{% else %}Usuário{% endif %}</div>
           </div>
         </div>
+        <div>
+            <div class="mt-1 text-slate-700 text-sm">*Precisa de alguma informação ou ajuste?<a style="color: blue;" href=""> Entre em contato.</a></div>
+        </div>
 
 
       <div class="flex items-center justify-end gap-3 pt-2">
@@ -205,13 +207,6 @@
       </div>
     </form>
 
-    {% if messages %}
-    <div class="mt-4 space-y-2">
-      {% for m in messages %}
-      <div class="px-4 py-2 rounded bg-green-100 text-green-800" role="alert">{{ m }}</div>
-      {% endfor %}
-    </div>
-    {% endif %}
   </div>
 </section>
 
@@ -262,6 +257,10 @@ document.getElementById('photo').addEventListener('change', function(event){
             </div>
           </div>
           <div class="flex items-center gap-2">
+            <!-- {% if doc.file_pdf %}
+            <a href="{{ doc.file_pdf.url }}" download
+               class="px-3 py-1.5 text-sm rounded-xl border border-slate-300 text-slate-700 bg-white hover:bg-slate-50">Ver</a>
+            {% endif %} -->
             {% if doc.file_docx %}
             <a href="{{ doc.file_docx.url }}" target="_blank"
                class="px-3 py-1.5 text-sm rounded-xl border border-slate-300 text-slate-700 bg-white hover:bg-slate-50">Abrir DOCX</a>

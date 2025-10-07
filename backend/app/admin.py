@@ -47,9 +47,10 @@ def generate_preview(modeladmin, request, queryset):
 
 @admin.register(Template)
 class TemplateAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "created_at", "preview_image")
+    list_display = ("name", "slug", "created_at", "preview_image", "role_can_access",)
     search_fields = ("name", "slug")
     prepopulated_fields = {"slug": ("name",)}
+    
     readonly_fields = ("created_at",)
     ordering = ("-created_at",)
 

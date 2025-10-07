@@ -2,11 +2,19 @@ from django.db import models
 from django.conf import settings
 import uuid
 from backend.app.services.preview import generate_docx_preview_pdf, generate_docx_preview
+from django.core.validators import MaxValueValidator, MinValueValidator
 
 class TemplateTag(models.Model):
     tag = models.CharField(max_length=20)
 
 class Template(models.Model):
+    class RolesAccess(models.TextChoices):
+        ADMIN = "ADMIN", "Administrador"
+        SERVIDOR = "SERVIDOR", "Servidor público"
+        EMPRESA = "EMPRESA", "Empresa"
+        TODOS = "TODOS", "Todos"
+
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=180)
     slug = models.SlugField(unique=True, null=True, blank=True)
@@ -14,7 +22,7 @@ class Template(models.Model):
     preview_image = models.ImageField(upload_to="previews/", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     preview_pdf = models.FileField(upload_to='templates/previews_pdf/', null=True, blank=True)
-    role_can_access = models.IntegerField(default=1)
+    role_can_access = models.CharField(max_length=16, choices=RolesAccess.choices, default=RolesAccess.TODOS)
     template_tag = models.ForeignKey(
         TemplateTag,
         on_delete=models.CASCADE,

@@ -15,6 +15,7 @@ from backend.app.forms import LoginForm, RegisterForm, UserProfileForm
 from backend.app.utils.utils import get_client_ip, is_locked, clear_failed_attempts, record_failed_attempt
 from django.core.paginator import Paginator
 from django.views.decorators.cache import never_cache
+from django.db.models import Q
 
 @require_http_methods(["GET","POST"])
 def LoginView(request):
@@ -153,7 +154,20 @@ from django.contrib.auth.decorators import login_required
 @never_cache
 @login_required
 def GetTemplatesView(request):
-    templates = Template.objects.all()
+    user = request.user
+
+    if user.is_superuser or user.is_staff:
+        templates = Template.objects.all().order_by("-created_at")
+    else:
+        user_role = getattr(user, "role", "") or ""
+        user_role = str(user_role).upper().strip()
+        print(user_role)
+    
+        templates = Template.objects.filter(
+                Q(role_can_access="TODOS") | Q(role_can_access=user_role)
+            ).order_by("-created_at")
+
+
     return render(request, "template_list.html", {"templates": templates})
 
 @never_cache
@@ -164,10 +178,20 @@ def DocumentGeneratorView(request):
     from django.contrib import messages
     from django.shortcuts import render, redirect, get_object_or_404
 
-    # --- lista de templates disponíveis ---
-    templates = Template.objects.all()
+    user = request.user
 
-    print(request.GET)
+    if user.is_superuser or user.is_staff:
+        templates = Template.objects.all().order_by("-created_at")
+    else:
+        user_role = getattr(user, "role", "") or ""
+        user_role = str(user_role).upper().strip()
+        print(user_role)
+    
+        templates = Template.objects.filter(
+                Q(role_can_access="TODOS") | Q(role_can_access=user_role)
+            ).order_by("-created_at")
+
+
     selected_template_id = request.GET.get("template_id")
     selected_template = None
     if selected_template_id:
@@ -178,7 +202,6 @@ def DocumentGeneratorView(request):
         except Template.DoesNotExist:
             selected_template = None
 
-
     if request.method == "POST":
         template_id = request.POST.get("template_id")
 
@@ -186,7 +209,7 @@ def DocumentGeneratorView(request):
             messages.error(request, "É necessário selecionar um documento base antes de gerar o documento.")
             return render(request, "document_generator.html", {"templates": templates})
 
-        template = get_object_or_404(Template, pk=template_id)
+        template = get_object_or_404(Template, pk=template_id, role_can_access__in=[user.role, "TODOS"])
 
         prompt = request.POST.get("ia_prompt", "").strip()
         if not prompt:

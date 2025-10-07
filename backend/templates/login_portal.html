@@ -520,6 +520,32 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
+
+        .eye-button {
+            position: absolute;
+            top: 50%;
+            right: 10px;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* SVG do olho */
+        .eye-icon {
+            width: 20px;
+            height: 20px;
+            color: #8c8c8c;
+        }
+
+        .eye-button:hover .eye-icon {
+            color: #000;
+        }
+
     </style>
 </head>
 <body>
@@ -627,6 +653,14 @@
         >
         <label class="floating-label" for="password">Senha</label>
 
+        <button type="button" class="eye-button" onclick="togglePassword('password')">
+            <svg xmlns="http://www.w3.org/2000/svg" class="eye-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+            </svg>
+        </button>
         {% if form.password.errors %}
           <p class="text-xs text-red-600 mt-1">{{ form.password.errors|join:", " }}</p>
         {% endif %}
@@ -690,6 +724,17 @@
             </div>
         </div>
     </div>
+
+<script>
+function togglePassword(id, btn) {
+    const input = document.getElementById(id);
+    if (input.type === "password") {
+        input.type = "text";
+    } else {
+        input.type = "password";
+    }
+}
+</script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {

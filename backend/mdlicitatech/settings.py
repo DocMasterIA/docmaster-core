@@ -306,13 +306,12 @@ UNFOLD = {
         ],
     },
 
+    "DASHBOARD_CALLBACK": "backend.app.views.dashboard_callback",
+
     "FOOTER": "© 2025 Minha Empresa",
 
 }
 
-UNFOLD = {
-    "DASHBOARD_CALLBACK": "backend.app.views.dashboard_callback",
-}
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/

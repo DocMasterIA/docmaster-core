@@ -284,21 +284,28 @@ import datetime
 def dashboard_callback(request, context):
     # exemplo: contadores
     total_users = User.objects.count()
-    # total_orders = Pedido.objects.count()
-    # total_clients = Cliente.objects.count()
-
+    templates = Template.objects.all()
+    documents = DocumentInstance.objects.all()
+    users = User.objects.all()
     # gráfico: últimos 7 dias
     today = datetime.date.today()
-    labels = [(today - datetime.timedelta(days=i)).strftime("%d/%m") for i in range(6, -1, -1)]
-    data = [DocumentInstance.objects.filter(created_at__date=today - datetime.timedelta(days=i)).count() for i in range(6, -1, -1)]
 
     context.update({
-        "total_users": User.objects.count(),
-        "total_templates": Template.objects.count(),
-        "total_documents": DocumentInstance.objects.count(),
-        "documents_finalizados": DocumentInstance.objects.filter(status="final").count(),
-        "latest_documents": DocumentInstance.objects.order_by("-created_at")[:5],
-
+        "total_users": users.count(),
+        "active_users": users.filter(is_active=True).count(),
+        "inactive_users": users.filter(is_active=False).count(),
+        "total_templates": templates.count(),
+        "template_names": [t.name for t in templates],
+        "documents_per_template": [documents.filter(template=t).count() for t in templates],
+        "total_documents": documents.count(),
+        "documents_finalizados": documents.filter(status='final').count(),
+        "latest_documents": documents.order_by('-created_at')[:5],
     })
+
+    context['cards'] = [
+        {'title':'Usuários','value':users.count(),'chart':'chartUsers','bg':'oklch(62.7% .28 235)'},
+        {'title':'Templates','value':templates.count(),'chart':'chartTemplates','bg':'oklch(55.8% .29 235)'},
+        {'title':'Documentos','value':documents.count(),'chart':'chartDocuments','bg':'oklch(49.6% .27 235)'},
+    ]
 
     return context

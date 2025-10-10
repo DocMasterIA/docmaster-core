@@ -1,7 +1,7 @@
 # apenas funções antigas que não terão uso real no sistema
 
 from jinja2 import Template as JinjaTemplate
-from .models import Snippet, Rule
+from ..models import Snippet, Rule
 from collections import defaultdict
 import logging
 
@@ -92,7 +92,7 @@ def get_snippets_for_data(data):
     Retorna um dict de snippets organizados por área ('intro', 'clause', 'conclusion')
     com base nos dados do formulário e nas regras cadastradas.
     """
-    from .models import Rule  # ou ajuste o import conforme seu app
+    from ..models import Rule  # ou ajuste o import conforme seu app
 
     all_snippets = []
 

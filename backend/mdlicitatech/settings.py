@@ -31,15 +31,15 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    # 'unfold',
-    # "unfold.contrib.filters",  # optional, if special filters are needed
-    # "unfold.contrib.forms",  # optional, if special form elements are needed
-    # "unfold.contrib.inlines",  # optional, if special inlines are needed
-    # "unfold.contrib.import_export",  # optional, if django-import-export package is used
-    # "unfold.contrib.guardian",  # optional, if django-guardian package is used
-    # "unfold.contrib.simple_history",  # optional, if django-simple-history package is used
-    # "unfold.contrib.location_field",  # optional, if django-location-field package is used
-    # "unfold.contrib.constance",  # optional, if django-constance package is used
+    'unfold',
+    "unfold.contrib.filters",  # optional, if special filters are needed
+    "unfold.contrib.forms",  # optional, if special form elements are needed
+    "unfold.contrib.inlines",  # optional, if special inlines are needed
+    "unfold.contrib.import_export",  # optional, if django-import-export package is used
+    "unfold.contrib.guardian",  # optional, if django-guardian package is used
+    "unfold.contrib.simple_history",  # optional, if django-simple-history package is used
+    "unfold.contrib.location_field",  # optional, if django-location-field package is used
+    "unfold.contrib.constance",  # optional, if django-constance package is used
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -119,42 +119,177 @@ TIME_ZONE = "America/Sao_Paulo"
 USE_I18N = True
 USE_TZ = True
 
+
+
+def has_perm(request, perm):
+    return request.user.has_perm(perm)
+
+
 from django.templatetags.static import static
 
-# UNFOLD = {
-#     # Título e cabeçalho
-#     "SITE_TITLE": "Painel MDLicitaTech",
-#     "SITE_HEADER": "Painel MDLicitaTech",
-#     "SITE_URL": "/",  # para onde o logo do header aponta
-#     "SITE_ICON": lambda request: static("logo_licita.png"),
-#     "STYLES": [lambda request: static("css/admin.css")],
+from django.templatetags.static import static
+from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
+from django.urls import reverse
+from django.contrib.auth import get_user_model
 
-    # # Temas (dark/light)
-    # "THEMES": [
-    #     {
-    #         "theme": "light",
-    #         "primary": "indigo",
-    #         "accent": "pink",
-    #         "gray": "neutral",
-    #         "font": "inter",
-    #     },
-    #     {
-    #         "theme": "dark",
-    #         "primary": "indigo",
-    #         "accent": "pink",
-    #         "gray": "neutral",
-    #         "font": "inter",
-    #     },
-    # ],
+def template_link(request):
+    from backend.app.models.documentos import Template
+    return reverse(f"admin:{Template._meta.app_label}_{Template._meta.model_name}_changelist")
 
-    # Rodapé
-#     "FOOTER": "© 2025 Minha Empresa",
+def schema_audit_link(request):
+    from backend.app.models.documentos import SchemaAudit
+    return reverse(f"admin:{SchemaAudit._meta.app_label}_{SchemaAudit._meta.model_name}_changelist")
 
-#     # # Extras opcionais
-#     # "COLORS": {
-#     #     "brand": "#4F46E5",  # cor principal personalizada
-#     # },
-# }
+def document_instance_link(request):
+    from backend.app.models.documentos import DocumentInstance
+    return reverse(f"admin:{DocumentInstance._meta.app_label}_{DocumentInstance._meta.model_name}_changelist")
+
+def admin_user_link(request):
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    return reverse(f"admin:{User._meta.app_label}_{User._meta.model_name}_changelist")
+
+
+UNFOLD = {
+    # Título e cabeçalho
+    "SITE_TITLE": "Painel MDLicitaTech",
+    "SITE_HEADER": "Painel MDLicitaTech",
+    "SITE_SUBHEADER": "Seu sistema de Licitações",
+    "SITE_URL": "/",  # para onde o logo do header aponta
+    "SITE_ICON": lambda request: static("logo_licita.png"),
+    "SITE_SYMBOL": "speed",  # symbol from icon set
+    "SITE_DROPDOWN": [
+        {
+            "icon": "web",
+            "title": _("Acessar Site"),
+            "link": "http://localhost:8000",
+        },
+        {
+            "icon": "person",
+            "title": _("Gerir Usuários"),
+            "link": "http://localhost:8000/admin/app/user/?",
+        },
+        {
+            "icon": "diamond",
+            "title": _("Gerir Administradores"),
+            "link": "http://localhost:8000/admin/app/user/?role__exact=ADMIN",
+        },
+    ],
+
+    "LOGIN": {
+        },
+
+    "COLORS": {
+        "base": {
+            "50": "oklch(98.5% .002 247.839)",
+            "100": "oklch(96.7% .003 264.542)",
+            "200": "oklch(92.8% .006 264.531)",
+            "300": "oklch(87.2% .01 258.338)",
+            "400": "oklch(70.7% .022 261.325)",
+            "500": "oklch(55.1% .027 264.364)",
+            "600": "oklch(44.6% .03 256.802)",
+            "700": "oklch(37.3% .034 259.733)",
+            "800": "oklch(27.8% .033 256.848)",
+            "900": "oklch(21% .034 264.665)",
+            "950": "oklch(13% .028 261.692)",
+        },
+        "primary": {
+            "50": "oklch(97.7% .015 235)",
+            "100": "oklch(94.6% .035 235)",
+            "200": "oklch(90.2% .07 235)",
+            "300": "oklch(82.7% .13 235)",
+            "400": "oklch(71.4% .22 235)",
+            "500": "oklch(62.7% .28 235)",
+            "600": "oklch(55.8% .29 235)",
+            "700": "oklch(49.6% .27 235)",
+            "800": "oklch(43.8% .23 235)",
+            "900": "oklch(38.1% .18 235)",
+            "950": "oklch(29.1% .14 235)"
+        },
+        "font": {
+            "subtle-light": "var(--color-base-500)",  # text-base-500
+            "subtle-dark": "var(--color-base-400)",  # text-base-400
+            "default-light": "var(--color-base-600)",  # text-base-600
+            "default-dark": "var(--color-base-300)",  # text-base-300
+            "important-light": "var(--color-base-900)",  # text-base-900
+            "important-dark": "var(--color-base-100)",  # text-base-100
+        },
+    },
+
+    "SIDEBAR": {
+        "show_search": True,           # ativa busca por apps/modelos
+        "command_search": True,        # busca de comandos (ctrl+k)
+        "show_all_applications": False,# mantém agrupamento, mas mantém dropdown se necessário
+        "persist_collapsed_state": True,  # flag custom — implementar JS para salvar no localStorage
+        "navigation": [
+            {
+                "title": _("Principal"),
+                "separator": False,  # Top border
+                "collapsible": False,  # Collapsible group of links
+                "items": [
+                    {
+                        "title": _("Painel ADM"),
+                        "icon": "dashboard",  # Supported icon set: https://fonts.google.com/icons
+                        "link": reverse_lazy("admin:index"),
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                
+                ],
+            },
+             {
+            "title": _("Usuários"),
+            "separator": False,
+            "collapsible": False,
+            "items": [
+                {
+                    "title": _("Todos Usuários"),
+                    "icon": "groups",
+                    "link": admin_user_link,
+                    "permission": lambda request: request.user.has_perm(f"{get_user_model()._meta.app_label}.view_{get_user_model()._meta.model_name}"),
+                },
+                
+            ],
+            },
+            {
+            "title": _("Documentos Bases"),
+            "separator": False,
+            "collapsible": False,
+            "items": [
+              {
+                    "title": _("Documentos Bases"),
+                    "icon": "description",
+                    "link": template_link,
+                    "permission": lambda request: request.user.has_perm("app.view_template"),  # substitua 'app' pelo app_label correto
+                },
+            ],
+        },
+        {
+            "title": _("Documentos Gerados"),
+            "separator": False,
+            "collapsible": False,
+            "items": [
+                {
+                    "title": _("Documentos Gerados"),
+                    "icon": "file_present",
+                    "link": document_instance_link,
+                    "permission": lambda request: request.user.has_perm("app.view_documentinstance"),
+                },
+                {
+                    "title": _("Documentos Processados"),
+                    "icon": "network_intel_node",
+                    "link": schema_audit_link,
+                    "permission": lambda request: request.user.has_perm("app.view_template"),  # substitua 'app' pelo app_label correto
+                },
+            ],
+        },
+        
+        ],
+    },
+
+    "FOOTER": "© 2025 Minha Empresa",
+
+}
 
 
 # Static files (CSS, JavaScript, Images)

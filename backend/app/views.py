@@ -111,7 +111,7 @@ def AreaDoUsuarioView(request):
     docs = docs.order_by("-updated_at")  # mais recentes primeiro
 
         # Paginação (10 documentos por página)
-    paginator = Paginator(docs, 5)
+    paginator = Paginator(docs, 2)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 

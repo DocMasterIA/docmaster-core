@@ -48,6 +48,10 @@ class Template(models.Model):
         if self.file and not self.preview_image:
             generate_docx_preview(self)
 
+    def __str__(self):
+        # Se tiver slug, mostra ele; senão, mostra o nome
+        return self.slug
+
 
 class TemplateSchema(models.Model):
     """

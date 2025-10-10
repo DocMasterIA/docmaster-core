@@ -283,12 +283,30 @@ import datetime
 
 def dashboard_callback(request, context):
     # exemplo: contadores
-    total_users = User.objects.count()
+    from django.db.models import Count
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+
     templates = Template.objects.all()
     documents = DocumentInstance.objects.all()
     users = User.objects.all()
-    # gráfico: últimos 7 dias
-    today = datetime.date.today()
+
+  
+
+    if start_date:
+        documents = documents.filter(created_at__date__gte=start_date)
+    if end_date:
+        documents = documents.filter(created_at__date__lte=end_date)
+
+
+    top_users_qs = (
+        User.objects
+        .annotate(doc_count=Count('documentinstance', filter=Q(documentinstance__in=documents)))
+        .order_by('-doc_count')[:5]
+    )
 
     context.update({
         "total_users": users.count(),
@@ -300,6 +318,9 @@ def dashboard_callback(request, context):
         "total_documents": documents.count(),
         "documents_finalizados": documents.filter(status='final').count(),
         "latest_documents": documents.order_by('-created_at')[:5],
+        "top_users": top_users_qs, 
+        "top_users_names": [u.email for u in top_users_qs],
+        "top_users_docs": [u.doc_count for u in top_users_qs],
     })
 
     context['cards'] = [

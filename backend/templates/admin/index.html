@@ -6,53 +6,77 @@
 
 {% block content %}
 <style>
-  :root {
-    /* Cores primárias */
-    --primary-50: 247 250 255;
-    --primary-100: 239 246 255;
-    --primary-200: 219 234 254;
-    --primary-300: 191 219 254;
-    --primary-400: 147 197 253;
-    --primary-500: 96 165 250;
-    --primary-600: 59 130 246;
-    --primary-700: 37 99 235;
-    --primary-800: 29 78 216;
-    --primary-900: 30 64 175;
-    --glass-alpha: 0.12;
-    --card-radius: 1rem;
-    --card-shadow: 0 10px 30px rgba(28, 34, 59, 0.185);
-  }
+:root {
+  /* Cores primárias */
+  --primary-50: 247 250 255;
+  --primary-100: 239 246 255;
+  --primary-200: 219 234 254;
+  --primary-300: 191 219 254;
+  --primary-400: 147 197 253;
+  --primary-500: 96 165 250;
+  --primary-600: 59 130 246;
+  --primary-700: 37 99 235;
+  --primary-800: 29 78 216;
+  --primary-900: 30 64 175;
+  --glass-alpha: 0.12;
+  --card-radius: 1rem;
+  --card-shadow: 0 10px 30px rgba(28, 34, 59, 0.185);
+}
 
-  .dash-card {
-    border-radius: var(--card-radius);
-    box-shadow: var(--card-shadow);
-    border: 1px solid rgba(255,255,255,0.06);
-    backdrop-filter: blur(10px) saturate(120%);
-    -webkit-backdrop-filter: blur(10px) saturate(120%);
-    overflow: hidden;
-    min-height: 120px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    transition: transform 0.2s, box-shadow 0.2s;
-  }
+.dash-card {
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  overflow: hidden;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
 
-  .dash-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 15px 35px rgba(28,34,59,0.25);
-  }
+.dash-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 15px 35px rgba(28,34,59,0.25);
+}
 
-  .dash-card h2 { margin: 0 0 .25rem 0; font-weight: 600; }
-  .dash-card .value { font-size: 1.9rem; font-weight: 700; margin: 0.25rem 0; }
-  .dash-card .desc { font-size: .875rem; opacity: .75; }
+.dash-card h2 { margin: 0 0 .25rem 0; font-weight: 600; }
+.dash-card .value { font-size: 1.9rem; font-weight: 700; margin: 0.25rem 0; }
+.dash-card .desc { font-size: .875rem; opacity: .75; }
 
-  .dash-table thead th, .dash-table tbody td { padding: .75rem 1rem; }
-  .card-canvas { width: 100%; height: 80px; }
-  @media (min-width:1024px) { .card-canvas { height: 96px; } }
+.dash-table thead th, .dash-table tbody td { padding: .75rem 1rem; }
+.card-canvas { width: 100%; height: 120px; }
+
+@media(min-width:1024px) {
+  .card-canvas { height: 140px; }
+  .charts-row { display: flex; gap: 1rem; }
+  .charts-row > .dash-card { flex: 1; }
+}
 </style>
 
 <div class="unfold-content p-6 space-y-6">
   <h1 class="text-3xl font-bold mb-4" style="color: var(--unfold-text-heading);">Painel de Controle</h1>
+
+  <!-- Filtro por data -->
+  <form method="get" class="mb-6 flex flex-wrap items-end gap-4">
+    <div>
+      <label class="block text-sm font-medium text-unfold-text-default">De</label>
+      <input type="date" name="start_date" value="{{ request.GET.start_date }}" 
+             class="mt-1 block w-full rounded border border-gray-300 px-2 py-1" />
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-unfold-text-default">Até</label>
+      <input type="date" name="end_date" value="{{ request.GET.end_date }}" 
+             class="mt-1 block w-full rounded border border-gray-300 px-2 py-1" />
+    </div>
+    <div>
+      <button type="submit" class="mt-4 inline-flex items-center px-4 py-2 bg-primary-500 text-white rounded hover:bg-primary-600 transition">
+        Filtrar
+      </button>
+    </div>
+  </form>
 
   <!-- CARDS PRINCIPAIS -->
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -67,39 +91,77 @@
     {% endfor %}
   </div>
 
-  <!-- GRÁFICO: Documentos por Template -->
-  <div class="mt-6 p-4 dash-card">
+  <!-- GRÁFICOS LADO A LADO -->
+  <div class="charts-row mt-6 gap-6">
+  <!-- Documentos por Documento Base -->
+  <div class="dash-card p-4" style="height: 500px;">
     <h2 class="text-xl font-semibold" style="color: var(--unfold-text-heading);">Documentos por Documento Base</h2>
-    <div class="mt-3">
-      <canvas id="chartDocsByTemplate" style="width:100%;height:160px;"></canvas>
+    <div style="height:420px; width:100%;">
+      <canvas id="chartDocsByTemplate" style="width:100%;height:100%;"></canvas>
     </div>
+  </div>
+
+    <!-- Top 20 Usuários -->
+ <div class="dash-card p-4" style="height: 500px;">
+    <h2 class="text-xl font-semibold" style="color: var(--unfold-text-heading);">Top 5 Usuários</h2>
+    <div style="height:420px; width:100%;">
+      <canvas id="chartTopUsers" style="width:100%;height:100%;"></canvas>
+    </div>
+  </div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 (function(){
-  const ctx = document.getElementById('chartDocsByTemplate');
-  if(ctx){
+  const root = getComputedStyle(document.documentElement);
+  const primaryRgb = root.getPropertyValue('--primary-600').trim().replace(/\s+/g,',');
+
+  // Gráfico Documentos por Documento Base
+  const ctxDocs = document.getElementById('chartDocsByTemplate');
+  if(ctxDocs){
     const labels = {{ template_names|safe }};
     const data = {{ documents_per_template|safe }};
-    const root = getComputedStyle(document.documentElement);
-    
-    // pega cor primária do :root e normaliza para r,g,b
-    let primaryRgb = root.getPropertyValue('--primary-600').trim().replace(/\s+/g,',');
-
-    new Chart(ctx.getContext('2d'), {
+    new Chart(ctxDocs.getContext('2d'), {
       type: 'bar',
       data: {
         labels: labels,
         datasets: [{
           label: 'Documentos',
           data: data,
-          backgroundColor: Array(data.length).fill('rgba(' + primaryRgb + ',0.9)'), // azul uniforme
-          borderRadius: 8
+          backgroundColor: Array(data.length).fill('rgba(' + primaryRgb + ',0.9)'),
+          borderRadius: 6
         }]
       },
       options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: root.getPropertyValue('--unfold-text-default') || '#ddd' } },
+          y: { ticks: { color: root.getPropertyValue('--unfold-text-default') || '#ddd' } }
+        }
+      }
+    });
+  }
+
+  // Gráfico Top 20 Usuários
+  const ctxUsers = document.getElementById('chartTopUsers');
+  if(ctxUsers){
+    const labels = {{ top_users_names|safe }};
+    const data = {{ top_users_docs|safe }};
+    new Chart(ctxUsers.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Documentos',
+          data: data,
+          backgroundColor: Array(data.length).fill('rgba(' + primaryRgb + ',0.85)'),
+          borderRadius: 6
+        }]
+      },
+      options: {
+        indexAxis: 'y',
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: {

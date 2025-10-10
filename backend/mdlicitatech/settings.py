@@ -141,6 +141,10 @@ def schema_audit_link(request):
     from backend.app.models.documentos import SchemaAudit
     return reverse(f"admin:{SchemaAudit._meta.app_label}_{SchemaAudit._meta.model_name}_changelist")
 
+def template_schema_link(request):
+    from backend.app.models.documentos import TemplateSchema
+    return reverse(f"admin:{TemplateSchema._meta.app_label}_{TemplateSchema._meta.model_name}_changelist")
+
 def document_instance_link(request):
     from backend.app.models.documentos import DocumentInstance
     return reverse(f"admin:{DocumentInstance._meta.app_label}_{DocumentInstance._meta.model_name}_changelist")
@@ -276,13 +280,28 @@ UNFOLD = {
                     "permission": lambda request: request.user.has_perm("app.view_documentinstance"),
                 },
                 {
-                    "title": _("Documentos Processados"),
+                    "title": _("Documentos Processados I.A"),
                     "icon": "network_intel_node",
-                    "link": schema_audit_link,
+                    "link": template_schema_link,
                     "permission": lambda request: request.user.has_perm("app.view_template"),  # substitua 'app' pelo app_label correto
                 },
             ],
         },
+        {
+            "title": _("Auditoria"),
+            "separator": False,
+            "collapsible": False,
+            "items": [
+                {
+                    "title": _("Auditoria I.A"),
+                    "icon": "robot",
+                    "link": schema_audit_link,
+                    "permission": lambda request: request.user.has_perm("app.view_documentinstance"),
+                },
+               
+            ],
+        },
+        
         
         ],
     },
@@ -291,6 +310,9 @@ UNFOLD = {
 
 }
 
+UNFOLD = {
+    "DASHBOARD_CALLBACK": "backend.app.views.dashboard_callback",
+}
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/

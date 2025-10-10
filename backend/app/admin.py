@@ -172,3 +172,24 @@ class DocumentInstanceAdmin(admin.ModelAdmin):
     action_regenerate_files.short_description = "Regenerar DOCX/PDF"
 
 
+
+
+from django.urls import path
+from django.template.response import TemplateResponse
+from django.contrib.admin import AdminSite
+from backend.app.models import User, Template, DocumentInstance
+
+# função view
+def dashboard_view(request):
+    total_users = User.objects.count()
+    total_templates = Template.objects.count()
+    total_documents = DocumentInstance.objects.count()
+    documents_finalizados = DocumentInstance.objects.filter(status='final').count()
+
+    context = dict(
+        total_users=total_users,
+        total_templates=total_templates,
+        total_documents=total_documents,
+        documents_finalizados=documents_finalizados,
+    )
+    return TemplateResponse(request, "admin/index.html", context)

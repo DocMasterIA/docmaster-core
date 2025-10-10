@@ -17,6 +17,7 @@ from django.core.paginator import Paginator
 from django.views.decorators.cache import never_cache
 from django.db.models import Q
 
+from backend.app.models.usuario import User
 @require_http_methods(["GET","POST"])
 def LoginView(request):
     # se já autenticated, redireciona
@@ -277,3 +278,27 @@ def DocumentGeneratorView(request):
         "form_data": {},
         "selected_template": selected_template
     })
+
+import datetime
+
+def dashboard_callback(request, context):
+    # exemplo: contadores
+    total_users = User.objects.count()
+    # total_orders = Pedido.objects.count()
+    # total_clients = Cliente.objects.count()
+
+    # gráfico: últimos 7 dias
+    today = datetime.date.today()
+    labels = [(today - datetime.timedelta(days=i)).strftime("%d/%m") for i in range(6, -1, -1)]
+    data = [DocumentInstance.objects.filter(created_at__date=today - datetime.timedelta(days=i)).count() for i in range(6, -1, -1)]
+
+    context.update({
+        "total_users": User.objects.count(),
+        "total_templates": Template.objects.count(),
+        "total_documents": DocumentInstance.objects.count(),
+        "documents_finalizados": DocumentInstance.objects.filter(status="final").count(),
+        "latest_documents": DocumentInstance.objects.order_by("-created_at")[:5],
+
+    })
+
+    return context

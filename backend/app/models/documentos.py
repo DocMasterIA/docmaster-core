@@ -3,36 +3,46 @@ from django.conf import settings
 import uuid
 from backend.app.services.preview import generate_docx_preview_pdf, generate_docx_preview
 from django.core.validators import MaxValueValidator, MinValueValidator
+from django.utils.translation import gettext_lazy as _
+
 
 class TemplateTag(models.Model):
-    tag = models.CharField(max_length=20)
+    tag = models.CharField(_("Tag"), max_length=20)
+
+    class Meta:
+        verbose_name = _("Tag de Template")
+        verbose_name_plural = _("Tags de Template")
+
 
 class Template(models.Model):
     class RolesAccess(models.TextChoices):
-        ADMIN = "ADMIN", "Administrador"
-        SERVIDOR = "SERVIDOR", "Servidor público"
-        EMPRESA = "EMPRESA", "Empresa"
-        TODOS = "TODOS", "Todos"
-
+        ADMIN = "ADMIN", _("Administrador")
+        SERVIDOR = "SERVIDOR", _("Servidor público")
+        EMPRESA = "EMPRESA", _("Empresa")
+        TODOS = "TODOS", _("Todos")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=180)
-    slug = models.SlugField(unique=True, null=True, blank=True)
-    file = models.FileField(upload_to='templates/docx/')
-    preview_image = models.ImageField(upload_to="previews/", null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    preview_pdf = models.FileField(upload_to='templates/previews_pdf/', null=True, blank=True)
-    role_can_access = models.CharField(max_length=16, choices=RolesAccess.choices, default=RolesAccess.TODOS)
+    name = models.CharField(_("Nome"), max_length=180)
+    slug = models.SlugField(_("Slug"), unique=True, null=True, blank=True)
+    file = models.FileField(_("Arquivo DOCX"), upload_to='templates/docx/')
+    preview_image = models.ImageField(_("Imagem de Preview"), upload_to="previews/", null=True, blank=True)
+    created_at = models.DateTimeField(_("Data de Criação"), auto_now_add=True)
+    preview_pdf = models.FileField(_("PDF de Preview"), upload_to='templates/previews_pdf/', null=True, blank=True)
+    role_can_access = models.CharField(_("Acesso"), max_length=16, choices=RolesAccess.choices, default=RolesAccess.TODOS)
     template_tag = models.ForeignKey(
         TemplateTag,
+        verbose_name=_("Tag do Template"),
         on_delete=models.CASCADE,
         blank=True,
         null=True
     )
 
+    class Meta:
+        verbose_name = _("Documento Base")
+        verbose_name_plural = _("Documentos Base")
+
     def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)  # salva o modelo primeiro
-        # se ainda não tem preview_pdf, gera automaticamente
+        super().save(*args, **kwargs)
         if self.file and not self.preview_pdf:
             generate_docx_preview_pdf(self)
         if self.file and not self.preview_image:
@@ -45,20 +55,39 @@ class TemplateSchema(models.Model):
     schema: lista de campos com block indices ou token strategy
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    template = models.OneToOneField(Template, on_delete=models.CASCADE, related_name='schema')
-    strategy = models.CharField(max_length=32, choices=(('tokens','tokens'),('index','index')), default='index')
-    schema = models.JSONField()  # lista de fields: [{key,label,block_indices,type,required}]
-    created_at = models.DateTimeField(auto_now_add=True)
+    template = models.OneToOneField(
+        Template, verbose_name=_("Template"), on_delete=models.CASCADE, related_name='schema'
+    )
+    strategy = models.CharField(
+        _("Estratégia"),
+        max_length=32,
+        choices=(('tokens', _("Tokens")), ('index', _("Índice"))),
+        default='index'
+    )
+    schema = models.JSONField(_("Schema"))  # lista de fields: [{key,label,block_indices,type,required}]
+    created_at = models.DateTimeField(_("Data de Criação"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Schema I.A de Documento Base")
+        verbose_name_plural = _("Schemas I.A de Documentos Base")
 
     def __str__(self):
         return f"Schema {self.template.name}"
 
-class SchemaAudit(models.Model):
-    schema = models.ForeignKey(TemplateSchema, on_delete=models.CASCADE)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
-    payload = models.JSONField()
-    created_at = models.DateTimeField(auto_now_add=True)
 
+class SchemaAudit(models.Model):
+    schema = models.ForeignKey(
+        TemplateSchema, verbose_name=_("Schema"), on_delete=models.CASCADE
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name=_("Usuário"), on_delete=models.SET_NULL, null=True
+    )
+    payload = models.JSONField(_("Payload"))
+    created_at = models.DateTimeField(_("Data de Criação"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Auditoria de Schema I.A")
+        verbose_name_plural = _("Auditorias de Schema I.A")
 
 
 class DocumentInstance(models.Model):
@@ -66,20 +95,24 @@ class DocumentInstance(models.Model):
     Documento gerado ou rascunho do usuário.
     """
     STATUS_CHOICES = (
-        ('draft','Rascunho'),
-        ('final','Finalizado'),
+        ('draft', _("Rascunho")),
+        ('final', _("Finalizado")),
     )
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    template = models.ForeignKey(Template, on_delete=models.PROTECT)
-    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    data = models.JSONField(default=dict)  # mapeamento campo -> valor preenchido
-    content_html = models.TextField(blank=True)  # preview HTML renderizado
-    file_docx = models.FileField(upload_to='documents/docx/', blank=True, null=True)
-    file_pdf = models.FileField(upload_to='documents/pdf/', blank=True, null=True)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    template = models.ForeignKey(Template, verbose_name=_("Template"), on_delete=models.PROTECT)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name=_("Proprietário"), on_delete=models.CASCADE)
+    data = models.JSONField(_("Dados"), default=dict)  # mapeamento campo -> valor preenchido
+    content_html = models.TextField(_("Conteúdo HTML"), blank=True)  # preview HTML renderizado
+    file_docx = models.FileField(_("Arquivo DOCX"), upload_to='documents/docx/', blank=True, null=True)
+    file_pdf = models.FileField(_("Arquivo PDF"), upload_to='documents/pdf/', blank=True, null=True)
+    status = models.CharField(_("Status"), max_length=10, choices=STATUS_CHOICES, default='draft')
+    created_at = models.DateTimeField(_("Data de Criação"), auto_now_add=True)
+    updated_at = models.DateTimeField(_("Data de Atualização"), auto_now=True)
+
+    class Meta:
+        verbose_name = _("Documento")
+        verbose_name_plural = _("Documentos")
 
     def __str__(self):
         return f"{self.template.name} ({self.owner.email})"

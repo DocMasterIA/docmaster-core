@@ -16,8 +16,10 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from backend.app.admin import dashboard_view
 
 urlpatterns = [
+    path('admin/painel/', dashboard_view, name='admin-painel'),
     path('admin/', admin.site.urls),
     path("", include("backend.app.urls")), 
 ]

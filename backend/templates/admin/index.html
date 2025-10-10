@@ -1,0 +1,100 @@
+{% extends 'admin/base.html' %}
+{% load i18n %}
+
+{% block title %}
+Painel | {{ site_title|default:_('Django site admin') }}
+{% endblock %}
+
+{% block branding %}
+{% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="unfold-content p-6 space-y-6">
+
+    <h1 class="text-3xl font-bold mb-6" style="color: var(--unfold-text-heading);">Painel de Controle</h1>
+
+    <!-- GRID DE CARDS -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+
+        <!-- Usuários -->
+        <div class="p-5 rounded-lg shadow-lg flex flex-col justify-between transition"
+             style="background-color: var(--unfold-bg-primary); color: var(--unfold-text-on-primary);">
+            <div>
+                <h2 class="text-lg font-semibold">Usuários</h2>
+                <p class="text-3xl font-bold">{{ total_users }}</p>
+            </div>
+            <div class="mt-2 text-sm opacity-90">Total de usuários cadastrados</div>
+        </div>
+
+        <!-- Templates -->
+        <div class="p-5 rounded-lg shadow-lg flex flex-col justify-between transition"
+             style="background-color: var(--unfold-bg-secondary); color: var(--unfold-text-on-secondary);">
+            <div>
+                <h2 class="text-lg font-semibold">Templates</h2>
+                <p class="text-3xl font-bold">{{ total_templates }}</p>
+            </div>
+            <div class="mt-2 text-sm opacity-90">Templates disponíveis</div>
+        </div>
+
+        <!-- Documentos -->
+        <div class="p-5 rounded-lg shadow-lg flex flex-col justify-between transition"
+             style="background-color: var(--unfold-bg-surface); color: var(--unfold-text-on-surface);">
+            <div>
+                <h2 class="text-lg font-semibold">Documentos</h2>
+                <p class="text-3xl font-bold">{{ total_documents }}</p>
+            </div>
+            <div class="mt-2 text-sm opacity-90">Documentos criados</div>
+        </div>
+
+        <!-- Finalizados -->
+        <div class="p-5 rounded-lg shadow-lg flex flex-col justify-between transition"
+             style="background-color: var(--unfold-bg-error); color: var(--unfold-text-on-error);">
+            <div>
+                <h2 class="text-lg font-semibold">Finalizados</h2>
+                <p class="text-3xl font-bold">{{ documents_finalizados }}</p>
+            </div>
+            <div class="mt-2 text-sm opacity-90">Documentos finalizados</div>
+        </div>
+
+    </div>
+
+    <!-- LISTA DOS 5 ÚLTIMOS DOCUMENTOS -->
+    <div class="mt-10">
+        <h2 class="text-2xl font-semibold mb-4" style="color: var(--unfold-text-heading);">Últimos Documentos</h2>
+        <div class="overflow-x-auto">
+            <table class="table-auto w-full rounded-lg shadow-md border"
+                   style="border-color: var(--unfold-border-color); color: var(--unfold-text-default);">
+                <thead style="background-color: var(--unfold-bg-header); color: var(--unfold-text-heading);">
+                    <tr>
+                        <th class="px-4 py-2 text-left">ID</th>
+                        <th class="px-4 py-2 text-left">Template</th>
+                        <th class="px-4 py-2 text-left">Usuário</th>
+                        <th class="px-4 py-2 text-left">Status</th>
+                        <th class="px-4 py-2 text-left">Criado em</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in latest_documents %}
+                    <tr style="border-top: 1px solid var(--unfold-border-color);" 
+                        class="hover:bg-unfold-surface-hover transition">
+                        <td class="px-4 py-2">{{ doc.id|stringformat:"8s" }}</td>
+                        <td class="px-4 py-2">{{ doc.template.name }}</td>
+                        <td class="px-4 py-2">{{ doc.owner.email }}</td>
+                        <td class="px-4 py-2">{{ doc.get_status_display }}</td>
+                        <td class="px-4 py-2">{{ doc.created_at|date:"d/m/Y H:i" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="px-4 py-2 text-center" style="color: var(--unfold-text-muted);">
+                            Nenhum documento
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

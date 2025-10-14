@@ -7,6 +7,7 @@ from io import BytesIO
 from django.core.files.base import ContentFile
 from PIL import Image
 from django.utils.translation import gettext_lazy as _
+from django.core.exceptions import ValidationError
 
 class UserManager(BaseUserManager):
     use_in_migrations = True
@@ -90,38 +91,84 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
-
+    
     @transaction.atomic
     def save(self, *args, **kwargs):
-        has_new_file = isinstance(getattr(self.profile_photo, 'file', None), UploadedFile)
+        """
+        Save robusto que:
+        - valida e aplica lock na Prefeitura para checar limite (evita race conditions)
+        - trata criação (precisa de PK para nome de arquivo determinístico)
+        - processa imagem de profile_photo (resize, convert to JPEG)
+        - remove arquivo antigo quando necessário
+        """
 
-        # Salva primeiro para garantir que self.pk existe
-        is_create = self.pk is None
-        if is_create:
+        # 1) validações de modelo (levanta ValidationError se inválido)
+        # Nota: se você usar forms/serializers que já fazem full_clean, isso é redundante,
+        # mas garante segurança caso alguém chame save() diretamente.
+        self.full_clean(exclude=None)
+
+        # Se não há prefeitura definida, segue normalmente (ou levante se for obrigatório)
+        if not self.prefeitura_id:
+            # continua para salvar normalmente (tratamento de foto abaixo ainda será aplicado)
+            pass
+        else:
+            # 2) só checar limite quando criando ou mudando de prefeitura
+            is_creating = self.pk is None
+            changed_prefeitura = False
+            if not is_creating:
+                old = type(self).objects.filter(pk=self.pk).only("prefeitura").first()
+                if old and old.prefeitura_id != self.prefeitura_id:
+                    changed_prefeitura = True
+
+            if is_creating or changed_prefeitura:
+                # lock na prefeitura para evitar condição de corrida
+                from app.models import Prefeitura  # import local pra evitar circular import
+                pref = Prefeitura.objects.select_for_update().get(pk=self.prefeitura_id)
+                current_count = type(self).objects.filter(prefeitura=pref).count()
+                # se estamos mudando de prefeitura e o usuário já estava na mesma prefeitura,
+                # current_count já reflete corretamente (self ainda não está nessa prefeitura)
+                if current_count >= pref.numero_usuarios_permitidos:
+                    raise ValidationError({
+                        "prefeitura": f"Limite de usuários atingido para {pref.nome_municipio} "
+                                    f"({pref.numero_usuarios_permitidos})."
+                    })
+
+        # 3) Detectar se há novo arquivo de profile_photo (UploadedFile)
+        has_new_file = isinstance(getattr(self.profile_photo, "file", None), UploadedFile)
+
+        # 4) Se for criação e precisamos de PK para nome do arquivo -> salvar rápido sem a imagem
+        need_pk_for_filename = has_new_file and (self.pk is None)
+        if need_pk_for_filename:
+            # salva sem arquivo (garante pk)
+            file_backup = self.profile_photo
+            self.profile_photo = None
             super().save(*args, **kwargs)
+            # restaura o arquivo para processamento abaixo
+            self.profile_photo = file_backup
 
-        # Guarda nome antigo para possível exclusão
+        # 5) Guardar nome antigo para remoção posterior (se houver)
         old_name = None
         if self.pk:
             try:
-                old_obj = User.objects.get(pk=self.pk)
+                old_obj = type(self).objects.get(pk=self.pk)
                 if old_obj.profile_photo:
                     old_name = old_obj.profile_photo.name
-            except User.DoesNotExist:
-                pass
+            except type(self).DoesNotExist:
+                old_name = None
 
-        # Se não há novo arquivo, apenas salva normalmente
+        # 6) Se não há novo arquivo, apenas salva normalmente (já validado acima)
         if not has_new_file:
             super().save(*args, **kwargs)
             return
 
-        # PROCESSA A IMAGEM
+        # 7) Processar imagem (resize, convert to JPEG)
         try:
-            self.profile_photo.file.seek(0)
-        except Exception:
-            pass
+            # garante cursor no início
+            try:
+                self.profile_photo.file.seek(0)
+            except Exception:
+                pass
 
-        try:
             img = Image.open(self.profile_photo)
             img = img.convert("RGB")
             img = img.resize((300, 300), Image.LANCZOS)
@@ -131,23 +178,24 @@ class User(AbstractBaseUser, PermissionsMixin):
             buffer.seek(0)
             content = ContentFile(buffer.read())
         except Exception:
-            # fallback: salva sem processamento
+            # fallback: tenta salvar o arquivo original
             super().save(*args, **kwargs)
             return
 
-        # Nome determinístico
+        # 8) gerar nome determinístico usando self.pk (função existente)
         final_name = profile_photo_filename(self.pk)
 
-        # Deleta arquivo antigo se diferente do final
+        # 9) remover arquivo antigo se for diferente do novo
         storage = self.profile_photo.storage
         try:
             if old_name and old_name != final_name and storage.exists(old_name):
                 storage.delete(old_name)
         except Exception:
+            # não falha o save por problemas de storage
             pass
 
-        # Salva a imagem processada
+        # 10) salvar a imagem processada no campo (save=False para salvar após ajustar outros campos)
         self.profile_photo.save(final_name, content, save=False)
 
-        # Salva o modelo
+        # 11) finalmente salva o modelo (dentro da mesma transação atomic)
         super().save(*args, **kwargs)

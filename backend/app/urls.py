@@ -8,12 +8,12 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('login/', login_global_redirect, name='login_global'),
     path('<str:prefeitura_url>/', LoginView, name='login_panel'),
-    path('logout', LogoutView, name="logout"),
+    path('<str:prefeitura_url>/logout', LogoutView, name="logout"),
     path('registro', RegisterView, name="registro_panel"),
     path('<str:prefeitura_url>/dashboard/',DashboardView, name="dashboard"),
-    path('area_do_usuario', AreaDoUsuarioView, name="area_do_usuario"),
-    path('gerador_de_documentos/', DocumentGeneratorView, name="gerador_de_documentos"),
-    path('biblioteca_documentos/',GetTemplatesView, name="biblioteca_documentos"),
+    path('<str:prefeitura_url>/area_do_usuario/', AreaDoUsuarioView, name="area_do_usuario"),
+    path('<str:prefeitura_url>/gerador_de_documentos/', DocumentGeneratorView, name="gerador_de_documentos"),
+    path('<str:prefeitura_url>/biblioteca_documentos/',GetTemplatesView, name="biblioteca_documentos"),
     ### API
     path('api/documentos_modelos/enviar', upload_template_and_request_mapping_api, name="documentos_modelos-enviar_api"),
     path("api/documentos_modelos/", get_template_list_api, name="documentos_modelos-get_api"),

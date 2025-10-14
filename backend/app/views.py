@@ -33,7 +33,7 @@ def LoginView(request, prefeitura_url):
 
     # já autenticado → vai pro dashboard
     if request.user.is_authenticated:
-        return redirect(reverse("dashboard"))
+        return redirect(reverse("dashboard", kwargs={"prefeitura_url": request.user.prefeitura.url}))
 
     # pegar a prefeitura da URL
     try:
@@ -54,9 +54,10 @@ def LoginView(request, prefeitura_url):
     if request.method == "POST" and form.is_valid():
         user = form.get_user()
 
-        if user.prefeitura_id != prefeitura.id:
-            messages.error(request, "Usuário não pertence a esta prefeitura.")
-            return render(request, "login_portal.html", {"form": form, "prefeitura": prefeitura})
+        if not user.is_staff and not user.is_superuser:
+            if user.prefeitura_id != prefeitura.id:
+                messages.error(request, "Usuário não pertence a esta prefeitura.")
+                return render(request, "login_portal.html", {"form": form, "prefeitura": prefeitura})
 
         user_key = f"user:{user.get_username()}"
         if is_locked(user_key):
@@ -74,7 +75,7 @@ def LoginView(request, prefeitura_url):
             request.session.set_expiry(0)
 
         messages.success(request, "Login realizado com sucesso!")
-        return redirect(reverse("dashboard"))
+        return redirect(reverse("dashboard", kwargs={"prefeitura_url": request.user.prefeitura.url}))
 
     if request.method == "POST" and not form.is_valid():
         record_failed_attempt(ip_key)
@@ -102,20 +103,37 @@ def RegisterView(request):
     return render(request, "register_portal.html", {"form": form})
 
 @login_required
-def LogoutView(request):
+def LogoutView(request, prefeitura_url=None):
     logout(request)
-    messages.info(request, "Você saiu da sua conta.")
-    return redirect(reverse("login_panel"))
+    messages.success(request, "Logout realizado com sucesso!")
+    if prefeitura_url:
+        # redireciona para a tela de login da prefeitura
+        return redirect('login_panel', prefeitura_url=prefeitura_url)
+    # fallback global
+    return redirect('landing')
 
 @never_cache
 @login_required
-def DashboardView(request):
-    return render(request, "dashboard.html")
-
-@never_cache
-@login_required
-def AreaDoUsuarioView(request):
+def DashboardView(request, prefeitura_url):
     user = request.user
+
+    if not user.is_staff and not user.is_superuser:
+        if request.user.prefeitura.url != prefeitura_url:
+            # tenta acessar o dashboard de outra prefeitura → redireciona ou 403
+            messages.error(request, "Você não tem permissão para acessar esta prefeitura.")
+            return redirect('/')  # ou página de escolha de prefeitura
+    return render(request, "dashboard.html", {"prefeitura": request.user.prefeitura})
+
+@never_cache
+@login_required
+def AreaDoUsuarioView(request, prefeitura_url):
+    user = request.user
+
+    if not user.is_staff and not user.is_superuser:
+        if user.prefeitura.url != prefeitura_url:
+            messages.error(request, "Você não tem permissão para acessar esta área.")
+            return redirect('/')  # ou página de escolha de prefeitura
+
     query = request.GET.get("q", "")  # busca por título/template
 
     docs = DocumentInstance.objects.filter(owner=user)
@@ -167,11 +185,19 @@ from django.contrib.auth.decorators import login_required
 
 @never_cache
 @login_required
-def GetTemplatesView(request):
+def GetTemplatesView(request, prefeitura_url):
     user = request.user
+
+    if not user.is_staff and not user.is_superuser:
+        if user.prefeitura.url != prefeitura_url:
+            messages.error(request, "Você não tem permissão para acessar esta área.")
+            return redirect('/')  # ou página de escolha de prefeitura
+
 
     if user.is_superuser or user.is_staff:
         templates = Template.objects.all().order_by("-created_at")
+
+    
     else:
         user_role = getattr(user, "role", "") or ""
         user_role = str(user_role).upper().strip()
@@ -182,17 +208,24 @@ def GetTemplatesView(request):
             ).order_by("-created_at")
 
 
-    return render(request, "template_list.html", {"templates": templates})
+    return render(request, "template_list.html", {"templates": templates, "prefeitura_url":prefeitura_url})
 
 @never_cache
 @login_required
-def DocumentGeneratorView(request):
+def DocumentGeneratorView(request, prefeitura_url):
     from django.core.files import File
     import json, tempfile, os, traceback
     from django.contrib import messages
     from django.shortcuts import render, redirect, get_object_or_404
 
     user = request.user
+
+    if not user.is_staff and not user.is_superuser:
+        if user.prefeitura.url != prefeitura_url:
+            messages.error(request, "Você não tem permissão para acessar esta área.")
+            return redirect('/')  # ou página de escolha de prefeitura
+
+
 
     if user.is_superuser or user.is_staff:
         templates = Template.objects.all().order_by("-created_at")
@@ -289,7 +322,8 @@ def DocumentGeneratorView(request):
     return render(request, "document_generator.html", {
         "templates": templates,
         "form_data": {},
-        "selected_template": selected_template
+        "selected_template": selected_template,
+        "prefeitura_url":request.user.prefeitura.url
     })
 
 import datetime

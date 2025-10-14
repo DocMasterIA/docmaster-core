@@ -292,6 +292,17 @@ def dashboard_view(request):
     )
     return TemplateResponse(request, "admin/index.html", context)
 
+
+class UsuarioInline(admin.TabularInline):
+    model = User
+    fk_name = "prefeitura"   # ajuste se o FK no User tiver outro nome
+    fields = ("first_name", "last_name","email", "is_staff", "is_active")  # escolha os campos que quer ver
+    readonly_fields = ("first_name", "last_name", "email",)  # campos somente leitura (opcional)
+    extra = 0                # não mostrar formulários vazios extras
+    show_change_link = True  # link para editar o usuário
+    can_delete = True
+
+
 @admin.register(Prefeitura)
 class PrefeituraAdmin(admin.ModelAdmin):
     list_display = ("nome_municipio", "url", "numero_usuarios_permitidos")
@@ -308,6 +319,9 @@ class PrefeituraAdmin(admin.ModelAdmin):
             "description": "A URL é gerada automaticamente a partir do nome do município."
         }),
     )
+
+    inlines = (UsuarioInline,)
+
 
     def has_delete_permission(self, request, obj=None):
         # opcional: impede exclusão acidental no admin

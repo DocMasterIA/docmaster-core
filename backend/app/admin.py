@@ -16,13 +16,13 @@ from django.utils.html import format_html
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     ordering = ("email",)
-    list_display = ("email", "first_name", "last_name", "profile_photo", "role", "is_staff", "is_active", "date_joined")
+    list_display = ("email", "first_name", "last_name", "profile_photo", "role", "prefeitura", "is_staff", "is_active", "date_joined")
     list_filter = ("role", "is_staff", "is_active")
-    search_fields = ("email", "first_name", "last_name", "organization")
+    search_fields = ("email", "first_name", "last_name", "prefeitura")
 
     fieldsets = (
         (None, {"fields": ("email", "password")}),
-        (_("Informações pessoais"), {"fields": ("first_name", "last_name", "organization", "role")}),
+        (_("Informações pessoais"), {"fields": ("first_name", "last_name", "prefeitura", "role")}),
         (_("Perfil"), {"fields": ("profile_photo",)}),  # tupla de um elemento
         (_("Permissões"), {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
         (_("Datas importantes"), {"fields": ("last_login", "date_joined")}),
@@ -30,7 +30,7 @@ class UserAdmin(BaseUserAdmin):
     add_fieldsets = (
         (None, {
             "classes": ("wide",),
-            "fields": ("email", "profile_photo","password1", "password2", "role", "is_staff", "is_active"),
+            "fields": ("email", "profile_photo","password1", "password2", "role", "prefeitura","is_staff", "is_active"),
         }),
     )
 from django.contrib import admin, messages

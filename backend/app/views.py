@@ -18,67 +18,65 @@ from django.views.decorators.cache import never_cache
 from django.db.models import Q
 
 from backend.app.models.usuario import User
+from backend.app.models.prefeitura import Prefeitura
+
+def login_global_redirect(request):
+    # ex: redireciona para a primeira prefeitura ou página de seleção
+    first_prefeitura = Prefeitura.objects.first()
+    if first_prefeitura:
+        return redirect(f'/{first_prefeitura.url}/')
+    return redirect('/landing/')  # fallback
+
 @require_http_methods(["GET","POST"])
-def LoginView(request, prefeitura_url=None):
-    # se já autenticated, redireciona
+def LoginView(request, prefeitura_url):
+    from .models import Prefeitura
+
+    # já autenticado → vai pro dashboard
     if request.user.is_authenticated:
         return redirect(reverse("dashboard"))
 
-    prefeitura = None
-    if prefeitura_url:
-        from .models import Prefeitura
-        try:
-            prefeitura = Prefeitura.objects.get(url=prefeitura_url)
-        except Prefeitura.DoesNotExist:
-            messages.error(request, "Prefeitura inválida")
-            return redirect("landing")  # ou outra página segura
-
-
+    # pegar a prefeitura da URL
+    try:
+        prefeitura = Prefeitura.objects.get(url=prefeitura_url)
+    except Prefeitura.DoesNotExist:
+        messages.error(request, "Prefeitura inválida")
+        return redirect("landing")  # ou página segura
 
     form = LoginForm(request=request, data=request.POST or None)
 
     ip = get_client_ip(request)
     ip_key = f"ip:{ip}"
 
-    # bloqueio por IP rápido
     if is_locked(ip_key):
         messages.error(request, "Muitas tentativas deste IP. Tente novamente mais tarde.")
-        return render(request, "login_portal.html", {"form": form})
+        return render(request, "login_portal.html", {"form": form, "prefeitura": prefeitura})
 
     if request.method == "POST" and form.is_valid():
         user = form.get_user()
 
-        if prefeitura and user.prefeitura_id != prefeitura.id:
-            messages.error(request, "Usuário não pertence a esta prefeitura")
+        if user.prefeitura_id != prefeitura.id:
+            messages.error(request, "Usuário não pertence a esta prefeitura.")
             return render(request, "login_portal.html", {"form": form, "prefeitura": prefeitura})
 
-        # bloqueio por usuário também
         user_key = f"user:{user.get_username()}"
         if is_locked(user_key):
             messages.error(request, "Conta bloqueada temporariamente por tentativas inválidas.")
-            return render(request, "login_portal.html", {"form": form})
+            return render(request, "login_portal.html", {"form": form, "prefeitura": prefeitura})
 
-        # sucesso: limpa tentativas
         clear_failed_attempts(ip_key)
         clear_failed_attempts(user_key)
-
-        # login
         auth_login(request, user)
 
-        # session: lembrar (persistente) ou sessão expira com o browser
+        # sessão persistente ou não
         if form.cleaned_data.get("remember"):
-            # 30 dias por exemplo
             request.session.set_expiry(60 * 60 * 24 * 30)
         else:
-            # expira quando fecha o browser (ou defina SESSION_COOKIE_AGE)
             request.session.set_expiry(0)
 
         messages.success(request, "Login realizado com sucesso!")
         return redirect(reverse("dashboard"))
 
-    # se form inválido (POST) -> contabiliza falha
     if request.method == "POST" and not form.is_valid():
-        # incrementa falhas por ip e por username se houver
         record_failed_attempt(ip_key)
         username_field = request.POST.get("email_or_username")
         if username_field:

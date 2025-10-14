@@ -611,7 +611,7 @@
                 <h1 class="login-title">Entrar</h1>
                 <p class="login-subtitle">Acesso profissional à plataforma governamental de licitações</p>
             </div>
-<form id="loginForm" method="post" action="{% url 'login_panel' %}" novalidate>
+<form id="loginForm" method="post" action="{% url 'login_panel' prefeitura_url=prefeitura.url  %}" novalidate>
     {% csrf_token %}
     {# mostra erros não-field do form #}
     {% if form.non_field_errors %}
@@ -671,7 +671,7 @@
             <input type="checkbox" id="remember" name="remember" class="checkbox" {% if form.remember.value %}checked{% endif %}>
             <label for="remember" class="checkbox-label text-sm">Lembrar de mim</label>
         </div>
-        <a href="{% url 'dashboard' %}" class="forgot-password text-sm text-blue-600">Precisa de ajuda?</a>
+        <a href="{% url 'dashboard' prefeitura_url=prefeitura.url %}" class="forgot-password text-sm text-blue-600">Precisa de ajuda?</a>
     </div>
 
     <button type="submit" class="login-button mt-6 w-full inline-flex items-center justify-center gap-2">

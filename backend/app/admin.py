@@ -11,6 +11,7 @@ from django.core.files import File
 import os
 import tempfile
 import uuid
+from django.utils.html import format_html
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
@@ -40,22 +41,69 @@ from backend.app.services.render import render_docx_from_template
 from backend.app.services.services import convert_html_to_pdf
 from backend.app.services.preview import generate_docx_preview
 
-@admin.action(description="Gerar preview do template selecionado")
-def generate_preview(modeladmin, request, queryset):
-    for tpl in queryset:
-        generate_docx_preview(tpl)
+
 
 @admin.register(Template)
 class TemplateAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "created_at", "preview_image", "role_can_access",)
+    list_display = ("name", "slug", "created_at", "preview_card", "role_can_access",)
     search_fields = ("name", "slug")
     prepopulated_fields = {"slug": ("name",)}
+    readonly_fields = ('preview_display',)  # campo só leitura
+        # mostra o PDF em iframe direto
+   
+  
+
     
+    def preview_card(self, obj):
+        if obj.preview_pdf:
+            return format_html(
+                '''
+                <div style="
+                    border-radius: 0.75rem;
+                    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+                    padding: 0.5rem;
+                    max-width: 320px;
+                    margin: 0.5rem 0;
+                    background: var(--unfold-surface, #f9fafb);
+                    color: var(--unfold-text-default, #111);
+                    transition: background 0.3s, color 0.3s;
+                    display:flex; flex-direction:column; align-items:center;
+                ">
+                    <strong style="display:block;margin-bottom:0.5rem;color:var(--unfold-text-heading, #111);">{name}</strong>
+                    <div style="
+                        width:100%;
+                        height:250px;
+                        overflow:hidden;
+                        border-radius:0.5rem;
+                        border:1px solid var(--unfold-border-color, #ddd);
+                        background: var(--unfold-bg-body, #fff);
+                    ">
+                        <embed src="{url}" type="application/pdf" width="100%" height="100%">
+                    </div>
+                    <a href="{url}" target="_blank" style="
+                        display:inline-block;
+                        margin-top:0.5rem;
+                        padding:0.25rem 0.5rem;
+                        background: var(--primary-600, #3b82f6);
+                        color:white;
+                        border-radius:0.25rem;
+                        text-decoration:none;
+                        font-size:0.875rem;
+                    ">Abrir/Download PDF</a>
+                </div>
+                ''',
+                name=obj.name,
+                url = obj.preview_pdf.url.replace('localhost', '127.0.0.1')
+            )
+        return "-"
+
+
+    preview_card.short_description = "Preview PDF"
+    preview_card.allow_tags = True
+
+
     readonly_fields = ("created_at",)
     ordering = ("-created_at",)
-
-    actions = [generate_preview]
-
 
 @admin.register(TemplateSchema)
 class TemplateSchemaAdmin(admin.ModelAdmin):
@@ -94,6 +142,56 @@ class DocumentInstanceAdmin(admin.ModelAdmin):
         ("Preview / Arquivos gerados", {"fields": ("content_html", "file_docx", "file_pdf")}),
         ("Metadados", {"fields": ("created_at", "updated_at")}),
     )
+
+
+   
+    # def preview_card(self, obj):
+    #     if obj.file_pdf:
+    #         return format_html(
+    #             '''
+    #             <div style="
+    #                 border-radius: 0.75rem;
+    #                 box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    #                 padding: 0.5rem;
+    #                 max-width: 320px;
+    #                 margin: 0.5rem 0;
+    #                 background: var(--unfold-surface, #f9fafb);
+    #                 color: var(--unfold-text-default, #111);
+    #                 transition: background 0.3s, color 0.3s;
+    #                 display:flex; flex-direction:column; align-items:center;
+    #             ">
+    #                 <strong style="display:block;margin-bottom:0.5rem;color:var(--unfold-text-heading, #111);">{name}</strong>
+    #                 <div style="
+    #                     width:100%;
+    #                     height:250px;
+    #                     overflow:hidden;
+    #                     border-radius:0.5rem;
+    #                     border:1px solid var(--unfold-border-color, #ddd);
+    #                     background: var(--unfold-bg-body, #fff);
+    #                 ">
+    #                     <embed src="{url}" type="application/pdf" width="100%" height="100%">
+    #                 </div>
+    #                 <a href="{url}" target="_blank" style="
+    #                     display:inline-block;
+    #                     margin-top:0.5rem;
+    #                     padding:0.25rem 0.5rem;
+    #                     background: var(--primary-600, #3b82f6);
+    #                     color:white;
+    #                     border-radius:0.25rem;
+    #                     text-decoration:none;
+    #                     font-size:0.875rem;
+    #                 ">Abrir/Download PDF</a>
+    #             </div>
+    #             ''',
+    #             name=obj.template.name,
+    #             url = obj.file_pdf.url.replace('localhost', '127.0.0.1')
+    #         )
+    #     return "-"
+
+
+
+    # preview_card.short_description = "Preview PDF"
+    # preview_card.allow_tags = True
 
     # ------------------ DISPLAY HELPERS ------------------
     def id_short(self, obj):

@@ -279,19 +279,20 @@ UNFOLD = {
                     "link": document_instance_link,
                     "permission": lambda request: request.user.has_perm("app.view_documentinstance"),
                 },
+                
+            ],
+        },
+        {
+            "title": _("Inteligencia Artificial"),
+            "separator": False,
+            "collapsible": False,
+            "items": [
                 {
-                    "title": _("Documentos Processados I.A"),
+                    "title": _("Dados Processados I.A"),
                     "icon": "network_intel_node",
                     "link": template_schema_link,
                     "permission": lambda request: request.user.has_perm("app.view_template"),  # substitua 'app' pelo app_label correto
                 },
-            ],
-        },
-        {
-            "title": _("Auditoria"),
-            "separator": False,
-            "collapsible": False,
-            "items": [
                 {
                     "title": _("Auditoria I.A"),
                     "icon": "robot",
@@ -335,3 +336,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = "app.User"
 
 LOGIN_URL = '/login'
+
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+SECURE_BROWSER_XSS_FILTER = False  # opcional

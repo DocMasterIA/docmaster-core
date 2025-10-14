@@ -6,6 +6,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
+    path('<str:prefeitura_url>/', LoginView, name='login_panel'),
     path('login', LoginView, name="login_panel"),
     path('logout', LogoutView, name="logout"),
     path('registro', RegisterView, name="registro_panel"),

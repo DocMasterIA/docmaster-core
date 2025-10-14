@@ -49,7 +49,7 @@ def user_profile_photo_path(instance, filename):
     filename = f'{instance.id}.{ext}'
     return os.path.join('profile_photos', filename)
 
-def _profile_photo_filename(pk: int) -> str:
+def profile_photo_filename(pk: int) -> str:
     # caminho dentro de MEDIA_ROOT; escolha a pasta que preferir
     return f"profile_photos/user_{pk}.jpg"
 
@@ -91,52 +91,35 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @transaction.atomic
     def save(self, *args, **kwargs):
-        """
-        Fluxo:
-        1) se for criação (sem pk) -> salva rápido para obter pk
-        2) se tem arquivo novo em self.profile_photo -> processa, compõe filename estável,
-           remove anterior se existir e salva o arquivo processado com save=False
-        3) chama super().save() para persistir a referência
-        """
-        # Detecta se há um novo arquivo vindo do formulário (um InMemoryUploadedFile por ex.)
-        has_new_uploaded_file = bool(self.profile_photo and getattr(self.profile_photo, "file", None))
+        has_new_file = bool(self.profile_photo and getattr(self.profile_photo, "file", None))
 
-        # Se for novo objeto, primeiro salva sem foto para obter pk
+        # Salva primeiro para garantir que self.pk existe
         is_create = self.pk is None
-        if is_create and not has_new_uploaded_file:
-            # nada especial, só cria normalmente
-            return super().save(*args, **kwargs)
+        if is_create:
+            super().save(*args, **kwargs)
 
-        if is_create and has_new_uploaded_file:
-            # salva sem processar a imagem para obter pk (transação evita inconsistências)
-            super().save(*args, **kwargs)  # agora self.pk existe
-
-        # A partir daqui self.pk existe (tanto criação quanto update)
-        storage = getattr(self.profile_photo, "storage", default_storage)
-        final_name = _profile_photo_filename(self.pk)
-
-        # Guarda nome antigo (se houver) para deletar depois, caso seja diferente
+        # Guarda nome antigo para possível exclusão
         old_name = None
         if self.pk:
             try:
                 old_obj = User.objects.get(pk=self.pk)
+                if old_obj.profile_photo:
+                    old_name = old_obj.profile_photo.name
             except User.DoesNotExist:
-                old_obj = None
-            if old_obj and old_obj.profile_photo:
-                old_name = old_obj.profile_photo.name
-
-        # Se não há novo arquivo, nada a fazer além de salvar normalmente
-        if not has_new_uploaded_file:
-            return super().save(*args, **kwargs)
-
-        # PROCESSA IMAGEM
-        try:
-            # garante apontar para início do stream (caso já tenha sido lido)
-            try:
-                self.profile_photo.file.seek(0)
-            except Exception:
                 pass
 
+        # Se não há novo arquivo, apenas salva normalmente
+        if not has_new_file:
+            super().save(*args, **kwargs)
+            return
+
+        # PROCESSA A IMAGEM
+        try:
+            self.profile_photo.file.seek(0)
+        except Exception:
+            pass
+
+        try:
             img = Image.open(self.profile_photo)
             img = img.convert("RGB")
             img = img.resize((300, 300), Image.LANCZOS)
@@ -146,30 +129,23 @@ class User(AbstractBaseUser, PermissionsMixin):
             buffer.seek(0)
             content = ContentFile(buffer.read())
         except Exception:
-            # se der erro no processamento, não sobrescreve nada — salva sem alterar
-            return super().save(*args, **kwargs)
+            # fallback: salva sem processamento
+            super().save(*args, **kwargs)
+            return
 
-        # Deleta arquivo final se já existir (força overwrite)
+        # Nome determinístico
+        final_name = profile_photo_filename(self.pk)
+
+        # Deleta arquivo antigo se diferente do final
+        storage = self.profile_photo.storage
         try:
-            if storage.exists(final_name):
-                storage.delete(final_name)
-        except Exception:
-            # falhar aqui não deve quebrar o save; só logue em produção
-            pass
-
-        # Salva o arquivo processado com o nome estável, sem salvar o model ainda
-        try:
-            self.profile_photo.save(final_name, content, save=False)
-        except Exception:
-            # fallback: apenas atribui o ContentFile sem usar .save(); menos ideal
-            self.profile_photo = ContentFile(content.read(), name=final_name)
-
-        # Agora que o field foi atualizado, persiste o modelo (faz update do profile_photo)
-        super().save(*args, **kwargs)
-
-        # Remove o arquivo antigo se for diferente do atual
-        try:
-            if old_name and old_name != self.profile_photo.name and storage.exists(old_name):
+            if old_name and old_name != final_name and storage.exists(old_name):
                 storage.delete(old_name)
         except Exception:
             pass
+
+        # Salva a imagem processada
+        self.profile_photo.save(final_name, content, save=False)
+
+        # Salva o modelo
+        super().save(*args, **kwargs)

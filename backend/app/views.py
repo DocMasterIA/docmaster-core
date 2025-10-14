@@ -19,10 +19,21 @@ from django.db.models import Q
 
 from backend.app.models.usuario import User
 @require_http_methods(["GET","POST"])
-def LoginView(request):
+def LoginView(request, prefeitura_url=None):
     # se já autenticated, redireciona
     if request.user.is_authenticated:
         return redirect(reverse("dashboard"))
+
+    prefeitura = None
+    if prefeitura_url:
+        from .models import Prefeitura
+        try:
+            prefeitura = Prefeitura.objects.get(url=prefeitura_url)
+        except Prefeitura.DoesNotExist:
+            messages.error(request, "Prefeitura inválida")
+            return redirect("landing")  # ou outra página segura
+
+
 
     form = LoginForm(request=request, data=request.POST or None)
 
@@ -36,6 +47,10 @@ def LoginView(request):
 
     if request.method == "POST" and form.is_valid():
         user = form.get_user()
+
+        if prefeitura and user.prefeitura_id != prefeitura.id:
+            messages.error(request, "Usuário não pertence a esta prefeitura")
+            return render(request, "login_portal.html", {"form": form, "prefeitura": prefeitura})
 
         # bloqueio por usuário também
         user_key = f"user:{user.get_username()}"
@@ -69,7 +84,7 @@ def LoginView(request):
         if username_field:
             record_failed_attempt(f"user:{username_field}")
 
-    return render(request, "login_portal.html", {"form": form})
+    return render(request, "login_portal.html", {"form": form, "prefeitura": prefeitura})
 
 def RegisterView(request):
     if request.method == "POST":

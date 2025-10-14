@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from backend.app.models import User, Template, DocumentInstance, TemplateSchema, SchemaAudit
+from backend.app.models import User, Template, DocumentInstance, TemplateSchema, SchemaAudit, Prefeitura
 from backend.app.services.render import render_docx_from_template
 from backend.app.services.services import convert_html_to_pdf  # seus serviços
 from django.core.files import File
@@ -291,3 +291,24 @@ def dashboard_view(request):
         documents_finalizados=documents_finalizados,
     )
     return TemplateResponse(request, "admin/index.html", context)
+
+@admin.register(Prefeitura)
+class PrefeituraAdmin(admin.ModelAdmin):
+    list_display = ("nome_municipio", "url", "numero_usuarios_permitidos")
+    search_fields = ("nome_municipio",)
+    ordering = ("nome_municipio",)
+    readonly_fields = ("url",)
+
+    fieldsets = (
+        (None, {
+            "fields": ("nome_municipio", "numero_usuarios_permitidos")
+        }),
+        ("Informações automáticas", {
+            "fields": ("url",),
+            "description": "A URL é gerada automaticamente a partir do nome do município."
+        }),
+    )
+
+    def has_delete_permission(self, request, obj=None):
+        # opcional: impede exclusão acidental no admin
+        return True  # ou False se quiser bloquear exclusões

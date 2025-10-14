@@ -154,6 +154,10 @@ def admin_user_link(request):
     User = get_user_model()
     return reverse(f"admin:{User._meta.app_label}_{User._meta.model_name}_changelist")
 
+def prefeitura_link(request):
+    from backend.app.models.prefeitura import Prefeitura
+    return reverse(f"admin:{Prefeitura._meta.app_label}_{Prefeitura._meta.model_name}_changelist")
+
 
 UNFOLD = {
     # Título e cabeçalho
@@ -240,6 +244,20 @@ UNFOLD = {
                     },
                 
                 ],
+            },
+            {
+            "title": _("Prefeituras"),
+            "separator": False,
+            "collapsible": False,
+            "items": [
+                {
+                    "title": _("Todas as Prefeituras"),
+                    "icon": "things_to_do",
+                    "link": prefeitura_link,
+                    "permission": lambda request: request.user.has_perm("app.view_prefeitura"),
+                },
+                
+            ],
             },
              {
             "title": _("Usuários"),

@@ -15,11 +15,13 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from backend.app.admin import dashboard_view
 
 urlpatterns = [
     path('admin/painel/', dashboard_view, name='admin-painel'),
     path('admin/', admin.site.urls),
     path("", include("backend.app.urls")), 
+    re_path(r'^(?P<prefeitura_slug>[-\w]+)/', include('backend.app.prefeitura_urls')),
+
 ]

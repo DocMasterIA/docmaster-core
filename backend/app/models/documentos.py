@@ -106,6 +106,14 @@ class DocumentInstance(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     template = models.ForeignKey(Template, verbose_name=_("Template"), on_delete=models.PROTECT)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name=_("Proprietário"), on_delete=models.CASCADE)
+    prefeitura_owner = models.ForeignKey(
+        "app.Prefeitura",                             # << referência em string para evitar import circular
+        verbose_name=_("Prefeitura proprietária"),
+        on_delete=models.CASCADE,
+        related_name="documentos",
+        null=True,                                    # opcionalmente permitir nulo até popular
+        blank=True
+    )
     data = models.JSONField(_("Dados"), default=dict)  # mapeamento campo -> valor preenchido
     content_html = models.TextField(_("Conteúdo HTML"), blank=True)  # preview HTML renderizado
     file_docx = models.FileField(_("Arquivo DOCX"), upload_to='documents/docx/', blank=True, null=True)
@@ -117,6 +125,12 @@ class DocumentInstance(models.Model):
     class Meta:
         verbose_name = _("Documento")
         verbose_name_plural = _("Documentos")
+
+    def save(self, *args, **kwargs):
+        # Se quiser preencher automaticamente pela prefeitura do owner (se existir)
+        if not self.prefeitura_owner and getattr(self, "owner", None) and getattr(self.owner, "prefeitura", None):
+            self.prefeitura_owner = self.owner.prefeitura
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.template.name} ({self.owner.email})"

@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from backend.app.models import User, Template, DocumentInstance, TemplateSchema, SchemaAudit, Prefeitura
+from backend.app.models import Template, DocumentInstance, TemplateSchema, SchemaAudit, Prefeitura
 from backend.app.services.render import render_docx_from_template
 from backend.app.services.services import convert_html_to_pdf  # seus serviços
 from django.core.files import File
@@ -12,6 +12,11 @@ import os
 import tempfile
 import uuid
 from django.utils.html import format_html
+from django.contrib.auth import get_user_model
+import logging
+
+logger = logging.getLogger(__name__)
+User = get_user_model()
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
@@ -292,9 +297,36 @@ def dashboard_view(request):
     )
     return TemplateResponse(request, "admin/index.html", context)
 
+from django.forms.models import BaseInlineFormSet
+from django.core.exceptions import ValidationError
+from django.db import transaction
 
+class UsuarioInlineFormSet(BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        prefeitura = self.instance
+        if not prefeitura.pk:
+            return
+
+        usuarios_existentes = prefeitura.user_set.count()
+        novos = 0
+        for form in self.forms:
+            # formulário pode ser invalido / vazio: pule
+            if not getattr(form, "cleaned_data", None):
+                continue
+            if form.cleaned_data and not form.cleaned_data.get("DELETE", False):
+                # novo se não tem PK (vai ser criado)
+                if form.instance.pk is None:
+                    novos += 1
+        total = usuarios_existentes + novos
+        if total > prefeitura.numero_usuarios_permitidos:
+            raise ValidationError(
+                f"Limite excedido! Esta prefeitura permite no máximo {prefeitura.numero_usuarios_permitidos} usuários."
+            )
+        
 class UsuarioInline(admin.TabularInline):
     model = User
+    formset = UsuarioInlineFormSet  # vincula a validação
     fk_name = "prefeitura"   # ajuste se o FK no User tiver outro nome
     fields = ("first_name", "last_name","email", "is_staff", "is_active")  # escolha os campos que quer ver
     readonly_fields = ("first_name", "last_name", "email",)  # campos somente leitura (opcional)
@@ -326,3 +358,40 @@ class PrefeituraAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         # opcional: impede exclusão acidental no admin
         return True  # ou False se quiser bloquear exclusões
+    
+    def save_formset(self, request, form, formset, change):
+        # aplicar apenas para o inline de usuários (use comparação robusta)
+        if formset.model != User:
+            return super().save_formset(request, form, formset, change)
+
+        prefeitura = form.instance
+        if not prefeitura.pk:
+            return super().save_formset(request, form, formset, change)
+
+        # Conta quantos novos serão criados no formset
+        novos = 0
+        for f in formset.forms:
+            if not getattr(f, "cleaned_data", None):
+                continue
+            if f.cleaned_data and not f.cleaned_data.get("DELETE", False):
+                if f.instance.pk is None:
+                    novos += 1
+
+        if novos == 0:
+            return super().save_formset(request, form, formset, change)
+
+        # checagem atômica com lock na prefeitura
+        from app.models import Prefeitura as PrefModel  # ajuste se necessário
+        with transaction.atomic():
+            pref_locked = PrefModel.objects.select_for_update().get(pk=prefeitura.pk)
+            existentes = User.objects.filter(prefeitura=pref_locked).count()
+            logger.debug("Admin save_formset: pref=%s existentes=%s novos=%s limite=%s",
+                         pref_locked.pk, existentes, novos, pref_locked.numero_usuarios_permitidos)
+            if existentes + novos > pref_locked.numero_usuarios_permitidos:
+                msg = (f"Não foi possível adicionar os {novos} usuário(s): limite de "
+                       f"{pref_locked.numero_usuarios_permitidos} atingido (existem {existentes}).")
+                self.message_user(request, msg, level=messages.ERROR)
+                # interrompe salvamento do formset lançando ValidationError que o admin exibe
+                raise ValidationError(msg)
+            # tudo ok — salva o formset dentro da mesma transação
+            return super().save_formset(request, form, formset, change)

@@ -55,8 +55,10 @@ def profile_photo_filename(pk: int) -> str:
 
 from django.core.files.storage import default_storage
 from django.db import transaction
+from django.core.files.uploadedfile import UploadedFile
 
 class User(AbstractBaseUser, PermissionsMixin):
+
     class Roles(models.TextChoices):
         ADMIN = "ADMIN", _("Administrador")
         SERVIDOR = "SERVIDOR", _("Servidor público")
@@ -91,7 +93,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @transaction.atomic
     def save(self, *args, **kwargs):
-        has_new_file = bool(self.profile_photo and getattr(self.profile_photo, "file", None))
+        has_new_file = isinstance(getattr(self.profile_photo, 'file', None), UploadedFile)
 
         # Salva primeiro para garantir que self.pk existe
         is_create = self.pk is None

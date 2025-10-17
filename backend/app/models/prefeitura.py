@@ -110,12 +110,6 @@ class Secretaria(models.Model):
 class SubtopicoSecretaria(models.Model):
     tipo_secretaria = models.ForeignKey(SecretariaTipo, on_delete=models.CASCADE, related_name="subtopicos", blank=True, null=True)
 
-    secretaria = models.ForeignKey(
-        Secretaria,
-        on_delete=models.CASCADE,
-        related_name="subtopicos",
-        verbose_name="Secretaria"
-    )
     nome = models.CharField(
         max_length=30,
         verbose_name="Nome do Subtópico"
@@ -128,15 +122,10 @@ class SubtopicoSecretaria(models.Model):
     class Meta:
         verbose_name = "Subtópico de Secretaria"
         verbose_name_plural = "Subtópicos de Secretarias"
-        unique_together = ("secretaria", "nome")
+        unique_together = ("tipo_secretaria", "nome")
         ordering = ["nome"]
 
     def __str__(self):
-        return f"{self.nome} ({self.secretaria.nome})"
+        return f"{self.nome} ({self.tipo_secretaria.nome})"
 
-    def clean(self):
-        qs = SubtopicoSecretaria.objects.filter(secretaria=self.secretaria, nome__iexact=self.nome)
-        if self.pk:
-            qs = qs.exclude(pk=self.pk)
-        if qs.exists():
-            raise ValidationError({"nome": "Já existe um subtopico com este nome nesta secretaria."})
+

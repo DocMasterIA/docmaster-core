@@ -383,6 +383,14 @@ class SecretariaInline(nested_admin.NestedStackedInline):
 
     inlines = [UsuarioInline]
 
+
+class SubtopicoSecretariaInLine(nested_admin.NestedStackedInline):
+    model = SubtopicoSecretaria
+    fk_name = "tipo_secretaria"   # ajuste se o FK no User tiver outro nome
+    fields = ("nome","descricao")  # escolha os campos que quer ver
+    extra = 0                # não mostrar formulários vazios extras
+
+    inlines = [UsuarioInline]
 @admin.register(SecretariaTipo)
 class SecretariaTipoAdmin(admin.ModelAdmin):
     list_display = ("nome", "descricao")

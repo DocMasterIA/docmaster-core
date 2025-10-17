@@ -138,6 +138,35 @@
     <h1 class="text-2xl font-bold text-slate-900 mb-2">Biblioteca de Templates</h1>
     <p class="text-slate-500 mb-4">Encontre e visualize rapidamente os modelos disponíveis</p>
 
+    <form method="get" class="mb-6 flex flex-col sm:flex-row gap-4 items-start">
+    <!-- Filtro Prefeitura -->
+    <select name="prefeitura"
+            class="px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200">
+        <option value="">Todas Prefeituras</option>
+        {% for p in prefeituras %}
+            <option value="{{ p.id }}" {% if selected_prefeitura == p.id|stringformat:"s" %}selected{% endif %}>
+                {{ p.nome_municipio }}
+            </option>
+        {% endfor %}
+    </select>
+
+    <!-- Filtro Subtópico -->
+    <select name="subtopico"
+            class="px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200">
+        <option value="">Todos Subtópicos</option>
+        {% for s in subtopicos %}
+            <option value="{{ s.id }}" {% if selected_subtopico == s.id|stringformat:"s" %}selected{% endif %}>
+                {{ s.nome }}
+            </option>
+        {% endfor %}
+    </select>
+
+
+    <button type="submit"
+            class="bg-blue-500 text-black px-4 py-3 rounded-xl transition-colors duration-200">
+        Filtrar
+    </button>
+   </form>
     <!-- Barra de pesquisa -->
     <div class="mb-6">
         <input type="text" id="templateSearch" placeholder="Pesquisar templates..."

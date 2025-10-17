@@ -3,7 +3,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.core.files import File
 from django.contrib import messages
 from django.urls import reverse
-from backend.app.models import Template, DocumentInstance
+from backend.app.models import Template, DocumentInstance, SubtopicoSecretaria
 from backend.app.forms import TemplateUploadForm
 from backend.app.services.services import assemble_document_context, generate_pdf_from_docx
 from backend.app.services.render import render_docx_from_template
@@ -200,7 +200,7 @@ def GetTemplatesView(request, prefeitura_url):
             return redirect('/')
 
     # --- 2. Filtros opcionais da querystring ---
-    subtitulo_id = request.GET.get("subtopico")  # id do subtópico, se informado
+    subtopico_id = request.GET.get("subtopico")  # id do subtópico, se informado
     prefeitura_id = request.GET.get("prefeitura")  # id da prefeitura, se informado
 
     # --- 3. QuerySet base ---
@@ -219,8 +219,12 @@ def GetTemplatesView(request, prefeitura_url):
         templates = templates.filter(prefeitura_id=prefeitura_id)
 
     # --- 6. Filtro por subtópico ---
-    if subtitulo_id:
-        templates = templates.filter(subtopico__id=subtitulo_id)
+    if subtopico_id:
+        templates = templates.filter(related_subtopico_id=subtopico_id)
+
+    prefeituras = Prefeitura.objects.all().order_by("nome_municipio")
+
+    subtopicos = SubtopicoSecretaria.objects.all().order_by("nome")  # ou filtrar apenas os relevantes
 
     return render(
         request,
@@ -228,8 +232,10 @@ def GetTemplatesView(request, prefeitura_url):
         {
             "templates": templates,
             "prefeitura_url": prefeitura_url,
+            "prefeituras": prefeituras,
+            "subtopicos": subtopicos,
             "selected_prefeitura": prefeitura_id,
-            "selected_subtopico": subtitulo_id,
+            "selected_subtopico": subtopico_id,
         }
     )
 

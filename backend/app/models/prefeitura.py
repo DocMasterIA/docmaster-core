@@ -73,7 +73,34 @@ class Secretaria(models.Model):
         if qs.exists():
             raise ValidationError({"nome": "Já existe uma secretaria com este nome nesta prefeitura."})
 
-
 class SubtopicoSecretaria(models.Model):
-    secretaria = models.ForeignKey(Secretaria, on_delete=models.CASCADE)
-    nome_subtopico = models.CharField(max_length=30)
+    secretaria = models.ForeignKey(
+        Secretaria,
+        on_delete=models.CASCADE,
+        related_name="subtopicos",
+        verbose_name="Secretaria"
+    )
+    nome = models.CharField(
+        max_length=30,
+        verbose_name="Nome do Subtópico"
+    )
+    descricao = models.TextField(
+        blank=True,
+        verbose_name="Descrição do Subtópico"
+    )
+
+    class Meta:
+        verbose_name = "Subtópico de Secretaria"
+        verbose_name_plural = "Subtópicos de Secretarias"
+        unique_together = ("secretaria", "nome")
+        ordering = ["nome"]
+
+    def __str__(self):
+        return f"{self.nome} ({self.secretaria.nome})"
+
+    def clean(self):
+        qs = SubtopicoSecretaria.objects.filter(secretaria=self.secretaria, nome__iexact=self.nome)
+        if self.pk:
+            qs = qs.exclude(pk=self.pk)
+        if qs.exists():
+            raise ValidationError({"nome": "Já existe um subtopico com este nome nesta secretaria."})

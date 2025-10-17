@@ -162,6 +162,10 @@ def prefeitura_link(request):
     from backend.app.models.prefeitura import Prefeitura
     return reverse(f"admin:{Prefeitura._meta.app_label}_{Prefeitura._meta.model_name}_changelist")
 
+def secretaria_tipo_link(request):
+    from backend.app.models.prefeitura import SecretariaTipo
+    return reverse(f"admin:{SecretariaTipo._meta.app_label}_{SecretariaTipo._meta.model_name}_changelist")
+
 
 UNFOLD = {
     # Título e cabeçalho
@@ -260,6 +264,13 @@ UNFOLD = {
                     "link": prefeitura_link,
                     "permission": lambda request: request.user.has_perm("app.view_prefeitura"),
                 },
+                {
+                    "title": _("Secretarias Globais"),
+                    "icon": "flag_circle",
+                    "link": secretaria_tipo_link,
+                    "permission": lambda request: request.user.has_perm("app.view_secretarias_tipo"),
+                },
+
                 
             ],
             },

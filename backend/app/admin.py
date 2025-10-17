@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from backend.app.models import Template, DocumentInstance, TemplateSchema, SchemaAudit, Prefeitura, Secretaria, SubtopicoSecretaria
+from backend.app.models import Template, DocumentInstance, TemplateSchema, SchemaAudit, Prefeitura, Secretaria, SubtopicoSecretaria, SecretariaTipo
 from backend.app.services.render import render_docx_from_template
 from backend.app.services.services import convert_html_to_pdf  # seus serviços
 from django.core.files import File
@@ -382,6 +382,13 @@ class SecretariaInline(nested_admin.NestedStackedInline):
     extra = 0                # não mostrar formulários vazios extras
 
     inlines = [UsuarioInline]
+
+@admin.register(SecretariaTipo)
+class SecretariaTipoAdmin(admin.ModelAdmin):
+    list_display = ("nome", "descricao")
+    readonly_fields = ("nome", "descricao")
+    search_fields = ("nome",)
+    ordering = ("nome",)
 
 @admin.register(Prefeitura)
 class PrefeituraAdmin(nested_admin.NestedModelAdmin):

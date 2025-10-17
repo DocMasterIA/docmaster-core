@@ -87,7 +87,7 @@ class Secretaria(models.Model):
         verbose_name="Descrição ou observações"
     )
 
-    tipo = models.ForeignKey(SecretariaTipo, on_delete=models.PROTECT, related_name="secretarias")
+    tipo = models.ForeignKey(SecretariaTipo, on_delete=models.PROTECT, related_name="secretarias", blank=True, null=True)
 
 
     class Meta:
@@ -108,7 +108,7 @@ class Secretaria(models.Model):
             raise ValidationError({"nome": "Já existe uma secretaria com este nome nesta prefeitura."})
 
 class SubtopicoSecretaria(models.Model):
-    tipo_secretaria = models.ForeignKey(SecretariaTipo, on_delete=models.CASCADE, related_name="subtopicos")
+    tipo_secretaria = models.ForeignKey(SecretariaTipo, on_delete=models.CASCADE, related_name="subtopicos", blank=True, null=True)
 
     secretaria = models.ForeignKey(
         Secretaria,

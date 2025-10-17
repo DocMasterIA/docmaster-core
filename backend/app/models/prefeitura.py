@@ -46,15 +46,19 @@ class Prefeitura(models.Model):
         default = DEFAULT_SECRETARIAS
         created = []
         skipped = []
+        
 
         with transaction.atomic():
-            for nome in default:
+            for item in default:
+                nome = item.get("nome")
+                descricao = item.get("descricao", "")
+
                 qs = Secretaria.objects.filter(prefeitura=self, nome__iexact=nome)
                 if qs.exists():
                     skipped.append(nome)
                     continue
                 try:
-                    s = Secretaria.objects.create(prefeitura=self, nome=nome, descricao=nome.descricao)
+                    s = Secretaria.objects.create(prefeitura=self, nome=nome, descricao=descricao)
                     created.append(s)
                 except IntegrityError:
                     skipped.append(nome)

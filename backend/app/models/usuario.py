@@ -76,14 +76,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     class Roles(models.TextChoices):
         ADMIN = "ADMIN", _("Administrador")
         SERVIDOR = "SERVIDOR", _("Servidor público")
-        EMPRESA = "EMPRESA", _("Empresa")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(_("E-mail"), unique=True, db_index=True)
     first_name = models.CharField(_("Nome"), max_length=120, blank=True)
     last_name = models.CharField(_("Sobrenome"), max_length=120, blank=True)
 
-    role = models.CharField(_("Função"), max_length=16, choices=Roles.choices, default=Roles.EMPRESA)
+    role = models.CharField(_("Função"), max_length=16, choices=Roles.choices, default=Roles.SERVIDOR)
 
     organization = models.CharField(_("Organização"), max_length=160, blank=True)
 

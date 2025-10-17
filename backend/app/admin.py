@@ -332,7 +332,7 @@ class UsuarioInline(nested_admin.NestedTabularInline):
     readonly_fields = ("first_name", "last_name", "email", "is_active")  
     extra = 0                # não mostrar formulários vazios extras
     show_change_link = False  # link para editar o usuário
-    can_delete = False
+    can_delete = True
 
     def has_add_permission(self, request, obj=None):
         # desativa a adição via inline

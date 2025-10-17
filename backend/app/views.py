@@ -182,33 +182,56 @@ def UploadTemplateView(request):
     return render(request, "upload_template.html", {"form": form})
 
 from django.contrib.auth.decorators import login_required
+from django.db.models import Q
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from .models import Template
+
 
 @never_cache
 @login_required
 def GetTemplatesView(request, prefeitura_url):
     user = request.user
 
+    # --- 1. Verificação de permissão ---
     if not user.is_staff and not user.is_superuser:
         if user.prefeitura.url != prefeitura_url:
             messages.error(request, "Você não tem permissão para acessar esta área.")
-            return redirect('/')  # ou página de escolha de prefeitura
+            return redirect('/')
 
+    # --- 2. Filtros opcionais da querystring ---
+    subtitulo_id = request.GET.get("subtopico")  # id do subtópico, se informado
+    prefeitura_id = request.GET.get("prefeitura")  # id da prefeitura, se informado
 
-    if user.is_superuser or user.is_staff:
-        templates = Template.objects.all().order_by("-created_at")
+    # --- 3. QuerySet base ---
+    templates = Template.objects.all().order_by("-created_at")
 
-    
-    else:
+    # --- 4. Filtro por role do usuário ---
+    if not (user.is_superuser or user.is_staff):
         user_role = getattr(user, "role", "") or ""
         user_role = str(user_role).upper().strip()
-        print(user_role)
-    
-        templates = Template.objects.filter(
-                Q(role_can_access="TODOS") | Q(role_can_access=user_role)
-            ).order_by("-created_at")
+        templates = templates.filter(
+            Q(role_can_access="TODOS") | Q(role_can_access=user_role)
+        )
 
+    # --- 5. Filtro por prefeitura ---
+    if prefeitura_id:
+        templates = templates.filter(prefeitura_id=prefeitura_id)
 
-    return render(request, "template_list.html", {"templates": templates, "prefeitura_url":prefeitura_url})
+    # --- 6. Filtro por subtópico ---
+    if subtitulo_id:
+        templates = templates.filter(subtopico__id=subtitulo_id)
+
+    return render(
+        request,
+        "template_list.html",
+        {
+            "templates": templates,
+            "prefeitura_url": prefeitura_url,
+            "selected_prefeitura": prefeitura_id,
+            "selected_subtopico": subtitulo_id,
+        }
+    )
 
 @never_cache
 @login_required

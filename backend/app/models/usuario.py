@@ -84,9 +84,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     last_name = models.CharField(_("Sobrenome"), max_length=120, blank=True)
 
     role = models.CharField(_("Função"), max_length=16, choices=Roles.choices, default=Roles.EMPRESA)
+
     organization = models.CharField(_("Organização"), max_length=160, blank=True)
 
     prefeitura = models.ForeignKey("app.Prefeitura", on_delete=models.CASCADE, blank=True, null=True)
+    secretaria = models.ForeignKey("app.Secretaria", on_delete=models.CASCADE, blank=True, null=True)
+    
     # campos obrigatórios do Django
     is_active = models.BooleanField(_("Ativo"), default=True)
     is_staff = models.BooleanField(_("Equipe/Admin"), default=False)

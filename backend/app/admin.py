@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from backend.app.models import Template, DocumentInstance, TemplateSchema, SchemaAudit, Prefeitura
+from backend.app.models import Template, DocumentInstance, TemplateSchema, SchemaAudit, Prefeitura, Secretaria, SubtopicoSecretaria
 from backend.app.services.render import render_docx_from_template
 from backend.app.services.services import convert_html_to_pdf  # seus serviços
 from django.core.files import File
@@ -334,6 +334,12 @@ class UsuarioInline(admin.TabularInline):
     show_change_link = True  # link para editar o usuário
     can_delete = True
 
+class SecretariaInline(admin.TabularInline):
+    model = Secretaria
+    fk_name = "prefeitura"   # ajuste se o FK no User tiver outro nome
+    fields = ("nome","descricao")  # escolha os campos que quer ver
+    extra = 0                # não mostrar formulários vazios extras
+
 
 @admin.register(Prefeitura)
 class PrefeituraAdmin(admin.ModelAdmin):
@@ -352,7 +358,7 @@ class PrefeituraAdmin(admin.ModelAdmin):
         }),
     )
 
-    inlines = (UsuarioInline,)
+    inlines = (UsuarioInline, SecretariaInline)
 
 
     def has_delete_permission(self, request, obj=None):

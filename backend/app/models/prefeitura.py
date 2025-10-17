@@ -21,6 +21,8 @@ class Prefeitura(models.Model):
         help_text="Quantidade máxima de usuários autorizados para esta prefeitura"
     )
 
+    
+
     class Meta:
         verbose_name = "Prefeitura"
         verbose_name_plural = "Prefeituras"
@@ -39,6 +41,32 @@ class Prefeitura(models.Model):
         self.url = nome.strip("_").replace("__", "_")
 
         super().save(*args, **kwargs)
+
+    def create_default_secretarias(self, nomes=None):
+        """
+        Cria secretarias padrão para esta prefeitura.
+        nomes: iterable de strings. Se None, usa DEFAULT_SECRETARIAS do settings.
+        Retorna (created_list, skipped_list)
+        """
+        from django.conf import settings
+        from django.db import transaction, IntegrityError
+        default = nomes if nomes is not None else getattr(settings, "DEFAULT_SECRETARIAS", [])
+        created = []
+        skipped = []
+
+        with transaction.atomic():
+            for nome in default:
+                qs = Secretaria.objects.filter(prefeitura=self, nome__iexact=nome)
+                if qs.exists():
+                    skipped.append(nome)
+                    continue
+                try:
+                    s = Secretaria.objects.create(prefeitura=self, nome=nome, descricao=nome.descricao)
+                    created.append(s)
+                except IntegrityError:
+                    skipped.append(nome)
+        return created, skipped
+    
 
 class Secretaria(models.Model):
     prefeitura = models.ForeignKey(

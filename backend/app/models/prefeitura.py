@@ -39,6 +39,14 @@ class Prefeitura(models.Model):
         max_length=40,
         help_text="Nome completo do município. Ex: São Bernardo do Campo"
     )
+
+    estado = models.CharField(
+        max_length=30,
+        choices=BrazilianStates.choices,
+        blank=True,
+        null=True
+    )
+    
     url = models.CharField(
         "URL do Município",
         max_length=40,

@@ -15,12 +15,28 @@ import uuid
 from django.utils.html import format_html
 from django.contrib.auth import get_user_model
 import logging
+from django import forms
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
+class UserAdminForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # se já existe uma prefeitura selecionada no form (edit)
+        if self.instance and self.instance.prefeitura:
+            self.fields["secretaria"].queryset = Secretaria.objects.filter(prefeitura=self.instance.prefeitura)
+        else:
+            # se não, nenhum disponível
+            self.fields["secretaria"].queryset = Secretaria.objects.none()
+
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
+    form = UserAdminForm
     ordering = ("email",)
     list_display = ("email", "first_name", "last_name", "profile_photo", "prefeitura","secretaria", "is_staff", "is_active", "date_joined")
     list_filter = ("role", "is_staff", "is_active")

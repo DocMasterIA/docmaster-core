@@ -64,7 +64,13 @@ class Prefeitura(models.Model):
                     skipped.append(nome)
         return created, skipped
     
+class SecretariaTipo(models.Model):
+    nome = models.CharField(max_length=70, unique=True)
+    descricao = models.TextField(blank=True)
 
+    def __str__(self):
+        return self.nome
+    
 class Secretaria(models.Model):
     prefeitura = models.ForeignKey(
         "app.Prefeitura",
@@ -80,6 +86,9 @@ class Secretaria(models.Model):
         blank=True,
         verbose_name="Descrição ou observações"
     )
+
+    tipo = models.ForeignKey(SecretariaTipo, on_delete=models.PROTECT, related_name="secretarias")
+
 
     class Meta:
         verbose_name = "Secretaria"
@@ -99,6 +108,8 @@ class Secretaria(models.Model):
             raise ValidationError({"nome": "Já existe uma secretaria com este nome nesta prefeitura."})
 
 class SubtopicoSecretaria(models.Model):
+    tipo_secretaria = models.ForeignKey(SecretariaTipo, on_delete=models.CASCADE, related_name="subtopicos")
+
     secretaria = models.ForeignKey(
         Secretaria,
         on_delete=models.CASCADE,

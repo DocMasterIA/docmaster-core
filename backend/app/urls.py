@@ -4,6 +4,7 @@ from .api import upload_template_and_request_mapping_api, get_template_list_api,
 from .ajax import area_do_usuario_ajax
 from django.conf import settings
 from django.conf.urls.static import static
+from .admin import SecretariaAutocomplete
 
 urlpatterns = [
     path('login/', login_global_redirect, name='login_global'),
@@ -22,6 +23,8 @@ urlpatterns = [
     path('api/documentos_modelos/<uuid:template_id>/pdf/', template_preview_pdf_api, name='documentos_modelos-previsualizar'),
 
     path("area_do_usuario/docs/ajax/", area_do_usuario_ajax, name="area_do_usuario_docs_ajax"),
+    path('secretaria-autocomplete/ajax/', SecretariaAutocomplete.as_view(), name='secretaria-autocomplete'),
+
 
 ]
 

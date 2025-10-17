@@ -16,6 +16,7 @@ from django.utils.html import format_html
 from django.contrib.auth import get_user_model
 import logging
 from django import forms
+from dal import autocomplete
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -24,6 +25,13 @@ class UserAdminForm(forms.ModelForm):
     class Meta:
         model = User
         fields = "__all__"
+        widgets = {
+            'secretaria': autocomplete.ModelSelect2(
+                url='secretaria-autocomplete',
+                forward=['prefeitura']  # envia o campo 'prefeitura' para o autocomplete
+            )
+        }
+
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -354,7 +362,18 @@ class UsuarioInline(nested_admin.NestedTabularInline):
         # desativa a adição via inline
         return False
 
-    
+from dal import autocomplete
+
+class SecretariaAutocomplete(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = Secretaria.objects.all()
+
+        # filtro por GET['prefeitura'] passado via AJAX
+        prefeitura_id = self.forwarded.get('prefeitura', None)
+        if prefeitura_id:
+            qs = qs.filter(prefeitura_id=prefeitura_id)
+
+        return qs
 
 class SecretariaInline(nested_admin.NestedStackedInline):
     model = Secretaria

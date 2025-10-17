@@ -1,3 +1,4 @@
+import nested_admin
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
@@ -21,13 +22,13 @@ User = get_user_model()
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     ordering = ("email",)
-    list_display = ("email", "first_name", "last_name", "profile_photo", "role", "prefeitura", "is_staff", "is_active", "date_joined")
+    list_display = ("email", "first_name", "last_name", "profile_photo", "prefeitura","secretaria", "is_staff", "is_active", "date_joined")
     list_filter = ("role", "is_staff", "is_active")
     search_fields = ("email", "first_name", "last_name", "prefeitura")
 
     fieldsets = (
         (None, {"fields": ("email", "password")}),
-        (_("Informações pessoais"), {"fields": ("first_name", "last_name", "prefeitura", "role")}),
+        (_("Informações pessoais"), {"fields": ("first_name", "last_name", "prefeitura", "secretaria", "role")}),
         (_("Perfil"), {"fields": ("profile_photo",)}),  # tupla de um elemento
         (_("Permissões"), {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
         (_("Datas importantes"), {"fields": ("last_login", "date_joined")}),
@@ -35,7 +36,7 @@ class UserAdmin(BaseUserAdmin):
     add_fieldsets = (
         (None, {
             "classes": ("wide",),
-            "fields": ("email", "profile_photo","password1", "password2", "role", "prefeitura","is_staff", "is_active"),
+            "fields": ("first_name", "last_name", "email", "profile_photo","password1", "password2", "role", "prefeitura", "secretaria", "is_staff", "is_active"),
         }),
     )
 from django.contrib import admin, messages
@@ -324,25 +325,26 @@ class UsuarioInlineFormSet(BaseInlineFormSet):
                 f"Limite excedido! Esta prefeitura permite no máximo {prefeitura.numero_usuarios_permitidos} usuários."
             )
         
-class UsuarioInline(admin.TabularInline):
+class UsuarioInline(nested_admin.NestedTabularInline):
     model = User
     formset = UsuarioInlineFormSet  # vincula a validação
-    fk_name = "prefeitura"   # ajuste se o FK no User tiver outro nome
+    fk_name = "secretaria"   # ajuste se o FK no User tiver outro nome
     fields = ("first_name", "last_name","email", "password", "is_active")  # escolha os campos que quer ver
     # readonly_fields = ("first_name", "last_name", "email",)  # campos somente leitura (opcional)
     extra = 0                # não mostrar formulários vazios extras
-    show_change_link = True  # link para editar o usuário
+    show_change_link = False  # link para editar o usuário
     can_delete = True
 
-class SecretariaInline(admin.TabularInline):
+class SecretariaInline(nested_admin.NestedStackedInline):
     model = Secretaria
     fk_name = "prefeitura"   # ajuste se o FK no User tiver outro nome
     fields = ("nome","descricao")  # escolha os campos que quer ver
     extra = 0                # não mostrar formulários vazios extras
 
+    inlines = [UsuarioInline]
 
 @admin.register(Prefeitura)
-class PrefeituraAdmin(admin.ModelAdmin):
+class PrefeituraAdmin(nested_admin.NestedModelAdmin):
     list_display = ("nome_municipio", "url", "numero_usuarios_permitidos")
     search_fields = ("nome_municipio",)
     ordering = ("nome_municipio",)
@@ -358,7 +360,7 @@ class PrefeituraAdmin(admin.ModelAdmin):
         }),
     )
 
-    inlines = (UsuarioInline, SecretariaInline)
+    inlines = [SecretariaInline]
 
 
     def has_delete_permission(self, request, obj=None):

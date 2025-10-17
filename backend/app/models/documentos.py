@@ -17,8 +17,6 @@ class TemplateTag(models.Model):
 class Template(models.Model):
     class RolesAccess(models.TextChoices):
         ADMIN = "ADMIN", _("Administrador")
-        SERVIDOR = "SERVIDOR", _("Servidor público")
-        EMPRESA = "EMPRESA", _("Empresa")
         TODOS = "TODOS", _("Todos")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -29,6 +27,24 @@ class Template(models.Model):
     created_at = models.DateTimeField(_("Data de Criação"), auto_now_add=True)
     preview_pdf = models.FileField(_("PDF de Preview"), upload_to='templates/previews_pdf/', null=True, blank=True)
     role_can_access = models.CharField(_("Acesso"), max_length=16, choices=RolesAccess.choices, default=RolesAccess.TODOS)
+
+    prefeitura =  models.ForeignKey(
+            "app.Prefeitura",
+            on_delete=models.PROTECT,
+            blank=True,
+            null=True
+        )
+
+    related_subtopico = models.ForeignKey(
+        "app.SubtopicoSecretaria",
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        verbose_name="Subtópico Relacionado"
+
+    )
+
+ 
     template_tag = models.ForeignKey(
         TemplateTag,
         verbose_name=_("Tag do Template"),

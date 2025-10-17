@@ -75,13 +75,11 @@ from backend.app.services.preview import generate_docx_preview
 
 @admin.register(Template)
 class TemplateAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "created_at", "preview_card", "role_can_access",)
+    list_display = ("name", "slug", "created_at", "preview_card", "role_can_access", "related_subtopico", "prefeitura")
     search_fields = ("name", "slug")
     prepopulated_fields = {"slug": ("name",)}
     readonly_fields = ('preview_display',)  # campo só leitura
         # mostra o PDF em iframe direto
-   
-  
 
     
     def preview_card(self, obj):

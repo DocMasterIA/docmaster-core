@@ -328,8 +328,8 @@ class UsuarioInline(admin.TabularInline):
     model = User
     formset = UsuarioInlineFormSet  # vincula a validação
     fk_name = "prefeitura"   # ajuste se o FK no User tiver outro nome
-    fields = ("first_name", "last_name","email", "is_staff", "is_active")  # escolha os campos que quer ver
-    readonly_fields = ("first_name", "last_name", "email",)  # campos somente leitura (opcional)
+    fields = ("first_name", "last_name","email", "password", "is_active")  # escolha os campos que quer ver
+    # readonly_fields = ("first_name", "last_name", "email",)  # campos somente leitura (opcional)
     extra = 0                # não mostrar formulários vazios extras
     show_change_link = True  # link para editar o usuário
     can_delete = True

@@ -60,6 +60,19 @@ from django.core.files.uploadedfile import UploadedFile
 
 class User(AbstractBaseUser, PermissionsMixin):
 
+    class RolePrefeitura(models.TextChoices):
+        GABINETE_PREFEITO = "GABINETE DO PREFEITO", _("Gabinete do Prefeito")
+        SEC_DE_ADM_E_FIN = "SECRETARIA DE ADMINISTRAÇÃO E FINANÇAS",_("Secretaria de Administração e Finanças")
+        SEC_DE_PLAN_E_GES = "SECRETARIA DE PLANEJAMENTO E GESTÃO",_("Secretaria de Planejamento e Gestão")
+        SEC_DE_OBRAS_E_INFRA= "SECRETARIA DE OBRAS E INFRAESTRUTURA", _("Secretaria de obras e infraestrutura")
+        SEC_DE_MAMB_E_AGRO = "SECRETARIA DE MEIO AMBIENTE E AGRICULTURA", _("Secretaria de Meio Ambiente e Agricultura")
+        SEC_DE_EDU = "SECRETARIA DE EDUCAÇÃO", _("Secretaria de Educação")
+        SEC_DE_SAUDE = "SECRETARIA DE SAÚDE", _("Secretaria de Saúde")
+        SEC_DE_ASS_SOCIAL = "SECRETARIA DE ASSISTÊNCIA SOCIAL", _("Secretaria de Assistência Social")
+        SEC_DE_SEG_E_TR = "SECRETARIA DE SEGURANÇA E TRÂNSITO", _("Secretaria de Segurança e Trânsito")
+        SEC_DE_CUL_ESP_E_LAZER = "SECRETARIA DE CULTURA, ESPORTE E LAZER", _("Secretaria de Cultura, Esporte e Lazer")
+        SEC_DA_FAZENDA = "SECRETARIA DA FAZENDA", _("Secretaria da fazenda")
+        
     class Roles(models.TextChoices):
         ADMIN = "ADMIN", _("Administrador")
         SERVIDOR = "SERVIDOR", _("Servidor público")
@@ -73,7 +86,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     role = models.CharField(_("Função"), max_length=16, choices=Roles.choices, default=Roles.EMPRESA)
     organization = models.CharField(_("Organização"), max_length=160, blank=True)
 
-    prefeitura = models.ForeignKey("app.Prefeitura", on_delete=models.CASCADE)
+    prefeitura = models.ForeignKey("app.Prefeitura", on_delete=models.CASCADE, blank=True, null=True)
     # campos obrigatórios do Django
     is_active = models.BooleanField(_("Ativo"), default=True)
     is_staff = models.BooleanField(_("Equipe/Admin"), default=False)
@@ -122,7 +135,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
             if is_creating or changed_prefeitura:
                 # lock na prefeitura para evitar condição de corrida
-                from app.models import Prefeitura  # import local pra evitar circular import
+                from backend.app.models import Prefeitura  # import local pra evitar circular import
                 pref = Prefeitura.objects.select_for_update().get(pk=self.prefeitura_id)
                 current_count = type(self).objects.filter(prefeitura=pref).count()
                 # se estamos mudando de prefeitura e o usuário já estava na mesma prefeitura,

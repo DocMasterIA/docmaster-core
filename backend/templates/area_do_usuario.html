@@ -177,15 +177,15 @@
        <div class="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
           <div>
             <div class="text-xxs font-medium text-slate-500">Nome e Sobrenome</div>
-            <div class="mt-1 font-semibold text-slate-700">{{ user.full_name }}</div>
+            <div class="mt-1 font-semibold text-slate-700">{{ user.first_name }} {{ user.last_name }}</div>
           </div>
           <div>
             <div class="text-xxs font-medium text-slate-500">Perfil</div>
             <div class="mt-1 font-semibold text-slate-700">{{ user.role }}</div>
           </div>
           <div>
-            <div class="text-xxs font-medium text-slate-500">Organização</div>
-            <div class="mt-1 font-semibold text-slate-700">{{ user.organization|default:"—" }}</div>
+            <div class="text-xxs font-medium text-slate-500">Prefeitura</div>
+            <div class="mt-1 font-semibold text-slate-700">{{ user.prefeitura|default:"—" }}</div>
           </div>
           <div>
             <div class="text-xxs font-medium text-slate-500">Conta criada em</div>

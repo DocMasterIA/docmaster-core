@@ -153,7 +153,7 @@ def AreaDoUsuarioView(request, prefeitura_url):
         if form.is_valid():
             form.save()
             messages.success(request, "Dados atualizados com sucesso!")
-            return redirect("area_do_usuario", kwargs={"prefeitura_url": request.user.prefeitura.url})  # ou use o nome da URL
+            return redirect("area_do_usuario", prefeitura_url=prefeitura_url)  # ou use o nome da URL
         else:
             messages.error(request, "Erro ao atualizar os dados. Verifique os campos.")
 

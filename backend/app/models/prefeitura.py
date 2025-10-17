@@ -38,3 +38,12 @@ class Prefeitura(models.Model):
         self.url = nome.strip("_").replace("__", "_")
 
         super().save(*args, **kwargs)
+
+class Secretaria(models.Model):
+    prefeitura = models.ForeignKey(Prefeitura, on_delete=models.CASCADE)
+    nome_prefeitura = models.CharField(max_length="70")
+    
+
+class SubtopicoSecretaria(models.Model):
+    secretaria = models.ForeignKey(Secretaria, on_delete=models.CASCADE)
+    nome_subtopico = models.CharField(max_length=30)

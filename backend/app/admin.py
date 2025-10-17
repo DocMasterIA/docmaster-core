@@ -327,13 +327,18 @@ class UsuarioInlineFormSet(BaseInlineFormSet):
         
 class UsuarioInline(nested_admin.NestedTabularInline):
     model = User
-    formset = UsuarioInlineFormSet  # vincula a validação
     fk_name = "secretaria"   # ajuste se o FK no User tiver outro nome
-    fields = ("first_name", "last_name","email", "password", "is_active")  # escolha os campos que quer ver
-    # readonly_fields = ("first_name", "last_name", "email",)  # campos somente leitura (opcional)
+    fields = ("first_name", "last_name","email", "is_active")  # escolha os campos que quer ver
+    readonly_fields = ("first_name", "last_name", "email", "is_active")  
     extra = 0                # não mostrar formulários vazios extras
     show_change_link = False  # link para editar o usuário
-    can_delete = True
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        # desativa a adição via inline
+        return False
+
+    
 
 class SecretariaInline(nested_admin.NestedStackedInline):
     model = Secretaria

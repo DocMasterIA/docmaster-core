@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 import unicodedata
+from django.core.exceptions import ValidationError
 
 class Prefeitura(models.Model):
     nome_municipio = models.CharField(
@@ -40,9 +41,38 @@ class Prefeitura(models.Model):
         super().save(*args, **kwargs)
 
 class Secretaria(models.Model):
-    prefeitura = models.ForeignKey(Prefeitura, on_delete=models.CASCADE)
-    nome_prefeitura = models.CharField(max_length="70")
-    
+    prefeitura = models.ForeignKey(
+        "app.Prefeitura",
+        on_delete=models.CASCADE,
+        related_name="secretarias",
+        verbose_name="Prefeitura"
+    )
+    nome = models.CharField(
+        max_length=70,
+        verbose_name="Nome da Secretaria"
+    )
+    descricao = models.TextField(
+        blank=True,
+        verbose_name="Descrição ou observações"
+    )
+
+    class Meta:
+        verbose_name = "Secretaria"
+        verbose_name_plural = "Secretarias"
+        unique_together = ("prefeitura", "nome")
+        ordering = ["nome"]
+
+    def __str__(self):
+        return f"{self.nome} ({self.prefeitura.nome_municipio})"
+
+    def clean(self):
+        # Garante que não exista secretaria duplicada na mesma prefeitura
+        qs = Secretaria.objects.filter(prefeitura=self.prefeitura, nome__iexact=self.nome)
+        if self.pk:
+            qs = qs.exclude(pk=self.pk)
+        if qs.exists():
+            raise ValidationError({"nome": "Já existe uma secretaria com este nome nesta prefeitura."})
+
 
 class SubtopicoSecretaria(models.Model):
     secretaria = models.ForeignKey(Secretaria, on_delete=models.CASCADE)

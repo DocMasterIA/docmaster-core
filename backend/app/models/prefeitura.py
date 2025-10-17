@@ -2,7 +2,7 @@ from django.db import models
 from django.conf import settings
 import unicodedata
 from django.core.exceptions import ValidationError
-
+from backend.defaults.secretarias import DEFAULT_SECRETARIAS
 class Prefeitura(models.Model):
     nome_municipio = models.CharField(
         "Nome do Município",
@@ -21,7 +21,6 @@ class Prefeitura(models.Model):
         help_text="Quantidade máxima de usuários autorizados para esta prefeitura"
     )
 
-    
 
     class Meta:
         verbose_name = "Prefeitura"
@@ -42,15 +41,9 @@ class Prefeitura(models.Model):
 
         super().save(*args, **kwargs)
 
-    def create_default_secretarias(self, nomes=None):
-        """
-        Cria secretarias padrão para esta prefeitura.
-        nomes: iterable de strings. Se None, usa DEFAULT_SECRETARIAS do settings.
-        Retorna (created_list, skipped_list)
-        """
-        from django.conf import settings
+    def create_default_secretarias(self):
         from django.db import transaction, IntegrityError
-        default = nomes if nomes is not None else getattr(settings, "DEFAULT_SECRETARIAS", [])
+        default = DEFAULT_SECRETARIAS
         created = []
         skipped = []
 

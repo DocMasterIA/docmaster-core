@@ -402,14 +402,14 @@ class SecretariaTipoAdmin(admin.ModelAdmin):
 
 @admin.register(Prefeitura)
 class PrefeituraAdmin(nested_admin.NestedModelAdmin):
-    list_display = ("nome_municipio", "url", "numero_usuarios_permitidos")
-    search_fields = ("nome_municipio",)
-    ordering = ("nome_municipio",)
+    list_display = ("nome_municipio", "estado", "url", "numero_usuarios_permitidos")
+    search_fields = ("nome_municipio", "estado",)
+    ordering = ("nome_municipio", "estado",)
     readonly_fields = ("url",)
 
     fieldsets = (
         (None, {
-            "fields": ("nome_municipio", "numero_usuarios_permitidos")
+            "fields": ("nome_municipio", "estado", "numero_usuarios_permitidos")
         }),
         ("Informações automáticas", {
             "fields": ("url",),

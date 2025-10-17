@@ -200,6 +200,7 @@ def GetTemplatesView(request, prefeitura_url):
             return redirect('/')
 
     # --- 2. Filtros opcionais da querystring ---
+    estado = request.GET.get("estado", "")
     subtopico_id = request.GET.get("subtopico")  # id do subtópico, se informado
     prefeitura_id = request.GET.get("prefeitura")  # id da prefeitura, se informado
 
@@ -214,7 +215,14 @@ def GetTemplatesView(request, prefeitura_url):
             Q(role_can_access="TODOS") | Q(role_can_access=user_role)
         )
 
+    prefeituras = Prefeitura.objects.all().order_by("nome_municipio")
+
     # --- 5. Filtro por prefeitura ---
+    if estado:
+        prefeituras = prefeituras.filter(estado=estado)
+        templates = templates.filter(prefeitura__estado=estado)
+
+    # --- Filtro por prefeitura ---
     if prefeitura_id:
         templates = templates.filter(prefeitura_id=prefeitura_id)
 
@@ -222,9 +230,9 @@ def GetTemplatesView(request, prefeitura_url):
     if subtopico_id:
         templates = templates.filter(related_subtopico_id=subtopico_id)
 
-    prefeituras = Prefeitura.objects.all().order_by("nome_municipio")
 
     subtopicos = SubtopicoSecretaria.objects.all().order_by("nome")  # ou filtrar apenas os relevantes
+    estados = Prefeitura.objects.values_list("estado", flat=True).distinct().order_by("estado")
 
     return render(
         request,
@@ -236,6 +244,7 @@ def GetTemplatesView(request, prefeitura_url):
             "subtopicos": subtopicos,
             "selected_prefeitura": prefeitura_id,
             "selected_subtopico": subtopico_id,
+            "estados": estados,
         }
     )
 

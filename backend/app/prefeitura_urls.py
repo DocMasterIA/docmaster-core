@@ -5,7 +5,7 @@ from .ajax import area_do_usuario_ajax
 from django.conf import settings
 from django.conf.urls.static import static
 
-// Rotas específicas por prefeitura (multi-tenant)
+# Rotas específicas por prefeitura (multi-tenant)
 urlpatterns = [
     path('login', LoginView, name="login_panel"),
     path('logout', LogoutView, name="logout"),

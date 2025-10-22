@@ -13,6 +13,9 @@ class TemplateTag(models.Model):
     class Meta:
         verbose_name = _("Tag de Template")
         verbose_name_plural = _("Tags de Template")
+    
+    def __str__(self):
+        return self.tag
 
 
 # Modelo de documento base (.docx) que serve como origem para geração de documentos.
@@ -69,7 +72,7 @@ class Template(models.Model):
 
     def __str__(self):
         # Se tiver slug, mostra ele; senão, mostra o nome
-        return self.slug
+        return self.slug or self.name
 
 
 # Manifesto de campos detectados/definidos para um Template via IA ou manual, para preenchimento automático.

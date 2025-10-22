@@ -207,13 +207,33 @@ def generate_document_data_from_prompt(template, user_prompt, llm_api_key=None):
     Returns:
         dict: Dados mínimos para renderização contextual
     """
+    import re
+    
+    # Extrair valor do prompt se mencionado
+    valor_estimado = '1000000.00'  # Valor padrão
+    valor_match = re.search(r'R\$\s*([\d.,]+)', user_prompt)
+    if valor_match:
+        # Converter valor para formato numérico
+        valor_str = valor_match.group(1).replace('.', '').replace(',', '.')
+        try:
+            valor_float = float(valor_str)
+            valor_estimado = f"{valor_float:.2f}"
+        except ValueError:
+            pass
+    
+    # Extrair número do edital do prompt se mencionado
+    numero_edital = '001/2024'  # Valor padrão
+    numero_match = re.search(r'(\d+/\d+)', user_prompt)
+    if numero_match:
+        numero_edital = numero_match.group(1)
+    
     # Retornar dados mínimos - a renderização contextual fará o trabalho
     return {
-        'numero_edital': '001/2024',
+        'numero_edital': numero_edital,  # Usar número extraído do prompt
         'modalidade': 'Pregão Eletrônico',
         'objeto': 'Contratação conforme especificado',
         'orgao': 'Prefeitura Municipal',
-        'valor_estimado': '1000000.00',
+        'valor_estimado': valor_estimado,  # Usar valor extraído do prompt
         'user_prompt': user_prompt  # Passar o prompt para a renderização contextual
     }
 

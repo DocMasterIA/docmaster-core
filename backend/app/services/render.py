@@ -171,159 +171,118 @@ def render_docx_contextual_intelligent(template_path: str, output_path: str, val
     return output_path
 
 def add_expert_content(doc, user_prompt):
-    """Adiciona conteúdo de especialista no local apropriado do documento."""
+    """Analisa o prompt do usuário e aplica mudanças inteligentes no documento."""
     from docx.shared import RGBColor
     from docx.oxml.shared import OxmlElement, qn
     import re
     
     changes_applied = 0
     
-    print("🔧 Adicionando conteúdo de especialista...")
+    print("🧠 Analisando prompt para mudanças inteligentes...")
     
-    # 0. Verificar se há instrução específica para mudar PREÇO TOTAL MÉDIO
-    if "PREÇO TOTAL MÉDIO" in user_prompt.upper() and "R$" in user_prompt:
-        print("  💰 Detectada instrução para alterar PREÇO TOTAL MÉDIO")
-        # Extrair valor do prompt
-        valor_match = re.search(r'R\$\s*([\d.,]+)', user_prompt)
-        if valor_match:
-            novo_valor = f"R$ {valor_match.group(1)}"
-        else:
-            novo_valor = "R$ 15.000.000,00"  # Valor padrão do prompt complexo
-            
-        for table in doc.tables:
-            for row in table.rows:
-                # Procurar linha que contém "PREÇO TOTAL MÉDIO"
-                for cell in row.cells:
-                    if "PREÇO TOTAL MÉDIO" in cell.text:
-                        print(f"  📍 Encontrada linha com PREÇO TOTAL MÉDIO")
-                        # Procurar célula com valor R$ na mesma linha
-                        for other_cell in row.cells:
-                            for paragraph in other_cell.paragraphs:
-                                for run in paragraph.runs:
-                                    if "R$" in run.text and any(x in run.text for x in ["5.678.659", "500.000", "10.000"]):
-                                        old_text = run.text
-                                        run.text = novo_valor
-                                        run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
-                                        print(f"  ✅ Alterado PREÇO TOTAL MÉDIO: {old_text} -> {novo_valor}")
-                                        changes_applied += 1
-                                        break
-                        break
+    # 1. Análise inteligente de valores monetários
+    valor_matches = re.findall(r'R\$\s*([\d.,]+)', user_prompt)
+    if valor_matches:
+        print(f"  💰 Valores detectados no prompt: {valor_matches}")
+        for valor in valor_matches:
+            novo_valor = f"R$ {valor}"
+            # Procurar e substituir valores em tabelas
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for paragraph in cell.paragraphs:
+                            for run in paragraph.runs:
+                                if "R$" in run.text and any(char.isdigit() for char in run.text):
+                                    old_text = run.text
+                                    run.text = novo_valor
+                                    run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                                    print(f"  ✅ Valor alterado: {old_text} -> {novo_valor}")
+                                    changes_applied += 1
     
-    # 1. Adicionar cláusula de julgamento por técnica e preço
-    for i, p in enumerate(doc.paragraphs):
-        if "julgamento" in p.text.lower() and "proposta" in p.text.lower():
-            print(f"  📍 Encontrado parágrafo de julgamento: {i+1}")
-            # Inserir parágrafo após este parágrafo específico
-            new_p_elem = OxmlElement('w:p')
-            p._element.addnext(new_p_elem)
-            new_p = type(p)(new_p_elem, p._parent)
-            
-            # Adicionar conteúdo
-            run = new_p.add_run()
-            run.text = "3.4.15. O julgamento das propostas será realizado mediante análise técnica e de preço, conforme disposto no art. 46 da Lei 14.133/2021, considerando os critérios de aceitabilidade e economicidade."
-            run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
-            print(f"  ✅ Adicionada cláusula de julgamento após parágrafo {i+1}")
-            changes_applied += 1
-            break
+    # 2. Análise inteligente de nomes e locais
+    nome_matches = re.findall(r'(?:mude|altere|troque|substitua).*?(?:para|por)\s+([A-ZÁÊÇÕ][a-záêçõ\s]+)', user_prompt, re.IGNORECASE)
+    if nome_matches:
+        print(f"  🏛️ Nomes/locais detectados no prompt: {nome_matches}")
+        for nome in nome_matches:
+            nome = nome.strip()
+            # Procurar e substituir nomes em todo o documento
+            for paragraph in doc.paragraphs:
+                for run in paragraph.runs:
+                    if any(palavra in run.text for palavra in ['ITAJÁ', 'GOIÂNIA', 'MUNICÍPIO', 'PREFEITURA']):
+                        old_text = run.text
+                        # Substituir baseado no contexto
+                        if 'ITAJÁ' in old_text and 'GOIÂNIA' in nome.upper():
+                            run.text = old_text.replace('ITAJÁ', nome.upper())
+                            run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                            print(f"  ✅ Nome alterado: {old_text} -> {run.text}")
+                            changes_applied += 1
     
-    # 2. Melhorar referência legal
-    for i, p in enumerate(doc.paragraphs):
-        if "Lei Federal nº 14.133" in p.text:
-            print(f"  📍 Encontrado parágrafo com lei: {i+1}")
-            # Melhorar referência legal existente
-            for run in p.runs:
-                if "Lei Federal nº 14.133" in run.text:
-                    run.text = "Lei Federal nº 14.133, de 1º de abril de 2021, e suas alterações posteriores"
+    # 3. Análise inteligente de números e datas
+    numero_matches = re.findall(r'(?:número|edital|processo)\s*(\d+/\d+)', user_prompt, re.IGNORECASE)
+    if numero_matches:
+        print(f"  📋 Números detectados no prompt: {numero_matches}")
+        for numero in numero_matches:
+            # Procurar e substituir números de edital
+            for paragraph in doc.paragraphs:
+                for run in paragraph.runs:
+                    if re.search(r'\d+/\d+', run.text):
+                        old_text = run.text
+                        run.text = re.sub(r'\d+/\d+', numero, old_text)
+                        run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                        print(f"  ✅ Número alterado: {old_text} -> {run.text}")
+                        changes_applied += 1
+    
+    # 3.1. Análise inteligente de números simples (sem palavra-chave)
+    numero_simples = re.findall(r'(\d+/\d+)', user_prompt)
+    if numero_simples:
+        print(f"  📋 Números simples detectados no prompt: {numero_simples}")
+        for numero in numero_simples:
+            # Procurar e substituir números de edital
+            for paragraph in doc.paragraphs:
+                for run in paragraph.runs:
+                    if re.search(r'\d+/\d+', run.text):
+                        old_text = run.text
+                        run.text = re.sub(r'\d+/\d+', numero, old_text)
+                        run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                        print(f"  ✅ Número simples alterado: {old_text} -> {run.text}")
+                        changes_applied += 1
+    
+    # 4. Análise inteligente de conteúdo a ser adicionado
+    if "adicionar" in user_prompt.lower() or "incluir" in user_prompt.lower():
+        print("  📝 Analisando conteúdo para adicionar...")
+        
+        # Procurar por palavras-chave que indicam o que adicionar
+        if "julgamento" in user_prompt.lower() and ("técnica" in user_prompt.lower() or "preço" in user_prompt.lower()):
+            print("  ⚖️ Adicionando cláusula de julgamento")
+            for i, p in enumerate(doc.paragraphs):
+                if "julgamento" in p.text.lower() and "proposta" in p.text.lower():
+                    print(f"  📍 Encontrado parágrafo de julgamento: {i+1}")
+                    new_p_elem = OxmlElement('w:p')
+                    p._element.addnext(new_p_elem)
+                    new_p = type(p)(new_p_elem, p._parent)
+                    
+                    run = new_p.add_run()
+                    run.text = "3.4.15. O julgamento das propostas será realizado mediante análise técnica e de preço, conforme disposto no art. 46 da Lei 14.133/2021, considerando os critérios de aceitabilidade e economicidade."
                     run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
-                    print(f"  ✅ Melhorada referência legal no parágrafo {i+1}")
+                    print(f"  ✅ Adicionada cláusula de julgamento após parágrafo {i+1}")
                     changes_applied += 1
                     break
-            break
-    
-    # 3. Adicionar observação prática
-    for i, p in enumerate(doc.paragraphs):
-        if "15.16" in p.text:
-            print(f"  📍 Encontrado parágrafo 15.16: {i+1}")
-            # Inserir parágrafo após este parágrafo específico
-            new_p_elem = OxmlElement('w:p')
-            p._element.addnext(new_p_elem)
-            new_p = type(p)(new_p_elem, p._parent)
-            
-            # Adicionar conteúdo
-            run = new_p.add_run()
-            run.text = "OBSERVAÇÃO PRÁTICA: Recomenda-se que o pregoeiro mantenha registro detalhado de todas as etapas do processo, incluindo justificativas para aceitação ou rejeição de propostas, conforme orientação do TCU."
-            run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
-            print(f"  ✅ Adicionada observação prática após parágrafo {i+1}")
-            changes_applied += 1
-            break
-    
-    # 4. Adicionar cláusula de garantia de cumprimento (se solicitado)
-    if "GARANTIA DE CUMPRIMENTO" in user_prompt.upper():
-        print("  🛡️ Adicionando cláusula de garantia de cumprimento")
-        for i, p in enumerate(doc.paragraphs):
-            if "garantia" in p.text.lower() and "contrato" in p.text.lower():
-                print(f"  📍 Encontrado parágrafo de garantia: {i+1}")
-                new_p_elem = OxmlElement('w:p')
-                p._element.addnext(new_p_elem)
-                new_p = type(p)(new_p_elem, p._parent)
-                
-                run = new_p.add_run()
-                run.text = "3.4.16. GARANTIA DE CUMPRIMENTO: O contratado deverá apresentar garantia de cumprimento do contrato no prazo de 24 meses, conforme disposto no art. 131 da Lei 14.133/2021, no valor de 5% do valor total do contrato."
-                run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
-                print(f"  ✅ Adicionada cláusula de garantia após parágrafo {i+1}")
-                changes_applied += 1
-                break
-    
-    # 5. Adicionar cláusula de penalidades por atraso (se solicitado)
-    if "PENALIDADES POR ATRASO" in user_prompt.upper():
-        print("  ⚖️ Adicionando cláusula de penalidades por atraso")
-        for i, p in enumerate(doc.paragraphs):
-            if "penalidade" in p.text.lower() or "atraso" in p.text.lower():
-                print(f"  📍 Encontrado parágrafo de penalidades: {i+1}")
-                new_p_elem = OxmlElement('w:p')
-                p._element.addnext(new_p_elem)
-                new_p = type(p)(new_p_elem, p._parent)
-                
-                run = new_p.add_run()
-                run.text = "3.4.17. PENALIDADES POR ATRASO: Em caso de atraso na entrega, será aplicada multa de 0,5% ao dia sobre o valor do contrato, limitada a 10% do valor total, conforme art. 129 da Lei 14.133/2021."
-                run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
-                print(f"  ✅ Adicionada cláusula de penalidades após parágrafo {i+1}")
-                changes_applied += 1
-                break
-    
-    # 6. Adicionar critérios de aceitabilidade (se solicitado)
-    if "CRITÉRIOS DE ACEITABILIDADE" in user_prompt.upper():
-        print("  📋 Adicionando critérios de aceitabilidade")
-        for i, p in enumerate(doc.paragraphs):
-            if "aceitabilidade" in p.text.lower() or "critério" in p.text.lower():
-                print(f"  📍 Encontrado parágrafo de critérios: {i+1}")
-                new_p_elem = OxmlElement('w:p')
-                p._element.addnext(new_p_elem)
-                new_p = type(p)(new_p_elem, p._parent)
-                
-                run = new_p.add_run()
-                run.text = "3.4.18. CRITÉRIOS DE ACEITABILIDADE: Serão consideradas aceitáveis as propostas que atendam aos requisitos mínimos de qualidade, prazo e preço, conforme critérios estabelecidos no art. 46 da Lei 14.133/2021, observando-se a economicidade e a eficiência."
-                run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
-                print(f"  ✅ Adicionados critérios de aceitabilidade após parágrafo {i+1}")
-                changes_applied += 1
-                break
-    
-    # 7. Adicionar referência à Região Metropolitana (se solicitado)
-    if "REGIÃO METROPOLITANA" in user_prompt.upper():
-        print("  🏛️ Adicionando referência à Região Metropolitana")
-        for i, p in enumerate(doc.paragraphs):
-            if "ITAJÁ/GO" in p.text:
-                print(f"  📍 Encontrado parágrafo com ITAJÁ: {i+1}")
-                for run in p.runs:
-                    if "ITAJÁ/GO" in run.text:
-                        old_text = run.text
-                        new_text = run.text.replace("ITAJÁ/GO", "ITAJÁ/GO, integrante da Região Metropolitana de Goiânia")
-                        run.text = new_text
-                        run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
-                        print(f"  ✅ Adicionada referência regional: {old_text} -> {new_text}")
-                        changes_applied += 1
-                        break
-                break
+        
+        if "observação" in user_prompt.lower() or "prática" in user_prompt.lower():
+            print("  📝 Adicionando observação prática")
+            for i, p in enumerate(doc.paragraphs):
+                if "15.16" in p.text:
+                    print(f"  📍 Encontrado parágrafo 15.16: {i+1}")
+                    new_p_elem = OxmlElement('w:p')
+                    p._element.addnext(new_p_elem)
+                    new_p = type(p)(new_p_elem, p._parent)
+                    
+                    run = new_p.add_run()
+                    run.text = "OBSERVAÇÃO PRÁTICA: Recomenda-se que o pregoeiro mantenha registro detalhado de todas as etapas do processo, incluindo justificativas para aceitação ou rejeição de propostas, conforme orientação do TCU."
+                    run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                    print(f"  ✅ Adicionada observação prática após parágrafo {i+1}")
+                    changes_applied += 1
+                    break
     
     print(f"  📊 Total de mudanças de especialista: {changes_applied}")
     return changes_applied

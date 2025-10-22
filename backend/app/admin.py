@@ -77,7 +77,7 @@ from backend.app.services.preview import generate_docx_preview
 # Admin de Templates com card de preview PDF incorporado e slug automático.
 @admin.register(Template)
 class TemplateAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "created_at", "preview_card", "role_can_access", "related_subtopico", "prefeitura")
+    list_display = ("name", "slug", "created_at", "preview_card", "role_can_access", "related_subtopico", "prefeitura", "template_tag")
     search_fields = ("name", "slug")
     prepopulated_fields = {"slug": ("name",)}
     #readonly_fields = ('preview_card',)  # campo só leitura

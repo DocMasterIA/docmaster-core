@@ -37,8 +37,12 @@ def upload_template_and_request_mapping_api(request):
     # extrair estrutura e chamar LLM
     try:
         doc_struct = extract_docx_structure(tpl.file.path)
-        # Chama o agente de IA (stub) para sugerir schema de campos
-        mapping = call_llm_for_mapping(doc_struct, user_instructions=mapping_instructions, llm_api_key=None)
+        # Chama o agente de IA para sugerir schema de campos
+        mapping = call_llm_for_mapping(
+            doc_struct, 
+            user_instructions=mapping_instructions, 
+            llm_api_key=None
+        )
         ok, err = validate_mapping_response(mapping)
         if not ok:
             # opcional: salvar Template sem schema e retornar mapping para revisão

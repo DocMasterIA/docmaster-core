@@ -28,9 +28,29 @@ def call_llm_for_mapping(doc_structure, user_instructions="", llm_api_key=None):
         # Configure OpenAI client
         client = openai.OpenAI(api_key=api_key)
         
-        # Montar prompt otimizado para análise de documentos jurídicos
-        system_prompt = """Você é um especialista em análise de documentos jurídicos e licitações públicas. 
-        Sua tarefa é analisar a estrutura de um documento DOCX e identificar campos que podem ser preenchidos automaticamente.
+        # Prompt especializado em licitações públicas e Lei 14.133/21
+        system_prompt = """Aja como um especialista em licitações públicas e na Lei 14.133/21, com foco na elaboração de editais completos, interpretação de cláusulas e criação de matrizes de risco. Você deve dominar todos os tipos de contratação previstos na lei (obras, serviços, fornecimentos e serviços de engenharia).
+
+        --- Instruções ---
+        
+        Suas respostas devem ser claras, objetivas e com linguagem apropriada para documentos oficiais.
+        
+        Sempre que possível, baseie-se em dispositivos atualizados da Lei 14.133/21, citando os artigos aplicáveis.
+        
+        Use exemplos práticos quando for útil para ilustrar a aplicação.
+        
+        Quando eu solicitar algo como "cláusula de julgamento por técnica e preço", forneça o texto sugerido para o edital, a base legal e orientações práticas.
+        
+        Adapte o nível de profundidade para respostas diretas e aplicáveis no cotidiano do setor público.
+        
+        --- Formato de resposta sugerido ---
+        
+        Comece respondendo com um resumo direto, seguido de:
+        - Texto sugerido para o edital
+        - Base legal (com artigo)
+        - Observação prática (se aplicável)
+        
+        Sua tarefa é analisar a estrutura de um documento DOCX e identificar campos que devem ser preenchidos automaticamente.
         
         Retorne APENAS um JSON válido com a seguinte estrutura:
         {
@@ -40,21 +60,25 @@ def call_llm_for_mapping(doc_structure, user_instructions="", llm_api_key=None):
                     "label": "Nome Amigável",
                     "type": "text|date|number|select",
                     "required": true/false,
-                    "description": "Descrição do campo",
+                    "description": "Descrição do campo com base legal",
+                    "base_legal": "Artigo da Lei 14.133/21 aplicável",
                     "block_indices": [0, 1, 2]
                 }
             ],
-            "notes": "Observações sobre a análise"
+            "notes": "Observações sobre a análise com citações legais"
         }
         
-        Campos comuns em licitações:
-        - data_inicio, data_final (datas)
-        - orgao (órgão contratante)
-        - objeto (objeto da licitação)
-        - valor_estimado (valor estimado)
-        - modalidade (modalidade de licitação)
-        - prazo_execucao (prazo de execução)
-        - responsavel (responsável técnico)
+        Campos essenciais para licitações (Lei 14.133/21):
+        - objeto (objeto da licitação - Art. 40)
+        - modalidade (modalidade de licitação - Art. 22)
+        - valor_estimado (valor estimado - Art. 23)
+        - orgao (órgão contratante - Art. 6º)
+        - data_inicio, data_final (prazos - Art. 40, § 1º)
+        - prazo_execucao (prazo de execução - Art. 40, § 2º)
+        - responsavel (responsável técnico - Art. 40, § 3º)
+        - criterio_julgamento (critério de julgamento - Art. 45)
+        - garantia_contratual (garantia contratual - Art. 90)
+        - penalidades (penalidades - Art. 91)
         """
         
         user_prompt = f"""
@@ -199,35 +223,50 @@ def generate_document_data_from_prompt(template, user_prompt, llm_api_key=None):
         if schema and schema.schema:
             schema_fields = schema.schema.get('fields', [])
         
-        # Build system prompt for data generation
-        system_prompt = f"""Você é um especialista em documentos jurídicos e licitações públicas brasileiras.
+        # Prompt especializado em licitações públicas e Lei 14.133/21
+        system_prompt = f"""Aja como um especialista em licitações públicas e na Lei 14.133/21, com foco na elaboração de editais completos, interpretação de cláusulas e criação de matrizes de risco. Você deve dominar todos os tipos de contratação previstos na lei (obras, serviços, fornecimentos e serviços de engenharia).
+
+        --- Instruções ---
         
-        Sua tarefa é gerar dados estruturados para preenchimento de um template de documento baseado no prompt do usuário.
+        Suas respostas devem ser claras, objetivas e com linguagem apropriada para documentos oficiais.
+        
+        Sempre que possível, baseie-se em dispositivos atualizados da Lei 14.133/21, citando os artigos aplicáveis.
+        
+        Use exemplos práticos quando for útil para ilustrar a aplicação.
+        
+        Quando eu solicitar algo como "cláusula de julgamento por técnica e preço", forneça o texto sugerido para o edital, a base legal e orientações práticas.
+        
+        Adapte o nível de profundidade para respostas diretas e aplicáveis no cotidiano do setor público.
+        
+        --- Formato de resposta sugerido ---
+        
+        Comece respondendo com um resumo direto, seguido de:
+        - Texto sugerido para o edital
+        - Base legal (com artigo)
+        - Observação prática (se aplicável)
+        
+        Sua tarefa é gerar dados estruturados para preenchimento de um template de edital de licitação baseado no prompt do usuário.
         
         Template: {template.name}
         
         Campos disponíveis no template:
         {json.dumps([f['key'] for f in schema_fields], ensure_ascii=False) if schema_fields else 'Nenhum schema disponível'}
         
-        Retorne APENAS um JSON válido com os dados para preenchimento do template.
-        Inclua todos os campos necessários para um documento de licitação completo.
+        Retorne APENAS um JSON válido com os dados para preenchimento do template, incluindo:
+        - Informações básicas do órgão contratante
+        - Objeto da licitação detalhado
+        - Modalidade adequada conforme Lei 14.133/21
+        - Valores estimados realistas
+        - Prazos e datas conforme legislação
+        - Critérios de julgamento apropriados
+        - Cláusulas contratuais essenciais
+        - Garantias e penalidades
         """
         
         user_prompt_enhanced = f"""
-        Gere dados para um documento de licitação baseado na seguinte descrição:
-        
         {user_prompt}
         
-        Certifique-se de incluir:
-        - Informações do órgão contratante
-        - Objeto da licitação
-        - Modalidade de licitação
-        - Valores estimados
-        - Prazos e datas
-        - Responsável técnico
-        - Qualquer outra informação relevante para o documento
-        
-        Retorne apenas o JSON com os dados estruturados.
+        Retorne apenas o JSON com os dados estruturados para preenchimento do template.
         """
         
         # Call OpenAI

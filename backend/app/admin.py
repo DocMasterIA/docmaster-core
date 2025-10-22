@@ -80,7 +80,16 @@ class TemplateAdmin(admin.ModelAdmin):
     list_display = ("name", "slug", "created_at", "preview_card", "role_can_access", "related_subtopico", "prefeitura")
     search_fields = ("name", "slug")
     prepopulated_fields = {"slug": ("name",)}
-    readonly_fields = ('preview_display',)  # campo só leitura
+    #readonly_fields = ('preview_card',)  # campo só leitura
+    fieldsets = (
+        ('Informações Básicas', {
+            'fields': ('name', 'slug', 'file', 'role_can_access', 'prefeitura', 'related_subtopico', 'template_tag')
+        }),
+        ('Preview', {
+            'fields': ('preview_image', 'preview_pdf'),
+            'classes': ('collapse',)
+        }),
+    )
         # mostra o PDF em iframe direto
 
     

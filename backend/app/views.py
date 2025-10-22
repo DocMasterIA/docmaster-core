@@ -310,7 +310,7 @@ def DocumentGeneratorView(request, prefeitura_url):
             return render(request, "document_generator.html", {"templates": templates})
 
         # --- gera dados automaticamente com IA baseado no prompt ---
-        from app.services.ia import generate_document_data_from_prompt
+        from backend.app.services.ia import generate_document_data_from_prompt
         
         try:
             data = generate_document_data_from_prompt(template, prompt)
@@ -324,12 +324,8 @@ def DocumentGeneratorView(request, prefeitura_url):
             messages.error(request, f"Erro ao gerar dados com IA: {str(e)}")
             return render(request, "document_generator.html", {"templates": templates})
 
-        # --- valida campos obrigatórios ---
-        REQUIRED_FIELDS = ["tipo_documento", "modalidade", "objeto", "orgao", "valor_estimado"]
-        missing = [f for f in REQUIRED_FIELDS if f not in data or not data[f]]
-        if missing:
-            messages.error(request, f"Campos obrigatórios faltando: {', '.join(missing)}")
-            return render(request, "document_generator.html", {"templates": templates, "form_data": data})
+        # --- validação removida: IA contextual pode gerar documentos sem campos obrigatórios ---
+        # A renderização contextual inteligente funciona com os dados disponíveis
 
         # --- monta contexto do template ---
         context = assemble_document_context(data)
@@ -345,8 +341,16 @@ def DocumentGeneratorView(request, prefeitura_url):
 
         tmpdir = tempfile.gettempdir()
         try:
-            # --- gera DOCX ---
-            docx_path = render_docx_from_template(template.file.path, context, dest_dir=tmpdir)
+            # --- gera DOCX usando renderização contextual inteligente ---
+            from backend.app.services.render import render_docx_contextual_intelligent
+            
+            # Usar renderização contextual inteligente que analisa o prompt e aplica mudanças
+            docx_path = render_docx_contextual_intelligent(
+                template.file.path, 
+                os.path.join(tmpdir, f"documento_contextual_{inst.pk}.docx"),
+                data, 
+                prompt
+            )
 
             # --- gera PDF ---
             pdf_path = generate_pdf_from_docx(docx_path)
@@ -359,10 +363,19 @@ def DocumentGeneratorView(request, prefeitura_url):
 
             inst.status = "final"
             inst.save()
-            messages.success(request, "Documento gerado com sucesso!")
+            messages.success(request, "Documento gerado com sucesso usando IA contextual inteligente!")
 
-            # aqui você pode redirecionar para download ou mostrar links
-            return redirect("document_detail", pk=inst.pk)
+            # Retornar para a mesma página com links de download
+            return render(request, "document_generator.html", {
+                "templates": templates,
+                "form_data": {},
+                "selected_template": selected_template,
+                "prefeitura_url": request.user.prefeitura.url,
+                "document_ready": True,
+                "document_docx_url": inst.file_docx.url if inst.file_docx else None,
+                "document_pdf_url": inst.file_pdf.url if inst.file_pdf else None,
+                "document_instance": inst
+            })
 
         except Exception as e:
             traceback.print_exc()

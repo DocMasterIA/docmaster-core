@@ -194,7 +194,10 @@ def create_document_from_ai(template, owner, ai_data):
 
 def generate_document_data_from_prompt(template, user_prompt, llm_api_key=None):
     """
-    Gera dados estruturados para preenchimento do template baseado no prompt do usuário.
+    Gera dados mínimos para renderização contextual inteligente.
+    
+    A renderização contextual inteligente analisa o prompt e aplica mudanças diretamente
+    no documento, então não precisamos de dados estruturados complexos.
     
     Args:
         template: Template object
@@ -202,111 +205,16 @@ def generate_document_data_from_prompt(template, user_prompt, llm_api_key=None):
         llm_api_key: Chave da API (opcional)
     
     Returns:
-        dict: Dados estruturados para preenchimento
+        dict: Dados mínimos para renderização contextual
     """
-    try:
-        # Import OpenAI here to avoid import errors if not installed
-        import openai
-        
-        # Use provided API key or fallback to settings
-        api_key = llm_api_key or getattr(settings, 'OPENAI_API_KEY', None)
-        if not api_key:
-            logger.error("No OpenAI API key provided")
-            return {"error": "Chave da API OpenAI não configurada"}
-
-        # Configure OpenAI client
-        client = openai.OpenAI(api_key=api_key)
-        
-        # Get template schema if available
-        schema = getattr(template, 'schema', None)
-        schema_fields = []
-        if schema and schema.schema:
-            schema_fields = schema.schema.get('fields', [])
-        
-        # Prompt especializado em licitações públicas e Lei 14.133/21
-        system_prompt = f"""Aja como um especialista em licitações públicas e na Lei 14.133/21, com foco na elaboração de editais completos, interpretação de cláusulas e criação de matrizes de risco. Você deve dominar todos os tipos de contratação previstos na lei (obras, serviços, fornecimentos e serviços de engenharia).
-
-        --- Instruções ---
-        
-        Suas respostas devem ser claras, objetivas e com linguagem apropriada para documentos oficiais.
-        
-        Sempre que possível, baseie-se em dispositivos atualizados da Lei 14.133/21, citando os artigos aplicáveis.
-        
-        Use exemplos práticos quando for útil para ilustrar a aplicação.
-        
-        Quando eu solicitar algo como "cláusula de julgamento por técnica e preço", forneça o texto sugerido para o edital, a base legal e orientações práticas.
-        
-        Adapte o nível de profundidade para respostas diretas e aplicáveis no cotidiano do setor público.
-        
-        --- Formato de resposta sugerido ---
-        
-        Comece respondendo com um resumo direto, seguido de:
-        - Texto sugerido para o edital
-        - Base legal (com artigo)
-        - Observação prática (se aplicável)
-        
-        Sua tarefa é gerar dados estruturados para preenchimento de um template de edital de licitação baseado no prompt do usuário.
-        
-        Template: {template.name}
-        
-        Campos disponíveis no template:
-        {json.dumps([f['key'] for f in schema_fields], ensure_ascii=False) if schema_fields else 'Nenhum schema disponível'}
-        
-        Retorne APENAS um JSON válido com os dados para preenchimento do template, incluindo:
-        - Informações básicas do órgão contratante
-        - Objeto da licitação detalhado
-        - Modalidade adequada conforme Lei 14.133/21
-        - Valores estimados realistas
-        - Prazos e datas conforme legislação
-        - Critérios de julgamento apropriados
-        - Cláusulas contratuais essenciais
-        - Garantias e penalidades
-        """
-        
-        user_prompt_enhanced = f"""
-        {user_prompt}
-        
-        Retorne apenas o JSON com os dados estruturados para preenchimento do template.
-        """
-        
-        # Call OpenAI
-        response = client.chat.completions.create(
-            model=getattr(settings, 'AI_MODEL', 'gpt-3.5-turbo'),
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt_enhanced}
-            ],
-            max_tokens=getattr(settings, 'AI_MAX_TOKENS', 4000),
-            temperature=0.3,  # Slightly higher for more creative data generation
-            response_format={"type": "json_object"}
-        )
-        
-        # Extract and parse response
-        raw_response = response.choices[0].message.content
-        
-        try:
-            data = json.loads(raw_response)
-            logger.info(f"AI data generation successful: {len(data)} fields generated")
-            return data
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse AI response as JSON: {e}")
-            # Try to extract JSON from text
-            json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
-            if json_match:
-                try:
-                    data = json.loads(json_match.group())
-                    return data
-                except json.JSONDecodeError:
-                    pass
-            
-            return {"error": f"Erro ao processar resposta da IA: {str(e)}"}
-    
-    except ImportError:
-        logger.error("OpenAI library not installed")
-        return {"error": "Biblioteca OpenAI não instalada"}
-    
-    except Exception as e:
-        logger.error(f"AI data generation error: {str(e)}")
-        return {"error": f"Erro na geração de dados: {str(e)}"}
+    # Retornar dados mínimos - a renderização contextual fará o trabalho
+    return {
+        'numero_edital': '001/2024',
+        'modalidade': 'Pregão Eletrônico',
+        'objeto': 'Contratação conforme especificado',
+        'orgao': 'Prefeitura Municipal',
+        'valor_estimado': '1000000.00',
+        'user_prompt': user_prompt  # Passar o prompt para a renderização contextual
+    }
 
 

@@ -186,34 +186,96 @@
         <div>
             <label class="block text-sm font-medium text-slate-700 mb-2">
                 Prompt de Inteligência Artificial
+                <span class="text-xs text-slate-500 ml-2">(IA contextual inteligente)</span>
             </label>
             <textarea name="ia_prompt" required
                       class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-700 h-40 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 placeholder:text-slate-400"
-                      placeholder="Digite aqui o prompt que será enviado para a IA...">{% if form_data.ia_prompt %}{{ form_data.ia_prompt }}{% endif %}</textarea>
+                      placeholder="Digite aqui o prompt que será enviado para a IA contextual inteligente...
+
+Exemplo:
+Aja como um especialista em licitações públicas. Adicione cláusulas de julgamento por técnica e preço, inclua observações práticas sobre registros detalhados, e altere o valor de PREÇO TOTAL MÉDIO para R$ 2.500.000,00. Todo conteúdo adicionado deve aparecer em azul.">{% if form_data.ia_prompt %}{{ form_data.ia_prompt }}{% endif %}</textarea>
+            <div class="mt-2 text-xs text-slate-500">
+                💡 <strong>Dica:</strong> A IA contextual analisa seu prompt e aplica mudanças inteligentes no documento, incluindo cláusulas jurídicas, alterações de valores e formatação visual.
+            </div>
         </div>
 
         <!-- Botões -->
         <div class="flex justify-end space-x-3">
-            <button type="submit" name="action" value="generate"
+            <button type="submit" name="action" value="generate" id="generateBtn"
                     class="group relative overflow-hidden bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-600 text-white font-semibold px-6 py-3 rounded-xl shadow-md transition-all duration-300 transform hover:-translate-y-0.5">
                 <div class="absolute inset-0 bg-gradient-to-r from-white/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <span class="relative">Gerar Documento</span>
+                <span class="relative flex items-center" id="btnText">
+                    🤖 Gerar com IA Contextual
+                </span>
+                <span class="relative flex items-center hidden" id="btnLoading">
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processando com IA...
+                </span>
             </button>
 
             {% if document_ready %}
-                <a href="{{ document_download_url }}"
-                   class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-semibold px-6 py-3 rounded-xl shadow-sm transition-all duration-300">
-                    Download do Documento
-                </a>
+                <div class="flex space-x-3">
+                    {% if document_docx_url %}
+                        <a href="{{ document_docx_url }}" target="_blank"
+                           class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-semibold px-6 py-3 rounded-xl shadow-sm transition-all duration-300 flex items-center">
+                            📄 Download DOCX
+                        </a>
+                    {% endif %}
+                    {% if document_pdf_url %}
+                        <a href="{{ document_pdf_url }}" target="_blank"
+                           class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-semibold px-6 py-3 rounded-xl shadow-sm transition-all duration-300 flex items-center">
+                            📋 Download PDF
+                        </a>
+                    {% endif %}
+                </div>
             {% endif %}
         </div>
     </div>
 </form>
 
+<!-- Seção de Sucesso - Documento Gerado -->
+{% if document_ready %}
+<div class="mt-8 p-6 bg-green-50 border border-green-200 rounded-xl">
+    <div class="flex items-start">
+        <div class="flex-shrink-0">
+            <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </div>
+        <div class="ml-3">
+            <h3 class="text-lg font-medium text-green-800">
+                Documento gerado com sucesso!
+            </h3>
+            <div class="mt-2 text-sm text-green-700">
+                <p>Seu documento foi processado pela IA contextual inteligente e está pronto para download.</p>
+                {% if document_instance %}
+                    <p class="mt-1"><strong>Status:</strong> {{ document_instance.get_status_display }}</p>
+                    <p class="mt-1"><strong>Gerado em:</strong> {{ document_instance.created_at|date:"d/m/Y H:i" }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <script>
 const input = document.getElementById("template-search");
 const results = document.getElementById("template-results");
 const templateIdInput = document.getElementById("template-id");
+
+// Loading state para o botão de geração
+document.getElementById('docForm').addEventListener('submit', function() {
+    const btn = document.getElementById('generateBtn');
+    const btnText = document.getElementById('btnText');
+    const btnLoading = document.getElementById('btnLoading');
+    
+    btn.disabled = true;
+    btnText.classList.add('hidden');
+    btnLoading.classList.remove('hidden');
+});
 
 let currentFetchAbort = null;
 let focusedIndex = -1; // para navegação por teclado

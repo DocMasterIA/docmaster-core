@@ -7,7 +7,7 @@ from weasyprint import HTML  # se usar WeasyPrint para PDF (pode trocar)
 import subprocess
 from docx import Document
 
-# util: garante pasta dentro do MEDIA_ROOT
+# Utilitário: garante pasta dentro do MEDIA_ROOT.
 def _ensure_media_subdir(*parts) -> str:
     base = Path(settings.MEDIA_ROOT)
     target = base.joinpath(*parts)

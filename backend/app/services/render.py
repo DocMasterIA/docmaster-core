@@ -7,6 +7,7 @@ from .services import _ensure_media_subdir
 from docxtpl import DocxTemplate
 import os 
 
+# Renderização de DOCX via docxtpl a partir de um template base e contexto.
 def render_docx_from_template(template_file_path: str, context: dict, dest_dir: str | None = None) -> str:
     """
     Gera um .docx preenchido a partir de um template .docx (docxtpl).
@@ -23,6 +24,7 @@ def render_docx_from_template(template_file_path: str, context: dict, dest_dir: 
     doc.save(out_path)
     return out_path
 
+# Geração opcional de HTML de preview (pode ser usado com render_to_string em views).
 def render_preview_html(template_obj, context: dict) -> str:
     """
     Retorna HTML de preview. Se o template_obj tiver preview_html (string),
@@ -33,6 +35,7 @@ def render_preview_html(template_obj, context: dict) -> str:
     return ""  # opcional, use render_to_string na view
 
 
+# Renderização por estratégia "index": substitui conteúdo de parágrafos por índices de blocos.
 def render_docx_by_index(template_path, out_path, mapping_schema, values: dict):
     """
     mapping_schema: TemplateSchema.schema
@@ -60,6 +63,7 @@ def render_docx_by_index(template_path, out_path, mapping_schema, values: dict):
     doc.save(out_path)
     return out_path
 
+# Renderização por tokens: usa docxtpl com {{ chaves }} dentro do DOCX.
 def render_docx_with_tokens(template_path: str, output_path: str, values: dict):
     """
     Gera um DOCX a partir de um template com marcações {{ }} via docxtpl.

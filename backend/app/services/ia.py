@@ -4,7 +4,7 @@ import tempfile, os
 import requests
 import json
 
-# Exemplo: função que chama a OpenAI (ou outro endpoint). Substituir conforme sua infra.
+# Função de integração com LLM/Agente IA (exemplo) para sugerir schema de campos a partir da estrutura do DOCX.
 def call_llm_for_mapping(doc_structure, user_instructions="", llm_api_key=None):
     """
     doc_structure: output de extract_docx_structure
@@ -28,7 +28,7 @@ Document blocks:
     """
 
     # Exemplo simples: se usar OpenAI SDK, aqui chamaria openai.ChatCompletion.create...
-    # Aqui um mock: POST to your LLM endpoint
+    # Aqui um mock: POST para seu endpoint de LLM
     resp = requests.post(
         "https://api.example-llm.local/generate",
         headers={"Authorization": f"Bearer {llm_api_key}"},
@@ -47,12 +47,13 @@ Document blocks:
     return parsed
 
 
+# Cria uma instância de documento a partir de dados estruturados vindos da IA.
+# Cria DocumentInstance a partir dos dados fornecidos pela IA.
+# ai_data deve conter campos usuais (tipo_documento, modalidade, objeto, orgao, valor_estimado, ...)
+# e opcionalmente "snippets" para montar blocos textuais.
 def create_document_from_ai(template, owner, ai_data):
     """
     Cria DocumentInstance a partir dos dados fornecidos pela IA.
-    ai_data deve ser um dict contendo:
-      - campos como tipo_documento, modalidade, objeto, orgao, valor_estimado, etc.
-      - snippets: {"intro": [...], "clause": [...], "conclusion": [...]}
     """
     from app.models import DocumentInstance
     from .services import generate_pdf_from_docx

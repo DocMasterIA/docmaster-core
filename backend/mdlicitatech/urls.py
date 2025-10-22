@@ -18,6 +18,10 @@ from django.contrib import admin
 from django.urls import path, include, re_path
 from backend.app.admin import dashboard_view
 
+# Roteamento principal do projeto:
+# - /admin e /admin/painel (dashboard custom)
+# - rotas globais do app
+# - rotas multi-tenant com primeiro segmento como slug da prefeitura
 urlpatterns = [
     path('admin/painel/', dashboard_view, name='admin-painel'),
     path('admin/', admin.site.urls),

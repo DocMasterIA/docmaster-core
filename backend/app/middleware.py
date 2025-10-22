@@ -4,8 +4,8 @@ from .models import Prefeitura
 
 class PrefeituraMiddleware:
     """
-    Resolve a prefeitura com base no primeiro segmento da URL e coloca em request.prefeitura.
-    Deve ser adicionado em MIDDLEWARE no settings.py *após* AuthenticationMiddleware.
+    Middleware multi-tenant: resolve a prefeitura a partir do primeiro segmento do path
+    e injeta em request.prefeitura. Deve estar após AuthenticationMiddleware.
     """
     def __init__(self, get_response):
         self.get_response = get_response

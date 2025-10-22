@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError
 class UserManager(BaseUserManager):
     use_in_migrations = True
 
+    # Cria usuário genérico (pode ter senha ou permanecer como convite sem senha).
     def _create_user(self, email, password, **extra_fields):
         if not email:
             raise ValueError(_("Usuários devem ter um e-mail"))
@@ -31,6 +32,7 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault("is_active", True)
         return self._create_user(email, password, **extra_fields)
 
+    # Cria superusuário administrativo (força flags is_staff/is_superuser = True).
     def create_superuser(self, email, password=None, **extra_fields):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
@@ -45,13 +47,13 @@ class UserManager(BaseUserManager):
 
 
 def user_profile_photo_path(instance, filename):
-    # salva sempre como 'profile_photos/{user_id}.ext'
+    # Caminho de upload para foto de perfil: 'profile_photos/{user_id}.ext'
     ext = filename.split('.')[-1]
     filename = f'{instance.id}.{ext}'
     return os.path.join('profile_photos', filename)
 
 def profile_photo_filename(pk: int) -> str:
-    # caminho dentro de MEDIA_ROOT; escolha a pasta que preferir
+    # Nome determinístico do arquivo de foto no storage/media
     return f"profile_photos/user_{pk}.jpg"
 
 from django.core.files.storage import default_storage
@@ -117,7 +119,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         - remove arquivo antigo quando necessário
         """
 
-        # 1) validações de modelo (levanta ValidationError se inválido)
+        # 1) Validações do modelo (levanta ValidationError se inválido)
         # Nota: se você usar forms/serializers que já fazem full_clean, isso é redundante,
         # mas garante segurança caso alguém chame save() diretamente.
         self.full_clean(exclude=None)
@@ -127,7 +129,7 @@ class User(AbstractBaseUser, PermissionsMixin):
             # continua para salvar normalmente (tratamento de foto abaixo ainda será aplicado)
             pass
         else:
-            # 2) só checar limite quando criando ou mudando de prefeitura
+            # 2) Checar limite quando criando ou mudando de prefeitura
             is_creating = self.pk is None
             changed_prefeitura = False
             if not is_creating:
@@ -136,7 +138,7 @@ class User(AbstractBaseUser, PermissionsMixin):
                     changed_prefeitura = True
 
             if is_creating or changed_prefeitura:
-                # lock na prefeitura para evitar condição de corrida
+                # Lock na prefeitura para evitar condição de corrida
                 from backend.app.models import Prefeitura  # import local pra evitar circular import
                 pref = Prefeitura.objects.select_for_update().get(pk=self.prefeitura_id)
                 current_count = type(self).objects.filter(prefeitura=pref).count()
@@ -148,10 +150,10 @@ class User(AbstractBaseUser, PermissionsMixin):
                                     f"({pref.numero_usuarios_permitidos})."
                     })
 
-        # 3) Detectar se há novo arquivo de profile_photo (UploadedFile)
+        # 3) Detecta se há novo arquivo de profile_photo (UploadedFile)
         has_new_file = isinstance(getattr(self.profile_photo, "file", None), UploadedFile)
 
-        # 4) Se for criação e precisamos de PK para nome do arquivo -> salvar rápido sem a imagem
+        # 4) Em criação com nova foto: salva primeiro para garantir PK
         need_pk_for_filename = has_new_file and (self.pk is None)
         if need_pk_for_filename:
             # salva sem arquivo (garante pk)
@@ -161,7 +163,7 @@ class User(AbstractBaseUser, PermissionsMixin):
             # restaura o arquivo para processamento abaixo
             self.profile_photo = file_backup
 
-        # 5) Guardar nome antigo para remoção posterior (se houver)
+        # 5) Guarda nome antigo para remoção posterior (se houver)
         old_name = None
         if self.pk:
             try:
@@ -171,12 +173,12 @@ class User(AbstractBaseUser, PermissionsMixin):
             except type(self).DoesNotExist:
                 old_name = None
 
-        # 6) Se não há novo arquivo, apenas salva normalmente (já validado acima)
+        # 6) Sem novo arquivo de foto: siga com save normal
         if not has_new_file:
             super().save(*args, **kwargs)
             return
 
-        # 7) Processar imagem (resize, convert to JPEG)
+        # 7) Processa imagem (resize, converte para JPEG)
         try:
             # garante cursor no início
             try:
@@ -197,10 +199,10 @@ class User(AbstractBaseUser, PermissionsMixin):
             super().save(*args, **kwargs)
             return
 
-        # 8) gerar nome determinístico usando self.pk (função existente)
+        # 8) Gera nome determinístico usando self.pk
         final_name = profile_photo_filename(self.pk)
 
-        # 9) remover arquivo antigo se for diferente do novo
+        # 9) Remove arquivo antigo se for diferente do novo
         storage = self.profile_photo.storage
         try:
             if old_name and old_name != final_name and storage.exists(old_name):
@@ -209,8 +211,8 @@ class User(AbstractBaseUser, PermissionsMixin):
             # não falha o save por problemas de storage
             pass
 
-        # 10) salvar a imagem processada no campo (save=False para salvar após ajustar outros campos)
+        # 10) Salva imagem processada no campo (save=False para consolidar alterações)
         self.profile_photo.save(final_name, content, save=False)
 
-        # 11) finalmente salva o modelo (dentro da mesma transação atomic)
+        # 11) Salva o modelo (na mesma transação)
         super().save(*args, **kwargs)

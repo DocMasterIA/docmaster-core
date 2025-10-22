@@ -6,6 +6,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.utils.translation import gettext_lazy as _
 
 
+# Tag categórica para templates (filtro/organização no catálogo de documentos base).
 class TemplateTag(models.Model):
     tag = models.CharField(_("Tag"), max_length=20)
 
@@ -14,6 +15,7 @@ class TemplateTag(models.Model):
         verbose_name_plural = _("Tags de Template")
 
 
+# Modelo de documento base (.docx) que serve como origem para geração de documentos.
 class Template(models.Model):
     class RolesAccess(models.TextChoices):
         ADMIN = "ADMIN", _("Administrador")
@@ -57,6 +59,7 @@ class Template(models.Model):
         verbose_name = _("Documento Base")
         verbose_name_plural = _("Documentos Base")
 
+    # Ao salvar, garante que previews (PDF/Imagem) sejam gerados se ausentes.
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         if self.file and not self.preview_pdf:
@@ -69,6 +72,7 @@ class Template(models.Model):
         return self.slug
 
 
+# Manifesto de campos detectados/definidos para um Template via IA ou manual, para preenchimento automático.
 class TemplateSchema(models.Model):
     """
     Manifesto/mapeamento gerado pela IA (ou manual) para um Template.
@@ -95,6 +99,7 @@ class TemplateSchema(models.Model):
         return f"Schema {self.template.name}"
 
 
+# Auditoria de interações/decisões relacionadas ao schema (rastreamento de IA/usuários).
 class SchemaAudit(models.Model):
     schema = models.ForeignKey(
         TemplateSchema, verbose_name=_("Schema"), on_delete=models.CASCADE
@@ -110,6 +115,7 @@ class SchemaAudit(models.Model):
         verbose_name_plural = _("Auditorias de Schema I.A")
 
 
+# Instância concreta de documento gerado a partir de um Template.
 class DocumentInstance(models.Model):
     """
     Documento gerado ou rascunho do usuário.
@@ -142,6 +148,7 @@ class DocumentInstance(models.Model):
         verbose_name = _("Documento")
         verbose_name_plural = _("Documentos")
 
+    # Ao salvar, preenche automaticamente `prefeitura_owner` a partir do owner, se ausente.
     def save(self, *args, **kwargs):
         # Se quiser preencher automaticamente pela prefeitura do owner (se existir)
         if not self.prefeitura_owner and getattr(self, "owner", None) and getattr(self.owner, "prefeitura", None):

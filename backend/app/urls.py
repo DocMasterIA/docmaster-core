@@ -6,6 +6,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from .admin import SecretariaAutocomplete
 
+# Rotas globais do app (login global, APIs e auxiliares como autocomplete)
 urlpatterns = [
     path('login/', login_global_redirect, name='login_global'),
     path('<str:prefeitura_url>/', LoginView, name='login_panel'),
@@ -15,7 +16,7 @@ urlpatterns = [
     path('<str:prefeitura_url>/area_do_usuario/', AreaDoUsuarioView, name="area_do_usuario"),
     path('<str:prefeitura_url>/gerador_de_documentos/', DocumentGeneratorView, name="gerador_de_documentos"),
     path('<str:prefeitura_url>/biblioteca_documentos/',GetTemplatesView, name="biblioteca_documentos"),
-    ### API
+    # API
     path('api/documentos_modelos/enviar', upload_template_and_request_mapping_api, name="documentos_modelos-enviar_api"),
     path("api/documentos_modelos/", get_template_list_api, name="documentos_modelos-get_api"),
     path("api/documentos_modelos/gerar", generate_document_with_values_api, name="documentos_modelos-gerar_api"),

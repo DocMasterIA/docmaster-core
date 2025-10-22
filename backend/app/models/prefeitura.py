@@ -3,6 +3,9 @@ import unicodedata
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from backend.defaults.secretarias import DEFAULT_SECRETARIAS
+
+# Modelo principal de locatário (tenant) do sistema.
+# Cada instância representa uma prefeitura e determina o escopo multi-tenant.
 class Prefeitura(models.Model):
 
     class BrazilianStates(models.TextChoices):
@@ -34,6 +37,7 @@ class Prefeitura(models.Model):
         SE = "SE", _("Sergipe")
         TO = "TO", _("Tocantins")
 
+    # Nome legível do município (exibido no admin e telas)
     nome_municipio = models.CharField(
         "Nome do Município",
         max_length=40,
@@ -47,6 +51,7 @@ class Prefeitura(models.Model):
         null=True
     )
     
+    # Slug/URL canônica usada na rota multi-tenant (gerada no save)
     url = models.CharField(
         "URL do Município",
         max_length=40,
@@ -54,6 +59,7 @@ class Prefeitura(models.Model):
         editable=False,
         help_text="Gerado automaticamente a partir do nome do município (ex: sao_bernardo_do_campo)"
     )
+    # Limite de usuários vinculados a esta prefeitura (usado em validações atômicas)
     numero_usuarios_permitidos = models.IntegerField(
         "Número de Usuários Permitidos",
         help_text="Quantidade máxima de usuários autorizados para esta prefeitura"
@@ -68,6 +74,8 @@ class Prefeitura(models.Model):
     def __str__(self):
         return f"Prefeitura de {self.nome_municipio}"
 
+    # Gera/atualiza o slug `url` a partir do nome do município.
+    # Remove acentuação, espaços e normaliza para padrão seguro de URL.
     def save(self, *args, **kwargs):
         # Normaliza (remove acentos e espaços)
         nome = unicodedata.normalize("NFKD", self.nome_municipio)
@@ -79,6 +87,8 @@ class Prefeitura(models.Model):
 
         super().save(*args, **kwargs)
 
+    # Cria secretarias padrão para a prefeitura a partir de `DEFAULT_SECRETARIAS`.
+    # Usa transação atômica; ignora/cria conforme existência anterior (case-insensitive).
     def create_default_secretarias(self):
         from django.db import transaction, IntegrityError
         default = DEFAULT_SECRETARIAS
@@ -102,6 +112,7 @@ class Prefeitura(models.Model):
                     skipped.append(nome)
         return created, skipped
     
+# Tipos globais de secretarias, reutilizáveis entre prefeituras.
 class SecretariaTipo(models.Model):
     nome = models.CharField(max_length=70, unique=True)
     descricao = models.TextField(blank=True)
@@ -109,6 +120,7 @@ class SecretariaTipo(models.Model):
     def __str__(self):
         return self.nome
     
+# Secretaria pertencente a uma prefeitura específica.
 class Secretaria(models.Model):
     prefeitura = models.ForeignKey(
         "app.Prefeitura",
@@ -137,6 +149,7 @@ class Secretaria(models.Model):
     def __str__(self):
         return f"{self.nome} ({self.prefeitura.nome_municipio})"
 
+    # Validação para impedir nomes duplicados de secretaria dentro da mesma prefeitura.
     def clean(self):
         # Garante que não exista secretaria duplicada na mesma prefeitura
         qs = Secretaria.objects.filter(prefeitura=self.prefeitura, nome__iexact=self.nome)
@@ -145,6 +158,7 @@ class Secretaria(models.Model):
         if qs.exists():
             raise ValidationError({"nome": "Já existe uma secretaria com este nome nesta prefeitura."})
 
+# Subtópicos categóricos vinculados ao tipo de secretaria (catálogo global).
 class SubtopicoSecretaria(models.Model):
     tipo_secretaria = models.ForeignKey(SecretariaTipo, on_delete=models.CASCADE, related_name="subtopicos", blank=True, null=True)
 

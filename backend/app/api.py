@@ -14,6 +14,7 @@ from django.views.decorators.http import require_GET
 
 
 
+# API: upload de Template (DOCX) e solicitação de mapeamento de campos via IA.
 @login_required
 def upload_template_and_request_mapping_api(request):
     if request.method != "POST":
@@ -26,7 +27,7 @@ def upload_template_and_request_mapping_api(request):
     name = request.POST.get("name") or uploaded.name
     mapping_instructions = request.POST.get("mapping_instructions", "")
 
-    # salvar template
+    # Salva Template e gera preview (imagem) imediatamente
     tpl = Template.objects.create(name=name, file=uploaded)
     
     preview_rel_path = generate_docx_preview(tpl)
@@ -36,7 +37,8 @@ def upload_template_and_request_mapping_api(request):
     # extrair estrutura e chamar LLM
     try:
         doc_struct = extract_docx_structure(tpl.file.path)
-        mapping = call_llm_for_mapping(doc_struct, user_instructions=mapping_instructions, llm_api_key=None)  # passe chave conforme config
+        # Chama o agente de IA (stub) para sugerir schema de campos
+        mapping = call_llm_for_mapping(doc_struct, user_instructions=mapping_instructions, llm_api_key=None)
         ok, err = validate_mapping_response(mapping)
         if not ok:
             # opcional: salvar Template sem schema e retornar mapping para revisão
@@ -49,6 +51,7 @@ def upload_template_and_request_mapping_api(request):
         traceback.print_exc()
         return JsonResponse({"ok": False, "error": str(e)}, status=500)
 
+# API: lista templates (ou um específico por id) com info de preview e existência de schema.
 @login_required
 def get_template_list_api(request):
     template_id = request.GET.get("id")
@@ -79,6 +82,7 @@ def get_template_list_api(request):
     return JsonResponse({"templates": items})
 
 
+# API: gerar documento (DOCX/PDF) a partir de valores recebidos, usando schema (index) ou fallback tokens.
 @login_required
 @csrf_exempt  # se for API token-based, prefira auth token em header e remova csrf_exempt
 def generate_document_with_values_api(request):
@@ -115,6 +119,7 @@ def generate_document_with_values_api(request):
     except Exception as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=500)
 
+# API: retorna até 10 templates para autocomplete/busca.
 @require_GET
 @login_required
 def template_list_api(request):
@@ -142,6 +147,7 @@ def template_list_api(request):
 
     return JsonResponse({"templates": data})
 
+# API: retorna URL do preview PDF, gerando se necessário.
 @login_required
 def template_preview_pdf_api(request, template_id):
     tpl = get_object_or_404(Template, id=template_id)

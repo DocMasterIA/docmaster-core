@@ -28,7 +28,7 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 
-# Application definition
+# Application definition (apps internos e terceiros usados pelo painel/admin/UX)
 
 INSTALLED_APPS = [
     "nested_admin",
@@ -167,6 +167,7 @@ def secretaria_tipo_link(request):
     return reverse(f"admin:{SecretariaTipo._meta.app_label}_{SecretariaTipo._meta.model_name}_changelist")
 
 
+# Configuração do tema/admin Unfold (sidebar, cores, atalhos e dashboard)
 UNFOLD = {
     # Título e cabeçalho
     "SITE_TITLE": "Painel MDLicitaTech",

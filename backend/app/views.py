@@ -20,6 +20,7 @@ from django.db.models import Q
 from backend.app.models.usuario import User
 from backend.app.models.prefeitura import Prefeitura
 
+# Redireciona login global para a primeira prefeitura disponível ou landing.
 def login_global_redirect(request):
     # ex: redireciona para a primeira prefeitura ou página de seleção
     first_prefeitura = Prefeitura.objects.first()
@@ -27,6 +28,7 @@ def login_global_redirect(request):
         return redirect(f'/{first_prefeitura.url}/')
     return redirect('/landing/')  # fallback
 
+# Tela de login por prefeitura; valida tentativas, faz vínculo de prefeitura do usuário.
 @require_http_methods(["GET","POST"])
 def LoginView(request, prefeitura_url):
     from .models import Prefeitura
@@ -85,6 +87,7 @@ def LoginView(request, prefeitura_url):
 
     return render(request, "login_portal.html", {"form": form, "prefeitura": prefeitura})
 
+# Cadastro simples de usuário (workflow global). Exibe mensagens de erro do formulário.
 def RegisterView(request):
     if request.method == "POST":
         form = RegisterForm(request.POST)
@@ -102,6 +105,7 @@ def RegisterView(request):
 
     return render(request, "register_portal.html", {"form": form})
 
+# Efetua logout e redireciona para login da prefeitura (se informado) ou landing.
 @login_required
 def LogoutView(request, prefeitura_url=None):
     logout(request)
@@ -112,6 +116,7 @@ def LogoutView(request, prefeitura_url=None):
     # fallback global
     return redirect('landing')
 
+# Dashboard por prefeitura; impede acesso a prefeitura distinta para usuários comuns.
 @never_cache
 @login_required
 def DashboardView(request, prefeitura_url):
@@ -124,6 +129,7 @@ def DashboardView(request, prefeitura_url):
             return redirect('/')  # ou página de escolha de prefeitura
     return render(request, "dashboard.html", {"prefeitura": request.user.prefeitura})
 
+# Área do usuário com paginação dos documentos gerados e edição de perfil.
 @never_cache
 @login_required
 def AreaDoUsuarioView(request, prefeitura_url):
@@ -162,6 +168,7 @@ def AreaDoUsuarioView(request, prefeitura_url):
 
     return render(request, "area_do_usuario.html", {"form": form, "page_obj": page_obj, "query": query,})
 
+# Upload manual de Template (DOCX) via formulário (exemplo de fluxo simples).
 @never_cache
 @login_required
 def UploadTemplateView(request):
@@ -188,6 +195,7 @@ from django.contrib import messages
 from .models import Template
 
 
+# Lista de Templates com filtros (estado, prefeitura, subtópico) e controle de acesso por role.
 @never_cache
 @login_required
 def GetTemplatesView(request, prefeitura_url):
@@ -248,6 +256,7 @@ def GetTemplatesView(request, prefeitura_url):
         }
     )
 
+# Geração de documento a partir de Template, usando dados recebidos (ex.: IA) e salvando instância.
 @never_cache
 @login_required
 def DocumentGeneratorView(request, prefeitura_url):
@@ -366,6 +375,7 @@ def DocumentGeneratorView(request, prefeitura_url):
 
 import datetime
 
+# Callback para compor métricas do painel admin (cards, gráficos e listas top).
 def dashboard_callback(request, context):
     # exemplo: contadores
     from django.db.models import Count

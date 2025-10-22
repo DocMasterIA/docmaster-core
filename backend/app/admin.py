@@ -42,6 +42,7 @@ class UserAdminForm(forms.ModelForm):
             # se não, nenhum disponível
             self.fields["secretaria"].queryset = Secretaria.objects.none()
 
+# Admin de usuários customizados, com autocomplete de secretaria e inline de leitura.
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     form = UserAdminForm
@@ -73,6 +74,7 @@ from backend.app.services.preview import generate_docx_preview
 
 
 
+# Admin de Templates com card de preview PDF incorporado e slug automático.
 @admin.register(Template)
 class TemplateAdmin(admin.ModelAdmin):
     list_display = ("name", "slug", "created_at", "preview_card", "role_can_access", "related_subtopico", "prefeitura")
@@ -133,6 +135,7 @@ class TemplateAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at",)
     ordering = ("-created_at",)
 
+# Admin de TemplateSchema (schema IA) com leitura básica.
 @admin.register(TemplateSchema)
 class TemplateSchemaAdmin(admin.ModelAdmin):
     list_display = ("template_name", "strategy", "created_at")
@@ -144,6 +147,7 @@ class TemplateSchemaAdmin(admin.ModelAdmin):
         return obj.template.name
     template_name.short_description = "Template"
 
+# Admin de auditoria de schemas IA.
 @admin.register(SchemaAudit)
 class SchemaAuditAdmin(admin.ModelAdmin):
     list_display = ("schema_template_name", "user", "created_at")
@@ -156,6 +160,7 @@ class SchemaAuditAdmin(admin.ModelAdmin):
     schema_template_name.short_description = "Template"
 
 # ------------------ DOCUMENT INSTANCE ------------------
+# Admin de documentos gerados, com ações de mudar status e regenerar arquivos.
 @admin.register(DocumentInstance)
 class DocumentInstanceAdmin(admin.ModelAdmin):
     list_display = ("id_short", "template", "owner_email", "status", "created_at", "file_docx", "file_pdf")
@@ -306,6 +311,7 @@ from django.contrib.admin import AdminSite
 from backend.app.models import User, Template, DocumentInstance
 
 # função view
+# Dashboard custom do admin com contadores resumidos.
 def dashboard_view(request):
     total_users = User.objects.count()
     total_templates = Template.objects.count()
@@ -324,6 +330,7 @@ from django.forms.models import BaseInlineFormSet
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
+# Formset inline para validar limites de usuários por prefeitura.
 class UsuarioInlineFormSet(BaseInlineFormSet):
     def clean(self):
         super().clean()
@@ -347,6 +354,7 @@ class UsuarioInlineFormSet(BaseInlineFormSet):
                 f"Limite excedido! Esta prefeitura permite no máximo {prefeitura.numero_usuarios_permitidos} usuários."
             )
         
+# Inline (somente leitura) de usuários dentro de Secretarias.
 class UsuarioInline(nested_admin.NestedTabularInline):
     model = User
     fk_name = "secretaria"   # ajuste se o FK no User tiver outro nome
@@ -373,6 +381,7 @@ class SecretariaAutocomplete(autocomplete.Select2QuerySetView):
 
         return qs
 
+# Inline de Secretarias dentro da Prefeitura, incluindo usuários como nested inline read-only.
 class SecretariaInline(nested_admin.NestedStackedInline):
     model = Secretaria
     fk_name = "prefeitura"   # ajuste se o FK no User tiver outro nome
@@ -382,6 +391,7 @@ class SecretariaInline(nested_admin.NestedStackedInline):
     inlines = [UsuarioInline]
 
 
+# Inline de Subtópicos dentro do Tipo de Secretaria.
 class SubtopicoSecretariaInLine(admin.StackedInline):
     model = SubtopicoSecretaria
     fk_name = "tipo_secretaria"   # ajuste se o FK no User tiver outro nome
@@ -389,6 +399,7 @@ class SubtopicoSecretariaInLine(admin.StackedInline):
     extra = 0                # não mostrar formulários vazios extras
 
 
+# Admin de Tipos de Secretaria com inline de Subtópicos.
 @admin.register(SecretariaTipo)
 class SecretariaTipoAdmin(admin.ModelAdmin):
     list_display = ("nome", "descricao")
@@ -400,6 +411,7 @@ class SecretariaTipoAdmin(admin.ModelAdmin):
 
 
 
+# Admin de Prefeituras com inline de Secretarias e validação de limite de usuários.
 @admin.register(Prefeitura)
 class PrefeituraAdmin(nested_admin.NestedModelAdmin):
     list_display = ("nome_municipio", "estado", "url", "numero_usuarios_permitidos")

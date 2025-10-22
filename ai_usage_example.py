@@ -51,7 +51,7 @@ def example_usage():
     result = call_llm_for_mapping(
         doc_structure=doc_structure,
         user_instructions=user_instructions,
-        llm_api_key=None  # Will use OPENAI_API_KEY from environment
+        llm_api_key="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"  # Will use OPENAI_API_KEY from environment
     )
     
     # Display results
@@ -74,10 +74,10 @@ def example_usage():
 
 if __name__ == "__main__":
     # Check if API key is set
-    if not os.getenv('OPENAI_API_KEY'):
+    """if not os.getenv('OPENAI_API_KEY'):
         print("❌ Erro: OPENAI_API_KEY não configurada")
         print("Configure com: export OPENAI_API_KEY='sua-chave-aqui'")
-        sys.exit(1)
+        sys.exit(1)"""
     
     try:
         example_usage()

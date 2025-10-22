@@ -309,16 +309,19 @@ def DocumentGeneratorView(request, prefeitura_url):
             messages.error(request, "É necessário fornecer o prompt da IA.")
             return render(request, "document_generator.html", {"templates": templates})
 
-        # --- recebe dados da IA ---
-        data_json = request.POST.get("data_json")
-        if not data_json:
-            messages.error(request, "Nenhum JSON recebido da IA.")
-            return render(request, "document_generator.html", {"templates": templates})
-
+        # --- gera dados automaticamente com IA baseado no prompt ---
+        from app.services.ia import generate_document_data_from_prompt
+        
         try:
-            data = json.loads(data_json)
-        except json.JSONDecodeError:
-            messages.error(request, "JSON inválido enviado pela IA.")
+            data = generate_document_data_from_prompt(template, prompt)
+            
+            # Verifica se houve erro na geração
+            if "error" in data:
+                messages.error(request, f"Erro na IA: {data['error']}")
+                return render(request, "document_generator.html", {"templates": templates})
+                
+        except Exception as e:
+            messages.error(request, f"Erro ao gerar dados com IA: {str(e)}")
             return render(request, "document_generator.html", {"templates": templates})
 
         # --- valida campos obrigatórios ---

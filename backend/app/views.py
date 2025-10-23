@@ -309,29 +309,29 @@ def DocumentGeneratorView(request, prefeitura_url):
             messages.error(request, "É necessário fornecer o prompt da IA.")
             return render(request, "document_generator.html", {"templates": templates})
 
-        # --- gera dados automaticamente com IA baseado no prompt ---
-        from backend.app.services.ia import generate_document_data_from_prompt
+        # --- ABORDAGEM SIMPLIFICADA: IA processa documento diretamente ---
+        from backend.app.services.ia import process_document_with_ai
         
         try:
-            data = generate_document_data_from_prompt(template, prompt)
+            # Processar documento diretamente com IA
+            result = process_document_with_ai(template.file.path, prompt)
             
-            # Verifica se houve erro na geração
-            if "error" in data:
-                messages.error(request, f"Erro na IA: {data['error']}")
+            if not result.get('success'):
+                messages.error(request, f"Erro na IA: {result.get('error', 'Erro desconhecido')}")
                 return render(request, "document_generator.html", {"templates": templates})
                 
+            # Criar dados básicos para salvar no banco
+            data = {
+                'user_prompt': prompt,
+                'changes_made': result.get('changes_made', []),
+                'message': result.get('message', 'Documento modificado')
+            }
+            
         except Exception as e:
-            messages.error(request, f"Erro ao gerar dados com IA: {str(e)}")
+            messages.error(request, f"Erro ao processar documento com IA: {str(e)}")
             return render(request, "document_generator.html", {"templates": templates})
 
-        # --- validação removida: IA contextual pode gerar documentos sem campos obrigatórios ---
-        # A renderização contextual inteligente funciona com os dados disponíveis
-
-        # --- monta contexto do template ---
-        context = assemble_document_context(data)
-        context['template'] = template
-
-        # --- cria DocumentInstance como rascunho/final direto ---
+        # --- cria DocumentInstance ---
         inst = DocumentInstance.objects.create(
             template=template,
             owner=request.user,
@@ -339,19 +339,13 @@ def DocumentGeneratorView(request, prefeitura_url):
             status="draft"
         )
 
-        tmpdir = tempfile.gettempdir()
         try:
-            # --- gera DOCX usando renderização contextual inteligente ---
-            from backend.app.services.render import render_docx_contextual_intelligent
+            # --- gera DOCX e PDF a partir do resultado da IA ---
+            from backend.app.services.services import generate_pdf_from_docx
             
-            # Usar renderização contextual inteligente que analisa o prompt e aplica mudanças
-            docx_path = render_docx_contextual_intelligent(
-                template.file.path, 
-                os.path.join(tmpdir, f"documento_contextual_{inst.pk}.docx"),
-                data, 
-                prompt
-            )
-
+            # --- usar resultado da IA diretamente ---
+            docx_path = result['output_path']
+            
             # --- gera PDF ---
             pdf_path = generate_pdf_from_docx(docx_path)
 
@@ -363,7 +357,7 @@ def DocumentGeneratorView(request, prefeitura_url):
 
             inst.status = "final"
             inst.save()
-            messages.success(request, "Documento gerado com sucesso usando IA contextual inteligente!")
+            messages.success(request, "Documento gerado com sucesso usando IA!")
 
             # Retornar para a mesma página com links de download
             return render(request, "document_generator.html", {

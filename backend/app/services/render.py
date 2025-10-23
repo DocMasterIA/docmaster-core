@@ -7,25 +7,50 @@ from .services import _ensure_media_subdir
 from docxtpl import DocxTemplate
 import os 
 
-# Renderização de DOCX via docxtpl a partir de um template base e contexto.
+# Renderização SIMPLIFICADA: usa IA diretamente para modificar documentos
 def render_docx_from_template(template_file_path: str, context: dict, dest_dir: str | None = None) -> str:
     """
-    Gera um .docx preenchido a partir de um template .docx.
-    Tenta primeiro docxtpl, depois renderização inteligente.
-    Retorna o caminho absoluto do arquivo gerado.
+    Gera um .docx modificado usando IA diretamente.
+    Abordagem SIMPLES: envia documento + prompt para IA fazer as mudanças.
     """
+    from .ia import process_document_with_ai
+    
     if dest_dir is None:
         dest_dir = _ensure_media_subdir("documents", "docx")
 
+    # Extrair prompt do usuário do contexto
+    user_prompt = context.get('user_prompt', '')
+    if not user_prompt:
+        # Se não há prompt específico, usar dados do contexto
+        user_prompt = f"Modifique o documento com os seguintes dados: {context}"
+    
+    print(f"🤖 Processando documento com IA: {user_prompt[:100]}...")
+    
+    # Usar IA para processar o documento diretamente
+    result = process_document_with_ai(template_file_path, user_prompt)
+    
+    if result.get('success'):
+        print(f"✅ Documento processado com IA com sucesso")
+        return result['output_path']
+    else:
+        print(f"❌ Erro no processamento com IA: {result.get('error')}")
+        # Fallback para renderização básica se IA falhar
+        return render_docx_fallback(template_file_path, context, dest_dir)
+
+
+def render_docx_fallback(template_file_path: str, context: dict, dest_dir: str) -> str:
+    """
+    Fallback simples se a IA falhar.
+    """
     filename = f"{Path(template_file_path).stem}_{uuid.uuid4().hex[:8]}.docx"
     out_path = os.path.join(dest_dir, filename)
-
+    
     # Verificar se o template tem tokens {{ }}
     has_tokens = False
     try:
         from docx import Document
         doc = Document(template_file_path)
-        for p in doc.paragraphs[:20]:  # Verificar primeiros 20 parágrafos
+        for p in doc.paragraphs[:20]:
             if '{{' in p.text and '}}' in p.text:
                 has_tokens = True
                 break
@@ -33,25 +58,24 @@ def render_docx_from_template(template_file_path: str, context: dict, dest_dir: 
         pass
     
     if has_tokens:
-        # Template tem tokens - usar docxtpl
+        # Usar docxtpl se tem tokens
         try:
             doc = DocxTemplate(template_file_path)
             doc.render(context)
             doc.save(out_path)
-            print(f"✅ Renderização com docxtpl bem-sucedida")
+            print(f"✅ Fallback com docxtpl bem-sucedido")
             return out_path
         except Exception as e:
-            print(f"⚠️ Docxtpl falhou: {e}")
-            print("🔄 Tentando renderização inteligente...")
-            render_docx_intelligent(template_file_path, out_path, context)
-            print(f"✅ Renderização inteligente bem-sucedida")
+            print(f"❌ Fallback docxtpl falhou: {e}")
+            # Copiar arquivo original se tudo falhar
+            import shutil
+            shutil.copy2(template_file_path, out_path)
             return out_path
     else:
-        # Template não tem tokens - usar renderização contextual inteligente
-        print("🔧 Template sem tokens - usando renderização contextual inteligente")
-        user_prompt = context.get('user_prompt', '')
-        render_docx_contextual_intelligent(template_file_path, out_path, context, user_prompt)
-        print(f"✅ Renderização contextual inteligente bem-sucedida")
+        # Copiar arquivo original se não tem tokens
+        import shutil
+        shutil.copy2(template_file_path, out_path)
+        print(f"✅ Arquivo original copiado como fallback")
         return out_path
 
 # Geração opcional de HTML de preview (pode ser usado com render_to_string em views).

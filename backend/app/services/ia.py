@@ -15,6 +15,7 @@ def process_document_with_ai(template_path, user_prompt, llm_api_key=None):
     try:
         from openai import OpenAI
         from docx import Document
+        import re
         
         # Configurar cliente OpenAI
         api_key = llm_api_key or getattr(settings, 'OPENAI_API_KEY', None)
@@ -27,8 +28,8 @@ def process_document_with_ai(template_path, user_prompt, llm_api_key=None):
         # Carregar documento
         doc = Document(template_path)
         
-        # Extrair texto do documento
-        document_text = extract_document_text_simple(doc)
+        # Extrair texto do documento (sem criar tabelas em texto)
+        document_text = extract_document_text_clean(doc)
         
         # Prompt simples como ChatGPT
         system_prompt = """Você é um assistente que edita documentos.
@@ -36,20 +37,30 @@ def process_document_with_ai(template_path, user_prompt, llm_api_key=None):
 INSTRUÇÕES:
 1. Receba o texto do documento
 2. Faça as modificações solicitadas pelo usuário
-3. Retorne o texto modificado
+3. Retorne APENAS as substituições necessárias
+
+FORMATO DE RESPOSTA:
+old: "texto original"
+new: "texto novo"
 
 REGRAS:
-- Mantenha a estrutura original
 - Faça apenas as mudanças solicitadas
-- Não adicione códigos ou formatação extra
-- Retorne apenas o texto modificado"""
+- Procure valores em TODO o texto
+- Retorne apenas as substituições específicas
+- Seja preciso e direto"""
         
         user_prompt_full = f"""TEXTO DO DOCUMENTO:
 {document_text}
 
 INSTRUÇÃO DO USUÁRIO: {user_prompt}
 
-Retorne o texto modificado."""
+Procure no texto o valor que precisa ser alterado e retorne a substituição no formato:
+old: "texto original"
+new: "texto novo"
+
+Exemplo:
+old: "R$ 5.678.659,46"
+new: "R$ 2.500.000,00" """
         
         # Chamada para OpenAI
         response = client.chat.completions.create(
@@ -58,15 +69,33 @@ Retorne o texto modificado."""
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt_full}
             ],
-            max_tokens=4000,
+            max_tokens=2000,
             temperature=0.1
         )
         
-        # Obter texto modificado
-        modified_text = response.choices[0].message.content
+        # Obter resposta
+        raw_response = response.choices[0].message.content
         
-        # Aplicar mudanças ao documento
-        modified_doc = apply_text_to_document(doc, modified_text)
+        # Processar resposta para extrair substituições
+        changes = []
+        lines = raw_response.split('\n')
+        
+        old_text = None
+        new_text = None
+        
+        for line in lines:
+            if line.strip().startswith('old:'):
+                old_text = line.split(':', 1)[1].strip().strip('"')
+            elif line.strip().startswith('new:'):
+                new_text = line.split(':', 1)[1].strip().strip('"')
+                
+                if old_text and new_text:
+                    changes.append({"old": old_text, "new": new_text})
+                    old_text = None
+                    new_text = None
+        
+        # Aplicar mudanças específicas no documento
+        modified_doc = apply_specific_changes(doc, changes)
         
         # Salvar documento modificado
         output_path = save_modified_document(modified_doc, template_path)
@@ -74,7 +103,7 @@ Retorne o texto modificado."""
         return {
             "success": True,
             "output_path": output_path,
-            "changes_made": ["Documento modificado conforme solicitado"],
+            "changes_made": [f"Substituído: {change.get('old')} -> {change.get('new')}" for change in changes],
             "message": "Documento modificado com sucesso"
         }
         
@@ -83,30 +112,37 @@ Retorne o texto modificado."""
         return {"error": f"Erro na IA: {str(e)}"}
 
 
-def extract_document_text_simple(doc):
+def extract_document_text_clean(doc):
     """
-    Extrai texto do documento de forma simples.
+    Extrai texto do documento de forma limpa, priorizando tabelas.
     """
     text_parts = []
     
-    # Extrair parágrafos
-    for paragraph in doc.paragraphs:
-        if paragraph.text.strip():
-            text_parts.append(paragraph.text.strip())
-    
-    # Incluir texto de tabelas
+    # PRIMEIRO: Extrair tabelas (elas são mais importantes)
     for table in doc.tables:
         for row in table.rows:
             row_text = " | ".join([cell.text.strip() for cell in row.cells])
             if row_text.strip():
                 text_parts.append(row_text)
     
-    # Limitar tamanho total do texto
+    # SEGUNDO: Extrair parágrafos
+    for paragraph in doc.paragraphs:
+        if paragraph.text.strip():
+            text_parts.append(paragraph.text.strip())
+    
+    # Limitar tamanho total do texto para evitar limite de tokens
     full_text = "\n".join(text_parts)
     if len(full_text) > 8000:  # Limite de caracteres
         full_text = full_text[:8000] + "\n... [TEXTO TRUNCADO]"
     
     return full_text
+
+
+def extract_document_text_simple(doc):
+    """
+    Função de compatibilidade.
+    """
+    return extract_document_text_clean(doc)
 
 
 def extract_document_text_conservative(doc):
@@ -405,9 +441,59 @@ Retorne o texto modificado."""
         return {"error": f"Erro no fallback: {str(e)}"}
 
 
+def apply_specific_changes(doc, changes):
+    """
+    Aplica mudanças específicas no documento, mantendo a estrutura original.
+    """
+    changes_applied = 0
+    
+    for change in changes:
+        old_text = change.get("old", "")
+        new_text = change.get("new", "")
+        
+        if not old_text or not new_text:
+            continue
+        
+        # Extrair apenas o valor monetário para substituição
+        import re
+        old_value = None
+        new_value = None
+        
+        # Procurar por padrão de valor monetário
+        old_match = re.search(r'R\$\s*([\d.,]+)', old_text)
+        new_match = re.search(r'R\$\s*([\d.,]+)', new_text)
+        
+        if old_match and new_match:
+            old_value = old_match.group(1)
+            new_value = new_match.group(1)
+            logger.info(f"Valores extraídos: '{old_value}' -> '{new_value}'")
+        
+        # Aplicar substituições em parágrafos
+        for paragraph in doc.paragraphs:
+            if old_value and old_value in paragraph.text:
+                # Substituir valor no parágrafo
+                paragraph.text = paragraph.text.replace(old_value, new_value)
+                changes_applied += 1
+                logger.info(f"Substituído em parágrafo: '{old_value}' -> '{new_value}'")
+        
+        # Aplicar substituições em tabelas
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for paragraph in cell.paragraphs:
+                        if old_value and old_value in paragraph.text:
+                            # Substituir valor na célula da tabela
+                            paragraph.text = paragraph.text.replace(old_value, new_value)
+                            changes_applied += 1
+                            logger.info(f"Substituído em tabela: '{old_value}' -> '{new_value}'")
+    
+    logger.info(f"Total de substituições aplicadas: {changes_applied}")
+    return doc
+
+
 def apply_text_to_document(doc, modified_text):
     """
-    Aplica o texto modificado ao documento de forma simples.
+    Função de compatibilidade.
     """
     # Dividir texto modificado em parágrafos
     paragraphs_text = modified_text.split('\n')

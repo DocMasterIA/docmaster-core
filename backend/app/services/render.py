@@ -206,6 +206,16 @@ def add_expert_content(doc, user_prompt, field_map=None):
                                     run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
                                     print(f"  ✅ Valor alterado: {old_text} -> {novo_valor}")
                                     changes_applied += 1
+            
+            # Procurar em parágrafos também (para templates simples)
+            for paragraph in doc.paragraphs:
+                for run in paragraph.runs:
+                    if "R$" in run.text and any(char.isdigit() for char in run.text):
+                        old_text = run.text
+                        run.text = novo_valor
+                        run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                        print(f"  ✅ Valor alterado (parágrafo): {old_text} -> {novo_valor}")
+                        changes_applied += 1
     
     # 2. Análise inteligente de nomes e locais
     nome_matches = re.findall(r'(?:mude|altere|troque|substitua).*?(?:para|por)\s+([A-ZÁÊÇÕ][a-záêçõ\s]+)', user_prompt, re.IGNORECASE)
@@ -239,6 +249,54 @@ def add_expert_content(doc, user_prompt, field_map=None):
                         run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
                         print(f"  ✅ Número alterado: {old_text} -> {run.text}")
                         changes_applied += 1
+    
+    # 4. Substituições específicas para campos do template
+    print("  🔧 Aplicando substituições específicas do template...")
+    
+    # Substituir campos específicos do template
+    for paragraph in doc.paragraphs:
+        for run in paragraph.runs:
+            original_text = run.text
+            
+            # Substituir PROCESSO Nº
+            if "PROCESSO Nº: ____________" in original_text:
+                if 'numero_edital' in field_map:
+                    run.text = original_text.replace("____________", field_map['numero_edital'])
+                    run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                    print(f"  ✅ Processo alterado: {field_map['numero_edital']}")
+                    changes_applied += 1
+            
+            # Substituir MODALIDADE
+            if "MODALIDADE: ____________" in original_text:
+                if 'modalidade' in field_map:
+                    run.text = original_text.replace("____________", field_map['modalidade'])
+                    run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                    print(f"  ✅ Modalidade alterada: {field_map['modalidade']}")
+                    changes_applied += 1
+            
+            # Substituir DATA DE ABERTURA
+            if "DATA DE ABERTURA: ____/____/______" in original_text:
+                if 'data_abertura' in field_map:
+                    run.text = original_text.replace("____/____/______", field_map['data_abertura'])
+                    run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                    print(f"  ✅ Data alterada: {field_map['data_abertura']}")
+                    changes_applied += 1
+            
+            # Substituir LOCAL
+            if "LOCAL: ____________________________" in original_text:
+                if 'local_orgao' in field_map:
+                    run.text = original_text.replace("____________________________", field_map['local_orgao'])
+                    run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                    print(f"  ✅ Local alterado: {field_map['local_orgao']}")
+                    changes_applied += 1
+            
+            # Substituir OBJETO
+            if "contratação de ____________" in original_text:
+                if 'objeto' in field_map:
+                    run.text = original_text.replace("____________", field_map['objeto'])
+                    run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                    print(f"  ✅ Objeto alterado: {field_map['objeto']}")
+                    changes_applied += 1
     
     # 3.1. Substituições contextuais inteligentes (MELHORADO)
     changes_applied += apply_contextual_intelligent_replacements(doc, field_map, user_prompt)
@@ -330,18 +388,16 @@ def add_expert_content(doc, user_prompt, field_map=None):
                         changes_applied += 1
                         
                     else:
-                        # Fallback: procurar por seção de julgamento em qualquer numeração
-                        print("  🔍 Procurando seção de julgamento (fallback)...")
+                        # Fallback: procurar por seção de julgamento ou qualquer seção numerada
+                        print("  🔍 Procurando seção apropriada (fallback)...")
                         
+                        # Primeiro, tentar encontrar seção de julgamento
                         for i, p in enumerate(doc.paragraphs):
                             texto = p.text.strip()
-                            # Procurar por padrões de julgamento que não sejam de outras seções
-                            if (re.search(r'\d+\.\d+\.\d+', texto) and  # Tem numeração
-                                'julgamento' in texto.lower() and 
-                                'proposta' in texto.lower() and
-                                not re.search(r'8\.\d+', texto)):  # Não é da seção 8.x
+                            if ('julgamento' in texto.lower() and 
+                                ('proposta' in texto.lower() or 'critério' in texto.lower())):
                                 
-                                print(f"  📍 Encontrado parágrafo de julgamento (fallback): {i+1}")
+                                print(f"  📍 Encontrado parágrafo de julgamento: {i+1}")
                                 
                                 # Adicionar cláusula específica
                                 new_p_elem = OxmlElement('w:p')
@@ -351,11 +407,52 @@ def add_expert_content(doc, user_prompt, field_map=None):
                                 run = new_p.add_run()
                                 run.text = clausula['texto']
                                 run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
-                                print(f"  ✅ Adicionada cláusula específica (fallback): {clausula_info.get('descricao', 'N/A')}")
+                                print(f"  ✅ Adicionada cláusula específica após julgamento: {clausula_info.get('descricao', 'N/A')}")
                                 changes_applied += 1
                                 break
                         else:
-                            print("  ⚠️ Não foi possível encontrar local apropriado para inserir cláusula")
+                            # Se não encontrar julgamento, procurar por qualquer seção numerada
+                            print("  🔍 Procurando qualquer seção numerada...")
+                            
+                            for i, p in enumerate(doc.paragraphs):
+                                texto = p.text.strip()
+                                # Procurar por seções numeradas (1., 2., 3., etc.)
+                                if re.search(r'^\d+\.\s+[A-Z]', texto):
+                                    print(f"  📍 Encontrado parágrafo numerado: {i+1} - {texto[:50]}...")
+                                    
+                                    # Adicionar cláusula específica
+                                    new_p_elem = OxmlElement('w:p')
+                                    p._element.addnext(new_p_elem)
+                                    new_p = type(p)(new_p_elem, p._parent)
+                                    
+                                    run = new_p.add_run()
+                                    run.text = clausula['texto']
+                                    run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                                    print(f"  ✅ Adicionada cláusula específica após seção: {clausula_info.get('descricao', 'N/A')}")
+                                    changes_applied += 1
+                                    break
+                            else:
+                                # Último fallback: adicionar no final do documento
+                                print("  🔍 Adicionando no final do documento (último fallback)...")
+                                
+                                # Encontrar o último parágrafo com conteúdo
+                                ultimo_paragrafo = None
+                                for i, p in enumerate(doc.paragraphs):
+                                    if p.text.strip():
+                                        ultimo_paragrafo = p
+                                
+                                if ultimo_paragrafo:
+                                    new_p_elem = OxmlElement('w:p')
+                                    ultimo_paragrafo._element.addnext(new_p_elem)
+                                    new_p = type(ultimo_paragrafo)(new_p_elem, ultimo_paragrafo._parent)
+                                    
+                                    run = new_p.add_run()
+                                    run.text = clausula['texto']
+                                    run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                                    print(f"  ✅ Adicionada cláusula específica no final: {clausula_info.get('descricao', 'N/A')}")
+                                    changes_applied += 1
+                                else:
+                                    print("  ⚠️ Não foi possível encontrar local apropriado para inserir cláusula")
                 except Exception as e:
                     print(f"  ❌ Erro ao processar cláusula: {e}")
                     continue

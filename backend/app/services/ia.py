@@ -328,7 +328,12 @@ INSTRUÇÕES:
 1. Identifique TODAS as cláusulas mencionadas no prompt
 2. Use sinônimos e variações (ex: "garantia de fornecimento" = "fornecimento de garantia")
 3. Seja flexível com a ordem das palavras
-4. Retorne APENAS o JSON, sem explicações
+4. Para cada cláusula, determine:
+   - O tipo correto
+   - A descrição original do usuário
+   - Se deve ter observação prática
+5. NÃO force posições específicas - deixe isso para análise posterior do documento
+6. Retorne APENAS o JSON, sem explicações
 
 FORMATO DE RESPOSTA:
 {
@@ -338,7 +343,8 @@ FORMATO DE RESPOSTA:
       "descricao": "descrição original do usuário",
       "confianca": 0.9
     }
-  ]
+  ],
+  "observacao_pratica": true/false
 }"""
 
         user_prompt_ia = f"""Analise este prompt e identifique todas as cláusulas específicas solicitadas:
@@ -416,6 +422,146 @@ def extrair_clausulas_fallback(user_prompt):
             })
     
     return clausulas_especificas
+
+
+def analisar_documento_e_posicionar_clausulas_com_ia(doc, clausulas_especificas, user_prompt):
+    """
+    Usa IA para analisar o documento e determinar o posicionamento ideal das cláusulas.
+    A IA analisa a estrutura real do documento e decide onde inserir cada cláusula.
+    
+    Args:
+        doc: Documento docx
+        clausulas_especificas: Lista de cláusulas detectadas
+        user_prompt: Prompt original do usuário
+    
+    Returns:
+        dict: Informações de posicionamento para cada cláusula
+    """
+    try:
+        from openai import OpenAI
+        from django.conf import settings
+        import re
+        
+        client = OpenAI(api_key=getattr(settings, 'OPENAI_API_KEY', ''))
+        
+        # Analisar estrutura completa do documento
+        estrutura_doc = []
+        for i, p in enumerate(doc.paragraphs):
+            texto = p.text.strip()
+            if texto:  # Todos os parágrafos com conteúdo
+                # Extrair numeração se existir
+                numeracao_match = re.search(r'(\d+\.\d+\.?\d*)', texto)
+                numeracao = numeracao_match.group(1) if numeracao_match else None
+                
+                # Extrair palavras-chave para contexto
+                palavras_chave = []
+                if 'julgamento' in texto.lower():
+                    palavras_chave.append('julgamento')
+                if 'garantia' in texto.lower():
+                    palavras_chave.append('garantia')
+                if 'penalidade' in texto.lower():
+                    palavras_chave.append('penalidade')
+                if 'prazo' in texto.lower():
+                    palavras_chave.append('prazo')
+                if 'documentação' in texto.lower():
+                    palavras_chave.append('documentação')
+                if 'desempate' in texto.lower():
+                    palavras_chave.append('desempate')
+                
+                estrutura_doc.append({
+                    'linha': i + 1,
+                    'texto': texto[:150] + '...' if len(texto) > 150 else texto,
+                    'numeracao': numeracao,
+                    'palavras_chave': palavras_chave
+                })
+        
+        system_prompt = """Você é um especialista em estruturação de editais de licitação.
+
+Analise a estrutura do documento e determine o posicionamento ideal para as cláusulas solicitadas.
+
+INSTRUÇÕES:
+1. Analise a estrutura real do documento
+2. Identifique seções apropriadas para cada tipo de cláusula
+3. Considere a numeração existente e mantenha sequência lógica
+4. Posicione cláusulas em seções que façam sentido contextualmente
+5. Seja flexível - não force seções específicas se não fizerem sentido
+6. Para cada cláusula, determine:
+   - Seção ideal (ex: 3.4, 4.2, 5.1, etc.)
+   - Número sequencial apropriado
+   - Posição relativa (após qual cláusula inserir)
+
+Retorne APENAS o JSON com as posições calculadas."""
+
+        user_prompt_ia = f"""Estrutura do documento (primeiros 30 parágrafos):
+{estrutura_doc[:30]}
+
+Cláusulas a posicionar:
+{[c['tipo'] + ': ' + c['descricao'] for c in clausulas_especificas]}
+
+Prompt do usuário: "{user_prompt}"
+
+Analise o documento e determine onde cada cláusula deve ser inserida para manter a lógica e estrutura do edital."""
+
+        response = client.chat.completions.create(
+            model=getattr(settings, 'AI_MODEL', 'gpt-3.5-turbo'),
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt_ia}
+            ],
+            max_tokens=1500,
+            temperature=0.1,
+            response_format={"type": "json_object"}
+        )
+        
+        # Parsear resposta
+        raw_response = response.choices[0].message.content
+        parsed = json.loads(raw_response)
+        
+        logger.info(f"IA analisou documento e determinou posicionamento para {len(clausulas_especificas)} cláusulas")
+        return parsed
+        
+    except Exception as e:
+        logger.error(f"Erro ao analisar documento com IA: {e}")
+        # Fallback para análise básica
+        return analisar_documento_basico(doc, clausulas_especificas)
+
+
+def analisar_documento_basico(doc, clausulas_especificas):
+    """
+    Análise básica de fallback quando a IA falha.
+    """
+    import re
+    
+    # Encontrar seções 3.4.x como fallback
+    clausulas_3_4 = []
+    for i, p in enumerate(doc.paragraphs):
+        texto = p.text.strip()
+        match = re.search(r'(?<!\d)3\.4\.(\d+)', texto)
+        if match:
+            clausulas_3_4.append({
+                'linha': i + 1,
+                'numero': int(match.group(1)),
+                'paragrafo': p
+            })
+    
+    if clausulas_3_4:
+        # Ordenar por número
+        clausulas_3_4.sort(key=lambda x: x['numero'])
+        ultimo_numero = clausulas_3_4[-1]['numero']
+        
+        return {
+            'estrategia': 'sequencial_3_4',
+            'secao_alvo': '3.4.x',
+            'inserir_apos': f'3.4.{ultimo_numero}',
+            'proximo_numero': ultimo_numero + 1
+        }
+    else:
+        # Fallback genérico
+        return {
+            'estrategia': 'final_documento',
+            'secao_alvo': 'final',
+            'inserir_apos': 'ultimo_paragrafo'
+        }
 
 
 def gerar_clausula_especifica(tipo_clausula, descricao):

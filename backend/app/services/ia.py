@@ -47,7 +47,9 @@ REGRAS:
 - Faça apenas as mudanças solicitadas
 - Procure valores em TODO o texto
 - Retorne apenas as substituições específicas
-- Seja preciso e direto"""
+- Seja preciso e direto
+- Para texto NOVO adicionado, use o formato: new: "[AZUL]texto adicionado[/AZUL]"
+- Para alterações simples, use: old: "texto antigo" e new: "texto novo" """
         
         user_prompt_full = f"""TEXTO DO DOCUMENTO:
 {document_text}
@@ -58,9 +60,18 @@ Procure no texto o valor que precisa ser alterado e retorne a substituição no 
 old: "texto original"
 new: "texto novo"
 
-Exemplo:
+Para ALTERAÇÕES de valores:
 old: "R$ 5.678.659,46"
-new: "R$ 2.500.000,00" """
+new: "R$ 2.500.000,00"
+
+Para ADIÇÃO de texto novo (cláusulas, parágrafos, etc.):
+old: ""
+new: "[AZUL]Texto novo que será adicionado ao documento[/AZUL]"
+
+IMPORTANTE: 
+- Use [AZUL]texto[/AZUL] apenas para texto NOVO que será adicionado ao documento
+- O texto será adicionado no local apropriado do documento
+- Não use quebras de linha especiais, apenas texto normal"""
         
         # Chamada para OpenAI
         response = client.chat.completions.create(
@@ -76,6 +87,9 @@ new: "R$ 2.500.000,00" """
         # Obter resposta
         raw_response = response.choices[0].message.content
         
+        # Log da resposta da IA
+        logger.info(f"Resposta da IA: {raw_response}")
+        
         # Processar resposta para extrair substituições
         changes = []
         lines = raw_response.split('\n')
@@ -89,8 +103,9 @@ new: "R$ 2.500.000,00" """
             elif line.strip().startswith('new:'):
                 new_text = line.split(':', 1)[1].strip().strip('"')
                 
-                if old_text and new_text:
+                if old_text is not None and new_text is not None:
                     changes.append({"old": old_text, "new": new_text})
+                    logger.info(f"Substituição encontrada: '{old_text}' -> '{new_text}'")
                     old_text = None
                     new_text = None
         
@@ -451,15 +466,34 @@ def apply_specific_changes(doc, changes):
         old_text = change.get("old", "")
         new_text = change.get("new", "")
         
-        if not old_text or not new_text:
+        if not new_text:
+            continue
+        
+        # Verificar se é texto novo sendo adicionado (com marcação [AZUL])
+        if "[AZUL]" in new_text and "[/AZUL]" in new_text:
+            # Extrair o texto que será adicionado
+            import re
+            azul_match = re.search(r'\[AZUL\](.*?)\[/AZUL\]', new_text)
+            if azul_match:
+                texto_para_adicionar = azul_match.group(1)
+                logger.info(f"Texto novo para adicionar: '{texto_para_adicionar}'")
+                
+                # Limpar o texto (remover \n\n e quebras de linha)
+                texto_limpo = texto_para_adicionar.replace('\\n\\n', '\n').replace('\\n', '\n')
+                
+                # Adicionar o texto no final do documento
+                novo_paragrafo = doc.add_paragraph(texto_limpo)
+                
+                changes_applied += 1
+                logger.info(f"Texto novo adicionado: '{texto_limpo[:100]}...'")
             continue
         
         # Extrair apenas o valor monetário para substituição
-        import re
         old_value = None
         new_value = None
         
         # Procurar por padrão de valor monetário
+        import re
         old_match = re.search(r'R\$\s*([\d.,]+)', old_text)
         new_match = re.search(r'R\$\s*([\d.,]+)', new_text)
         

@@ -271,36 +271,8 @@ def generate_document_data_from_prompt(template, user_prompt, llm_api_key=None):
     # Detectar se deve adicionar observação prática
     adicionar_observacao_pratica = 'observação' in user_prompt.lower() and 'prática' in user_prompt.lower()
     
-    # Extrair cláusulas específicas solicitadas
-    clausulas_especificas = []
-    
-    # Detectar cláusulas específicas no prompt
-    clausula_patterns = [
-        (r'cláusula\s+de\s+([^,\.]+)', 'clausula'),
-        (r'adicionar\s+uma\s+cláusula\s+sobre\s+([^,\.]+)', 'clausula'),
-        (r'incluir\s+cláusula\s+de\s+([^,\.]+)', 'clausula'),
-        (r'garantia\s+de\s+execução', 'garantia_execucao'),
-        (r'penalidade\s+por\s+atraso', 'penalidade_atraso'),
-        (r'fornecimento\s+de\s+garantia', 'fornecimento_garantia'),
-        (r'critério\s+de\s+desempate', 'criterio_desempate'),
-        (r'prazo\s+de\s+entrega', 'prazo_entrega'),
-        (r'documentação\s+complementar', 'documentacao_complementar'),
-    ]
-    
-    for pattern, tipo in clausula_patterns:
-        matches = re.findall(pattern, user_prompt, re.IGNORECASE)
-        for match in matches:
-            # match pode ser uma string ou uma tupla
-            if isinstance(match, tuple):
-                descricao = match[0] if match else ''
-            else:
-                descricao = match if match else ''
-            
-            clausulas_especificas.append({
-                'tipo': tipo,
-                'descricao': descricao,
-                'texto_completo': descricao
-            })
+    # Extrair cláusulas específicas solicitadas usando IA
+    clausulas_especificas = extrair_clausulas_com_ia(user_prompt)
     
     # Retornar dados estruturados para renderização contextual
     return {
@@ -317,6 +289,133 @@ def generate_document_data_from_prompt(template, user_prompt, llm_api_key=None):
         'clausulas_especificas': clausulas_especificas,
         'user_prompt': user_prompt
     }
+
+
+def extrair_clausulas_com_ia(user_prompt):
+    """
+    Usa IA para extrair cláusulas específicas do prompt de forma inteligente.
+    Reconhece diferentes variações e formatos de solicitação de cláusulas.
+    
+    Args:
+        user_prompt: Prompt do usuário
+    
+    Returns:
+        list: Lista de cláusulas detectadas com tipo e descrição
+    """
+    try:
+        from openai import OpenAI
+        from django.conf import settings
+        
+        client = OpenAI(api_key=getattr(settings, 'OPENAI_API_KEY', ''))
+        
+        system_prompt = """Você é um especialista em licitações públicas e Lei 14.133/2021.
+
+Analise o prompt do usuário e identifique todas as cláusulas específicas solicitadas, independente da ordem das palavras ou formato.
+
+TIPOS DE CLÁUSULAS RECONHECIDAS:
+- garantia_execucao: Garantia de execução, garantia contratual, caução
+- penalidade_atraso: Penalidade por atraso, multa por atraso, penalidade
+- fornecimento_garantia: Garantia de fornecimento, garantia de qualidade, garantia de produtos
+- criterio_desempate: Critério de desempate, desempate, critério de classificação
+- prazo_entrega: Prazo de entrega, prazo de fornecimento, prazo de entrega
+- documentacao_complementar: Documentação complementar, documentos adicionais
+- julgamento_tecnica_preco: Julgamento por técnica e preço, critério de julgamento
+- garantia_qualidade: Garantia de qualidade, garantia de conformidade
+- prazo_execucao: Prazo de execução, prazo contratual
+- reajuste_precos: Reajuste de preços, atualização de preços
+
+INSTRUÇÕES:
+1. Identifique TODAS as cláusulas mencionadas no prompt
+2. Use sinônimos e variações (ex: "garantia de fornecimento" = "fornecimento de garantia")
+3. Seja flexível com a ordem das palavras
+4. Retorne APENAS o JSON, sem explicações
+
+FORMATO DE RESPOSTA:
+{
+  "clausulas": [
+    {
+      "tipo": "tipo_da_clausula",
+      "descricao": "descrição original do usuário",
+      "confianca": 0.9
+    }
+  ]
+}"""
+
+        user_prompt_ia = f"""Analise este prompt e identifique todas as cláusulas específicas solicitadas:
+
+"{user_prompt}"
+
+Retorne apenas o JSON com as cláusulas detectadas."""
+
+        response = client.chat.completions.create(
+            model=getattr(settings, 'AI_MODEL', 'gpt-3.5-turbo'),
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt_ia}
+            ],
+            max_tokens=1000,
+            temperature=0.1,
+            response_format={"type": "json_object"}
+        )
+        
+        # Parsear resposta
+        raw_response = response.choices[0].message.content
+        parsed = json.loads(raw_response)
+        
+        clausulas_detectadas = []
+        for clausula in parsed.get('clausulas', []):
+            clausulas_detectadas.append({
+                'tipo': clausula.get('tipo', 'clausula'),
+                'descricao': clausula.get('descricao', ''),
+                'texto_completo': clausula.get('descricao', ''),
+                'confianca': clausula.get('confianca', 0.8)
+            })
+        
+        logger.info(f"IA detectou {len(clausulas_detectadas)} cláusulas: {[c['tipo'] for c in clausulas_detectadas]}")
+        return clausulas_detectadas
+        
+    except Exception as e:
+        logger.error(f"Erro ao extrair cláusulas com IA: {e}")
+        # Fallback para detecção básica
+        return extrair_clausulas_fallback(user_prompt)
+
+
+def extrair_clausulas_fallback(user_prompt):
+    """
+    Fallback para detecção básica de cláusulas quando a IA falha.
+    """
+    clausulas_especificas = []
+    
+    # Padrões básicos como fallback
+    clausula_patterns = [
+        (r'cláusula\s+de\s+([^,\.]+)', 'clausula'),
+        (r'adicionar\s+uma\s+cláusula\s+sobre\s+([^,\.]+)', 'clausula'),
+        (r'incluir\s+cláusula\s+de\s+([^,\.]+)', 'clausula'),
+        (r'garantia\s+de\s+execução', 'garantia_execucao'),
+        (r'penalidade\s+por\s+atraso', 'penalidade_atraso'),
+        (r'garantia\s+de\s+fornecimento', 'fornecimento_garantia'),
+        (r'fornecimento\s+de\s+garantia', 'fornecimento_garantia'),
+        (r'critério\s+de\s+desempate', 'criterio_desempate'),
+        (r'prazo\s+de\s+entrega', 'prazo_entrega'),
+        (r'documentação\s+complementar', 'documentacao_complementar'),
+    ]
+    
+    for pattern, tipo in clausula_patterns:
+        matches = re.findall(pattern, user_prompt, re.IGNORECASE)
+        for match in matches:
+            if isinstance(match, tuple):
+                descricao = match[0] if match else ''
+            else:
+                descricao = match if match else ''
+            
+            clausulas_especificas.append({
+                'tipo': tipo,
+                'descricao': descricao,
+                'texto_completo': descricao,
+                'confianca': 0.7
+            })
+    
+    return clausulas_especificas
 
 
 def gerar_clausula_especifica(tipo_clausula, descricao):
@@ -361,6 +460,26 @@ def gerar_clausula_especifica(tipo_clausula, descricao):
             'texto': '''3.4.21. DOCUMENTAÇÃO COMPLEMENTAR: O contratado deverá apresentar, no prazo de 5 (cinco) dias úteis após a assinatura do contrato, a documentação complementar especificada no Anexo II, conforme art. 25 da Lei 14.133/2021.''',
             'base_legal': 'Art. 25 da Lei 14.133/2021',
             'observacao': 'A não apresentação da documentação no prazo estabelecido implicará rescisão do contrato.'
+        },
+        'julgamento_tecnica_preco': {
+            'texto': '''3.4.22. JULGAMENTO POR TÉCNICA E PREÇO: O julgamento das propostas será realizado mediante análise técnica e de preço, conforme disposto no art. 46 da Lei 14.133/2021, considerando os critérios de aceitabilidade e economicidade.''',
+            'base_legal': 'Art. 46 da Lei 14.133/2021',
+            'observacao': 'A análise técnica será realizada por comissão especializada designada pelo pregoeiro.'
+        },
+        'garantia_qualidade': {
+            'texto': '''3.4.23. GARANTIA DE QUALIDADE: O fornecedor garantirá a qualidade e conformidade dos produtos fornecidos, conforme especificações técnicas, pelo prazo de 90 (noventa) dias após a entrega, nos termos do art. 59 da Lei 14.133/2021.''',
+            'base_legal': 'Art. 59 da Lei 14.133/2021',
+            'observacao': 'A garantia de qualidade é independente da garantia de execução do contrato.'
+        },
+        'prazo_execucao': {
+            'texto': '''3.4.24. PRAZO DE EXECUÇÃO: O prazo para execução do contrato será de 180 (cento e oitenta) dias corridos, contados a partir da assinatura do contrato, conforme cronograma físico-financeiro anexo, nos termos do art. 40 da Lei 14.133/2021.''',
+            'base_legal': 'Art. 40 da Lei 14.133/2021',
+            'observacao': 'O prazo poderá ser prorrogado mediante justificativa técnica devidamente fundamentada.'
+        },
+        'reajuste_precos': {
+            'texto': '''3.4.25. REAJUSTE DE PREÇOS: Os preços serão reajustados mensalmente pelo Índice Nacional de Preços ao Consumidor Amplo (IPCA), conforme art. 60 da Lei 14.133/2021, a partir do 13º mês de vigência do contrato.''',
+            'base_legal': 'Art. 60 da Lei 14.133/2021',
+            'observacao': 'O reajuste será aplicado automaticamente, sem necessidade de termo aditivo.'
         }
     }
     

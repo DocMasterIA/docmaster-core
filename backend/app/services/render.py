@@ -286,10 +286,11 @@ def add_expert_content(doc, user_prompt, field_map=None):
                     # Encontrar local apropriado para adicionar a cláusula (sequência 3.4.x)
                     # Estratégia: encontrar a seção 3.4.x e inserir na sequência correta
                     
-                    # 1. Encontrar todos os parágrafos com numeração 3.4.x
+                    # 1. Encontrar todos os parágrafos com numeração 3.4.x (não 13.4.x)
                     clausulas_3_4 = []
                     for i, p in enumerate(doc.paragraphs):
-                        match = re.search(r'3\.4\.(\d+)', p.text)
+                        # Regex mais específico: deve começar com 3.4. e não ser precedido por dígito
+                        match = re.search(r'(?<!\d)3\.4\.(\d+)', p.text)
                         if match:
                             clausulas_3_4.append({
                                 'indice': i,
@@ -363,10 +364,11 @@ def add_expert_content(doc, user_prompt, field_map=None):
         if adicionar_clausula and not clausulas_especificas:
             print("  ⚖️ Adicionando cláusula de julgamento")
             
-            # Encontrar seção 3.4.x para inserir
+            # Encontrar seção 3.4.x para inserir (não 13.4.x)
             clausulas_3_4 = []
             for i, p in enumerate(doc.paragraphs):
-                match = re.search(r'3\.4\.(\d+)', p.text)
+                # Regex mais específico: deve começar com 3.4. e não ser precedido por dígito
+                match = re.search(r'(?<!\d)3\.4\.(\d+)', p.text)
                 if match:
                     clausulas_3_4.append({
                         'indice': i,

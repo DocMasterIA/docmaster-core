@@ -122,7 +122,11 @@ def render_docx_contextual_intelligent(template_path: str, output_path: str, val
     field_map = {}
     for key, value in values.items():
         if value is not None:
-            field_map[key] = str(value)
+            # Não converter listas e dicionários para string
+            if isinstance(value, (list, dict)):
+                field_map[key] = value
+            else:
+                            field_map[key] = str(value)
     
     # Análise contextual do documento
     context_analysis = analyze_document_context(doc, user_prompt)
@@ -236,25 +240,19 @@ def add_expert_content(doc, user_prompt, field_map=None):
                         print(f"  ✅ Número alterado: {old_text} -> {run.text}")
                         changes_applied += 1
     
-    # 3.1. Análise inteligente de números simples (sem palavra-chave)
-    numero_simples = re.findall(r'(\d+/\d+)', user_prompt)
-    if numero_simples:
-        print(f"  📋 Números simples detectados no prompt: {numero_simples}")
-        for numero in numero_simples:
-            # Procurar e substituir números de edital
-            for paragraph in doc.paragraphs:
-                for run in paragraph.runs:
-                    if re.search(r'\d+/\d+', run.text):
-                        old_text = run.text
-                        run.text = re.sub(r'\d+/\d+', numero, old_text)
-                        run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
-                        print(f"  ✅ Número simples alterado: {old_text} -> {run.text}")
-                        changes_applied += 1
+    # 3.1. Substituições contextuais inteligentes (MELHORADO)
+    changes_applied += apply_contextual_intelligent_replacements(doc, field_map, user_prompt)
     
     # 4. Análise inteligente de conteúdo a ser adicionado
     # Usar dados estruturados primeiro, depois fallback para análise do prompt
-    adicionar_clausula = field_map.get('adicionar_clausula_julgamento', False)
-    adicionar_observacao = field_map.get('adicionar_observacao_pratica', False)
+    adicionar_clausula = field_map.get('adicionar_clausula_julgamento', False) if field_map else False
+    adicionar_observacao = field_map.get('adicionar_observacao_pratica', False) if field_map else False
+    clausulas_especificas = field_map.get('clausulas_especificas', []) if field_map else []
+    
+    # Garantir que clausulas_especificas é uma lista
+    if not isinstance(clausulas_especificas, list):
+        print(f"  ⚠️ clausulas_especificas não é uma lista: {type(clausulas_especificas)}")
+        clausulas_especificas = []
     
     # Fallback para análise do prompt se dados estruturados não estiverem disponíveis
     if not adicionar_clausula and ("adicionar" in user_prompt.lower() or "incluir" in user_prompt.lower()):
@@ -263,8 +261,78 @@ def add_expert_content(doc, user_prompt, field_map=None):
     if not adicionar_observacao and ("adicionar" in user_prompt.lower() or "incluir" in user_prompt.lower()):
         adicionar_observacao = "observação" in user_prompt.lower() and "prática" in user_prompt.lower()
     
-    if adicionar_clausula or adicionar_observacao:
+    if adicionar_clausula or adicionar_observacao or clausulas_especificas:
         print("  📝 Analisando conteúdo para adicionar...")
+        
+        # Adicionar cláusulas específicas solicitadas
+        if clausulas_especificas:
+            print(f"  📋 Processando {len(clausulas_especificas)} cláusula(s) específica(s)...")
+            for clausula_info in clausulas_especificas:
+                try:
+                    from backend.app.services.ia import gerar_clausula_especifica
+                    
+                    # Verificar se clausula_info é um dicionário
+                    if not isinstance(clausula_info, dict):
+                        print(f"  ❌ Cláusula não é um dicionário: {type(clausula_info)}")
+                        continue
+                    
+                    clausula = gerar_clausula_especifica(
+                        clausula_info.get('tipo', 'clausula'), 
+                        clausula_info.get('descricao', '')
+                    )
+                    
+                    print(f"  ⚖️ Adicionando cláusula: {clausula_info.get('descricao', 'N/A')}")
+                    
+                    # Encontrar local apropriado para adicionar a cláusula (sequência 3.4.x)
+                    # Primeiro, encontrar todos os parágrafos com numeração 3.4.x
+                    clausulas_existentes = []
+                    for i, p in enumerate(doc.paragraphs):
+                        match = re.search(r'3\.4\.(\d+)', p.text)
+                        if match:
+                            clausulas_existentes.append({
+                                'indice': i,
+                                'numero': int(match.group(1)),
+                                'paragrafo': p
+                            })
+                    
+                    # Ordenar por número
+                    clausulas_existentes.sort(key=lambda x: x['numero'])
+                    
+                    # Encontrar o local correto para inserir (após a última cláusula 3.4.x)
+                    if clausulas_existentes:
+                        ultima_clausula = clausulas_existentes[-1]
+                        print(f"  📍 Encontrado {len(clausulas_existentes)} cláusulas 3.4.x existentes, inserindo após 3.4.{ultima_clausula['numero']}")
+                        
+                        # Adicionar cláusula específica após a última cláusula existente
+                        new_p_elem = OxmlElement('w:p')
+                        ultima_clausula['paragrafo']._element.addnext(new_p_elem)
+                        new_p = type(ultima_clausula['paragrafo'])(new_p_elem, ultima_clausula['paragrafo']._parent)
+                        
+                        run = new_p.add_run()
+                        run.text = clausula['texto']
+                        run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                        print(f"  ✅ Adicionada cláusula específica: {clausula_info.get('descricao', 'N/A')}")
+                        changes_applied += 1
+                    else:
+                        # Fallback: procurar por qualquer parágrafo de julgamento
+                        for i, p in enumerate(doc.paragraphs):
+                            if "julgamento" in p.text.lower() and "proposta" in p.text.lower():
+                                print(f"  📍 Encontrado parágrafo de julgamento (fallback): {i+1}")
+                                
+                                # Adicionar cláusula específica
+                                new_p_elem = OxmlElement('w:p')
+                                p._element.addnext(new_p_elem)
+                                new_p = type(p)(new_p_elem, p._parent)
+                                
+                                run = new_p.add_run()
+                                run.text = clausula['texto']
+                                run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                                print(f"  ✅ Adicionada cláusula específica: {clausula_info.get('descricao', 'N/A')}")
+                                changes_applied += 1
+                                break
+                except Exception as e:
+                    print(f"  ❌ Erro ao processar cláusula: {e}")
+                    continue
         
         # Adicionar cláusula de julgamento
         if adicionar_clausula:
@@ -508,3 +576,219 @@ def render_docx_intelligent(template_path: str, output_path: str, values: dict):
     
     doc.save(output_path)
     return output_path
+
+def apply_contextual_intelligent_replacements(doc, field_map, user_prompt):
+    """
+    Aplica substituições contextuais inteligentes, preservando referências legais
+    e fazendo alterações apenas no contexto apropriado.
+    """
+    from docx.shared import RGBColor
+    import re
+    
+    changes_applied = 0
+    
+    print("  🧠 Aplicando substituições contextuais inteligentes...")
+    
+    # Padrões que devem ser preservados (referências legais)
+    LEGAL_PATTERNS = [
+        r'Lei\s+\d+\.\d+/\d+',           # Lei 14.133/2021
+        r'Lei\s+n\.\d+',                 # Lei n.º 14.133
+        r'Lei\s+nº\s+\d+',               # Lei nº 14.133
+        r'Decreto\s+\d+\.\d+/\d+',       # Decreto 10.024/19
+        r'Decreto\s+Federal\s+\d+\.\d+/\d+', # Decreto Federal 10.024/19
+        r'Lei\s+Complementar\s+\d+/\d+', # Lei Complementar 123/2006
+        r'Lei\s+Complementar\s+nº\s+\d+/\d+', # Lei Complementar nº 123/2006
+        r'art\.\s+\d+',                  # art. 156
+        r'artigo\s+\d+',                 # artigo 156
+        r'§\d+',                         # §5º
+        r'parágrafo\s+\d+',              # parágrafo 1º
+        r'parágrafo\s+\d+º',             # parágrafo 1º
+        r'inciso\s+[IVX]+',              # inciso I, IV
+        r'inciso\s+\d+',                 # inciso 1, 2
+        # Padrões mais específicos para evitar falsos positivos
+        r'Lei\s+Federal\s+nº\s+\d+\.\d+/\d+', # Lei Federal nº 14.133/2021
+        r'Lei\s+Complementar\s+n\.\d+',  # Lei Complementar n.º 123
+        r'Decreto\s+n\.\d+',             # Decreto n.º 10.024
+        r'Decreto\s+nº\s+\d+',           # Decreto nº 10.024
+    ]
+    
+    def is_legal_reference(text):
+        """Verifica se o texto contém referências legais que devem ser preservadas"""
+        # Verificar padrões específicos de referências legais
+        legal_indicators = [
+            'Lei', 'Decreto', 'art.', 'artigo', '§', 'parágrafo', 'inciso',
+            'Lei Federal', 'Lei Complementar', 'Decreto Federal'
+        ]
+        
+        # Se contém indicadores legais, verificar se é realmente uma referência
+        has_legal_indicator = any(indicator in text for indicator in legal_indicators)
+        if not has_legal_indicator:
+            return False
+        
+        # Verificar padrões específicos
+        return any(re.search(pattern, text, re.IGNORECASE) for pattern in LEGAL_PATTERNS)
+    
+    def should_replace_in_context(text, replacement_type):
+        """Verifica se deve fazer substituição baseado no contexto"""
+        if is_legal_reference(text):
+            return False
+        
+        if replacement_type == 'edital':
+            # Verificar se é realmente um número de edital, não uma referência legal
+            edital_indicators = ['EDITAL', 'edital', 'PREGÃO', 'pregão', 'SRP']
+            has_edital_indicator = any(indicator in text.upper() for indicator in edital_indicators)
+            has_number_pattern = bool(re.search(r'\d+/\d+', text))
+            
+            # Não substituir se contém referências legais
+            legal_indicators = ['Lei', 'Decreto', 'art.', 'artigo', '§', 'parágrafo', 'inciso']
+            has_legal_indicator = any(indicator in text for indicator in legal_indicators)
+            
+            return has_edital_indicator and has_number_pattern and not has_legal_indicator
+            
+        elif replacement_type == 'data':
+            return any(word in text.lower() for word in ['abertura', 'sessão', 'julgamento', 'dia'])
+        elif replacement_type == 'valor':
+            return 'R$' in text or 'valor' in text.lower()
+        elif replacement_type == 'local':
+            return any(word in text.upper() for word in ['MUNICÍPIO', 'PREFEITURA', 'ITAJÁ', 'BRASÍLIA'])
+        
+        return False
+    
+    # 1. Substituições de números de edital (contextual)
+    if 'numero_edital' in field_map and field_map['numero_edital']:
+        numero_edital = field_map['numero_edital']
+        for paragraph in doc.paragraphs:
+            for run in paragraph.runs:
+                if should_replace_in_context(run.text, 'edital') and re.search(r'\d+/\d+', run.text):
+                    old_text = run.text
+                    # Substituir apenas números de edital, não referências legais
+                    if 'EDITAL' in old_text.upper() and not is_legal_reference(old_text):
+                        # Padrões específicos para números de edital
+                        patterns = [
+                            r'EDITAL\s*N[.º]?\s*\d+/\d+',
+                            r'Edital\s*N[.º]?\s*\d+/\d+',
+                            r'edital\s*N[.º]?\s*\d+/\d+',
+                            r'PREGÃO\s*ELETRÔNICO\s*SRP\s*N[.º]?\s*\d+/\d+',
+                            r'Pregão\s*Eletrônico\s*SRP\s*N[.º]?\s*\d+/\d+',
+                        ]
+                        
+                        new_text = old_text
+                        for pattern in patterns:
+                            if re.search(pattern, new_text, re.IGNORECASE):
+                                new_text = re.sub(pattern, f'EDITAL N. {numero_edital}', new_text, flags=re.IGNORECASE)
+                                break
+                        
+                        if new_text != old_text:
+                            run.text = new_text
+                            run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                            print(f"  ✅ Edital alterado: {old_text} -> {new_text}")
+                            changes_applied += 1
+    
+    # 2. Substituições de data (contextual)
+    if 'data_abertura' in field_map and field_map['data_abertura']:
+        data_abertura = field_map['data_abertura']
+        for paragraph in doc.paragraphs:
+            for run in paragraph.runs:
+                if should_replace_in_context(run.text, 'data') and re.search(r'\d{1,2}/\d{1,2}/\d{4}', run.text):
+                    old_text = run.text
+                    # Substituir apenas datas de abertura/sessão, não referências legais
+                    if any(word in old_text.lower() for word in ['abertura', 'sessão', 'julgamento']):
+                        new_text = re.sub(r'\d{1,2}/\d{1,2}/\d{4}', data_abertura, old_text)
+                        if new_text != old_text:
+                            run.text = new_text
+                            run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                            print(f"  ✅ Data alterada: {old_text} -> {new_text}")
+                            changes_applied += 1
+    
+    # 3. Substituições de valor (contextual)
+    if 'valor_estimado' in field_map and field_map['valor_estimado']:
+        valor = field_map['valor_estimado']
+        try:
+            valor_float = float(valor)
+            valor_formatado = f"R$ {valor_float:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        except:
+            valor_formatado = f"R$ {valor}"
+        
+        for paragraph in doc.paragraphs:
+            for run in paragraph.runs:
+                if should_replace_in_context(run.text, 'valor') and 'R$' in run.text:
+                    old_text = run.text
+                    new_text = re.sub(r'R\$\s*[\d.,]+', valor_formatado, old_text)
+                    if new_text != old_text:
+                        run.text = new_text
+                        run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                        print(f"  ✅ Valor alterado: {old_text} -> {new_text}")
+                        changes_applied += 1
+    
+    # 4. Substituições de local (contextual)
+    if 'local_orgao' in field_map and field_map['local_orgao'] == 'BRASÍLIA':
+        for paragraph in doc.paragraphs:
+            for run in paragraph.runs:
+                if should_replace_in_context(run.text, 'local') and 'ITAJÁ' in run.text:
+                    old_text = run.text
+                    new_text = old_text.replace('ITAJÁ', 'BRASÍLIA')
+                    if new_text != old_text:
+                        run.text = new_text
+                        run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                        print(f"  ✅ Local alterado: {old_text} -> {new_text}")
+                        changes_applied += 1
+    
+    # 5. Substituições em tabelas (contextual)
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    for run in paragraph.runs:
+                        # Aplicar as mesmas regras contextuais nas tabelas
+                        if should_replace_in_context(run.text, 'edital') and re.search(r'\d+/\d+', run.text):
+                            old_text = run.text
+                            if 'EDITAL' in old_text.upper() and not is_legal_reference(old_text):
+                                # Padrões específicos para números de edital em tabelas
+                                patterns = [
+                                    r'EDITAL\s*N[.º]?\s*\d+/\d+',
+                                    r'Edital\s*N[.º]?\s*\d+/\d+',
+                                    r'edital\s*N[.º]?\s*\d+/\d+',
+                                    r'PREGÃO\s*ELETRÔNICO\s*SRP\s*N[.º]?\s*\d+/\d+',
+                                    r'Pregão\s*Eletrônico\s*SRP\s*N[.º]?\s*\d+/\d+',
+                                ]
+                                
+                                new_text = old_text
+                                for pattern in patterns:
+                                    if re.search(pattern, new_text, re.IGNORECASE):
+                                        new_text = re.sub(pattern, f'EDITAL N. {field_map.get("numero_edital", "")}', new_text, flags=re.IGNORECASE)
+                                        break
+                                
+                                if new_text != old_text:
+                                    run.text = new_text
+                                    run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                                    print(f"  ✅ Edital (tabela) alterado: {old_text} -> {new_text}")
+                                    changes_applied += 1
+                        
+                        if should_replace_in_context(run.text, 'data') and re.search(r'\d{1,2}/\d{1,2}/\d{4}', run.text):
+                            old_text = run.text
+                            if any(word in old_text.lower() for word in ['abertura', 'sessão', 'julgamento']):
+                                new_text = re.sub(r'\d{1,2}/\d{1,2}/\d{4}', field_map.get("data_abertura", ""), old_text)
+                                if new_text != old_text:
+                                    run.text = new_text
+                                    run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                                    print(f"  ✅ Data (tabela) alterada: {old_text} -> {new_text}")
+                                    changes_applied += 1
+                        
+                        if should_replace_in_context(run.text, 'valor') and 'R$' in run.text:
+                            old_text = run.text
+                            valor = field_map.get('valor_estimado', '')
+                            if valor:
+                                try:
+                                    valor_float = float(valor)
+                                    valor_formatado = f"R$ {valor_float:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                                except:
+                                    valor_formatado = f"R$ {valor}"
+                                new_text = re.sub(r'R\$\s*[\d.,]+', valor_formatado, old_text)
+                                if new_text != old_text:
+                                    run.text = new_text
+                                    run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                                    print(f"  ✅ Valor (tabela) alterado: {old_text} -> {new_text}")
+                                    changes_applied += 1
+    
+    print(f"  📊 Substituições contextuais aplicadas: {changes_applied}")
+    return changes_applied

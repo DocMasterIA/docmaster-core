@@ -222,9 +222,22 @@ def generate_document_data_from_prompt(template, user_prompt, llm_api_key=None):
     
     # Extrair número do edital do prompt se mencionado
     numero_edital = '001/2024'  # Valor padrão
-    numero_match = re.search(r'(\d+/\d+)', user_prompt)
-    if numero_match:
-        numero_edital = numero_match.group(1)
+    
+    # Procurar especificamente por "número do edital" ou "edital" seguido de número
+    edital_patterns = [
+        r'edital\s+para\s+(\d+/\d+)',  # "edital para 456/2024"
+        r'edital\s+(\d+/\d+)',         # "edital 456/2024"
+        r'número\s+do\s+edital\s+para\s+(\d+/\d+)',  # "número do edital para 456/2024"
+        r'número\s+do\s+edital\s+(\d+/\d+)',         # "número do edital 456/2024"
+        r'altere\s+o\s+número\s+do\s+edital\s+para\s+(\d+/\d+)',  # "altere o número do edital para 456/2024"
+        r'altere\s+o\s+número\s+do\s+edital\s+(\d+/\d+)',         # "altere o número do edital 456/2024"
+    ]
+    
+    for pattern in edital_patterns:
+        numero_match = re.search(pattern, user_prompt, re.IGNORECASE)
+        if numero_match:
+            numero_edital = numero_match.group(1)
+            break
     
     # Extrair data de abertura
     data_abertura = None
@@ -258,6 +271,37 @@ def generate_document_data_from_prompt(template, user_prompt, llm_api_key=None):
     # Detectar se deve adicionar observação prática
     adicionar_observacao_pratica = 'observação' in user_prompt.lower() and 'prática' in user_prompt.lower()
     
+    # Extrair cláusulas específicas solicitadas
+    clausulas_especificas = []
+    
+    # Detectar cláusulas específicas no prompt
+    clausula_patterns = [
+        (r'cláusula\s+de\s+([^,\.]+)', 'clausula'),
+        (r'adicionar\s+uma\s+cláusula\s+sobre\s+([^,\.]+)', 'clausula'),
+        (r'incluir\s+cláusula\s+de\s+([^,\.]+)', 'clausula'),
+        (r'garantia\s+de\s+execução', 'garantia_execucao'),
+        (r'penalidade\s+por\s+atraso', 'penalidade_atraso'),
+        (r'fornecimento\s+de\s+garantia', 'fornecimento_garantia'),
+        (r'critério\s+de\s+desempate', 'criterio_desempate'),
+        (r'prazo\s+de\s+entrega', 'prazo_entrega'),
+        (r'documentação\s+complementar', 'documentacao_complementar'),
+    ]
+    
+    for pattern, tipo in clausula_patterns:
+        matches = re.findall(pattern, user_prompt, re.IGNORECASE)
+        for match in matches:
+            # match pode ser uma string ou uma tupla
+            if isinstance(match, tuple):
+                descricao = match[0] if match else ''
+            else:
+                descricao = match if match else ''
+            
+            clausulas_especificas.append({
+                'tipo': tipo,
+                'descricao': descricao,
+                'texto_completo': descricao
+            })
+    
     # Retornar dados estruturados para renderização contextual
     return {
         'numero_edital': numero_edital,
@@ -270,7 +314,65 @@ def generate_document_data_from_prompt(template, user_prompt, llm_api_key=None):
         'prazo_execucao': prazo_execucao,
         'adicionar_clausula_julgamento': adicionar_clausula_julgamento,
         'adicionar_observacao_pratica': adicionar_observacao_pratica,
+        'clausulas_especificas': clausulas_especificas,
         'user_prompt': user_prompt
+    }
+
+
+def gerar_clausula_especifica(tipo_clausula, descricao):
+    """
+    Gera cláusula específica baseada no tipo e descrição solicitada.
+    
+    Args:
+        tipo_clausula: Tipo da cláusula (garantia_execucao, penalidade_atraso, etc.)
+        descricao: Descrição específica da cláusula
+    
+    Returns:
+        dict: Cláusula com texto, base legal e observação prática
+    """
+    
+    clausulas_predefinidas = {
+        'garantia_execucao': {
+            'texto': '''3.4.16. GARANTIA DE EXECUÇÃO: O contratado deverá apresentar garantia de execução do contrato no valor de 5% (cinco por cento) do valor total do contrato, na forma de caução em dinheiro, títulos da dívida pública federal, estadual ou municipal, ou seguro-garantia, conforme disposto no art. 56 da Lei 14.133/2021.''',
+            'base_legal': 'Art. 56 da Lei 14.133/2021',
+            'observacao': 'A garantia deve ser apresentada no prazo de 5 dias úteis após a assinatura do contrato.'
+        },
+        'penalidade_atraso': {
+            'texto': '''3.4.17. PENALIDADE POR ATRASO: Em caso de atraso na execução do contrato, será aplicada multa de 0,5% (meio por cento) do valor do contrato por dia de atraso, limitada a 10% (dez por cento) do valor total, conforme art. 57 da Lei 14.133/2021.''',
+            'base_legal': 'Art. 57 da Lei 14.133/2021',
+            'observacao': 'O atraso será contado a partir do prazo estabelecido no cronograma físico-financeiro.'
+        },
+        'fornecimento_garantia': {
+            'texto': '''3.4.18. GARANTIA DE FORNECIMENTO: O fornecedor deverá apresentar garantia de fornecimento no valor de 2% (dois por cento) do valor total do contrato, garantindo a qualidade e conformidade dos produtos fornecidos, conforme art. 58 da Lei 14.133/2021.''',
+            'base_legal': 'Art. 58 da Lei 14.133/2021',
+            'observacao': 'A garantia terá validade de 90 dias após a entrega dos produtos.'
+        },
+        'criterio_desempate': {
+            'texto': '''3.4.19. CRITÉRIO DE DESEMPATE: Em caso de empate, será adotado o seguinte critério de desempate: I - maior número de itens oferecidos; II - menor prazo de entrega; III - sorteio público, conforme art. 45 da Lei 14.133/2021.''',
+            'base_legal': 'Art. 45 da Lei 14.133/2021',
+            'observacao': 'O sorteio será realizado na presença dos licitantes interessados.'
+        },
+        'prazo_entrega': {
+            'texto': '''3.4.20. PRAZO DE ENTREGA: O prazo para entrega dos produtos será de 30 (trinta) dias corridos, contados a partir da assinatura do contrato, conforme cronograma físico-financeiro anexo, nos termos do art. 40, §2º da Lei 14.133/2021.''',
+            'base_legal': 'Art. 40, §2º da Lei 14.133/2021',
+            'observacao': 'O prazo poderá ser prorrogado mediante justificativa técnica devidamente fundamentada.'
+        },
+        'documentacao_complementar': {
+            'texto': '''3.4.21. DOCUMENTAÇÃO COMPLEMENTAR: O contratado deverá apresentar, no prazo de 5 (cinco) dias úteis após a assinatura do contrato, a documentação complementar especificada no Anexo II, conforme art. 25 da Lei 14.133/2021.''',
+            'base_legal': 'Art. 25 da Lei 14.133/2021',
+            'observacao': 'A não apresentação da documentação no prazo estabelecido implicará rescisão do contrato.'
+        }
+    }
+    
+    # Se for uma cláusula predefinida, retornar
+    if tipo_clausula in clausulas_predefinidas:
+        return clausulas_predefinidas[tipo_clausula]
+    
+    # Se for uma cláusula genérica, gerar baseada na descrição
+    return {
+        'texto': f'''3.4.22. {descricao.upper()}: {descricao.capitalize()}, conforme disposto na Lei 14.133/2021 e demais normas aplicáveis.''',
+        'base_legal': 'Lei 14.133/2021',
+        'observacao': f'Esta cláusula deve ser adequada às especificidades do objeto da licitação.'
     }
 
 

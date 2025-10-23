@@ -126,7 +126,7 @@ def render_docx_contextual_intelligent(template_path: str, output_path: str, val
             if isinstance(value, (list, dict)):
                 field_map[key] = value
             else:
-                            field_map[key] = str(value)
+                field_map[key] = str(value)
     
     # Análise contextual do documento
     context_analysis = analyze_document_context(doc, user_prompt)
@@ -284,39 +284,62 @@ def add_expert_content(doc, user_prompt, field_map=None):
                     print(f"  ⚖️ Adicionando cláusula: {clausula_info.get('descricao', 'N/A')}")
                     
                     # Encontrar local apropriado para adicionar a cláusula (sequência 3.4.x)
-                    # Primeiro, encontrar todos os parágrafos com numeração 3.4.x
-                    clausulas_existentes = []
+                    # Estratégia: encontrar a seção 3.4.x e inserir na sequência correta
+                    
+                    # 1. Encontrar todos os parágrafos com numeração 3.4.x
+                    clausulas_3_4 = []
                     for i, p in enumerate(doc.paragraphs):
                         match = re.search(r'3\.4\.(\d+)', p.text)
                         if match:
-                            clausulas_existentes.append({
+                            clausulas_3_4.append({
                                 'indice': i,
                                 'numero': int(match.group(1)),
-                                'paragrafo': p
+                                'paragrafo': p,
+                                'texto': p.text.strip()
                             })
                     
-                    # Ordenar por número
-                    clausulas_existentes.sort(key=lambda x: x['numero'])
+                    # 2. Ordenar por número para manter sequência
+                    clausulas_3_4.sort(key=lambda x: x['numero'])
                     
-                    # Encontrar o local correto para inserir (após a última cláusula 3.4.x)
-                    if clausulas_existentes:
-                        ultima_clausula = clausulas_existentes[-1]
-                        print(f"  📍 Encontrado {len(clausulas_existentes)} cláusulas 3.4.x existentes, inserindo após 3.4.{ultima_clausula['numero']}")
+                    if clausulas_3_4:
+                        print(f"  📍 Encontrado {len(clausulas_3_4)} cláusulas 3.4.x existentes")
                         
-                        # Adicionar cláusula específica após a última cláusula existente
+                        # 3. Encontrar o próximo número disponível
+                        numeros_existentes = [c['numero'] for c in clausulas_3_4]
+                        proximo_numero = max(numeros_existentes) + 1
+                        
+                        # 4. Atualizar o texto da cláusula com o número correto
+                        clausula_texto_atualizado = clausula['texto']
+                        # Substituir o número da cláusula pelo próximo disponível
+                        clausula_texto_atualizado = re.sub(r'3\.4\.\d+', f'3.4.{proximo_numero}', clausula_texto_atualizado)
+                        
+                        # 5. Encontrar o local correto para inserir (após a última cláusula 3.4.x)
+                        ultima_clausula = clausulas_3_4[-1]
+                        print(f"  📍 Inserindo cláusula 3.4.{proximo_numero} após 3.4.{ultima_clausula['numero']}")
+                        
+                        # 6. Inserir após a última cláusula 3.4.x
                         new_p_elem = OxmlElement('w:p')
                         ultima_clausula['paragrafo']._element.addnext(new_p_elem)
                         new_p = type(ultima_clausula['paragrafo'])(new_p_elem, ultima_clausula['paragrafo']._parent)
                         
                         run = new_p.add_run()
-                        run.text = clausula['texto']
+                        run.text = clausula_texto_atualizado
                         run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
-                        print(f"  ✅ Adicionada cláusula específica: {clausula_info.get('descricao', 'N/A')}")
+                        print(f"  ✅ Adicionada cláusula específica 3.4.{proximo_numero}: {clausula_info.get('descricao', 'N/A')}")
                         changes_applied += 1
+                        
                     else:
-                        # Fallback: procurar por qualquer parágrafo de julgamento
+                        # Fallback: procurar por seção de julgamento em qualquer numeração
+                        print("  🔍 Procurando seção de julgamento (fallback)...")
+                        
                         for i, p in enumerate(doc.paragraphs):
-                            if "julgamento" in p.text.lower() and "proposta" in p.text.lower():
+                            texto = p.text.strip()
+                            # Procurar por padrões de julgamento que não sejam de outras seções
+                            if (re.search(r'\d+\.\d+\.\d+', texto) and  # Tem numeração
+                                'julgamento' in texto.lower() and 
+                                'proposta' in texto.lower() and
+                                not re.search(r'8\.\d+', texto)):  # Não é da seção 8.x
+                                
                                 print(f"  📍 Encontrado parágrafo de julgamento (fallback): {i+1}")
                                 
                                 # Adicionar cláusula específica
@@ -327,29 +350,48 @@ def add_expert_content(doc, user_prompt, field_map=None):
                                 run = new_p.add_run()
                                 run.text = clausula['texto']
                                 run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
-                                print(f"  ✅ Adicionada cláusula específica: {clausula_info.get('descricao', 'N/A')}")
+                                print(f"  ✅ Adicionada cláusula específica (fallback): {clausula_info.get('descricao', 'N/A')}")
                                 changes_applied += 1
                                 break
+                        else:
+                            print("  ⚠️ Não foi possível encontrar local apropriado para inserir cláusula")
                 except Exception as e:
                     print(f"  ❌ Erro ao processar cláusula: {e}")
                     continue
         
-        # Adicionar cláusula de julgamento
-        if adicionar_clausula:
+        # Adicionar cláusula de julgamento (apenas se não foi adicionada como cláusula específica)
+        if adicionar_clausula and not clausulas_especificas:
             print("  ⚖️ Adicionando cláusula de julgamento")
+            
+            # Encontrar seção 3.4.x para inserir
+            clausulas_3_4 = []
             for i, p in enumerate(doc.paragraphs):
-                if "julgamento" in p.text.lower() and "proposta" in p.text.lower():
-                    print(f"  📍 Encontrado parágrafo de julgamento: {i+1}")
-                    new_p_elem = OxmlElement('w:p')
-                    p._element.addnext(new_p_elem)
-                    new_p = type(p)(new_p_elem, p._parent)
-                    
-                    run = new_p.add_run()
-                    run.text = "3.4.15. O julgamento das propostas será realizado mediante análise técnica e de preço, conforme disposto no art. 46 da Lei 14.133/2021, considerando os critérios de aceitabilidade e economicidade."
-                    run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
-                    print(f"  ✅ Adicionada cláusula de julgamento após parágrafo {i+1}")
-                    changes_applied += 1
-                    break
+                match = re.search(r'3\.4\.(\d+)', p.text)
+                if match:
+                    clausulas_3_4.append({
+                        'indice': i,
+                        'numero': int(match.group(1)),
+                        'paragrafo': p
+                    })
+            
+            if clausulas_3_4:
+                # Ordenar por número e usar a última cláusula 3.4.x
+                clausulas_3_4.sort(key=lambda x: x['numero'])
+                ultima_clausula = clausulas_3_4[-1]
+                
+                print(f"  📍 Inserindo cláusula de julgamento após 3.4.{ultima_clausula['numero']}")
+                
+                new_p_elem = OxmlElement('w:p')
+                ultima_clausula['paragrafo']._element.addnext(new_p_elem)
+                new_p = type(ultima_clausula['paragrafo'])(new_p_elem, ultima_clausula['paragrafo']._parent)
+                
+                run = new_p.add_run()
+                run.text = "3.4.15. O julgamento das propostas será realizado mediante análise técnica e de preço, conforme disposto no art. 46 da Lei 14.133/2021, considerando os critérios de aceitabilidade e economicidade."
+                run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                print(f"  ✅ Adicionada cláusula de julgamento na seção 3.4.x")
+                changes_applied += 1
+            else:
+                print("  ⚠️ Não foi possível encontrar seção 3.4.x para inserir cláusula de julgamento")
         
         # Adicionar observação prática
         if adicionar_observacao:

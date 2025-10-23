@@ -194,10 +194,9 @@ def create_document_from_ai(template, owner, ai_data):
 
 def generate_document_data_from_prompt(template, user_prompt, llm_api_key=None):
     """
-    Gera dados mínimos para renderização contextual inteligente.
+    Gera dados estruturados para renderização contextual inteligente.
     
-    A renderização contextual inteligente analisa o prompt e aplica mudanças diretamente
-    no documento, então não precisamos de dados estruturados complexos.
+    Extrai informações específicas do prompt do usuário para aplicar alterações precisas.
     
     Args:
         template: Template object
@@ -205,7 +204,7 @@ def generate_document_data_from_prompt(template, user_prompt, llm_api_key=None):
         llm_api_key: Chave da API (opcional)
     
     Returns:
-        dict: Dados mínimos para renderização contextual
+        dict: Dados estruturados para renderização contextual
     """
     import re
     
@@ -227,14 +226,51 @@ def generate_document_data_from_prompt(template, user_prompt, llm_api_key=None):
     if numero_match:
         numero_edital = numero_match.group(1)
     
-    # Retornar dados mínimos - a renderização contextual fará o trabalho
+    # Extrair data de abertura
+    data_abertura = None
+    data_match = re.search(r'(\d{1,2}/\d{1,2}/\d{4})', user_prompt)
+    if data_match:
+        data_abertura = data_match.group(1)
+    
+    # Extrair local/órgão
+    local_orgao = None
+    if 'BRASÍLIA' in user_prompt.upper() or 'brasília' in user_prompt.lower():
+        local_orgao = 'BRASÍLIA'
+    elif 'ITAJÁ' in user_prompt.upper() or 'itajá' in user_prompt.lower():
+        local_orgao = 'ITAJÁ'
+    
+    # Extrair órgão específico
+    orgao_especifico = 'Prefeitura Municipal'
+    if 'SECRETARIA MUNICIPAL DE SAÚDE' in user_prompt.upper():
+        orgao_especifico = 'SECRETARIA MUNICIPAL DE SAÚDE'
+    elif 'SECRETARIA' in user_prompt.upper() and 'SAÚDE' in user_prompt.upper():
+        orgao_especifico = 'SECRETARIA MUNICIPAL DE SAÚDE'
+    
+    # Extrair prazo de execução
+    prazo_execucao = None
+    prazo_match = re.search(r'(\d+)\s*dias?', user_prompt, re.IGNORECASE)
+    if prazo_match:
+        prazo_execucao = prazo_match.group(1)
+    
+    # Detectar se deve adicionar cláusula de julgamento
+    adicionar_clausula_julgamento = 'julgamento' in user_prompt.lower() and ('técnica' in user_prompt.lower() or 'preço' in user_prompt.lower())
+    
+    # Detectar se deve adicionar observação prática
+    adicionar_observacao_pratica = 'observação' in user_prompt.lower() and 'prática' in user_prompt.lower()
+    
+    # Retornar dados estruturados para renderização contextual
     return {
-        'numero_edital': numero_edital,  # Usar número extraído do prompt
+        'numero_edital': numero_edital,
         'modalidade': 'Pregão Eletrônico',
         'objeto': 'Contratação conforme especificado',
-        'orgao': 'Prefeitura Municipal',
-        'valor_estimado': valor_estimado,  # Usar valor extraído do prompt
-        'user_prompt': user_prompt  # Passar o prompt para a renderização contextual
+        'orgao': orgao_especifico,
+        'valor_estimado': valor_estimado,
+        'data_abertura': data_abertura,
+        'local_orgao': local_orgao,
+        'prazo_execucao': prazo_execucao,
+        'adicionar_clausula_julgamento': adicionar_clausula_julgamento,
+        'adicionar_observacao_pratica': adicionar_observacao_pratica,
+        'user_prompt': user_prompt
     }
 
 

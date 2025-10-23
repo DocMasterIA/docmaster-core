@@ -162,15 +162,15 @@ def render_docx_contextual_intelligent(template_path: str, output_path: str, val
                             p._p.remove(r._r)
                         p.add_run(new_text)
     
-    # 3. Adicionar conteúdo de especialista baseado no prompt
+    # 3. Adicionar conteúdo de especialista baseado no prompt e dados estruturados
     if 'especialista' in user_prompt.lower() or 'licitações' in user_prompt.lower():
-        changes_applied += add_expert_content(doc, user_prompt)
+        changes_applied += add_expert_content(doc, user_prompt, field_map)
     
     print(f"✅ Total de mudanças aplicadas: {changes_applied}")
     doc.save(output_path)
     return output_path
 
-def add_expert_content(doc, user_prompt):
+def add_expert_content(doc, user_prompt, field_map=None):
     """Analisa o prompt do usuário e aplica mudanças inteligentes no documento."""
     from docx.shared import RGBColor
     from docx.oxml.shared import OxmlElement, qn
@@ -179,6 +179,10 @@ def add_expert_content(doc, user_prompt):
     changes_applied = 0
     
     print("🧠 Analisando prompt para mudanças inteligentes...")
+    
+    # Usar dados estruturados se disponíveis
+    if field_map is None:
+        field_map = {}
     
     # 1. Análise inteligente de valores monetários
     valor_matches = re.findall(r'R\$\s*([\d.,]+)', user_prompt)
@@ -248,11 +252,22 @@ def add_expert_content(doc, user_prompt):
                         changes_applied += 1
     
     # 4. Análise inteligente de conteúdo a ser adicionado
-    if "adicionar" in user_prompt.lower() or "incluir" in user_prompt.lower():
+    # Usar dados estruturados primeiro, depois fallback para análise do prompt
+    adicionar_clausula = field_map.get('adicionar_clausula_julgamento', False)
+    adicionar_observacao = field_map.get('adicionar_observacao_pratica', False)
+    
+    # Fallback para análise do prompt se dados estruturados não estiverem disponíveis
+    if not adicionar_clausula and ("adicionar" in user_prompt.lower() or "incluir" in user_prompt.lower()):
+        adicionar_clausula = "julgamento" in user_prompt.lower() and ("técnica" in user_prompt.lower() or "preço" in user_prompt.lower())
+    
+    if not adicionar_observacao and ("adicionar" in user_prompt.lower() or "incluir" in user_prompt.lower()):
+        adicionar_observacao = "observação" in user_prompt.lower() and "prática" in user_prompt.lower()
+    
+    if adicionar_clausula or adicionar_observacao:
         print("  📝 Analisando conteúdo para adicionar...")
         
-        # Procurar por palavras-chave que indicam o que adicionar
-        if "julgamento" in user_prompt.lower() and ("técnica" in user_prompt.lower() or "preço" in user_prompt.lower()):
+        # Adicionar cláusula de julgamento
+        if adicionar_clausula:
             print("  ⚖️ Adicionando cláusula de julgamento")
             for i, p in enumerate(doc.paragraphs):
                 if "julgamento" in p.text.lower() and "proposta" in p.text.lower():
@@ -268,11 +283,12 @@ def add_expert_content(doc, user_prompt):
                     changes_applied += 1
                     break
         
-        if "observação" in user_prompt.lower() or "prática" in user_prompt.lower():
+        # Adicionar observação prática
+        if adicionar_observacao:
             print("  📝 Adicionando observação prática")
             for i, p in enumerate(doc.paragraphs):
-                if "15.16" in p.text:
-                    print(f"  📍 Encontrado parágrafo 15.16: {i+1}")
+                if "15.16" in p.text or "julgamento" in p.text.lower():
+                    print(f"  📍 Encontrado parágrafo para observação: {i+1}")
                     new_p_elem = OxmlElement('w:p')
                     p._element.addnext(new_p_elem)
                     new_p = type(p)(new_p_elem, p._parent)
@@ -336,11 +352,73 @@ def analyze_document_context(doc, user_prompt):
     return context
 
 def apply_contextual_changes(text, field_map, context_analysis, user_prompt):
-    """Aplica mudanças contextuais no texto baseado no prompt e dados."""
+    """Aplica mudanças contextuais no texto baseado no prompt e dados estruturados."""
     import re
     new_text = text
     
-    # 1. Substituições baseadas no prompt do usuário
+    # 1. Substituições específicas baseadas nos dados estruturados extraídos
+    
+    # Número do edital
+    if 'numero_edital' in field_map and field_map['numero_edital']:
+        # Substituir qualquer número de edital existente
+        edital_pattern = r'EDITAL\s*N[.º]?\s*\d+/\d+'
+        if re.search(edital_pattern, new_text):
+            new_text = re.sub(edital_pattern, f"EDITAL N. {field_map['numero_edital']}", new_text)
+        # Também substituir em outros contextos
+        edital_simple_pattern = r'\d+/\d+'
+        if re.search(edital_simple_pattern, new_text) and 'EDITAL' in new_text:
+            new_text = re.sub(edital_simple_pattern, field_map['numero_edital'], new_text, count=1)
+    
+    # Data de abertura
+    if 'data_abertura' in field_map and field_map['data_abertura']:
+        data_pattern = r'\d{1,2}/\d{1,2}/\d{4}'
+        if re.search(data_pattern, new_text):
+            new_text = re.sub(data_pattern, field_map['data_abertura'], new_text)
+    
+    # Local/Órgão - BRASÍLIA
+    if 'local_orgao' in field_map and field_map['local_orgao'] == 'BRASÍLIA':
+        # Substituir ITAJÁ por BRASÍLIA
+        if 'ITAJÁ' in new_text:
+            new_text = new_text.replace('ITAJÁ', 'BRASÍLIA')
+        if 'Itajá' in new_text:
+            new_text = new_text.replace('Itajá', 'Brasília')
+        if 'itajá' in new_text:
+            new_text = new_text.replace('itajá', 'brasília')
+    
+    # Órgão específico
+    if 'orgao' in field_map and 'SECRETARIA' in field_map['orgao'].upper():
+        # Substituir referências genéricas por órgão específico
+        if 'Prefeitura Municipal' in new_text:
+            new_text = new_text.replace('Prefeitura Municipal', field_map['orgao'])
+        if 'MUNICÍPIO' in new_text and 'ITAJÁ' in new_text:
+            new_text = new_text.replace('MUNICÍPIO DE ITAJÁ/GO', f"MUNICÍPIO DE BRASÍLIA/DF - {field_map['orgao']}")
+    
+    # Valor estimado
+    if 'valor_estimado' in field_map and field_map['valor_estimado']:
+        valor = field_map['valor_estimado']
+        try:
+            valor_float = float(valor)
+            valor_formatado = f"R$ {valor_float:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+            
+            # Procurar e substituir valores monetários
+            valor_pattern = r'R\$\s*[\d.,]+'
+            if re.search(valor_pattern, new_text):
+                new_text = re.sub(valor_pattern, valor_formatado, new_text)
+            
+            # Também substituir valores sem R$
+            valor_simples_pattern = r'\d{1,3}(?:\.\d{3})*(?:,\d{2})?'
+            if re.search(valor_simples_pattern, new_text) and 'R$' in new_text:
+                new_text = re.sub(valor_simples_pattern, valor_formatado.replace('R$ ', ''), new_text)
+        except:
+            pass
+    
+    # Prazo de execução
+    if 'prazo_execucao' in field_map and field_map['prazo_execucao']:
+        prazo_pattern = r'\d+\s*dias?'
+        if re.search(prazo_pattern, new_text, re.IGNORECASE):
+            new_text = re.sub(prazo_pattern, f"{field_map['prazo_execucao']} dias", new_text, flags=re.IGNORECASE)
+    
+    # 2. Substituições baseadas no prompt do usuário (fallback)
     if 'goiânia' in user_prompt.lower() or 'goiania' in user_prompt.lower():
         # Substituir município para Goiânia
         if context_analysis['municipio'] and context_analysis['estado']:
@@ -352,7 +430,7 @@ def apply_contextual_changes(text, field_map, context_analysis, user_prompt):
             new_text = new_text.replace(context_analysis['municipio'], 'GOIÂNIA')
             new_text = new_text.replace(context_analysis['municipio'].lower(), 'Goiânia')
     
-    # 2. Substituições baseadas nos dados da IA
+    # 3. Substituições genéricas baseadas no contexto
     if 'numero_edital' in field_map and context_analysis['numero_edital']:
         new_text = new_text.replace(context_analysis['numero_edital'], field_map['numero_edital'])
     
@@ -367,59 +445,7 @@ def apply_contextual_changes(text, field_map, context_analysis, user_prompt):
         if 'Aquisição de Medicamentos' in new_text:
             new_text = new_text.replace('Aquisição de Medicamentos', field_map['objeto'])
     
-    # 3. Substituições genéricas baseadas no contexto
-    if 'valor_estimado' in field_map or 'valor_total' in field_map or 'preco_total_medio' in field_map:
-        # Procurar valores monetários no texto
-        valor_pattern = r'R\$\s*[\d.,]+'
-        if re.search(valor_pattern, new_text):
-            # Usar o primeiro valor disponível
-            valor = field_map.get('valor_total') or field_map.get('valor_estimado') or field_map.get('preco_total_medio')
-            if valor:
-                # Formatar o valor corretamente
-                try:
-                    valor_float = float(valor)
-                    valor_formatado = f"R$ {valor_float:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                    new_text = re.sub(valor_pattern, valor_formatado, new_text)
-                except:
-                    new_text = re.sub(valor_pattern, f"R$ {valor}", new_text)
-    
-    # 4. Substituições específicas baseadas no prompt
-    if '5.678.659,46' in user_prompt and '10.000.412,19' in user_prompt:
-        # Substituição específica para o valor mencionado no prompt
-        if 'R$ 5.678.659,46' in new_text:
-            new_text = new_text.replace('R$ 5.678.659,46', 'R$ 10.000.412,19')
-        elif '5.678.659,46' in new_text:
-            new_text = new_text.replace('5.678.659,46', '10.000.412,19')
-    
-    # 5. Aplicar dados específicos da IA
-    if 'numero_edital' in field_map and field_map['numero_edital']:
-        # Substituir número do edital
-        if 'EDITAL N.' in new_text and '014/2025' in new_text:
-            new_text = new_text.replace('014/2025', field_map['numero_edital'])
-        elif 'EDITAL N.' in new_text and '005/2025' in new_text:
-            new_text = new_text.replace('005/2025', field_map['numero_edital'])
-    
-    if 'valor_estimado' in field_map and field_map['valor_estimado']:
-        # Substituir valores monetários
-        valor = field_map['valor_estimado']
-        if 'R$' in new_text and any(char.isdigit() for char in new_text):
-            # Procurar padrão de valor e substituir
-            import re
-            valor_pattern = r'R\$\s*[\d.,]+'
-            if re.search(valor_pattern, new_text):
-                try:
-                    valor_float = float(valor)
-                    valor_formatado = f"R$ {valor_float:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-                    new_text = re.sub(valor_pattern, valor_formatado, new_text)
-                except:
-                    new_text = re.sub(valor_pattern, f"R$ {valor}", new_text)
-    
-    if 'objeto' in field_map and field_map['objeto']:
-        # Substituir objeto
-        if 'Aquisição de Medicamentos' in new_text:
-            new_text = new_text.replace('Aquisição de Medicamentos', field_map['objeto'])
-    
-    # 6. Aplicar formatação em azul se solicitado
+    # 4. Aplicar formatação em azul se solicitado
     if 'azul' in user_prompt.lower() or 'blue' in user_prompt.lower():
         # Marcar texto para formatação em azul (será aplicado na renderização)
         if new_text != text:  # Se houve mudança

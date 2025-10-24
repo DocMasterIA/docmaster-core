@@ -226,6 +226,16 @@ IMPORTANTE - GERAÇÃO DE CLÁUSULAS:
 - Adapte o conteúdo ao contexto específico da licitação
 - Use linguagem jurídica apropriada e formal
 
+IMPORTANTE - LOCALIZAÇÃO INTELIGENTE DE CLÁUSULAS:
+- NÃO use sempre "3.1" como referência - seja INTELIGENTE
+- Para cláusula 2.9, procure por "2.8" ou "2.7" para inserir APÓS
+- Para cláusula 4.2, procure por "4.1" ou "4.0" para inserir APÓS
+- Para cláusula 5.1, procure por "5.0" ou "4.9" para inserir APÓS
+- Se o usuário pedir "após parágrafo X.Y", procure por "X.Y" exato
+- Se o usuário pedir "nova cláusula", procure por numeração sequencial
+- NÃO adicione em locais aleatórios - siga a numeração correta
+- Seja PRECISO na localização - não use sempre o mesmo local
+
 IMPORTANTE - NÃO FAÇA ALTERAÇÕES EXTRAS:
 - NÃO altere modalidades se não foi solicitado
 - NÃO altere cidades se não foi solicitado
@@ -333,7 +343,6 @@ def apply_ai_changes(doc, ai_response):
     
     # Processar cada linha da resposta
     lines = ai_response.split('\n')
-    
     for line in lines:
         line = line.strip()
         if not line:
@@ -355,10 +364,10 @@ def apply_ai_changes(doc, ai_response):
                     print(f"❌ Substituição falhou: '{old_text}' -> '{new_text}'")
         
         # Processar ADICIONAR_APOS
-        elif line.startswith('ADICIONAR_APOS:'):
+        elif line.startswith('ADICIONAR_APOS:') or line.startswith('ADICIONAR_APÓS:'):
             if '→' in line:
                 parts = line.split('→', 1)
-                reference_text = parts[0].replace('ADICIONAR_APOS:', '').strip().strip('"')
+                reference_text = parts[0].replace('ADICIONAR_APOS:', '').replace('ADICIONAR_APÓS:', '').strip().strip('"')
                 new_text = parts[1].strip().strip('"')
                 
                 if add_text_after(doc, reference_text, new_text):
@@ -635,46 +644,111 @@ def apply_substitution(doc, old_text, new_text):
     return found
 
 def add_text_after(doc, reference_text, new_text):
-    """Adiciona texto após o texto de referência"""
+    """Adiciona texto após o texto de referência de forma INTELIGENTE"""
+    import re
     found = False
     
-    # Procurar em parágrafos
-    for paragraph in doc.paragraphs:
-        if reference_text in paragraph.text:
-            # Inserir após este parágrafo
-            new_p_elem = OxmlElement('w:p')
-            paragraph._element.addnext(new_p_elem)
-            new_p = type(paragraph)(new_p_elem, paragraph._parent)
-            
-            run = new_p.add_run()
-            run.text = new_text
-            run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
-            found = True
-            break
     
-    # Procurar em tabelas
+    # Extrair número da cláusula do new_text (ex: "2.9" de "2.9 - Critérios...")
+    clausula_match = re.search(r'(\d+\.\d+)', new_text)
+    if clausula_match:
+        clausula_num = clausula_match.group(1)
+        print(f"  🎯 Procurando localização inteligente para cláusula {clausula_num}")
+        
+        # Procurar por cláusula anterior (ex: para 2.9, procurar 2.8 ou 2.7)
+        clausula_parts = clausula_num.split('.')
+        secao = int(clausula_parts[0])
+        subsecao = int(clausula_parts[1])
+        
+        # Tentar encontrar cláusula anterior
+        for tentativa in range(5):  # Tentar até 5 cláusulas anteriores
+            if subsecao - tentativa > 0:
+                ref_candidata = f"{secao}.{subsecao - tentativa}"
+                print(f"  🔍 Tentando encontrar: {ref_candidata}")
+                
+                for paragraph in doc.paragraphs:
+                    if ref_candidata in paragraph.text:
+                        print(f"  ✅ Encontrada referência: {ref_candidata}")
+                        print(f"  📝 Texto da referência: {paragraph.text[:100]}...")
+                        
+                        # Inserir após este parágrafo
+                        new_p_elem = OxmlElement('w:p')
+                        paragraph._element.addnext(new_p_elem)
+                        new_p = type(paragraph)(new_p_elem, paragraph._parent)
+                        
+                        run = new_p.add_run()
+                        run.text = new_text
+                        run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                        found = True
+                        print(f"  ✅ Cláusula {clausula_num} adicionada após: {ref_candidata}")
+                        print(f"  📝 Texto adicionado: {new_text[:100]}...")
+                        return True
+        
+        # Se não encontrou cláusula anterior, procurar pela última cláusula da seção
+        if not found:
+            print(f"  🔍 Procurando última cláusula da seção {secao}")
+            for i in range(9, 0, -1):  # Procurar de 9 para 1
+                ref_candidata = f"{secao}.{i}"
+                print(f"  🔍 Tentando encontrar: {ref_candidata}")
+                
+                for paragraph in doc.paragraphs:
+                    if ref_candidata in paragraph.text:
+                        print(f"  ✅ Encontrada última cláusula da seção: {ref_candidata}")
+                        
+                        # Inserir após este parágrafo
+                        new_p_elem = OxmlElement('w:p')
+                        paragraph._element.addnext(new_p_elem)
+                        new_p = type(paragraph)(new_p_elem, paragraph._parent)
+                        
+                        run = new_p.add_run()
+                        run.text = new_text
+                        run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                        found = True
+                        print(f"  ✅ Cláusula {clausula_num} adicionada após: {ref_candidata}")
+                        return True
+        
+        # Se não encontrou cláusula anterior, procurar por seção anterior
+        if secao > 1 and not found:
+            ref_candidata = f"{secao-1}.9"  # Última cláusula da seção anterior
+            print(f"  🔍 Tentando encontrar seção anterior: {ref_candidata}")
+            
+            for paragraph in doc.paragraphs:
+                if ref_candidata in paragraph.text:
+                    print(f"  ✅ Encontrada referência: {ref_candidata}")
+                    
+                    # Inserir após este parágrafo
+                    new_p_elem = OxmlElement('w:p')
+                    paragraph._element.addnext(new_p_elem)
+                    new_p = type(paragraph)(new_p_elem, paragraph._parent)
+                    
+                    run = new_p.add_run()
+                    run.text = new_text
+                    run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                    found = True
+                    print(f"  ✅ Cláusula {clausula_num} adicionada após: {ref_candidata}")
+                    return True
+    
+    # Fallback: procurar por referência exata
     if not found:
-        for table in doc.tables:
-            for row in table.rows:
-                for cell in row.cells:
-                    for paragraph in cell.paragraphs:
-                        if reference_text in paragraph.text:
-                            # Inserir após este parágrafo na célula
-                            new_p_elem = OxmlElement('w:p')
-                            paragraph._element.addnext(new_p_elem)
-                            new_p = type(paragraph)(new_p_elem, paragraph._parent)
-                            
-                            run = new_p.add_run()
-                            run.text = new_text
-                            run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
-                            found = True
-                            break
-                    if found:
-                        break
-                if found:
-                    break
-            if found:
+        print(f"  🔍 Fallback: procurando referência exata: {reference_text}")
+        for paragraph in doc.paragraphs:
+            if reference_text in paragraph.text:
+                print(f"  ✅ Encontrada referência exata: {reference_text}")
+                
+                # Inserir após este parágrafo
+                new_p_elem = OxmlElement('w:p')
+                paragraph._element.addnext(new_p_elem)
+                new_p = type(paragraph)(new_p_elem, paragraph._parent)
+                
+                run = new_p.add_run()
+                run.text = new_text
+                run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                found = True
+                print(f"  ✅ Texto adicionado após: {reference_text}")
                 break
+    
+    if not found:
+        print(f"  ❌ Referência não encontrada: {reference_text}")
     
     return found
 

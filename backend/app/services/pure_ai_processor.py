@@ -225,6 +225,10 @@ IMPORTANTE - GERAÇÃO DE CLÁUSULAS:
 - Gere conteúdo TÉCNICO e PROFISSIONAL adequado para documentos oficiais
 - Adapte o conteúdo ao contexto específico da licitação
 - Use linguagem jurídica apropriada e formal
+- CRÍTICO: Use SEMPRE a numeração EXATA solicitada pelo usuário
+- CRÍTICO: Se pedir "7.1", gere "7.1 - Título", NÃO "3.2 - Cláusula 7.1"
+- CRÍTICO: A numeração deve ser a PRIMEIRA coisa no texto da cláusula
+- CRÍTICO: NÃO crie numeração local baseada em referências
 
 IMPORTANTE - LOCALIZAÇÃO INTELIGENTE DE CLÁUSULAS:
 - NÃO use sempre "3.1" como referência - seja INTELIGENTE
@@ -237,6 +241,9 @@ IMPORTANTE - LOCALIZAÇÃO INTELIGENTE DE CLÁUSULAS:
 - Seja PRECISO na localização - não use sempre o mesmo local
 - IMPORTANTE: Use a numeração EXATA - se pedir "4.1", procure "4.1", não "4.2"
 - IMPORTANTE: Se não encontrar a cláusula exata, procure pela anterior na mesma seção
+- CRÍTICO: Se a cláusula solicitada JÁ EXISTE, adicione APÓS ela, não incremente a numeração local
+- CRÍTICO: Se pedir "7.1" e já existe "7.1", adicione "7.1" após a existente, não "3.2"
+- CRÍTICO: Mantenha a numeração solicitada pelo usuário, não crie numeração local
 
 IMPORTANTE - NÃO FAÇA ALTERAÇÕES EXTRAS:
 - NÃO altere modalidades se não foi solicitado
@@ -662,9 +669,41 @@ def add_text_after(doc, reference_text, new_text):
         secao = int(clausula_parts[0])
         subsecao = int(clausula_parts[1])
         
-        # Primeiro, tentar encontrar a referência exata que a IA pediu
+        # Primeiro, verificar se a cláusula solicitada já existe no documento
+        print(f"  🔍 Verificando se cláusula {clausula_num} já existe no documento...")
+        clausula_existe = False
+        clausula_existente_posicao = -1
+        
+        for paragraph in doc.paragraphs:
+            # Busca EXATA por cláusula existente (ex: "7.1" deve ser exatamente "7.1")
+            pattern = rf'^[^0-9]*{re.escape(clausula_num)}(?:\s|\.|$|[^0-9])'
+            if re.search(pattern, paragraph.text):
+                clausula_existe = True
+                clausula_existente_posicao = paragraph
+                print(f"  ✅ Cláusula {clausula_num} JÁ EXISTE no documento")
+                print(f"  📝 Texto da cláusula existente: {paragraph.text[:100]}...")
+                break
+        
+        # Se a cláusula já existe, adicionar APÓS ela
+        if clausula_existe:
+            print(f"  🔍 Adicionando nova cláusula {clausula_num} APÓS a existente...")
+            
+            # Inserir após a cláusula existente
+            new_p_elem = OxmlElement('w:p')
+            clausula_existente_posicao._element.addnext(new_p_elem)
+            new_p = type(clausula_existente_posicao)(new_p_elem, clausula_existente_posicao._parent)
+            
+            run = new_p.add_run()
+            run.text = new_text
+            run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+            found = True
+            print(f"  ✅ Nova cláusula {clausula_num} adicionada APÓS a existente")
+            print(f"  📝 Texto adicionado: {new_text[:100]}...")
+            return True
+        
+        # Se a cláusula não existe, tentar encontrar a referência exata que a IA pediu
         if reference_text:
-            print(f"  🔍 Procurando referência exata da IA: {reference_text}")
+            print(f"  🔍 Cláusula {clausula_num} não existe, procurando referência da IA: {reference_text}")
             for paragraph in doc.paragraphs:
                 # Busca EXATA por referência (ex: "4.1" deve ser exatamente "4.1", não "3.4.1")
                 # Usar regex mais específica para evitar confusão com substrings

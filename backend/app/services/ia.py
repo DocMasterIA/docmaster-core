@@ -12,12 +12,23 @@ def process_document_with_ai(template_path, user_prompt, llm_api_key=None):
     """
     FUNCIONA EXATAMENTE COMO CHATGPT: Recebe documento + prompt, retorna documento modificado.
     Usa processador 100% baseado em IA - sem regras fixas, sem regex, sem contexto pré-definido.
+    Agora com suporte a prompts complexos e limpeza de cache.
     """
     try:
         # Usar o processador 100% baseado em IA
-        from .pure_ai_processor import process_document_pure_ai
+        from .pure_ai_processor import process_document_pure_ai, process_complex_prompt
         
-        result = process_document_pure_ai(template_path, user_prompt, llm_api_key)
+        # Verificar se é um prompt complexo (com múltiplas instruções numeradas)
+        import re
+        # Contar quantas instruções numeradas existem
+        instrucoes = re.findall(r'\d+\.\s*[^0-9]+', user_prompt)
+        
+        if len(instrucoes) >= 2:
+            print("🔧 Detectado prompt complexo - usando processamento especializado")
+            result = process_complex_prompt(template_path, user_prompt, llm_api_key)
+        else:
+            print("📝 Prompt simples - usando processamento normal")
+            result = process_document_pure_ai(template_path, user_prompt, llm_api_key)
         
         if result.get('success'):
             return {

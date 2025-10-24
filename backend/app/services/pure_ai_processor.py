@@ -15,12 +15,124 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+def clear_value_cache():
+    """
+    Limpa cache de valores para evitar valores fixos entre processamentos.
+    Resolve o problema do valor 'viciado' em 7.500.000,00.
+    """
+    import gc
+    import sys
+    
+    # Limpar garbage collection
+    gc.collect()
+    
+    # Limpar variáveis globais se existirem
+    if 'last_processed_value' in globals():
+        del globals()['last_processed_value']
+    
+    if 'cached_document_text' in globals():
+        del globals()['cached_document_text']
+    
+    # Limpar cache de módulos relacionados
+    modules_to_clear = [
+        'backend.app.services.pure_ai_processor',
+        'backend.app.services.ia'
+    ]
+    
+    for module_name in modules_to_clear:
+        if module_name in sys.modules:
+            module = sys.modules[module_name]
+            # Limpar atributos de cache se existirem
+            cache_attrs = ['_document_cache', '_value_cache', '_last_response']
+            for attr in cache_attrs:
+                if hasattr(module, attr):
+                    delattr(module, attr)
+    
+    print("🧹 Cache limpo - valores fixos removidos")
+    return True
+
+def clear_ai_response_cache():
+    """
+    Limpa especificamente o cache de respostas da IA.
+    """
+    import gc
+    
+    # Forçar limpeza de memória
+    gc.collect()
+    
+    # Limpar variáveis que podem estar causando o problema
+    if 'last_ai_response' in globals():
+        del globals()['last_ai_response']
+    
+    if 'processed_values' in globals():
+        del globals()['processed_values']
+    
+    print("🤖 Cache de IA limpo - respostas antigas removidas")
+    return True
+
+def reset_document_processor():
+    """
+    Reseta completamente o processador de documentos.
+    """
+    import gc
+    import sys
+    
+    # Limpar todos os caches
+    clear_value_cache()
+    clear_ai_response_cache()
+    
+    # Forçar garbage collection
+    gc.collect()
+    
+    # Limpar imports se necessário
+    if 'backend.app.services.pure_ai_processor' in sys.modules:
+        del sys.modules['backend.app.services.pure_ai_processor']
+    
+    print("🔄 Processador de documentos resetado")
+    return True
+
+def process_complex_prompt(template_path, user_prompt, llm_api_key=None):
+    """
+    Processa prompts complexos de forma mais inteligente.
+    Extrai instruções numeradas e processa o documento uma vez com todas as instruções.
+    """
+    import re
+    
+    # Extrair instruções numeradas do prompt
+    instructions = re.findall(r'\d+\.\s*([^0-9]+?)(?=\d+\.|$)', user_prompt, re.DOTALL)
+    instructions = [inst.strip() for inst in instructions if inst.strip()]
+    
+    if len(instructions) <= 1:
+        # Prompt simples, usar processamento normal
+        return process_document_pure_ai(template_path, user_prompt, llm_api_key)
+    
+    print(f"🔧 Detectadas {len(instructions)} instruções numeradas")
+    
+    # Criar prompt consolidado com todas as instruções
+    consolidated_prompt = "Execute as seguintes alterações no documento:\n\n"
+    for i, instruction in enumerate(instructions, 1):
+        consolidated_prompt += f"{i}. {instruction}\n"
+    
+    print(f"📝 Prompt consolidado: {consolidated_prompt[:100]}...")
+    
+    # Processar uma única vez com todas as instruções
+    result = process_document_pure_ai(template_path, consolidated_prompt, llm_api_key)
+    
+    if result.get('success'):
+        print(f"✅ Prompt complexo processado com sucesso")
+        return result
+    else:
+        print(f"❌ Erro no prompt complexo: {result.get('error')}")
+        return result
+
 def process_document_pure_ai(template_path, user_prompt, llm_api_key=None):
     """
     Processa documento 100% com IA - exatamente como ChatGPT.
     A IA analisa o documento e decide onde fazer mudanças.
     """
     try:
+        # Limpar cache antes de processar para evitar valores fixos
+        clear_value_cache()
         from openai import OpenAI
         from django.conf import settings
         
@@ -38,14 +150,33 @@ def process_document_pure_ai(template_path, user_prompt, llm_api_key=None):
         # Extrair texto completo do documento (sem filtros, sem regras)
         document_text = extract_full_document_text(doc)
         
-        # Prompt 100% baseado na IA - SEM regras fixas
-        system_prompt = """Você edita documentos como o ChatGPT.
+        # Prompt ultra-otimizado para economizar tokens
+        system_prompt = """Você é um assistente especializado em editar documentos DOCX. 
 
-FORMATO DE RESPOSTA:
+INSTRUÇÕES:
+1. Analise o documento fornecido
+2. Execute EXATAMENTE as alterações solicitadas pelo usuário
+3. Retorne APENAS as instruções no formato especificado
+
+FORMATO DE RESPOSTA OBRIGATÓRIO:
 SUBSTITUIR: "texto original exato" → "texto novo"
-ADICIONAR_APOS: "texto de referência exato" → "texto a ser adicionado"
+ADICIONAR_APOS: "referência exata" → "texto novo"
 
-Use texto EXATO do documento. Analise contexto e decida onde inserir."""
+REGRAS CRÍTICAS:
+- Use texto EXATO encontrado no documento
+- Para valores monetários, use o formato COMPLETO (ex: "R$ 5.678.659,46")
+- NUNCA substitua apenas "R$" - sempre o valor completo
+- NÃO retorne o texto do documento, apenas as instruções
+- Seja preciso e específico nas substituições
+- Execute TODAS as alterações solicitadas
+
+Exemplo de resposta CORRETA:
+SUBSTITUIR: "R$ 5.678.659,46" → "R$ 75.000.000,00"
+SUBSTITUIR: "ITAJÁ" → "BRASÍLIA"
+ADICIONAR_APOS: "parágrafo 15.16" → "OBSERVAÇÃO PRÁTICA: Texto da observação"
+
+Exemplo de resposta INCORRETA:
+SUBSTITUIR: "R$" → "R$ 75.000.000,00"  # ERRADO!"""
         
         user_prompt_full = f"""DOCUMENTO COMPLETO:
 {document_text}
@@ -56,12 +187,12 @@ Analise o documento e identifique onde fazer as mudanças solicitadas. Use o for
         
         # Chamada para OpenAI
         response = client.chat.completions.create(
-            model="gpt-4",  # Usar GPT-4 para melhor análise
+            model="gpt-3.5-turbo",  # 90% mais barato que GPT-4
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt_full}
             ],
-            max_tokens=1500,  # Mais tokens para GPT-4
+            max_tokens=500,  # Reduzido drasticamente
             temperature=0.1
         )
         
@@ -89,34 +220,36 @@ Analise o documento e identifique onde fazer as mudanças solicitadas. Use o for
 
 def extract_full_document_text(doc):
     """
-    Extrai texto do documento SEM regras fixas.
-    A IA decide o que é relevante.
+    Extrai apenas o essencial - máximo 20 parágrafos para economizar tokens.
+    A IA decide o que é relevante baseado em palavras-chave importantes.
     """
     text_parts = []
     
-    # Extrair todos os parágrafos (sem filtros)
+    # Extrair apenas parágrafos com conteúdo relevante (muito mais restritivo)
     for paragraph in doc.paragraphs:
         text = paragraph.text.strip()
-        if text:
+        if not text or len(text) < 20:
+            continue
+            
+        # Apenas se contém palavras-chave importantes para licitações
+        if any(keyword in text.upper() for keyword in [
+            'R$', 'MUNICÍPIO', 'EDITAL', 'PREGÃO', 'VALOR', 'PREÇO', 
+            'LICITAÇÃO', 'CONTRATO', 'JULGAMENTO', 'OBSERVAÇÃO'
+        ]):
             text_parts.append(text)
     
-    # Limitar a 80 parágrafos para economizar tokens
-    text_parts = text_parts[:80]
+    # Limitar a apenas 20 parágrafos mais relevantes
+    text_parts = text_parts[:20]
     
-    # Extrair todas as tabelas
+    # Apenas tabelas com valores monetários
     for table in doc.tables:
-        table_text = []
         for row in table.rows:
-            row_text = []
             for cell in row.cells:
-                if cell.text.strip():
-                    row_text.append(cell.text.strip())
-            if row_text:
-                table_text.append(" | ".join(row_text))
-        if table_text:
-            text_parts.append("TABELA: " + "\n".join(table_text))
+                if 'R$' in cell.text:
+                    text_parts.append(f"TABELA: {cell.text}")
+                    break
     
-    return "\n\n".join(text_parts)
+    return "\n".join(text_parts)  # Sem quebras duplas para economizar
 
 def apply_ai_changes(doc, ai_response):
     """
@@ -251,36 +384,53 @@ def apply_substitution(doc, old_text, new_text):
                         if found:
                             break
     
-    # Se ainda não encontrou, tentar busca por partes do texto
+    # REMOVIDO: Lógica fixa que forçava valor 7.500.000,00
+    # A IA agora decide o valor baseado no prompt do usuário
+    
+    # Se ainda não encontrou, tentar busca flexível por valor monetário
     if not found:
-        # Procurar por "PREÇO TOTAL MÉDIO" e "R$" em células adjacentes
-        for table in doc.tables:
-            for row in table.rows:
-                for cell_idx, cell in enumerate(row.cells):
-                    for paragraph in cell.paragraphs:
-                        if "PREÇO TOTAL MÉDIO" in paragraph.text:
-                            # Procurar na célula adjacente por valor monetário
-                            if cell_idx + 1 < len(row.cells):
-                                next_cell = row.cells[cell_idx + 1]
-                                for next_paragraph in next_cell.paragraphs:
-                                    if "R$" in next_paragraph.text and "5.678.659,46" in next_paragraph.text:
-                                        # Encontrar o valor antigo e substituir
-                                        for run in next_paragraph.runs:
-                                            if "5.678.659,46" in run.text:
-                                                run.text = run.text.replace("5.678.659,46", "7.500.000,00")
-                                                run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
-                                                found = True
-                                                break
-                                        if found:
-                                            break
-                            if found:
-                                break
+        import re
+        # Extrair valor do texto antigo
+        valor_antigo_match = re.search(r'R\$\s*([\d.,]+)', old_text)
+        valor_novo_match = re.search(r'R\$\s*([\d.,]+)', new_text)
+        
+        if valor_antigo_match and valor_novo_match:
+            valor_antigo = valor_antigo_match.group(1)
+            valor_novo = valor_novo_match.group(1)
+            
+            # Procurar pelo valor antigo em qualquer lugar
+            for paragraph in doc.paragraphs:
+                if valor_antigo in paragraph.text:
+                    for run in paragraph.runs:
+                        if valor_antigo in run.text:
+                            run.text = run.text.replace(valor_antigo, valor_novo)
+                            run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                            found = True
+                            break
                     if found:
                         break
-                if found:
-                    break
-            if found:
-                break
+            
+            # Procurar em tabelas
+            if not found:
+                for table in doc.tables:
+                    for row in table.rows:
+                        for cell in row.cells:
+                            for paragraph in cell.paragraphs:
+                                if valor_antigo in paragraph.text:
+                                    for run in paragraph.runs:
+                                        if valor_antigo in run.text:
+                                            run.text = run.text.replace(valor_antigo, valor_novo)
+                                            run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                                            found = True
+                                            break
+                                    if found:
+                                        break
+                            if found:
+                                break
+                        if found:
+                            break
+                    if found:
+                        break
     
     return found
 

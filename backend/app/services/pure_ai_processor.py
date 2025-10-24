@@ -180,11 +180,19 @@ IMPORTANTE - SUBSTITUIÇÃO COMPLETA:
 - Mantenha a formatação original (maiúsculo/minúsculo) do documento
 - Substitua TODAS as ocorrências relacionadas
 
-IMPORTANTE - LOCALIZAÇÃO DE CLÁUSULAS:
-- Se o usuário pedir "cláusula 2.9", procure por "2.8" ou "2.7" para inserir APÓS
-- Se o usuário pedir "após parágrafo 2.8", procure por "2.8" exato
-- Se o usuário pedir "nova cláusula", procure por numeração sequencial
-- NÃO adicione em locais aleatórios - siga a numeração
+IMPORTANTE - TABELAS:
+- Se o usuário pedir "MODALIDADE DA LICITAÇÃO na tabela", procure especificamente em tabelas
+- Se o usuário pedir "PREÇO TOTAL MÉDIO na tabela", procure especificamente em tabelas
+- Se o usuário pedir "na tabela", foque APENAS em tabelas
+- Se o usuário pedir "em todo lugar", substitua em parágrafos E tabelas
+
+IMPORTANTE - GERAÇÃO DE CLÁUSULAS:
+- NUNCA use placeholders como "[texto da cláusula]" ou "[texto completo e detalhado]"
+- SEMPRE gere texto REAL, ESPECÍFICO e DETALHADO para cláusulas
+- Inclua SEMPRE referências legais quando solicitadas (ex: Lei 14.133/2021)
+- Gere conteúdo TÉCNICO e PROFISSIONAL adequado para documentos oficiais
+- Adapte o conteúdo ao contexto específico da licitação
+- Use linguagem jurídica apropriada e formal
 
 Exemplo de resposta CORRETA:
 SUBSTITUIR: "R$ 5.678.659,46" → "R$ 75.000.000,00"
@@ -197,11 +205,11 @@ SUBSTITUIR: "PREGÃO ELETRÔNICO SRP" → "TOMADA DE PREÇOS"
 SUBSTITUIR: "Pregão Eletrônico" → "Tomada de Preços"
 SUBSTITUIR: "PREGÃO" → "TOMADA DE PREÇOS"
 SUBSTITUIR: "005/2025" → "123/2025"
-ADICIONAR_APOS: "2.8" → "2.9 - Critérios de Responsabilidade Social: [texto da cláusula]"
+ADICIONAR_APOS: "2.8" → "2.9 - Critérios de Responsabilidade Social: A contratação priorizará empresas que demonstrem compromisso com práticas de responsabilidade social, incluindo: (a) contratação de pessoas com deficiência; (b) programas de inclusão social; (c) práticas sustentáveis; (d) investimento em comunidades locais. A pontuação será atribuída conforme critérios estabelecidos no Anexo I, com base na Lei 14.133/2021."
 
 Exemplo de resposta INCORRETA:
 SUBSTITUIR: "R$" → "R$ 75.000.000,00"  # ERRADO!
-ADICIONAR_APOS: "3.1" → "OBSERVAÇÃO PRÁTICA"  # ERRADO! Deveria ser após 2.8"""
+ADICIONAR_APOS: "2.8" → "2.9 - Critérios de Responsabilidade Social: [texto da cláusula]"  # ERRADO! Use texto real"""
         
         user_prompt_full = f"""DOCUMENTO COMPLETO:
 {document_text}

@@ -18,37 +18,59 @@ logger = logging.getLogger(__name__)
 def clear_value_cache():
     """
     Limpa cache de valores para evitar valores fixos entre processamentos.
-    Resolve o problema do valor 'viciado' em 7.500.000,00.
+    Resolve o problema do valor 'viciado' e modalidades fixas.
     """
     import gc
     import sys
+    import os
     
     # Limpar garbage collection
     gc.collect()
     
     # Limpar variáveis globais se existirem
-    if 'last_processed_value' in globals():
-        del globals()['last_processed_value']
+    global_vars_to_clear = [
+        'last_processed_value', 'cached_document_text', 'last_ai_response',
+        'cached_modalidade', 'cached_cidade', 'cached_valor',
+        'last_substitution', 'cached_instructions'
+    ]
     
-    if 'cached_document_text' in globals():
-        del globals()['cached_document_text']
+    for var_name in global_vars_to_clear:
+        if var_name in globals():
+            del globals()[var_name]
     
     # Limpar cache de módulos relacionados
     modules_to_clear = [
         'backend.app.services.pure_ai_processor',
-        'backend.app.services.ia'
+        'backend.app.services.ia',
+        'backend.app.services.services',
+        'backend.app.services.render'
     ]
     
     for module_name in modules_to_clear:
         if module_name in sys.modules:
             module = sys.modules[module_name]
             # Limpar atributos de cache se existirem
-            cache_attrs = ['_document_cache', '_value_cache', '_last_response']
+            cache_attrs = [
+                '_document_cache', '_value_cache', '_last_response',
+                '_cached_modalidade', '_cached_cidade', '_cached_valor',
+                '_last_substitution', '_cached_instructions', '_ai_cache'
+            ]
             for attr in cache_attrs:
                 if hasattr(module, attr):
                     delattr(module, attr)
     
-    print("🧹 Cache limpo - valores fixos removidos")
+    # Limpar cache do OpenAI se existir
+    try:
+        import openai
+        if hasattr(openai, '_cache'):
+            openai._cache.clear()
+    except:
+        pass
+    
+    # Forçar limpeza de memória
+    gc.collect()
+    
+    print("🧹 Cache completamente limpo - valores e modalidades fixas removidos")
     return True
 
 def clear_ai_response_cache():
@@ -81,6 +103,16 @@ def reset_document_processor():
     clear_value_cache()
     clear_ai_response_cache()
     
+    # Limpar variáveis específicas do processamento
+    processor_vars = [
+        'last_ai_instructions', 'cached_substitutions', 'last_modalidade',
+        'last_cidade', 'last_valor', 'cached_prompts', 'last_document_text'
+    ]
+    
+    for var in processor_vars:
+        if var in globals():
+            del globals()[var]
+    
     # Forçar garbage collection
     gc.collect()
     
@@ -88,7 +120,7 @@ def reset_document_processor():
     if 'backend.app.services.pure_ai_processor' in sys.modules:
         del sys.modules['backend.app.services.pure_ai_processor']
     
-    print("🔄 Processador de documentos resetado")
+    print("🔄 Processador de documentos resetado completamente - sem vícios")
     return True
 
 def process_complex_prompt(template_path, user_prompt, llm_api_key=None):
@@ -157,7 +189,7 @@ INSTRUÇÕES:
 1. Analise o documento fornecido
 2. Execute EXATAMENTE as alterações solicitadas pelo usuário
 3. Retorne APENAS as instruções no formato especificado
-4. Seja PRECISO - substitua TODAS as ocorrências relacionadas
+4. Seja PRECISO - substitua APENAS o que foi solicitado
 
 FORMATO DE RESPOSTA OBRIGATÓRIO:
 SUBSTITUIR: "texto original exato" → "texto novo"
@@ -167,13 +199,13 @@ REGRAS CRÍTICAS:
 - Use texto EXATO encontrado no documento
 - Para valores monetários, use o formato COMPLETO (ex: "R$ 5.678.659,46")
 - NUNCA substitua apenas "R$" - sempre o valor completo
-- Para QUALQUER alteração, substitua TODAS as variações encontradas
+- NÃO faça alterações que não foram solicitadas
 - NÃO retorne o texto do documento, apenas as instruções
 - Seja preciso e específico nas substituições
-- Execute TODAS as alterações solicitadas
-- Seja ABRANGENTE - não deixe ocorrências sem alterar
+- Execute APENAS as alterações solicitadas
+- NÃO adicione alterações extras
 
-IMPORTANTE - SUBSTITUIÇÃO COMPLETA:
+IMPORTANTE - APENAS O SOLICITADO:
 - Se o usuário pedir "Belo Horizonte", substitua "ITAJÁ", "Itajá", "ITAJÁ/GO", "Itajá/GO", "Itajá Goiás", etc.
 - Se o usuário pedir "Tomada de Preços", substitua "PREGÃO ELETRÔNICO SRP", "Pregão Eletrônico", "PREGÃO", etc.
 - Se o usuário pedir "123/2025", substitua "005/2025", "001/2024", etc.
@@ -194,6 +226,13 @@ IMPORTANTE - GERAÇÃO DE CLÁUSULAS:
 - Adapte o conteúdo ao contexto específico da licitação
 - Use linguagem jurídica apropriada e formal
 
+IMPORTANTE - NÃO FAÇA ALTERAÇÕES EXTRAS:
+- NÃO altere modalidades se não foi solicitado
+- NÃO altere cidades se não foi solicitado
+- NÃO altere valores se não foi solicitado
+- NÃO altere números se não foi solicitado
+- Execute APENAS o que foi explicitamente pedido
+
 Exemplo de resposta CORRETA:
 SUBSTITUIR: "R$ 5.678.659,46" → "R$ 75.000.000,00"
 SUBSTITUIR: "ITAJÁ" → "BELO HORIZONTE"
@@ -209,7 +248,8 @@ ADICIONAR_APOS: "2.8" → "2.9 - Critérios de Responsabilidade Social: A contra
 
 Exemplo de resposta INCORRETA:
 SUBSTITUIR: "R$" → "R$ 75.000.000,00"  # ERRADO!
-ADICIONAR_APOS: "2.8" → "2.9 - Critérios de Responsabilidade Social: [texto da cláusula]"  # ERRADO! Use texto real"""
+ADICIONAR_APOS: "2.8" → "2.9 - Critérios de Responsabilidade Social: [texto da cláusula]"  # ERRADO! Use texto real
+SUBSTITUIR: "PREGÃO ELETRÔNICO SRP" → "TOMADA DE PREÇOS"  # ERRADO! Se não foi solicitado"""
         
         user_prompt_full = f"""DOCUMENTO COMPLETO:
 {document_text}

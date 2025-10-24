@@ -183,6 +183,9 @@ def process_document_pure_ai(template_path, user_prompt, llm_api_key=None):
         document_text = extract_full_document_text(doc)
         
         # Prompt ultra-otimizado para economizar tokens
+# ... existing code ...
+
+        # Prompt ultra-otimizado para economizar tokens
         system_prompt = """Você é um assistente especializado em editar documentos DOCX de forma PRECISA e EFICIENTE.
 
 INSTRUÇÕES:
@@ -231,14 +234,12 @@ IMPORTANTE - GERAÇÃO DE CLÁUSULAS:
 - CRÍTICO: NÃO crie numeração local baseada em referências
 
 IMPORTANTE - LOCALIZAÇÃO INTELIGENTE DE CLÁUSULAS:
-- NÃO use sempre "3.1" como referência - seja INTELIGENTE
 - Para cláusula 2.9, procure por "2.8" ou "2.7" para inserir APÓS
 - Para cláusula 4.2, procure por "4.1" ou "4.0" para inserir APÓS
 - Para cláusula 5.1, procure por "5.0" ou "4.9" para inserir APÓS
 - Se o usuário pedir "após parágrafo X.Y", procure por "X.Y" exato
 - Se o usuário pedir "nova cláusula", procure por numeração sequencial
-- NÃO adicione em locais aleatórios - siga a numeração correta
-- Seja PRECISO na localização - não use sempre o mesmo local
+- Seja PRECISO na localização - siga a numeração correta
 - IMPORTANTE: Use a numeração EXATA - se pedir "4.1", procure "4.1", não "4.2"
 - IMPORTANTE: Se não encontrar a cláusula exata, procure pela anterior na mesma seção
 - CRÍTICO: Se a cláusula solicitada JÁ EXISTE, adicione APÓS ela, não incremente a numeração local

@@ -151,12 +151,13 @@ def process_document_pure_ai(template_path, user_prompt, llm_api_key=None):
         document_text = extract_full_document_text(doc)
         
         # Prompt ultra-otimizado para economizar tokens
-        system_prompt = """Você é um assistente especializado em editar documentos DOCX. 
+        system_prompt = """Você é um assistente especializado em editar documentos DOCX de forma COMPLETA e ABRANGENTE.
 
 INSTRUÇÕES:
 1. Analise o documento fornecido
 2. Execute EXATAMENTE as alterações solicitadas pelo usuário
 3. Retorne APENAS as instruções no formato especificado
+4. Seja ABRANGENTE - substitua TODAS as ocorrências relacionadas
 
 FORMATO DE RESPOSTA OBRIGATÓRIO:
 SUBSTITUIR: "texto original exato" → "texto novo"
@@ -166,13 +167,30 @@ REGRAS CRÍTICAS:
 - Use texto EXATO encontrado no documento
 - Para valores monetários, use o formato COMPLETO (ex: "R$ 5.678.659,46")
 - NUNCA substitua apenas "R$" - sempre o valor completo
+- Para QUALQUER alteração, substitua TODAS as variações encontradas
 - NÃO retorne o texto do documento, apenas as instruções
 - Seja preciso e específico nas substituições
 - Execute TODAS as alterações solicitadas
+- Seja ABRANGENTE - não deixe ocorrências sem alterar
+
+IMPORTANTE - SUBSTITUIÇÃO COMPLETA:
+- Se o usuário pedir "Belo Horizonte", substitua "ITAJÁ", "Itajá", "ITAJÁ/GO", "Itajá/GO", "Itajá Goiás", etc.
+- Se o usuário pedir "Pregão Eletrônico GFV", substitua "PREGÃO ELETRÔNICO SRP", "Pregão Eletrônico", "PREGÃO", etc.
+- Se o usuário pedir "123/2025", substitua "005/2025", "001/2024", etc.
+- Mantenha a formatação original (maiúsculo/minúsculo) do documento
+- Substitua TODAS as ocorrências relacionadas
 
 Exemplo de resposta CORRETA:
 SUBSTITUIR: "R$ 5.678.659,46" → "R$ 75.000.000,00"
-SUBSTITUIR: "ITAJÁ" → "BRASÍLIA"
+SUBSTITUIR: "ITAJÁ" → "BELO HORIZONTE"
+SUBSTITUIR: "Itajá" → "Belo Horizonte"
+SUBSTITUIR: "ITAJÁ/GO" → "BELO HORIZONTE/MG"
+SUBSTITUIR: "Itajá/GO" → "Belo Horizonte/MG"
+SUBSTITUIR: "Itajá Goiás" → "Belo Horizonte/MG"
+SUBSTITUIR: "PREGÃO ELETRÔNICO SRP" → "PREGÃO ELETRÔNICO GFV"
+SUBSTITUIR: "Pregão Eletrônico" → "Pregão Eletrônico GFV"
+SUBSTITUIR: "PREGÃO" → "PREGÃO ELETRÔNICO GFV"
+SUBSTITUIR: "005/2025" → "123/2025"
 ADICIONAR_APOS: "parágrafo 15.16" → "OBSERVAÇÃO PRÁTICA: Texto da observação"
 
 Exemplo de resposta INCORRETA:
@@ -431,6 +449,133 @@ def apply_substitution(doc, old_text, new_text):
                             break
                     if found:
                         break
+    
+    # Se ainda não encontrou e é uma substituição de cidade, tentar busca mais ampla
+    if not found and any(cidade in old_text.upper() for cidade in ['ITAJÁ', 'BELO HORIZONTE', 'SÃO PAULO', 'RIO DE JANEIRO']):
+        # Buscar por variações da cidade antiga
+        cidade_antiga_variacoes = [
+            'ITAJÁ', 'Itajá', 'itajá', 'ITAJÁ/GO', 'Itajá/GO', 'itajá/go',
+            'ITAJÁ GO', 'Itajá Go', 'itajá go', 'ITAJÁ-GO', 'Itajá-GO'
+        ]
+        
+        for variacao in cidade_antiga_variacoes:
+            if variacao in old_text:
+                # Procurar essa variação no documento
+                for paragraph in doc.paragraphs:
+                    if variacao in paragraph.text:
+                        for run in paragraph.runs:
+                            if variacao in run.text:
+                                # Manter a formatação original
+                                if variacao.isupper():
+                                    novo_texto = new_text.upper()
+                                elif variacao.islower():
+                                    novo_texto = new_text.lower()
+                                else:
+                                    novo_texto = new_text
+                                
+                                run.text = run.text.replace(variacao, novo_texto)
+                                run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                                found = True
+                                break
+                        if found:
+                            break
+                
+                # Procurar em tabelas
+                if not found:
+                    for table in doc.tables:
+                        for row in table.rows:
+                            for cell in row.cells:
+                                for paragraph in cell.paragraphs:
+                                    if variacao in paragraph.text:
+                                        for run in paragraph.runs:
+                                            if variacao in run.text:
+                                                # Manter a formatação original
+                                                if variacao.isupper():
+                                                    novo_texto = new_text.upper()
+                                                elif variacao.islower():
+                                                    novo_texto = new_text.lower()
+                                                else:
+                                                    novo_texto = new_text
+                                                
+                                                run.text = run.text.replace(variacao, novo_texto)
+                                                run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                                                found = True
+                                                break
+                                        if found:
+                                            break
+                                if found:
+                                    break
+                            if found:
+                                break
+                        if found:
+                            break
+                
+                if found:
+                    break
+    
+    # Se ainda não encontrou e é uma substituição de modalidade, tentar busca mais ampla
+    if not found and any(modalidade in old_text.upper() for modalidade in ['PREGÃO', 'TOMADA', 'CONCORRÊNCIA', 'DISPENSA', 'INEXIGIBILIDADE']):
+        # Buscar por variações da modalidade antiga
+        modalidade_antiga_variacoes = [
+            'PREGÃO ELETRÔNICO SRP', 'Pregão Eletrônico SRP', 'pregão eletrônico srp',
+            'PREGÃO ELETRÔNICO', 'Pregão Eletrônico', 'pregão eletrônico',
+            'PREGÃO', 'Pregão', 'pregão'
+        ]
+        
+        for variacao in modalidade_antiga_variacoes:
+            if variacao in old_text:
+                # Procurar essa variação no documento
+                for paragraph in doc.paragraphs:
+                    if variacao in paragraph.text:
+                        for run in paragraph.runs:
+                            if variacao in run.text:
+                                # Manter a formatação original
+                                if variacao.isupper():
+                                    novo_texto = new_text.upper()
+                                elif variacao.islower():
+                                    novo_texto = new_text.lower()
+                                else:
+                                    novo_texto = new_text
+                                
+                                run.text = run.text.replace(variacao, novo_texto)
+                                run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                                found = True
+                                break
+                        if found:
+                            break
+                
+                # Procurar em tabelas
+                if not found:
+                    for table in doc.tables:
+                        for row in table.rows:
+                            for cell in row.cells:
+                                for paragraph in cell.paragraphs:
+                                    if variacao in paragraph.text:
+                                        for run in paragraph.runs:
+                                            if variacao in run.text:
+                                                # Manter a formatação original
+                                                if variacao.isupper():
+                                                    novo_texto = new_text.upper()
+                                                elif variacao.islower():
+                                                    novo_texto = new_text.lower()
+                                                else:
+                                                    novo_texto = new_text
+                                                
+                                                run.text = run.text.replace(variacao, novo_texto)
+                                                run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                                                found = True
+                                                break
+                                        if found:
+                                            break
+                                if found:
+                                    break
+                            if found:
+                                break
+                        if found:
+                            break
+                
+                if found:
+                    break
     
     return found
 

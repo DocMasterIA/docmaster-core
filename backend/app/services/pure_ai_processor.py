@@ -182,9 +182,7 @@ def process_document_pure_ai(template_path, user_prompt, llm_api_key=None):
         # Extrair texto completo do documento (sem filtros, sem regras)
         document_text = extract_full_document_text(doc)
         
-        # Prompt ultra-otimizado para economizar tokens
-# ... existing code ...
-
+  
         # Prompt ultra-otimizado para economizar tokens
         system_prompt = """Você é um assistente especializado em editar documentos DOCX de forma PRECISA e EFICIENTE.
 
@@ -229,9 +227,10 @@ IMPORTANTE - GERAÇÃO DE CLÁUSULAS:
 - Adapte o conteúdo ao contexto específico da licitação
 - Use linguagem jurídica apropriada e formal
 - CRÍTICO: Use SEMPRE a numeração EXATA solicitada pelo usuário
-- CRÍTICO: Se pedir "7.1", gere "7.1 - Título", NÃO "3.2 - Cláusula 7.1"
+- CRÍTICO: Se pedir "7.1", gere "7.1 Título", NÃO "3.2 - Cláusula 7.1"
 - CRÍTICO: A numeração deve ser a PRIMEIRA coisa no texto da cláusula
 - CRÍTICO: NÃO crie numeração local baseada em referências
+- CRÍTICO: NÃO use hífen após a numeração - use apenas espaço
 
 IMPORTANTE - LOCALIZAÇÃO INTELIGENTE DE CLÁUSULAS:
 - Para cláusula 2.9, procure por "2.8" ou "2.7" para inserir APÓS
@@ -264,13 +263,13 @@ SUBSTITUIR: "PREGÃO ELETRÔNICO SRP" → "TOMADA DE PREÇOS"
 SUBSTITUIR: "Pregão Eletrônico" → "Tomada de Preços"
 SUBSTITUIR: "PREGÃO" → "TOMADA DE PREÇOS"
 SUBSTITUIR: "005/2025" → "123/2025"
-ADICIONAR_APOS: "2.8" → "2.9 - Critérios de Responsabilidade Social: A contratação priorizará empresas que demonstrem compromisso com práticas de responsabilidade social, incluindo: (a) contratação de pessoas com deficiência; (b) programas de inclusão social; (c) práticas sustentáveis; (d) investimento em comunidades locais. A pontuação será atribuída conforme critérios estabelecidos no Anexo I, com base na Lei 14.133/2021."
+ADICIONAR_APOS: "2.8" → "2.9 - A contratação priorizará empresas que demonstrem compromisso com práticas de responsabilidade social, incluindo: (a) contratação de pessoas com deficiência; (b) programas de inclusão social; (c) práticas sustentáveis; (d) investimento em comunidades locais. A pontuação será atribuída conforme critérios estabelecidos no Anexo I, com base na Lei 14.133/2021."
 
 Exemplo de resposta INCORRETA:
 SUBSTITUIR: "R$" → "R$ 75.000.000,00"  # ERRADO!
-ADICIONAR_APOS: "2.8" → "2.9 - Critérios de Responsabilidade Social: [texto da cláusula]"  # ERRADO! Use texto real
+ADICIONAR_APOS: "2.8" → "2.9 - [texto da cláusula]"  # ERRADO! Use texto real
 SUBSTITUIR: "PREGÃO ELETRÔNICO SRP" → "TOMADA DE PREÇOS"  # ERRADO! Se não foi solicitado"""
-        
+
         user_prompt_full = f"""DOCUMENTO COMPLETO:
 {document_text}
 

@@ -151,13 +151,13 @@ def process_document_pure_ai(template_path, user_prompt, llm_api_key=None):
         document_text = extract_full_document_text(doc)
         
         # Prompt ultra-otimizado para economizar tokens
-        system_prompt = """Você é um assistente especializado em editar documentos DOCX de forma COMPLETA e ABRANGENTE.
+        system_prompt = """Você é um assistente especializado em editar documentos DOCX de forma PRECISA e EFICIENTE.
 
 INSTRUÇÕES:
 1. Analise o documento fornecido
 2. Execute EXATAMENTE as alterações solicitadas pelo usuário
 3. Retorne APENAS as instruções no formato especificado
-4. Seja ABRANGENTE - substitua TODAS as ocorrências relacionadas
+4. Seja PRECISO - substitua TODAS as ocorrências relacionadas
 
 FORMATO DE RESPOSTA OBRIGATÓRIO:
 SUBSTITUIR: "texto original exato" → "texto novo"
@@ -175,10 +175,16 @@ REGRAS CRÍTICAS:
 
 IMPORTANTE - SUBSTITUIÇÃO COMPLETA:
 - Se o usuário pedir "Belo Horizonte", substitua "ITAJÁ", "Itajá", "ITAJÁ/GO", "Itajá/GO", "Itajá Goiás", etc.
-- Se o usuário pedir "Pregão Eletrônico GFV", substitua "PREGÃO ELETRÔNICO SRP", "Pregão Eletrônico", "PREGÃO", etc.
+- Se o usuário pedir "Tomada de Preços", substitua "PREGÃO ELETRÔNICO SRP", "Pregão Eletrônico", "PREGÃO", etc.
 - Se o usuário pedir "123/2025", substitua "005/2025", "001/2024", etc.
 - Mantenha a formatação original (maiúsculo/minúsculo) do documento
 - Substitua TODAS as ocorrências relacionadas
+
+IMPORTANTE - LOCALIZAÇÃO DE CLÁUSULAS:
+- Se o usuário pedir "cláusula 2.9", procure por "2.8" ou "2.7" para inserir APÓS
+- Se o usuário pedir "após parágrafo 2.8", procure por "2.8" exato
+- Se o usuário pedir "nova cláusula", procure por numeração sequencial
+- NÃO adicione em locais aleatórios - siga a numeração
 
 Exemplo de resposta CORRETA:
 SUBSTITUIR: "R$ 5.678.659,46" → "R$ 75.000.000,00"
@@ -187,14 +193,15 @@ SUBSTITUIR: "Itajá" → "Belo Horizonte"
 SUBSTITUIR: "ITAJÁ/GO" → "BELO HORIZONTE/MG"
 SUBSTITUIR: "Itajá/GO" → "Belo Horizonte/MG"
 SUBSTITUIR: "Itajá Goiás" → "Belo Horizonte/MG"
-SUBSTITUIR: "PREGÃO ELETRÔNICO SRP" → "PREGÃO ELETRÔNICO GFV"
-SUBSTITUIR: "Pregão Eletrônico" → "Pregão Eletrônico GFV"
-SUBSTITUIR: "PREGÃO" → "PREGÃO ELETRÔNICO GFV"
+SUBSTITUIR: "PREGÃO ELETRÔNICO SRP" → "TOMADA DE PREÇOS"
+SUBSTITUIR: "Pregão Eletrônico" → "Tomada de Preços"
+SUBSTITUIR: "PREGÃO" → "TOMADA DE PREÇOS"
 SUBSTITUIR: "005/2025" → "123/2025"
-ADICIONAR_APOS: "parágrafo 15.16" → "OBSERVAÇÃO PRÁTICA: Texto da observação"
+ADICIONAR_APOS: "2.8" → "2.9 - Critérios de Responsabilidade Social: [texto da cláusula]"
 
 Exemplo de resposta INCORRETA:
-SUBSTITUIR: "R$" → "R$ 75.000.000,00"  # ERRADO!"""
+SUBSTITUIR: "R$" → "R$ 75.000.000,00"  # ERRADO!
+ADICIONAR_APOS: "3.1" → "OBSERVAÇÃO PRÁTICA"  # ERRADO! Deveria ser após 2.8"""
         
         user_prompt_full = f"""DOCUMENTO COMPLETO:
 {document_text}

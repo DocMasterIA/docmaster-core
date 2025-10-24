@@ -11,117 +11,24 @@ logger = logging.getLogger(__name__)
 def process_document_with_ai(template_path, user_prompt, llm_api_key=None):
     """
     FUNCIONA EXATAMENTE COMO CHATGPT: Recebe documento + prompt, retorna documento modificado.
+    Usa processador 100% baseado em IA - sem regras fixas, sem regex, sem contexto pré-definido.
     """
     try:
-        from openai import OpenAI
-        from docx import Document
-        import re
+        # Usar o processador 100% baseado em IA
+        from .pure_ai_processor import process_document_pure_ai
         
-        # Configurar cliente OpenAI
-        api_key = llm_api_key or getattr(settings, 'OPENAI_API_KEY', None)
-        if not api_key:
-            logger.error("No OpenAI API key provided")
-            return {"error": "Chave da API OpenAI não configurada"}
+        result = process_document_pure_ai(template_path, user_prompt, llm_api_key)
         
-        client = OpenAI(api_key=api_key)
-        
-        # Carregar documento
-        doc = Document(template_path)
-        
-        # Extrair texto do documento (sem criar tabelas em texto)
-        document_text = extract_document_text_clean(doc)
-        
-        # Prompt simples como ChatGPT
-        system_prompt = """Você é um assistente que edita documentos.
-
-INSTRUÇÕES:
-1. Receba o texto do documento
-2. Faça as modificações solicitadas pelo usuário
-3. Retorne APENAS as substituições necessárias
-
-FORMATO DE RESPOSTA:
-old: "texto original"
-new: "texto novo"
-
-REGRAS:
-- Faça apenas as mudanças solicitadas
-- Procure valores em TODO o texto
-- Retorne apenas as substituições específicas
-- Seja preciso e direto
-- Para texto NOVO adicionado, use o formato: new: "[AZUL]texto adicionado[/AZUL]"
-- Para alterações simples, use: old: "texto antigo" e new: "texto novo" """
-        
-        user_prompt_full = f"""TEXTO DO DOCUMENTO:
-{document_text}
-
-INSTRUÇÃO DO USUÁRIO: {user_prompt}
-
-Procure no texto o valor que precisa ser alterado e retorne a substituição no formato:
-old: "texto original"
-new: "texto novo"
-
-Para ALTERAÇÕES de valores:
-old: "R$ 5.678.659,46"
-new: "R$ 2.500.000,00"
-
-Para ADIÇÃO de texto novo (cláusulas, parágrafos, etc.):
-old: ""
-new: "[AZUL]Texto novo que será adicionado ao documento[/AZUL]"
-
-IMPORTANTE: 
-- Use [AZUL]texto[/AZUL] apenas para texto NOVO que será adicionado ao documento
-- O texto será adicionado no local apropriado do documento
-- Não use quebras de linha especiais, apenas texto normal"""
-        
-        # Chamada para OpenAI
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt_full}
-            ],
-            max_tokens=2000,
-            temperature=0.1
-        )
-        
-        # Obter resposta
-        raw_response = response.choices[0].message.content
-        
-        # Log da resposta da IA
-        logger.info(f"Resposta da IA: {raw_response}")
-        
-        # Processar resposta para extrair substituições
-        changes = []
-        lines = raw_response.split('\n')
-        
-        old_text = None
-        new_text = None
-        
-        for line in lines:
-            if line.strip().startswith('old:'):
-                old_text = line.split(':', 1)[1].strip().strip('"')
-            elif line.strip().startswith('new:'):
-                new_text = line.split(':', 1)[1].strip().strip('"')
-                
-                if old_text is not None and new_text is not None:
-                    changes.append({"old": old_text, "new": new_text})
-                    logger.info(f"Substituição encontrada: '{old_text}' -> '{new_text}'")
-                    old_text = None
-                    new_text = None
-        
-        # Aplicar mudanças específicas no documento
-        modified_doc = apply_specific_changes(doc, changes)
-        
-        # Salvar documento modificado
-        output_path = save_modified_document(modified_doc, template_path)
-        
-        return {
-            "success": True,
-            "output_path": output_path,
-            "changes_made": [f"Substituído: {change.get('old')} -> {change.get('new')}" for change in changes],
-            "message": "Documento modificado com sucesso"
-        }
-        
+        if result.get('success'):
+            return {
+                "success": True,
+                "output_path": result['output_path'],
+                "changes_made": [f"Mudança aplicada pela IA: {result['changes_applied']} alterações"],
+                "message": result['message']
+            }
+        else:
+            return result
+            
     except Exception as e:
         logger.error(f"Erro ao processar documento com IA: {str(e)}")
         return {"error": f"Erro na IA: {str(e)}"}

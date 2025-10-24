@@ -235,6 +235,8 @@ IMPORTANTE - LOCALIZAÇÃO INTELIGENTE DE CLÁUSULAS:
 - Se o usuário pedir "nova cláusula", procure por numeração sequencial
 - NÃO adicione em locais aleatórios - siga a numeração correta
 - Seja PRECISO na localização - não use sempre o mesmo local
+- IMPORTANTE: Use a numeração EXATA - se pedir "4.1", procure "4.1", não "4.2"
+- IMPORTANTE: Se não encontrar a cláusula exata, procure pela anterior na mesma seção
 
 IMPORTANTE - NÃO FAÇA ALTERAÇÕES EXTRAS:
 - NÃO altere modalidades se não foi solicitado
@@ -660,6 +662,33 @@ def add_text_after(doc, reference_text, new_text):
         secao = int(clausula_parts[0])
         subsecao = int(clausula_parts[1])
         
+        # Primeiro, tentar encontrar a referência exata que a IA pediu
+        if reference_text:
+            print(f"  🔍 Procurando referência exata da IA: {reference_text}")
+            for paragraph in doc.paragraphs:
+                # Busca EXATA por referência (ex: "4.1" deve ser exatamente "4.1", não "3.4.1")
+                # Usar regex mais específica para evitar confusão com substrings
+                pattern = rf'^[^0-9]*{re.escape(reference_text)}(?:\s|\.|$|[^0-9])'
+                if re.search(pattern, paragraph.text):
+                    print(f"  ✅ Encontrada referência EXATA da IA: {reference_text}")
+                    print(f"  📝 Texto da referência: {paragraph.text[:100]}...")
+                    
+                    # Inserir após este parágrafo
+                    new_p_elem = OxmlElement('w:p')
+                    paragraph._element.addnext(new_p_elem)
+                    new_p = type(paragraph)(new_p_elem, paragraph._parent)
+                    
+                    run = new_p.add_run()
+                    run.text = new_text
+                    run.font.color.rgb = RGBColor(0, 0, 255)  # Azul
+                    found = True
+                    print(f"  ✅ Cláusula {clausula_num} adicionada após: {reference_text}")
+                    print(f"  📝 Texto adicionado: {new_text[:100]}...")
+                    return True
+        
+        # Se não encontrou a referência exata, tentar encontrar cláusula anterior
+        print(f"  🔍 Referência exata não encontrada, procurando cláusula anterior...")
+        
         # Tentar encontrar cláusula anterior
         for tentativa in range(5):  # Tentar até 5 cláusulas anteriores
             if subsecao - tentativa > 0:
@@ -667,8 +696,9 @@ def add_text_after(doc, reference_text, new_text):
                 print(f"  🔍 Tentando encontrar: {ref_candidata}")
                 
                 for paragraph in doc.paragraphs:
-                    if ref_candidata in paragraph.text:
-                        print(f"  ✅ Encontrada referência: {ref_candidata}")
+                    # Busca EXATA por cláusula (ex: "2.8" deve ser exatamente "2.8", não "13.1.8")
+                    if re.search(rf'\b{re.escape(ref_candidata)}\b', paragraph.text):
+                        print(f"  ✅ Encontrada referência EXATA: {ref_candidata}")
                         print(f"  📝 Texto da referência: {paragraph.text[:100]}...")
                         
                         # Inserir após este parágrafo
@@ -692,8 +722,10 @@ def add_text_after(doc, reference_text, new_text):
                 print(f"  🔍 Tentando encontrar: {ref_candidata}")
                 
                 for paragraph in doc.paragraphs:
-                    if ref_candidata in paragraph.text:
-                        print(f"  ✅ Encontrada última cláusula da seção: {ref_candidata}")
+                    # Busca EXATA por cláusula (ex: "2.9" deve ser exatamente "2.9", não "12.9")
+                    if re.search(rf'\b{re.escape(ref_candidata)}\b', paragraph.text):
+                        print(f"  ✅ Encontrada última cláusula da seção EXATA: {ref_candidata}")
+                        print(f"  📝 Texto da referência: {paragraph.text[:100]}...")
                         
                         # Inserir após este parágrafo
                         new_p_elem = OxmlElement('w:p')
@@ -713,8 +745,10 @@ def add_text_after(doc, reference_text, new_text):
             print(f"  🔍 Tentando encontrar seção anterior: {ref_candidata}")
             
             for paragraph in doc.paragraphs:
-                if ref_candidata in paragraph.text:
-                    print(f"  ✅ Encontrada referência: {ref_candidata}")
+                # Busca EXATA por cláusula (ex: "1.9" deve ser exatamente "1.9", não "11.9")
+                if re.search(rf'\b{re.escape(ref_candidata)}\b', paragraph.text):
+                    print(f"  ✅ Encontrada referência EXATA: {ref_candidata}")
+                    print(f"  📝 Texto da referência: {paragraph.text[:100]}...")
                     
                     # Inserir após este parágrafo
                     new_p_elem = OxmlElement('w:p')
@@ -732,8 +766,10 @@ def add_text_after(doc, reference_text, new_text):
     if not found:
         print(f"  🔍 Fallback: procurando referência exata: {reference_text}")
         for paragraph in doc.paragraphs:
-            if reference_text in paragraph.text:
+            # Busca EXATA por referência (ex: "2.8" deve ser exatamente "2.8", não "13.1.8")
+            if re.search(rf'\b{re.escape(reference_text)}\b', paragraph.text):
                 print(f"  ✅ Encontrada referência exata: {reference_text}")
+                print(f"  📝 Texto da referência: {paragraph.text[:100]}...")
                 
                 # Inserir após este parágrafo
                 new_p_elem = OxmlElement('w:p')

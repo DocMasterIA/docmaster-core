@@ -157,6 +157,147 @@ def process_complex_prompt(template_path, user_prompt, llm_api_key=None):
         print(f"❌ Erro no prompt complexo: {result.get('error')}")
         return result
 
+# ... existing code ...
+
+def suggest_insertion_position(doc, content_type, user_prompt):
+    """
+    Sugere posição inteligente para inserir conteúdo baseado no contexto.
+    """
+    import re
+    
+    # Analisar o tipo de conteúdo solicitado
+    content_indicators = {
+        'penalidades': ['penalidade', 'multa', 'sanção', 'atraso'],
+        'sustentabilidade': ['sustentabilidade', 'ambiental', 'ecológico', 'verde'],
+        'responsabilidade_social': ['responsabilidade social', 'inclusão', 'deficiência'],
+        'fiscalização': ['fiscalização', 'controle', 'monitoramento'],
+        'julgamento': ['julgamento', 'avaliação', 'critério', 'pontuação'],
+        'contrato': ['contrato', 'execução', 'prazo', 'vigência'],
+        'recursos': ['recurso', 'impugnação', 'contraditório'],
+        'disposições_gerais': ['disposições gerais', 'final', 'conclusão']
+    }
+    
+    # Identificar tipo de conteúdo
+    content_type_detected = None
+    for content_type_key, indicators in content_indicators.items():
+        if any(indicator in user_prompt.lower() for indicator in indicators):
+            content_type_detected = content_type_key
+            break
+    
+    if not content_type_detected:
+        content_type_detected = 'disposições_gerais'
+    
+    print(f"🎯 Tipo de conteúdo detectado: {content_type_detected}")
+    
+    # Estratégias de posicionamento baseadas no tipo
+    positioning_strategies = {
+        'penalidades': [
+            r'(\d+\.\d+).*penalidade',
+            r'(\d+\.\d+).*multa',
+            r'(\d+\.\d+).*sanção',
+            r'(\d+\.\d+).*atraso',
+            r'(\d+\.\d+).*prazo',
+            r'(\d+\.\d+).*execução'
+        ],
+        'sustentabilidade': [
+            r'(\d+\.\d+).*sustentabilidade',
+            r'(\d+\.\d+).*ambiental',
+            r'(\d+\.\d+).*ecológico',
+            r'(\d+\.\d+).*verde',
+            r'(\d+\.\d+).*critério'
+        ],
+        'responsabilidade_social': [
+            r'(\d+\.\d+).*responsabilidade',
+            r'(\d+\.\d+).*inclusão',
+            r'(\d+\.\d+).*deficiência',
+            r'(\d+\.\d+).*social',
+            r'(\d+\.\d+).*critério'
+        ],
+        'fiscalização': [
+            r'(\d+\.\d+).*fiscalização',
+            r'(\d+\.\d+).*controle',
+            r'(\d+\.\d+).*monitoramento',
+            r'(\d+\.\d+).*supervisão',
+            r'(\d+\.\d+).*execução'
+        ],
+        'julgamento': [
+            r'(\d+\.\d+).*julgamento',
+            r'(\d+\.\d+).*avaliação',
+            r'(\d+\.\d+).*critério',
+            r'(\d+\.\d+).*pontuação',
+            r'(\d+\.\d+).*classificação'
+        ],
+        'contrato': [
+            r'(\d+\.\d+).*contrato',
+            r'(\d+\.\d+).*execução',
+            r'(\d+\.\d+).*prazo',
+            r'(\d+\.\d+).*vigência',
+            r'(\d+\.\d+).*obrigações'
+        ],
+        'recursos': [
+            r'(\d+\.\d+).*recurso',
+            r'(\d+\.\d+).*impugnação',
+            r'(\d+\.\d+).*contraditório',
+            r'(\d+\.\d+).*defesa',
+            r'(\d+\.\d+).*procedimento'
+        ],
+        'disposições_gerais': [
+            r'(\d+\.\d+).*disposições',
+            r'(\d+\.\d+).*final',
+            r'(\d+\.\d+).*conclusão',
+            r'(\d+\.\d+).*geral',
+            r'(\d+\.\d+).*vigência'
+        ]
+    }
+    
+    # Procurar posição ideal baseada no tipo de conteúdo
+    strategies = positioning_strategies.get(content_type_detected, positioning_strategies['disposições_gerais'])
+    
+    for strategy in strategies:
+        for paragraph in doc.paragraphs:
+            if re.search(strategy, paragraph.text, re.IGNORECASE):
+                # Extrair número da cláusula encontrada
+                match = re.search(r'(\d+\.\d+)', paragraph.text)
+                if match:
+                    clausula_num = match.group(1)
+                    print(f"🎯 Posição sugerida para {content_type_detected}: após cláusula {clausula_num}")
+                    return clausula_num
+    
+    # Fallback: procurar por seções lógicas
+    fallback_sections = {
+        'penalidades': ['3', '4', '5'],  # Seções de procedimentos
+        'sustentabilidade': ['2', '3', '4'],  # Seções de critérios
+        'responsabilidade_social': ['2', '3', '4'],  # Seções de critérios
+        'fiscalização': ['3', '4', '5'],  # Seções de procedimentos
+        'julgamento': ['3', '4', '5'],  # Seções de procedimentos
+        'contrato': ['4', '5', '6'],  # Seções de execução
+        'recursos': ['3', '4', '5'],  # Seções de procedimentos
+        'disposições_gerais': ['6', '7', '8']  # Seções finais
+    }
+    
+    sections = fallback_sections.get(content_type_detected, ['6', '7', '8'])
+    
+    for section in sections:
+        for paragraph in doc.paragraphs:
+            if re.search(rf'^{section}\.', paragraph.text):
+                # Procurar última cláusula da seção
+                for i in range(9, 0, -1):
+                    ref_candidata = f"{section}.{i}"
+                    if re.search(rf'\b{re.escape(ref_candidata)}\b', paragraph.text):
+                        print(f"🎯 Posição sugerida para {content_type_detected}: após cláusula {ref_candidata}")
+                        return ref_candidata
+    
+    # Último fallback: procurar por qualquer cláusula numerada
+    for paragraph in doc.paragraphs:
+        match = re.search(r'(\d+\.\d+)', paragraph.text)
+        if match:
+            clausula_num = match.group(1)
+            print(f"🎯 Posição sugerida (fallback): após cláusula {clausula_num}")
+            return clausula_num
+    
+    return None
+
+
 def process_document_pure_ai(template_path, user_prompt, llm_api_key=None):
     """
     Processa documento 100% com IA - exatamente como ChatGPT.
@@ -263,7 +404,7 @@ SUBSTITUIR: "PREGÃO ELETRÔNICO SRP" → "TOMADA DE PREÇOS"
 SUBSTITUIR: "Pregão Eletrônico" → "Tomada de Preços"
 SUBSTITUIR: "PREGÃO" → "TOMADA DE PREÇOS"
 SUBSTITUIR: "005/2025" → "123/2025"
-ADICIONAR_APOS: "2.8" → "2.9 - A contratação priorizará empresas que demonstrem compromisso com práticas de responsabilidade social, incluindo: (a) contratação de pessoas com deficiência; (b) programas de inclusão social; (c) práticas sustentáveis; (d) investimento em comunidades locais. A pontuação será atribuída conforme critérios estabelecidos no Anexo I, com base na Lei 14.133/2021."
+ADICIONAR_APOS: "2.8" → "2.9 - A contratação priorizará empresas que demonstrem compromisso com práticas de responsabilidade social, incluindo: (a) contratação de pessoas com deficiência; (b) programas de inclusão social; (c) práticas sustentáveis; (d) investimento em comunidades locais, com base na Lei 14.133/2021."
 
 Exemplo de resposta INCORRETA:
 SUBSTITUIR: "R$" → "R$ 75.000.000,00"  # ERRADO!

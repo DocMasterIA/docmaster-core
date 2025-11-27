@@ -36,7 +36,7 @@ def generate_pdf_from_docx(docx_path):
 
 def extract_docx_structure(path):
     """
-    Retorna uma lista ordenada de blocos com metadados para enviar ao LLM.
+    Retorna uma lista ordenada de blocos com metadados do documento.
     Cada bloco: {'index': int, 'type': 'heading'|'paragraph'|'table', 'text': str, 'style': 'Heading 1'...}
     """
     doc = Document(path)

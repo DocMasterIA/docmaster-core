@@ -309,27 +309,9 @@ def DocumentGeneratorView(request, prefeitura_url):
             messages.error(request, "É necessário fornecer o prompt da IA.")
             return render(request, "document_generator.html", {"templates": templates})
 
-        # --- ABORDAGEM SIMPLIFICADA: IA processa documento diretamente ---
-        from backend.app.services.ia import process_document_with_ai
-        
-        try:
-            # Processar documento diretamente com IA
-            result = process_document_with_ai(template.file.path, prompt)
-            
-            if not result.get('success'):
-                messages.error(request, f"Erro na IA: {result.get('error', 'Erro desconhecido')}")
-                return render(request, "document_generator.html", {"templates": templates})
-                
-            # Criar dados básicos para salvar no banco
-            data = {
-                'user_prompt': prompt,
-                'changes_made': result.get('changes_made', []),
-                'message': result.get('message', 'Documento modificado')
-            }
-            
-        except Exception as e:
-            messages.error(request, f"Erro ao processar documento com IA: {str(e)}")
-            return render(request, "document_generator.html", {"templates": templates})
+        # --- Processamento de documento sem IA ---
+        messages.error(request, "Funcionalidade de IA removida. Use renderização básica com tokens {{ }}.")
+        return render(request, "document_generator.html", {"templates": templates})
 
         # --- cria DocumentInstance ---
         inst = DocumentInstance.objects.create(

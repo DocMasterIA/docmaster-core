@@ -1,5 +1,4 @@
 from backend.app.services.services import extract_docx_structure, validate_mapping_response, save_template_schema, generate_pdf_from_docx
-from backend.app.services.ia import call_llm_for_mapping
 from backend.app.services.render import render_docx_by_index, render_docx_with_tokens
 from backend.app.services.preview import generate_docx_preview, generate_docx_preview_pdf
 from django.contrib.auth.decorators import login_required
@@ -34,18 +33,16 @@ def upload_template_and_request_mapping_api(request):
     tpl.preview_image = preview_rel_path
     tpl.save()
 
-    # extrair estrutura e chamar LLM
+    # extrair estrutura (sem IA)
     try:
         doc_struct = extract_docx_structure(tpl.file.path)
-        # Chama o agente de IA para sugerir schema de campos
-        mapping = call_llm_for_mapping(
-            doc_struct, 
-            user_instructions=mapping_instructions, 
-            llm_api_key=None
-        )
+        # Retornar estrutura básica sem mapeamento automático
+        mapping = {
+            "fields": [],
+            "notes": "Mapeamento automático via IA foi removido. Use tokens {{ }} no template."
+        }
         ok, err = validate_mapping_response(mapping)
         if not ok:
-            # opcional: salvar Template sem schema e retornar mapping para revisão
             return JsonResponse({"ok": False, "error": f"Mapping inválido: {err}", "raw_mapping": mapping}, status=422)
 
         schema_obj = save_template_schema(tpl, mapping, strategy="index")

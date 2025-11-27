@@ -316,26 +316,6 @@ UNFOLD = {
                 
             ],
         },
-        {
-            "title": _("Inteligencia Artificial"),
-            "separator": False,
-            "collapsible": False,
-            "items": [
-                {
-                    "title": _("Dados Processados I.A"),
-                    "icon": "network_intel_node",
-                    "link": template_schema_link,
-                    "permission": lambda request: request.user.has_perm("app.view_template"),  # substitua 'app' pelo app_label correto
-                },
-                {
-                    "title": _("Auditoria I.A"),
-                    "icon": "robot",
-                    "link": schema_audit_link,
-                    "permission": lambda request: request.user.has_perm("app.view_documentinstance"),
-                },
-               
-            ],
-        },
         
         
         ],
@@ -374,9 +354,5 @@ LOGIN_URL = '/login'
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 SECURE_BROWSER_XSS_FILTER = False  # opcional
 
-# AI Configuration
-OPENAI_API_KEY = "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"
-AI_MODEL = os.getenv('AI_MODEL', 'gpt-3.5-turbo')
-AI_MAX_TOKENS = int(os.getenv('AI_MAX_TOKENS', '4000'))
-AI_TEMPERATURE = float(os.getenv('AI_TEMPERATURE', '0.1'))
-AI_USE_MOCK = False
+# AI Configuration - REMOVIDO
+# Funcionalidade de IA foi removida do sistema

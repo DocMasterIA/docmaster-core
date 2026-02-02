@@ -90,6 +90,32 @@ Documentação interativa: **http://localhost:8002/docs**
 
 ---
 
+## Docker
+
+Build (na raiz do repositório):
+
+```bash
+docker build -t llm_api -f llm_api/Dockerfile .
+```
+
+Executar (Ollama no host; Linux use `host.docker.internal` ou IP do host):
+
+```bash
+docker run --rm -p 8002:8002 \
+  -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
+  llm_api
+```
+
+Variáveis úteis em Docker:
+
+- `OLLAMA_BASE_URL` – URL do Ollama (no host: `http://host.docker.internal:11434`; em rede Docker: `http://ollama:11434` se o serviço se chamar `ollama`).
+- `PORT` – Porta interna (default `8002`).
+- `LLM_AUDIT_LOG_DIR` – Ex.: `/app/logs`; monte um volume se quiser persistir logs.
+
+Em **docker-compose**, o Django deve apontar para este serviço com `LLM_API_BASE_URL=http://llm_api:8002` (nome do serviço = hostname na rede).
+
+---
+
 ## Tratamento de erros
 
 - **401**: `LLMUnauthorizedError` → HTTP 401

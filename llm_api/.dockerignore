@@ -1,0 +1,24 @@
+# Git e IDE
+.git
+.gitignore
+.env
+.env.*
+*.md
+!README.md
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv
+env
+
+# Testes e cobertura (não necessários na imagem)
+.pytest_cache
+.coverage
+htmlcov
+*.egg-info
+.eggs

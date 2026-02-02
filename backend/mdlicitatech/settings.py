@@ -351,6 +351,9 @@ AUTH_USER_MODEL = "app.User"
 
 LOGIN_URL = '/login'
 
+# Proxy para o serviço FastAPI de orquestração LLM (usa sessão Django para autorização)
+LLM_API_BASE_URL = os.environ.get("LLM_API_BASE_URL", "http://127.0.0.1:8002").rstrip("/")
+
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 SECURE_BROWSER_XSS_FILTER = False  # opcional
 

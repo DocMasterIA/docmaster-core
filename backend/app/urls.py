@@ -11,6 +11,7 @@ from .api import (
     api_auth_login,
     api_auth_logout,
 )
+from .llm_proxy import llm_proxy
 from .ajax import area_do_usuario_ajax
 from django.conf import settings
 from django.conf.urls.static import static
@@ -36,6 +37,8 @@ urlpatterns = [
     path('api/me/documents/', api_me_documents, name='api_me_documents'),
     path('api/auth/login/', api_auth_login, name='api_auth_login'),
     path('api/auth/logout/', api_auth_logout, name='api_auth_logout'),
+    # Proxy LLM: sessão Django obrigatória; repassa para FastAPI (LLM_API_BASE_URL)
+    path('api/llm/<path:path>', llm_proxy, name='api_llm_proxy'),
 
     path("area_do_usuario/docs/ajax/", area_do_usuario_ajax, name="area_do_usuario_docs_ajax"),
     path('secretaria-autocomplete/ajax/', SecretariaAutocomplete.as_view(), name='secretaria-autocomplete'),

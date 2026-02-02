@@ -25,6 +25,16 @@ Com `VITE_API_URL` vazio, o frontend usa URLs relativas (`/api/...`, `/media/...
 | `api/documentos_modelos/enviar` | POST | `DocumentGenerator.vue` | FormData: template_file, name. Resposta: ok, template_id, schema |
 | `api/documentos_modelos/gerar` | POST | `DocumentGenerator.vue` | JSON: template_id, values: { prompt }, output: 'docx'|'pdf'. Resposta: arquivo binário (blob) |
 | `api/documentos_modelos/<uuid>/pdf/` | GET | `DocumentGenerator.vue`, `TemplateList.vue` | Resposta: ok, pdf_url (ou error) |
+| `api/llm/<path>` | GET/POST | (uso futuro) | **Proxy LLM**: exige sessão Django; repassa para FastAPI (planner, section, generate, health). Ex.: `api/llm/health`, `api/llm/generate` |
+
+---
+
+## Proxy LLM (FastAPI + IA)
+
+- O frontend chama **Django** em `/api/llm/...` (mesmo cookie de sessão).
+- O Django valida a sessão (`@api_login_required`) e repassa a requisição ao serviço FastAPI (`LLM_API_BASE_URL`, ex.: `http://127.0.0.1:8002`).
+- Assim o uso do FastAPI+IA fica restrito a usuários autenticados; o FastAPI não precisa implementar autenticação.
+- Configuração: `LLM_API_BASE_URL` em `settings.py` ou variável de ambiente.
 
 ---
 

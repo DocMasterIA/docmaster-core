@@ -52,7 +52,6 @@ def _raise_for_status(response: httpx.Response) -> None:
             body=response.text,
         )
 
-
 async def request(
     method: str,
     path: str,

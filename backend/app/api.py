@@ -4,17 +4,30 @@ from backend.app.services.preview import generate_docx_preview, generate_docx_pr
 from django.contrib.auth.decorators import login_required
 import json, tempfile, traceback
 from django.http import JsonResponse, FileResponse
-from backend.app.models import Template, TemplateSchema
+from backend.app.models import Template, TemplateSchema, DocumentInstance, Prefeitura
+from backend.app.forms import UserProfileForm, LoginForm
 from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth import login as auth_login, logout as auth_logout
+from backend.app.utils.utils import get_client_ip, is_locked, clear_failed_attempts, record_failed_attempt
+from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404
 import os
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_GET
 
 
+def api_login_required(view_func):
+    """Decorator que retorna 401 JSON para APIs quando o usuário não está autenticado (em vez de redirect)."""
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return JsonResponse({"error": "Não autenticado. Faça login."}, status=401)
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
 
 # API: upload de Template (DOCX) e solicitação de mapeamento de campos via IA.
-@login_required
+@api_login_required
+@csrf_exempt
 def upload_template_and_request_mapping_api(request):
     if request.method != "POST":
         return JsonResponse({"ok": False, "error": "Use POST"}, status=405)
@@ -53,7 +66,7 @@ def upload_template_and_request_mapping_api(request):
         return JsonResponse({"ok": False, "error": str(e)}, status=500)
 
 # API: lista templates (ou um específico por id) com info de preview e existência de schema.
-@login_required
+@api_login_required
 def get_template_list_api(request):
     template_id = request.GET.get("id")
     if template_id:
@@ -84,7 +97,7 @@ def get_template_list_api(request):
 
 
 # API: gerar documento (DOCX/PDF) a partir de valores recebidos, usando schema (index) ou fallback tokens.
-@login_required
+@api_login_required
 @csrf_exempt  # se for API token-based, prefira auth token em header e remova csrf_exempt
 def generate_document_with_values_api(request):
     if request.method != "POST":
@@ -122,7 +135,7 @@ def generate_document_with_values_api(request):
 
 # API: retorna até 10 templates para autocomplete/busca.
 @require_GET
-@login_required
+@api_login_required
 def template_list_api(request):
     """
     Retorna até 10 templates em JSON.
@@ -149,7 +162,7 @@ def template_list_api(request):
     return JsonResponse({"templates": data})
 
 # API: retorna URL do preview PDF, gerando se necessário.
-@login_required
+@api_login_required
 def template_preview_pdf_api(request, template_id):
     tpl = get_object_or_404(Template, id=template_id)
     if tpl.preview_pdf and tpl.preview_pdf.name:
@@ -161,3 +174,155 @@ def template_preview_pdf_api(request, template_id):
     if url:
         return JsonResponse({"ok": True, "pdf_url": url})
     return JsonResponse({"ok": False, "error": "Não foi possível gerar preview PDF"}, status=500)
+
+
+# API: login (POST) — aceita JSON e define sessão.
+@csrf_exempt
+def api_auth_login(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Use POST"}, status=405)
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({"ok": False, "error": "Corpo inválido"}, status=400)
+    email_or_username = (data.get("email_or_username") or "").strip()
+    password = data.get("password") or ""
+    remember = bool(data.get("remember"))
+    prefeitura_url = (data.get("prefeitura_url") or "").strip()
+
+    if not email_or_username or not password:
+        return JsonResponse({"ok": False, "error": "E-mail/usuário e senha são obrigatórios."}, status=400)
+
+    if request.user.is_authenticated:
+        return JsonResponse({"ok": True, "message": "Já autenticado."})
+
+    prefeitura = None
+    if prefeitura_url:
+        try:
+            prefeitura = Prefeitura.objects.get(url=prefeitura_url)
+        except Prefeitura.DoesNotExist:
+            return JsonResponse({"ok": False, "error": "Prefeitura inválida."}, status=400)
+    else:
+        prefeitura = Prefeitura.objects.first()
+        if not prefeitura:
+            return JsonResponse({"ok": False, "error": "Nenhuma prefeitura configurada."}, status=503)
+
+    ip_key = f"ip:{get_client_ip(request)}"
+    if is_locked(ip_key):
+        return JsonResponse({"ok": False, "error": "Muitas tentativas deste IP. Tente novamente mais tarde."}, status=429)
+
+    form = LoginForm(request=request, data={"email_or_username": email_or_username, "password": password, "remember": remember})
+    if not form.is_valid():
+        record_failed_attempt(ip_key)
+        if email_or_username:
+            record_failed_attempt(f"user:{email_or_username}")
+        err = form.non_field_errors()
+        if err:
+            return JsonResponse({"ok": False, "error": err[0]}, status=401)
+        return JsonResponse({"ok": False, "error": "E-mail/usuário ou senha inválidos."}, status=401)
+
+    user = form.get_user()
+    if not user.is_staff and not user.is_superuser:
+        if user.prefeitura_id != prefeitura.id:
+            return JsonResponse({"ok": False, "error": "Usuário não pertence a esta prefeitura."}, status=403)
+    user_key = f"user:{user.get_username()}"
+    if is_locked(user_key):
+        return JsonResponse({"ok": False, "error": "Conta bloqueada temporariamente. Tente novamente mais tarde."}, status=429)
+    clear_failed_attempts(ip_key)
+    clear_failed_attempts(user_key)
+    auth_login(request, user)
+    if remember:
+        request.session.set_expiry(60 * 60 * 24 * 30)
+    else:
+        request.session.set_expiry(0)
+    return JsonResponse({"ok": True, "message": "Login realizado com sucesso.", "prefeitura_url": prefeitura.url})
+
+
+# API: logout (encerra sessão e retorna OK para o front redirecionar ao login).
+@csrf_exempt
+def api_auth_logout(request):
+    if request.method not in ("GET", "POST"):
+        return JsonResponse({"ok": False, "error": "Use GET ou POST"}, status=405)
+    auth_logout(request)
+    return JsonResponse({"ok": True, "message": "Logout realizado."})
+
+
+# API: perfil do usuário logado (GET) e atualização (POST).
+@api_login_required
+@csrf_exempt
+def api_me(request):
+    user = request.user
+    if request.method == "GET":
+        data = {
+            "id": str(user.id),
+            "email": user.email,
+            "first_name": user.first_name or "",
+            "last_name": user.last_name or "",
+            "full_name": f"{user.first_name or ''} {user.last_name or ''}".strip() or user.email,
+            "role": getattr(user, "role", "") or "",
+            "date_joined": user.date_joined.strftime("%d/%m/%Y %H:%M") if user.date_joined else "",
+            "is_staff": user.is_staff,
+        }
+        if user.profile_photo and user.profile_photo.name:
+            data["profile_photo"] = user.profile_photo.url
+        else:
+            data["profile_photo"] = None
+        if getattr(user, "secretaria", None):
+            data["secretaria"] = str(user.secretaria)
+        else:
+            data["secretaria"] = None
+        if getattr(user, "prefeitura", None):
+            data["prefeitura"] = str(user.prefeitura)
+        else:
+            data["prefeitura"] = None
+        return JsonResponse(data)
+    if request.method == "POST":
+        form = UserProfileForm(request.POST, request.FILES, instance=user)
+        if form.is_valid():
+            form.save()
+            return JsonResponse({"ok": True, "message": "Dados atualizados com sucesso!"})
+        return JsonResponse({"ok": False, "errors": form.errors}, status=400)
+    return JsonResponse({"error": "Method not allowed"}, status=405)
+
+
+# API: lista de documentos do usuário (paginação e busca).
+@api_login_required
+@require_GET
+def api_me_documents(request):
+    user = request.user
+    query = request.GET.get("q", "").strip()
+    page_number = request.GET.get("page", 1)
+    docs = DocumentInstance.objects.filter(owner=user).select_related("template")
+    if query:
+        docs = docs.filter(template__name__icontains=query)
+    docs = docs.order_by("-updated_at")
+    paginator = Paginator(docs, 10)
+    page_obj = paginator.get_page(page_number)
+    results = []
+    for doc in page_obj:
+        item = {
+            "id": str(doc.id),
+            "template_name": doc.template.name if doc.template else "",
+            "updated_at": doc.updated_at.strftime("%d/%m/%Y %H:%M") if doc.updated_at else "",
+            "status": doc.status,
+            "status_display": doc.get_status_display(),
+        }
+        if doc.file_docx and doc.file_docx.name:
+            item["file_docx_url"] = doc.file_docx.url
+        else:
+            item["file_docx_url"] = None
+        if doc.file_pdf and doc.file_pdf.name:
+            item["file_pdf_url"] = doc.file_pdf.url
+        else:
+            item["file_pdf_url"] = None
+        results.append(item)
+    return JsonResponse({
+        "results": results,
+        "count": paginator.count,
+        "num_pages": paginator.num_pages,
+        "page": page_obj.number,
+        "has_previous": page_obj.has_previous(),
+        "has_next": page_obj.has_next(),
+        "start_index": page_obj.start_index(),
+        "end_index": page_obj.end_index(),
+    })

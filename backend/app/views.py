@@ -2,6 +2,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.files import File
 from django.contrib import messages
+from django.http import HttpResponse
 from django.urls import reverse
 from backend.app.models import Template, DocumentInstance, SubtopicoSecretaria
 from backend.app.forms import TemplateUploadForm
@@ -19,6 +20,12 @@ from django.db.models import Q
 
 from backend.app.models.usuario import User
 from backend.app.models.prefeitura import Prefeitura
+
+
+def favicon_view(request):
+    """Responde a /favicon.ico para evitar que dispare LoginView (prefeitura_url)."""
+    return HttpResponse(status=204)
+
 
 # Redireciona login global para a primeira prefeitura disponível ou landing.
 def login_global_redirect(request):
@@ -42,7 +49,7 @@ def LoginView(request, prefeitura_url):
         prefeitura = Prefeitura.objects.get(url=prefeitura_url)
     except Prefeitura.DoesNotExist:
         messages.error(request, "Prefeitura inválida")
-        return redirect("landing")  # ou página segura
+        return redirect("login_global")
 
     form = LoginForm(request=request, data=request.POST or None)
 

@@ -1,0 +1,38 @@
+# DocMaster IA – orquestração LLM (FastAPI)
+# Uso: docker compose up -d llm_api
+# Quando o Django rodar em outro serviço, defina LLM_API_BASE_URL=http://llm_api:8002
+# Para carregar variáveis do .env do host: env_file: - llm_api/.env
+
+services:
+  llm_api:
+    build:
+      context: .
+      dockerfile: llm_api/Dockerfile
+    image: docmaster-llm_api
+    container_name: llm_api
+    ports:
+      - "8002:8002"
+    environment:
+      - PORT=8002
+      # Ollama no host (Docker Desktop / Mac/Win); Linux: use extra_hosts ou IP do host
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - LLM_TIMEOUT=120
+      - LLM_MAX_RETRIES=3
+      # Auditoria: logs em /app/logs no container; volume abaixo persiste no host
+      - LLM_AUDIT_LOG_DIR=/app/logs
+    volumes:
+      # Logs de auditoria (llm_audit_YYYY-MM-DD.jsonl) aparecem em ./llm_audit no projeto
+      - ./llm_audit:/app/logs
+    restart: unless-stopped
+
+  # Exemplo quando o Django estiver em Docker (descomente e ajuste build/command):
+  # backend:
+  #   build:
+  #     context: .
+  #     dockerfile: backend/Dockerfile  # criar quando for containerizar o Django
+  #   environment:
+  #     - LLM_API_BASE_URL=http://llm_api:8002
+  #   depends_on:
+  #     - llm_api
+  #   ports:
+  #     - "8000:8000"

@@ -1,6 +1,6 @@
 # Módulo de Orquestração LLM (FastAPI)
 
-Camada intermediária entre o backend da aplicação e o servidor de IA local: integração padronizada, segura e auditável, com cliente HTTP, tratamento de erros (401, 429, 5xx), retries, timeout e registro de respostas brutas. Interface padronizada para chamadas **planner** e **section**. Não há garantia de resultados específicos quanto às respostas do modelo.
+Camada intermediária entre o backend da aplicação e o servidor de IA local: integração padronizada, segura e auditável, com cliente HTTP, tratamento de erros (401, 429, 5xx), retries, timeout e registro de respostas brutas. Interface padronizada para chamadas **planner**, **section** e **analysis** (análise de editais). Não há garantia de resultados específicos quanto às respostas do modelo.
 
 ---
 
@@ -14,7 +14,7 @@ llm_api/
 │   ├── config.py         # OLLAMA_BASE_URL, timeout, retries, audit dir
 │   ├── exceptions.py     # LLMClientError, 401, 429, 5xx, Timeout
 │   ├── client.py         # Cliente HTTP (httpx), retries, timeout
-│   ├── adapter.py        # planner(), section(), auditoria
+│   ├── adapter.py        # planner(), section(), analysis(), auditoria
 │   ├── audit.py          # log_request_response (arquivo + logger)
 │   ├── interfaces/
 │   │   ├── __init__.py
@@ -22,7 +22,7 @@ llm_api/
 │   │   └── section.py    # call_section
 │   └── api/
 │       ├── __init__.py
-│       └── routes.py     # POST /api/llm/planner, POST /api/llm/section, GET /api/llm/health
+│       └── routes.py     # POST /api/llm/planner, section, analysis; GET /api/llm/health
 ├── README.md
 └── requirements.txt
 ```
@@ -39,6 +39,7 @@ llm_api/
 | `LLM_AUDIT_LOG_DIR` | Diretório para logs de auditoria (JSONL) | (vazio = só logger) |
 | `LLM_ENDPOINT_PLANNER` | Path do endpoint planner | `/v1/planner` |
 | `LLM_ENDPOINT_SECTION` | Path do endpoint section | `/v1/section` |
+| `LLM_ENDPOINT_ANALYSIS` | Path do endpoint de análise (ex.: editais) | `/v1/analysis` |
 
 ---
 
@@ -48,6 +49,7 @@ llm_api/
 - **GET /api/llm/health** – Health check.
 - **POST /api/llm/planner** – Chamada tipo planner (body: `prompt`, opcional `context`, `options`).
 - **POST /api/llm/section** – Chamada tipo section (body: `prompt`, opcional `section_id`, `context`).
+- **POST /api/llm/analysis** – Análise/avaliação de documento (ex.: editais); body: `document`, opcional `context`, `options`. Não gera nem modifica documento.
 
 Respostas de sucesso: `{"ok": true, "data": ...}`. Erros: 401, 429, 4xx/5xx com `detail` em JSON.
 
@@ -61,7 +63,7 @@ Cada linha contém:
 
 - `timestamp`: ISO 8601 (UTC)
 - `request_id`: UUID da chamada
-- `call_type`: `"planner"` ou `"section"`
+- `call_type`: `"planner"`, `"section"` ou `"analysis"`
 - `request_payload`: payload enviado (serializável)
 - `response_raw`: resposta bruta do servidor (ou `{"error": "..."}` em falha)
 - `duration_ms`: duração em milissegundos

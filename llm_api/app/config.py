@@ -45,6 +45,8 @@ LLM_AUDIT_LOG_DIR: Optional[str] = os.environ.get("LLM_AUDIT_LOG_DIR") or None
 # Endpoints relativos ao OLLAMA_BASE_URL (podem ser sobrescritos por env se necessário)
 LLM_ENDPOINT_PLANNER: str = os.environ.get("LLM_ENDPOINT_PLANNER", "/v1/planner")
 LLM_ENDPOINT_SECTION: str = os.environ.get("LLM_ENDPOINT_SECTION", "/v1/section")
+# Análise de editais: avaliação de documento (não gera/modifica, apenas analisa)
+LLM_ENDPOINT_ANALYSIS: str = os.environ.get("LLM_ENDPOINT_ANALYSIS", "/v1/analysis")
 
 # Ollama: endpoint e modelo padrão para /api/generate
 OLLAMA_GENERATE_PATH: str = os.getenv("OLLAMA_GENERATE_PATH", "/api/generate")

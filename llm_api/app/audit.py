@@ -24,8 +24,12 @@ def _ensure_audit_dir() -> Path | None:
     if not LLM_AUDIT_LOG_DIR:
         return None
     p = Path(LLM_AUDIT_LOG_DIR)
-    p.mkdir(parents=True, exist_ok=True)
-    return p
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+    except OSError as e:
+        logger.warning("Não foi possível criar diretório de auditoria %s: %s", p, e)
+        return None
 
 
 def _serialize_payload(obj: Any) -> Any:

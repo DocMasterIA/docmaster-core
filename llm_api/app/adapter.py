@@ -1,8 +1,11 @@
 """
 Adapter LLM: interface padronizada entre a aplicação e o servidor de IA.
 
-Métodos de alto nível (planner, section) que utilizam o client, registram
-auditoria e devolvem respostas normalizadas. Ponto único de chamada.
+Métodos de alto nível (planner, section, analysis) que utilizam o client,
+registram auditoria e devolvem respostas normalizadas. Ponto único de chamada.
+
+- planner / section: criação ou modificação de documentos.
+- analysis: avaliação de documento (ex.: análise de editais), sem gerar/editar.
 """
 from __future__ import annotations
 
@@ -14,6 +17,7 @@ from typing import Any
 from app.audit import log_request_response
 from app.client import request
 from app.config import (
+    LLM_ENDPOINT_ANALYSIS,
     LLM_ENDPOINT_PLANNER,
     LLM_ENDPOINT_SECTION,
     OLLAMA_GENERATE_PATH,
@@ -31,7 +35,7 @@ async def _call(
     """
     Envia requisição ao servidor de IA, registra auditoria e retorna resposta.
 
-    - call_type: "planner" ou "section" (para logs).
+    - call_type: "planner", "section" ou "analysis" (para logs).
     - path: endpoint relativo (ex.: /v1/planner).
     - payload: corpo JSON da requisição.
     """
@@ -80,6 +84,17 @@ async def section(payload: dict[str, Any]) -> dict[str, Any] | str:
     Não há garantia de resultado específico.
     """
     return await _call("section", LLM_ENDPOINT_SECTION, payload)
+
+
+async def analysis(payload: dict[str, Any]) -> dict[str, Any] | str:
+    """
+    Chamada padronizada para análise/avaliação de documento (ex.: análise de editais).
+
+    Não gera nem modifica documento; apenas avalia o conteúdo e retorna
+    parecer, riscos, conformidade, etc., conforme contrato do servidor de IA.
+    Payload típico: document (texto ou trecho), context, options.
+    """
+    return await _call("analysis", LLM_ENDPOINT_ANALYSIS, payload)
 
 
 async def generate(

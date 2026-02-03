@@ -1,7 +1,7 @@
 """
 Rotas FastAPI para o módulo LLM.
 
-Endpoints funcionais que recebem JSON, chamam adapter (planner/section),
+Endpoints funcionais que recebem JSON, chamam adapter (planner/section/analysis),
 tratam erros e retornam resposta padronizada.
 """
 from __future__ import annotations
@@ -19,6 +19,7 @@ from app.exceptions import (
     LLMTimeoutError,
     LLMUnauthorizedError,
 )
+from app.interfaces.analysis import call_analysis
 from app.interfaces.planner import call_planner
 from app.interfaces.section import call_section
 
@@ -38,6 +39,13 @@ class SectionRequest(BaseModel):
     prompt: str = ""
     section_id: str | None = None
     context: dict[str, Any] | None = None
+
+
+class AnalysisRequest(BaseModel):
+    """Payload para análise de documento (ex.: análise de editais). Avaliação sem gerar/editar."""
+    document: str = ""
+    context: dict[str, Any] | None = None
+    options: dict[str, Any] | None = None
 
 
 class GenerateRequest(BaseModel):
@@ -62,6 +70,15 @@ def _payload_from_section_request(req: SectionRequest) -> dict[str, Any]:
         payload["section_id"] = req.section_id
     if req.context is not None:
         payload["context"] = req.context
+    return payload
+
+
+def _payload_from_analysis_request(req: AnalysisRequest) -> dict[str, Any]:
+    payload: dict[str, Any] = {"document": req.document}
+    if req.context is not None:
+        payload["context"] = req.context
+    if req.options is not None:
+        payload["options"] = req.options
     return payload
 
 
@@ -117,6 +134,32 @@ async def endpoint_section(body: SectionRequest) -> dict[str, Any]:
         raise HTTPException(status_code=e.status_code or 400, detail=e.message)
 
 
+@router.post("/analysis")
+async def endpoint_analysis(body: AnalysisRequest) -> dict[str, Any]:
+    """
+    Endpoint para análise/avaliação de documento (ex.: análise de editais).
+
+    Recebe JSON com document (texto a avaliar) e opcionalmente context, options.
+    Não gera nem modifica documento; retorna avaliação do servidor de IA.
+    """
+    try:
+        payload = _payload_from_analysis_request(body)
+        result = await call_analysis(payload)
+        if isinstance(result, dict):
+            return {"ok": True, "data": result}
+        return {"ok": True, "data": {"raw": result}}
+    except LLMUnauthorizedError as e:
+        raise HTTPException(status_code=401, detail=e.message)
+    except LLMRateLimitError as e:
+        raise HTTPException(status_code=429, detail=e.message)
+    except LLMServerError as e:
+        raise HTTPException(status_code=e.status_code or 502, detail=e.message)
+    except LLMTimeoutError as e:
+        raise HTTPException(status_code=504, detail=e.message)
+    except LLMClientError as e:
+        raise HTTPException(status_code=e.status_code or 400, detail=e.message)
+
+
 @router.post("/generate")
 async def endpoint_generate(body: GenerateRequest) -> dict[str, Any]:
     """
@@ -124,6 +167,12 @@ async def endpoint_generate(body: GenerateRequest) -> dict[str, Any]:
 
     Recebe prompt (obrigatório), model (opcional) e stream (opcional).
     Retorna o JSON do Ollama (response, model, done, etc.).
+    """
+
+    """
+    teste: curl -X POST http://localhost:8002/api/llm/generate \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Quais são os tipos de editais de licitação?"}'
     """
     try:
         result = await generate(
@@ -144,6 +193,29 @@ async def endpoint_generate(body: GenerateRequest) -> dict[str, Any]:
         raise HTTPException(status_code=504, detail=e.message)
     except LLMClientError as e:
         raise HTTPException(status_code=e.status_code or 400, detail=e.message)
+
+
+@router.get("/test-audit")
+async def test_audit() -> dict[str, Any]:
+    """
+    Testa se o diretório de auditoria (LLM_AUDIT_LOG_DIR) existe e é gravável.
+    Útil para validar em Docker. Grava uma linha de teste e retorna ok ou erro.
+    """
+    from app.audit import log_request_response
+    from app.config import LLM_AUDIT_LOG_DIR
+
+    if not LLM_AUDIT_LOG_DIR:
+        return {"ok": False, "error": "LLM_AUDIT_LOG_DIR não definido", "dir": None}
+    try:
+        log_request_response(
+            call_type="test",
+            request_payload={"test": True},
+            response_raw={"message": "teste de escrita"},
+            duration_ms=0.0,
+        )
+        return {"ok": True, "message": "Log de auditoria gravado", "dir": LLM_AUDIT_LOG_DIR}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "dir": LLM_AUDIT_LOG_DIR}
 
 
 @router.get("/health")

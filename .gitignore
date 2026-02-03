@@ -41,4 +41,7 @@ mobile/ios/
 *.pid
 *.sock
 
+# LLM API – logs de auditoria (volume Docker)
+/llm_audit/
+
 /staticfiles/

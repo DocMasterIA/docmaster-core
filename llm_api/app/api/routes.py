@@ -220,3 +220,5 @@ async def test_audit() -> dict[str, Any]:
 async def health() -> dict[str, str]:
     """Health check do serviço de orquestração LLM."""
     return {"status": "ok", "service": "llm-orchestration"}
+
+#...

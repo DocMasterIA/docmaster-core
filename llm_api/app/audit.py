@@ -2,14 +2,14 @@
 Registro (log) de respostas brutas do modelo para fins de auditoria.
 
 Grava por requisição: timestamp, request_id, call_type, request_payload,
-response_raw e duration_ms. Formato JSON Lines; destino configurável
-(LLM_AUDIT_LOG_DIR) ou apenas logger Python.
+response_raw e duration_ms. Formato JSON Lines. Pasta de logs é criada
+automaticamente (padrão: "logs" junto à raiz do pacote); opcionalmente
+sobrescrita por LLM_AUDIT_LOG_DIR.
 """
 from __future__ import annotations
 
 import json
 import logging
-import os
 import time
 import uuid
 from pathlib import Path
@@ -19,11 +19,20 @@ from app.config import LLM_AUDIT_LOG_DIR
 
 logger = logging.getLogger("llm.audit")
 
+# Pasta padrão de auditoria (raiz do pacote / "logs" — em Docker = /app/logs)
+_DEFAULT_AUDIT_DIR = Path(__file__).resolve().parent.parent / "logs"
+
+
+def _get_audit_dir() -> Path:
+    """Retorna o diretório de auditoria (env ou padrão automático)."""
+    if LLM_AUDIT_LOG_DIR and LLM_AUDIT_LOG_DIR.strip():
+        return Path(LLM_AUDIT_LOG_DIR.strip())
+    return _DEFAULT_AUDIT_DIR
+
 
 def _ensure_audit_dir() -> Path | None:
-    if not LLM_AUDIT_LOG_DIR:
-        return None
-    p = Path(LLM_AUDIT_LOG_DIR)
+    """Cria o diretório de auditoria se não existir e retorna o Path; em falha retorna None."""
+    p = _get_audit_dir()
     try:
         p.mkdir(parents=True, exist_ok=True)
         return p

@@ -39,7 +39,7 @@ LLM_TIMEOUT: float = _env_float("LLM_TIMEOUT", 120.0)
 # Número máximo de tentativas (retries) em caso de falha transitória
 LLM_MAX_RETRIES: int = _env_int("LLM_MAX_RETRIES", 3)
 
-# Diretório para logs de auditoria (respostas brutas). Vazio = não grava em arquivo.
+# Diretório para logs de auditoria (opcional). Se vazio, o audit usa pasta padrão "logs" automaticamente.
 LLM_AUDIT_LOG_DIR: Optional[str] = os.environ.get("LLM_AUDIT_LOG_DIR") or None
 
 # Endpoints relativos ao OLLAMA_BASE_URL (podem ser sobrescritos por env se necessário)

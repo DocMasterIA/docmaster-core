@@ -18,10 +18,9 @@ services:
       - OLLAMA_BASE_URL=http://ollama:11434
       - LLM_TIMEOUT=120
       - LLM_MAX_RETRIES=3
-      # Auditoria: logs em /app/logs no container; volume abaixo persiste no host
-      - LLM_AUDIT_LOG_DIR=/app/logs
+      # LLM_AUDIT_LOG_DIR opcional; se vazio, o app usa /app/logs automaticamente
     volumes:
-      # Logs de auditoria (llm_audit_YYYY-MM-DD.jsonl) aparecem em ./llm_audit no projeto
+      # Logs de auditoria automáticos (llm_audit_YYYY-MM-DD.jsonl) em ./llm_audit no projeto
       - ./llm_audit:/app/logs
     restart: unless-stopped
 

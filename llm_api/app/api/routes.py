@@ -198,14 +198,12 @@ async def endpoint_generate(body: GenerateRequest) -> dict[str, Any]:
 @router.get("/test-audit")
 async def test_audit() -> dict[str, Any]:
     """
-    Testa se o diretório de auditoria (LLM_AUDIT_LOG_DIR) existe e é gravável.
-    Útil para validar em Docker. Grava uma linha de teste e retorna ok ou erro.
+    Testa se o diretório de auditoria existe e é gravável (pasta automática ou LLM_AUDIT_LOG_DIR).
+    Grava uma linha de teste e retorna ok ou erro.
     """
-    from app.audit import log_request_response
-    from app.config import LLM_AUDIT_LOG_DIR
+    from app.audit import _get_audit_dir, log_request_response
 
-    if not LLM_AUDIT_LOG_DIR:
-        return {"ok": False, "error": "LLM_AUDIT_LOG_DIR não definido", "dir": None}
+    audit_dir = str(_get_audit_dir())
     try:
         log_request_response(
             call_type="test",
@@ -213,9 +211,9 @@ async def test_audit() -> dict[str, Any]:
             response_raw={"message": "teste de escrita"},
             duration_ms=0.0,
         )
-        return {"ok": True, "message": "Log de auditoria gravado", "dir": LLM_AUDIT_LOG_DIR}
+        return {"ok": True, "message": "Log de auditoria gravado", "dir": audit_dir}
     except Exception as e:
-        return {"ok": False, "error": str(e), "dir": LLM_AUDIT_LOG_DIR}
+        return {"ok": False, "error": str(e), "dir": audit_dir}
 
 
 @router.get("/health")

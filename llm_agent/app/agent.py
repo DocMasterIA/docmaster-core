@@ -11,21 +11,26 @@ Responsável por:
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 
 from pydantic import ValidationError
 
+from .catalog_filter import filter_eligible_sections
 from .client import OrchestrationError, call_generate
 from .config import AGENT_MAX_RETRIES
 from .prompts import (
+    CATALOG_SELECTION_SYSTEM_PROMPT,
     INTERPRETER_SYSTEM_PROMPT,
+    build_catalog_selection_user_prompt,
     build_interpreter_user_prompt,
     build_system_prompt,
     build_user_prompt,
 )
+from .registry import get_catalog_from_registry
 from .schemas import (
     ContextoBasico,
     DocumentStructure,
+    SectionCatalogEntry,
     SectionNode,
     StructureRequest,
     StructureResponse,
@@ -184,6 +189,71 @@ def _validate_semantics(document_type: str, structure: DocumentStructure) -> Non
             raise ValueError(f"Seções obrigatórias ausentes para '{dt}': {', '.join(missing)}.")
 
 
+def _catalog_entry_to_section_node(
+    entry: SectionCatalogEntry,
+    context: ContextoBasico,
+) -> SectionNode:
+    """Converte uma entrada do catálogo em SectionNode; required considera required_by e contexto."""
+    required = entry.required
+    if entry.required_by and (context.extras or {}).get("requiring_authority") in entry.required_by:
+        required = True
+    return SectionNode(
+        key=entry.key,
+        title=entry.title,
+        required=required,
+        content_type=entry.content_type,
+        table_schema=entry.table_schema,
+        children=[],
+    )
+
+
+def _build_structure_from_catalog_selection(
+    selected_keys: List[str],
+    eligible_entries: List[SectionCatalogEntry],
+    document_type: str,
+    context: ContextoBasico,
+) -> DocumentStructure:
+    """
+    Monta DocumentStructure a partir da lista ordenada de keys retornada pelo modelo,
+    usando apenas definições do catálogo (sem invenção).
+    """
+    by_key = {e.key: _catalog_entry_to_section_node(e, context) for e in eligible_entries}
+    selected_set = set(selected_keys)
+    # Só considera keys que estão no catálogo elegível
+    ordered = [k for k in selected_keys if k in by_key]
+    if not ordered:
+        # Fallback mínimo: pelo menos as raízes na ordem do catálogo
+        ordered = [e.key for e in eligible_entries if (e.parent_key or "").strip() == ""]
+
+    # Monta árvore: nós raiz (parent_key None ou não selecionado) e filhos
+    roots: List[SectionNode] = []
+    key_to_node = dict(by_key)
+    for k in ordered:
+        node = key_to_node.get(k)
+        if not node:
+            continue
+        entry = next((e for e in eligible_entries if e.key == k), None)
+        if not entry:
+            continue
+        parent_key = (entry.parent_key or "").strip() or None
+        if not parent_key or parent_key not in selected_set or parent_key not in key_to_node:
+            roots.append(node)
+        else:
+            parent = key_to_node[parent_key]
+            parent.children.append(node)
+
+    if not roots:
+        roots = [key_to_node[k] for k in ordered if k in key_to_node]
+
+    # Ordena raízes pela ordem em ordered; ordena children pela ordem em ordered
+    order_idx = {k: i for i, k in enumerate(ordered)}
+    roots.sort(key=lambda n: order_idx.get(n.key, 999))
+    for node in key_to_node.values():
+        node.children.sort(key=lambda n: order_idx.get(n.key, 999))
+
+    return DocumentStructure(document_type=document_type, root_sections=roots)
+
+
 def _build_llm_payload(req: StructureRequest) -> Dict[str, Any]:
     """Monta o payload para o /api/llm/generate da orquestração."""
     system_prompt = build_system_prompt(req.document_type)
@@ -273,12 +343,102 @@ def _parse_structure(raw: Any, document_type: str) -> DocumentStructure:
     return DocumentStructure.model_validate(candidate)
 
 
+def _parse_catalog_selection_response(raw: Any, eligible_keys: set) -> List[str]:
+    """
+    Extrai a lista section_keys da resposta do modelo (catálogo versionável).
+    Retorna apenas keys que estão em eligible_keys; ordem preservada.
+    """
+    if isinstance(raw, str):
+        raw = _strip_markdown_json(raw)
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+    if not isinstance(raw, dict):
+        return []
+    keys = raw.get("section_keys")
+    if not isinstance(keys, list):
+        return []
+    return [k for k in keys if isinstance(k, str) and k.strip() in eligible_keys]
+
+
+async def _generate_structure_with_catalog(req: StructureRequest) -> StructureResponse:
+    """
+    Fluxo com catálogo versionável: filtra seções elegíveis de forma determinística,
+    pede ao modelo apenas a ordenação/seleção (lista de keys), monta estrutura do catálogo.
+    """
+    eligible = filter_eligible_sections(
+        req.sections_catalog, req.document_type, req.context
+    )
+    eligible_keys = {e.key for e in eligible}
+    if not eligible:
+        fallback = _minimal_structure_for(req.document_type)
+        return StructureResponse(
+            ok=False,
+            structure=fallback,
+            error="Nenhuma seção do catálogo elegível para o tipo e contexto informados.",
+            retries=0,
+        )
+
+    system_prompt = CATALOG_SELECTION_SYSTEM_PROMPT.strip()
+    user_prompt = build_catalog_selection_user_prompt(
+        eligible, req.document_type, req.context.model_dump()
+    )
+    full_prompt = f"<<SYSTEM>>\n{system_prompt}\n\n<<USER>>\n{user_prompt}"
+    payload = {"prompt": full_prompt, "stream": False}
+
+    last_error: str | None = None
+    for attempt in range(AGENT_MAX_RETRIES + 1):
+        try:
+            data = await call_generate(payload)
+            raw = data.get("response") if isinstance(data, dict) else data
+            if raw is None:
+                raw = data
+            selected = _parse_catalog_selection_response(raw, eligible_keys)
+            if not selected:
+                # Fallback: ordem do catálogo (raízes primeiro)
+                selected = [e.key for e in eligible if (e.parent_key or "").strip() == ""]
+                if not selected:
+                    selected = [e.key for e in eligible]
+            structure = _build_structure_from_catalog_selection(
+                selected, eligible, req.document_type, req.context
+            )
+            return StructureResponse(ok=True, structure=structure, retries=attempt)
+        except (OrchestrationError, Exception) as e:
+            last_error = str(e)
+            continue
+
+    # Fallback: todas as elegíveis na ordem do catálogo
+    selected = [e.key for e in eligible]
+    structure = _build_structure_from_catalog_selection(
+        selected, eligible, req.document_type, req.context
+    )
+    return StructureResponse(
+        ok=False,
+        structure=structure,
+        error=last_error or "Resposta do modelo inválida; usada ordem padrão do catálogo.",
+        retries=AGENT_MAX_RETRIES + 1,
+    )
+
+
 async def generate_structure(req: StructureRequest) -> StructureResponse:
     """
     Função principal do agente:
-    - Tenta AGENT_MAX_RETRIES+1 vezes obter uma estrutura válida do modelo.
-    - Em falha, retorna estrutura mínima de fallback.
+    - Se sections_catalog for informado: fluxo versionável (seleção/ordenação apenas).
+    - Se não, mas existir registro em arquivo (SECTIONS_REGISTRY_PATH): usa catálogo do registro.
+    - Caso contrário: geração livre com hints; fallback para estrutura mínima.
     """
+    catalog = req.sections_catalog
+    if catalog is None or not catalog.entries:
+        catalog = get_catalog_from_registry()
+    if catalog is not None and catalog.entries:
+        req_with_catalog = StructureRequest(
+            document_type=req.document_type,
+            context=req.context,
+            sections_catalog=catalog,
+        )
+        return await _generate_structure_with_catalog(req_with_catalog)
+
     last_error: str | None = None
 
     for attempt in range(AGENT_MAX_RETRIES + 1):
@@ -287,7 +447,6 @@ async def generate_structure(req: StructureRequest) -> StructureResponse:
             data = await call_generate(payload)
 
             # A orquestração devolve algo em "data"; esperamos algo como {"response": "..."} ou similar.
-            # Procuramos um campo óbvio de texto longo; se não houver, tentamos usar o próprio data.
             raw = data.get("response") if isinstance(data, dict) else data
             if raw is None:
                 raw = data
@@ -298,8 +457,6 @@ async def generate_structure(req: StructureRequest) -> StructureResponse:
 
         except (OrchestrationError, ValidationError, Exception) as e:
             last_error = str(e)
-            # Nas tentativas seguintes, o prompt já vem mais forte via BASE_SYSTEM_PROMPT;
-            # aqui poderíamos reforçar ainda mais conforme necessidade futura.
             continue
 
     # Fallback: estrutura mínima

@@ -49,3 +49,12 @@ AGENT_TIMEOUT: float = _env_float("AGENT_TIMEOUT", 60.0)
 # Número máximo de tentativas semânticas (re-prompt) para corrigir saída inválida.
 AGENT_MAX_RETRIES: int = _env_int("AGENT_MAX_RETRIES", 2)
 
+# Registro manual de seções (JSON). Se existir, será usado quando a requisição não enviar sections_catalog.
+SECTIONS_REGISTRY_PATH: str = os.getenv(
+    "SECTIONS_REGISTRY_PATH",
+    os.path.join(os.path.dirname(__file__), "..", "data", "sections_registry.json"),
+)
+
+# Chave para atualizar o registro via POST /api/agent/registry (header X-Update-Key). Vazio = endpoint recusa atualização.
+REGISTRY_UPDATE_KEY: str = os.getenv("REGISTRY_UPDATE_KEY", "").strip()
+

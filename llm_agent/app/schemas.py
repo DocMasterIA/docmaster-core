@@ -2,10 +2,13 @@
 Modelos de entrada e saída do agente de estrutura documental.
 
 Saída SEMPRE estrutural (JSON), sem texto jurídico final.
+
+Inclui o modelo de seções versionáveis: definições técnicas controladas que
+o agente apenas seleciona/organiza/omite, nunca inventa.
 """
 from __future__ import annotations
 
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -76,12 +79,211 @@ class PromptStructureRequest(BaseModel):
         return v
 
 
+# ---- Seções versionáveis (catálogo controlado, sem invenção pelo modelo) ----
+
+class ApplicabilityScope(BaseModel):
+    """
+    Escopo de aplicabilidade da seção (município, estado, órgão, tipo de administração).
+
+    Quando preenchido, a seção só é elegível se o contexto indicar explicitamente
+    que aquele escopo se aplica. Evita generalizações indevidas.
+    """
+
+    municipio: Optional[str] = Field(None, description="Sigla ou nome do município.")
+    estado: Optional[str] = Field(None, description="UF ou nome do estado.")
+    orgao: Optional[str] = Field(None, description="Órgão ou entidade específica.")
+    tipo_administracao: Optional[str] = Field(
+        None,
+        description="Tipo de administração (ex.: direta, indireta, autárquica).",
+    )
+
+
+class ConditionalRule(BaseModel):
+    """
+    Regra condicional de inclusão: avaliada de forma determinística contra o contexto.
+
+    O modelo de IA não infere condições; elas vêm do registro da seção.
+    """
+
+    rule_type: Literal["has_field", "field_equals", "field_in"] = Field(
+        ...,
+        description=(
+            "has_field: contexto tem valor não vazio no path. "
+            "field_equals: valor no path é igual a value. "
+            "field_in: valor no path está na lista values."
+        ),
+    )
+    path: str = Field(
+        ...,
+        description="Caminho no contexto (ex.: 'modalidade', 'extras.valor_estimado').",
+    )
+    value: Optional[Any] = Field(None, description="Para field_equals.")
+    values: Optional[List[Any]] = Field(None, description="Para field_in.")
+
+
+class SectionCatalogEntry(BaseModel):
+    """
+    Definição técnica e versionável de uma seção do catálogo.
+
+    O agente nunca inventa seções; apenas seleciona, ordena ou omite as que
+    existem no catálogo. Título, content_type e table_schema vêm daqui.
+    """
+
+    key: str = Field(..., description="Identificador estável da seção (snake_case).")
+    title: str = Field(..., description="Título formal exibido no documento.")
+    document_types: List[str] = Field(
+        ...,
+        description="Tipos de documento nos quais a seção pode aparecer.",
+    )
+    content_type: Literal["text", "table", "list"] = Field(
+        ..., description="Tipo de conteúdo: text, table ou list."
+    )
+    required: bool = Field(False, description="Se a seção é obrigatória para o tipo.")
+    required_by: Optional[List[str]] = Field(
+        None,
+        description="Ex.: ['tcu', 'orgao_federal']. Seção obrigatória quando contexto indicar uma dessas autoridades.",
+    )
+    table_schema: Optional["TableSchema"] = Field(
+        default=None,
+        description="Schema da tabela quando content_type == 'table'.",
+    )
+    legal_basis: Optional[str] = Field(
+        None,
+        description="Fundamento legal ou normativo quando aplicável.",
+    )
+    conditional_rules: List[ConditionalRule] = Field(
+        default_factory=list,
+        description="Regras condicionais de inclusão (avaliadas deterministicamente).",
+    )
+    applicability_scope: Optional[ApplicabilityScope] = Field(
+        None,
+        description="Escopo (município, estado, órgão etc.); se presente, contexto deve bater.",
+    )
+    version: str = Field("1", description="Versão da definição (rastreabilidade).")
+    is_active: bool = Field(True, description="Se está ativa para geração.")
+    effective_from: Optional[str] = Field(
+        None,
+        description="Data a partir da qual a versão vale (ISO ou livre).",
+    )
+    parent_key: Optional[str] = Field(
+        None,
+        description="Key da seção pai, se for subseção; None = raiz.",
+    )
+
+    @model_validator(mode="after")
+    def _validate_table_schema(self) -> "SectionCatalogEntry":
+        if self.content_type == "table" and self.table_schema is None:
+            raise ValueError("content_type 'table' exige table_schema.")
+        if self.content_type != "table" and self.table_schema is not None:
+            raise ValueError("table_schema só quando content_type == 'table'.")
+
+
+class SectionCatalog(BaseModel):
+    """
+    Catálogo de seções versionáveis: contrato estrutural do sistema.
+
+    Identificador e versão do catálogo permitem auditoria e compatibilidade
+    com documentos antigos.
+    """
+
+    catalog_id: Optional[str] = Field(None, description="Identificador do catálogo.")
+    catalog_version: Optional[str] = Field(None, description="Versão do catálogo.")
+    entries: List[SectionCatalogEntry] = Field(
+        ..., description="Definições de seções (sempre usar versão explícita ou ativa)."
+    )
+
+
+# ---- Registro manual (arquivo JSON atualizável via chave) ----
+# Formato declarativo com lógica explícita; normalizado para SectionCatalogEntry.
+
+
+class RegistryConditionalIf(BaseModel):
+    """Atalho declarativo: incluir seção quando contexto tem valor em path contido em 'any'."""
+
+    if_path: str = Field(
+        "extras.tipo_objeto",
+        description="Path no contexto (ex.: extras.tipo_objeto, extras.tipo_contratacao).",
+    )
+    any: List[str] = Field(
+        ...,
+        description="Lista de valores; se algum estiver presente no path, a seção é elegível.",
+    )
+
+
+class RegistrySectionEntry(BaseModel):
+    """
+    Entrada do registro de seções (formato JSON do arquivo / payload de atualização).
+
+    Declarações lógicas claras; variabilidade por tipo de documento, obrigatoriedade
+    por autoridade (required_by), condição por tipo de objeto (if), status e enabled.
+    """
+
+    key: str = Field(..., description="Identificador estável (snake_case).")
+    title: str = Field(..., description="Título formal no documento.")
+    document_types: List[str] = Field(
+        ...,
+        description="Tipos de documento em que a seção pode aparecer (ex.: ['etp', 'termo_referencia']).",
+    )
+    content_type: Literal["text", "table", "list"] = Field(
+        "text", description="Tipo de conteúdo: text, table ou list."
+    )
+    required: bool = Field(False, description="Obrigatória para o tipo de documento.")
+    required_by: Optional[List[str]] = Field(
+        None,
+        description="Ex.: ['tcu', 'orgao_federal']. Obrigatória quando o contexto indicar uma dessas autoridades.",
+    )
+    legal_basis: Optional[Union[str, List[str]]] = Field(
+        None,
+        description="Fundamento(s) legal(is), ex.: ['art_18_lei_14133'] ou string única.",
+    )
+    conditional_rules: Optional[Union[List[ConditionalRule], Dict[str, Any]]] = Field(
+        None,
+        description=(
+            "Regras determinísticas. Formato completo: lista de ConditionalRule. "
+            "Atalho: { \"if\": [\"obra\", \"servico_continuado\"], \"if_path\": \"extras.tipo_objeto\" }."
+        ),
+    )
+    applicability_scope: Optional[ApplicabilityScope] = Field(None)
+    table_schema: Optional["TableSchema"] = Field(None)
+    status: Literal["optional", "required"] = Field(
+        "optional",
+        description="'optional' -> required=False; 'required' -> required=True (sobrescreve 'required' se ambos).",
+    )
+    enabled: bool = Field(True, description="Se a seção está ativa no registro (is_active).")
+    version: str = Field("1", description="Versão da definição.")
+    effective_from: Optional[str] = Field(None)
+    parent_key: Optional[str] = Field(None, description="Key da seção pai; null = raiz.")
+
+    @model_validator(mode="after")
+    def _validate_table_for_table_type(self) -> "RegistrySectionEntry":
+        if self.content_type == "table" and self.table_schema is None:
+            raise ValueError("content_type 'table' exige table_schema.")
+        if self.content_type != "table" and self.table_schema is not None:
+            raise ValueError("table_schema só quando content_type == 'table'.")
+        return self
+
+
+class SectionsRegistry(BaseModel):
+    """
+    Registro completo de seções (arquivo JSON ou body de atualização).
+
+    Atualização: POST /api/agent/registry com body = este JSON e header
+    X-Update-Key igual ao configurado; o agente persiste no arquivo e recarrega.
+    """
+
+    catalog_id: Optional[str] = Field(None)
+    catalog_version: Optional[str] = Field(None)
+    entries: List[RegistrySectionEntry] = Field(..., description="Seções cadastradas manualmente.")
+
+
 class StructureRequest(BaseModel):
     """
     Entrada principal do agente.
 
     - document_type: string identificando o tipo de documento (chave técnica).
     - context: informações mínimas (objeto, órgão, modalidade etc.).
+    - sections_catalog: opcional; quando presente, o agente só seleciona/organiza
+      seções deste catálogo (fluxo versionável, sem invenção de seções).
     """
 
     document_type: str = Field(
@@ -92,6 +294,13 @@ class StructureRequest(BaseModel):
         ),
     )
     context: ContextoBasico
+    sections_catalog: Optional[SectionCatalog] = Field(
+        None,
+        description=(
+            "Catálogo de seções versionáveis. Se informado, a IA apenas seleciona/ordena "
+            "seções deste catálogo; não inventa novas. Se omitido, usa fluxo com hints/dicas."
+        ),
+    )
 
     @field_validator("document_type")
     @classmethod
@@ -130,6 +339,9 @@ class TableSchema(BaseModel):
         if not v:
             raise ValueError("Pelo menos uma coluna é obrigatória em uma tabela.")
         return v
+
+
+SectionCatalogEntry.model_rebuild()
 
 
 class SectionNode(BaseModel):

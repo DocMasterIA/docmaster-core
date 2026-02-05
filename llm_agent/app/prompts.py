@@ -79,27 +79,48 @@ Onde:
 
 Você deve respeitar a lógica jurídica e administrativa aplicável ao tipo de
 documento e ao contexto fornecido, mas SEM redigir conteúdo textual das cláusulas.
+
+Seções condicionais: inclua seções de custo/valor, forma de pagamento ou garantia
+APENAS quando o contexto do usuário mencionar orçamento, valor estimado, pagamento
+ou garantia. Se o prompt não especificar objeto de compra e valor, não inclua
+cláusula de custos/valores.
+
+Seções frequentemente presentes: conformidade com a legislação, acompanhamento e
+fiscalização, e medidas acauteladoras aparecem comumente em editais e termos;
+inclua quando fizer sentido para o tipo de documento e para o contexto.
 """
 
 
 DOCUMENT_TYPE_HINTS: Dict[str, str] = {
     "termo_referencia": """
 Documento: TERMO DE REFERÊNCIA.
-Sugestão de seções:
+
+Seções base (sugeridas para a maioria dos casos):
 - objeto
 - justificativa
 - descricao_detalhada_objeto
 - requisitos_tecnicos
 - prazo_execucao
 - criterios_aceitacao
-- gestao_fiscalizacao
+- gestao_fiscalizacao (ou desdobrar: acompanhamento_fiscalizacao)
 - obrigacoes_contratada
 - obrigacoes_contratante
 - anexos
+
+Seções frequentemente presentes (incluir quando adequado ao contexto):
+- conformidade_legislacao (conformidade com a legislação aplicável)
+- acompanhamento_fiscalizacao (do acompanhamento e fiscalização; pode integrar gestão)
+- medidas_acauteladoras
+
+Seções condicionais (incluir SOMENTE se o contexto indicar):
+- forma_pagamento — quando houver menção a pagamento, cronograma financeiro ou contrato.
+- avaliacao_custo / custos_valores — quando o usuário citar valor, orçamento ou compra com preço.
+- garantia — quando aplicável a bens ou serviços com garantia (equipamentos, obras, etc.).
 """,
     "estudo_tecnico_preliminar": """
 Documento: ESTUDO TÉCNICO PRELIMINAR (ETP).
-Sugestão de seções:
+
+Seções base:
 - objeto
 - necessidade
 - solucao_proposta
@@ -107,10 +128,19 @@ Sugestão de seções:
 - analise_riscos
 - estimativa_custos
 - conclusao
+
+Seções frequentemente presentes:
+- conformidade_legislacao
+- medidas_acauteladoras
+
+Seções condicionais:
+- avaliacao_custo / custos_valores — apenas se o contexto mencionar valor ou orçamento.
+- garantia — se aplicável ao objeto (bens, obras).
 """,
     "documento_formalizacao_demanda": """
 Documento: DOCUMENTO DE FORMALIZAÇÃO DA DEMANDA (DFD).
-Sugestão de seções:
+
+Seções base:
 - identificacao_demanda
 - justificativa
 - escopo_demanda
@@ -118,8 +148,52 @@ Sugestão de seções:
 - restricoes_premissas
 - impactos_esperados
 - aprovacoes
+
+Seções frequentemente presentes:
+- conformidade_legislacao
+- medidas_acauteladoras
+
+Seções condicionais:
+- custos_valores / avaliacao_custo — apenas se houver menção a valor ou orçamento na demanda.
 """,
 }
+
+
+CATALOG_SELECTION_SYSTEM_PROMPT = """
+Você é um agente que define a ORDEM e SELEÇÃO de seções de um documento de licitação.
+
+Você NÃO pode inventar seções. Sua saída DEVE ser APENAS um JSON com um único campo:
+"section_keys": uma lista de strings (identificadores das seções) na ordem em que devem aparecer no documento.
+
+Regras obrigatórias:
+- Use SOMENTE chaves (keys) que estiverem na lista permitida fornecida no prompt de usuário.
+- Você PODE omitir seções da lista (não é obrigatório incluir todas).
+- NÃO adicione nenhuma chave que não esteja na lista permitida.
+- NÃO escreva texto explicativo; saída DEVE ser somente o JSON.
+"""
+
+
+def build_catalog_selection_user_prompt(
+    eligible_entries: list,
+    document_type: str,
+    context: dict,
+) -> str:
+    """
+    Monta o prompt de usuário para o agente selecionar/ordenar seções do catálogo.
+
+    eligible_entries: lista de SectionCatalogEntry (key, title).
+    """
+    lines = [
+        f"Tipo de documento: {document_type}",
+        "Contexto:",
+        repr(context),
+        "",
+        "Lista de seções PERMITIDAS (key → título). Retorne apenas um JSON: {\"section_keys\": [\"key1\", \"key2\", ...]} na ordem desejada para o documento. Pode omitir algumas; não inclua keys fora da lista.",
+        "",
+    ]
+    for e in eligible_entries:
+        lines.append(f"  - {e.key} → {e.title}")
+    return "\n".join(lines)
 
 
 def build_system_prompt(document_type: str) -> str:

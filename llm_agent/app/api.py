@@ -6,13 +6,38 @@ NÃO para consumo público direto.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, Header, HTTPException
 
 from .agent import generate_structure, interpret_user_prompt
-from .schemas import PromptStructureRequest, StructureRequest, StructureResponse
+from .registry import is_valid_update_key, update_registry
+from .schemas import PromptStructureRequest, SectionsRegistry, StructureRequest, StructureResponse
 
 
 router = APIRouter(prefix="/agent", tags=["llm_agent"])
+
+
+@router.post("/registry")
+async def endpoint_update_registry(
+    body: SectionsRegistry,
+    x_update_key: str | None = Header(None, alias="X-Update-Key"),
+) -> dict:
+    """
+    Atualiza o registro de seções (JSON) persistido em arquivo.
+
+    Envie o JSON completo do registro no body e a chave de atualização no header
+    X-Update-Key. A chave deve ser configurada em REGISTRY_UPDATE_KEY.
+    Após sucesso, o próximo generate_structure usará o novo catálogo.
+    """
+    if not is_valid_update_key(x_update_key):
+        raise HTTPException(
+            status_code=401,
+            detail="Chave de atualização inválida ou não configurada (X-Update-Key).",
+        )
+    try:
+        update_registry(body)
+        return {"ok": True, "message": "Registro de seções atualizado."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/structure-from-prompt", response_model=StructureResponse)

@@ -193,13 +193,29 @@ def _build_llm_payload(req: StructureRequest) -> Dict[str, Any]:
     }
 
 
+def _strip_markdown_json(text: str) -> str:
+    """
+    Remove envoltório de bloco markdown (```json ... ```) se presente.
+    Muitos modelos retornam JSON dentro de code fence.
+    """
+    text = text.strip()
+    if text.startswith("```"):
+        # Remove abertura: ```json ou ```
+        first_line = text.split("\n", 1)[0]
+        if first_line.startswith("```"):
+            text = text[len(first_line) :].lstrip("\n")
+        if text.endswith("```"):
+            text = text[: text.rfind("```")].rstrip()
+    return text
+
+
 def _parse_structure(raw: Any, document_type: str) -> DocumentStructure:
     """
     Converte a resposta bruta do modelo em DocumentStructure, validando o schema.
     """
-    # raw deve ser um dict JSON; se vier string, tentamos dar json.loads.
+    # raw deve ser um dict JSON; se vier string, removemos markdown e tentamos json.loads.
     if isinstance(raw, str):
-        raw = raw.strip()
+        raw = _strip_markdown_json(raw)
         try:
             candidate = json.loads(raw)
         except json.JSONDecodeError as e:

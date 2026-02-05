@@ -37,7 +37,11 @@ async def call_generate(payload: Dict[str, Any]) -> Dict[str, Any]:
         try:
             resp = await client.post(url, json=payload)
         except httpx.RequestError as e:
-            raise OrchestrationError(f"Falha ao chamar módulo de orquestração: {e}") from e
+            msg = str(e).strip() or e.__class__.__name__
+            raise OrchestrationError(
+                f"Falha ao chamar módulo de orquestração ({url}): {msg}. "
+                "Verifique se o serviço llm_api está rodando e acessível."
+            ) from e
 
     if resp.status_code != 200:
         raise OrchestrationError(

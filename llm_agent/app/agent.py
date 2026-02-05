@@ -208,7 +208,7 @@ def _validate_semantics(document_type: str, structure: DocumentStructure) -> Non
 def _build_llm_payload(req: StructureRequest) -> Dict[str, Any]:
     """Monta o payload para o /api/llm/generate da orquestração."""
     system_prompt = build_system_prompt(req.document_type)
-    user_prompt = build_user_prompt(req.document_type, req.context.dict())
+    user_prompt = build_user_prompt(req.document_type, req.context.model_dump())
 
     # O módulo de orquestração espera: prompt, model?, stream?
     # Usamos um prompt concatenado (system + user) para simplificar.
@@ -243,7 +243,7 @@ def _parse_structure(raw: Any, document_type: str) -> DocumentStructure:
     # Se o modelo não preencher document_type, garantimos o eco do tipo solicitado.
     candidate.setdefault("document_type", document_type)
 
-    return DocumentStructure.parse_obj(candidate)
+    return DocumentStructure.model_validate(candidate)
 
 
 async def generate_structure(req: StructureRequest) -> StructureResponse:

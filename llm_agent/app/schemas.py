@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, root_validator, validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class ContextoBasico(BaseModel):
@@ -28,12 +28,14 @@ class ContextoBasico(BaseModel):
         description="Outros parâmetros relevantes (mapa livre).",
     )
 
-    @root_validator
-    def _strip_empty(cls, values: dict) -> dict:
-        for key, value in list(values.items()):
-            if isinstance(value, str):
-                values[key] = value.strip()
-        return values
+    @field_validator("objeto", "orgao", "modalidade", mode="before")
+    @classmethod
+    def _strip_strings(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        if isinstance(v, str):
+            return v.strip()
+        return v
 
 
 class DocumentoTipo(str):
@@ -69,7 +71,8 @@ class StructureRequest(BaseModel):
     )
     context: ContextoBasico
 
-    @validator("document_type")
+    @field_validator("document_type")
+    @classmethod
     def _document_type_not_empty(cls, v: str) -> str:
         v = (v or "").strip()
         if not v:
@@ -83,7 +86,8 @@ class TableColumn(BaseModel):
     key: str = Field(..., description="Identificador técnico da coluna (snake_case).")
     label: str = Field(..., description="Rótulo exibido na tabela.")
 
-    @validator("key", "label")
+    @field_validator("key", "label")
+    @classmethod
     def _not_blank_col(cls, v: str) -> str:
         v = (v or "").strip()
         if not v:
@@ -98,7 +102,8 @@ class TableSchema(BaseModel):
         ..., description="Lista de colunas da tabela (sem linhas/dados)."
     )
 
-    @validator("columns")
+    @field_validator("columns")
+    @classmethod
     def _at_least_one_column(cls, v: List[TableColumn]) -> List[TableColumn]:
         if not v:
             raise ValueError("Pelo menos uma coluna é obrigatória em uma tabela.")
@@ -132,25 +137,26 @@ class SectionNode(BaseModel):
         description="Subseções desta seção (estrutura recursiva).",
     )
 
-    @validator("key", "title")
+    @field_validator("key", "title")
+    @classmethod
     def _not_blank(cls, v: str) -> str:
         v = (v or "").strip()
         if not v:
             raise ValueError("Campo não pode ser vazio.")
         return v
 
-    @root_validator
-    def _validate_table_schema(cls, values: dict) -> dict:
-        ctype = values.get("content_type")
-        schema = values.get("table_schema")
+    @model_validator(mode="after")
+    def _validate_table_schema(self) -> "SectionNode":
+        ctype = self.content_type
+        schema = self.table_schema
         if ctype == "table" and schema is None:
             raise ValueError("Se content_type == 'table', table_schema é obrigatório.")
         if ctype != "table" and schema is not None:
             raise ValueError("table_schema só deve ser informado quando content_type == 'table'.")
-        return values
+        return self
 
 
-SectionNode.update_forward_refs()
+SectionNode.model_rebuild()
 
 
 class DocumentStructure(BaseModel):
@@ -164,7 +170,8 @@ class DocumentStructure(BaseModel):
     document_type: str
     root_sections: List[SectionNode]
 
-    @validator("root_sections")
+    @field_validator("root_sections")
+    @classmethod
     def _at_least_one_section(cls, v: List[SectionNode]) -> List[SectionNode]:
         if not v:
             raise ValueError("Pelo menos uma seção raiz é obrigatória.")

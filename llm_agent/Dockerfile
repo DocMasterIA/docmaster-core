@@ -26,5 +26,5 @@ RUN useradd --create-home --shell /bin/bash appuser \
     && chown -R appuser:appuser /app
 USER appuser
 
-CMD ["sh", " -c", "uvicorn llm_agent.app.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "uvicorn llm_agent.app.main:app --host 0.0.0.0 --port ${PORT}"]
 

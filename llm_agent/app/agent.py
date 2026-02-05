@@ -158,27 +158,9 @@ def _validate_semantics(document_type: str, structure: DocumentStructure) -> Non
         while stack:
             node = stack.pop()
             if node.content_type not in {"text", "table", "list"}:
-                raise ValidationError(
-                    [
-                        {
-                            "loc": ("content_type",),
-                            "msg": f"content_type inválido em seção '{node.key}'.",
-                            "type": "value_error",
-                        }
-                    ],
-                    DocumentStructure,
-                )
+                raise ValueError(f"content_type inválido em seção '{node.key}'.")
             if node.content_type == "table" and node.table_schema is None:
-                raise ValidationError(
-                    [
-                        {
-                            "loc": ("table_schema",),
-                            "msg": f"Seção '{node.key}' marcada como 'table' deve conter table_schema.",
-                            "type": "value_error",
-                        }
-                    ],
-                    DocumentStructure,
-                )
+                raise ValueError(f"Seção '{node.key}' marcada como 'table' deve conter table_schema.")
             stack.extend(node.children)
 
     # 2) seções mínimas obrigatórias por tipo de documento (chaves técnicas)
@@ -193,16 +175,7 @@ def _validate_semantics(document_type: str, structure: DocumentStructure) -> Non
         keys = _collect_keys(structure.root_sections)
         missing = [k for k in expected_keys if k not in keys]
         if missing:
-            raise ValidationError(
-                [
-                    {
-                        "loc": ("root_sections",),
-                        "msg": f"Seções obrigatórias ausentes para '{dt}': {', '.join(missing)}.",
-                        "type": "value_error",
-                    }
-                ],
-                DocumentStructure,
-            )
+            raise ValueError(f"Seções obrigatórias ausentes para '{dt}': {', '.join(missing)}.")
 
 
 def _build_llm_payload(req: StructureRequest) -> Dict[str, Any]:
@@ -230,15 +203,12 @@ def _parse_structure(raw: Any, document_type: str) -> DocumentStructure:
         try:
             candidate = json.loads(raw)
         except json.JSONDecodeError as e:
-            raise ValidationError([{"loc": ("__root__",), "msg": f"JSON inválido: {e}", "type": "value_error"}], DocumentStructure)
+            raise ValueError(f"JSON inválido: {e}") from e
     else:
         candidate = raw
 
     if not isinstance(candidate, dict):
-        raise ValidationError(
-            [{"loc": ("__root__",), "msg": "Resposta não é um objeto JSON.", "type": "type_error"}],
-            DocumentStructure,
-        )
+        raise ValueError("Resposta não é um objeto JSON.")
 
     # Se o modelo não preencher document_type, garantimos o eco do tipo solicitado.
     candidate.setdefault("document_type", document_type)

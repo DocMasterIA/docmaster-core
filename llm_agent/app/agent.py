@@ -17,8 +17,14 @@ from pydantic import ValidationError
 
 from .client import OrchestrationError, call_generate
 from .config import AGENT_MAX_RETRIES
-from .prompts import build_system_prompt, build_user_prompt
+from .prompts import (
+    INTERPRETER_SYSTEM_PROMPT,
+    build_interpreter_user_prompt,
+    build_system_prompt,
+    build_user_prompt,
+)
 from .schemas import (
+    ContextoBasico,
     DocumentStructure,
     SectionNode,
     StructureRequest,
@@ -191,6 +197,41 @@ def _build_llm_payload(req: StructureRequest) -> Dict[str, Any]:
         # Deixamos o modelo padrão a cargo do llm_api (OLLAMA_MODEL).
         "stream": False,
     }
+
+
+def _build_interpreter_payload(user_prompt: str) -> Dict[str, Any]:
+    """Monta o payload para chamar o LLM no papel de interpretador (texto livre → StructureRequest)."""
+    full_prompt = (
+        f"<<SYSTEM>>\n{INTERPRETER_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{build_interpreter_user_prompt(user_prompt)}"
+    )
+    return {"prompt": full_prompt, "stream": False}
+
+
+async def interpret_user_prompt(user_prompt: str) -> StructureRequest:
+    """
+    Interpreta o texto livre do usuário e retorna um StructureRequest válido.
+
+    Chama o LLM para extrair document_type e context; em falha de parsing ou
+    orquestração, retorna fallback: termo_referencia com context.objeto = trecho do prompt.
+    """
+    try:
+        payload = _build_interpreter_payload(user_prompt)
+        data = await call_generate(payload)
+        raw = data.get("response") if isinstance(data, dict) else data
+        if raw is None:
+            raw = data
+        if isinstance(raw, dict):
+            return StructureRequest.model_validate(raw)
+        text = _strip_markdown_json(str(raw))
+        candidate = json.loads(text)
+        return StructureRequest.model_validate(candidate)
+    except Exception:
+        return StructureRequest(
+            document_type="termo_referencia",
+            context=ContextoBasico(
+                objeto=(user_prompt[:500].strip() or "Documento solicitado pelo usuário.")
+            ),
+        )
 
 
 def _strip_markdown_json(text: str) -> str:

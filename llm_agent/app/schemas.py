@@ -54,6 +54,28 @@ class DocumentoTipo(str):
     # Outros tipos podem ser usados livremente (string arbitrária).
 
 
+class PromptStructureRequest(BaseModel):
+    """
+    Entrada para o endpoint que interpreta prompt livre do usuário.
+
+    O agente interpreta o texto e extrai document_type + context para
+    então gerar a estrutura via generate_structure.
+    """
+
+    user_prompt: str = Field(
+        ...,
+        description="Texto livre descrevendo o documento desejado (ex.: tipo, objeto, órgão, modalidade).",
+    )
+
+    @field_validator("user_prompt")
+    @classmethod
+    def _user_prompt_not_empty(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("user_prompt é obrigatório.")
+        return v
+
+
 class StructureRequest(BaseModel):
     """
     Entrada principal do agente.

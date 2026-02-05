@@ -8,11 +8,25 @@ from __future__ import annotations
 
 from fastapi import APIRouter, FastAPI, HTTPException
 
-from .agent import generate_structure
-from .schemas import StructureRequest, StructureResponse
+from .agent import generate_structure, interpret_user_prompt
+from .schemas import PromptStructureRequest, StructureRequest, StructureResponse
 
 
 router = APIRouter(prefix="/agent", tags=["llm_agent"])
+
+
+@router.post("/structure-from-prompt", response_model=StructureResponse)
+async def endpoint_structure_from_prompt(body: PromptStructureRequest) -> StructureResponse:
+    """
+    Interpreta um prompt livre do usuário, extrai tipo e contexto e gera a estrutura.
+
+    Fluxo: user_prompt → interpretador LLM → StructureRequest → generate_structure → StructureResponse.
+    """
+    try:
+        req = await interpret_user_prompt(body.user_prompt)
+        return await generate_structure(req)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao processar prompt: {e}") from e
 
 
 @router.post("/structure", response_model=StructureResponse)

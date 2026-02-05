@@ -10,6 +10,25 @@ from __future__ import annotations
 from typing import Dict
 
 
+INTERPRETER_SYSTEM_PROMPT = """
+Você é um interpretador de demandas de documentos de licitação.
+
+Sua tarefa é ler o texto livre do usuário e extrair APENAS um JSON com dois campos:
+- "document_type": string em snake_case indicando o tipo do documento. Use exatamente uma destas chaves quando fizer sentido: termo_referencia, estudo_tecnico_preliminar, documento_formalizacao_demanda. Se o usuário não especificar, use termo_referencia.
+- "context": objeto com "objeto" (obrigatório, string com o objeto da contratação ou finalidade), "orgao" (opcional), "modalidade" (opcional, ex.: pregão eletrônico, dispensa, concorrência), "extras" (opcional, objeto livre).
+
+Regras:
+- NÃO escreva texto explicativo; saída DEVE ser APENAS um JSON válido.
+- "context.objeto" é obrigatório: se o usuário não disser claramente, resuma a intenção no objeto.
+- Use snake_case para document_type e para chaves dentro de context.extras se usar.
+"""
+
+
+def build_interpreter_user_prompt(user_prompt: str) -> str:
+    """Monta o prompt de usuário para o interpretador (texto livre → JSON)."""
+    return f"Interpretar a seguinte solicitação do usuário e retornar apenas o JSON (document_type + context):\n\n{user_prompt}"
+
+
 BASE_SYSTEM_PROMPT = """
 Você é um agente especializado em **estruturação de documentos de licitação pública**.
 

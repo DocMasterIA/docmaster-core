@@ -24,6 +24,23 @@ services:
       - ./llm_audit:/app/logs
     restart: unless-stopped
 
+  llm_agent:
+    build:
+      context: .
+      dockerfile: llm_agent/Dockerfile
+    image: docmaster-llm_agent
+    container_name: llm_agent
+    ports:
+      - "8003:8003"
+    environment:
+      - PORT=8003
+      - LLM_ORCHESTRATION_BASE_URL=http://llm_api:8002
+      - AGENT_TIMEOUT=60
+      - AGENT_MAX_RETRIES=2
+    depends_on:
+      - llm_api
+    restart: unless-stopped
+
   # Exemplo quando o Django estiver em Docker (descomente e ajuste build/command):
   # backend:
   #   build:

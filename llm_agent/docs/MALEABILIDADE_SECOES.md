@@ -57,6 +57,16 @@ Texto curto usado pela IA para **mapear intenção** (ex.: “Especificações p
 2. **Seleção**: a IA recebe a lista (key, title, description) e o contexto; devolve apenas **keys** dessa lista, na ordem desejada, escolhendo por **intenção** (não precisa bater título exato).
 3. **Esqueleto**: a estrutura final usa só seções do catálogo; decisões de layout/funcionamento de cada seção ficam para etapa futura.
 
+## Correspondência pedido ↔ seção com nível de certeza (`section_matches`)
+
+Quando a requisição vem de **structure-from-prompt** (ou quando `StructureRequest` traz `user_prompt` preenchido) e há catálogo/registro, a IA além de devolver `section_keys` devolve **matches**: para cada seção que o usuário “pediu” (mesmo com redação diferente), indica qual key corresponde e com que **confiança**.
+
+- **high**: praticamente a mesma cláusula (ex.: “cláusula sobre viabilidade” ou “informação de viabilidade” → Declaração de Viabilidade).
+- **medium**: claramente relacionada.
+- **low**: possível relação.
+
+O campo **section_matches** na `StructureResponse` é uma lista de `{ "key", "user_phrase", "confidence" }`. Assim o sistema sabe que o pedido do usuário já estava coberto por uma seção cadastrada, mesmo sem casar 100% com o título.
+
 ## Definição posterior
 
 - **Padrão de arquivo**: como inferir ou definir `document_pattern`/`categoria` (ex.: por objeto, por órgão, por template) será definido depois; o sistema já aceita esses campos em `context.extras`.

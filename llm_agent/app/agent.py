@@ -20,6 +20,7 @@ from .client import OrchestrationError, call_generate
 from .config import AGENT_MAX_RETRIES
 from .prompts import (
     CATALOG_SELECTION_SYSTEM_PROMPT,
+    CATALOG_SELECTION_WITH_MATCHES_SYSTEM_PROMPT,
     INTERPRETER_SYSTEM_PROMPT,
     build_catalog_selection_user_prompt,
     build_interpreter_user_prompt,
@@ -31,6 +32,7 @@ from .schemas import (
     ContextoBasico,
     DocumentStructure,
     SectionCatalogEntry,
+    SectionMatchAnnotation,
     SectionNode,
     StructureRequest,
     StructureResponse,
@@ -359,6 +361,48 @@ def _parse_catalog_selection_response(raw: Any, eligible_keys: set) -> List[str]
     return [k for k in keys if isinstance(k, str) and k.strip() in eligible_keys]
 
 
+def _parse_catalog_selection_matches(
+    raw: Any, eligible_keys: set
+) -> List[SectionMatchAnnotation]:
+    """
+    Extrai a lista matches da resposta (key, user_phrase, confidence).
+    Só retorna entradas cuja key está em eligible_keys e confidence é high/medium/low.
+    """
+    if isinstance(raw, str):
+        raw = _strip_markdown_json(raw)
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+    if not isinstance(raw, dict):
+        return []
+    matches = raw.get("matches")
+    if not isinstance(matches, list):
+        return []
+    out: List[SectionMatchAnnotation] = []
+    for m in matches:
+        if not isinstance(m, dict):
+            continue
+        key = m.get("key")
+        user_phrase = m.get("user_phrase")
+        confidence = m.get("confidence")
+        if (
+            isinstance(key, str)
+            and key.strip() in eligible_keys
+            and isinstance(user_phrase, str)
+            and user_phrase.strip()
+            and confidence in ("high", "medium", "low")
+        ):
+            out.append(
+                SectionMatchAnnotation(
+                    key=key.strip(),
+                    user_phrase=user_phrase.strip(),
+                    confidence=confidence,
+                )
+            )
+    return out
+
+
 async def _generate_structure_with_catalog(req: StructureRequest) -> StructureResponse:
     """
     Fluxo com catálogo versionável: filtra seções elegíveis de forma determinística,
@@ -377,11 +421,19 @@ async def _generate_structure_with_catalog(req: StructureRequest) -> StructureRe
             retries=0,
         )
 
-    system_prompt = CATALOG_SELECTION_SYSTEM_PROMPT.strip()
-    user_prompt = build_catalog_selection_user_prompt(
-        eligible, req.document_type, req.context.model_dump()
+    use_matches = bool((req.user_prompt or "").strip())
+    system_prompt = (
+        CATALOG_SELECTION_WITH_MATCHES_SYSTEM_PROMPT.strip()
+        if use_matches
+        else CATALOG_SELECTION_SYSTEM_PROMPT.strip()
     )
-    full_prompt = f"<<SYSTEM>>\n{system_prompt}\n\n<<USER>>\n{user_prompt}"
+    user_prompt_text = build_catalog_selection_user_prompt(
+        eligible,
+        req.document_type,
+        req.context.model_dump(),
+        user_prompt=req.user_prompt if use_matches else None,
+    )
+    full_prompt = f"<<SYSTEM>>\n{system_prompt}\n\n<<USER>>\n{user_prompt_text}"
     payload = {"prompt": full_prompt, "stream": False}
 
     last_error: str | None = None
@@ -400,7 +452,15 @@ async def _generate_structure_with_catalog(req: StructureRequest) -> StructureRe
             structure = _build_structure_from_catalog_selection(
                 selected, eligible, req.document_type, req.context
             )
-            return StructureResponse(ok=True, structure=structure, retries=attempt)
+            section_matches = (
+                _parse_catalog_selection_matches(raw, eligible_keys) if use_matches else None
+            )
+            return StructureResponse(
+                ok=True,
+                structure=structure,
+                retries=attempt,
+                section_matches=section_matches,
+            )
         except (OrchestrationError, Exception) as e:
             last_error = str(e)
             continue
@@ -415,6 +475,7 @@ async def _generate_structure_with_catalog(req: StructureRequest) -> StructureRe
         structure=structure,
         error=last_error or "Resposta do modelo inválida; usada ordem padrão do catálogo.",
         retries=AGENT_MAX_RETRIES + 1,
+        section_matches=None,
     )
 
 
@@ -433,6 +494,7 @@ async def generate_structure(req: StructureRequest) -> StructureResponse:
             document_type=req.document_type,
             context=req.context,
             sections_catalog=catalog,
+            user_prompt=req.user_prompt,
         )
         return await _generate_structure_with_catalog(req_with_catalog)
 

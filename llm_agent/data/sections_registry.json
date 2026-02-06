@@ -42,6 +42,7 @@
       "key": "declaracao_viabilidade",
       "title": "Declaração de Viabilidade da Contratação",
       "document_types": ["estudo_tecnico_preliminar"],
+      "description": "Viabilidade da contratação, informação sobre viabilidade, cláusula de viabilidade.",
       "content_type": "text",
       "required": false,
       "conditional_rules": {

@@ -46,10 +46,17 @@ async def endpoint_structure_from_prompt(body: PromptStructureRequest) -> Struct
     Interpreta um prompt livre do usuário, extrai tipo e contexto e gera a estrutura.
 
     Fluxo: user_prompt → interpretador LLM → StructureRequest → generate_structure → StructureResponse.
+    Quando há catálogo/registro, a IA calcula section_matches (correspondência pedido ↔ seção com nível de certeza).
     """
     try:
         req = await interpret_user_prompt(body.user_prompt)
-        return await generate_structure(req)
+        req_with_prompt = StructureRequest(
+            document_type=req.document_type,
+            context=req.context,
+            sections_catalog=req.sections_catalog,
+            user_prompt=body.user_prompt,
+        )
+        return await generate_structure(req_with_prompt)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao processar prompt: {e}") from e
 

@@ -284,6 +284,25 @@ class SectionsRegistry(BaseModel):
     entries: List[RegistrySectionEntry] = Field(..., description="Seções cadastradas manualmente.")
 
 
+class SectionMatchAnnotation(BaseModel):
+    """
+    Anotação de correspondência: o pedido do usuário (user_phrase) foi interpretado
+    como referindo-se à seção cadastrada (key), com nível de certeza (confidence).
+    """
+    key: str = Field(..., description="Key da seção no catálogo que corresponde ao pedido.")
+    user_phrase: str = Field(
+        ...,
+        description="Trecho ou paráfrase do pedido do usuário que foi associado a esta seção.",
+    )
+    confidence: Literal["high", "medium", "low"] = Field(
+        ...,
+        description=(
+            "high = praticamente a mesma cláusula; "
+            "medium = claramente relacionada; low = possível relação."
+        ),
+    )
+
+
 class StructureRequest(BaseModel):
     """
     Entrada principal do agente.
@@ -292,6 +311,8 @@ class StructureRequest(BaseModel):
     - context: informações mínimas (objeto, órgão, modalidade etc.).
     - sections_catalog: opcional; quando presente, o agente só seleciona/organiza
       seções deste catálogo (fluxo versionável, sem invenção de seções).
+    - user_prompt: opcional; quando presente (ex.: structure-from-prompt), a IA
+      calcula correspondências entre o pedido e as seções cadastradas (section_matches).
     """
 
     document_type: str = Field(
@@ -307,6 +328,13 @@ class StructureRequest(BaseModel):
         description=(
             "Catálogo de seções versionáveis. Se informado, a IA apenas seleciona/ordena "
             "seções deste catálogo; não inventa novas. Se omitido, usa fluxo com hints/dicas."
+        ),
+    )
+    user_prompt: Optional[str] = Field(
+        None,
+        description=(
+            "Texto livre do usuário (ex.: pedido por cláusula). Quando informado no fluxo "
+            "com catálogo, a IA devolve section_matches com nível de certeza (high/medium/low)."
         ),
     )
 
@@ -429,6 +457,13 @@ class StructureResponse(BaseModel):
     structure: Optional[DocumentStructure] = None
     error: Optional[str] = None
     retries: int = 0
+    section_matches: Optional[List[SectionMatchAnnotation]] = Field(
+        None,
+        description=(
+            "Quando user_prompt foi informado e há catálogo: correspondências entre "
+            "trechos do pedido e seções incluídas, com nível de certeza (high/medium/low)."
+        ),
+    )
 
 
 # ---- Composição jurídica controlada (cláusulas) ----

@@ -208,25 +208,57 @@ Selecione as seções que MELHOR correspondam à intenção (objeto, finalidade,
 a descrição de cada seção ajuda a fazer esse mapeamento. Só é permitido devolver keys da lista.
 """
 
+CATALOG_SELECTION_WITH_MATCHES_SYSTEM_PROMPT = """
+Você é um agente que define a ORDEM e SELEÇÃO de seções de um documento de licitação e que CALCULA
+se o que o usuário pediu no texto corresponde a alguma seção já cadastrada (mesmo com redação diferente).
+
+Sua saída DEVE ser um JSON com dois campos:
+1. "section_keys": lista de strings (identificadores das seções) na ordem em que devem aparecer no documento.
+2. "matches": lista de objetos { "key": "...", "user_phrase": "...", "confidence": "high"|"medium"|"low" }.
+
+Regras:
+- Use SOMENTE keys que estiverem na lista permitida. Pode omitir seções.
+- Para "matches": indique quais seções selecionadas correspondem a algo que o usuário pediu no texto.
+  - "user_phrase": trecho ou paráfrase do pedido do usuário que você interpretou como referindo-se a essa seção
+    (ex.: usuário disse "cláusula sobre viabilidade" → key declaracao_viabilidade, user_phrase "cláusula sobre viabilidade").
+  - "confidence": "high" = praticamente a mesma cláusula (ex.: "informação de viabilidade" → Declaração de Viabilidade);
+    "medium" = claramente relacionada; "low" = possível relação. Só inclua em matches seções que estão em section_keys.
+- Não invente keys; não escreva texto explicativo fora do JSON.
+"""
+
 
 def build_catalog_selection_user_prompt(
     eligible_entries: list,
     document_type: str,
     context: dict,
+    user_prompt: str | None = None,
 ) -> str:
     """
     Monta o prompt de usuário para o agente selecionar/ordenar seções do catálogo.
-    Inclui description quando existir, para matching por intenção (título/pedido em outro formato).
+    Se user_prompt for informado, pede também o campo "matches" (key, user_phrase, confidence).
     """
     lines = [
         f"Tipo de documento: {document_type}",
         "Contexto:",
         repr(context),
         "",
-        "Lista de seções PERMITIDAS. Retorne apenas um JSON: {\"section_keys\": [\"key1\", \"key2\", ...]} na ordem desejada. "
-        "Selecione as que melhor atendam à intenção (pode haver redação diferente no pedido). Pode omitir algumas; não inclua keys fora da lista.",
-        "",
     ]
+    if user_prompt:
+        lines.append("Pedido do usuário (texto livre):")
+        lines.append(repr(user_prompt))
+        lines.append("")
+        lines.append(
+            "Lista de seções PERMITIDAS. Retorne um JSON com \"section_keys\" (lista na ordem desejada) e \"matches\": "
+            "lista de { \"key\", \"user_phrase\", \"confidence\" } indicando quais seções correspondem ao que o usuário "
+            "pediu e com que nível de certeza (high = praticamente a mesma cláusula; medium = relacionada; low = possível). "
+            "Só inclua em matches keys que estão em section_keys. Se não houver correspondência clara, matches pode ser []."
+        )
+    else:
+        lines.append(
+            "Lista de seções PERMITIDAS. Retorne apenas um JSON: {\"section_keys\": [\"key1\", \"key2\", ...]} na ordem desejada. "
+            "Selecione as que melhor atendam à intenção (pode haver redação diferente no pedido). Pode omitir algumas; não inclua keys fora da lista."
+        )
+    lines.append("")
     for e in eligible_entries:
         desc = getattr(e, "description", None) or ""
         if desc:

@@ -1,6 +1,20 @@
 # llm_agent — Agente de Estrutura Documental
 
-Resumo detalhado do funcionamento do módulo **llm_agent**: geração da **estrutura lógica** (esqueleto) de documentos de licitação pública, sem redação de texto jurídico. O agente não inventa seções; quando há catálogo/registro, apenas **seleciona e ordena** seções previamente cadastradas.
+Resumo do funcionamento do **llm_agent**: geração da **estrutura lógica** (esqueleto) de documentos de licitação pública, sem redação de texto jurídico. Com catálogo/registro, a IA apenas **seleciona e ordena** seções cadastradas; sem catálogo, usa dicas por tipo de documento e fallback mínimo.
+
+---
+
+## Fluxo em uso hoje (resumo)
+
+1. **Cliente** chama **POST /api/agent/structure** (com document_type + context) ou **POST /api/agent/structure-from-prompt** (com user_prompt).
+2. **structure-from-prompt**: o interpretador LLM extrai `document_type` e `context` do texto; o resultado vira um `StructureRequest` (com `user_prompt` preservado quando há catálogo).
+3. **generate_structure**:
+   - Se houver **sections_catalog** (no body ou carregado do arquivo `SECTIONS_REGISTRY_PATH`): filtra **elegíveis** (tipo, escopo, conditional_rules, categoria), envia ao LLM só a lista (key/title/description); o LLM devolve `section_keys` (e, se houver `user_prompt`, `matches` com nível de certeza). A estrutura final é montada só com entradas do catálogo.
+   - Se **não** houver catálogo: monta prompt com BASE_SYSTEM_PROMPT + DOCUMENT_TYPE_HINTS; o LLM devolve JSON com `root_sections`; valida e aplica fallback mínimo em falha.
+4. **Resposta**: `StructureResponse` com `ok`, `structure` (DocumentStructure), `error` (opcional), `retries` e, quando houve `user_prompt` no fluxo com catálogo, `section_matches` (correspondência pedido ↔ seção com confidence high/medium/low).
+5. **POST /api/agent/registry** (opcional): atualiza o arquivo de registro; body = JSON completo do registro; próxima geração usa o novo catálogo (uso local, sem autenticação).
+
+Nenhum endpoint gera texto jurídico nem opera no nível de cláusulas numeradas/versionadas; isso fica para camadas futuras (RAG, composição).
 
 ---
 
@@ -63,9 +77,9 @@ Resumo detalhado do funcionamento do módulo **llm_agent**: geração da **estru
 
 | Método e path | Descrição |
 |---------------|-----------|
-| **POST /api/agent/structure** | Gera a estrutura. Body: `StructureRequest` (document_type, context, opcionalmente sections_catalog). Retorno: `StructureResponse` (ok, structure, error, retries). |
-| **POST /api/agent/structure-from-prompt** | Interpreta prompt livre. Body: `{ "user_prompt": "..." }`. Internamente chama o interpretador LLM → `StructureRequest` → `generate_structure`. Retorno: mesmo `StructureResponse`. |
-| **POST /api/agent/registry** | Atualiza o registro de seções (arquivo JSON). Body: `SectionsRegistry` completo. Header obrigatório: `X-Update-Key` (valor deve ser o mesmo de `REGISTRY_UPDATE_KEY`). |
+| **POST /api/agent/structure** | Gera a estrutura. Body: `StructureRequest` (document_type, context; opcional: sections_catalog, user_prompt). Retorno: `StructureResponse` (ok, structure, error, retries; section_matches quando houve user_prompt no fluxo com catálogo). |
+| **POST /api/agent/structure-from-prompt** | Interpreta prompt livre. Body: `{ "user_prompt": "..." }`. Interpretador LLM → `StructureRequest` → `generate_structure`. Retorno: mesmo `StructureResponse`; com catálogo, inclui section_matches (pedido ↔ seção com confidence). |
+| **POST /api/agent/registry** | Atualiza o registro de seções (arquivo JSON). Body: `SectionsRegistry` completo. Uso local, sem chave. |
 
 A API é pensada para uso interno (ex.: backend Django), não para consumo público direto.
 
@@ -130,7 +144,7 @@ O resultado é um `StructureRequest` que segue para `generate_structure` como qu
 Fundamento legal, obrigatoriedade por autoridade (ex.: TCU), e demais “declarações de funcionamento” de seções/cláusulas não são declarados aqui.
 
 - **Carregamento**: na primeira necessidade (ou após atualização), o registro é lido do disco, validado como `SectionsRegistry` e convertido para `SectionCatalog` (função `registry_entry_to_catalog_entry` para cada entrada); resultado é cacheado em memória.
-- **Atualização**: `POST /api/agent/registry` com body = JSON completo do registro e header `X-Update-Key` igual a `REGISTRY_UPDATE_KEY`. O arquivo é reescrito e o cache invalidado; a próxima geração usa o novo conteúdo.
+- **Atualização**: `POST /api/agent/registry` com body = JSON completo do registro. O arquivo é reescrito e o cache invalidado; a próxima geração usa o novo conteúdo (pensado para uso local).
 
 ---
 
@@ -149,15 +163,16 @@ Saída: lista de `SectionCatalogEntry` elegíveis, na ordem do catálogo. O mode
 
 ---
 
-## 8. Prompts (resumo)
+## 8. Prompts em uso hoje
 
-- **INTERPRETER_SYSTEM_PROMPT**: extrair JSON com document_type e context a partir de texto livre; sem texto explicativo.
-- **BASE_SYSTEM_PROMPT**: agente de estruturação; saída **apenas** JSON de estrutura (document_type + root_sections); não redigir texto jurídico; formato dos nós (key, title, required, content_type, table_schema, children).
-- **DOCUMENT_TYPE_HINTS**: por tipo (termo_referencia, estudo_tecnico_preliminar, documento_formalizacao_demanda), lista de seções sugeridas e orientações (condicionais, frequentemente presentes). Usado quando **não** há catálogo.
-- **CATALOG_SELECTION_SYSTEM_PROMPT**: quando há catálogo; a IA deve devolver só `{ "section_keys": [...] }` com keys da lista permitida; pode omitir seções; matching por intenção (redação diferente do usuário).
-- **build_catalog_selection_user_prompt**: monta a lista permitida (key, title, description quando existir) e o contexto para o modelo escolher por intenção.
-
-Há também **CLAUSE_COMPOSITION_SYSTEM_PROMPT** e schemas de composição jurídica (ClauseCompositionRequest/Response), reservados para uso futuro pela camada de RAG/composição de cláusulas; o llm_agent atual **não** expõe endpoint de geração de texto de cláusulas.
+| Prompt / função | Onde é usado | Papel |
+|------------------|--------------|--------|
+| **INTERPRETER_SYSTEM_PROMPT** | structure-from-prompt → interpret_user_prompt | Extrair JSON (document_type + context) do texto livre. |
+| **BASE_SYSTEM_PROMPT** + **DOCUMENT_TYPE_HINTS** | generate_structure (fluxo **sem** catálogo) | Gerar JSON de estrutura (root_sections) quando não há registro. |
+| **CATALOG_SELECTION_SYSTEM_PROMPT** | generate_structure (fluxo **com** catálogo, sem user_prompt) | Devolver só `section_keys` da lista permitida. |
+| **CATALOG_SELECTION_WITH_MATCHES_SYSTEM_PROMPT** | generate_structure (fluxo com catálogo **e** user_prompt) | Devolver `section_keys` e `matches` (key, user_phrase, confidence). |
+| **build_catalog_selection_user_prompt** | agent.py ao montar prompt de seleção | Lista permitida (key, title, description) + contexto (e opcionalmente user_prompt). |
+| **build_system_prompt** / **build_user_prompt** | Fluxo sem catálogo | Tipo + contexto para geração livre de estrutura. |
 
 ---
 
@@ -170,14 +185,14 @@ Há também **CLAUSE_COMPOSITION_SYSTEM_PROMPT** e schemas de composição jurí
 | **AGENT_TIMEOUT** | Timeout (s) da chamada HTTP ao llm_api | 60.0 |
 | **AGENT_MAX_RETRIES** | Tentativas extras em caso de resposta inválida | 2 |
 | **SECTIONS_REGISTRY_PATH** | Caminho do arquivo JSON do registro | `…/llm_agent/data/sections_registry.json` |
-| **REGISTRY_UPDATE_KEY** | Chave para aceitar POST /registry; vazio = atualização recusada | (vazio) |
+| **REGISTRY_UPDATE_KEY** | (Não usado.) Reservado para futura proteção do POST /registry. | (vazio) |
 
 ---
 
 ## 10. Schemas principais (entrada/saída)
 
-- **StructureRequest**: document_type, context (ContextoBasico), sections_catalog (opcional).
-- **StructureResponse**: ok, structure (DocumentStructure ou null), error (opcional), retries.
+- **StructureRequest**: document_type, context (ContextoBasico), sections_catalog (opcional), user_prompt (opcional; quando preenchido, no fluxo com catálogo a resposta pode trazer section_matches).
+- **StructureResponse**: ok, structure (DocumentStructure ou null), error (opcional), retries, section_matches (opcional; lista de SectionMatchAnnotation quando user_prompt foi usado no fluxo com catálogo).
 - **DocumentStructure**: document_type, root_sections (lista de SectionNode).
 - **SectionNode**: key, title, required, content_type ("text" | "table" | "list"), table_schema (opcional), children (lista recursiva).
 - **PromptStructureRequest**: user_prompt (para structure-from-prompt).
@@ -187,15 +202,32 @@ O catálogo interno (**SectionCatalog** / **SectionCatalogEntry**) inclui, entre
 
 ---
 
-## 11. O que este módulo não faz (deixado para depois)
+## 11. Partes declaradas mas ainda não usadas / indefinidas
+
+Itens que existem no código ou na documentação como **contrato** ou **referência futura**, mas **não** são usados por nenhum endpoint nem fluxo atual.
+
+| Item | Onde está | Situação |
+|------|-----------|----------|
+| **DOCUMENT_CLAUSE_STRUCTURE_SYSTEM_PROMPT** | prompts.py | Texto de referência para quando existir agente de **cláusulas hierárquicas** (id lógico, numeração, versão, escopo). Nenhum endpoint o envia ao LLM. Ver docs/DOCUMENT_CLAUSE_STRUCTURE_PROMPT.md. |
+| **CLAUSE_COMPOSITION_SYSTEM_PROMPT** | prompts.py | Reservado para agente que **gera texto de cláusulas** a partir de base registrada + RAG. Nenhum endpoint de geração de texto de cláusulas existe no llm_agent. |
+| **ClauseCompositionRequest** / **ClauseCompositionResponse** | schemas.py | Schemas de entrada/saída para esse futuro agente de composição. Não são usados por nenhuma rota. |
+| **Endpoint de estrutura/modificação no nível de cláusulas** | — | Não implementado. O fluxo esperado (documento com cláusulas numeradas, versionamento, escopo por cláusula) está apenas descrito na doc. |
+| **Endpoint de geração de texto de cláusulas** | — | Não implementado. Seria o consumidor de CLAUSE_COMPOSITION_SYSTEM_PROMPT e dos schemas ClauseComposition*. |
+
+O que **é** usado hoje: **SectionMatchAnnotation** e **section_matches** em StructureResponse (preenchidos quando há `user_prompt` no fluxo com catálogo); **user_prompt** em StructureRequest (opcional, repassado para o prompt de seleção e para montar section_matches).
+
+---
+
+## 12. O que este módulo não faz (deixado para depois)
 
 - **Redação de cláusulas**: nenhum texto jurídico é produzido aqui.
 - **Fundamento legal, obrigatoriedade por órgão (ex.: TCU), layout final (tabela vs texto, colunas)**: não são declarados no registro; ficam para a camada de RAG e para o agente de composição jurídica.
 - **Inferência de seções fora do catálogo**: com catálogo/registro, a IA só seleciona e ordena keys existentes; sem catálogo, as dicas (hints) guiam a geração livre, mas o módulo não mantém um banco de cláusulas nem RAG.
+- **Estrutura no nível de cláusulas** (identificador lógico, numeração exibida, versão por cláusula): definida conceitualmente no DOCUMENT_CLAUSE_STRUCTURE_SYSTEM_PROMPT, mas sem implementação.
 
 ---
 
-## 12. Execução
+## 13. Execução
 
 - Desenvolvimento local (com llm_api rodando, ex.: na porta 8002):
   ```bash
@@ -203,4 +235,4 @@ O catálogo interno (**SectionCatalog** / **SectionCatalogEntry**) inclui, entre
   ```
 - Em produção/Docker: o serviço llm_agent sobe na porta configurada (ex.: 8003) e usa `LLM_ORCHESTRATION_BASE_URL` para falar com o llm_api. O arquivo de registro deve estar acessível no caminho `SECTIONS_REGISTRY_PATH` (volume ou path interno ao container).
 
-Documentação complementar: `docs/TEST_REGISTRY_CURL.md` (testes com curl), `docs/MALEABILIDADE_SECOES.md` (categorias e matching por intenção).
+Documentação complementar: `docs/PROMPTS_TESTE.md` (prompts e curls para testar), `docs/MALEABILIDADE_SECOES.md` (categorias e matching por intenção), `docs/DOCUMENT_CLAUSE_STRUCTURE_PROMPT.md` (prompt de cláusulas hierárquicas — não usado hoje), `docs/TECNOLOGIAS_COMPOSICAO.md` (sugestões de tecnologias para evolução).

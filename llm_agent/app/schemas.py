@@ -275,8 +275,7 @@ class SectionsRegistry(BaseModel):
     """
     Registro completo de seções (arquivo JSON ou body de atualização).
 
-    Atualização: POST /api/agent/registry com body = este JSON e header
-    X-Update-Key igual ao configurado; o agente persiste no arquivo e recarrega.
+    Atualização: POST /api/agent/registry com body = este JSON; o agente persiste no arquivo e recarrega.
     """
 
     catalog_id: Optional[str] = Field(None)

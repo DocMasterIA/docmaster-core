@@ -3,13 +3,47 @@
   "catalog_version": "1.0",
   "entries": [
     {
+      "key": "objeto",
+      "title": "Do Objeto",
+      "document_types": ["estudo_tecnico_preliminar"],
+      "content_type": "text",
+      "required": true,
+      "conditional_rules": null,
+      "status": "required",
+      "enabled": true,
+      "version": "1",
+      "parent_key": null
+    },
+    {
+      "key": "necessidade",
+      "title": "Da Necessidade",
+      "document_types": ["estudo_tecnico_preliminar"],
+      "content_type": "text",
+      "required": true,
+      "conditional_rules": null,
+      "status": "required",
+      "enabled": true,
+      "version": "1",
+      "parent_key": null
+    },
+    {
+      "key": "estimativa_custos",
+      "title": "Da Estimativa de Custos",
+      "document_types": ["estudo_tecnico_preliminar"],
+      "content_type": "text",
+      "required": true,
+      "conditional_rules": null,
+      "status": "required",
+      "enabled": true,
+      "version": "1",
+      "parent_key": null
+    },
+    {
       "key": "declaracao_viabilidade",
       "title": "Declaração de Viabilidade da Contratação",
       "document_types": ["estudo_tecnico_preliminar"],
       "content_type": "text",
       "required": false,
-      "required_by": ["tcu", "orgao_federal"],
-      "legal_basis": ["art_18_lei_14133"],
       "conditional_rules": {
         "if": ["obra", "servico_continuado"],
         "if_path": "extras.tipo_objeto"

@@ -111,17 +111,39 @@ def applies_to_scope(
     return True
 
 
+def _context_categories(context: ContextoBasico) -> set:
+    """
+    Extrai categorias/padrão do documento do contexto (extras.document_pattern ou extras.categoria).
+    Retorna set de strings em minúsculo; vazio se não informado.
+    """
+    extras = context.extras or {}
+    out: set = set()
+    for key in ("document_pattern", "categoria"):
+        v = extras.get(key)
+        if v is None:
+            continue
+        if isinstance(v, str) and v.strip():
+            out.add(v.strip().lower())
+        elif isinstance(v, list):
+            for x in v:
+                if isinstance(x, str) and x.strip():
+                    out.add(x.strip().lower())
+    return out
+
+
 def filter_eligible_sections(
     catalog: SectionCatalog,
     document_type: str,
     context: ContextoBasico,
 ) -> List[SectionCatalogEntry]:
     """
-    Retorna apenas as seções do catálogo elegíveis para o tipo de documento
-    e para o contexto, segundo escopo e regras condicionais (avaliação determinística).
+    Retorna seções elegíveis: tipo de documento, escopo, regras condicionais e,
+    quando o contexto tiver document_pattern/categoria, seções que tenham
+    essa categoria (ou sem categoria) para permitir padrões dinâmicos (ex. TR compra medicamentos).
     """
     doc_type = document_type.strip().lower()
     context_dict = _context_to_dict(context)
+    ctx_categories = _context_categories(context)
     eligible: List[SectionCatalogEntry] = []
 
     for entry in catalog.entries:
@@ -135,6 +157,11 @@ def filter_eligible_sections(
             if not all(
                 evaluate_conditional_rule(r, context_dict) for r in entry.conditional_rules
             ):
+                continue
+        # Padrão/categoria: quando contexto informa categoria, só inclui seções sem categoria ou com essa categoria
+        if ctx_categories:
+            entry_cats = { (c or "").strip().lower() for c in (entry.categories or []) if c }
+            if entry_cats and not (entry_cats & ctx_categories):
                 continue
         eligible.append(entry)
 

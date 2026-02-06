@@ -193,14 +193,11 @@ def _catalog_entry_to_section_node(
     entry: SectionCatalogEntry,
     context: ContextoBasico,
 ) -> SectionNode:
-    """Converte uma entrada do catálogo em SectionNode; required considera required_by e contexto."""
-    required = entry.required
-    if entry.required_by and (context.extras or {}).get("requiring_authority") in entry.required_by:
-        required = True
+    """Converte uma entrada do catálogo em SectionNode (nível estrutural apenas)."""
     return SectionNode(
         key=entry.key,
         title=entry.title,
-        required=required,
+        required=entry.required,
         content_type=entry.content_type,
         table_schema=entry.table_schema,
         children=[],

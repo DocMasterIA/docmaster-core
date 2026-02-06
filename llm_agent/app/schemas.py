@@ -135,14 +135,21 @@ class SectionCatalogEntry(BaseModel):
         ...,
         description="Tipos de documento nos quais a seção pode aparecer.",
     )
+    categories: Optional[List[str]] = Field(
+        None,
+        description=(
+            "Padrões/categorias do documento (ex.: compra_medicamentos, obras, tic). "
+            "Quando o contexto informar document_pattern ou categoria, seções com matching são elegíveis."
+        ),
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Texto curto para matching por intenção (ex.: 'Especificações para aquisição de medicamentos').",
+    )
     content_type: Literal["text", "table", "list"] = Field(
         ..., description="Tipo de conteúdo: text, table ou list."
     )
-    required: bool = Field(False, description="Se a seção é obrigatória para o tipo.")
-    required_by: Optional[List[str]] = Field(
-        None,
-        description="Ex.: ['tcu', 'orgao_federal']. Seção obrigatória quando contexto indicar uma dessas autoridades.",
-    )
+    required: bool = Field(False, description="Se a seção é obrigatória para o tipo (nível estrutural).")
     table_schema: Optional["TableSchema"] = Field(
         default=None,
         description="Schema da tabela quando content_type == 'table'.",
@@ -214,8 +221,9 @@ class RegistrySectionEntry(BaseModel):
     """
     Entrada do registro de seções (formato JSON do arquivo / payload de atualização).
 
-    Declarações lógicas claras; variabilidade por tipo de documento, obrigatoriedade
-    por autoridade (required_by), condição por tipo de objeto (if), status e enabled.
+    Declarações lógicas claras; variabilidade por tipo de documento, condição por tipo
+    de objeto (if), status e enabled. Aspectos de funcionamento jurídico (fundamento
+    legal, obrigatoriedade por autoridade etc.) ficam para a camada de RAG, não aqui.
     """
 
     key: str = Field(..., description="Identificador estável (snake_case).")
@@ -224,18 +232,18 @@ class RegistrySectionEntry(BaseModel):
         ...,
         description="Tipos de documento em que a seção pode aparecer (ex.: ['etp', 'termo_referencia']).",
     )
+    categories: Optional[List[str]] = Field(
+        None,
+        description="Padrões/categorias (ex.: compra_medicamentos, obras, tic). Definido posteriormente.",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Texto curto para a IA mapear intenção do usuário (título ou pedido em outro formato).",
+    )
     content_type: Literal["text", "table", "list"] = Field(
         "text", description="Tipo de conteúdo: text, table ou list."
     )
-    required: bool = Field(False, description="Obrigatória para o tipo de documento.")
-    required_by: Optional[List[str]] = Field(
-        None,
-        description="Ex.: ['tcu', 'orgao_federal']. Obrigatória quando o contexto indicar uma dessas autoridades.",
-    )
-    legal_basis: Optional[Union[str, List[str]]] = Field(
-        None,
-        description="Fundamento(s) legal(is), ex.: ['art_18_lei_14133'] ou string única.",
-    )
+    required: bool = Field(False, description="Obrigatória para o tipo de documento (nível estrutural).")
     conditional_rules: Optional[Union[List[ConditionalRule], Dict[str, Any]]] = Field(
         None,
         description=(
@@ -421,4 +429,63 @@ class StructureResponse(BaseModel):
     structure: Optional[DocumentStructure] = None
     error: Optional[str] = None
     retries: int = 0
+
+
+# ---- Composição jurídica controlada (cláusulas) ----
+# Contrato para geração de texto de cláusulas a partir de base registrada + RAG.
+# O agente NUNCA inventa; só adapta cláusulas existentes e indica proveniência.
+
+
+class ClauseCompositionRequest(BaseModel):
+    """
+    Entrada para o agente de composição de cláusulas.
+
+    A geração deve derivar da cláusula base (key/version/scope) e do contexto;
+    RAG snippets fundamentam variações textuais.
+    """
+
+    clause_key: str = Field(..., description="Key técnica da cláusula base registrada.")
+    version: Optional[str] = Field(None, description="Versão da cláusula base; se omitido, usa ativa.")
+    applicability_scope: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Escopo (município, estado, órgão etc.) quando relevante.",
+    )
+    context: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Parâmetros contextuais: objeto, modalidade, natureza do bem, finalidade, etc.",
+    )
+    rag_snippets: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        description="Documentos/trechos recuperados (RAG) que podem fundamentar variações.",
+    )
+
+
+class ClauseCompositionResponse(BaseModel):
+    """
+    Saída do agente de composição: texto gerado + proveniência obrigatória,
+    ou sinalização explícita de que não pode gerar com segurança.
+    """
+
+    generated_text: Optional[str] = Field(
+        None,
+        description="Texto da cláusula adaptada ao contexto. Nulo se cannot_generate=True.",
+    )
+    source_key: str = Field(..., description="Key da cláusula base utilizada.")
+    source_version: str = Field(..., description="Versão da cláusula base utilizada.")
+    params_applied: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Parâmetros contextuais efetivamente aplicados na adaptação.",
+    )
+    sources_used: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Referências aos trechos RAG que justificam variações textuais.",
+    )
+    cannot_generate: bool = Field(
+        False,
+        description="True quando não há cláusula registrada adequada; não produzir conteúdo especulativo.",
+    )
+    reason: Optional[str] = Field(
+        None,
+        description="Motivo quando cannot_generate=True (ex.: cláusula não encontrada, escopo incompatível).",
+    )
 

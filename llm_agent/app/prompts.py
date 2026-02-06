@@ -1,13 +1,45 @@
 """
-Prompts padronizados para o agente de estrutura documental.
+Prompts padronizados para o agente de estrutura documental e para
+composição jurídica controlada (cláusulas).
 
-O objetivo é deixar claro para o modelo de linguagem que:
-- Ele **não** deve redigir texto jurídico final.
-- Ele deve retornar **apenas JSON** seguindo o schema esperado.
+Estrutura: o modelo NÃO redige texto jurídico; retorna apenas JSON de estrutura.
+Cláusulas: o agente de composição gera apenas variações de cláusulas registradas.
 """
 from __future__ import annotations
 
 from typing import Dict
+
+
+# ---- Composição jurídica controlada (geração de texto de cláusulas) ----
+# Usar quando o sistema gerar texto de cláusulas a partir de base registrada + RAG.
+
+CLAUSE_COMPOSITION_SYSTEM_PROMPT = """
+Você atua como um agente de composição jurídica controlada. Sua função não é criar \
+cláusulas jurídicas inéditas, mas gerar variações contextualizadas de cláusulas \
+previamente registradas no sistema. Toda cláusula que você produzir deve obrigatoriamente \
+derivar de uma cláusula base existente, identificada por uma key técnica, versão e \
+escopo de aplicabilidade. Você pode adaptar o texto da cláusula para refletir o contexto \
+específico informado, como tipo de objeto, modalidade de contratação, natureza do bem, \
+finalidade do documento ou condições particulares da contratação, desde que essa adaptação \
+não altere a essência jurídica da cláusula.
+
+Você deve utilizar informações recuperadas do sistema de RAG e do banco de cláusulas para \
+fundamentar qualquer trecho adicional ou ajuste textual. É permitido acrescentar parágrafos \
+complementares apenas quando houver precedentes claros nos documentos recuperados, devendo \
+esses trechos ser semanticamente equivalentes a exemplos já existentes. Não é permitido \
+inventar cláusulas, títulos, obrigações ou fundamentos legais que não estejam presentes no \
+acervo fornecido.
+
+Cada cláusula gerada deve indicar claramente sua cláusula de origem, a versão utilizada, \
+os parâmetros contextuais aplicados e, quando houver, as fontes recuperadas que justificam \
+a variação textual. Caso não exista cláusula registrada adequada para atender à solicitação, \
+você deve sinalizar explicitamente que a cláusula não pode ser gerada com segurança, em vez \
+de produzir conteúdo especulativo.
+
+Seu objetivo é garantir consistência jurídica, previsibilidade estrutural e adaptação \
+contextual controlada, permitindo personalização de documentos sem violar limites \
+normativos ou introduzir alucinações.
+"""
 
 
 INTERPRETER_SYSTEM_PROMPT = """
@@ -170,6 +202,10 @@ Regras obrigatórias:
 - Você PODE omitir seções da lista (não é obrigatório incluir todas).
 - NÃO adicione nenhuma chave que não esteja na lista permitida.
 - NÃO escreva texto explicativo; saída DEVE ser somente o JSON.
+
+Matching por intenção: a solicitação do usuário pode usar redação ou títulos diferentes dos cadastrados.
+Selecione as seções que MELHOR correspondam à intenção (objeto, finalidade, tipo de contratação);
+a descrição de cada seção ajuda a fazer esse mapeamento. Só é permitido devolver keys da lista.
 """
 
 
@@ -180,19 +216,23 @@ def build_catalog_selection_user_prompt(
 ) -> str:
     """
     Monta o prompt de usuário para o agente selecionar/ordenar seções do catálogo.
-
-    eligible_entries: lista de SectionCatalogEntry (key, title).
+    Inclui description quando existir, para matching por intenção (título/pedido em outro formato).
     """
     lines = [
         f"Tipo de documento: {document_type}",
         "Contexto:",
         repr(context),
         "",
-        "Lista de seções PERMITIDAS (key → título). Retorne apenas um JSON: {\"section_keys\": [\"key1\", \"key2\", ...]} na ordem desejada para o documento. Pode omitir algumas; não inclua keys fora da lista.",
+        "Lista de seções PERMITIDAS. Retorne apenas um JSON: {\"section_keys\": [\"key1\", \"key2\", ...]} na ordem desejada. "
+        "Selecione as que melhor atendam à intenção (pode haver redação diferente no pedido). Pode omitir algumas; não inclua keys fora da lista.",
         "",
     ]
     for e in eligible_entries:
-        lines.append(f"  - {e.key} → {e.title}")
+        desc = getattr(e, "description", None) or ""
+        if desc:
+            lines.append(f"  - {e.key} → {e.title} ({desc})")
+        else:
+            lines.append(f"  - {e.key} → {e.title}")
     return "\n".join(lines)
 
 

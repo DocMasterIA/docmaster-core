@@ -25,17 +25,6 @@ from .schemas import (
 _cached_catalog: Optional[SectionCatalog] = None
 
 
-def _normalize_legal_basis(v: Optional[Any]) -> Optional[str]:
-    if v is None:
-        return None
-    if isinstance(v, str):
-        return v.strip() or None
-    if isinstance(v, list):
-        parts = [str(x).strip() for x in v if x is not None and str(x).strip()]
-        return ", ".join(parts) if parts else None
-    return None
-
-
 def _normalize_conditional_rules(
     v: Optional[Any],
     default_if_path: str = "extras.tipo_objeto",
@@ -84,11 +73,11 @@ def registry_entry_to_catalog_entry(reg: Any) -> SectionCatalogEntry:
         key=reg["key"],
         title=reg["title"],
         document_types=list(reg["document_types"]),
+        categories=reg.get("categories"),
+        description=reg.get("description"),
         content_type=reg.get("content_type", "text"),
         required=required,
-        required_by=reg.get("required_by"),
         table_schema=table_schema,
-        legal_basis=_normalize_legal_basis(reg.get("legal_basis")),
         conditional_rules=conditional_rules,
         applicability_scope=_normalize_scope(reg.get("applicability_scope")),
         version=str(reg.get("version", "1")),

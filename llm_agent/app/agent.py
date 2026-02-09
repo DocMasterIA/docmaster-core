@@ -364,7 +364,6 @@ def _strip_markdown_json(text: str) -> str:
     """
     text = text.strip()
     if text.startswith("```"):
-        # Remove abertura: ```json ou ```
         first_line = text.split("\n", 1)[0]
         if first_line.startswith("```"):
             text = text[len(first_line) :].lstrip("\n")
@@ -373,54 +372,129 @@ def _strip_markdown_json(text: str) -> str:
     return text
 
 
-def _extract_json_object(text: str) -> str:
+def _extract_code_fence(text: str, fence: str = "```") -> str | None:
+    """Extrai o primeiro bloco entre ``` e ``` (ou entre fence e fence). Retorna None se não achar."""
+    idx = text.find(fence)
+    if idx < 0:
+        return None
+    idx2 = text.find(fence, idx + len(fence))
+    if idx2 < 0:
+        return None
+    block = text[idx + len(fence) : idx2].strip()
+    if block.lower().startswith("json"):
+        block = block[4:].lstrip()
+    return block if block.startswith("{") else None
+
+
+def _extract_json_object_respecting_strings(text: str) -> str:
     """
-    Extrai o primeiro objeto JSON balanceado { ... } do texto.
-    Útil quando o modelo devolve explicação antes/depois ou usa aspas simples.
+    Extrai o primeiro objeto { ... } respeitando strings (não conta { } dentro de "..." ou '...').
+    Evita quebra quando o modelo coloca chaves no título ou em valores.
     """
     start = text.find("{")
     if start < 0:
         return text
+    i = start
     depth = 0
-    for i in range(start, len(text)):
-        if text[i] == "{":
+    in_double = False
+    in_single = False
+    escape = False
+    quote_char: str | None = None
+    n = len(text)
+    while i < n:
+        c = text[i]
+        if escape:
+            escape = False
+            i += 1
+            continue
+        if c == "\\" and (in_double or in_single):
+            escape = True
+            i += 1
+            continue
+        if in_double or in_single:
+            if c == quote_char:
+                in_double = False
+                in_single = False
+                quote_char = None
+            i += 1
+            continue
+        if c == '"':
+            in_double = True
+            quote_char = '"'
+            i += 1
+            continue
+        if c == "'":
+            in_single = True
+            quote_char = "'"
+            i += 1
+            continue
+        if c == "{":
             depth += 1
-        elif text[i] == "}":
+        elif c == "}":
             depth -= 1
             if depth == 0:
                 return text[start : i + 1]
+        i += 1
     return text[start:].rstrip()
 
 
 def _raw_to_structure_candidate(raw: Any) -> dict:
     """
     Converte resposta bruta (string ou dict) em dict para DocumentStructure.
-    Tenta json.loads, extração de bloco { }, e ast.literal_eval (aspas simples).
+    Tenta: parse direto, bloco ```json```, extração { } respeitando strings, ast.literal_eval.
     """
     if isinstance(raw, dict):
         return raw
-    text = _strip_markdown_json(str(raw))
-    # 1) Parse direto
+    text = str(raw).strip()
+    # 1) Parse direto (após remover markdown genérico)
+    cleaned = _strip_markdown_json(text)
     try:
-        return json.loads(text)
+        return json.loads(cleaned)
     except json.JSONDecodeError:
         pass
-    # 2) Extrair primeiro bloco { ... } e tentar de novo
-    extracted = _extract_json_object(text)
-    if extracted != text:
+    # 2) Bloco explícito ```json ... ```
+    fence_block = _extract_code_fence(text)
+    if fence_block:
+        try:
+            return json.loads(fence_block)
+        except json.JSONDecodeError:
+            pass
+        if fence_block.strip().startswith("{") and "'" in fence_block:
+            try:
+                obj = ast.literal_eval(fence_block)
+                if isinstance(obj, dict):
+                    return obj
+            except (ValueError, SyntaxError):
+                pass
+    # 3) Extrair { } respeitando strings (evita quebrar em títulos/valores com { ou })
+    extracted = _extract_json_object_respecting_strings(cleaned)
+    if extracted and extracted != cleaned:
         try:
             return json.loads(extracted)
         except json.JSONDecodeError:
             pass
-    # 3) Aspas simples (estilo Python dict) — só se parecer seguro
-    if extracted.strip().startswith("{") and "'" in extracted:
-        try:
-            obj = ast.literal_eval(extracted)
-            if isinstance(obj, dict):
-                return obj
-        except (ValueError, SyntaxError):
-            pass
-    raise ValueError(f"JSON inválido: não foi possível extrair objeto da resposta.")
+        if extracted.strip().startswith("{") and "'" in extracted:
+            try:
+                obj = ast.literal_eval(extracted)
+                if isinstance(obj, dict):
+                    return obj
+            except (ValueError, SyntaxError):
+                pass
+    # 4) Última tentativa: extração por chaves sem respeitar strings (comportamento antigo)
+    start = cleaned.find("{")
+    if start >= 0:
+        depth = 0
+        for i in range(start, len(cleaned)):
+            if cleaned[i] == "{":
+                depth += 1
+            elif cleaned[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(cleaned[start : i + 1])
+                    except json.JSONDecodeError:
+                        break
+    raise ValueError("JSON inválido: não foi possível extrair objeto da resposta.")
 
 
 def _parse_structure(raw: Any, document_type: str) -> DocumentStructure:

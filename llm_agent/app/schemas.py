@@ -465,7 +465,105 @@ class StructureResponse(BaseModel):
     )
 
 
-# ---- Composição jurídica controlada (cláusulas) ----
+# ---- Estrutura de cláusulas hierárquicas (esqueleto, sem texto) ----
+# Usada para descrever a árvore de cláusulas/subcláusulas que um documento pode ter.
+# Subcláusulas NÃO possuem título próprio; apenas cláusulas de topo têm title exibido.
+
+
+class ClauseNode(BaseModel):
+    """
+    Nó estrutural de cláusula.
+
+    - logical_id: identificador lógico estável (ex.: RESPONSABILIDADES_CONTRATADA).
+    - title: título exibido apenas para cláusulas de topo; subcláusulas não têm título.
+    - status: situação estrutural da cláusula (ativa, substituída, revogada).
+    - scope: escopo de validade (federal, estadual, municipal, etc.).
+    - version: versão estrutural da cláusula.
+    - children: subcláusulas hierárquicas, que representam slots estruturais.
+    """
+
+    logical_id: str = Field(..., description="Identificador lógico estável da cláusula.")
+    title: Optional[str] = Field(
+        None,
+        description=(
+            "Título exibido apenas para cláusulas de topo. "
+            "Subcláusulas não devem ter título próprio."
+        ),
+    )
+    status: Optional[Literal["active", "superseded", "revoked"]] = Field(
+        None,
+        description="Situação estrutural da cláusula.",
+    )
+    scope: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Escopo de validade (federal, estadual, municipal, órgão específico, etc.).",
+    )
+    version: Optional[str] = Field(
+        None,
+        description="Versão estrutural da cláusula.",
+    )
+    children: List["ClauseNode"] = Field(
+        default_factory=list,
+        description="Subcláusulas hierárquicas (slots estruturais, sem texto jurídico).",
+    )
+
+
+class ClauseStructureRequest(BaseModel):
+    """
+    Entrada para o agente de estrutura de cláusulas hierárquicas.
+
+    O objetivo é obter APENAS o esqueleto estrutural de cláusulas/subcláusulas
+    (slots), sem texto jurídico final.
+    """
+
+    document_type: str = Field(
+        ...,
+        description="Tipo de documento ao qual a estrutura de cláusulas se aplica.",
+    )
+    context: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Contexto livre (objeto, modalidade, órgão, extras, etc.).",
+    )
+    section_key: Optional[str] = Field(
+        None,
+        description="Opcional: key da seção/camada estrutural à qual as cláusulas se referem.",
+    )
+    base_description: Optional[str] = Field(
+        None,
+        description=(
+            "Descrição textual breve da cláusula/assunto a estruturar "
+            "(ex.: 'cláusula de garantias', 'cláusula de responsabilidades')."
+        ),
+    )
+
+    @field_validator("document_type", "section_key", "base_description", mode="before")
+    @classmethod
+    def _strip_opt_strings(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        if isinstance(v, str):
+            v = v.strip()
+            return v or None
+        return v
+
+
+class ClauseStructureResponse(BaseModel):
+    """
+    Resposta do agente de estrutura de cláusulas.
+
+    Retorna apenas a árvore estrutural (ClauseNode), sem texto jurídico.
+    """
+
+    ok: bool
+    root_clauses: Optional[List[ClauseNode]] = Field(
+        None,
+        description="Cláusulas de topo estruturais, com subcláusulas hierárquicas.",
+    )
+    error: Optional[str] = None
+    retries: int = 0
+
+
+# ---- Composição jurídica controlada (cláusulas - TEXTO) ----
 # Contrato para geração de texto de cláusulas a partir de base registrada + RAG.
 # O agente NUNCA inventa; só adapta cláusulas existentes e indica proveniência.
 

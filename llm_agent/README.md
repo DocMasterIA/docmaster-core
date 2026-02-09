@@ -80,6 +80,7 @@ Nenhum endpoint gera texto jurídico nem opera no nível de cláusulas numeradas
 | **POST /api/agent/structure** | Gera a estrutura. Body: `StructureRequest` (document_type, context; opcional: sections_catalog, user_prompt). Retorno: `StructureResponse` (ok, structure, error, retries; section_matches quando houve user_prompt no fluxo com catálogo). |
 | **POST /api/agent/structure-from-prompt** | Interpreta prompt livre. Body: `{ "user_prompt": "..." }`. Interpretador LLM → `StructureRequest` → `generate_structure`. Retorno: mesmo `StructureResponse`; com catálogo, inclui section_matches (pedido ↔ seção com confidence). |
 | **POST /api/agent/registry** | Atualiza o registro de seções (arquivo JSON). Body: `SectionsRegistry` completo. Uso local, sem chave. |
+| **POST /api/agent/clause-structure** | Gera **apenas** o esqueleto de cláusulas/subcláusulas (ClauseNode). Body: `ClauseStructureRequest` (document_type, context; opcionais: section_key, base_description). Retorno: `ClauseStructureResponse` (ok, root_clauses, error, retries). Subcláusulas não têm título. |
 
 A API é pensada para uso interno (ex.: backend Django), não para consumo público direto.
 
@@ -171,6 +172,7 @@ Saída: lista de `SectionCatalogEntry` elegíveis, na ordem do catálogo. O mode
 | **BASE_SYSTEM_PROMPT** + **DOCUMENT_TYPE_HINTS** | generate_structure (fluxo **sem** catálogo) | Gerar JSON de estrutura (root_sections) quando não há registro. |
 | **CATALOG_SELECTION_SYSTEM_PROMPT** | generate_structure (fluxo **com** catálogo, sem user_prompt) | Devolver só `section_keys` da lista permitida. |
 | **CATALOG_SELECTION_WITH_MATCHES_SYSTEM_PROMPT** | generate_structure (fluxo com catálogo **e** user_prompt) | Devolver `section_keys` e `matches` (key, user_phrase, confidence). |
+| **DOCUMENT_CLAUSE_STRUCTURE_SYSTEM_PROMPT** | generate_clause_structure (clause-structure) | Definir apenas a estrutura de cláusulas/subcláusulas (ClauseNode), sem texto jurídico. |
 | **build_catalog_selection_user_prompt** | agent.py ao montar prompt de seleção | Lista permitida (key, title, description) + contexto (e opcionalmente user_prompt). |
 | **build_system_prompt** / **build_user_prompt** | Fluxo sem catálogo | Tipo + contexto para geração livre de estrutura. |
 
@@ -197,6 +199,9 @@ Saída: lista de `SectionCatalogEntry` elegíveis, na ordem do catálogo. O mode
 - **SectionNode**: key, title, required, content_type ("text" | "table" | "list"), table_schema (opcional), children (lista recursiva).
 - **PromptStructureRequest**: user_prompt (para structure-from-prompt).
 - **SectionsRegistry**: catalog_id, catalog_version, entries (lista de RegistrySectionEntry); usado no body de POST /registry e no arquivo JSON.
+- **ClauseNode**: logical_id, title (apenas para cláusulas de topo), status, scope, version, children (lista recursiva; subcláusulas sem título).
+- **ClauseStructureRequest**: document_type, context (dict livre), section_key (opcional), base_description (opcional).
+- **ClauseStructureResponse**: ok, root_clauses (lista de ClauseNode ou null), error (opcional), retries.
 
 O catálogo interno (**SectionCatalog** / **SectionCatalogEntry**) inclui, entre outros: key, title, document_types, categories, description, content_type, required, conditional_rules, applicability_scope, version, is_active, parent_key, table_schema (opcional). Não inclui campos de “funcionamento jurídico” (fundamento legal, obrigatoriedade por autoridade etc.), reservados para RAG.
 

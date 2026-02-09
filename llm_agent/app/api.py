@@ -8,9 +8,16 @@ from __future__ import annotations
 
 from fastapi import APIRouter, FastAPI, HTTPException
 
-from .agent import generate_structure, interpret_user_prompt
+from .agent import generate_clause_structure, generate_structure, interpret_user_prompt
 from .registry import update_registry
-from .schemas import PromptStructureRequest, SectionsRegistry, StructureRequest, StructureResponse
+from .schemas import (
+    ClauseStructureRequest,
+    ClauseStructureResponse,
+    PromptStructureRequest,
+    SectionsRegistry,
+    StructureRequest,
+    StructureResponse,
+)
 
 
 router = APIRouter(prefix="/agent", tags=["llm_agent"])
@@ -70,6 +77,28 @@ async def endpoint_structure(body: StructureRequest) -> StructureResponse:
         return await generate_structure(body)
     except Exception as e:  # Último fallback defensivo
         raise HTTPException(status_code=500, detail=f"Erro no agente de estrutura: {e}") from e
+
+
+@router.post("/clause-structure", response_model=ClauseStructureResponse)
+async def endpoint_clause_structure(body: ClauseStructureRequest) -> ClauseStructureResponse:
+    """
+    Gera apenas a estrutura hierárquica de cláusulas/subcláusulas (esqueleto).
+
+    Entrada:
+    - document_type: tipo de documento.
+    - context: contexto livre (objeto, modalidade, órgão, extras, etc.).
+    - section_key/base_description: opcionais, para focar em uma cláusula/assunto específico.
+
+    Saída:
+    - Árvore de ClauseNode (root_clauses) sem texto jurídico; subcláusulas não têm título.
+    """
+    try:
+        return await generate_clause_structure(body)
+    except Exception as e:  # Último fallback defensivo
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro no agente de estrutura de cláusulas: {e}",
+        ) from e
 
 
 def create_app() -> FastAPI:

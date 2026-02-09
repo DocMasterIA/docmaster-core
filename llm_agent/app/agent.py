@@ -21,6 +21,7 @@ from .config import AGENT_MAX_RETRIES
 from .prompts import (
     CATALOG_SELECTION_SYSTEM_PROMPT,
     CATALOG_SELECTION_WITH_MATCHES_SYSTEM_PROMPT,
+    DOCUMENT_CLAUSE_STRUCTURE_SYSTEM_PROMPT,
     INTERPRETER_SYSTEM_PROMPT,
     build_catalog_selection_user_prompt,
     build_interpreter_user_prompt,
@@ -29,6 +30,8 @@ from .prompts import (
 )
 from .registry import get_catalog_from_registry
 from .schemas import (
+    ClauseStructureRequest,
+    ClauseStructureResponse,
     ContextoBasico,
     DocumentStructure,
     SectionCatalogEntry,
@@ -524,6 +527,108 @@ async def generate_structure(req: StructureRequest) -> StructureResponse:
         ok=False,
         structure=fallback,
         error=last_error or "Não foi possível obter estrutura válida do modelo.",
+        retries=AGENT_MAX_RETRIES + 1,
+    )
+
+
+async def generate_clause_structure(req: ClauseStructureRequest) -> ClauseStructureResponse:
+    """
+    Gera apenas a estrutura hierárquica de cláusulas/subcláusulas (esqueleto).
+
+    Usa DOCUMENT_CLAUSE_STRUCTURE_SYSTEM_PROMPT e retorna uma árvore de ClauseNode
+    sem texto jurídico final; decisão sobre quais subcláusulas ativar será feita
+    posteriormente pelo módulo de RAG/composição.
+    """
+    system_prompt = DOCUMENT_CLAUSE_STRUCTURE_SYSTEM_PROMPT.strip()
+
+    # Monta prompt de usuário com tipo, contexto e, opcionalmente, seção e descrição base.
+    parts: List[str] = []
+    parts.append(f"Tipo de documento: {req.document_type}")
+    if req.section_key:
+        parts.append(f"Seção estrutural relacionada (section_key): {req.section_key}")
+    if req.base_description:
+        parts.append(f"Descrição base da cláusula/assunto: {req.base_description}")
+    if req.context:
+        try:
+            ctx_json = json.dumps(req.context, ensure_ascii=False, indent=2)
+        except Exception:
+            ctx_json = str(req.context)
+        parts.append(f"Contexto (JSON):\n{ctx_json}")
+
+    user_prompt = (
+        "Gerar APENAS o esqueleto estrutural de cláusulas e subcláusulas "
+        "(sem texto jurídico), no seguinte formato JSON:\n\n"
+        "{\n"
+        '  "root_clauses": [\n'
+        "    {\n"
+        '      "logical_id": "EXEMPLO_CLAUSULA",\n'
+        '      "title": "Título apenas para cláusulas de topo",\n'
+        '      "status": "active",\n'
+        '      "version": "1.0",\n'
+        '      "scope": { "nivel": "federal" },\n'
+        '      "children": [\n'
+        "        {\n"
+        '          "logical_id": "EXEMPLO_SUBCLAUSULA",\n'
+        '          "status": "active",\n'
+        '          "children": []\n'
+        "        }\n"
+        "      ]\n"
+        "    }\n"
+        "  ]\n"
+        "}\n\n"
+        "Regras importantes:\n"
+        "- Subcláusulas NÃO devem ter título (title ausente ou nulo).\n"
+        "- Não gere texto jurídico, apenas a estrutura e identificadores lógicos.\n"
+        "- Retorne APENAS o JSON, sem explicações.\n\n"
+    )
+    user_prompt += "\n".join(parts)
+
+    full_prompt = f"<<SYSTEM>>\n{system_prompt}\n\n<<USER>>\n{user_prompt}"
+    payload = {"prompt": full_prompt, "stream": False}
+
+    last_error: str | None = None
+    for attempt in range(AGENT_MAX_RETRIES + 1):
+        try:
+            data = await call_generate(payload)
+            raw = data.get("response") if isinstance(data, dict) else data
+            if raw is None:
+                raw = data
+
+            # Aceita string ou dict; remove ```json ``` se vier.
+            if isinstance(raw, str):
+                raw_clean = raw.strip()
+                if raw_clean.startswith("```"):
+                    # Reaproveita utilidade de limpar markdown JSON.
+                    from .agent import _strip_markdown_json  # type: ignore  # local import to avoid cycle
+
+                    raw_clean = _strip_markdown_json(raw_clean)
+                candidate = json.loads(raw_clean)
+            else:
+                candidate = raw
+
+            if not isinstance(candidate, dict):
+                raise ValueError("Resposta não é um objeto JSON.")
+
+            # Permitir que o modelo omita root_clauses em casos extremos; validamos via Pydantic.
+            resp = ClauseStructureResponse.model_validate(candidate)
+            # Se root_clauses vier vazio ou None, consideramos falha.
+            if not resp.root_clauses:
+                raise ValueError("root_clauses vazio ou ausente na resposta do modelo.")
+
+            return ClauseStructureResponse(
+                ok=True,
+                root_clauses=resp.root_clauses,
+                error=None,
+                retries=attempt,
+            )
+        except (OrchestrationError, Exception) as e:
+            last_error = str(e)
+            continue
+
+    return ClauseStructureResponse(
+        ok=False,
+        root_clauses=None,
+        error=last_error or "Não foi possível obter estrutura de cláusulas válida do modelo.",
         retries=AGENT_MAX_RETRIES + 1,
     )
 

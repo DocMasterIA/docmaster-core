@@ -10,6 +10,7 @@ Responsável por:
 """
 from __future__ import annotations
 
+import ast
 import json
 from typing import Any, Dict, List, Tuple
 
@@ -372,26 +373,69 @@ def _strip_markdown_json(text: str) -> str:
     return text
 
 
+def _extract_json_object(text: str) -> str:
+    """
+    Extrai o primeiro objeto JSON balanceado { ... } do texto.
+    Útil quando o modelo devolve explicação antes/depois ou usa aspas simples.
+    """
+    start = text.find("{")
+    if start < 0:
+        return text
+    depth = 0
+    for i in range(start, len(text)):
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return text[start:].rstrip()
+
+
+def _raw_to_structure_candidate(raw: Any) -> dict:
+    """
+    Converte resposta bruta (string ou dict) em dict para DocumentStructure.
+    Tenta json.loads, extração de bloco { }, e ast.literal_eval (aspas simples).
+    """
+    if isinstance(raw, dict):
+        return raw
+    text = _strip_markdown_json(str(raw))
+    # 1) Parse direto
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    # 2) Extrair primeiro bloco { ... } e tentar de novo
+    extracted = _extract_json_object(text)
+    if extracted != text:
+        try:
+            return json.loads(extracted)
+        except json.JSONDecodeError:
+            pass
+    # 3) Aspas simples (estilo Python dict) — só se parecer seguro
+    if extracted.strip().startswith("{") and "'" in extracted:
+        try:
+            obj = ast.literal_eval(extracted)
+            if isinstance(obj, dict):
+                return obj
+        except (ValueError, SyntaxError):
+            pass
+    raise ValueError(f"JSON inválido: não foi possível extrair objeto da resposta.")
+
+
 def _parse_structure(raw: Any, document_type: str) -> DocumentStructure:
     """
     Converte a resposta bruta do modelo em DocumentStructure, validando o schema.
     """
-    # raw deve ser um dict JSON; se vier string, removemos markdown e tentamos json.loads.
-    if isinstance(raw, str):
-        raw = _strip_markdown_json(raw)
-        try:
-            candidate = json.loads(raw)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"JSON inválido: {e}") from e
-    else:
-        candidate = raw
+    try:
+        candidate = _raw_to_structure_candidate(raw)
+    except ValueError as e:
+        raise e from e
 
     if not isinstance(candidate, dict):
         raise ValueError("Resposta não é um objeto JSON.")
 
-    # Se o modelo não preencher document_type, garantimos o eco do tipo solicitado.
     candidate.setdefault("document_type", document_type)
-
     return DocumentStructure.model_validate(candidate)
 
 

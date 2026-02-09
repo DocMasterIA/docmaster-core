@@ -209,6 +209,56 @@ def _catalog_entry_to_section_node(
     )
 
 
+def _collect_keys_in_order(nodes: List[SectionNode]) -> List[str]:
+    """Coleta keys em ordem (DFS) a partir dos nós raiz."""
+    out: List[str] = []
+    for n in nodes:
+        out.append(n.key)
+        if n.children:
+            out.extend(_collect_keys_in_order(n.children))
+    return out
+
+
+def _enrich_node_from_catalog(
+    node: SectionNode, eligible_by_key: Dict[str, SectionCatalogEntry]
+) -> None:
+    """Enriquece um SectionNode com título/content_type/table_schema/required do catálogo (in-place)."""
+    if node.key in eligible_by_key:
+        e = eligible_by_key[node.key]
+        node.title = e.title
+        node.content_type = e.content_type
+        node.required = e.required
+        node.table_schema = e.table_schema
+    for ch in node.children:
+        _enrich_node_from_catalog(ch, eligible_by_key)
+
+
+def _merge_base_with_catalog(
+    base_structure: DocumentStructure,
+    eligible: List[SectionCatalogEntry],
+    selected_keys: List[str],
+    context: ContextoBasico,
+) -> DocumentStructure:
+    """
+    Base (from hints) + catálogo: enriquece nós da base com dados do catálogo quando a key
+    existe em ambos; adiciona ao final as seções só do catálogo (selected_keys não presentes na base).
+    """
+    eligible_by_key = {e.key: e for e in eligible}
+    base_keys_ordered = _collect_keys_in_order(base_structure.root_sections)
+    catalog_only_keys = [k for k in selected_keys if k not in base_keys_ordered and k in eligible_by_key]
+    for root in base_structure.root_sections:
+        _enrich_node_from_catalog(root, eligible_by_key)
+    extra_nodes = [
+        _catalog_entry_to_section_node(eligible_by_key[k], context)
+        for k in catalog_only_keys
+    ]
+    merged_roots = list(base_structure.root_sections) + extra_nodes
+    return DocumentStructure(
+        document_type=base_structure.document_type,
+        root_sections=merged_roots,
+    )
+
+
 def _build_structure_from_catalog_selection(
     selected_keys: List[str],
     eligible_entries: List[SectionCatalogEntry],
@@ -406,10 +456,14 @@ def _parse_catalog_selection_matches(
     return out
 
 
-async def _generate_structure_with_catalog(req: StructureRequest) -> StructureResponse:
+async def _generate_structure_with_catalog(
+    req: StructureRequest,
+    base_structure: DocumentStructure | None = None,
+) -> StructureResponse:
     """
-    Fluxo com catálogo versionável: filtra seções elegíveis de forma determinística,
-    pede ao modelo apenas a ordenação/seleção (lista de keys), monta estrutura do catálogo.
+    Fluxo com catálogo: pede ao modelo a ordenação/seleção (lista de keys) entre as elegíveis.
+    Se base_structure for informado, usa base (hints) + catálogo: enriquece a base e adiciona
+    seções só do catálogo. Caso contrário, monta a estrutura apenas a partir do catálogo.
     """
     eligible = filter_eligible_sections(
         req.sections_catalog, req.document_type, req.context
@@ -448,16 +502,20 @@ async def _generate_structure_with_catalog(req: StructureRequest) -> StructureRe
                 raw = data
             selected = _parse_catalog_selection_response(raw, eligible_keys)
             if not selected:
-                # Fallback: ordem do catálogo (raízes primeiro)
                 selected = [e.key for e in eligible if (e.parent_key or "").strip() == ""]
                 if not selected:
                     selected = [e.key for e in eligible]
-            structure = _build_structure_from_catalog_selection(
-                selected, eligible, req.document_type, req.context
-            )
             section_matches = (
                 _parse_catalog_selection_matches(raw, eligible_keys) if use_matches else None
             )
+            if base_structure is not None:
+                structure = _merge_base_with_catalog(
+                    base_structure, eligible, selected, req.context
+                )
+            else:
+                structure = _build_structure_from_catalog_selection(
+                    selected, eligible, req.document_type, req.context
+                )
             return StructureResponse(
                 ok=True,
                 structure=structure,
@@ -468,11 +526,15 @@ async def _generate_structure_with_catalog(req: StructureRequest) -> StructureRe
             last_error = str(e)
             continue
 
-    # Fallback: todas as elegíveis na ordem do catálogo
     selected = [e.key for e in eligible]
-    structure = _build_structure_from_catalog_selection(
-        selected, eligible, req.document_type, req.context
-    )
+    if base_structure is not None:
+        structure = _merge_base_with_catalog(
+            base_structure, eligible, selected, req.context
+        )
+    else:
+        structure = _build_structure_from_catalog_selection(
+            selected, eligible, req.document_type, req.context
+        )
     return StructureResponse(
         ok=False,
         structure=structure,
@@ -485,49 +547,58 @@ async def _generate_structure_with_catalog(req: StructureRequest) -> StructureRe
 async def generate_structure(req: StructureRequest) -> StructureResponse:
     """
     Função principal do agente:
-    - Se sections_catalog for informado: fluxo versionável (seleção/ordenação apenas).
-    - Se não, mas existir registro em arquivo (SECTIONS_REGISTRY_PATH): usa catálogo do registro.
-    - Caso contrário: geração livre com hints; fallback para estrutura mínima.
+    - Sempre obtém a base (LLM + DOCUMENT_TYPE_HINTS); fallback para estrutura mínima se falhar.
+    - Se houver catálogo com seções elegíveis: aplica fluxo de catálogo em cima da base (enriquece
+      nós com dados do catálogo e adiciona seções só do catálogo). Senão, devolve só a base.
     """
     catalog = req.sections_catalog
     if catalog is None or not catalog.entries:
         catalog = get_catalog_from_registry()
-    if catalog is not None and catalog.entries:
+    eligible = (
+        filter_eligible_sections(catalog, req.document_type, req.context)
+        if catalog is not None and catalog.entries
+        else []
+    )
+
+    # 1) Sempre obter base (LLM + hints)
+    base_structure: DocumentStructure | None = None
+    last_error: str | None = None
+    base_retries = 0
+    for attempt in range(AGENT_MAX_RETRIES + 1):
+        try:
+            payload = _build_llm_payload(req)
+            data = await call_generate(payload)
+            raw = data.get("response") if isinstance(data, dict) else data
+            if raw is None:
+                raw = data
+            base_structure = _parse_structure(raw, req.document_type)
+            _validate_semantics(req.document_type, base_structure)
+            base_retries = attempt
+            break
+        except (OrchestrationError, ValidationError, Exception) as e:
+            last_error = str(e)
+            continue
+    used_base_fallback = base_structure is None
+    if base_structure is None:
+        base_structure = _minimal_structure_for(req.document_type)
+
+    # 2) Se há elegíveis, base + fluxo de catálogo (enriquecer e adicionar seções do catálogo)
+    if eligible and catalog is not None:
         req_with_catalog = StructureRequest(
             document_type=req.document_type,
             context=req.context,
             sections_catalog=catalog,
             user_prompt=req.user_prompt,
         )
-        return await _generate_structure_with_catalog(req_with_catalog)
+        return await _generate_structure_with_catalog(
+            req_with_catalog, base_structure=base_structure
+        )
 
-    last_error: str | None = None
-
-    for attempt in range(AGENT_MAX_RETRIES + 1):
-        try:
-            payload = _build_llm_payload(req)
-            data = await call_generate(payload)
-
-            # A orquestração devolve algo em "data"; esperamos algo como {"response": "..."} ou similar.
-            raw = data.get("response") if isinstance(data, dict) else data
-            if raw is None:
-                raw = data
-
-            structure = _parse_structure(raw, req.document_type)
-            _validate_semantics(req.document_type, structure)
-            return StructureResponse(ok=True, structure=structure, retries=attempt)
-
-        except (OrchestrationError, ValidationError, Exception) as e:
-            last_error = str(e)
-            continue
-
-    # Fallback: estrutura mínima
-    fallback = _minimal_structure_for(req.document_type)
     return StructureResponse(
-        ok=False,
-        structure=fallback,
-        error=last_error or "Não foi possível obter estrutura válida do modelo.",
-        retries=AGENT_MAX_RETRIES + 1,
+        ok=not used_base_fallback,
+        structure=base_structure,
+        error=last_error if used_base_fallback else None,
+        retries=base_retries if not used_base_fallback else AGENT_MAX_RETRIES + 1,
     )
 
 

@@ -438,16 +438,28 @@ def _extract_json_object_respecting_strings(text: str) -> str:
     return text[start:].rstrip()
 
 
+def _normalize_double_braces(text: str) -> str:
+    """
+    Alguns backends (ex.: Ollama/template) devolvem JSON com chaves escapadas como {{ e }}.
+    Converte para { e } para permitir parse válido.
+    """
+    if "{{" in text or "}}" in text:
+        return text.replace("{{", "{").replace("}}", "}")
+    return text
+
+
 def _raw_to_structure_candidate(raw: Any) -> dict:
     """
     Converte resposta bruta (string ou dict) em dict para DocumentStructure.
-    Tenta: parse direto, bloco ```json```, extração { } respeitando strings, ast.literal_eval.
+    Tenta: normalizar {{ }}, parse direto, bloco ```json```, extração { } respeitando strings, ast.literal_eval.
     """
     if isinstance(raw, dict):
         return raw
     text = str(raw).strip()
-    # 1) Parse direto (após remover markdown genérico)
+    # 0) Remover markdown e normalizar chaves duplas ({{ }} → { }) que alguns modelos devolvem
     cleaned = _strip_markdown_json(text)
+    cleaned = _normalize_double_braces(cleaned)
+    # 1) Parse direto
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError:
@@ -455,6 +467,7 @@ def _raw_to_structure_candidate(raw: Any) -> dict:
     # 2) Bloco explícito ```json ... ```
     fence_block = _extract_code_fence(text)
     if fence_block:
+        fence_block = _normalize_double_braces(fence_block)
         try:
             return json.loads(fence_block)
         except json.JSONDecodeError:

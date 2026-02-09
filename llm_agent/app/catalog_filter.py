@@ -147,6 +147,8 @@ def filter_eligible_sections(
     eligible: List[SectionCatalogEntry] = []
 
     for entry in catalog.entries:
+        if entry is None:
+            continue
         if not entry.is_active:
             continue
         if doc_type not in [t.strip().lower() for t in entry.document_types]:

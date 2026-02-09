@@ -89,7 +89,11 @@ def registry_entry_to_catalog_entry(reg: Any) -> SectionCatalogEntry:
 
 def sections_registry_to_catalog(registry: SectionsRegistry) -> SectionCatalog:
     """Converte o registro completo (formato arquivo) em SectionCatalog para o agente."""
-    entries = [registry_entry_to_catalog_entry(e) for e in registry.entries]
+    entries = [
+        registry_entry_to_catalog_entry(e)
+        for e in registry.entries
+        if e is not None
+    ]
     return SectionCatalog(
         catalog_id=registry.catalog_id,
         catalog_version=registry.catalog_version,

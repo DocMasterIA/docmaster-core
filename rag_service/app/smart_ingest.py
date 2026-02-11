@@ -111,10 +111,12 @@ def smart_ingest_file(
     
     from langchain.text_splitter import RecursiveCharacterTextSplitter
     
-    # Splitter para quebrar seções muito grandes (limite do nomic-embed-text ~8k tokens)
+    # Splitter para quebrar seções muito grandes
+    # nomic-embed-text tem limite de ~8192 tokens, mas vamos ser conservadores
+    MAX_CHUNK = 1000  # ~250 tokens, bem seguro
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=2000,  # ~500 tokens, bem abaixo do limite
-        chunk_overlap=200,
+        chunk_size=MAX_CHUNK,
+        chunk_overlap=100,
         separators=["\n\n", "\n", ". ", " ", ""],
     )
     
@@ -147,7 +149,7 @@ def smart_ingest_file(
                 section_meta["section_number"] = section.number
             
             # Se a seção for grande, divide em chunks
-            if len(section.content) > 2000:
+            if len(section.content) > MAX_CHUNK:
                 chunks = splitter.split_text(section.content)
                 for i, chunk in enumerate(chunks):
                     docs.append(Document(

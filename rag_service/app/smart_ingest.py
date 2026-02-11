@@ -23,21 +23,25 @@ from .loaders import get_file_metadata, load_document_text
 
 def _infer_document_type_from_path(path: str) -> str:
     """
-    Infere o tipo de documento pelo caminho da pasta.
+    Infere o tipo de documento pelo nome da PASTA pai.
     
     Exemplos:
         /data/treinamento/TERMO DE REFERENCIA/doc.pdf → termo_referencia
         /data/treinamento/ETP/doc.pdf → etp
         /data/treinamento/DFD/doc.pdf → dfd
     """
-    path_lower = path.lower()
+    from pathlib import Path as P
     
-    if "termo de referencia" in path_lower or "/tr/" in path_lower:
-        return "termo_referencia"
-    elif "/etp/" in path_lower or "estudo tecnico" in path_lower:
+    # Pega o nome da pasta pai do arquivo
+    parent_folder = P(path).parent.name.lower()
+    
+    # Checa pelo nome exato da pasta
+    if parent_folder in ("etp", "etps"):
         return "etp"
-    elif "/dfd/" in path_lower or "formalizacao" in path_lower or "demanda" in path_lower:
+    elif parent_folder in ("dfd", "dfds", "demanda", "demandas"):
         return "dfd"
+    elif "termo" in parent_folder or parent_folder in ("tr", "trs"):
+        return "termo_referencia"
     else:
         return "outro"
 
@@ -112,11 +116,12 @@ def smart_ingest_file(
     from langchain.text_splitter import RecursiveCharacterTextSplitter
     
     # Splitter para quebrar seções muito grandes
-    # nomic-embed-text tem limite de ~8192 tokens, mas vamos ser conservadores
-    MAX_CHUNK = 1000  # ~250 tokens, bem seguro
+    # nomic-embed-text tem limite de ~8192 tokens
+    # Sendo bem conservador: 500 chars ~= 125 tokens
+    MAX_CHUNK = 500
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=MAX_CHUNK,
-        chunk_overlap=100,
+        chunk_overlap=50,
         separators=["\n\n", "\n", ". ", " ", ""],
     )
     

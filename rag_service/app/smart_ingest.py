@@ -113,7 +113,7 @@ def smart_ingest_file(
         **(extra_metadata or {}),
     }
     
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
     
     # Splitter para quebrar seções muito grandes
     # nomic-embed-text tem limite de ~8192 tokens

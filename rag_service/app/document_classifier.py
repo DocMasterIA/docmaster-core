@@ -46,8 +46,13 @@ DOCUMENT_TYPE_PATTERNS = [
     ]),
     # Documento de Formalização da Demanda
     (DocumentType.DFD, [
-        r"DOCUMENTO\s+DE\s+FORMALIZA[CÇ][AÃ]O\s+(DA\s+)?DEMANDA",
-        r"FORMALIZA[CÇ][AÃ]O\s+DE\s+DEMANDA",
+        # Com "DOCUMENTO DE" na frente
+        r"DOCUMENTO\s+DE\s+FORMALIZA[CÇ][AÃ]O\s+(DA\s+|DE\s+)?DEMANDA",
+        # Apenas "FORMALIZAÇÃO DE/DA DEMANDA" (sem "DOCUMENTO DE")
+        r"FORMALIZA[CÇ][AÃ]O\s+(DA\s+|DE\s+)DEMANDA",
+        # Variante "FORMULAÇÃO" (typo comum em alguns docs)
+        r"FORMULA[CÇ][AÃ]O\s+(DA\s+|DE\s+)DEMANDA",
+        # Sigla
         r"\bDFD\b",
     ]),
 ]

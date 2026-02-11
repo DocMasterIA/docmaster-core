@@ -1,0 +1,114 @@
+# ============================================
+# COMANDOS DO RAG SERVICE - DocMaster IA
+# ============================================
+
+# IMPORTANTE: Sempre executar docker compose de ~/docmaster-core
+# ou de onde estiver o docker-compose.yml principal
+
+# --------------------------------------------
+# SUBIR SERVIÇOS
+# --------------------------------------------
+
+# Subir todos os serviços
+docker compose up -d
+
+# Subir apenas o rag_service
+docker compose up -d rag_service
+
+# Reiniciar rag_service
+docker compose up -d rag_service --force-recreate
+
+# Ver logs
+docker logs rag_service -f
+
+# --------------------------------------------
+# CLASSIFICAR DOCUMENTO (sem indexar)
+# --------------------------------------------
+
+curl -X POST http://localhost:8004/api/rag/classify \
+  -H "Content-Type: application/json" \
+  -d '{"path": "/data/treinamento/TERMO DE REFERENCIA/TERMO DE REFERENCIA1.pdf"}'
+
+# --------------------------------------------
+# INGERIR UM ARQUIVO
+# --------------------------------------------
+
+curl -X POST http://localhost:8004/api/rag/smart-ingest/file \
+  -H "Content-Type: application/json" \
+  -d '{"path": "/data/treinamento/TERMO DE REFERENCIA/TERMO DE REFERENCIA1.pdf"}'
+
+# --------------------------------------------
+# INGERIR PASTA INTEIRA
+# --------------------------------------------
+
+# Termos de Referência
+curl -X POST http://localhost:8004/api/rag/smart-ingest/folder \
+  -H "Content-Type: application/json" \
+  -d '{"folder_path": "/data/treinamento/TERMO DE REFERENCIA"}'
+
+# ETPs
+curl -X POST http://localhost:8004/api/rag/smart-ingest/folder \
+  -H "Content-Type: application/json" \
+  -d '{"folder_path": "/data/treinamento/ETP"}'
+
+# DFDs
+curl -X POST http://localhost:8004/api/rag/smart-ingest/folder \
+  -H "Content-Type: application/json" \
+  -d '{"folder_path": "/data/treinamento/DFD"}'
+
+# --------------------------------------------
+# CONSULTAR (QUERY)
+# --------------------------------------------
+
+# Pergunta simples
+curl -X POST http://localhost:8004/api/rag/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "qual o objeto do contrato?"}'
+
+# Só recuperar documentos (sem gerar resposta)
+curl -X POST http://localhost:8004/api/rag/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "cláusula de justificativa", "generate_answer": false}'
+
+# Buscar em coleção específica
+curl -X POST http://localhost:8004/api/rag/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "objeto", "collection": "minha_colecao"}'
+
+# --------------------------------------------
+# VER RESUMO DA BASE
+# --------------------------------------------
+
+curl http://localhost:8004/api/rag/summary
+
+# --------------------------------------------
+# LISTAR COLEÇÕES
+# --------------------------------------------
+
+curl http://localhost:8004/api/rag/collections
+
+# --------------------------------------------
+# DELETAR COLEÇÃO
+# --------------------------------------------
+
+curl -X DELETE http://localhost:8004/api/rag/collections/docmaster_docs
+
+# --------------------------------------------
+# HEALTH CHECK
+# --------------------------------------------
+
+curl http://localhost:8004/api/rag/health
+
+# --------------------------------------------
+# CAMINHOS IMPORTANTES
+# --------------------------------------------
+
+# Dentro do container:
+# /data/treinamento/TERMO DE REFERENCIA/
+# /data/treinamento/ETP/
+# /data/treinamento/DFD/
+
+# No host (mapeado via volume):
+# ~/treinamento/TERMO DE REFERENCIA/
+# ~/treinamento/ETP/
+# ~/treinamento/DFD/

@@ -4,6 +4,23 @@
 # Para carregar variáveis do .env do host: env_file: - llm_api/.env
 
 services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    # GPU: descomente se tiver NVIDIA
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
   llm_api:
     build:
       context: .
@@ -14,11 +31,12 @@ services:
       - "8002:8002"
     environment:
       - PORT=8002
-      # Ollama no host (Docker Desktop / Mac/Win); Linux: use extra_hosts ou IP do host
       - OLLAMA_BASE_URL=http://ollama:11434
       - LLM_TIMEOUT=120
       - LLM_MAX_RETRIES=3
       # LLM_AUDIT_LOG_DIR opcional; se vazio, o app usa /app/logs automaticamente
+    depends_on:
+      - ollama
     volumes:
       # Logs de auditoria automáticos (llm_audit_YYYY-MM-DD.jsonl) em ./llm_audit no projeto
       - ./llm_audit:/app/logs
@@ -88,3 +106,4 @@ services:
 
 volumes:
   chroma_data:
+  ollama_data:

@@ -66,6 +66,9 @@ services:
       - LLM_ORCHESTRATION_BASE_URL=http://llm_api:8002
       - RAG_TOP_K=5
       - RAG_TIMEOUT=60
+    volumes:
+      # Monta pasta de treinamento para acesso aos documentos
+      - ./treinamento:/data/treinamento:ro
     depends_on:
       - llm_api
       - chromadb

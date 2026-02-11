@@ -2,8 +2,18 @@
 # COMANDOS DO RAG SERVICE - DocMaster IA
 # ============================================
 
-# IMPORTANTE: Sempre executar docker compose de ~/docmaster-core
-# ou de onde estiver o docker-compose.yml principal
+# IMPORTANTE: Sempre executar docker compose de onde estiver
+# o docker-compose.yml principal (ex: ~/ ou ~/docmaster-core)
+
+# --------------------------------------------
+# CLASSIFICAÇÃO POR CAMINHO (não por conteúdo)
+# --------------------------------------------
+# O tipo do documento é INFERIDO pela pasta:
+#   /data/treinamento/TERMO DE REFERENCIA/... → termo_referencia
+#   /data/treinamento/ETP/... → etp
+#   /data/treinamento/DFD/... → dfd
+#
+# Isso é mais confiável que tentar detectar pelo texto.
 
 # --------------------------------------------
 # SUBIR SERVIÇOS
@@ -22,20 +32,32 @@ docker compose up -d rag_service --force-recreate
 docker logs rag_service -f
 
 # --------------------------------------------
-# CLASSIFICAR DOCUMENTO (sem indexar)
+# TESTAR CLASSIFICAÇÃO (sem indexar)
 # --------------------------------------------
 
+# Mostra tipo inferido pelo caminho + seções extraídas
 curl -X POST http://localhost:8004/api/rag/classify \
   -H "Content-Type: application/json" \
   -d '{"path": "/data/treinamento/TERMO DE REFERENCIA/TERMO DE REFERENCIA1.pdf"}'
+
+# Forçar tipo específico no teste
+curl -X POST http://localhost:8004/api/rag/classify \
+  -H "Content-Type: application/json" \
+  -d '{"path": "/data/treinamento/DFD/arquivo.pdf", "document_type": "dfd"}'
 
 # --------------------------------------------
 # INGERIR UM ARQUIVO
 # --------------------------------------------
 
+# Tipo inferido pelo caminho da pasta
 curl -X POST http://localhost:8004/api/rag/smart-ingest/file \
   -H "Content-Type: application/json" \
   -d '{"path": "/data/treinamento/TERMO DE REFERENCIA/TERMO DE REFERENCIA1.pdf"}'
+
+# Tipo informado explicitamente (se a pasta não indicar)
+curl -X POST http://localhost:8004/api/rag/smart-ingest/file \
+  -H "Content-Type: application/json" \
+  -d '{"path": "/data/outros/documento.pdf", "document_type": "dfd"}'
 
 # --------------------------------------------
 # INGERIR PASTA INTEIRA

@@ -33,18 +33,10 @@ class ExtractedSection:
 
 
 # Padrões para detectar tipo de documento (busca no início do texto)
+# IMPORTANTE: A ordem importa! DFD vem primeiro porque DFDs frequentemente
+# mencionam "Termo de Referência" no conteúdo como documento relacionado.
 DOCUMENT_TYPE_PATTERNS = [
-    # Termo de Referência
-    (DocumentType.TERMO_REFERENCIA, [
-        r"TERMO\s+DE\s+REFER[EÊ]NCIA",
-        r"TERMO\s+REFERENCIA",
-    ]),
-    # Estudo Técnico Preliminar
-    (DocumentType.ETP, [
-        r"ESTUDO\s+T[EÉ]CNICO\s+PRELIMINAR",
-        r"\bETP\b",
-    ]),
-    # Documento de Formalização da Demanda
+    # Documento de Formalização da Demanda (verificar PRIMEIRO)
     (DocumentType.DFD, [
         # Com "DOCUMENTO DE" na frente
         r"DOCUMENTO\s+DE\s+FORMALIZA[CÇ][AÃ]O\s+(DA\s+|DE\s+)?DEMANDA",
@@ -54,6 +46,16 @@ DOCUMENT_TYPE_PATTERNS = [
         r"FORMULA[CÇ][AÃ]O\s+(DA\s+|DE\s+)DEMANDA",
         # Sigla
         r"\bDFD\b",
+    ]),
+    # Estudo Técnico Preliminar
+    (DocumentType.ETP, [
+        r"ESTUDO\s+T[EÉ]CNICO\s+PRELIMINAR",
+        r"\bETP\b",
+    ]),
+    # Termo de Referência (por último)
+    (DocumentType.TERMO_REFERENCIA, [
+        r"TERMO\s+DE\s+REFER[EÊ]NCIA",
+        r"TERMO\s+REFERENCIA",
     ]),
 ]
 
@@ -96,7 +98,7 @@ def _to_snake_case(text: str) -> str:
     return re.sub(r'[^a-z0-9]+', '_', normalized.lower()).strip('_')
 
 
-def detect_document_type(text: str, search_limit: int = 3000) -> Tuple[DocumentType, Optional[str]]:
+def detect_document_type(text: str, search_limit: int = 1500) -> Tuple[DocumentType, Optional[str]]:
     """
     Detecta o tipo de documento com base no conteúdo.
     

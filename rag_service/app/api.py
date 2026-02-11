@@ -30,6 +30,10 @@ class SmartIngestFileRequest(BaseModel):
     path: str = Field(..., description="Caminho do arquivo (PDF ou DOCX).")
     collection: Optional[str] = Field(None, description="Nome da coleção.")
     extra_metadata: Optional[dict] = Field(None, description="Metadados extras.")
+    document_type: Optional[str] = Field(
+        None,
+        description="Tipo do documento (termo_referencia, etp, dfd). Se omitido, infere pelo caminho.",
+    )
 
 
 class SmartIngestFolderRequest(BaseModel):
@@ -158,10 +162,10 @@ async def endpoint_delete_collection(name: str) -> dict:
 @router.post("/smart-ingest/file")
 async def endpoint_smart_ingest_file(body: SmartIngestFileRequest) -> dict:
     """
-    Ingere arquivo com classificação automática.
+    Ingere arquivo com extração de seções.
     
-    Detecta tipo de documento (TR, ETP, DFD) e extrai seções
-    automaticamente, indexando cada uma com metadados.
+    O tipo de documento é inferido pelo caminho da pasta (/DFD/ → dfd, etc)
+    ou pode ser informado explicitamente via document_type.
     """
     from .smart_ingest import smart_ingest_file
     
@@ -170,6 +174,7 @@ async def endpoint_smart_ingest_file(body: SmartIngestFileRequest) -> dict:
             path=body.path,
             collection_name=body.collection,
             extra_metadata=body.extra_metadata,
+            document_type=body.document_type,
         )
         return {"ok": True, **result}
     except FileNotFoundError:
@@ -222,21 +227,23 @@ async def endpoint_summary(collection: Optional[str] = None) -> dict:
 @router.post("/classify")
 async def endpoint_classify(body: SmartIngestFileRequest) -> dict:
     """
-    Apenas classifica um documento sem indexar.
+    Mostra tipo inferido e seções extraídas (sem indexar).
     
-    Útil para testar a detecção de tipo e extração de seções.
+    Útil para testar antes de fazer a ingestão.
     """
-    from .document_classifier import classify_and_extract
+    from .document_classifier import extract_sections
+    from .smart_ingest import _infer_document_type_from_path
     from .loaders import load_document_text
     
     try:
         text = load_document_text(body.path)
-        doc_type, type_match, sections = classify_and_extract(text)
+        doc_type = body.document_type or _infer_document_type_from_path(body.path)
+        sections = extract_sections(text)
         
         return {
             "ok": True,
-            "document_type": doc_type.value,
-            "type_match": type_match,
+            "document_type": doc_type,
+            "inferred_from": "path" if not body.document_type else "explicit",
             "sections_found": len(sections),
             "sections": [
                 {

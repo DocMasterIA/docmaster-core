@@ -1,6 +1,8 @@
 """
-Ingestão inteligente de documentos com classificação automática
-e extração de seções.
+Ingestão inteligente de documentos com extração de seções.
+
+O tipo de documento é inferido pelo caminho da pasta (mais confiável
+que detecção por conteúdo).
 """
 from __future__ import annotations
 
@@ -14,9 +16,30 @@ from .config import CHROMA_COLLECTION, OLLAMA_BASE_URL
 from .document_classifier import (
     DocumentType,
     ExtractedSection,
-    classify_and_extract,
+    extract_sections,
 )
 from .loaders import get_file_metadata, load_document_text
+
+
+def _infer_document_type_from_path(path: str) -> str:
+    """
+    Infere o tipo de documento pelo caminho da pasta.
+    
+    Exemplos:
+        /data/treinamento/TERMO DE REFERENCIA/doc.pdf → termo_referencia
+        /data/treinamento/ETP/doc.pdf → etp
+        /data/treinamento/DFD/doc.pdf → dfd
+    """
+    path_lower = path.lower()
+    
+    if "termo de referencia" in path_lower or "/tr/" in path_lower:
+        return "termo_referencia"
+    elif "/etp/" in path_lower or "estudo tecnico" in path_lower:
+        return "etp"
+    elif "/dfd/" in path_lower or "formalizacao" in path_lower or "demanda" in path_lower:
+        return "dfd"
+    else:
+        return "outro"
 
 
 def _get_embedding_function():
@@ -31,13 +54,13 @@ def _get_embedding_function():
 
 def _section_to_document(
     section: ExtractedSection,
-    doc_type: DocumentType,
+    doc_type: str,
     base_metadata: Dict[str, Any],
 ) -> Document:
     """Converte ExtractedSection para Document do LangChain."""
     metadata = {
         **base_metadata,
-        "document_type": doc_type.value,
+        "document_type": doc_type,
         "section_key": section.key,
         "section_title": section.title,
     }
@@ -51,19 +74,19 @@ def smart_ingest_file(
     path: str,
     collection_name: Optional[str] = None,
     extra_metadata: Optional[Dict[str, Any]] = None,
+    document_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Ingere um documento com classificação automática e extração de seções.
+    Ingere um documento com extração de seções.
     
-    O documento é analisado para:
-    1. Detectar tipo (TR, ETP, DFD)
-    2. Extrair seções/cláusulas
-    3. Indexar cada seção como documento separado com metadados
+    O tipo de documento é inferido pelo caminho da pasta (ex: /DFD/ → dfd)
+    ou pode ser passado explicitamente.
     
     Args:
         path: Caminho do arquivo (PDF ou DOCX).
         collection_name: Nome da coleção ChromaDB.
         extra_metadata: Metadados adicionais a anexar.
+        document_type: Tipo explícito (se None, infere pelo caminho).
     
     Returns:
         Dict com resultado da ingestão.
@@ -73,8 +96,11 @@ def smart_ingest_file(
     # Carrega texto
     text = load_document_text(path)
     
-    # Classifica e extrai seções
-    doc_type, type_match, sections = classify_and_extract(text)
+    # Tipo: usa o informado ou infere pelo caminho
+    doc_type = document_type or _infer_document_type_from_path(path)
+    
+    # Extrai seções
+    sections = extract_sections(text)
     
     # Metadados base
     file_meta = get_file_metadata(path)
@@ -89,7 +115,7 @@ def smart_ingest_file(
             page_content=text,
             metadata={
                 **base_metadata,
-                "document_type": doc_type.value,
+                "document_type": doc_type,
                 "section_key": "full_document",
             }
         )]
@@ -113,8 +139,8 @@ def smart_ingest_file(
     
     return {
         "file": Path(path).name,
-        "document_type": doc_type.value,
-        "type_match": type_match,
+        "document_type": doc_type,
+        "inferred_from": "path",
         "sections_extracted": len(sections),
         "sections": [
             {"key": s.key, "title": s.title, "number": s.number}

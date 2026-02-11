@@ -76,6 +76,32 @@ Esperado: interpretador tende a devolver algo como termo_referencia com objeto g
 
 ---
 
+### 1.6 Criação de DFD (Documento de Formalização da Demanda)
+
+**DFD** = **Documento de Formalização da Demanda** (tipo `documento_formalizacao_demanda` em `prompts.py`). Prompts para pedir só a estrutura desse documento.
+
+```bash
+curl -s -X POST http://localhost:8003/api/agent/structure-from-prompt \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "Preciso de um documento de formalização da demanda (DFD) para aquisição de equipamentos de informática."}' | jq .
+```
+
+**Prompt (texto):**
+> Preciso de um documento de formalização da demanda (DFD) para aquisição de equipamentos de informática.
+
+Outro exemplo:
+
+```bash
+curl -s -X POST http://localhost:8003/api/agent/structure-from-prompt \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "Quero um DFD da demanda de contratação de serviços de limpeza para o órgão."}' | jq .
+```
+
+**Prompt (texto):**
+> Quero um DFD da demanda de contratação de serviços de limpeza para o órgão.
+
+---
+
 ## 2. POST /api/agent/structure
 
 Envia **document_type** e **context** (e opcionalmente **sections_catalog**). Útil para testar filtro por **extras** (tipo_objeto, categoria).
@@ -202,7 +228,8 @@ curl -s -X POST http://localhost:8003/api/agent/registry \
 
 | Objetivo | Endpoint | Destaque |
 |----------|----------|----------|
-| Interpretar texto livre e gerar estrutura | POST /structure-from-prompt | Testar com os prompts das seções 1.1 a 1.5 |
+| Interpretar texto livre e gerar estrutura | POST /structure-from-prompt | Testar com os prompts das seções 1.1 a 1.6 |
+| DFD (Documento de Formalização da Demanda) | POST /structure-from-prompt | 1.6 |
 | Ver seção condicional (Decl. Viabilidade) | POST /structure com ETP + extras.tipo_objeto=obra | 2.1 |
 | Ver seção condicional ausente | POST /structure com ETP + tipo_objeto=fornecimento | 2.2 |
 | Ver section_matches (certeza pedido ↔ seção) | /structure-from-prompt com “cláusula sobre viabilidade” ou /structure com user_prompt | 1.2, 1.3, 2.4 |

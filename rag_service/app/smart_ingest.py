@@ -109,22 +109,53 @@ def smart_ingest_file(
         **(extra_metadata or {}),
     }
     
-    # Se não encontrou seções, usa texto completo como um documento
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    
+    # Splitter para quebrar seções muito grandes (limite do nomic-embed-text ~8k tokens)
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=2000,  # ~500 tokens, bem abaixo do limite
+        chunk_overlap=200,
+        separators=["\n\n", "\n", ". ", " ", ""],
+    )
+    
+    # Se não encontrou seções, usa texto completo
     if not sections:
-        docs = [Document(
-            page_content=text,
-            metadata={
+        chunks = splitter.split_text(text)
+        docs = [
+            Document(
+                page_content=chunk,
+                metadata={
+                    **base_metadata,
+                    "document_type": doc_type,
+                    "section_key": "full_document",
+                    "chunk_index": i,
+                }
+            )
+            for i, chunk in enumerate(chunks)
+        ]
+    else:
+        # Converte seções para documents, quebrando as muito grandes
+        docs = []
+        for section in sections:
+            section_meta = {
                 **base_metadata,
                 "document_type": doc_type,
-                "section_key": "full_document",
+                "section_key": section.key,
+                "section_title": section.title,
             }
-        )]
-    else:
-        # Converte seções para documents
-        docs = [
-            _section_to_document(section, doc_type, base_metadata)
-            for section in sections
-        ]
+            if section.number:
+                section_meta["section_number"] = section.number
+            
+            # Se a seção for grande, divide em chunks
+            if len(section.content) > 2000:
+                chunks = splitter.split_text(section.content)
+                for i, chunk in enumerate(chunks):
+                    docs.append(Document(
+                        page_content=chunk,
+                        metadata={**section_meta, "chunk_index": i}
+                    ))
+            else:
+                docs.append(Document(page_content=section.content, metadata=section_meta))
     
     # Indexa no ChromaDB
     client = get_chroma_client()
@@ -142,11 +173,7 @@ def smart_ingest_file(
         "document_type": doc_type,
         "inferred_from": "path",
         "sections_extracted": len(sections),
-        "sections": [
-            {"key": s.key, "title": s.title, "number": s.number}
-            for s in sections
-        ],
-        "chunks_added": len(ids),
+        "chunks_added": len(ids),  # pode ser > sections se houve split
         "collection": coll_name,
     }
 

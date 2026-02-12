@@ -42,7 +42,14 @@ def _infer_document_type_from_path(path: str) -> str:
         return "dfd"
     elif "termo" in parent_folder or parent_folder in ("tr", "trs"):
         return "termo_referencia"
-    elif "lei" in parent_folder or "14133" in parent_folder or "referencia" in parent_folder:
+    elif (
+        "lei" in parent_folder
+        or "14133" in parent_folder
+        or "14_133" in parent_folder
+        or "14.133" in parent_folder
+        or "referencia" in parent_folder
+        or "licitacoes" in parent_folder
+    ):
         return "lei"
     else:
         return "outro"
@@ -191,16 +198,18 @@ def smart_ingest_folder(
     collection_name: Optional[str] = None,
     extra_metadata: Optional[Dict[str, Any]] = None,
     recursive: bool = True,
+    document_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Ingere todos os documentos de uma pasta.
-    
+
     Args:
         folder_path: Caminho da pasta.
         collection_name: Nome da coleção.
         extra_metadata: Metadados extras para todos os docs.
         recursive: Se True, processa subpastas.
-    
+        document_type: Forçar tipo (lei, etp, dfd, etc.). Se None, infere pelo caminho.
+
     Returns:
         Dict com resultados por arquivo.
     """
@@ -231,6 +240,7 @@ def smart_ingest_folder(
                 str(file_path),
                 collection_name=collection_name,
                 extra_metadata=extra_metadata,
+                document_type=document_type,
             )
             results["success"].append(result)
             results["summary"]["success_count"] += 1

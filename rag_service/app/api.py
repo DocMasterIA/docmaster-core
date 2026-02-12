@@ -44,6 +44,10 @@ class SmartIngestFolderRequest(BaseModel):
     collection: Optional[str] = Field(None, description="Nome da coleção.")
     extra_metadata: Optional[dict] = Field(None, description="Metadados extras.")
     recursive: bool = Field(True, description="Processar subpastas.")
+    document_type: Optional[str] = Field(
+        None,
+        description="Forçar tipo (termo_referencia, etp, dfd, lei). Se omitido, infere pelo caminho.",
+    )
 
 router = APIRouter(prefix="/rag", tags=["rag"])
 
@@ -234,6 +238,7 @@ async def endpoint_smart_ingest_folder(body: SmartIngestFolderRequest) -> dict:
             collection_name=body.collection,
             extra_metadata=body.extra_metadata,
             recursive=body.recursive,
+            document_type=body.document_type,
         )
         return {"ok": True, **result}
     except FileNotFoundError:

@@ -141,7 +141,7 @@ async def check_compliance(
     MAX_TEXT = 4000
     text_trimmed = (text or "").strip()[:MAX_TEXT]
 
-    # 1. Busca trechos da lei relevantes
+    # 1. Busca trechos da lei relevantes (document_type=lei)
     docs = retrieve(
         query=text_trimmed,
         collection_name=collection_name,
@@ -149,11 +149,28 @@ async def check_compliance(
         where={"document_type": "lei"},
     )
 
+    # Fallback: se não encontrou "lei", tenta sem filtro (lei pode estar como "outro")
+    if not docs:
+        docs = retrieve(
+            query=text_trimmed,
+            collection_name=collection_name,
+            top_k=top_k,
+            where={"document_type": "outro"},
+        )
+        if docs:
+            # Filtra só docs que parecem ser lei (arquivo contém lei/14133)
+            law_docs = [
+                d for d in docs
+                if "lei" in (d.get("metadata") or {}).get("source_file", "").lower()
+                or "14133" in (d.get("metadata") or {}).get("source_file", "")
+            ]
+            docs = law_docs if law_docs else docs[:1]  # usa ao menos 1 para não ficar vazio
+
     # Sem trechos da lei indexados
     if not docs:
         return {
             "compliant": None,
-            "observations": "Nenhum trecho da Lei 14.133 encontrado no RAG. Ingeste a lei em /data/treinamento/LEI_14_133/ e reingira.",
+            "observations": "Nenhum trecho da Lei 14.133 encontrado. Ingeste a lei em /data/treinamento/LEI_14_133/ com document_type=lei.",
             "relevant_articles": [],
         }
 

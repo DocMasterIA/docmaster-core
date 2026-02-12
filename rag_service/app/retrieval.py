@@ -184,9 +184,14 @@ TRECHOS RELEVANTES DA LEI:
 TEXTO A ANALISAR:
 {text_trimmed}
 
-Responda em até 2 linhas:
-1. SIM ou NÃO (está em conformidade?)
-2. Uma frase com a observação principal (se NÃO, cite o que está em desacordo)."""
+Regras:
+- Se o texto viola limites da lei (prazos, valores, modalidades) → responda NÃO.
+- Se há dúvida por falta de informação na lei → responda NÃO e indique o que falta verificar.
+- Responda apenas SIM se houver clara conformidade.
+
+Formato da resposta (obrigatório):
+1. Primeira linha: exatamente "SIM" ou "NÃO"
+2. Segunda linha: uma frase com a justificativa (cite o artigo ou o que está em desacordo, se NÃO)."""
 
     # 3. Chama LLM
     response_text = await generate_answer(query=query_for_llm, context_docs=docs)

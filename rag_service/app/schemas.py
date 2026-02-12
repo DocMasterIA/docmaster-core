@@ -122,3 +122,38 @@ class HealthResponse(BaseModel):
         description="Conexão com ChromaDB.",
     )
     message: Optional[str] = Field(None, description="Mensagem adicional.")
+
+
+class CheckComplianceRequest(BaseModel):
+    """Request para verificação de conformidade com a Lei 14.133."""
+
+    text: str = Field(..., description="Texto gerado a validar (cláusula ou documento).")
+    collection: Optional[str] = Field(None, description="Coleção a consultar.")
+    top_k: int = Field(5, description="Quantidade de trechos da lei a recuperar.")
+
+    @field_validator("text")
+    @classmethod
+    def _text_not_empty(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("text é obrigatório.")
+        return v
+
+
+class CheckComplianceResponse(BaseModel):
+    """Resposta da verificação de conformidade."""
+
+    ok: bool = Field(..., description="Indica sucesso da operação.")
+    compliant: Optional[bool] = Field(
+        None,
+        description="True=em conformidade, False=não, None=indeterminado ou lei não indexada.",
+    )
+    observations: str = Field(
+        "",
+        description="Observação do LLM (resposta SIM/NÃO + breve justificativa).",
+    )
+    relevant_articles: Optional[List[dict]] = Field(
+        None,
+        description="Trechos da lei recuperados como referência.",
+    )
+    error: Optional[str] = Field(None, description="Erro, se houver.")

@@ -78,6 +78,27 @@ curl -X POST http://localhost:8004/api/rag/smart-ingest/folder \
   -H "Content-Type: application/json" \
   -d '{"folder_path": "/data/treinamento/DFD"}'
 
+# Lei 14.133 (para verificação de conformidade)
+# 1. Coloque o PDF da lei em: treinamento/LEI_14_133/
+# 2. Ingerir:
+curl -X POST http://localhost:8004/api/rag/smart-ingest/folder \
+  -H "Content-Type: application/json" \
+  -d '{"folder_path": "/data/treinamento/LEI_14_133"}'
+
+# --------------------------------------------
+# VERIFICAR CONFORMIDADE (Lei 14.133)
+# --------------------------------------------
+
+# Verifica se texto gerado está em conformidade com a lei
+curl -X POST http://localhost:8004/api/rag/check-compliance \
+  -H "Content-Type: application/json" \
+  -d '{"text": "O prazo de vigência será de 12 meses, podendo ser prorrogado por igual período."}'
+
+# Com mais trechos da lei para comparação
+curl -X POST http://localhost:8004/api/rag/check-compliance \
+  -H "Content-Type: application/json" \
+  -d '{"text": "O contrato terá vigência de 5 anos.", "top_k": 8}'
+
 # --------------------------------------------
 # CONSULTAR (QUERY)
 # --------------------------------------------

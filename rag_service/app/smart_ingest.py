@@ -42,6 +42,8 @@ def _infer_document_type_from_path(path: str) -> str:
         return "dfd"
     elif "termo" in parent_folder or parent_folder in ("tr", "trs"):
         return "termo_referencia"
+    elif "lei" in parent_folder or "14133" in parent_folder or "referencia" in parent_folder:
+        return "lei"
     else:
         return "outro"
 

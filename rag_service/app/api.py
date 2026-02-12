@@ -12,8 +12,10 @@ from pydantic import BaseModel, Field
 
 from .chroma_client import delete_collection, get_chroma_client, list_collections
 from .ingestion import ingest_text
-from .retrieval import generate_answer, retrieve
+from .retrieval import check_compliance, generate_answer, retrieve
 from .schemas import (
+    CheckComplianceRequest,
+    CheckComplianceResponse,
     CollectionsResponse,
     HealthResponse,
     IngestRequest,
@@ -128,6 +130,38 @@ async def endpoint_query(body: QueryRequest) -> QueryResponse:
         )
     except Exception as e:
         return QueryResponse(ok=False, error=str(e))
+
+
+@router.post("/check-compliance", response_model=CheckComplianceResponse)
+async def endpoint_check_compliance(body: CheckComplianceRequest) -> CheckComplianceResponse:
+    """
+    Verifica se o texto gerado está em conformidade com a Lei 14.133.
+
+    Fluxo:
+    1. Busca trechos da lei (document_type=lei) relevantes ao texto
+    2. Envia texto + trechos ao LLM
+    3. Retorna SIM/NÃO + observação breve
+
+    Pré-requisito: Lei 14.133 ingerida em /data/treinamento/LEI_14_133/
+    """
+    try:
+        result = await check_compliance(
+            text=body.text,
+            collection_name=body.collection,
+            top_k=body.top_k,
+        )
+        return CheckComplianceResponse(
+            ok=True,
+            compliant=result["compliant"],
+            observations=result.get("observations", ""),
+            relevant_articles=result.get("relevant_articles"),
+        )
+    except Exception as e:
+        return CheckComplianceResponse(
+            ok=False,
+            observations="",
+            error=str(e),
+        )
 
 
 @router.get("/collections", response_model=CollectionsResponse)

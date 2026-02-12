@@ -10,7 +10,7 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Dependências (contexto = raiz do repo)
+# Dependências (contexto = docmaster-core)
 COPY rag_service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -26,4 +26,6 @@ RUN useradd --create-home --shell /bin/bash appuser \
     && chown -R appuser:appuser /app
 USER appuser
 
-CMD ["sh", "-c", "uvicorn rag_service.app.main:app --host 0.0.0.0 --port ${PORT}"]
+# PYTHONPATH no CMD garante que rag_service seja encontrado
+WORKDIR /app
+CMD ["sh", "-c", "PYTHONPATH=/app exec uvicorn rag_service.app.main:app --host 0.0.0.0 --port ${PORT}"]

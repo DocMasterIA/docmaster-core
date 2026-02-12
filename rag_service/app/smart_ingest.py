@@ -96,7 +96,8 @@ def smart_ingest_file(
         Dict com resultado da ingestão.
     """
     from langchain_chroma import Chroma
-    
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+
     # Carrega texto
     text = load_document_text(path)
     
@@ -112,9 +113,7 @@ def smart_ingest_file(
         **file_meta,
         **(extra_metadata or {}),
     }
-    
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
-    
+
     # Splitter para quebrar seções muito grandes
     # nomic-embed-text tem limite de ~8192 tokens
     # Sendo bem conservador: 500 chars ~= 125 tokens

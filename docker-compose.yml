@@ -82,6 +82,7 @@ services:
       - CHROMA_PORT=8000  # porta interna do container ChromaDB
       - OLLAMA_BASE_URL=http://ollama:11434
       - LLM_ORCHESTRATION_BASE_URL=http://llm_api:8002
+      - LLM_AGENT_BASE_URL=http://llm_agent:8003
       - RAG_TOP_K=5
       - RAG_TIMEOUT=60
     volumes:
@@ -89,6 +90,7 @@ services:
       - ./treinamento:/data/treinamento:ro
     depends_on:
       - llm_api
+      - llm_agent
       - chromadb
     restart: unless-stopped
 

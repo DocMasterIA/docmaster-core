@@ -38,13 +38,14 @@ async def endpoint_update_registry(body: SectionsRegistry) -> dict:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.post("/structure-from-prompt", response_model=StructureResponse)
-async def endpoint_structure_from_prompt(body: PromptStructureRequest) -> StructureResponse:
+@router.post("/structure-from-prompt")
+async def endpoint_structure_from_prompt(body: PromptStructureRequest) -> dict:
     """
     Interpreta um prompt livre do usuário, extrai tipo e contexto e gera a estrutura.
 
     Fluxo: user_prompt → interpretador LLM → StructureRequest → generate_structure → StructureResponse.
     Quando há catálogo/registro, a IA calcula section_matches (correspondência pedido ↔ seção com nível de certeza).
+    Retorna também context para integração com RAG (geração de textos de cláusulas).
     """
     try:
         req = await interpret_user_prompt(body.user_prompt)
@@ -54,7 +55,11 @@ async def endpoint_structure_from_prompt(body: PromptStructureRequest) -> Struct
             sections_catalog=req.sections_catalog,
             user_prompt=body.user_prompt,
         )
-        return await generate_structure(req_with_prompt)
+        resp = await generate_structure(req_with_prompt)
+        # Inclui context para o rag_service poder gerar textos de cláusulas
+        out = resp.model_dump() if hasattr(resp, "model_dump") else dict(resp)
+        out["context"] = req.context.model_dump() if hasattr(req.context, "model_dump") else {"objeto": getattr(req.context, "objeto", ""), "orgao": getattr(req.context, "orgao", None), "modalidade": getattr(req.context, "modalidade", None)}
+        return out
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao processar prompt: {e}") from e
 

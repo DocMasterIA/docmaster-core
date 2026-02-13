@@ -185,9 +185,10 @@ TEXTO A ANALISAR:
 {text_trimmed}
 
 Regras:
+- Lei 14.133 limita a vigência de contratos (ex.: serviços até 60 meses, com prorrogação limitada). Vigências muito longas (ex.: 20 anos) tendem a ser incompatíveis.
 - Se o texto viola limites da lei (prazos, valores, modalidades) → responda NÃO.
-- Se há dúvida por falta de informação na lei → responda NÃO e indique o que falta verificar.
-- Responda apenas SIM se houver clara conformidade.
+- Se há dúvida ou o texto não está claramente previsto na lei → responda NÃO.
+- Responda SIM somente quando houver inequívoca conformidade com os trechos da lei.
 
 Formato da resposta (obrigatório):
 1. Primeira linha: exatamente "SIM" ou "NÃO"

@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import APIRouter, FastAPI, HTTPException, UploadFile
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .chroma_client import delete_collection, get_chroma_client, list_collections
 from .ingestion import ingest_text
@@ -36,6 +36,21 @@ class SmartIngestFileRequest(BaseModel):
         None,
         description="Tipo do documento (termo_referencia, etp, dfd). Se omitido, infere pelo caminho.",
     )
+
+
+class GenerateDocumentRequest(BaseModel):
+    """Request para geração de documento completo (estrutura + textos de cláusulas)."""
+    user_prompt: str = Field(..., description="Pedido livre (ex.: gerar ETP para coleta seletiva)")
+    collection: Optional[str] = Field(None, description="Coleção RAG.")
+    top_k_per_section: int = Field(5, description="Exemplos por seção para composição.")
+
+    @field_validator("user_prompt")
+    @classmethod
+    def _user_prompt_not_empty(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("user_prompt é obrigatório.")
+        return v
 
 
 class SmartIngestFolderRequest(BaseModel):
@@ -134,6 +149,32 @@ async def endpoint_query(body: QueryRequest) -> QueryResponse:
         )
     except Exception as e:
         return QueryResponse(ok=False, error=str(e))
+
+
+@router.post("/generate-document")
+async def endpoint_generate_document(body: GenerateDocumentRequest) -> dict:
+    """
+    Gera documento completo: estrutura + textos de cláusulas.
+
+    Fluxo:
+    1. Interpreta prompt via llm_agent e obtém estrutura
+    2. Para cada seção: recupera exemplos do RAG
+    3. Gera texto de cada cláusula via LLM (robusto, completo, não verboso)
+    4. Retorna structure + section_texts
+
+    Exemplo: "gerar ETP para coleta seletiva" → estrutura + cláusula objeto com texto + justificativa com texto, etc.
+    """
+    from .document_generator import generate_full_document
+
+    try:
+        result = await generate_full_document(
+            user_prompt=body.user_prompt,
+            collection_name=body.collection,
+            top_k_per_section=body.top_k_per_section,
+        )
+        return {"ok": True, **result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/check-compliance", response_model=CheckComplianceResponse)

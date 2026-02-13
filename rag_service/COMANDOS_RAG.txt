@@ -86,6 +86,21 @@ curl -X POST http://localhost:8004/api/rag/smart-ingest/folder \
   -d '{"folder_path": "/data/treinamento/LEI_14_133"}'
 
 # --------------------------------------------
+# GERAR DOCUMENTO COMPLETO (estrutura + textos de cláusulas)
+# --------------------------------------------
+
+# Um comando: gera estrutura E textos de cada cláusula
+# Ex.: "gerar ETP para coleta seletiva" → estrutura + cláusula objeto + texto objeto + justificativa + texto justificativa, etc.
+curl -X POST http://localhost:8004/api/rag/generate-document \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "gerar ETP para coleta seletiva municipal"}' --max-time 120
+
+# Com mais exemplos por seção (cláusulas mais robustas)
+curl -X POST http://localhost:8004/api/rag/generate-document \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "gerar Termo de Referência para contratação de serviços de TI", "top_k_per_section": 8}' --max-time 180
+
+# --------------------------------------------
 # VERIFICAR CONFORMIDADE (Lei 14.133)
 # --------------------------------------------
 
@@ -98,6 +113,7 @@ curl -X POST http://localhost:8004/api/rag/check-compliance \
 curl -X POST http://localhost:8004/api/rag/check-compliance \
   -H "Content-Type: application/json" \
   -d '{"text": "O contrato terá vigência de 5 anos.", "top_k": 8}'
+
 
 # --------------------------------------------
 # CONSULTAR (QUERY)

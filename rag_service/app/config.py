@@ -29,6 +29,12 @@ LLM_ORCHESTRATION_BASE_URL: str = os.getenv(
     "http://localhost:8002",
 ).rstrip("/")
 
+# Base URL do llm_agent (para gerar estrutura de documentos)
+LLM_AGENT_BASE_URL: str = os.getenv(
+    "LLM_AGENT_BASE_URL",
+    "http://localhost:8003",
+).rstrip("/")
+
 LLM_ORCHESTRATION_GENERATE_PATH: str = os.getenv(
     "LLM_ORCHESTRATION_GENERATE_PATH",
     "/api/llm/generate",

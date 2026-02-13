@@ -100,6 +100,51 @@ curl -X POST http://localhost:8004/api/rag/generate-document \
   -H "Content-Type: application/json" \
   -d '{"user_prompt": "gerar Termo de Referência para contratação de serviços de TI", "top_k_per_section": 8}' --max-time 180
 
+# ---- ETP (Estudo Técnico Preliminar) ----
+curl -X POST http://localhost:8004/api/rag/generate-document \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "gerar ETP para pavimentação asfáltica"}' --max-time 120
+
+curl -X POST http://localhost:8004/api/rag/generate-document \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "gerar ETP para aquisição de equipamentos de informática"}' --max-time 120
+
+curl -X POST http://localhost:8004/api/rag/generate-document \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "gerar estudo técnico preliminar para contratação de serviços de limpeza"}' --max-time 120
+
+# ---- Termo de Referência ----
+curl -X POST http://localhost:8004/api/rag/generate-document \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "gerar Termo de Referência para contratação de serviços de publicidade no Diário Oficial"}' --max-time 120
+
+curl -X POST http://localhost:8004/api/rag/generate-document \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "gerar TR para manutenção predial"}' --max-time 120
+
+curl -X POST http://localhost:8004/api/rag/generate-document \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "gerar Termo de Referência para aquisição de medicamentos"}' --max-time 120
+
+# ---- DFD (Documento de Formalização de Demanda) ----
+curl -X POST http://localhost:8004/api/rag/generate-document \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "gerar DFD para formalização de demanda de compra de mobiliário"}' --max-time 120
+
+curl -X POST http://localhost:8004/api/rag/generate-document \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "gerar documento de formalização de demanda para contratação de assessoria jurídica"}' --max-time 120
+
+# ---- Com mais exemplos (top_k_per_section maior) ----
+curl -X POST http://localhost:8004/api/rag/generate-document \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "gerar ETP para iluminação pública", "top_k_per_section": 8}' --max-time 180
+
+# ---- Salvar resultado em arquivo (para análise) ----
+curl -X POST http://localhost:8004/api/rag/generate-document \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "gerar Termo de Referência para serviços de consultoria"}' --max-time 120 | jq . > resultado_geracao.json
+
 # --------------------------------------------
 # VERIFICAR CONFORMIDADE (Lei 14.133)
 # --------------------------------------------

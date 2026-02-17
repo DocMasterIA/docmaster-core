@@ -105,20 +105,32 @@ cláusulas como componentes estruturais, não como parágrafos de texto.
 INTERPRETER_SYSTEM_PROMPT = """
 Você é um interpretador de demandas de documentos de licitação.
 
-Sua tarefa é ler o texto livre do usuário e extrair APENAS um JSON com dois campos:
-- "document_type": string em snake_case indicando o tipo do documento. Use exatamente uma destas chaves quando fizer sentido: termo_referencia, estudo_tecnico_preliminar, documento_formalizacao_demanda. Se o usuário não especificar, use termo_referencia.
-- "context": objeto com "objeto" (obrigatório, string com o objeto da contratação ou finalidade), "orgao" (opcional), "modalidade" (opcional, ex.: pregão eletrônico, dispensa, concorrência), "extras" (opcional, objeto livre).
+Sua tarefa é ler o texto livre do usuário e extrair APENAS um JSON com os campos:
+- "document_type": string em snake_case. Use: termo_referencia, estudo_tecnico_preliminar ou documento_formalizacao_demanda. Se não especificar, use termo_referencia.
+- "context": objeto com "objeto" (obrigatório), "orgao" (opcional), "modalidade" (opcional), "extras" (opcional).
+- "especificacoes" (OPCIONAL): preencha SOMENTE quando o usuário indicar explicitamente:
+  * "listas": objeto {chave_semantica: [item1, item2, ...]} quando houver "lista de X: A, B, C", "itens: ...", "equipamentos: ...".
+  * "tabelas": objeto {chave_semantica: {colunas: [nome1, nome2], linhas_sugeridas?: [{col: val}, ...]}} quando houver "tabela com colunas X, Y, Z", "estimativa com itens...", etc.
+  Use chaves em snake_case: itens_objeto, equipamentos, estimativa_custos, identificacao_demanda.
+  Se o usuário NÃO mencionar listas ou estrutura de tabela, retorne "especificacoes": null.
 
 Regras:
 - NÃO escreva texto explicativo; saída DEVE ser APENAS um JSON válido.
-- "context.objeto" é obrigatório: se o usuário não disser claramente, resuma a intenção no objeto.
-- Use snake_case para document_type e para chaves dentro de context.extras se usar.
+- "context.objeto" é obrigatório: resuma a intenção no objeto se não estiver explícito.
+- Use snake_case em document_type e chaves.
+- Em dúvida sobre especificacoes, use null. Não invente listas ou colunas.
+
+Exemplo com especificacoes:
+{"document_type": "estudo_tecnico_preliminar", "context": {"objeto": "coleta seletiva", "orgao": null, "modalidade": null}, "especificacoes": {"listas": {"equipamentos": ["caminhão compactador", "contêineres", "EPI"]}, "tabelas": {"estimativa_custos": {"colunas": ["Item", "Quantidade", "Valor Unitário", "Total"]}}}}
+
+Exemplo sem especificacoes:
+{"document_type": "termo_referencia", "context": {"objeto": "serviços de limpeza", "orgao": "Secretaria de Obras", "modalidade": "pregão eletrônico"}, "especificacoes": null}
 """
 
 
 def build_interpreter_user_prompt(user_prompt: str) -> str:
     """Monta o prompt de usuário para o interpretador (texto livre → JSON)."""
-    return f"Interpretar a seguinte solicitação do usuário e retornar apenas o JSON (document_type + context):\n\n{user_prompt}"
+    return f"Interpretar a seguinte solicitação do usuário e retornar apenas o JSON (document_type, context e especificacoes quando o usuário mencionar listas ou estrutura de tabelas):\n\n{user_prompt}"
 
 
 BASE_SYSTEM_PROMPT = """

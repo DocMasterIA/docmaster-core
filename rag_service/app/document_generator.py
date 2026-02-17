@@ -56,7 +56,7 @@ def _document_type_to_rag_filter(document_type: str) -> str:
 
 
 async def _call_llm_agent_structure(user_prompt: str) -> Dict[str, Any]:
-    """Chama llm_agent para obter estrutura a partir do prompt livre."""
+    """Chama llm_agent para obter estrutura, context e especificacoes a partir do prompt livre."""
     url = f"{LLM_AGENT_BASE_URL}/api/agent/structure-from-prompt"
     payload = {"user_prompt": user_prompt}
     async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
@@ -65,7 +65,26 @@ async def _call_llm_agent_structure(user_prompt: str) -> Dict[str, Any]:
         data = resp.json()
     if not data.get("ok") or not data.get("structure"):
         raise ValueError(data.get("error", "Estrutura não retornada pelo llm_agent"))
-    return data["structure"]
+    return data
+
+
+def _format_especificacoes(especificacoes: Dict[str, Any] | None) -> str:
+    """Formata especificacoes (listas, tabelas) para inclusão no prompt."""
+    if not especificacoes:
+        return ""
+    parts: List[str] = []
+    if especificacoes.get("listas"):
+        for key, items in especificacoes["listas"].items():
+            if isinstance(items, list) and items:
+                parts.append(f"- Lista '{key}': {', '.join(str(x) for x in items)}")
+    if especificacoes.get("tabelas"):
+        for key, tbl in especificacoes["tabelas"].items():
+            if isinstance(tbl, dict) and tbl.get("colunas"):
+                cols = ", ".join(str(c) for c in tbl["colunas"])
+                parts.append(f"- Tabela '{key}' (colunas: {cols})")
+    if not parts:
+        return ""
+    return "Especificações indicadas pelo usuário (use quando fizer sentido para esta seção):\n" + "\n".join(parts) + "\n\n"
 
 
 async def _generate_clause_text(
@@ -74,8 +93,10 @@ async def _generate_clause_text(
     context: Dict[str, Any],
     rag_context: str,
     document_type: str,
+    especificacoes: Dict[str, Any] | None = None,
 ) -> str:
-    """Gera texto da cláusula via LLM usando contexto RAG e seção."""
+    """Gera texto da cláusula via LLM usando contexto RAG, seção e especificacoes."""
+    espec_text = _format_especificacoes(especificacoes)
     query = f"""Gerar o texto COMPLETO da cláusula "{section_title}" (section_key: {section_key}).
 
 Contexto do documento:
@@ -84,10 +105,10 @@ Contexto do documento:
 - Órgão: {context.get("orgao", "não informado")}
 - Modalidade: {context.get("modalidade", "não informado")}
 
-EXEMPLOS DE CLÁUSULAS SIMILARES (extraídos de documentos reais):
+{espec_text}EXEMPLOS DE CLÁUSULAS SIMILARES (extraídos de documentos reais):
 {rag_context}
 
-Instruções: Gere um texto completo, robusto e pronto para uso. Adapte ao contexto (objeto, órgão) mantendo a estrutura jurídica dos exemplos. Não seja verboso; seja preciso e completo."""
+Instruções: Gere um texto completo, robusto e pronto para uso. Adapte ao contexto (objeto, órgão) mantendo a estrutura jurídica dos exemplos. Quando houver especificações acima relevantes para esta seção (listas, tabelas), incorpore-as de forma adequada. Não seja verboso; seja preciso e completo."""
 
     full_prompt = f"<<SYSTEM>>\n{CLAUSE_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{query}"
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
@@ -137,8 +158,9 @@ async def generate_full_document(
     doc_structure = resp.get("structure") or resp
     document_type = doc_structure.get("document_type", "termo_referencia")
     doc_type_filter = _document_type_to_rag_filter(document_type)
-    # Context vem do llm_agent (retornado em structure-from-prompt)
+    # Context e especificacoes vêm do llm_agent (retornado em structure-from-prompt)
     ctx = resp.get("context") or {}
+    especificacoes = resp.get("especificacoes")
     if not isinstance(ctx, dict):
         ctx = {}
     if not ctx.get("objeto"):
@@ -182,6 +204,7 @@ async def generate_full_document(
                 context=ctx,
                 rag_context=rag_context,
                 document_type=document_type,
+                especificacoes=especificacoes,
             )
             section_texts[key] = text
         except Exception as e:
@@ -192,4 +215,5 @@ async def generate_full_document(
         "section_texts": section_texts,
         "document_type": document_type,
         "context": ctx,
+        "especificacoes": especificacoes,
     }

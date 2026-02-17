@@ -330,13 +330,37 @@ def _build_interpreter_payload(user_prompt: str) -> Dict[str, Any]:
     return {"prompt": full_prompt, "stream": False}
 
 
+def _fallback_structure_request(user_prompt: str, candidate: Dict[str, Any] | None = None) -> StructureRequest:
+    """Fallback conservador quando parsing falha; tenta preservar document_type e context do candidate."""
+    if candidate and isinstance(candidate.get("context"), dict):
+        ctx = candidate["context"]
+        objeto = (ctx.get("objeto") or "").strip() or (user_prompt[:500].strip() or "Documento solicitado.")
+        return StructureRequest(
+            document_type=(candidate.get("document_type") or "termo_referencia").strip() or "termo_referencia",
+            context=ContextoBasico(
+                objeto=objeto,
+                orgao=ctx.get("orgao"),
+                modalidade=ctx.get("modalidade"),
+                extras=ctx.get("extras"),
+            ),
+            especificacoes=None,
+        )
+    return StructureRequest(
+        document_type="termo_referencia",
+        context=ContextoBasico(objeto=(user_prompt[:500].strip() or "Documento solicitado pelo usuário.")),
+        especificacoes=None,
+    )
+
+
 async def interpret_user_prompt(user_prompt: str) -> StructureRequest:
     """
     Interpreta o texto livre do usuário e retorna um StructureRequest válido.
 
-    Chama o LLM para extrair document_type e context; em falha de parsing ou
-    orquestração, retorna fallback: termo_referencia com context.objeto = trecho do prompt.
+    Chama o LLM para extrair document_type, context e especificacoes (opcional).
+    Em falha de parsing: tenta preservar document_type/context; especificacoes
+    malformadas são descartadas (especificacoes=None).
     """
+    candidate: Dict[str, Any] | None = None
     try:
         payload = _build_interpreter_payload(user_prompt)
         data = await call_generate(payload)
@@ -344,17 +368,23 @@ async def interpret_user_prompt(user_prompt: str) -> StructureRequest:
         if raw is None:
             raw = data
         if isinstance(raw, dict):
-            return StructureRequest.model_validate(raw)
-        text = _strip_markdown_json(str(raw))
-        candidate = json.loads(text)
+            candidate = raw
+        else:
+            text = _strip_markdown_json(str(raw))
+            candidate = json.loads(text)
         return StructureRequest.model_validate(candidate)
+    except ValidationError:
+        # especificacoes ou outro campo podem estar malformados; tenta sem especificacoes
+        if candidate is not None:
+            try:
+                safe = {k: v for k, v in candidate.items() if k != "especificacoes"}
+                safe["especificacoes"] = None
+                return StructureRequest.model_validate(safe)
+            except Exception:
+                pass
+        return _fallback_structure_request(user_prompt, candidate)
     except Exception:
-        return StructureRequest(
-            document_type="termo_referencia",
-            context=ContextoBasico(
-                objeto=(user_prompt[:500].strip() or "Documento solicitado pelo usuário.")
-            ),
-        )
+        return _fallback_structure_request(user_prompt, candidate)
 
 
 def _strip_markdown_json(text: str) -> str:

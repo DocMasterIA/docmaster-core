@@ -54,11 +54,13 @@ async def endpoint_structure_from_prompt(body: PromptStructureRequest) -> dict:
             context=req.context,
             sections_catalog=req.sections_catalog,
             user_prompt=body.user_prompt,
+            especificacoes=req.especificacoes,
         )
         resp = await generate_structure(req_with_prompt)
-        # Inclui context para o rag_service poder gerar textos de cláusulas
+        # Inclui context e especificacoes para o rag_service poder gerar textos e usar listas/tabelas
         out = resp.model_dump() if hasattr(resp, "model_dump") else dict(resp)
         out["context"] = req.context.model_dump() if hasattr(req.context, "model_dump") else {"objeto": getattr(req.context, "objeto", ""), "orgao": getattr(req.context, "orgao", None), "modalidade": getattr(req.context, "modalidade", None)}
+        out["especificacoes"] = req.especificacoes.model_dump() if req.especificacoes else None
         return out
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao processar prompt: {e}") from e

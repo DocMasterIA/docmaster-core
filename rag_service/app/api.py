@@ -203,7 +203,15 @@ async def endpoint_generate_document(
 
         if output_docx:
             data = {"structure": result["structure"], "section_texts": result["section_texts"]}
-            files = json_to_docx_and_pdf(data)
+            table_data = None
+            espec = result.get("especificacoes")
+            if isinstance(espec, dict) and espec.get("tabelas"):
+                table_data = {
+                    k: v.get("linhas_sugeridas") or []
+                    for k, v in espec["tabelas"].items()
+                    if isinstance(v, dict)
+                }
+            files = json_to_docx_and_pdf(data, table_data=table_data)
             out["docx_path"] = files["docx_path"]
             out["pdf_path"] = files["pdf_path"]
             out["pdf_available"] = files["pdf_available"]

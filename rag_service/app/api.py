@@ -5,6 +5,7 @@ Endpoints para ingestão, consulta e gerenciamento de coleções.
 """
 from __future__ import annotations
 
+import base64
 import logging
 from pathlib import Path
 
@@ -180,6 +181,10 @@ async def endpoint_generate_document(
     body: GenerateDocumentRequest,
     output_docx: bool = Query(False, description="Se True, gera e retorna o arquivo DOCX"),
     format: str = Query("docx", description="Com output_docx: docx (arquivo) ou json (metadados)"),
+    inspect: bool = Query(
+        False,
+        description="Com output_docx e format=json: retorna section_texts + docx em base64 para comparar origem dos erros (LLM vs docx)",
+    ),
 ) -> Any:
     """
     Gera documento completo: estrutura + textos de cláusulas.
@@ -217,6 +222,10 @@ async def endpoint_generate_document(
                     media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     filename="documento.docx",
                 )
+            if inspect and format == "json" and Path(files["docx_path"]).exists():
+                with open(files["docx_path"], "rb") as f:
+                    out["docx_base64"] = base64.b64encode(f.read()).decode("ascii")
+                out["_inspect"] = "Compare section_texts (saída LLM) com o DOCX decodificado; erros iguais=LLM, só no DOCX=docx_generator"
         return out
     except Exception as e:
         logger.exception("Erro em generate-document: %s", e)

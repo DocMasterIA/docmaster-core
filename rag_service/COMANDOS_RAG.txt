@@ -150,6 +150,15 @@ curl -X POST "http://localhost:8004/api/rag/generate-document?output_docx=true" 
   -H "Content-Type: application/json" \
   -d '{"user_prompt": "gerar ETP para coleta seletiva"}' --max-time 180 -o documento.docx
 
+# ---- INSPECIONAR: diagnosticar erros (pt, inglês, palavras cortadas) ----
+# Retorna JSON com section_texts (saída LLM) + docx_base64 (DOCX gerado).
+# Compare: erros em section_texts = LLM; erros só no DOCX = docx_generator
+curl -X POST "http://localhost:8004/api/rag/generate-document?output_docx=true&format=json&inspect=true" \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "gerar ETP para coleta seletiva"}' | jq . > inspecao.json
+# Decodificar DOCX: jq -r '.docx_base64' inspecao.json | base64 -d > documento_inspecao.docx
+# Ver textos brutos: jq '.section_texts' inspecao.json
+
 # --------------------------------------------
 # RENDER-DOCUMENT (JSON → DOCX/PDF)
 # --------------------------------------------

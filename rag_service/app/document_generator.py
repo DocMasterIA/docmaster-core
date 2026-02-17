@@ -19,6 +19,7 @@ from .config import (
     LLM_ORCHESTRATION_GENERATE_PATH,
     OLLAMA_BASE_URL,
     RAG_HTTP_TIMEOUT,
+    RAG_POSTPROCESS,
     RAG_TOP_K,
 )
 from .retrieval import retrieve
@@ -68,11 +69,16 @@ Regras:
 def _postprocess_clause_text(text: str) -> str:
     """
     Limpa saída do LLM antes de ir para o DOCX.
-    Corrige markdown residual, acentuação comum e símbolos.
+
+    Filosofia: corrigir apenas erros claros (typos, markdown residual, símbolos).
+    NÃO restringe conteúdo; removemos só meta-comentários explícitos e títulos duplicados.
+    Para desativar: RAG_POSTPROCESS=0 (retorna texto bruto do modelo).
     """
     import re
     if not text or not isinstance(text, str):
         return text
+    if not RAG_POSTPROCESS:
+        return text.strip()
     t = text.strip()
     # Remove **negrito** e *itálico* (markdown)
     t = re.sub(r"\*\*([^*]+)\*\*", r"\1", t)
@@ -83,6 +89,9 @@ def _postprocess_clause_text(text: str) -> str:
     # Corrige erros comuns de português
     fixes = [
         (r"\btratante\b", "contratante"),
+        (r"\bmodificiem\b", "modifiquem"),
+        (r"\bo equipamentos\b", "os equipamentos"),
+        (r"será verificado a conformidade", "será verificada a conformidade"),
         (r"\bresiduos\b", "resíduos"),
         (r"\bresiduo\b", "resíduo"),
         (r"\borgao\b", "órgão"),
@@ -95,15 +104,22 @@ def _postprocess_clause_text(text: str) -> str:
     ]
     for pat, repl in fixes:
         t = re.sub(pat, repl, t, flags=re.IGNORECASE)
-    # Remove meta-comentários residuais (ex.: "A cláusula \"X\" (section_key: y) deve conter...")
+    # Remove meta-comentários explícitos (só quando o nome da cláusula está entre aspas - auto-referência)
+    # Ex.: "A cláusula \"Necessidade\" é fundamental..." - NÃO remove "A cláusula de garantia deve..."
     t = re.sub(
-        r"A cláusula\s+[\"']?[^\"']+[\"']?\s*\([^)]*section_key[^)]*\)[^.]*\.?\s*",
+        r"A cláusula\s+[\"'][^\"']+[\"']\s*\([^)]*section_key[^)]*\)[^.]*\.?\s*",
         "",
         t,
         flags=re.IGNORECASE,
     )
     t = re.sub(
-        r"A cláusula\s+[\"']?[^\"']+[\"']?\s+(?:é fundamental|deve conter|deve abordar)[^.]*\.\s*",
+        r"A cláusula\s+[\"'][^\"']+[\"']\s+(?:é fundamental|deve conter|deve abordar)[^.]*\.\s*",
+        "",
+        t,
+        flags=re.IGNORECASE,
+    )
+    t = re.sub(
+        r"A presente cláusula tem como objetivo estabelecer[^.]*\.\s*",
         "",
         t,
         flags=re.IGNORECASE,

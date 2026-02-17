@@ -51,6 +51,7 @@ A geração de cláusulas usa o modelo configurado no **llm_api** (Ollama). Mode
 
 Para melhorar português, acentuação e reduzir markdown residual:
 - **Prompts** reforçam: sempre pt-BR, sem markdown, acentuação correta.
-- **Pós-processamento** (_postprocess_clause_text): remove **negrito**, corrige § 1o→§ 1º, residuos→resíduos, etc.
+- **Pós-processamento** (_postprocess_clause_text): corrige typos claros (resíduos, § 1º, tratante→contratante), remove markdown residual e meta-comentários explícitos. Não restringe conteúdo; só corrige erros objetivos.
+- Para desativar o pós-processamento (ver saída bruta do modelo): `RAG_POSTPROCESS=0`
 
 Para trocar o modelo, defina `OLLAMA_MODEL` no llm_api (ex.: `llama3.2`, `mistral`, `phi3`).

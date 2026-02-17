@@ -50,3 +50,6 @@ EMBEDDING_TIMEOUT: float = float(os.getenv("EMBEDDING_TIMEOUT", "30.0"))
 
 # Retrieval
 RAG_TOP_K: int = _env_int("RAG_TOP_K", 5)
+
+# Pós-processamento de cláusulas (1 = ativo, 0 = desativado para debug/comparação)
+RAG_POSTPROCESS: bool = os.getenv("RAG_POSTPROCESS", "1").strip() not in ("0", "false", "False", "no")

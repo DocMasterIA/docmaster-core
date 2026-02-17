@@ -47,6 +47,8 @@ Regras obrigatórias:
 8. NUNCA use formatação markdown para tabelas (ex.: | col1 | col2 | ou linhas com ---). Tabelas são renderizadas em seções separadas pelo sistema. Se precisar mencionar dados tabulares, descreva em prosa ou indique "conforme tabela na seção correspondente".
 
 Formato de saída: apenas o texto da cláusula, pronto para inserção no documento. Sem título, sem numeração, sem explicações adicionais. Texto puro, sem markdown.
+- NUNCA faça meta-comentário: não escreva "A cláusula X deve conter...", "A cláusula \"Necessidade\" é fundamental...", "section_key: ...". Redija DIRETAMENTE o conteúdo da cláusula, como se já estivesse no documento final.
+- NUNCA use títulos ou cabeçalhos no texto (ex.: "CONFORMIDADE COM A LEGISLAÇÃO", "Conclusão", "LISTA DE ALTERNATIVAS"). O título da seção já será inserido automaticamente.
 """
 
 
@@ -78,8 +80,9 @@ def _postprocess_clause_text(text: str) -> str:
     # Corrige § No → § Nº (ordinal em parágrafos)
     t = re.sub(r"§\s*(\d+)\s*[oO](?=\s|$|\.|,)", r"§ \1º", t)
     t = re.sub(r"art\.?\s*(\d+)\s*[oO](?=\s|$|\.|,)", r"art. \1º", t)
-    # Corrige acentuação comum
+    # Corrige erros comuns de português
     fixes = [
+        (r"\btratante\b", "contratante"),
         (r"\bresiduos\b", "resíduos"),
         (r"\bresiduo\b", "resíduo"),
         (r"\borgao\b", "órgão"),
@@ -92,8 +95,21 @@ def _postprocess_clause_text(text: str) -> str:
     ]
     for pat, repl in fixes:
         t = re.sub(pat, repl, t, flags=re.IGNORECASE)
-    # Remove marcadores markdown no início de linha (* ou - )
-    t = re.sub(r"^[\*\-]\s+", "", t, flags=re.MULTILINE)
+    # Remove meta-comentários residuais (ex.: "A cláusula \"X\" (section_key: y) deve conter...")
+    t = re.sub(
+        r"A cláusula\s+[\"']?[^\"']+[\"']?\s*\([^)]*section_key[^)]*\)[^.]*\.?\s*",
+        "",
+        t,
+        flags=re.IGNORECASE,
+    )
+    t = re.sub(
+        r"A cláusula\s+[\"']?[^\"']+[\"']?\s+(?:é fundamental|deve conter|deve abordar)[^.]*\.\s*",
+        "",
+        t,
+        flags=re.IGNORECASE,
+    )
+    # Remove marcadores markdown no início de linha (* ou - , inclusive com espaços)
+    t = re.sub(r"^\s*[\*\-]\s+", "", t, flags=re.MULTILINE)
     # Remove linhas vazias excessivas (mais de 2 seguidas)
     t = re.sub(r"\n{3,}", "\n\n", t)
     return t.strip()
@@ -164,7 +180,7 @@ Contexto do documento:
 {espec_text}EXEMPLOS DE CLÁUSULAS SIMILARES (extraídos de documentos reais):
 {rag_context}
 
-Instruções: Gere um texto completo, robusto e pronto para uso, SEMPRE em português brasileiro com acentuação correta. Adapte ao contexto (objeto, órgão) mantendo a estrutura jurídica dos exemplos. Use listas em prosa quando fizer sentido; tabelas são renderizadas em seções separadas. Nunca use markdown (** * ## ---). Não seja verboso; seja preciso e completo."""
+Instruções: Gere o CONTEÚDO da cláusula diretamente, sem meta-comentário ("A cláusula deve...", "section_key", títulos). Sempre em português brasileiro com acentuação correta. Adapte ao contexto (objeto, órgão) mantendo a estrutura jurídica dos exemplos. Use listas em prosa quando fizer sentido; tabelas são renderizadas em seções separadas. Nunca use markdown (** * ## ---). Não seja verboso; seja preciso e completo."""
 
     full_prompt = f"<<SYSTEM>>\n{CLAUSE_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{query}"
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"

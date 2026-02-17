@@ -5,7 +5,10 @@ Endpoints para ingestão, consulta e gerenciamento de coleções.
 """
 from __future__ import annotations
 
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, FastAPI, HTTPException, Query
@@ -216,7 +219,9 @@ async def endpoint_generate_document(
                 )
         return out
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.exception("Erro em generate-document: %s", e)
+        detail = str(e).strip() or f"{type(e).__name__} (sem mensagem)"
+        raise HTTPException(status_code=500, detail=detail) from e
 
 
 @router.post("/render-document")

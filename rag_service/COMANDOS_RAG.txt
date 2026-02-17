@@ -145,6 +145,45 @@ curl -X POST http://localhost:8004/api/rag/generate-document \
   -H "Content-Type: application/json" \
   -d '{"user_prompt": "gerar Termo de Referência para serviços de consultoria"}' --max-time 120 | jq . > resultado_geracao.json
 
+# ---- Gerar e baixar DOCX diretamente ----
+curl -X POST "http://localhost:8004/api/rag/generate-document?output_docx=true" \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "gerar ETP para coleta seletiva"}' --max-time 180 -o documento.docx
+
+# --------------------------------------------
+# RENDER-DOCUMENT (JSON → DOCX/PDF)
+# --------------------------------------------
+# Gera DOCX e PDF a partir de JSON (structure + section_texts).
+# Use o JSON retornado por generate-document ou monte manualmente.
+
+# Baixar DOCX (padrão)
+curl -X POST http://localhost:8004/api/rag/render-document \
+  -H "Content-Type: application/json" \
+  -d '{
+    "structure": {
+      "document_type": "estudo_tecnico_preliminar",
+      "root_sections": [
+        {"key": "objeto", "title": "DO OBJETO", "content_type": "text", "required": true, "children": []},
+        {"key": "necessidade", "title": "DA NECESSIDADE", "content_type": "text", "required": true, "children": []},
+        {"key": "estimativa_custos", "title": "DA ESTIMATIVA DE CUSTOS", "content_type": "table", "required": true,
+         "table_schema": {"columns": [{"key": "item", "label": "Item"}, {"key": "quantidade", "label": "Quantidade"}, {"key": "valor_unitario", "label": "Valor Unitário"}]},
+         "children": []}
+      ]
+    },
+    "section_texts": {
+      "objeto": "Contratação de serviços de coleta seletiva de resíduos sólidos.",
+      "necessidade": "Necessidade de realizar a coleta seletiva conforme legislação ambiental."
+    },
+    "table_data": {
+      "estimativa_custos": [{"item": "Coleta mensal", "quantidade": "12", "valor_unitario": "R$ 5.000,00"}]
+    }
+  }' -o documento.docx
+
+# Retornar JSON com caminhos (docx_path, pdf_path se LibreOffice instalado)
+curl -X POST "http://localhost:8004/api/rag/render-document?format=json" \
+  -H "Content-Type: application/json" \
+  -d '{"structure": {"document_type": "termo_referencia", "root_sections": [{"key": "objeto", "title": "DO OBJETO", "content_type": "text", "required": true, "children": []}]}, "section_texts": {"objeto": "Objeto do contrato."}}'
+
 # --------------------------------------------
 # VERIFICAR CONFORMIDADE (Lei 14.133)
 # --------------------------------------------

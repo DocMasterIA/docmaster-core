@@ -5,9 +5,11 @@ Endpoints para ingestão, consulta e gerenciamento de coleções.
 """
 from __future__ import annotations
 
-from typing import Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, FastAPI, HTTPException, UploadFile
+from fastapi import APIRouter, FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, field_validator
 
 from .chroma_client import delete_collection, get_chroma_client, list_collections
@@ -51,6 +53,25 @@ class GenerateDocumentRequest(BaseModel):
         if not v:
             raise ValueError("user_prompt é obrigatório.")
         return v
+
+
+class RenderDocumentRequest(BaseModel):
+    """
+    JSON para geração de DOCX/PDF.
+    Compatível com saída de generate-document.
+    """
+    structure: dict = Field(
+        ...,
+        description="Estrutura com document_type e root_sections (chaves: key, title, content_type, children, table_schema).",
+    )
+    section_texts: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Textos por section_key (content_type=text).",
+    )
+    table_data: Optional[Dict[str, List[Dict[str, Any]]]] = Field(
+        None,
+        description="Dados de tabelas: {section_key: [{col_key: value}, ...]}.",
+    )
 
 
 class SmartIngestFolderRequest(BaseModel):
@@ -152,7 +173,11 @@ async def endpoint_query(body: QueryRequest) -> QueryResponse:
 
 
 @router.post("/generate-document")
-async def endpoint_generate_document(body: GenerateDocumentRequest) -> dict:
+async def endpoint_generate_document(
+    body: GenerateDocumentRequest,
+    output_docx: bool = Query(False, description="Se True, gera e retorna o arquivo DOCX"),
+    format: str = Query("docx", description="Com output_docx: docx (arquivo) ou json (metadados)"),
+) -> Any:
     """
     Gera documento completo: estrutura + textos de cláusulas.
 
@@ -161,10 +186,12 @@ async def endpoint_generate_document(body: GenerateDocumentRequest) -> dict:
     2. Para cada seção: recupera exemplos do RAG
     3. Gera texto de cada cláusula via LLM (robusto, completo, não verboso)
     4. Retorna structure + section_texts
+    5. Se output_docx=True: gera DOCX/PDF e retorna o arquivo ou metadados
 
     Exemplo: "gerar ETP para coleta seletiva" → estrutura + cláusula objeto com texto + justificativa com texto, etc.
     """
     from .document_generator import generate_full_document
+    from .docx_generator import json_to_docx_and_pdf
 
     try:
         result = await generate_full_document(
@@ -172,7 +199,61 @@ async def endpoint_generate_document(body: GenerateDocumentRequest) -> dict:
             collection_name=body.collection,
             top_k_per_section=body.top_k_per_section,
         )
-        return {"ok": True, **result}
+        out = {"ok": True, **result}
+
+        if output_docx:
+            data = {"structure": result["structure"], "section_texts": result["section_texts"]}
+            files = json_to_docx_and_pdf(data)
+            out["docx_path"] = files["docx_path"]
+            out["pdf_path"] = files["pdf_path"]
+            out["pdf_available"] = files["pdf_available"]
+            if format == "docx" and Path(files["docx_path"]).exists():
+                return FileResponse(
+                    files["docx_path"],
+                    media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    filename="documento.docx",
+                )
+        return out
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/render-document")
+async def endpoint_render_document(
+    body: RenderDocumentRequest,
+    format: str = Query("docx", description="Formato de retorno: docx ou json"),
+) -> Any:
+    """
+    Gera DOCX (e PDF se LibreOffice disponível) a partir do JSON.
+
+    Recebe structure + section_texts (formato do generate-document).
+    Tabelas: use table_data para preencher linhas ou deixe vazio para placeholder.
+
+    format=docx (padrão): retorna o arquivo DOCX para download.
+    format=json: retorna JSON com docx_path, pdf_path, pdf_available.
+    """
+    from .docx_generator import json_to_docx_and_pdf
+
+    try:
+        data = {
+            "structure": body.structure,
+            "section_texts": body.section_texts,
+        }
+        result = json_to_docx_and_pdf(
+            data,
+            table_data=body.table_data,
+        )
+        if format == "json":
+            return {"ok": True, **result}
+        # Retorna arquivo DOCX para download
+        docx_path = result["docx_path"]
+        if not Path(docx_path).exists():
+            raise HTTPException(status_code=500, detail="Arquivo DOCX não foi gerado.")
+        return FileResponse(
+            docx_path,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            filename="documento.docx",
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 

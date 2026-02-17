@@ -30,6 +30,12 @@ Você é um agente de composição jurídica para documentos de licitação púb
 
 Sua função é gerar cláusulas COMPLETAS e ROBUSTAS, baseadas em exemplos reais fornecidos no contexto.
 
+LÍNGUA E FORMATAÇÃO (obrigatório):
+- Redija SEMPRE em português brasileiro (pt-BR). NUNCA use inglês ou outros idiomas.
+- Use acentuação correta: resíduos, órgão, disposições, número, seqüência (ou sequência), § 1º, art. 1º, etc.
+- NUNCA use formatação markdown: proibido **negrito**, *itálico*, ##, ---, | tabela |. O texto será inserido em documento Word; use apenas texto puro.
+- Para listas, use parágrafos ou enumeração em prosa (primeiro, segundo; a) b) c)). Não use * ou - como marcadores.
+
 Regras obrigatórias:
 1. O texto gerado deve ser completo e autocontido – incluir todas as disposições necessárias para a cláusula, sem remeter a "conforme acima" ou "anexo".
 2. Não ser verboso nem repetitivo – ir direto ao ponto, com clareza e precisão técnica.
@@ -40,7 +46,7 @@ Regras obrigatórias:
 7. O texto deve poder ser usado diretamente no documento – sem placeholder, sem "[preencher]", sem lacunas.
 8. NUNCA use formatação markdown para tabelas (ex.: | col1 | col2 | ou linhas com ---). Tabelas são renderizadas em seções separadas pelo sistema. Se precisar mencionar dados tabulares, descreva em prosa ou indique "conforme tabela na seção correspondente".
 
-Formato de saída: apenas o texto da cláusula, pronto para inserção no documento. Sem título, sem numeração, sem explicações adicionais.
+Formato de saída: apenas o texto da cláusula, pronto para inserção no documento. Sem título, sem numeração, sem explicações adicionais. Texto puro, sem markdown.
 """
 
 
@@ -51,10 +57,46 @@ Você gera linhas de tabela para documentos de licitação. Sua saída DEVE ser 
 Regras:
 - Retorne SOMENTE um array JSON: [{"col1": "val1", "col2": "val2"}, ...]
 - Cada objeto representa uma linha; as chaves devem ser exatamente os nomes das colunas fornecidos.
-- Valores em string. Valores monetários no formato "R$ X.XXX,XX".
+- Valores em string, SEMPRE em português brasileiro. Valores monetários no formato "R$ X.XXX,XX".
 - Gere 3 a 10 linhas realistas conforme o contexto (objeto, tipo de documento).
 - NÃO escreva texto explicativo; NÃO use markdown; NÃO use ```.
 """
+
+
+def _postprocess_clause_text(text: str) -> str:
+    """
+    Limpa saída do LLM antes de ir para o DOCX.
+    Corrige markdown residual, acentuação comum e símbolos.
+    """
+    import re
+    if not text or not isinstance(text, str):
+        return text
+    t = text.strip()
+    # Remove **negrito** e *itálico* (markdown)
+    t = re.sub(r"\*\*([^*]+)\*\*", r"\1", t)
+    t = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"\1", t)
+    # Corrige § No → § Nº (ordinal em parágrafos)
+    t = re.sub(r"§\s*(\d+)\s*[oO](?=\s|$|\.|,)", r"§ \1º", t)
+    t = re.sub(r"art\.?\s*(\d+)\s*[oO](?=\s|$|\.|,)", r"art. \1º", t)
+    # Corrige acentuação comum
+    fixes = [
+        (r"\bresiduos\b", "resíduos"),
+        (r"\bresiduo\b", "resíduo"),
+        (r"\borgao\b", "órgão"),
+        (r"\borgaos\b", "órgãos"),
+        (r"\bnumero\b", "número"),
+        (r"\bnumeros\b", "números"),
+        (r"\bdisposicoes\b", "disposições"),
+        (r"\bsequencia\b", "sequência"),
+        (r"\bseqüencia\b", "sequência"),
+    ]
+    for pat, repl in fixes:
+        t = re.sub(pat, repl, t, flags=re.IGNORECASE)
+    # Remove marcadores markdown no início de linha (* ou - )
+    t = re.sub(r"^[\*\-]\s+", "", t, flags=re.MULTILINE)
+    # Remove linhas vazias excessivas (mais de 2 seguidas)
+    t = re.sub(r"\n{3,}", "\n\n", t)
+    return t.strip()
 
 
 def _document_type_to_rag_filter(document_type: str) -> str:
@@ -122,7 +164,7 @@ Contexto do documento:
 {espec_text}EXEMPLOS DE CLÁUSULAS SIMILARES (extraídos de documentos reais):
 {rag_context}
 
-Instruções: Gere um texto completo, robusto e pronto para uso. Adapte ao contexto (objeto, órgão) mantendo a estrutura jurídica dos exemplos. Use listas em prosa quando fizer sentido; tabelas são renderizadas em seções separadas – nunca use markdown (| col |). Não seja verboso; seja preciso e completo."""
+Instruções: Gere um texto completo, robusto e pronto para uso, SEMPRE em português brasileiro com acentuação correta. Adapte ao contexto (objeto, órgão) mantendo a estrutura jurídica dos exemplos. Use listas em prosa quando fizer sentido; tabelas são renderizadas em seções separadas. Nunca use markdown (** * ## ---). Não seja verboso; seja preciso e completo."""
 
     full_prompt = f"<<SYSTEM>>\n{CLAUSE_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{query}"
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
@@ -134,7 +176,8 @@ Instruções: Gere um texto completo, robusto e pronto para uso. Adapte ao conte
         body = resp.json()
     data = body.get("data", body) if isinstance(body, dict) else {}
     text = data.get("response", data.get("text", ""))
-    return (text or "").strip()
+    raw = (text or "").strip()
+    return _postprocess_clause_text(raw)
 
 
 def _collect_text_sections(nodes: List[Dict], acc: List[Dict]) -> None:

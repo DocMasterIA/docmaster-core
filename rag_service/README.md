@@ -28,7 +28,7 @@ Módulo de **Retrieval-Augmented Generation** para ingestão, busca vetorial e g
 | `OLLAMA_BASE_URL` | http://localhost:11434 | URL do Ollama (embeddings) |
 | `LLM_ORCHESTRATION_BASE_URL` | http://localhost:8002 | URL do llm_api |
 | `RAG_TOP_K` | 5 | Trechos a recuperar por query |
-| `RAG_TIMEOUT` | 60 | Timeout para chamada LLM (s) |
+| `RAG_TIMEOUT` | 0 | Timeout para chamada LLM (s); 0 = sem limite |
 
 ## Uso local
 
@@ -44,3 +44,13 @@ docker compose up -d rag_service
 ```
 
 Documentação interativa: http://localhost:8004/docs
+
+## Qualidade do texto gerado
+
+A geração de cláusulas usa o modelo configurado no **llm_api** (Ollama). Modelo padrão: `OLLAMA_MODEL=llama3.1:8b` (definido no llm_api).
+
+Para melhorar português, acentuação e reduzir markdown residual:
+- **Prompts** reforçam: sempre pt-BR, sem markdown, acentuação correta.
+- **Pós-processamento** (_postprocess_clause_text): remove **negrito**, corrige § 1o→§ 1º, residuos→resíduos, etc.
+
+Para trocar o modelo, defina `OLLAMA_MODEL` no llm_api (ex.: `llama3.2`, `mistral`, `phi3`).

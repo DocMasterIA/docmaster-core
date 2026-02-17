@@ -41,6 +41,58 @@ class ContextoBasico(BaseModel):
         return v
 
 
+# ---- Especificações extraídas do prompt (interpreter enriquecido) ----
+
+
+class TabelaEspecificacao(BaseModel):
+    """Especificação de tabela extraída do prompt do usuário."""
+
+    colunas: List[str] = Field(
+        ...,
+        min_length=1,
+        max_length=15,
+        description="Nomes das colunas da tabela.",
+    )
+    linhas_sugeridas: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        max_length=50,
+        description="Linhas de exemplo sugeridas pelo usuário (opcional).",
+    )
+
+    @field_validator("colunas")
+    @classmethod
+    def _colunas_non_empty(cls, v: List[str]) -> List[str]:
+        return [str(x).strip() for x in v if str(x).strip()]
+
+
+class EspecificacoesDocumento(BaseModel):
+    """
+    Especificações detalhadas extraídas do prompt (listas, tabelas).
+
+    Opcional: quando o interpretador não identifica, fica null.
+    """
+
+    listas: Optional[Dict[str, List[str]]] = Field(
+        None,
+        description="Listas nomeadas: {chave_semantica: [item1, item2, ...]}. Ex.: equipamentos, itens_objeto.",
+    )
+    tabelas: Optional[Dict[str, TabelaEspecificacao]] = Field(
+        None,
+        description="Tabelas nomeadas: {chave_semantica: {colunas, linhas_sugeridas?}}.",
+    )
+
+    @field_validator("listas")
+    @classmethod
+    def _listas_limits(cls, v: Optional[Dict[str, List[str]]]) -> Optional[Dict[str, List[str]]]:
+        if v is None:
+            return v
+        out = {}
+        for k, items in v.items():
+            if isinstance(items, list) and items:
+                out[str(k).strip()] = [str(x).strip() for x in items[:30] if str(x).strip()]
+        return out if out else None
+
+
 class DocumentoTipo(str):
     """
     Tipos suportados de documento.
@@ -334,6 +386,13 @@ class StructureRequest(BaseModel):
         description=(
             "Texto livre do usuário (ex.: pedido por cláusula). Quando informado no fluxo "
             "com catálogo, a IA devolve section_matches com nível de certeza (high/medium/low)."
+        ),
+    )
+    especificacoes: Optional[EspecificacoesDocumento] = Field(
+        None,
+        description=(
+            "Listas e tabelas extraídas do prompt (opcional). "
+            "Quando o interpretador identifica 'lista de X: A, B, C' ou 'tabela com colunas Y, Z', preenche aqui."
         ),
     )
 

@@ -110,7 +110,9 @@ Sua tarefa é ler o texto livre do usuário e extrair APENAS um JSON com os camp
 - "context": objeto com "objeto" (obrigatório), "orgao" (opcional), "modalidade" (opcional), "extras" (opcional).
 - "especificacoes" (OPCIONAL): preencha SOMENTE quando o usuário indicar explicitamente:
   * "listas": objeto {chave_semantica: [item1, item2, ...]} quando houver "lista de X: A, B, C", "itens: ...", "equipamentos: ...".
-  * "tabelas": objeto {chave_semantica: {colunas: [nome1, nome2], linhas_sugeridas?: [{col: val}, ...]}} quando houver "tabela com colunas X, Y, Z", "estimativa com itens...", etc.
+  * "tabelas": objeto {chave_semantica: {colunas: [nome1, nome2], linhas_sugeridas?: [{col1: val1, col2: val2}, ...]}}.
+    - "colunas": extraia quando o usuário indicar colunas (ex.: "com colunas Item, Quantidade, Valor").
+    - "linhas_sugeridas": extraia quando o usuário indicar linhas/dados (ex.: "Caminhão 1 R$ 100.000, Contêineres 5 R$ 2.000"). Use os nomes das colunas (ou labels) como chaves em cada objeto. Se o usuário só indicar colunas, omita linhas_sugeridas.
   Use chaves em snake_case: itens_objeto, equipamentos, estimativa_custos, identificacao_demanda.
   Se o usuário NÃO mencionar listas ou estrutura de tabela, retorne "especificacoes": null.
 
@@ -120,8 +122,11 @@ Regras:
 - Use snake_case em document_type e chaves.
 - Em dúvida sobre especificacoes, use null. Não invente listas ou colunas.
 
-Exemplo com especificacoes:
+Exemplo com especificacoes (só colunas):
 {"document_type": "estudo_tecnico_preliminar", "context": {"objeto": "coleta seletiva", "orgao": null, "modalidade": null}, "especificacoes": {"listas": {"equipamentos": ["caminhão compactador", "contêineres", "EPI"]}, "tabelas": {"estimativa_custos": {"colunas": ["Item", "Quantidade", "Valor Unitário", "Total"]}}}}
+
+Exemplo com especificacoes (colunas e linhas):
+{"document_type": "estudo_tecnico_preliminar", "context": {"objeto": "coleta seletiva", "orgao": null, "modalidade": null}, "especificacoes": {"tabelas": {"estimativa_custos": {"colunas": ["Item", "Quantidade", "Valor Unitário", "Total"], "linhas_sugeridas": [{"Item": "Caminhão compactador", "Quantidade": "1", "Valor Unitário": "R$ 100.000,00", "Total": "R$ 100.000,00"}, {"Item": "Contêineres", "Quantidade": "5", "Valor Unitário": "R$ 2.000,00", "Total": "R$ 10.000,00"}]}}}}
 
 Exemplo sem especificacoes:
 {"document_type": "termo_referencia", "context": {"objeto": "serviços de limpeza", "orgao": "Secretaria de Obras", "modalidade": "pregão eletrônico"}, "especificacoes": null}

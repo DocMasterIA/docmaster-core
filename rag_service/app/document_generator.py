@@ -38,8 +38,22 @@ Regras obrigatórias:
 5. Incluir obrigações, prazos, responsabilidades e condições quando fizerem parte da natureza da cláusula.
 6. NUNCA inventar fundamentos legais ou disposições que não estejam nos exemplos ou na lei – em dúvida, seja conservador.
 7. O texto deve poder ser usado diretamente no documento – sem placeholder, sem "[preencher]", sem lacunas.
+8. NUNCA use formatação markdown para tabelas (ex.: | col1 | col2 | ou linhas com ---). Tabelas são renderizadas em seções separadas pelo sistema. Se precisar mencionar dados tabulares, descreva em prosa ou indique "conforme tabela na seção correspondente".
 
 Formato de saída: apenas o texto da cláusula, pronto para inserção no documento. Sem título, sem numeração, sem explicações adicionais.
+"""
+
+
+# Prompt para geração de linhas de tabela (retorno estruturado JSON)
+TABLE_ROWS_SYSTEM_PROMPT = """
+Você gera linhas de tabela para documentos de licitação. Sua saída DEVE ser APENAS um array JSON de objetos.
+
+Regras:
+- Retorne SOMENTE um array JSON: [{"col1": "val1", "col2": "val2"}, ...]
+- Cada objeto representa uma linha; as chaves devem ser exatamente os nomes das colunas fornecidos.
+- Valores em string. Valores monetários no formato "R$ X.XXX,XX".
+- Gere 3 a 10 linhas realistas conforme o contexto (objeto, tipo de documento).
+- NÃO escreva texto explicativo; NÃO use markdown; NÃO use ```.
 """
 
 
@@ -81,7 +95,7 @@ def _format_especificacoes(especificacoes: Dict[str, Any] | None) -> str:
         for key, tbl in especificacoes["tabelas"].items():
             if isinstance(tbl, dict) and tbl.get("colunas"):
                 cols = ", ".join(str(c) for c in tbl["colunas"])
-                parts.append(f"- Tabela '{key}' (colunas: {cols})")
+                parts.append(f"- Tabela '{key}' (colunas: {cols}) – será renderizada em seção própria; NÃO gere tabela em markdown aqui")
     if not parts:
         return ""
     return "Especificações indicadas pelo usuário (use quando fizer sentido para esta seção):\n" + "\n".join(parts) + "\n\n"
@@ -108,7 +122,7 @@ Contexto do documento:
 {espec_text}EXEMPLOS DE CLÁUSULAS SIMILARES (extraídos de documentos reais):
 {rag_context}
 
-Instruções: Gere um texto completo, robusto e pronto para uso. Adapte ao contexto (objeto, órgão) mantendo a estrutura jurídica dos exemplos. Quando houver especificações acima relevantes para esta seção (listas, tabelas), incorpore-as de forma adequada. Não seja verboso; seja preciso e completo."""
+Instruções: Gere um texto completo, robusto e pronto para uso. Adapte ao contexto (objeto, órgão) mantendo a estrutura jurídica dos exemplos. Use listas em prosa quando fizer sentido; tabelas são renderizadas em seções separadas – nunca use markdown (| col |). Não seja verboso; seja preciso e completo."""
 
     full_prompt = f"<<SYSTEM>>\n{CLAUSE_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{query}"
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
@@ -130,6 +144,96 @@ def _collect_text_sections(nodes: List[Dict], acc: List[Dict]) -> None:
             acc.append({"key": node["key"], "title": node.get("title", node["key"])})
         if node.get("children"):
             _collect_text_sections(node["children"], acc)
+
+
+def _collect_table_sections(nodes: List[Dict], acc: List[Dict]) -> None:
+    """Coleta seções com content_type=table (incluindo subseções)."""
+    for node in nodes:
+        if node.get("content_type") == "table":
+            schema = node.get("table_schema") or {}
+            cols = schema.get("columns") or []
+            acc.append({
+                "key": node["key"],
+                "title": node.get("title", node["key"]),
+                "columns": [{"key": c.get("key"), "label": c.get("label", c.get("key", ""))} for c in cols],
+            })
+        if node.get("children"):
+            _collect_table_sections(node["children"], acc)
+
+
+def _parse_table_rows_json(raw: str) -> List[Dict[str, Any]]:
+    """Extrai array JSON de linhas da resposta do LLM (aceita markdown, etc)."""
+    import json
+    import re
+
+    text = (raw or "").strip()
+    # Remove ```json ... ```
+    if "```" in text:
+        m = re.search(r"```(?:json)?\s*(\[[\s\S]*?\])\s*```", text)
+        if m:
+            text = m.group(1)
+    # Procura primeiro [...]
+    start = text.find("[")
+    if start < 0:
+        return []
+    depth = 0
+    for i, c in enumerate(text[start:], start=start):
+        if c == "[":
+            depth += 1
+        elif c == "]":
+            depth -= 1
+            if depth == 0:
+                try:
+                    out = json.loads(text[start : i + 1])
+                    return out if isinstance(out, list) else []
+                except json.JSONDecodeError:
+                    pass
+                break
+    return []
+
+
+async def _generate_table_rows(
+    section_key: str,
+    section_title: str,
+    columns: List[Dict[str, str]],
+    context: Dict[str, Any],
+    document_type: str,
+    rag_context: str,
+) -> List[Dict[str, Any]]:
+    """Gera linhas de tabela via LLM; retorna lista de dicts ou vazia em falha."""
+    col_labels = [c.get("label") or c.get("key") or "" for c in columns if c.get("label") or c.get("key")]
+    if not col_labels:
+        return []
+
+    query = f"""Gerar linhas para a tabela "{section_title}" (section_key: {section_key}).
+
+Contexto: {document_type}. Objeto: {context.get("objeto", "não informado")}. Órgão: {context.get("orgao", "não informado")}.
+
+Colunas (use exatamente esses nomes como chaves em cada objeto): {", ".join(col_labels)}
+
+Exemplos de conteúdo similar (referência):
+{rag_context[:800] if rag_context else "Nenhum."}
+
+Retorne APENAS um array JSON de objetos, cada um com as chaves das colunas. Exemplo: [{{"{col_labels[0]}": "val1", "{col_labels[1] if len(col_labels) > 1 else col_labels[0]}": "val2"}}, ...]"""
+
+    full_prompt = f"<<SYSTEM>>\n{TABLE_ROWS_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{query}"
+    url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
+    payload = {"prompt": full_prompt, "stream": False}
+
+    try:
+        async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            body = resp.json()
+        data = body.get("data", body) if isinstance(body, dict) else {}
+        raw = data.get("response", data.get("text", ""))
+        rows = _parse_table_rows_json(str(raw or ""))
+        if not isinstance(rows, list):
+            return []
+        # Validar: cada item deve ser dict
+        return [r for r in rows if isinstance(r, dict)][:20]
+    except Exception:
+        return []
 
 
 async def generate_full_document(
@@ -210,10 +314,50 @@ async def generate_full_document(
         except Exception as e:
             section_texts[key] = f"[Erro ao gerar: {e}]"
 
+    # Table data: inicialmente de especificacoes (linhas_sugeridas)
+    table_data: Dict[str, List[Dict[str, Any]]] = {}
+    espec_tabelas = especificacoes.get("tabelas") if isinstance(especificacoes, dict) else {}
+    if espec_tabelas:
+        for k, v in espec_tabelas.items():
+            if isinstance(v, dict):
+                linhas = v.get("linhas_sugeridas")
+                if isinstance(linhas, list) and linhas:
+                    table_data[k] = linhas
+
+    # Seções de tabela sem dados: gerar linhas via LLM
+    table_sections: List[Dict] = []
+    _collect_table_sections(root, table_sections)
+    for sec in table_sections:
+        key = sec["key"]
+        if table_data.get(key):
+            continue
+        cols = sec.get("columns") or []
+        if not cols:
+            continue
+        query = f"{ctx.get('objeto', '')} tabela {sec.get('title', key)} estimativa custos"
+        docs = retrieve(
+            query=query,
+            collection_name=coll,
+            top_k=3,
+            where={"document_type": doc_type_filter},
+        )
+        rag_ctx = "\n\n---\n\n".join((d.get("content", "") or "")[:500] for d in docs)
+        rows = await _generate_table_rows(
+            section_key=key,
+            section_title=sec.get("title", key),
+            columns=cols,
+            context=ctx,
+            document_type=document_type,
+            rag_context=rag_ctx,
+        )
+        if rows:
+            table_data[key] = rows
+
     return {
         "structure": doc_structure,
         "section_texts": section_texts,
         "document_type": document_type,
         "context": ctx,
         "especificacoes": especificacoes,
+        "table_data": table_data,
     }

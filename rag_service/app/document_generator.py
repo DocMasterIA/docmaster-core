@@ -110,6 +110,17 @@ def _postprocess_clause_text(text: str) -> str:
     )
     # Remove marcadores markdown no início de linha (* ou - , inclusive com espaços)
     t = re.sub(r"^\s*[\*\-]\s+", "", t, flags=re.MULTILINE)
+    # Remove títulos/cabeçalhos no início do texto (o título da seção já é inserido automaticamente)
+    heading_patterns = [
+        r"^Conclusão\s*(?:e\s+Recomendações?\s*(?:Finais?)?)?\.?\s*\n+",
+        r"^CONFORMIDADE\s+COM\s+A\s+LEGISLAÇÃO\.?\s*\n+",
+        r"^LISTA\s+DE\s+ALTERNATIVAS\.?\s*\n+",
+        r"^LISTA\s+DE\s+MEDIDAS\.?\s*\n+",
+        r"^Análise\s+de\s+Riscos\.?\s*\n+",
+        r"^SOLUÇÃO\s+PROPOSTA\.?\s*\n+",
+    ]
+    for pat in heading_patterns:
+        t = re.sub(pat, "", t, flags=re.IGNORECASE)
     # Remove linhas vazias excessivas (mais de 2 seguidas)
     t = re.sub(r"\n{3,}", "\n\n", t)
     return t.strip()

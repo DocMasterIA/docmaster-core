@@ -43,8 +43,9 @@ LLM_ORCHESTRATION_GENERATE_PATH: str = os.getenv(
 # Ollama (para embeddings, quando usar localmente)
 OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
-# Timeouts
-RAG_TIMEOUT: float = float(os.getenv("RAG_TIMEOUT", "60.0"))
+# Timeouts (RAG_TIMEOUT: 0 = sem limite; por enquanto desativado para evitar ReadTimeout)
+RAG_TIMEOUT: float = float(os.getenv("RAG_TIMEOUT", "0"))
+RAG_HTTP_TIMEOUT: float | None = None if RAG_TIMEOUT <= 0 else RAG_TIMEOUT
 EMBEDDING_TIMEOUT: float = float(os.getenv("EMBEDDING_TIMEOUT", "30.0"))
 
 # Retrieval

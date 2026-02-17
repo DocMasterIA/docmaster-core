@@ -18,7 +18,7 @@ from .config import (
     LLM_ORCHESTRATION_BASE_URL,
     LLM_ORCHESTRATION_GENERATE_PATH,
     OLLAMA_BASE_URL,
-    RAG_TIMEOUT,
+    RAG_HTTP_TIMEOUT,
     RAG_TOP_K,
 )
 from .retrieval import retrieve
@@ -73,7 +73,7 @@ async def _call_llm_agent_structure(user_prompt: str) -> Dict[str, Any]:
     """Chama llm_agent para obter estrutura, context e especificacoes a partir do prompt livre."""
     url = f"{LLM_AGENT_BASE_URL}/api/agent/structure-from-prompt"
     payload = {"user_prompt": user_prompt}
-    async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
         resp = await client.post(url, json=payload)
         resp.raise_for_status()
         data = resp.json()
@@ -128,7 +128,7 @@ Instruções: Gere um texto completo, robusto e pronto para uso. Adapte ao conte
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
     payload = {"prompt": full_prompt, "stream": False}
 
-    async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
         resp = await client.post(url, json=payload)
         resp.raise_for_status()
         body = resp.json()
@@ -221,7 +221,7 @@ Retorne APENAS um array JSON de objetos, cada um com as chaves das colunas. Exem
     payload = {"prompt": full_prompt, "stream": False}
 
     try:
-        async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()
             body = resp.json()

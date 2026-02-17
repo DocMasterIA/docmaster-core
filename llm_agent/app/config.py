@@ -43,8 +43,8 @@ LLM_ORCHESTRATION_GENERATE_PATH: str = os.getenv(
     "/api/llm/generate",
 )
 
-# Timeout em segundos para a chamada ao módulo de orquestração.
-AGENT_TIMEOUT: float = _env_float("AGENT_TIMEOUT", 60.0)
+# Timeout em segundos para a chamada ao módulo de orquestração (llm_api pode demorar com Ollama).
+AGENT_TIMEOUT: float = _env_float("AGENT_TIMEOUT", 120.0)
 
 # Número máximo de tentativas semânticas (re-prompt) para corrigir saída inválida.
 AGENT_MAX_RETRIES: int = _env_int("AGENT_MAX_RETRIES", 2)

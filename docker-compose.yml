@@ -53,7 +53,7 @@ services:
     environment:
       - PORT=8003
       - LLM_ORCHESTRATION_BASE_URL=http://llm_api:8002
-      - AGENT_TIMEOUT=60
+      - AGENT_TIMEOUT=120
       - AGENT_MAX_RETRIES=2
     depends_on:
       - llm_api
@@ -84,7 +84,7 @@ services:
       - LLM_ORCHESTRATION_BASE_URL=http://llm_api:8002
       - LLM_AGENT_BASE_URL=http://llm_agent:8003
       - RAG_TOP_K=5
-      - RAG_TIMEOUT=60
+      - RAG_TIMEOUT=0
     volumes:
       # Monta pasta de treinamento para acesso aos documentos
       - ./treinamento:/data/treinamento:ro

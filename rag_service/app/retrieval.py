@@ -16,7 +16,7 @@ from .config import (
     LLM_ORCHESTRATION_GENERATE_PATH,
     OLLAMA_BASE_URL,
     RAG_TOP_K,
-    RAG_TIMEOUT,
+    RAG_HTTP_TIMEOUT,
 )
 
 
@@ -106,7 +106,7 @@ Resposta:"""
         "stream": False,
     }
 
-    async with httpx.AsyncClient(timeout=RAG_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
         resp = await client.post(url, json=payload)
         resp.raise_for_status()
         body = resp.json()

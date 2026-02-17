@@ -217,6 +217,13 @@ Instruções: Gere o CONTEÚDO da cláusula diretamente, sem meta-comentário ("
         resp = await client.post(url, json=payload)
         resp.raise_for_status()
         body = resp.json()
+
+    # Se a resposta contiver "detail" com mensagem de erro (ex.: proxy retorna 200 com erro), não inserir no documento
+    if isinstance(body, dict) and body.get("detail"):
+        detail = str(body["detail"]).strip()
+        if any(kw in detail.lower() for kw in ("falha", "erro", "timeout", "error", "verifique")):
+            raise ValueError(f"Orquestração retornou erro: {detail}")
+
     data = body.get("data", body) if isinstance(body, dict) else {}
     text = data.get("response", data.get("text", ""))
     raw = (text or "").strip()
@@ -387,18 +394,15 @@ async def generate_full_document(
         )
         if not rag_context:
             rag_context = "(Nenhum exemplo encontrado no RAG. Gere uma cláusula genérica mas completa e robusta.)"
-        try:
-            text = await _generate_clause_text(
-                section_key=key,
-                section_title=title,
-                context=ctx,
-                rag_context=rag_context,
-                document_type=document_type,
-                especificacoes=especificacoes,
-            )
-            section_texts[key] = text
-        except Exception as e:
-            section_texts[key] = f"[Erro ao gerar: {e}]"
+        text = await _generate_clause_text(
+            section_key=key,
+            section_title=title,
+            context=ctx,
+            rag_context=rag_context,
+            document_type=document_type,
+            especificacoes=especificacoes,
+        )
+        section_texts[key] = text
 
     # Table data: inicialmente de especificacoes (linhas_sugeridas)
     table_data: Dict[str, List[Dict[str, Any]]] = {}

@@ -53,7 +53,7 @@ Regras obrigatórias:
 5. Incluir obrigações, prazos, responsabilidades e condições quando fizerem parte da natureza da cláusula.
 6. NUNCA inventar fundamentos legais ou disposições que não estejam nos exemplos ou na lei – em dúvida, seja conservador.
 7. NUNCA use placeholders: proibido [preencher], [prazo determinado], [valor], [X], [objeto], etc. Use valores genéricos plausíveis quando não houver dado específico (ex.: "30 dias", "conforme edital", "no prazo estabelecido no contrato").
-8. NUNCA repita frases ou parágrafos idênticos – cada seção deve ter redação própria e específica. Evite fórmulas genéricas repetidas (ex.: "encontra-se detalhada nas partes específicas").
+8. NUNCA repita frases ou parágrafos idênticos na MESMA seção – cada parágrafo deve ter redação própria. Evite fórmulas genéricas repetidas (ex.: "encontra-se detalhada nas partes específicas", "A Administração fará o acompanhamento e o controle das obras e serviços"). Se uma frase for necessária mais de uma vez, reformule-a.
 9. NUNCA use formatação markdown para tabelas (ex.: | col1 | col2 | ou linhas com ---). Tabelas são renderizadas em seções separadas pelo sistema. Se precisar mencionar dados tabulares, descreva em prosa ou indique "conforme tabela na seção correspondente".
 
 Formato de saída: APENAS o texto da cláusula. Sem prefácios, sem intros, sem notas, sem explicações. O primeiro caractere da sua resposta deve ser o início do conteúdo jurídico, não uma frase sobre a seção.
@@ -79,6 +79,7 @@ Regras:
 - NUNCA use placeholders: proibido [preencher], [prazo], [valor], [X], etc. Use valores genéricos plausíveis (ex.: "30 dias", "conforme edital").
 - LEGISLAÇÃO: Use APENAS a Lei 14.133/2021. NUNCA cite a Lei 8.666/1993 (foi revogada).
 - Diferencie obrigações da CONTRATADA (empresa/fornecedor) das do CONTRATANTE (Administração): o sujeito deve ser correto em cada tipo de seção.
+- NUNCA repita frases idênticas ou quase idênticas entre os itens – cada item deve ter redação própria.
 """
 
 
@@ -304,6 +305,42 @@ def _sanitize_rag_context_for_legislation(rag_context: str) -> str:
     return t
 
 
+def _mark_pure_legal_citations_in_rag(rag_context: str) -> str:
+    """
+    Sinaliza trechos do RAG que parecem citação legal pura (transcrição de artigos),
+    para que o LLM não os copie literalmente como cláusulas narrativas.
+    """
+    import re
+    if not rag_context or not isinstance(rag_context, str):
+        return rag_context
+    sep = "\n\n---\n\n"
+    chunks = rag_context.split(sep)
+    marker = "[Referência legal – adaptar em prosa contratual, não transcrever literalmente]\n"
+    legal_boilerplate = re.compile(
+        r"^(?:Art\.|§\s*\d|Artigo\s+\d)",
+        re.IGNORECASE,
+    )
+    legal_phrases = (
+        "vedada a aplicação combinada",
+        "será regido pelas regras",
+        "inciso II do caput",
+        "indicadas expressamente no edital",
+    )
+    result = []
+    for c in chunks:
+        s = (c or "").strip()
+        if not s:
+            result.append(c)
+            continue
+        is_pure_legal = (
+            legal_boilerplate.match(s)
+            and any(p in s.lower() for p in legal_phrases)
+            and len(s) < 500
+        )
+        result.append(marker + c if is_pure_legal else c)
+    return sep.join(result)
+
+
 def _document_type_to_rag_filter(document_type: str) -> str:
     """Mapeia document_type do llm_agent para document_type do RAG."""
     dt = (document_type or "").lower()
@@ -340,11 +377,16 @@ def _get_section_specific_instructions(
     key = (section_key or "").lower()
     doc_type = (document_type or "").lower()
 
-    # Alternativas Analisadas (ETP): NÃO usar estrutura "Alternativa 1", "Alternativa 2"
+    # Alternativas Analisadas (ETP): ETP NÃO apresenta alternativas À CONTRATADA
     if "alternativa" in key and ("etp" in doc_type or "estudo" in doc_type):
-        if for_list:
-            return "\nINSTRUÇÕES ESPECÍFICAS: ETP não usa \"Alternativa 1\", \"Alternativa 2\". Liste as alternativas como itens simples, sem criar subseções. Formato direto.\n"
-        return "\nINSTRUÇÕES ESPECÍFICAS: Em ETP, NÃO use a estrutura \"Alternativa 1\", \"Alternativa 2\" como subseções – não é utilizada em ETPs. Redija em texto corrido ou lista numerada (1., 2., 3. ou a), b), c)). Para subitens use 1., 2. ou a), b) – NUNCA § 1º, § 2º (só em citação de lei).\n"
+        return (
+            "\nINSTRUÇÕES OBRIGATÓRIAS - ALTERNATIVAS EM ETP:\n"
+            "- O ETP NÃO apresenta alternativas À CONTRATADA. O objeto já está definido; a contratada não escolhe entre opções.\n"
+            "- Se houver esta seção, descreva brevemente as alternativas que a ADMINISTRAÇÃO analisou ao elaborar o estudo (para fins de documentação), indicando qual foi adotada e por quê. Ex.: diferentes modalidades de prestação que a Administração considerou (cooperativa, empresa privada etc.) e a escolha final.\n"
+            "- NUNCA liste equipamentos (caminhão, contêineres, EPI) como \"alternativas\" – são parte do objeto/solução, não alternativas.\n"
+            "- NUNCA use estrutura \"Alternativa 1\", \"Alternativa 2\" como subseções – não é utilizada em ETPs.\n"
+            "- FORMATO: Use SEMPRE texto corrido ou enumeração explícita (1., 2., 3. ou a), b), c)). NUNCA use listas soltas de termos (uma palavra ou item por linha sem numeração, ex.: Caminhão\\nContêineres\\nEPI). NUNCA use § 1º, § 2º em enumeração (só em citação de lei).\n"
+        )
 
     # Obrigações da Contratada (empresa que executa)
     if "contratada" in key:
@@ -462,7 +504,9 @@ Contexto do documento:
 {espec_text}EXEMPLOS DE CLÁUSULAS SIMILARES (extraídos de documentos reais):
 {rag_context}
 
-Instruções: O PRIMEIRO caractere da sua resposta deve ser o início do conteúdo jurídico. Não comece com "Aqui estão...", "A cláusula deve...", "Segue..." ou qualquer intro. Redija DIRETAMENTE a cláusula. Português brasileiro, acentuação correta. Adapte ao contexto. Sem markdown. Sem placeholders []. Cite Lei 14.133/2021. Não repita frases de outras seções."""
+ATENÇÃO AO CONTEXTO RAG: Alguns exemplos podem conter trechos de citação legal pura (transcrição literal de artigos de lei). NÃO copie esses trechos como cláusulas narrativas – use-os apenas como referência para fundamentar; redija em prosa contratual adequada ao documento.
+
+Instruções: O PRIMEIRO caractere da sua resposta deve ser o início do conteúdo jurídico. Não comece com "Aqui estão...", "A cláusula deve...", "Segue..." ou qualquer intro. Redija DIRETAMENTE a cláusula. Português brasileiro, acentuação correta. Adapte ao contexto. Sem markdown. Sem placeholders []. Cite Lei 14.133/2021. Não repita frases (nem de outras seções nem dentro da mesma seção)."""
 
     full_prompt = f"<<SYSTEM>>\n{CLAUSE_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{query}"
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
@@ -542,7 +586,7 @@ Contexto: {document_type}. Objeto: {context.get("objeto", "não informado")}. Ó
 {espec_text}Exemplos de itens similares (referência):
 {rag_context}
 
-O PRIMEIRO caractere da resposta deve ser o primeiro item. Não comece com intro. Cada item em uma linha. Sem numeração, sem marcadores. Sem placeholders. Lei 14.133/2021."""
+ATENÇÃO: Não copie trechos de citação legal pura (transcrição de artigos) dos exemplos – use como referência e redija em prosa adequada. O PRIMEIRO caractere da resposta deve ser o primeiro item. Não comece com intro. Cada item em uma linha. Sem numeração, sem marcadores. Sem placeholders. Lei 14.133/2021."""
 
     full_prompt = f"<<SYSTEM>>\n{LIST_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{query}"
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
@@ -739,6 +783,7 @@ async def generate_full_document(
         if not rag_context:
             rag_context = "(Nenhum exemplo encontrado no RAG. Gere uma cláusula genérica mas completa e robusta.)"
         rag_context = _sanitize_rag_context_for_legislation(rag_context)
+        rag_context = _mark_pure_legal_citations_in_rag(rag_context)
         text = await _generate_clause_text(
             section_key=key,
             section_title=title,
@@ -768,6 +813,7 @@ async def generate_full_document(
         if not rag_context:
             rag_context = "(Nenhum exemplo encontrado. Gere itens genéricos mas pertinentes à seção.)"
         rag_context = _sanitize_rag_context_for_legislation(rag_context)
+        rag_context = _mark_pure_legal_citations_in_rag(rag_context)
         text = await _generate_list_content(
             section_key=key,
             section_title=title,

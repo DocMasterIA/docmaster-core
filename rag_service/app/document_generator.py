@@ -161,7 +161,9 @@ def _postprocess_clause_text(text: str) -> str:
     t = re.sub(r"Lei\s*8\.333", "Lei 14.133/2021", t, flags=re.IGNORECASE)
     # Placeholders: substitui por texto genérico plausível
     placeholder_fixes = [
+        (r"R\$\s*\[conforme\s+edital\]", "conforme edital"),
         (r"\[prazo\s+determinado\]", "no prazo estabelecido no edital"),
+        (r"\[conforme\s+edital\]", "conforme edital"),
         (r"\[preencher\]", "conforme especificado no edital"),
         (r"\[valor\]", "o valor estabelecido no contrato"),
         (r"\[objeto\]", "o objeto da contratação"),
@@ -211,6 +213,17 @@ def _postprocess_clause_text(text: str) -> str:
     t = _convert_markdown_table_to_plain(t)
     # Remove marcadores markdown no início de linha (* ou - , inclusive com espaços)
     t = re.sub(r"^\s*[\*\-]\s+", "", t, flags=re.MULTILINE)
+    # Remove meta-comentários do LLM (intro listas, section_key, etc.)
+    meta_comment_patterns = [
+        r"^Aqui estão os itens da lista para a seção[^\n]*(?:\n|$)",
+        r"^Segue(?:m)? os itens da (?:lista )?para a seção[^\n]*(?:\n|$)",
+        r"^(?:Os )?itens da seção[^\n]*(?:\n|$)",
+        r"^Lista de itens para a seção[^\n]*(?:\n|$)",
+        r"^.*\(section_key\s*:\s*[a-z_]+\)[^.\n]*\.?\s*(?:\n|$)",
+    ]
+    for pat in meta_comment_patterns:
+        t = re.sub(pat, "", t, flags=re.IGNORECASE)
+
     # Remove títulos/cabeçalhos no início do texto (o título da seção já é inserido automaticamente)
     heading_patterns = [
         r"^Conclusão\s*(?:e\s+Recomendações?\s*(?:Finais?)?)?\.?\s*\n+",
@@ -416,6 +429,26 @@ Instruções: Gere o CONTEÚDO da cláusula diretamente, sem meta-comentário ("
     return _postprocess_clause_text(raw)
 
 
+def _is_meta_comment_line(line: str) -> bool:
+    """Verifica se a linha é meta-comentário do LLM (intro de lista, section_key, etc.)."""
+    import re
+    s = (line or "").strip()
+    if not s:
+        return True
+    patterns = [
+        r"^Aqui estão os itens da lista para a seção",
+        r"^Segue(?:m)? os itens da (?:lista )?para a seção",
+        r"^(?:Os )?itens da seção\s+[\"'].*[\"']",
+        r"^Lista de itens para a seção",
+        r"\(section_key\s*:\s*[a-z_]+\)",
+        r"baseados?\s+na\s+Lei\s+14\.133.*contexto\s+fornecido",
+    ]
+    for pat in patterns:
+        if re.search(pat, s, re.IGNORECASE):
+            return True
+    return False
+
+
 def _postprocess_list_text(text: str) -> str:
     """Garante que a saída seja uma linha por item, sem numeração/marcadores no início."""
     import re
@@ -429,6 +462,8 @@ def _postprocess_list_text(text: str) -> str:
     lines = [ln.strip() for ln in text.strip().split("\n") if ln.strip()]
     cleaned = []
     for ln in lines:
+        if _is_meta_comment_line(ln):
+            continue
         # Remove numeração inicial (1. 2. 3. ou 1) 2) etc.) e marcadores (- * •)
         ln = re.sub(r"^\s*[\d]+[\.\)]\s*", "", ln)
         ln = re.sub(r"^\s*[\-\*•]\s+", "", ln)

@@ -41,15 +41,35 @@ Regras obrigatórias:
 1. O texto gerado deve ser completo e autocontido – incluir todas as disposições necessárias para a cláusula, sem remeter a "conforme acima" ou "anexo".
 2. Não ser verboso nem repetitivo – ir direto ao ponto, com clareza e precisão técnica.
 3. Usar os exemplos do contexto RAG como referência – adaptar ao objeto/contexto informado, mantendo estrutura jurídica e requisitos essenciais.
-4. Garantir conformidade com a Lei 14.133/2021 quando aplicável – prazos, valores, modalidades e disposições devem respeitar limites legais.
+4. LEGISLAÇÃO: Use APENAS a Lei 14.133/2021. NUNCA cite a Lei 8.666/1993 (foi revogada em 2021).
 5. Incluir obrigações, prazos, responsabilidades e condições quando fizerem parte da natureza da cláusula.
 6. NUNCA inventar fundamentos legais ou disposições que não estejam nos exemplos ou na lei – em dúvida, seja conservador.
-7. O texto deve poder ser usado diretamente no documento – sem placeholder, sem "[preencher]", sem lacunas.
-8. NUNCA use formatação markdown para tabelas (ex.: | col1 | col2 | ou linhas com ---). Tabelas são renderizadas em seções separadas pelo sistema. Se precisar mencionar dados tabulares, descreva em prosa ou indique "conforme tabela na seção correspondente".
+7. NUNCA use placeholders: proibido [preencher], [prazo determinado], [valor], [X], [objeto], etc. Use valores genéricos plausíveis quando não houver dado específico (ex.: "30 dias", "conforme edital", "no prazo estabelecido no contrato").
+8. NUNCA repita frases ou parágrafos idênticos – cada seção deve ter redação própria e específica. Evite fórmulas genéricas repetidas (ex.: "encontra-se detalhada nas partes específicas").
+9. NUNCA use formatação markdown para tabelas (ex.: | col1 | col2 | ou linhas com ---). Tabelas são renderizadas em seções separadas pelo sistema. Se precisar mencionar dados tabulares, descreva em prosa ou indique "conforme tabela na seção correspondente".
 
 Formato de saída: apenas o texto da cláusula, pronto para inserção no documento. Sem título, sem numeração, sem explicações adicionais. Texto puro, sem markdown.
 - NUNCA faça meta-comentário: não escreva "A cláusula X deve conter...", "A cláusula \"Necessidade\" é fundamental...", "section_key: ...". Redija DIRETAMENTE o conteúdo da cláusula, como se já estivesse no documento final.
 - NUNCA use títulos ou cabeçalhos no texto (ex.: "CONFORMIDADE COM A LEGISLAÇÃO", "Conclusão", "LISTA DE ALTERNATIVAS"). O título da seção já será inserido automaticamente.
+"""
+
+
+# Prompt para geração de listas (Obrigações, Critérios de Aceitação, etc.)
+LIST_COMPOSITION_SYSTEM_PROMPT = """
+Você gera itens de lista para seções de documentos de licitação (obrigações, critérios de aceitação, etc.).
+
+LÍNGUA: Sempre português brasileiro com acentuação correta.
+
+FORMATO DE SAÍDA: Cada item em UMA LINHA separada. NÃO use numeração (1. 2. 3.) nem marcadores (- * •). Apenas o texto de cada item, um por linha. O sistema aplicará os marcadores automaticamente.
+
+Regras:
+- Gere 3 a 8 itens conforme a natureza da seção e do objeto.
+- Baseie-se nos exemplos do contexto RAG quando disponíveis.
+- Cada item deve ser conciso e completo (frase ou oração).
+- Sem markdown, sem meta-comentários.
+- NUNCA use placeholders: proibido [preencher], [prazo], [valor], [X], etc. Use valores genéricos plausíveis (ex.: "30 dias", "conforme edital").
+- LEGISLAÇÃO: Use APENAS a Lei 14.133/2021. NUNCA cite a Lei 8.666/1993 (foi revogada).
+- Diferencie obrigações da CONTRATADA (empresa/fornecedor) das do CONTRATANTE (Administração): o sujeito deve ser correto em cada tipo de seção.
 """
 
 
@@ -134,6 +154,21 @@ def _postprocess_clause_text(text: str) -> str:
     # Corrige § No → § Nº (ordinal em parágrafos)
     t = re.sub(r"§\s*(\d+)\s*[oO](?=\s|$|\.|,)", r"§ \1º", t)
     t = re.sub(r"art\.?\s*(\d+)\s*[oO](?=\s|$|\.|,)", r"art. \1º", t)
+    # Leis revogadas: corrige para Lei 14.133/2021
+    t = re.sub(r"Lei\s*(?:n[º°]?|n\.?\s*[º°]?)?\s*8\.666/1993", "Lei 14.133/2021", t, flags=re.IGNORECASE)
+    t = re.sub(r"Lei\s*8\.666", "Lei 14.133/2021", t, flags=re.IGNORECASE)
+    t = re.sub(r"Lei\s*(?:n[º°]?|n\.?\s*[º°]?)?\s*8\.333/1991", "Lei 14.133/2021", t, flags=re.IGNORECASE)
+    t = re.sub(r"Lei\s*8\.333", "Lei 14.133/2021", t, flags=re.IGNORECASE)
+    # Placeholders: substitui por texto genérico plausível
+    placeholder_fixes = [
+        (r"\[prazo\s+determinado\]", "no prazo estabelecido no edital"),
+        (r"\[preencher\]", "conforme especificado no edital"),
+        (r"\[valor\]", "o valor estabelecido no contrato"),
+        (r"\[objeto\]", "o objeto da contratação"),
+        (r"\[X\]", "conforme edital"),
+    ]
+    for pat, repl in placeholder_fixes:
+        t = re.sub(pat, repl, t, flags=re.IGNORECASE)
     # Corrige erros comuns de português
     fixes = [
         (r"\btratante\b", "contratante"),
@@ -192,6 +227,24 @@ def _postprocess_clause_text(text: str) -> str:
     return t.strip()
 
 
+def _sanitize_rag_context_for_legislation(rag_context: str) -> str:
+    """
+    Substitui referências a leis revogadas (8.666, 8.333) no contexto RAG por Lei 14.133/2021.
+    Assim o LLM recebe exemplos já atualizados e não replica as leis antigas.
+    """
+    import re
+    if not rag_context or not isinstance(rag_context, str):
+        return rag_context
+    t = rag_context
+    # Lei 8.666/1993 (licitações - revogada pela 14.133/2021)
+    t = re.sub(r"Lei\s*(?:n[º°]?|n\.?\s*[º°]?)?\s*8\.666/1993", "Lei 14.133/2021", t, flags=re.IGNORECASE)
+    t = re.sub(r"Lei\s*8\.666(?:/1993)?", "Lei 14.133/2021", t, flags=re.IGNORECASE)
+    # Lei 8.333/1991 (orçamento - quando citada em contexto licitatório, priorizar 14.133)
+    t = re.sub(r"Lei\s*(?:n[º°]?|n\.?\s*[º°]?)?\s*8\.333/1991", "Lei 14.133/2021", t, flags=re.IGNORECASE)
+    t = re.sub(r"Lei\s*8\.333(?:/1991)?", "Lei 14.133/2021", t, flags=re.IGNORECASE)
+    return t
+
+
 def _document_type_to_rag_filter(document_type: str) -> str:
     """Mapeia document_type do llm_agent para document_type do RAG."""
     dt = (document_type or "").lower()
@@ -215,6 +268,88 @@ async def _call_llm_agent_structure(user_prompt: str) -> Dict[str, Any]:
     if not data.get("ok") or not data.get("structure"):
         raise ValueError(data.get("error", "Estrutura não retornada pelo llm_agent"))
     return data
+
+
+def _get_section_specific_instructions(section_key: str, for_list: bool = False) -> str:
+    """
+    Retorna instruções específicas por seção para guiar a geração.
+    for_list=True: instruções condensadas para itens de lista.
+    """
+    key = (section_key or "").lower()
+
+    # Obrigações da Contratada (empresa que executa)
+    if "contratada" in key:
+        if for_list:
+            return "\nINSTRUÇÕES ESPECÍFICAS: Cada item deve descrever obrigação da CONTRATADA (empresa, fornecedor, licitante). NÃO inclua deveres da Administração. Ex.: \"Apresentar cronograma de execução\", \"Manter documentação atualizada\".\n"
+        return "\nINSTRUÇÕES ESPECÍFICAS: O sujeito das obrigações é a CONTRATADA (empresa, fornecedor, licitante que executa o serviço). NÃO inclua obrigações da Administração. Redija deveres da empresa em relação ao contrato.\n"
+
+    # Obrigações do Contratante (Administração que contrata)
+    if "contratante" in key:
+        if for_list:
+            return "\nINSTRUÇÕES ESPECÍFICAS: Cada item deve descrever obrigação do CONTRATANTE (Administração, órgão). NÃO inclua deveres da empresa. Ex.: \"Fornecer dados necessários à execução\", \"Efetuar pagamento conforme cronograma\".\n"
+        return "\nINSTRUÇÕES ESPECÍFICAS: O sujeito das obrigações é o CONTRATANTE (Administração Pública, órgão, poder público). NÃO inclua obrigações da empresa contratada. Redija deveres da Administração em relação ao contrato.\n"
+
+    # Critérios de Aceitação / Julgamento
+    if "criterios" in key or "aceitacao" in key or "julgamento" in key:
+        if for_list:
+            return "\nINSTRUÇÕES ESPECÍFICAS: Liste critérios de aceitação ou de julgamento de propostas. Cite APENAS a Lei 14.133/2021 (não a Lei 8.666). Ex.: \"Conformidade com as especificações técnicas\", \"Menor preço global\".\n"
+        return "\nINSTRUÇÕES ESPECÍFICAS: Descreva os critérios de aceitação e/ou julgamento das propostas. Cite APENAS a Lei 14.133/2021 (não a Lei 8.666). Evite repetir \"menor preço\" ou fórmulas genéricas em excesso.\n"
+
+    # Requisitos Técnicos
+    if "requisitos" in key and "tecnic" in key:
+        if for_list:
+            return "\nINSTRUÇÕES ESPECÍFICAS: Liste requisitos técnicos específicos do objeto (equipamentos, capacidades, qualificações). Cada item deve ser verificável e mensurável.\n"
+        return "\nINSTRUÇÕES ESPECÍFICAS: Especifique requisitos técnicos objetivos (capacidade, desempenho, qualificação). Evite vagas genéricas; seja específico ao objeto.\n"
+
+    # Justificativa
+    if "justificativa" in key:
+        if for_list:
+            return "\nINSTRUÇÕES ESPECÍFICAS: Liste argumentos que justifiquem as exigências. NÃO repita \"encontra-se detalhada nas partes específicas\". Cada item deve trazer justificativa concreta.\n"
+        return "\nINSTRUÇÕES ESPECÍFICAS: Justifique as exigências de forma objetiva. NÃO use fórmulas genéricas repetidas (ex.: \"encontra-se detalhada nas partes específicas deste documento\"). Apresente argumentos concretos.\n"
+
+    # Prazo de Execução
+    if "prazo" in key and "execuc" in key:
+        if for_list:
+            return "\nINSTRUÇÕES ESPECÍFICAS: Liste prazos e condições. Quem EXECUTA é a CONTRATADA (empresa), não a Administração. Use valores plausíveis (ex.: \"180 dias\", \"30 dias\").\n"
+        return "\nINSTRUÇÕES ESPECÍFICAS: O prazo de execução é da CONTRATADA (empresa que executa o serviço). NÃO escreva que \"a Administração executará\". Use prazos em dias conforme Lei 14.133/2021.\n"
+
+    # Garantia
+    if "garantia" in key:
+        if for_list:
+            return "\nINSTRUÇÕES ESPECÍFICAS: Liste tipos de garantia (proposta, execução, etc.) e percentuais. Lei 14.133: garantia de proposta até 5% do valor estimado. NÃO cite Lei 8.666.\n"
+        return "\nINSTRUÇÕES ESPECÍFICAS: Garantia de proposta não superior a 5% (Lei 14.133/2021). NÃO cite Lei 8.666. Especifique prazos de devolução e exigência.\n"
+
+    # Forma de Pagamento
+    if "pagamento" in key or "forma_pagamento" in key:
+        if for_list:
+            return "\nINSTRUÇÕES ESPECÍFICAS: Liste condições de pagamento (parcelas, datas, documentos). Use valores ou percentuais plausíveis, nunca placeholders.\n"
+        return "\nINSTRUÇÕES ESPECÍFICAS: Descreva forma e condições de pagamento. Use prazos concretos (ex.: \"30 dias após a entrega\"). NÃO use [prazo] ou [valor].\n"
+
+    # Objeto
+    if key == "objeto" or key.startswith("objeto_"):
+        if for_list:
+            return "\nINSTRUÇÕES ESPECÍFICAS: Liste as partes ou modalidades do objeto. Seja específico ao contexto (serviços, bens).\n"
+        return "\nINSTRUÇÕES ESPECÍFICAS: Defina o objeto da contratação com clareza. Inclua escopo, alcance e excludentes. Adapte ao contexto informado.\n"
+
+    # Necessidade
+    if "necessidade" in key:
+        if for_list:
+            return "\nINSTRUÇÕES ESPECÍFICAS: Liste motivos da necessidade (legal, operacional, técnico). Evite repetir frases de outras seções.\n"
+        return "\nINSTRUÇÕES ESPECÍFICAS: Fundamente a necessidade da contratação. Evite fórmulas genéricas; adapte ao objeto e ao órgão.\n"
+
+    # Gestão e Fiscalização
+    if "gestao" in key or "fiscalizacao" in key or "acompanhamento" in key:
+        if for_list:
+            return "\nINSTRUÇÕES ESPECÍFICAS: Liste etapas, responsáveis ou ações de gestão/fiscalização. Diferencie responsabilidade da Administração da da contratada.\n"
+        return "\nINSTRUÇÕES ESPECÍFICAS: Descreva competências de gestão e fiscalização. Diferencie o papel da Administração (fiscalizar) do da contratada (executar).\n"
+
+    # Conformidade com Legislação
+    if "conformidade" in key or "legislacao" in key or "legislação" in key:
+        if for_list:
+            return "\nINSTRUÇÕES ESPECÍFICAS: Liste leis e normas aplicáveis. Priorize Lei 14.133/2021. NÃO cite Lei 8.666/1993.\n"
+        return "\nINSTRUÇÕES ESPECÍFICAS: Indique conformidade com Lei 14.133/2021 e normas aplicáveis. NÃO cite Lei 8.666/1993 (revogada).\n"
+
+    return ""
 
 
 def _format_especificacoes(especificacoes: Dict[str, Any] | None) -> str:
@@ -246,6 +381,7 @@ async def _generate_clause_text(
 ) -> str:
     """Gera texto da cláusula via LLM usando contexto RAG, seção e especificacoes."""
     espec_text = _format_especificacoes(especificacoes)
+    section_hint = _get_section_specific_instructions(section_key, for_list=False)
     query = f"""Gerar o texto COMPLETO da cláusula "{section_title}" (section_key: {section_key}).
 
 Contexto do documento:
@@ -253,11 +389,11 @@ Contexto do documento:
 - Objeto: {context.get("objeto", "não informado")}
 - Órgão: {context.get("orgao", "não informado")}
 - Modalidade: {context.get("modalidade", "não informado")}
-
+{section_hint}
 {espec_text}EXEMPLOS DE CLÁUSULAS SIMILARES (extraídos de documentos reais):
 {rag_context}
 
-Instruções: Gere o CONTEÚDO da cláusula diretamente, sem meta-comentário ("A cláusula deve...", "section_key", títulos). Sempre em português brasileiro com acentuação correta. Adapte ao contexto (objeto, órgão) mantendo a estrutura jurídica dos exemplos. Use listas em prosa quando fizer sentido; tabelas são renderizadas em seções separadas. Nunca use markdown (** * ## ---). Não seja verboso; seja preciso e completo."""
+Instruções: Gere o CONTEÚDO da cláusula diretamente, sem meta-comentário ("A cláusula deve...", "section_key", títulos). Sempre em português brasileiro com acentuação correta. Adapte ao contexto (objeto, órgão) mantendo a estrutura jurídica dos exemplos. Use listas em prosa quando fizer sentido; tabelas são renderizadas em seções separadas. Nunca use markdown (** * ## ---). Não seja verboso; seja preciso e completo. NUNCA use placeholders como [preencher] ou [prazo]. Cite apenas a Lei 14.133/2021 (não a Lei 8.666). Não repita frases de outras seções."""
 
     full_prompt = f"<<SYSTEM>>\n{CLAUSE_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{query}"
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
@@ -280,6 +416,67 @@ Instruções: Gere o CONTEÚDO da cláusula diretamente, sem meta-comentário ("
     return _postprocess_clause_text(raw)
 
 
+def _postprocess_list_text(text: str) -> str:
+    """Garante que a saída seja uma linha por item, sem numeração/marcadores no início."""
+    import re
+    if not text or not isinstance(text, str):
+        return text
+    # Leis 8.666 e 8.333 → 14.133
+    text = re.sub(r"Lei\s*(?:n[º°]?|n\.?\s*[º°]?)?\s*8\.666/1993", "Lei 14.133/2021", text, flags=re.IGNORECASE)
+    text = re.sub(r"Lei\s*8\.666", "Lei 14.133/2021", text, flags=re.IGNORECASE)
+    text = re.sub(r"Lei\s*(?:n[º°]?|n\.?\s*[º°]?)?\s*8\.333/1991", "Lei 14.133/2021", text, flags=re.IGNORECASE)
+    text = re.sub(r"Lei\s*8\.333", "Lei 14.133/2021", text, flags=re.IGNORECASE)
+    lines = [ln.strip() for ln in text.strip().split("\n") if ln.strip()]
+    cleaned = []
+    for ln in lines:
+        # Remove numeração inicial (1. 2. 3. ou 1) 2) etc.) e marcadores (- * •)
+        ln = re.sub(r"^\s*[\d]+[\.\)]\s*", "", ln)
+        ln = re.sub(r"^\s*[\-\*•]\s+", "", ln)
+        if ln:
+            cleaned.append(ln)
+    return "\n".join(cleaned)
+
+
+async def _generate_list_content(
+    section_key: str,
+    section_title: str,
+    context: Dict[str, Any],
+    rag_context: str,
+    document_type: str,
+    especificacoes: Dict[str, Any] | None = None,
+) -> str:
+    """Gera itens de lista via LLM para seções content_type=list."""
+    espec_text = _format_especificacoes(especificacoes)
+    section_hint = _get_section_specific_instructions(section_key, for_list=True)
+    query = f"""Gerar os itens da lista para a seção "{section_title}" (section_key: {section_key}).
+
+Contexto: {document_type}. Objeto: {context.get("objeto", "não informado")}. Órgão: {context.get("orgao", "não informado")}.
+{section_hint}
+{espec_text}Exemplos de itens similares (referência):
+{rag_context}
+
+Retorne cada item em uma linha separada. Sem numeração, sem marcadores (- * •). Apenas o texto de cada item. NUNCA use placeholders. Cite apenas Lei 14.133/2021 (não 8.666)."""
+
+    full_prompt = f"<<SYSTEM>>\n{LIST_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{query}"
+    url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
+    payload = {"prompt": full_prompt, "stream": False}
+
+    async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
+        resp = await client.post(url, json=payload)
+        resp.raise_for_status()
+        body = resp.json()
+
+    if isinstance(body, dict) and body.get("detail"):
+        detail = str(body["detail"]).strip()
+        if any(kw in detail.lower() for kw in ("falha", "erro", "timeout", "error", "verifique")):
+            raise ValueError(f"Orquestração retornou erro: {detail}")
+
+    data = body.get("data", body) if isinstance(body, dict) else {}
+    text = data.get("response", data.get("text", ""))
+    raw = (text or "").strip()
+    return _postprocess_list_text(raw)
+
+
 def _collect_text_sections(nodes: List[Dict], acc: List[Dict]) -> None:
     """Coleta seções com content_type=text (incluindo subseções)."""
     for node in nodes:
@@ -287,6 +484,15 @@ def _collect_text_sections(nodes: List[Dict], acc: List[Dict]) -> None:
             acc.append({"key": node["key"], "title": node.get("title", node["key"])})
         if node.get("children"):
             _collect_text_sections(node["children"], acc)
+
+
+def _collect_list_sections(nodes: List[Dict], acc: List[Dict]) -> None:
+    """Coleta seções com content_type=list (incluindo subseções)."""
+    for node in nodes:
+        if node.get("content_type") == "list":
+            acc.append({"key": node["key"], "title": node.get("title", node["key"])})
+        if node.get("children"):
+            _collect_list_sections(node["children"], acc)
 
 
 def _collect_table_sections(nodes: List[Dict], acc: List[Dict]) -> None:
@@ -444,7 +650,37 @@ async def generate_full_document(
         )
         if not rag_context:
             rag_context = "(Nenhum exemplo encontrado no RAG. Gere uma cláusula genérica mas completa e robusta.)"
+        rag_context = _sanitize_rag_context_for_legislation(rag_context)
         text = await _generate_clause_text(
+            section_key=key,
+            section_title=title,
+            context=ctx,
+            rag_context=rag_context,
+            document_type=document_type,
+            especificacoes=especificacoes,
+        )
+        section_texts[key] = text
+
+    # Seções content_type=list: gerar itens via LLM
+    list_sections: List[Dict[str, str]] = []
+    _collect_list_sections(root, list_sections)
+    for sec in list_sections:
+        key = sec["key"]
+        title = sec["title"]
+        query = f"{ctx.get('objeto', '')} {title} {key} obrigações critérios itens"
+        docs = retrieve(
+            query=query,
+            collection_name=coll,
+            top_k=top_k_per_section,
+            where={"document_type": doc_type_filter},
+        )
+        if not docs:
+            docs = retrieve(query=query, collection_name=coll, top_k=top_k_per_section)
+        rag_context = "\n\n---\n\n".join((d.get("content", "") or "")[:600] for d in docs)
+        if not rag_context:
+            rag_context = "(Nenhum exemplo encontrado. Gere itens genéricos mas pertinentes à seção.)"
+        rag_context = _sanitize_rag_context_for_legislation(rag_context)
+        text = await _generate_list_content(
             section_key=key,
             section_title=title,
             context=ctx,
@@ -482,6 +718,7 @@ async def generate_full_document(
             where={"document_type": doc_type_filter},
         )
         rag_ctx = "\n\n---\n\n".join((d.get("content", "") or "")[:500] for d in docs)
+        rag_ctx = _sanitize_rag_context_for_legislation(rag_ctx)
         rows = await _generate_table_rows(
             section_key=key,
             section_title=sec.get("title", key),

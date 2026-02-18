@@ -49,6 +49,10 @@ class GenerateDocumentRequest(BaseModel):
     user_prompt: str = Field(..., description="Pedido livre (ex.: gerar ETP para coleta seletiva)")
     collection: Optional[str] = Field(None, description="Coleção RAG.")
     top_k_per_section: int = Field(5, description="Exemplos por seção para composição.")
+    context: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Contexto do usuário (usuario: {nome_completo, secretaria, prefeitura, orgao}, template_id, document_type_hint).",
+    )
 
     @field_validator("user_prompt")
     @classmethod
@@ -206,6 +210,7 @@ async def endpoint_generate_document(
             user_prompt=body.user_prompt,
             collection_name=body.collection,
             top_k_per_section=body.top_k_per_section,
+            context_override=body.context,
         )
         out = {"ok": True, **result}
 

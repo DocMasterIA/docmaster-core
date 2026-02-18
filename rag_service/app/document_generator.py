@@ -214,6 +214,8 @@ def _postprocess_clause_text(text: str) -> str:
     t = re.sub(r"art\.?\s*(\d+)\s*[oO](?=\s|$|\.|,)", r"art. \1º", t)
     # Converte § 1º em início de linha (enumeração indevida) → 1. (§ só em citação de lei)
     t = re.sub(r"^\s*§\s*(\d+)\s*º\s+", r"\1. ", t, flags=re.MULTILINE)
+    # Converte 1ª, 2ª, 3ª em enumeração → 1., 2., 3.
+    t = re.sub(r"(\d+)\s*ª\s+", r"\1. ", t)
     # Remove "Art. 123. " no início de parágrafo (ETP/estudo não usa numeração de artigos)
     t = re.sub(r"^(Art\.?\s*\d+\.\s+)", "", t, flags=re.MULTILINE)
     # Substitui "presente artigo" por "nesta seção" (estudo/ETP não usa numeração de artigos)
@@ -301,6 +303,9 @@ def _postprocess_clause_text(text: str) -> str:
         r"^A contratação posterior de item específico constante de grupo",
         r"^O descumprimento das determinações constantes no presente artigo",
         r"^É vedada a aplicação combinada desta Lei",
+        r"^A Administração poderá exigir a comprovação do recolhimento de quantia a título de garantia de proposta",
+        r"^A garantia de proposta será devolvida aos licitantes",
+        r"^Constará do edital de licitação cláusula que exija dos licitantes",
     )
     paras = re.split(r"\n\s*\n", t)
     kept = []
@@ -427,12 +432,14 @@ def _get_etp_preamble() -> str:
     return (
         "\n\n=== DOCUMENTO ETP (ESTUDO TÉCNICO PRELIMINAR) ===\n"
         "O ETP é um estudo interno da Administração, NÃO um contrato. Regras específicas:\n"
-        "- NUNCA use \"Art. X.\" no início de parágrafos – ETP não tem numeração de artigos.\n"
-        "- NUNCA use \"presente artigo\" ou \"neste artigo\" – use \"nesta seção\" ou \"neste documento\".\n"
-        "- NUNCA transcreva parágrafos literais de lei (ex.: \"O contrato será regido...\", \"As hipóteses de cancelamento...\"). Use como referência e redija em prosa.\n"
-        "- NUNCA inclua linhas de tabela (Item – Quantidade – Valor – Total) em prosa – tabelas ficam em seção própria.\n"
-        "- NUNCA repita frases ou parágrafos – cada um deve ser único.\n"
-        "- Adapte o conteúdo ao objeto específico; evite texto genérico.\n"
+        "- PRIORIDADE: Use o objeto informado no prompt/contexto. Se o usuário pediu \"limpeza urbana\", NÃO misture com \"coleta seletiva\" ou outros objetos dos exemplos do RAG.\n"
+        "- OBJETO: Defina o que será CONTRATADO (serviços, bens). NUNCA descreva \"o que o ETP deve incluir\" – descreva o escopo da contratação.\n"
+        "- SOLUÇÃO: Descreva solução técnica/operacional. NUNCA transcreva trechos de lei (garantia de proposta, cláusulas do edital).\n"
+        "- NUNCA use \"Art. X.\" no início de parágrafos.\n"
+        "- NUNCA use \"presente artigo\" ou \"neste artigo\" – use \"nesta seção\".\n"
+        "- NUNCA transcreva parágrafos literais de lei.\n"
+        "- NUNCA inclua linhas de tabela em prosa – use \"conforme tabela na seção correspondente\".\n"
+        "- NUNCA repita frases ou parágrafos.\n"
     )
 
 
@@ -477,15 +484,15 @@ def _get_section_specific_instructions(
     if "conclus" in key and is_etp:
         return "\nINSTRUÇÕES ETP: Conclusão em prosa. NUNCA use \"Art. X.\" no início. NUNCA use \"presente artigo\". Use \"nesta seção\" ou \"neste documento\". Não repita parágrafos.\n"
 
-    # ETP: Objeto – sem tabela inline
+    # ETP: Objeto – escopo do CONTRATO, não estrutura do ETP
     if (key == "objeto" or key.startswith("objeto_")) and is_etp:
         if for_list:
-            return "\nINSTRUÇÕES ETP: Liste partes do objeto. NUNCA inclua linhas de tabela. Sem tabelas inline.\n"
-        return "\nINSTRUÇÕES ETP: Defina o objeto com clareza. NUNCA inclua linhas de tabela (Item – Quantidade – Valor) em prosa. Para estimativa de custos, diga apenas \"conforme tabela na seção correspondente\". Adapte ao contexto.\n"
+            return "\nINSTRUÇÕES ETP: Liste partes do OBJETO DA CONTRATAÇÃO (o que será contratado). NUNCA descreva o que o ETP deve conter – defina os serviços/bens a serem contratados. NUNCA inclua linhas de tabela.\n"
+        return "\nINSTRUÇÕES ETP: Defina o OBJETO DA CONTRATAÇÃO (o que será contratado – serviços, bens, escopo). NUNCA descreva \"o que o ETP deve incluir\" ou \"aspectos do estudo\". O objeto é o escopo da contratação futura. Inclua alcance e excludentes. Priorize o objeto informado no prompt (ex.: limpeza urbana ≠ coleta seletiva). Sem tabelas inline.\n"
 
-    # ETP: Solução proposta – sem tabela inline
+    # ETP: Solução proposta – técnica/operacional, sem transcrição de lei
     if "soluc" in key and is_etp:
-        return "\nINSTRUÇÕES ETP: Descreva a solução proposta. NUNCA inclua linhas de tabela de custos em prosa – use \"conforme tabela na seção correspondente\". Não repita.\n"
+        return "\nINSTRUÇÕES ETP: Descreva a solução TÉCNICA/OPERACIONAL (como o serviço será prestado, requisitos técnicos, modalidade). NUNCA transcreva trechos de lei (garantia de proposta, cláusula do edital, critérios de desempate detalhados). NUNCA inclua linhas de tabela de custos – use \"conforme tabela na seção correspondente\". Não repita.\n"
 
     # ETP: Conformidade – sem lista de colunas
     if ("conformidade" in key or "legislacao" in key or "legislação" in key) and is_etp:
@@ -493,7 +500,7 @@ def _get_section_specific_instructions(
 
     # ETP: Riscos / Análise de riscos
     if "risco" in key and is_etp:
-        return "\nINSTRUÇÕES ETP: Descreva alocação de riscos de forma objetiva. Diferencie responsabilidades da Administração e do contratado. Não repita. Não transcreva trechos de lei.\n"
+        return "\nINSTRUÇÕES ETP: Descreva alocação de riscos de forma objetiva. Use enumeração 1., 2., 3. ou a), b), c) – NUNCA use 1ª, 2ª, 3ª. Diferencie responsabilidades da Administração e do contratado. Não repita. Não transcreva trechos de lei.\n"
 
     # Alternativas Analisadas (ETP): ETP NÃO apresenta alternativas À CONTRATADA
     if "alternativa" in key and ("etp" in doc_type or "estudo" in doc_type):
@@ -503,7 +510,7 @@ def _get_section_specific_instructions(
             "- Se houver esta seção, descreva brevemente as alternativas que a ADMINISTRAÇÃO analisou ao elaborar o estudo (para fins de documentação), indicando qual foi adotada e por quê. Ex.: diferentes modalidades de prestação que a Administração considerou (cooperativa, empresa privada etc.) e a escolha final.\n"
             "- NUNCA liste equipamentos (caminhão, contêineres, EPI) como \"alternativas\" – são parte do objeto/solução, não alternativas.\n"
             "- NUNCA use estrutura \"Alternativa 1\", \"Alternativa 2\" como subseções – não é utilizada em ETPs.\n"
-            "- FORMATO: Use SEMPRE texto corrido ou enumeração explícita (1., 2., 3. ou a), b), c)). NUNCA use listas soltas de termos (uma palavra ou item por linha sem numeração, ex.: Caminhão\\nContêineres\\nEPI). NUNCA use § 1º, § 2º em enumeração (só em citação de lei).\n"
+            "- FORMATO: Use SEMPRE texto corrido ou enumeração explícita (1., 2., 3. ou a), b), c)). NUNCA use listas soltas (um item por linha sem 1., 2. ou a), b) – ex.: O modelo X\\nA contratação Y). Redija \"1. O modelo... 2. A contratação...\" ou texto corrido. NUNCA use 1ª, 2ª em enumeração – use 1., 2. NUNCA use § 1º, § 2º (só em citação de lei).\n"
         )
 
     # Obrigações da Contratada (empresa que executa)
@@ -554,17 +561,17 @@ def _get_section_specific_instructions(
             return "\nINSTRUÇÕES ESPECÍFICAS: Liste condições de pagamento (parcelas, datas, documentos). Use valores ou percentuais plausíveis, nunca placeholders.\n"
         return "\nINSTRUÇÕES ESPECÍFICAS: Descreva forma e condições de pagamento. Use prazos concretos (ex.: \"30 dias após a entrega\"). NÃO use [prazo] ou [valor].\n"
 
-    # Objeto
+    # Objeto (fallback quando não ETP)
     if key == "objeto" or key.startswith("objeto_"):
         if for_list:
-            return "\nINSTRUÇÕES ESPECÍFICAS: Liste as partes ou modalidades do objeto. Seja específico ao contexto (serviços, bens).\n"
-        return "\nINSTRUÇÕES ESPECÍFICAS: Defina o objeto da contratação com clareza. Inclua escopo, alcance e excludentes. Adapte ao contexto informado.\n"
+            return "\nINSTRUÇÕES ESPECÍFICAS: Liste as partes ou modalidades do OBJETO DA CONTRATAÇÃO (o que será contratado). Seja específico ao contexto (serviços, bens).\n"
+        return "\nINSTRUÇÕES ESPECÍFICAS: Defina o OBJETO DA CONTRATAÇÃO (o que será contratado – escopo, serviços, bens). NUNCA descreva \"o que o documento deve incluir\". Inclua alcance e excludentes. Priorize o objeto informado no prompt.\n"
 
     # Necessidade
     if "necessidade" in key:
         if for_list:
-            return "\nINSTRUÇÕES ESPECÍFICAS: Liste motivos da necessidade (legal, operacional, técnico). Evite repetir frases de outras seções.\n"
-        return "\nINSTRUÇÕES ESPECÍFICAS: Fundamente a necessidade da contratação. Evite fórmulas genéricas; adapte ao objeto e ao órgão.\n"
+            return "\nINSTRUÇÕES ESPECÍFICAS: Liste motivos da necessidade. Priorize o objeto do prompt (ex.: se for limpeza urbana, não misture com coleta seletiva). Evite repetir frases.\n"
+        return "\nINSTRUÇÕES ESPECÍFICAS: Fundamente a necessidade da contratação. PRIORIDADE: adapte ao objeto informado no prompt – se o usuário pediu limpeza urbana, não use exemplos de coleta seletiva. Evite fórmulas genéricas.\n"
 
     # Gestão e Fiscalização
     if "gestao" in key or "fiscalizacao" in key or "acompanhamento" in key:
@@ -579,6 +586,23 @@ def _get_section_specific_instructions(
         return "\nINSTRUÇÕES ESPECÍFICAS: Indique conformidade com Lei 14.133/2021 e normas aplicáveis. NÃO cite Lei 8.666/1993 (revogada).\n"
 
     return ""
+
+
+def _format_user_context(context: Dict[str, Any]) -> str:
+    """Formata contexto do usuário (Django) para inclusão no prompt."""
+    usuario = context.get("usuario") if isinstance(context, dict) else None
+    if not usuario or not isinstance(usuario, dict):
+        return ""
+    parts: List[str] = []
+    if usuario.get("nome_completo"):
+        parts.append(f"- Solicitante: {usuario['nome_completo']}")
+    if usuario.get("secretaria"):
+        parts.append(f"- Secretaria/Gabinete: {usuario['secretaria']}")
+    if usuario.get("prefeitura") and not context.get("orgao"):
+        parts.append(f"- Prefeitura: {usuario['prefeitura']}")
+    if not parts:
+        return ""
+    return "Contexto do solicitante:\n" + "\n".join(parts) + "\n\n"
 
 
 def _format_especificacoes(especificacoes: Dict[str, Any] | None) -> str:
@@ -613,6 +637,7 @@ async def _generate_clause_text(
     section_hint = _get_section_specific_instructions(section_key, for_list=False, document_type=document_type)
     doc_type_lower = (document_type or "").lower()
     etp_preamble = _get_etp_preamble() if ("etp" in doc_type_lower or "estudo" in doc_type_lower) else ""
+    user_ctx = _format_user_context(context)
     query = f"""Gerar o texto COMPLETO da cláusula "{section_title}" (section_key: {section_key}).
 {etp_preamble}
 Contexto do documento:
@@ -620,7 +645,7 @@ Contexto do documento:
 - Objeto: {context.get("objeto", "não informado")}
 - Órgão: {context.get("orgao", "não informado")}
 - Modalidade: {context.get("modalidade", "não informado")}
-{section_hint}
+{user_ctx}{section_hint}
 {espec_text}EXEMPLOS DE CLÁUSULAS SIMILARES (extraídos de documentos reais):
 {rag_context}
 
@@ -706,9 +731,11 @@ async def _generate_list_content(
     """Gera itens de lista via LLM para seções content_type=list."""
     espec_text = _format_especificacoes(especificacoes)
     section_hint = _get_section_specific_instructions(section_key, for_list=True, document_type=document_type)
+    user_ctx = _format_user_context(context)
     query = f"""Gerar os itens da lista para a seção "{section_title}" (section_key: {section_key}).
 
 Contexto: {document_type}. Objeto: {context.get("objeto", "não informado")}. Órgão: {context.get("orgao", "não informado")}.
+{user_ctx}
 {section_hint}
 {espec_text}Exemplos de itens similares (referência):
 {rag_context}
@@ -848,6 +875,7 @@ async def generate_full_document(
     user_prompt: str,
     collection_name: Optional[str] = None,
     top_k_per_section: int = 5,
+    context_override: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Gera documento completo: estrutura + textos de cláusulas.
@@ -871,12 +899,27 @@ async def generate_full_document(
     document_type = doc_structure.get("document_type", "termo_referencia")
     doc_type_filter = _document_type_to_rag_filter(document_type)
     # Context e especificacoes vêm do llm_agent (retornado em structure-from-prompt)
-    ctx = resp.get("context") or {}
+    ctx = dict(resp.get("context") or {}) if isinstance(resp.get("context"), dict) else {}
     especificacoes = resp.get("especificacoes")
-    if not isinstance(ctx, dict):
-        ctx = {}
     if not ctx.get("objeto"):
         ctx["objeto"] = user_prompt[:400].strip() or "Documento solicitado"
+
+    # Merge context_override (Django: usuario, template_id, etc.)
+    if context_override and isinstance(context_override, dict):
+        usuario = context_override.get("usuario")
+        if isinstance(usuario, dict):
+            ctx["usuario"] = usuario
+            if usuario.get("orgao"):
+                ctx["orgao"] = usuario["orgao"]
+            elif usuario.get("prefeitura"):
+                ctx["orgao"] = f"Prefeitura Municipal de {usuario['prefeitura']}"
+        if context_override.get("template_id") is not None:
+            ctx["template_id"] = context_override["template_id"]
+        if context_override.get("document_type_hint"):
+            doc_type_hint = (context_override["document_type_hint"] or "").strip().lower()
+            if doc_type_hint:
+                document_type = doc_type_hint
+                doc_type_filter = _document_type_to_rag_filter(document_type)
 
     # Coleta seções que precisam de texto
     text_sections: List[Dict[str, str]] = []

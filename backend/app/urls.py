@@ -10,6 +10,7 @@ from .api import (
     api_me_documents,
     api_auth_login,
     api_auth_logout,
+    gerar_via_llm_api,
 )
 from .llm_proxy import llm_proxy
 from .ajax import area_do_usuario_ajax
@@ -31,6 +32,7 @@ urlpatterns = [
     path('api/documentos_modelos/enviar', upload_template_and_request_mapping_api, name="documentos_modelos-enviar_api"),
     path("api/documentos_modelos/", get_template_list_api, name="documentos_modelos-get_api"),
     path("api/documentos_modelos/gerar", generate_document_with_values_api, name="documentos_modelos-gerar_api"),
+    path("api/documentos/gerar-via-llm", gerar_via_llm_api, name="documentos_gerar_via_llm_api"),
     path("api/documentos_modelos/lista_10", template_list_api, name="documentos_modelos-lista_10_api"),
     path('api/documentos_modelos/<uuid:template_id>/pdf/', template_preview_pdf_api, name='documentos_modelos-previsualizar'),
     path('api/me/', api_me, name='api_me'),

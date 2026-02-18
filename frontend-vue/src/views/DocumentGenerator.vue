@@ -25,17 +25,29 @@
                 <label class="gov-label">Documento Base</label>
                 <div class="doc-gen__source-tabs">
                   <label class="doc-gen__tab">
-                    <input v-model="useOwnFile" type="radio" :value="false" @change="onSourceChange(false)" />
+                    <input v-model="sourceMode" type="radio" value="template" @change="onSourceChange('template')" />
                     <span>Template da biblioteca</span>
                   </label>
                   <label class="doc-gen__tab">
-                    <input v-model="useOwnFile" type="radio" :value="true" @change="onSourceChange(true)" />
+                    <input v-model="sourceMode" type="radio" value="file" @change="onSourceChange('file')" />
                     <span>Enviar meu .docx</span>
+                  </label>
+                  <label class="doc-gen__tab">
+                    <input v-model="sourceMode" type="radio" value="llm" @change="onSourceChange('llm')" />
+                    <span>Criar do zero (ETP, DFD, TR)</span>
                   </label>
                 </div>
 
+                <!-- Criar do zero com IA (LLM) -->
+                <div v-show="sourceMode === 'llm'" class="doc-gen__llm-hint">
+                  <p class="gov-text-soft">
+                    <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                    A IA gera o documento completo a partir do seu prompt (ETP, DFD, Termo de Referência). Use o contexto do seu órgão e secretaria.
+                  </p>
+                </div>
+
                 <!-- Template da biblioteca -->
-                <div v-show="!useOwnFile" class="doc-gen__search-wrap">
+                <div v-show="sourceMode === 'template'" class="doc-gen__search-wrap">
                   <input
                     id="template-search"
                     v-model="searchQuery"
@@ -73,7 +85,7 @@
                 </div>
 
                 <!-- Enviar meu .docx -->
-                <div v-show="useOwnFile" class="doc-gen__upload-own">
+                <div v-show="sourceMode === 'file'" class="doc-gen__upload-own">
                   <input
                     ref="docxFileInput"
                     type="file"
@@ -117,7 +129,7 @@
                   name="ia_prompt"
                   class="gov-textarea"
                   rows="6"
-                  placeholder="Digite aqui o prompt que será enviado para a IA contextual inteligente..."
+                  :placeholder="sourceMode === 'llm' ? 'Ex: Gerar ETP para coleta seletiva de resíduos em 3 bairros' : 'Digite aqui o prompt que será enviado para a IA contextual inteligente...'"
                   required
                 />
                 <p class="gov-text-soft gov-mt-sm">
@@ -182,7 +194,10 @@
             <h3 class="doc-gen__preview-heading">{{ previewHeading }}</h3>
             <p class="gov-text-soft">{{ previewSub }}</p>
             <div class="doc-gen__preview-excerpt">
-              <template v-if="useOwnFile && selectedDocxFile">
+              <template v-if="sourceMode === 'llm'">
+                <p class="gov-text-soft">O documento será criado inteiramente pela IA com base no seu prompt. Sem necessidade de template prévio.</p>
+              </template>
+              <template v-else-if="sourceMode === 'file' && selectedDocxFile">
                 <p class="gov-text-soft">Documento enviado: <strong>{{ selectedDocxFile.name }}</strong></p>
                 <p class="gov-text-soft gov-text-sm">Pré-visualização em PDF não disponível para arquivo enviado. Gere o documento para baixar.</p>
               </template>
@@ -191,12 +206,12 @@
                 <img :src="previewImageUrl" alt="Preview" class="doc-gen__preview-img" />
               </template>
               <template v-else>
-                <p class="gov-text-soft">Nenhum documento base selecionado. Escolha um template ou envie um arquivo .docx.</p>
+                <p class="gov-text-soft">Nenhum documento base selecionado. Escolha um template, envie um .docx ou use "Criar do zero".</p>
               </template>
             </div>
             <div class="doc-gen__preview-actions">
               <button
-                v-if="selectedTemplate?.id && !useOwnFile"
+                v-if="selectedTemplate?.id && sourceMode === 'template'"
                 type="button"
                 class="gov-btn gov-btn--primary gov-btn--sm"
                 @click="openPdfModal"
@@ -289,16 +304,20 @@ const pdfPage = ref(1);
 const pdfTotalPages = ref(0);
 const pdfGotoPage = ref(1);
 
-const hasDocumentBase = computed(() =>
-  useOwnFile.value ? !!selectedDocxFile.value : !!selectedTemplate.value?.id
-);
+const hasDocumentBase = computed(() => {
+  if (sourceMode.value === 'llm') return true;
+  if (sourceMode.value === 'file') return !!selectedDocxFile.value;
+  return !!selectedTemplate.value?.id;
+});
 
 const previewHeading = computed(() => {
-  if (useOwnFile.value && selectedDocxFile.value) return selectedDocxFile.value.name;
+  if (sourceMode.value === 'llm') return 'Gerar do zero com IA';
+  if (sourceMode.value === 'file' && selectedDocxFile.value) return selectedDocxFile.value.name;
   return selectedTemplate.value?.name || 'Modelo de Documento';
 });
 const previewSub = computed(() => {
-  if (useOwnFile.value && selectedDocxFile.value) return 'Documento enviado — use o prompt e gere para baixar.';
+  if (sourceMode.value === 'llm') return 'ETP, DFD ou Termo de Referência gerado via LLM com base no seu prompt.';
+  if (sourceMode.value === 'file' && selectedDocxFile.value) return 'Documento enviado — use o prompt e gere para baixar.';
   return selectedTemplate.value ? `Modelo de Documento - ${selectedTemplate.value.name}` : 'Selecione um template ou envie um .docx.';
 });
 const previewImageUrl = computed(() => {
@@ -370,12 +389,13 @@ function clickOutside(e) {
   }
 }
 
-function onSourceChange(ownFile) {
-  if (ownFile) {
+function onSourceChange(mode) {
+  if (mode === 'llm' || mode === 'file') {
     selectedTemplate.value = null;
     searchQuery.value = '';
     showTemplateDropdown.value = false;
-  } else {
+  }
+  if (mode === 'template' || mode === 'llm') {
     selectedDocxFile.value = null;
     if (docxFileInput.value) docxFileInput.value.value = '';
   }
@@ -411,59 +431,106 @@ async function onSubmit() {
   documentPdfUrl.value = '';
   generateError.value = '';
 
-  let templateId = selectedTemplate.value?.id;
-
   try {
-    if (useOwnFile.value && selectedDocxFile.value) {
-      const formData = new FormData();
-      formData.append('template_file', selectedDocxFile.value);
-      formData.append('name', selectedDocxFile.value.name.replace(/\.docx$/i, ''));
-      const resUpload = await fetch(`${API_BASE}/api/documentos_modelos/enviar`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
-      const dataUpload = await resUpload.json().catch(() => ({}));
-      if (!resUpload.ok || !dataUpload.template_id) {
-        generateError.value = dataUpload.error || `Erro ao enviar arquivo (${resUpload.status})`;
-        return;
-      }
-      templateId = dataUpload.template_id;
-    }
-
-    const payload = { template_id: templateId, values: { prompt: iaPrompt.value.trim() } };
-    const opts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(payload) };
-
-    const resDocx = await fetch(`${API_BASE}/api/documentos_modelos/gerar`, {
-      ...opts,
-      body: JSON.stringify({ ...payload, output: 'docx' }),
-    });
-    if (!resDocx.ok) {
-      const err = await resDocx.json().catch(() => ({}));
-      generateError.value = err.error || `Erro ${resDocx.status}`;
+    if (sourceMode.value === 'llm') {
+      await submitViaLLM();
       return;
     }
-    const resPdf = await fetch(`${API_BASE}/api/documentos_modelos/gerar`, {
-      ...opts,
-      body: JSON.stringify({ ...payload, output: 'pdf' }),
-    });
-    if (!resPdf.ok) {
-      const err = await resPdf.json().catch(() => ({}));
-      generateError.value = err.error || `Erro ${resPdf.status}`;
-      return;
-    }
-
-    const blobDocx = await resDocx.blob();
-    const blobPdf = await resPdf.blob();
-    documentDocxUrl.value = URL.createObjectURL(blobDocx);
-    documentPdfUrl.value = URL.createObjectURL(blobPdf);
-    documentReady.value = true;
-    successMessage.value = 'Seu documento foi processado e está pronto para download.';
+    await submitViaTemplate();
   } catch (e) {
     generateError.value = e.message || 'Erro ao gerar documento';
   } finally {
     isSubmitting.value = false;
   }
+}
+
+async function submitViaLLM() {
+  const payload = {
+    user_prompt: iaPrompt.value.trim(),
+    output: 'docx',
+  };
+  if (selectedTemplate.value?.id) payload.template_id = selectedTemplate.value.id;
+
+  const res = await fetch(`${API_BASE}/api/documentos/gerar-via-llm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  });
+
+  const contentType = res.headers.get('content-type') || '';
+  if (!res.ok) {
+    const err = contentType.includes('json')
+      ? await res.json().catch(() => ({}))
+      : {};
+    generateError.value = err.error || err.detail || `Erro ${res.status}`;
+    return;
+  }
+
+  if (contentType.includes('application/vnd.openxmlformats') || contentType.includes('octet-stream')) {
+    const blob = await res.blob();
+    documentDocxUrl.value = URL.createObjectURL(blob);
+    documentPdfUrl.value = '';
+    documentReady.value = true;
+    successMessage.value = 'Documento gerado pela IA. Baixe o DOCX abaixo.';
+  } else {
+    const data = await res.json().catch(() => ({}));
+    if (data.ok && data.docx_path) {
+      generateError.value = 'Resposta inesperada: DOCX não retornado. Tente novamente.';
+    } else {
+      generateError.value = data.error || data.detail || 'Erro na geração';
+    }
+  }
+}
+
+async function submitViaTemplate() {
+  let templateId = selectedTemplate.value?.id;
+
+  if (sourceMode.value === 'file' && selectedDocxFile.value) {
+    const formData = new FormData();
+    formData.append('template_file', selectedDocxFile.value);
+    formData.append('name', selectedDocxFile.value.name.replace(/\.docx$/i, ''));
+    const resUpload = await fetch(`${API_BASE}/api/documentos_modelos/enviar`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+    const dataUpload = await resUpload.json().catch(() => ({}));
+    if (!resUpload.ok || !dataUpload.template_id) {
+      generateError.value = dataUpload.error || `Erro ao enviar arquivo (${resUpload.status})`;
+      return;
+    }
+    templateId = dataUpload.template_id;
+  }
+
+  const payload = { template_id: templateId, values: { prompt: iaPrompt.value.trim() } };
+  const opts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include' };
+
+  const resDocx = await fetch(`${API_BASE}/api/documentos_modelos/gerar`, {
+    ...opts,
+    body: JSON.stringify({ ...payload, output: 'docx' }),
+  });
+  if (!resDocx.ok) {
+    const err = await resDocx.json().catch(() => ({}));
+    generateError.value = err.error || `Erro ${resDocx.status}`;
+    return;
+  }
+  const resPdf = await fetch(`${API_BASE}/api/documentos_modelos/gerar`, {
+    ...opts,
+    body: JSON.stringify({ ...payload, output: 'pdf' }),
+  });
+  if (!resPdf.ok) {
+    const err = await resPdf.json().catch(() => ({}));
+    generateError.value = err.error || `Erro ${resPdf.status}`;
+    return;
+  }
+
+  const blobDocx = await resDocx.blob();
+  const blobPdf = await resPdf.blob();
+  documentDocxUrl.value = URL.createObjectURL(blobDocx);
+  documentPdfUrl.value = URL.createObjectURL(blobPdf);
+  documentReady.value = true;
+  successMessage.value = 'Seu documento foi processado e está pronto para download.';
 }
 
 function openPdfModal() {
@@ -646,6 +713,16 @@ function goToPage() {
   border-color: var(--color-primary);
   background: #e5f3fa;
   color: var(--color-primary-dark);
+}
+.doc-gen__llm-hint {
+  padding: 12px 16px;
+  background: #e5f3fa;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+}
+.doc-gen__llm-hint .fa-wand-magic-sparkles {
+  margin-right: 6px;
+  color: var(--color-primary);
 }
 .doc-gen__upload-own {
   position: relative;

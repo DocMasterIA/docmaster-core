@@ -1,19 +1,22 @@
 from backend.app.services.services import extract_docx_structure, validate_mapping_response, save_template_schema, generate_pdf_from_docx
+from backend.app.services.llm_context import build_llm_context_from_request
 from backend.app.services.render import render_docx_by_index, render_docx_with_tokens
 from backend.app.services.preview import generate_docx_preview, generate_docx_preview_pdf
 from django.contrib.auth.decorators import login_required
 import json, tempfile, traceback
-from django.http import JsonResponse, FileResponse
+from django.http import JsonResponse, FileResponse, HttpResponse
 from backend.app.models import Template, TemplateSchema, DocumentInstance, Prefeitura
 from backend.app.forms import UserProfileForm, LoginForm
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login as auth_login, logout as auth_logout
 from backend.app.utils.utils import get_client_ip, is_locked, clear_failed_attempts, record_failed_attempt
+from django.conf import settings as django_settings
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404
 import os
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_GET
+import requests
 
 
 def api_login_required(view_func):
@@ -132,6 +135,84 @@ def generate_document_with_values_api(request):
 
     except Exception as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+
+# API: gerar documento via LLM (rag_service) com contexto do usuário.
+@api_login_required
+@csrf_exempt
+def gerar_via_llm_api(request):
+    """
+    Gera documento (ETP, DFD, TR) via serviço RAG/LLM.
+    Usa contexto do usuário logado (nome, secretaria, prefeitura).
+    """
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Use POST"}, status=405)
+
+    try:
+        payload = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({"ok": False, "error": "Corpo JSON inválido"}, status=400)
+
+    user_prompt = (payload.get("user_prompt") or "").strip()
+    template_id = payload.get("template_id")
+    output = (payload.get("output") or "docx").lower()
+
+    if not user_prompt:
+        return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
+
+    context = build_llm_context_from_request(request)
+    if template_id is not None:
+        context["template_id"] = str(template_id)
+    if payload.get("document_type_hint"):
+        context["document_type_hint"] = payload["document_type_hint"]
+
+    rag_url = getattr(django_settings, "RAG_SERVICE_URL", "http://127.0.0.1:8004").rstrip("/")
+    url = f"{rag_url}/api/rag/generate-document"
+    params = {}
+    if output == "docx":
+        params["output_docx"] = "true"
+
+    body = {
+        "user_prompt": user_prompt,
+        "context": context,
+    }
+
+    try:
+        resp = requests.post(url, json=body, params=params, timeout=180)
+    except requests.exceptions.Timeout:
+        return JsonResponse({"ok": False, "error": "Serviço de geração demorou para responder. Tente novamente."}, status=504)
+    except requests.exceptions.ConnectionError:
+        return JsonResponse({"ok": False, "error": "Serviço de geração indisponível. Verifique se o rag_service está em execução."}, status=503)
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=502)
+
+    if resp.status_code != 200:
+        try:
+            err = resp.json().get("detail", resp.text)
+        except Exception:
+            err = resp.text
+        return JsonResponse({"ok": False, "error": err}, status=resp.status_code)
+
+    content_type = resp.headers.get("content-type", "")
+    if "json" in content_type:
+        data = resp.json()
+        if not data.get("ok"):
+            return JsonResponse({"ok": False, "error": data.get("error", "Erro na geração")}, status=500)
+        if output == "docx" and data.get("docx_path") and os.path.isfile(data["docx_path"]):
+            return FileResponse(
+                open(data["docx_path"], "rb"),
+                as_attachment=True,
+                filename="documento.docx",
+                content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        return JsonResponse({"ok": True, **{k: v for k, v in data.items() if k not in ("docx_path", "pdf_path")}})
+    # Resposta é o arquivo DOCX diretamente (format=docx)
+    if output == "docx" and resp.content:
+        r = HttpResponse(resp.content, content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        r["Content-Disposition"] = 'attachment; filename="documento.docx"'
+        return r
+    return JsonResponse({"ok": False, "error": "Resposta inesperada do serviço"}, status=502)
+
 
 # API: retorna até 10 templates para autocomplete/busca.
 @require_GET

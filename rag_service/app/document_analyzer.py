@@ -7,6 +7,7 @@ não exceder o contexto do modelo.
 """
 from __future__ import annotations
 
+import html
 import json
 import re
 from typing import Any, Dict, List, Optional, Tuple
@@ -31,11 +32,19 @@ MAX_LAW_CHUNKS = 4
 # Prompt estritamente enxuto – sem fluff (por seção)
 ANALYSIS_SYSTEM_PROMPT = """Analise este TRECHO de documento em relação à Lei 14.133/2021.
 Responda APENAS em JSON válido. Sem intro, sem meta-comentários.
+
+REGRAS DE PRECISÃO:
+1. Só cite artigo/parágrafo que SEJA APLICÁVEL ao contexto do trecho. Ex.: Art. 46 § 5º trata de contratação semi-integrada e alteração do projeto básico pelo contratado – não use para parcelamento da solução (isso é § 4º ou outro).
+2. Em erros: descreva o que falta ou viola E cite o dispositivo que exige isso. Confira se o dispositivo citado trata exatamente daquele ponto.
+3. Acertos: cite art. só quando o trecho da lei recuperado realmente comprove o acerto.
+4. Se houver dúvida se o art. se aplica, coloque em observacoes, não em erros.
+5. Não invente dispositivos. Use apenas os trechos da lei fornecidos no contexto.
+
 - pontos_importantes: até 5 bullets (o que este trecho trata).
-- acertos: lista do que está CORRETO conforme a lei (cite art.).
-- erros: lista do que está ERRADO ou viola a lei (cite art.).
-- conformidade_geral: true SE não houver erros; false SE houver erros.
-- observacoes: uma frase ou vazio."""
+- acertos: lista do que está CORRETO (cite art. quando o contexto da lei comprovar).
+- erros: lista do que está ERRADO (descreva o problema + art. § que o exige; confira aplicabilidade).
+- conformidade_geral: true SE não houver erros; false SE houver erros confirmados.
+- observacoes: dúvidas ou sugestões que não são erros explícitos."""
 
 ANALYSIS_USER_PROMPT_TEMPLATE = """TRECHOS DA LEI 14.133:
 {context}
@@ -43,7 +52,18 @@ ANALYSIS_USER_PROMPT_TEMPLATE = """TRECHOS DA LEI 14.133:
 TRECHO DO DOCUMENTO ({section_hint}):
 {document}
 
+Use os trechos da lei acima. Cite apenas o que consta neles. Verifique se cada art./§ citado trata do ponto que você está avaliando.
 JSON: {{"pontos_importantes": [...], "acertos": [...], "erros": [...], "conformidade_geral": bool, "observacoes": "..."}}"""
+
+
+def _decode_html(text: str) -> str:
+    """Decodifica entidades HTML (&#x; &amp; &agrave; etc.)."""
+    if not text or not isinstance(text, str):
+        return text
+    try:
+        return html.unescape(text)
+    except Exception:
+        return text
 
 
 def _ensure_str(val: Any) -> str:
@@ -197,14 +217,17 @@ def _merge_analysis_results(
                     break
         return out
 
+    def _clean(items: List[str]) -> List[str]:
+        return [_decode_html(x) for x in items]
+
     return {
-        "pontos_importantes": _dedup(all_pontos, 12),
-        "acertos": _dedup(all_acertos, 15),
-        "erros": _dedup(all_erros, 15),
+        "pontos_importantes": _clean(_dedup(all_pontos, 12)),
+        "acertos": _clean(_dedup(all_acertos, 15)),
+        "erros": _clean(_dedup(all_erros, 15)),
         "conformidade_geral": False if any_error else (
             all(p.get("conformidade_geral") for p in parsed_list) if parsed_list else None
         ),
-        "observacoes": " | ".join(obs_parts[:3]) if obs_parts else "",
+        "observacoes": _decode_html(" | ".join(obs_parts[:3]) if obs_parts else ""),
     }
 
 

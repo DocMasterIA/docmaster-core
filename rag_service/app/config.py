@@ -53,3 +53,6 @@ RAG_TOP_K: int = _env_int("RAG_TOP_K", 5)
 
 # Pós-processamento de cláusulas (1 = ativo, 0 = desativado para debug/comparação)
 RAG_POSTPROCESS: bool = os.getenv("RAG_POSTPROCESS", "1").strip() not in ("0", "false", "False", "no")
+
+# Sanitização via LLM: remove meta-comentários usando a IA (1 = ativo). Alternativa à lista manual de regex.
+RAG_LLM_SANITIZE: bool = os.getenv("RAG_LLM_SANITIZE", "1").strip() not in ("0", "false", "False", "no")

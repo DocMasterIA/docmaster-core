@@ -19,6 +19,7 @@ from .config import (
     LLM_ORCHESTRATION_GENERATE_PATH,
     OLLAMA_BASE_URL,
     RAG_HTTP_TIMEOUT,
+    RAG_LLM_SANITIZE,
     RAG_POSTPROCESS,
     RAG_TOP_K,
 )
@@ -29,13 +30,20 @@ from .retrieval import retrieve
 CLAUSE_COMPOSITION_SYSTEM_PROMPT = """
 Você é um agente de composição jurídica para documentos de licitação pública.
 
+REGRA FUNDAMENTAL - ENTENDA BEM: Sua saída será INSERIDA DIRETAMENTE no documento final. Você está escrevendo o conteúdo que já aparecerá na página, como se fosse um redator humano. Portanto:
+- NUNCA inclua frases introdutórias como "Aqui estão os itens...", "Segue a lista...", "A cláusula deve conter...".
+- NUNCA inclua notas, avisos ou meta-informações: "Nota: Este texto foi gerado...", "section_key:", referências ao sistema.
+- NUNCA explique o que você vai fazer ou o que a seção deve ter. Redija DIRETAMENTE o conteúdo jurídico final.
+- Pense: "Um leitor abrirá o documento e verá isto. Deve ser conteúdo de cláusula puro, sem prefácios."
+
 Sua função é gerar cláusulas COMPLETAS e ROBUSTAS, baseadas em exemplos reais fornecidos no contexto.
 
 LÍNGUA E FORMATAÇÃO (obrigatório):
 - Redija SEMPRE em português brasileiro (pt-BR). NUNCA use inglês ou outros idiomas.
-- Use acentuação correta: resíduos, órgão, disposições, número, seqüência (ou sequência), § 1º, art. 1º, etc.
+- Use acentuação correta: resíduos, órgão, disposições, número, seqüência (ou sequência), etc.
+- § 1º, § 2º: use SOMENTE ao citar artigo de lei (ex.: "art. 10, § 1º, da Lei 14.133/2021"). Para enumeração em texto de cláusula, use 1., 2., 3. ou a), b), c) – NUNCA § 1º, § 2º em redação ordinária.
 - NUNCA use formatação markdown: proibido **negrito**, *itálico*, ##, ---, | tabela |. O texto será inserido em documento Word; use apenas texto puro.
-- Para listas, use parágrafos ou enumeração em prosa (primeiro, segundo; a) b) c)). Não use * ou - como marcadores.
+- Para listas, use parágrafos ou enumeração em prosa (primeiro, segundo; 1. 2. 3.; a) b) c)). Não use * ou - como marcadores.
 
 Regras obrigatórias:
 1. O texto gerado deve ser completo e autocontido – incluir todas as disposições necessárias para a cláusula, sem remeter a "conforme acima" ou "anexo".
@@ -48,15 +56,16 @@ Regras obrigatórias:
 8. NUNCA repita frases ou parágrafos idênticos – cada seção deve ter redação própria e específica. Evite fórmulas genéricas repetidas (ex.: "encontra-se detalhada nas partes específicas").
 9. NUNCA use formatação markdown para tabelas (ex.: | col1 | col2 | ou linhas com ---). Tabelas são renderizadas em seções separadas pelo sistema. Se precisar mencionar dados tabulares, descreva em prosa ou indique "conforme tabela na seção correspondente".
 
-Formato de saída: apenas o texto da cláusula, pronto para inserção no documento. Sem título, sem numeração, sem explicações adicionais. Texto puro, sem markdown.
-- NUNCA faça meta-comentário: não escreva "A cláusula X deve conter...", "A cláusula \"Necessidade\" é fundamental...", "section_key: ...". Redija DIRETAMENTE o conteúdo da cláusula, como se já estivesse no documento final.
-- NUNCA use títulos ou cabeçalhos no texto (ex.: "CONFORMIDADE COM A LEGISLAÇÃO", "Conclusão", "LISTA DE ALTERNATIVAS"). O título da seção já será inserido automaticamente.
+Formato de saída: APENAS o texto da cláusula. Sem prefácios, sem intros, sem notas, sem explicações. O primeiro caractere da sua resposta deve ser o início do conteúdo jurídico, não uma frase sobre a seção.
+- NUNCA use títulos ou cabeçalhos no texto. O título da seção já é inserido automaticamente pelo sistema.
 """
 
 
 # Prompt para geração de listas (Obrigações, Critérios de Aceitação, etc.)
 LIST_COMPOSITION_SYSTEM_PROMPT = """
 Você gera itens de lista para seções de documentos de licitação (obrigações, critérios de aceitação, etc.).
+
+REGRA FUNDAMENTAL: Sua saída será INSERIDA DIRETAMENTE no documento. NUNCA comece com intros como "Aqui estão os itens...", "Segue a lista...", "Os itens da seção...". O PRIMEIRO caractere da sua resposta deve ser o primeiro item da lista. Sem prefácios, sem notas, sem section_key ou meta-informações.
 
 LÍNGUA: Sempre português brasileiro com acentuação correta.
 
@@ -73,6 +82,13 @@ Regras:
 """
 
 
+# Prompt para sanitização via LLM (remove meta-comentários usando a IA)
+LLM_SANITIZE_PROMPT = """Remova do texto abaixo qualquer frase que NÃO seja conteúdo de documento (intros como "Aqui estão...", "Segue a lista...", notas como "Nota: Este texto foi gerado...", meta-instruções como "A cláusula deve conter...", "section_key:"). Retorne APENAS o texto limpo. O primeiro caractere da sua resposta deve ser o início do conteúdo jurídico. Não adicione explicações. Se já estiver correto, retorne igual.
+
+TEXTO:
+"""
+
+
 # Prompt para geração de linhas de tabela (retorno estruturado JSON)
 TABLE_ROWS_SYSTEM_PROMPT = """
 Você gera linhas de tabela para documentos de licitação. Sua saída DEVE ser APENAS um array JSON de objetos.
@@ -84,6 +100,32 @@ Regras:
 - Gere 3 a 10 linhas realistas conforme o contexto (objeto, tipo de documento).
 - NÃO escreva texto explicativo; NÃO use markdown; NÃO use ```.
 """
+
+
+async def _llm_sanitize_meta_comments(text: str) -> str:
+    """
+    Usa o LLM para remover meta-comentários. A IA interpreta o que deve ser removido.
+    Retorna o texto original em caso de falha.
+    """
+    if not text or not RAG_LLM_SANITIZE or not RAG_POSTPROCESS:
+        return text
+    if len(text.strip()) < 50:
+        return text
+    try:
+        full_prompt = LLM_SANITIZE_PROMPT + text
+        url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
+        payload = {"prompt": full_prompt, "stream": False}
+        async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            body = resp.json()
+        data = body.get("data", body) if isinstance(body, dict) else {}
+        out = (data.get("response", data.get("text", "")) or "").strip()
+        if out:
+            return out
+    except Exception:
+        pass
+    return text
 
 
 def _convert_markdown_table_to_plain(text: str) -> str:
@@ -100,10 +142,16 @@ def _convert_markdown_table_to_plain(text: str) -> str:
     while i < len(lines):
         line = lines[i]
         # Detecta início de tabela markdown: linha com | ... |
-        if re.match(r"^\s*\|.+\|\s*$", line):
+        # Linha de tabela: | col | col | ou col | col (sem | inicial) ou separador ---|
+        _is_table_line = (
+            lambda s: re.match(r"^\s*\|.+\|\s*$", s)
+            or re.match(r"^[\s\|\-:]+$", s)
+            or (s.count("|") >= 2 and len(s.strip()) > 10)
+        )
+        if _is_table_line(line):
             block: List[str] = [line]
             j = i + 1
-            while j < len(lines) and re.match(r"^\s*\|.+\|\s*$", lines[j]):
+            while j < len(lines) and _is_table_line(lines[j]):
                 block.append(lines[j])
                 j += 1
             # Parse: header, separador (|---|), dados
@@ -151,9 +199,11 @@ def _postprocess_clause_text(text: str) -> str:
     # Remove **negrito** e *itálico* (markdown)
     t = re.sub(r"\*\*([^*]+)\*\*", r"\1", t)
     t = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"\1", t)
-    # Corrige § No → § Nº (ordinal em parágrafos)
+    # Corrige § 1o → § 1º em citações de lei (art. X, § 1º)
     t = re.sub(r"§\s*(\d+)\s*[oO](?=\s|$|\.|,)", r"§ \1º", t)
     t = re.sub(r"art\.?\s*(\d+)\s*[oO](?=\s|$|\.|,)", r"art. \1º", t)
+    # Converte § 1º em início de linha (enumeração indevida) → 1. (§ só em citação de lei)
+    t = re.sub(r"^\s*§\s*(\d+)\s*º\s+", r"\1. ", t, flags=re.MULTILINE)
     # Leis revogadas: corrige para Lei 14.133/2021
     t = re.sub(r"Lei\s*(?:n[º°]?|n\.?\s*[º°]?)?\s*8\.666/1993", "Lei 14.133/2021", t, flags=re.IGNORECASE)
     t = re.sub(r"Lei\s*8\.666", "Lei 14.133/2021", t, flags=re.IGNORECASE)
@@ -167,12 +217,15 @@ def _postprocess_clause_text(text: str) -> str:
         (r"\[preencher\]", "conforme especificado no edital"),
         (r"\[valor\]", "o valor estabelecido no contrato"),
         (r"\[objeto\]", "o objeto da contratação"),
+        (r"\[órgão\]", "o órgão competente"),
+        (r"\[orgao\]", "o órgão competente"),
         (r"\[X\]", "conforme edital"),
     ]
     for pat, repl in placeholder_fixes:
         t = re.sub(pat, repl, t, flags=re.IGNORECASE)
     # Corrige erros comuns de português
     fixes = [
+        (r"Mantê-la documentação", "Manter a documentação"),
         (r"\btratante\b", "contratante"),
         (r"\bmodificiem\b", "modifiquem"),
         (r"\bo equipamentos\b", "os equipamentos"),
@@ -213,16 +266,9 @@ def _postprocess_clause_text(text: str) -> str:
     t = _convert_markdown_table_to_plain(t)
     # Remove marcadores markdown no início de linha (* ou - , inclusive com espaços)
     t = re.sub(r"^\s*[\*\-]\s+", "", t, flags=re.MULTILINE)
-    # Remove meta-comentários do LLM (intro listas, section_key, etc.)
-    meta_comment_patterns = [
-        r"^Aqui estão os itens da lista para a seção[^\n]*(?:\n|$)",
-        r"^Segue(?:m)? os itens da (?:lista )?para a seção[^\n]*(?:\n|$)",
-        r"^(?:Os )?itens da seção[^\n]*(?:\n|$)",
-        r"^Lista de itens para a seção[^\n]*(?:\n|$)",
-        r"^.*\(section_key\s*:\s*[a-z_]+\)[^.\n]*\.?\s*(?:\n|$)",
-    ]
-    for pat in meta_comment_patterns:
-        t = re.sub(pat, "", t, flags=re.IGNORECASE)
+    # Fallback: remove artefatos técnicos e notas meta (section_key, "Nota: o texto foi gerado...")
+    t = re.sub(r"^.*\(section_key\s*:\s*[a-z_]+\)[^.\n]*\.?\s*(?:\n|$)", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"^Nota:\s*[^\n]*(?:gerado|texto foi|instruções|fornecidas)[^\n]*(?:\n|$)", "", t, flags=re.IGNORECASE)
 
     # Remove títulos/cabeçalhos no início do texto (o título da seção já é inserido automaticamente)
     heading_patterns = [
@@ -283,12 +329,22 @@ async def _call_llm_agent_structure(user_prompt: str) -> Dict[str, Any]:
     return data
 
 
-def _get_section_specific_instructions(section_key: str, for_list: bool = False) -> str:
+def _get_section_specific_instructions(
+    section_key: str, for_list: bool = False, document_type: str = ""
+) -> str:
     """
     Retorna instruções específicas por seção para guiar a geração.
     for_list=True: instruções condensadas para itens de lista.
+    document_type: usado para regras específicas de ETP, TR, DFD.
     """
     key = (section_key or "").lower()
+    doc_type = (document_type or "").lower()
+
+    # Alternativas Analisadas (ETP): NÃO usar estrutura "Alternativa 1", "Alternativa 2"
+    if "alternativa" in key and ("etp" in doc_type or "estudo" in doc_type):
+        if for_list:
+            return "\nINSTRUÇÕES ESPECÍFICAS: ETP não usa \"Alternativa 1\", \"Alternativa 2\". Liste as alternativas como itens simples, sem criar subseções. Formato direto.\n"
+        return "\nINSTRUÇÕES ESPECÍFICAS: Em ETP, NÃO use a estrutura \"Alternativa 1\", \"Alternativa 2\" como subseções – não é utilizada em ETPs. Redija em texto corrido ou lista numerada (1., 2., 3. ou a), b), c)). Para subitens use 1., 2. ou a), b) – NUNCA § 1º, § 2º (só em citação de lei).\n"
 
     # Obrigações da Contratada (empresa que executa)
     if "contratada" in key:
@@ -394,7 +450,7 @@ async def _generate_clause_text(
 ) -> str:
     """Gera texto da cláusula via LLM usando contexto RAG, seção e especificacoes."""
     espec_text = _format_especificacoes(especificacoes)
-    section_hint = _get_section_specific_instructions(section_key, for_list=False)
+    section_hint = _get_section_specific_instructions(section_key, for_list=False, document_type=document_type)
     query = f"""Gerar o texto COMPLETO da cláusula "{section_title}" (section_key: {section_key}).
 
 Contexto do documento:
@@ -406,7 +462,7 @@ Contexto do documento:
 {espec_text}EXEMPLOS DE CLÁUSULAS SIMILARES (extraídos de documentos reais):
 {rag_context}
 
-Instruções: Gere o CONTEÚDO da cláusula diretamente, sem meta-comentário ("A cláusula deve...", "section_key", títulos). Sempre em português brasileiro com acentuação correta. Adapte ao contexto (objeto, órgão) mantendo a estrutura jurídica dos exemplos. Use listas em prosa quando fizer sentido; tabelas são renderizadas em seções separadas. Nunca use markdown (** * ## ---). Não seja verboso; seja preciso e completo. NUNCA use placeholders como [preencher] ou [prazo]. Cite apenas a Lei 14.133/2021 (não a Lei 8.666). Não repita frases de outras seções."""
+Instruções: O PRIMEIRO caractere da sua resposta deve ser o início do conteúdo jurídico. Não comece com "Aqui estão...", "A cláusula deve...", "Segue..." ou qualquer intro. Redija DIRETAMENTE a cláusula. Português brasileiro, acentuação correta. Adapte ao contexto. Sem markdown. Sem placeholders []. Cite Lei 14.133/2021. Não repita frases de outras seções."""
 
     full_prompt = f"<<SYSTEM>>\n{CLAUSE_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{query}"
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
@@ -426,26 +482,22 @@ Instruções: Gere o CONTEÚDO da cláusula diretamente, sem meta-comentário ("
     data = body.get("data", body) if isinstance(body, dict) else {}
     text = data.get("response", data.get("text", ""))
     raw = (text or "").strip()
+    raw = await _llm_sanitize_meta_comments(raw)
     return _postprocess_clause_text(raw)
 
 
 def _is_meta_comment_line(line: str) -> bool:
-    """Verifica se a linha é meta-comentário do LLM (intro de lista, section_key, etc.)."""
+    """Fallback mínimo: detecta linhas meta (section_key, intros, Nota: gerado...). Sanitização principal via LLM."""
     import re
     s = (line or "").strip()
     if not s:
         return True
-    patterns = [
-        r"^Aqui estão os itens da lista para a seção",
-        r"^Segue(?:m)? os itens da (?:lista )?para a seção",
-        r"^(?:Os )?itens da seção\s+[\"'].*[\"']",
-        r"^Lista de itens para a seção",
-        r"\(section_key\s*:\s*[a-z_]+\)",
-        r"baseados?\s+na\s+Lei\s+14\.133.*contexto\s+fornecido",
-    ]
-    for pat in patterns:
-        if re.search(pat, s, re.IGNORECASE):
-            return True
+    if re.search(r"\(section_key\s*:\s*[a-z_]+\)", s, re.IGNORECASE):
+        return True
+    if re.match(r"^Nota:\s*.*(?:gerado|texto foi|instruções|fornecidas)", s, re.IGNORECASE):
+        return True
+    if re.match(r"^(Aqui estão|Segue(?:m)? (?:aqui )?(?:os )?itens|A cláusula deve conter)", s, re.IGNORECASE):
+        return True
     return False
 
 
@@ -482,7 +534,7 @@ async def _generate_list_content(
 ) -> str:
     """Gera itens de lista via LLM para seções content_type=list."""
     espec_text = _format_especificacoes(especificacoes)
-    section_hint = _get_section_specific_instructions(section_key, for_list=True)
+    section_hint = _get_section_specific_instructions(section_key, for_list=True, document_type=document_type)
     query = f"""Gerar os itens da lista para a seção "{section_title}" (section_key: {section_key}).
 
 Contexto: {document_type}. Objeto: {context.get("objeto", "não informado")}. Órgão: {context.get("orgao", "não informado")}.
@@ -490,7 +542,7 @@ Contexto: {document_type}. Objeto: {context.get("objeto", "não informado")}. Ó
 {espec_text}Exemplos de itens similares (referência):
 {rag_context}
 
-Retorne cada item em uma linha separada. Sem numeração, sem marcadores (- * •). Apenas o texto de cada item. NUNCA use placeholders. Cite apenas Lei 14.133/2021 (não 8.666)."""
+O PRIMEIRO caractere da resposta deve ser o primeiro item. Não comece com intro. Cada item em uma linha. Sem numeração, sem marcadores. Sem placeholders. Lei 14.133/2021."""
 
     full_prompt = f"<<SYSTEM>>\n{LIST_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{query}"
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
@@ -509,6 +561,7 @@ Retorne cada item em uma linha separada. Sem numeração, sem marcadores (- * �
     data = body.get("data", body) if isinstance(body, dict) else {}
     text = data.get("response", data.get("text", ""))
     raw = (text or "").strip()
+    raw = await _llm_sanitize_meta_comments(raw)
     return _postprocess_list_text(raw)
 
 

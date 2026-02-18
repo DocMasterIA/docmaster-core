@@ -23,8 +23,10 @@ from .document_classifier import detect_document_type, extract_sections
 from .loaders import load_document_text
 from .retrieval import retrieve
 
-# Limite de caracteres para evitar estourar contexto LLM
-MAX_DOCUMENT_CHARS = 45_000
+# Limites para caber no contexto do LLM (ajustar conforme modelo)
+MAX_DOCUMENT_CHARS = 10_000
+MAX_LAW_CHUNK_CHARS = 400
+MAX_LAW_CHUNKS = 5
 
 # Prompt estritamente enxuto – sem fluff
 ANALYSIS_SYSTEM_PROMPT = """Analise o documento em relação à Lei 14.133/2021 (Lei de Licitações e Contratos).
@@ -97,7 +99,7 @@ async def analyze_document(
     path: Optional[str] = None,
     text: Optional[str] = None,
     collection_name: Optional[str] = None,
-    top_k: int = 8,
+    top_k: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Analisa documento contra a Lei 14.133/2021.
@@ -112,6 +114,8 @@ async def analyze_document(
         Dict com document_type, sections_detected, pontos_importantes, acertos,
         erros, conformidade_geral, observacoes.
     """
+    k = top_k if top_k is not None else MAX_LAW_CHUNKS
+
     if path and not text:
         raw_text = load_document_text(path)
     elif text:
@@ -137,18 +141,18 @@ async def analyze_document(
     sections_detected = [s.key for s in sections] if sections else []
     document_type = _infer_document_type(raw_text)
 
-    # RAG: trechos da Lei 14.133
+    # RAG: trechos da Lei 14.133 (limitados para caber no contexto)
     docs = retrieve(
         query=doc_text,
         collection_name=collection_name or CHROMA_COLLECTION,
-        top_k=top_k,
+        top_k=k,
         where={"document_type": "lei"},
     )
     if not docs:
         docs = retrieve(
             query=doc_text,
             collection_name=collection_name or CHROMA_COLLECTION,
-            top_k=top_k,
+            top_k=k,
             where={"document_type": "outro"},
         )
         law_docs = [
@@ -159,7 +163,7 @@ async def analyze_document(
         docs = law_docs if law_docs else docs[:2]
 
     context = "\n\n---\n\n".join(
-        (d.get("content", "") or "")[:800] for d in docs
+        (d.get("content", "") or "")[:MAX_LAW_CHUNK_CHARS] for d in docs[:MAX_LAW_CHUNKS]
     ) if docs else "Lei 14.133 não indexada. Analise com base em conhecimento geral."
 
     user_part = ANALYSIS_USER_PROMPT_TEMPLATE.format(

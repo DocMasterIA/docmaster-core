@@ -341,6 +341,52 @@ async def endpoint_delete_collection(name: str) -> dict:
 # ============================================================
 
 
+@router.post("/ingest-manual")
+async def endpoint_ingest_manual(
+    file: Optional[UploadFile] = File(None),
+    path: Optional[str] = Form(None),
+    collection: Optional[str] = Form(None),
+) -> dict:
+    """
+    Ingere manual/guia (ex.: manual de licitações, ETP, DFD, TR) como base de conhecimento.
+
+    Envie `file` (upload) OU `path` (caminho no servidor).
+    Chunks são marcados com document_type=guia e tipo_documento (etp, dfd, termo_referencia, geral).
+    O analisador usará como contexto sem citar o manual diretamente.
+    """
+    from .loaders import load_document_text
+    from .manual_ingest import ingest_manual
+
+    if file and path:
+        raise HTTPException(status_code=400, detail="Informe apenas file OU path.")
+    if not file and not path:
+        raise HTTPException(status_code=400, detail="Informe file (upload) ou path.")
+
+    try:
+        if file:
+            suffix = Path(file.filename or "manual.pdf").suffix.lower()
+            if suffix not in (".pdf", ".docx", ".doc"):
+                raise HTTPException(status_code=400, detail="Use PDF ou DOCX.")
+            contents = await file.read()
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                tmp.write(contents)
+                tmp_path = tmp.name
+            try:
+                result = ingest_manual(path=tmp_path, collection_name=collection)
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
+        else:
+            result = ingest_manual(path=path, collection_name=collection)
+        return {"ok": True, **result}
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Arquivo não encontrado: {path}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("Erro em ingest-manual: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/smart-ingest/file")
 async def endpoint_smart_ingest_file(body: SmartIngestFileRequest) -> dict:
     """

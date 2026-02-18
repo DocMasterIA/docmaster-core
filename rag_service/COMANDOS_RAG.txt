@@ -78,6 +78,21 @@ curl -X POST http://localhost:8004/api/rag/smart-ingest/folder \
   -H "Content-Type: application/json" \
   -d '{"folder_path": "/data/treinamento/DFD"}'
 
+# --------------------------------------------
+# INGERIR MANUAL/GUIA (base de conhecimento)
+# --------------------------------------------
+# Manual de licitações, ETP, DFD, TR. Chunks marcados como document_type=guia.
+# O analisador usa como referência sem citar o texto diretamente.
+
+# Por path:
+curl -X POST http://localhost:8004/api/rag/ingest-manual \
+  -F "path=/data/treinamento/manual_licitacoes.pdf"
+
+# Por upload:
+curl -X POST http://localhost:8004/api/rag/ingest-manual \
+  -F "file=@/caminho/manual_etp_dfd_tr.pdf"
+
+# --------------------------------------------
 # Lei 14.133 (para verificação de conformidade)
 # 1. Coloque o PDF da lei em: treinamento/LEI_14_133/
 # 2. Ingerir:

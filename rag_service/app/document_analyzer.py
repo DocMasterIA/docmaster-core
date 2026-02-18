@@ -29,29 +29,29 @@ MAX_SECTION_CHARS = 2_800
 MAX_LAW_CHUNK_CHARS = 350
 MAX_LAW_CHUNKS = 4
 
-# Prompt estritamente enxuto – sem fluff (por seção)
-ANALYSIS_SYSTEM_PROMPT = """Analise este TRECHO de documento em relação à Lei 14.133/2021.
+# Prompt: análise direta e funcional, sem citação explícita de artigos
+# Foco no que funciona/não funciona no documento, não em "Art. X diz Y"
+ANALYSIS_SYSTEM_PROMPT = """Analise este TRECHO de documento licitatório (ETP, DFD ou TR).
 Responda APENAS em JSON válido. Sem intro, sem meta-comentários.
 
+ESTILO: Seja DIRETO e FUNCIONAL. Descreva o que está certo/errado em termos práticos.
+EVITE: citações diretas de lei ("Art. 46 § 5º", "conforme art. X"). Use a lei como referência interna, mas escreva para o usuário entender o problema ou o acerto sem precisar buscar o dispositivo.
+PREFIRA: "Falta justificativa para a contratação integrada" em vez de "Não há menção ao Art. 46 § 5º".
+
 REGRAS:
-1. acertos: liste o que o documento FAZ CERTO conforme os trechos da lei fornecidos. Cite art./§ quando o trecho da lei comprovar. Não deixe vazio se houver conformidade.
-2. erros: liste o que FALTA ou VIOLA, citando art./§ que exige. Só inclua se o dispositivo citado tratar exatamente daquele ponto (ex.: Art. 46 § 5º = semi-integrada + alteração de projeto – não usar para parcelamento).
-3. conformidade_geral: true SE erros estiver vazio; false SE houver ao menos um erro.
-4. Use apenas dispositivos presentes nos trechos da lei fornecidos. Não invente.
-5. Em dúvida sobre aplicabilidade: coloque em observacoes, não em erros.
+1. pontos_importantes: até 5 bullets – o que este trecho trata (objeto, justificativa, prazo, etc.).
+2. acertos: o que o documento faz BEM – descreva em linguagem clara. Ex.: "Objeto descrito com clareza", "Justificativa técnica adequada".
+3. erros: o que FALTA ou está INCORRETO – descreva o problema e o que deveria ter, sem citar art. Ex.: "Não há justificativa para não parcelar a solução", "Cronograma físico-financeiro ausente".
+4. conformidade_geral: true SE erros vazio; false SE houver erros.
+5. observacoes: sugestões breves ou dúvidas (opcional)."""
 
-- pontos_importantes: até 5 bullets (o que este trecho trata).
-- acertos: itens em conformidade (obrigatório preencher quando houver).
-- erros: itens em desacordo (só com art./§ aplicável).
-- observacoes: sugestões ou dúvidas (opcional)."""
-
-ANALYSIS_USER_PROMPT_TEMPLATE = """TRECHOS DA LEI 14.133:
+ANALYSIS_USER_PROMPT_TEMPLATE = """CONTEXTO (Lei 14.133 e boas práticas):
 {context}
 
 TRECHO DO DOCUMENTO ({section_hint}):
 {document}
 
-Analise: o que está correto (acertos) e o que falta/erro (erros). Cite art. só dos trechos acima. conformidade_geral=false somente se houver erros.
+Use o contexto para avaliar. Responda em linguagem DIRETA e FUNCIONAL. Não cite artigos na saída – descreva o acerto ou o problema de forma que o usuário entenda.
 JSON: {{"pontos_importantes": [...], "acertos": [...], "erros": [...], "conformidade_geral": bool, "observacoes": "..."}}"""
 
 
@@ -309,9 +309,22 @@ async def analyze_document(
             ]
             docs = law_docs if law_docs else docs[:2]
 
-        context = "\n\n---\n\n".join(
+        law_context = "\n\n---\n\n".join(
             (d.get("content", "") or "")[:MAX_LAW_CHUNK_CHARS] for d in docs[:MAX_LAW_CHUNKS]
-        ) if docs else "Lei 14.133 não indexada. Analise com base em conhecimento geral."
+        ) if docs else "Lei 14.133 não indexada."
+
+        guia_docs = retrieve(
+            query=doc_chunk,
+            collection_name=coll,
+            top_k=2,
+            where={"document_type": "guia"},
+        )
+        guia_context = ""
+        if guia_docs:
+            guia_parts = [(d.get("content", "") or "")[:400] for d in guia_docs]
+            guia_context = "\n\n[Referência – boas práticas]\n" + "\n---\n".join(guia_parts)
+
+        context = (law_context + guia_context) if law_context or guia_context else "Sem referências indexadas."
 
         user_part = ANALYSIS_USER_PROMPT_TEMPLATE.format(
             context=context,

@@ -18,9 +18,23 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from docx import Document
-from docx.shared import Pt
+from docx.shared import Pt, RGBColor
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
+
+FONT_NAME = "Times New Roman"
+FONT_COLOR = RGBColor(0, 0, 0)
+
+
+def _apply_document_styles(doc: Document) -> None:
+    """Define fonte Times New Roman e cor preta em todos os estilos do documento."""
+    for style_name in ("Normal", "Title", "Heading 1", "Heading 2", "Heading 3", "List Paragraph"):
+        try:
+            style = doc.styles[style_name]
+            style.font.name = FONT_NAME
+            style.font.color.rgb = FONT_COLOR
+        except KeyError:
+            pass
 
 
 def _add_table_borders(table, style: str = "single") -> None:
@@ -116,6 +130,20 @@ def _render_section(
         _render_section(doc, child, section_texts, table_data, level + 1)
 
 
+def _document_type_to_title(document_type: str) -> str:
+    """Mapeia document_type (snake_case) para título formatado com acentuação."""
+    dt = (document_type or "").strip().lower()
+    mapping = {
+        "documento_formalizacao_demanda": "Documento de Formalização da Demanda",
+        "dfd": "Documento de Formalização da Demanda",
+        "termo_referencia": "Termo de Referência",
+        "termo de referência": "Termo de Referência",
+        "estudo_tecnico_preliminar": "Estudo Técnico Preliminar",
+        "etp": "Estudo Técnico Preliminar",
+    }
+    return mapping.get(dt) or dt.replace("_", " ").title()
+
+
 def json_to_docx(
     data: Dict[str, Any],
     output_path: Optional[str] = None,
@@ -143,12 +171,9 @@ def json_to_docx(
     root_sections = structure.get("root_sections") or []
 
     doc = Document()
+    _apply_document_styles(doc)
     doc_type = structure.get("document_type", "documento")
-    # Título do documento
-    doc.add_heading(
-        doc_type.replace("_", " ").title(),
-        level=0,
-    )
+    doc.add_heading(_document_type_to_title(doc_type), level=0)
     doc.add_paragraph()
 
     for node in root_sections:

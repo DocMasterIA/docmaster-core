@@ -46,6 +46,23 @@ TRECHO DO DOCUMENTO ({section_hint}):
 JSON: {{"pontos_importantes": [...], "acertos": [...], "erros": [...], "conformidade_geral": bool, "observacoes": "..."}}"""
 
 
+def _ensure_str(val: Any) -> str:
+    """Garante que o valor seja string (LLM pode retornar dict/list)."""
+    if val is None:
+        return ""
+    if isinstance(val, str):
+        return val.strip()
+    if isinstance(val, dict):
+        for key in ("response", "text", "content", "message"):
+            v = val.get(key)
+            if v is not None:
+                return _ensure_str(v)
+        return ""
+    if isinstance(val, (list, tuple)):
+        return " ".join(_ensure_str(x) for x in val if x)
+    return str(val) if val else ""
+
+
 async def _call_llm(prompt: str) -> str:
     """Chama o LLM com o prompt completo."""
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
@@ -57,12 +74,12 @@ async def _call_llm(prompt: str) -> str:
         body = resp.json()
         data = body.get("data", body) if isinstance(body, dict) else {}
         text = data.get("response", data.get("text", ""))
-        return (text or "").strip()
+        return _ensure_str(text)
 
 
-def _parse_analysis_response(text: str) -> Dict[str, Any]:
+def _parse_analysis_response(text: Any) -> Dict[str, Any]:
     """Extrai JSON da resposta do LLM (pode vir com markdown ou texto antes/depois)."""
-    text = (text or "").strip()
+    text = _ensure_str(text)
     # Tenta extrair bloco ```json ... ```
     m = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
     if m:
@@ -152,12 +169,15 @@ def _merge_analysis_results(
     obs_parts: List[str] = []
 
     for p in parsed_list:
-        all_pontos.extend(p.get("pontos_importantes") or [])
-        all_acertos.extend(p.get("acertos") or [])
-        all_erros.extend(p.get("erros") or [])
+        for item in p.get("pontos_importantes") or []:
+            all_pontos.append(_ensure_str(item))
+        for item in p.get("acertos") or []:
+            all_acertos.append(_ensure_str(item))
+        for item in p.get("erros") or []:
+            all_erros.append(_ensure_str(item))
         if p.get("conformidade_geral") is False:
             any_error = True
-        obs = (p.get("observacoes") or "").strip()
+        obs = _ensure_str(p.get("observacoes"))
         if obs:
             obs_parts.append(obs)
 
@@ -166,7 +186,7 @@ def _merge_analysis_results(
         seen_lower: set = set()
         out = []
         for x in items:
-            xn = (x or "").strip()
+            xn = _ensure_str(x)
             if not xn:
                 continue
             k = xn.lower()

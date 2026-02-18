@@ -34,6 +34,9 @@ REGRA FUNDAMENTAL - ENTENDA BEM: Sua saída será INSERIDA DIRETAMENTE no docume
 - NUNCA inclua frases introdutórias como "Aqui estão os itens...", "Segue a lista...", "A cláusula deve conter...".
 - NUNCA inclua notas, avisos ou meta-informações: "Nota: Este texto foi gerado...", "section_key:", referências ao sistema.
 - NUNCA explique o que você vai fazer ou o que a seção deve ter. Redija DIRETAMENTE o conteúdo jurídico final.
+
+PALAVRAS/EXPRESSÕES PROIBIDAS – não use em hipótese alguma:
+"Nota:", "Notas:", "Atenção:", "Observação:" (quando meta), "A cláusula deve", "Segue", "Aqui estão", "section_key", "O texto a seguir", "Conforme instruções", "Gerado com base em".
 - Pense: "Um leitor abrirá o documento e verá isto. Deve ser conteúdo de cláusula puro, sem prefácios."
 
 Sua função é gerar cláusulas COMPLETAS e ROBUSTAS, baseadas em exemplos reais fornecidos no contexto.
@@ -53,7 +56,7 @@ Regras obrigatórias:
 5. Incluir obrigações, prazos, responsabilidades e condições quando fizerem parte da natureza da cláusula.
 6. NUNCA inventar fundamentos legais ou disposições que não estejam nos exemplos ou na lei – em dúvida, seja conservador.
 7. NUNCA use placeholders: proibido [preencher], [prazo determinado], [valor], [X], [objeto], etc. Use valores genéricos plausíveis quando não houver dado específico (ex.: "30 dias", "conforme edital", "no prazo estabelecido no contrato").
-8. NUNCA repita frases ou parágrafos idênticos na MESMA seção – cada parágrafo deve ter redação própria. Evite fórmulas genéricas repetidas (ex.: "encontra-se detalhada nas partes específicas", "A Administração fará o acompanhamento e o controle das obras e serviços"). Se uma frase for necessária mais de uma vez, reformule-a.
+8. REPETIÇÃO É INACEITÁVEL: NUNCA repita frases ou parágrafos idênticos ou quase idênticos na MESMA seção. Cada parágrafo deve ter redação única. Evite fórmulas genéricas repetidas (ex.: "encontra-se detalhada nas partes específicas", "A Administração fará o acompanhamento e o controle das obras e serviços", "nos termos das necessidades específicas"). Se precisar reiterar uma ideia, reformule completamente.
 9. NUNCA use formatação markdown para tabelas (ex.: | col1 | col2 | ou linhas com ---). Tabelas são renderizadas em seções separadas pelo sistema. Se precisar mencionar dados tabulares, descreva em prosa ou indique "conforme tabela na seção correspondente".
 
 Formato de saída: APENAS o texto da cláusula. Sem prefácios, sem intros, sem notas, sem explicações. O primeiro caractere da sua resposta deve ser o início do conteúdo jurídico, não uma frase sobre a seção.
@@ -66,6 +69,8 @@ LIST_COMPOSITION_SYSTEM_PROMPT = """
 Você gera itens de lista para seções de documentos de licitação (obrigações, critérios de aceitação, etc.).
 
 REGRA FUNDAMENTAL: Sua saída será INSERIDA DIRETAMENTE no documento. NUNCA comece com intros como "Aqui estão os itens...", "Segue a lista...", "Os itens da seção...". O PRIMEIRO caractere da sua resposta deve ser o primeiro item da lista. Sem prefácios, sem notas, sem section_key ou meta-informações.
+
+PROIBIDO: "Nota:", "Notas:", "Atenção:", "Observação:" (meta), "A cláusula deve", "Segue", "Aqui estão", "section_key".
 
 LÍNGUA: Sempre português brasileiro com acentuação correta.
 
@@ -84,7 +89,11 @@ Regras:
 
 
 # Prompt para sanitização via LLM (remove meta-comentários usando a IA)
-LLM_SANITIZE_PROMPT = """Remova do texto abaixo qualquer frase que NÃO seja conteúdo de documento (intros como "Aqui estão...", "Segue a lista...", notas como "Nota: Este texto foi gerado...", meta-instruções como "A cláusula deve conter...", "section_key:"). Retorne APENAS o texto limpo. O primeiro caractere da sua resposta deve ser o início do conteúdo jurídico. Não adicione explicações. Se já estiver correto, retorne igual.
+LLM_SANITIZE_PROMPT = """Remova do texto abaixo QUALQUER frase que não seja conteúdo de documento:
+- Linhas que comecem com: Nota:, Notas:, Atenção:, Observação: (quando meta)
+- Intros: "Aqui estão...", "Segue a lista...", "A cláusula deve conter..."
+- Meta: "section_key:", "O texto a seguir", "Conforme instruções", "Gerado com base em", "Este texto foi gerado"
+Retorne APENAS o texto limpo. O primeiro caractere deve ser o início do conteúdo jurídico. Sem explicações.
 
 TEXTO:
 """
@@ -205,6 +214,12 @@ def _postprocess_clause_text(text: str) -> str:
     t = re.sub(r"art\.?\s*(\d+)\s*[oO](?=\s|$|\.|,)", r"art. \1º", t)
     # Converte § 1º em início de linha (enumeração indevida) → 1. (§ só em citação de lei)
     t = re.sub(r"^\s*§\s*(\d+)\s*º\s+", r"\1. ", t, flags=re.MULTILINE)
+    # Remove "Art. 123. " no início de parágrafo (ETP/estudo não usa numeração de artigos)
+    t = re.sub(r"^(Art\.?\s*\d+\.\s+)", "", t, flags=re.MULTILINE)
+    # Substitui "presente artigo" por "nesta seção" (estudo/ETP não usa numeração de artigos)
+    t = re.sub(r"\bno presente artigo\b", "nesta seção", t, flags=re.IGNORECASE)
+    t = re.sub(r"\bdo presente artigo\b", "desta seção", t, flags=re.IGNORECASE)
+    t = re.sub(r"\bneste artigo\b", "nesta seção", t, flags=re.IGNORECASE)
     # Leis revogadas: corrige para Lei 14.133/2021
     t = re.sub(r"Lei\s*(?:n[º°]?|n\.?\s*[º°]?)?\s*8\.666/1993", "Lei 14.133/2021", t, flags=re.IGNORECASE)
     t = re.sub(r"Lei\s*8\.666", "Lei 14.133/2021", t, flags=re.IGNORECASE)
@@ -240,6 +255,8 @@ def _postprocess_clause_text(text: str) -> str:
         (r"\bdisposicoes\b", "disposições"),
         (r"\bsequencia\b", "sequência"),
         (r"\bseqüencia\b", "sequência"),
+        (r"\bacatuladoras\b", "acautelatórias"),
+        (r"\bacatulador\b", "acautelatório"),
     ]
     for pat, repl in fixes:
         t = re.sub(pat, repl, t, flags=re.IGNORECASE)
@@ -267,9 +284,34 @@ def _postprocess_clause_text(text: str) -> str:
     t = _convert_markdown_table_to_plain(t)
     # Remove marcadores markdown no início de linha (* ou - , inclusive com espaços)
     t = re.sub(r"^\s*[\*\-]\s+", "", t, flags=re.MULTILINE)
-    # Fallback: remove artefatos técnicos e notas meta (section_key, "Nota: o texto foi gerado...")
-    t = re.sub(r"^.*\(section_key\s*:\s*[a-z_]+\)[^.\n]*\.?\s*(?:\n|$)", "", t, flags=re.IGNORECASE)
-    t = re.sub(r"^Nota:\s*[^\n]*(?:gerado|texto foi|instruções|fornecidas)[^\n]*(?:\n|$)", "", t, flags=re.IGNORECASE)
+    # Remove notas e meta-comentários (linhas inteiras)
+    _M = re.MULTILINE | re.IGNORECASE
+    t = re.sub(r"^.*\(section_key\s*:\s*[a-z_]+\)[^.\n]*\.?\s*(?:\n|$)", "", t, flags=_M)
+    t = re.sub(r"^Nota:\s*[^\n]*(?:\n|$)", "", t, flags=_M)
+    t = re.sub(r"^Notas:\s*[^\n]*(?:\n|$)", "", t, flags=_M)
+    t = re.sub(r"^Atenção:\s*[^\n]*(?:instruções|meta|gerado|texto foi|conforme|use|não use)[^\n]*(?:\n|$)", "", t, flags=_M)
+    t = re.sub(r"^Observação:\s*[^\n]*(?:instruções|meta|gerado|texto foi|conforme)[^\n]*(?:\n|$)", "", t, flags=_M)
+    t = re.sub(r"^(?:A cláusula deve|Segue(?:m)?|Aqui estão)\s+[^\n]*(?:\n|$)", "", t, flags=_M)
+
+    # Remove parágrafos inteiros que são citação legal pura (transcrição de lei)
+    _legal_para_patterns = (
+        r"^O contrato (?:será|seria) regido pelas regras",
+        r"^A Administração poderá optar por licitar de acordo com as leis citadas",
+        r"^As hipóteses de cancelamento da ata de registro de preços",
+        r"^A contratação posterior de item específico constante de grupo",
+        r"^O descumprimento das determinações constantes no presente artigo",
+        r"^É vedada a aplicação combinada desta Lei",
+    )
+    paras = re.split(r"\n\s*\n", t)
+    kept = []
+    for p in paras:
+        s = (p or "").strip()
+        if not s:
+            continue
+        if any(re.match(pat, s, re.IGNORECASE) for pat in _legal_para_patterns):
+            continue
+        kept.append(p)
+    t = "\n\n".join(kept)
 
     # Remove títulos/cabeçalhos no início do texto (o título da seção já é inserido automaticamente)
     heading_patterns = [
@@ -282,9 +324,39 @@ def _postprocess_clause_text(text: str) -> str:
     ]
     for pat in heading_patterns:
         t = re.sub(pat, "", t, flags=re.IGNORECASE)
+    # Remove parágrafos duplicados (repetição – mantém apenas a primeira ocorrência)
+    t = _remove_duplicate_paragraphs(t)
     # Remove linhas vazias excessivas (mais de 2 seguidas)
     t = re.sub(r"\n{3,}", "\n\n", t)
     return t.strip()
+
+
+def _remove_duplicate_paragraphs(text: str) -> str:
+    """
+    Remove parágrafos idênticos ou quase idênticos, mantendo apenas a primeira ocorrência.
+    Reduz repetições geradas pela IA.
+    """
+    import re
+    if not text or not isinstance(text, str):
+        return text
+    paras = re.split(r"\n\s*\n", text)
+    seen_normalized: set[str] = set()
+    kept: List[str] = []
+    for p in paras:
+        s = (p or "").strip()
+        if not s:
+            kept.append(p)
+            continue
+        # Normaliza para comparação: lowercase, colapsa espaços
+        norm = re.sub(r"\s+", " ", s.lower())
+        if len(norm) < 30:
+            kept.append(p)
+            continue
+        if norm in seen_normalized:
+            continue
+        seen_normalized.add(norm)
+        kept.append(p)
+    return "\n\n".join(kept)
 
 
 def _sanitize_rag_context_for_legislation(rag_context: str) -> str:
@@ -325,6 +397,12 @@ def _mark_pure_legal_citations_in_rag(rag_context: str) -> str:
         "será regido pelas regras",
         "inciso II do caput",
         "indicadas expressamente no edital",
+        "hipóteses de cancelamento da ata",
+        "contratação posterior de item específico",
+        "prévia pesquisa de mercado",
+        "descumprimento das determinações",
+        "presente artigo ensejará",
+        "ata de registro de preços",
     )
     result = []
     for c in chunks:
@@ -339,6 +417,23 @@ def _mark_pure_legal_citations_in_rag(rag_context: str) -> str:
         )
         result.append(marker + c if is_pure_legal else c)
     return sep.join(result)
+
+
+def _get_etp_preamble() -> str:
+    """
+    Retorna preâmbulo de instruções específicas para ETP (Estudo Técnico Preliminar).
+    Injetado no prompt quando document_type é ETP para refinar a geração.
+    """
+    return (
+        "\n\n=== DOCUMENTO ETP (ESTUDO TÉCNICO PRELIMINAR) ===\n"
+        "O ETP é um estudo interno da Administração, NÃO um contrato. Regras específicas:\n"
+        "- NUNCA use \"Art. X.\" no início de parágrafos – ETP não tem numeração de artigos.\n"
+        "- NUNCA use \"presente artigo\" ou \"neste artigo\" – use \"nesta seção\" ou \"neste documento\".\n"
+        "- NUNCA transcreva parágrafos literais de lei (ex.: \"O contrato será regido...\", \"As hipóteses de cancelamento...\"). Use como referência e redija em prosa.\n"
+        "- NUNCA inclua linhas de tabela (Item – Quantidade – Valor – Total) em prosa – tabelas ficam em seção própria.\n"
+        "- NUNCA repita frases ou parágrafos – cada um deve ser único.\n"
+        "- Adapte o conteúdo ao objeto específico; evite texto genérico.\n"
+    )
 
 
 def _document_type_to_rag_filter(document_type: str) -> str:
@@ -376,6 +471,29 @@ def _get_section_specific_instructions(
     """
     key = (section_key or "").lower()
     doc_type = (document_type or "").lower()
+    is_etp = "etp" in doc_type or "estudo" in doc_type
+
+    # ETP: Conclusão – sem Art., sem "presente artigo"
+    if "conclus" in key and is_etp:
+        return "\nINSTRUÇÕES ETP: Conclusão em prosa. NUNCA use \"Art. X.\" no início. NUNCA use \"presente artigo\". Use \"nesta seção\" ou \"neste documento\". Não repita parágrafos.\n"
+
+    # ETP: Objeto – sem tabela inline
+    if (key == "objeto" or key.startswith("objeto_")) and is_etp:
+        if for_list:
+            return "\nINSTRUÇÕES ETP: Liste partes do objeto. NUNCA inclua linhas de tabela. Sem tabelas inline.\n"
+        return "\nINSTRUÇÕES ETP: Defina o objeto com clareza. NUNCA inclua linhas de tabela (Item – Quantidade – Valor) em prosa. Para estimativa de custos, diga apenas \"conforme tabela na seção correspondente\". Adapte ao contexto.\n"
+
+    # ETP: Solução proposta – sem tabela inline
+    if "soluc" in key and is_etp:
+        return "\nINSTRUÇÕES ETP: Descreva a solução proposta. NUNCA inclua linhas de tabela de custos em prosa – use \"conforme tabela na seção correspondente\". Não repita.\n"
+
+    # ETP: Conformidade – sem lista de colunas
+    if ("conformidade" in key or "legislacao" in key or "legislação" in key) and is_etp:
+        return "\nINSTRUÇÕES ETP: Indique conformidade com Lei 14.133/2021. NUNCA liste \"Item, Quantidade, Valor Unitário, Total\" como itens – isso é estrutura de tabela, não de texto. Não repita frases.\n"
+
+    # ETP: Riscos / Análise de riscos
+    if "risco" in key and is_etp:
+        return "\nINSTRUÇÕES ETP: Descreva alocação de riscos de forma objetiva. Diferencie responsabilidades da Administração e do contratado. Não repita. Não transcreva trechos de lei.\n"
 
     # Alternativas Analisadas (ETP): ETP NÃO apresenta alternativas À CONTRATADA
     if "alternativa" in key and ("etp" in doc_type or "estudo" in doc_type):
@@ -493,8 +611,10 @@ async def _generate_clause_text(
     """Gera texto da cláusula via LLM usando contexto RAG, seção e especificacoes."""
     espec_text = _format_especificacoes(especificacoes)
     section_hint = _get_section_specific_instructions(section_key, for_list=False, document_type=document_type)
+    doc_type_lower = (document_type or "").lower()
+    etp_preamble = _get_etp_preamble() if ("etp" in doc_type_lower or "estudo" in doc_type_lower) else ""
     query = f"""Gerar o texto COMPLETO da cláusula "{section_title}" (section_key: {section_key}).
-
+{etp_preamble}
 Contexto do documento:
 - Tipo: {document_type}
 - Objeto: {context.get("objeto", "não informado")}
@@ -506,7 +626,8 @@ Contexto do documento:
 
 ATENÇÃO AO CONTEXTO RAG: Alguns exemplos podem conter trechos de citação legal pura (transcrição literal de artigos de lei). NÃO copie esses trechos como cláusulas narrativas – use-os apenas como referência para fundamentar; redija em prosa contratual adequada ao documento.
 
-Instruções: O PRIMEIRO caractere da sua resposta deve ser o início do conteúdo jurídico. Não comece com "Aqui estão...", "A cláusula deve...", "Segue..." ou qualquer intro. Redija DIRETAMENTE a cláusula. Português brasileiro, acentuação correta. Adapte ao contexto. Sem markdown. Sem placeholders []. Cite Lei 14.133/2021. Não repita frases (nem de outras seções nem dentro da mesma seção)."""
+Instruções: O PRIMEIRO caractere da sua resposta deve ser o início do conteúdo jurídico. Não comece com "Aqui estão...", "A cláusula deve...", "Segue..." ou qualquer intro. PROIBIDO: Nota:, Notas:, Atenção:, Observação: (meta), section_key. Redija DIRETAMENTE a cláusula. Português brasileiro. Sem markdown. Sem placeholders []. Cite Lei 14.133/2021. Não repita frases ou parágrafos."""
+
 
     full_prompt = f"<<SYSTEM>>\n{CLAUSE_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{query}"
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
@@ -531,16 +652,22 @@ Instruções: O PRIMEIRO caractere da sua resposta deve ser o início do conteú
 
 
 def _is_meta_comment_line(line: str) -> bool:
-    """Fallback mínimo: detecta linhas meta (section_key, intros, Nota: gerado...). Sanitização principal via LLM."""
+    """Detecta linhas meta (Nota:, Notas:, section_key, intros). Nunca incluir no documento."""
     import re
     s = (line or "").strip()
     if not s:
         return True
     if re.search(r"\(section_key\s*:\s*[a-z_]+\)", s, re.IGNORECASE):
         return True
-    if re.match(r"^Nota:\s*.*(?:gerado|texto foi|instruções|fornecidas)", s, re.IGNORECASE):
+    if re.match(r"^Nota:\s*", s, re.IGNORECASE):
+        return True
+    if re.match(r"^Notas:\s*", s, re.IGNORECASE):
+        return True
+    if re.match(r"^Atenção:\s*", s, re.IGNORECASE):
         return True
     if re.match(r"^(Aqui estão|Segue(?:m)? (?:aqui )?(?:os )?itens|A cláusula deve conter)", s, re.IGNORECASE):
+        return True
+    if re.match(r"^(O texto a seguir|Conforme instruções|Gerado com base em)", s, re.IGNORECASE):
         return True
     return False
 

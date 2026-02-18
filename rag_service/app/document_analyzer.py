@@ -2,14 +2,14 @@
 Analisador de documentos licitatórios contra a Lei 14.133/2021.
 
 Extrai texto de DOCX/PDF (sem OCR), recupera trechos da lei via RAG e analisa
-conformidade com o LLM. Saída direta: pontos importantes, acertos, erros.
+conformidade com o LLM. Processa documento inteiro por seções/chunks para
+não exceder o contexto do modelo.
 """
 from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 
@@ -19,33 +19,31 @@ from .config import (
     LLM_ORCHESTRATION_GENERATE_PATH,
     RAG_HTTP_TIMEOUT,
 )
-from .document_classifier import detect_document_type, extract_sections
+from .document_classifier import ExtractedSection, detect_document_type, extract_sections
 from .loaders import load_document_text
 from .retrieval import retrieve
 
-# Limites para caber no contexto do LLM (ajustar conforme modelo)
-MAX_DOCUMENT_CHARS = 10_000
-MAX_LAW_CHUNK_CHARS = 400
-MAX_LAW_CHUNKS = 5
+# Limite por chamada LLM (cada seção/chunk cabe no contexto)
+MAX_SECTION_CHARS = 2_800
+MAX_LAW_CHUNK_CHARS = 350
+MAX_LAW_CHUNKS = 4
 
-# Prompt estritamente enxuto – sem fluff
-ANALYSIS_SYSTEM_PROMPT = """Analise o documento em relação à Lei 14.133/2021 (Lei de Licitações e Contratos).
+# Prompt estritamente enxuto – sem fluff (por seção)
+ANALYSIS_SYSTEM_PROMPT = """Analise este TRECHO de documento em relação à Lei 14.133/2021.
 Responda APENAS em JSON válido. Sem intro, sem meta-comentários.
-Regras:
-- pontos_importantes: até 8 bullets objetivos (o que o doc trata).
-- acertos: lista do que está CORRETO conforme a lei (cite art. quando possível).
-- erros: lista do que está ERRADO ou viola a lei (cite art. sempre).
-- conformidade_geral: true SE não houver erros; false SE houver qualquer erro.
-- observacoes: uma frase curta ou string vazia.
-Nada mais."""
+- pontos_importantes: até 5 bullets (o que este trecho trata).
+- acertos: lista do que está CORRETO conforme a lei (cite art.).
+- erros: lista do que está ERRADO ou viola a lei (cite art.).
+- conformidade_geral: true SE não houver erros; false SE houver erros.
+- observacoes: uma frase ou vazio."""
 
-ANALYSIS_USER_PROMPT_TEMPLATE = """TRECHOS RELEVANTES DA LEI 14.133:
+ANALYSIS_USER_PROMPT_TEMPLATE = """TRECHOS DA LEI 14.133:
 {context}
 
-DOCUMENTO A ANALISAR:
+TRECHO DO DOCUMENTO ({section_hint}):
 {document}
 
-Retorne JSON: {"pontos_importantes": [...], "acertos": [...], "erros": [...], "conformidade_geral": bool, "observacoes": "..."}"""
+JSON: {{"pontos_importantes": [...], "acertos": [...], "erros": [...], "conformidade_geral": bool, "observacoes": "..."}}"""
 
 
 async def _call_llm(prompt: str) -> str:
@@ -95,6 +93,101 @@ def _infer_document_type(text: str) -> str:
     return doc_type.value if hasattr(doc_type, "value") else str(doc_type)
 
 
+def _chunk_text(text: str, max_size: int) -> List[str]:
+    """Quebra texto em chunks por parágrafos, respeitando max_size."""
+    if len(text) <= max_size:
+        return [text] if text.strip() else []
+    chunks = []
+    current = []
+    current_len = 0
+    for para in text.split("\n\n"):
+        para = para.strip()
+        if not para:
+            continue
+        if current_len + len(para) + 2 > max_size and current:
+            chunks.append("\n\n".join(current))
+            current = []
+            current_len = 0
+        current.append(para)
+        current_len += len(para) + 2
+    if current:
+        chunks.append("\n\n".join(current))
+    return chunks
+
+
+def _build_analysis_chunks(
+    sections: List[ExtractedSection],
+    raw_text: str,
+) -> List[Tuple[str, str]]:
+    """
+    Retorna lista de (texto, hint) para análise.
+    Se houver seções: uma entrada por seção (ou chunks se a seção for grande).
+    Se não: chunks do texto completo.
+    """
+    result: List[Tuple[str, str]] = []
+    if sections:
+        for sec in sections:
+            if not sec.content or not sec.content.strip():
+                continue
+            if len(sec.content) <= MAX_SECTION_CHARS:
+                result.append((sec.content, f"Seção: {sec.title}"))
+            else:
+                for i, chunk in enumerate(_chunk_text(sec.content, MAX_SECTION_CHARS)):
+                    hint = f"Seção {sec.title} (parte {i+1})"
+                    result.append((chunk, hint))
+    else:
+        for i, chunk in enumerate(_chunk_text(raw_text, MAX_SECTION_CHARS)):
+            result.append((chunk, f"Trecho {i+1}"))
+    return result
+
+
+def _merge_analysis_results(
+    parsed_list: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Agrega resultados de múltiplas chamadas LLM."""
+    all_pontos: List[str] = []
+    all_acertos: List[str] = []
+    all_erros: List[str] = []
+    any_error = False
+    obs_parts: List[str] = []
+
+    for p in parsed_list:
+        all_pontos.extend(p.get("pontos_importantes") or [])
+        all_acertos.extend(p.get("acertos") or [])
+        all_erros.extend(p.get("erros") or [])
+        if p.get("conformidade_geral") is False:
+            any_error = True
+        obs = (p.get("observacoes") or "").strip()
+        if obs:
+            obs_parts.append(obs)
+
+    # Deduplica mantendo ordem (simples: por igualdade)
+    def _dedup(items: List[str], limit: int = 20) -> List[str]:
+        seen_lower: set = set()
+        out = []
+        for x in items:
+            xn = (x or "").strip()
+            if not xn:
+                continue
+            k = xn.lower()
+            if k not in seen_lower:
+                seen_lower.add(k)
+                out.append(xn)
+                if len(out) >= limit:
+                    break
+        return out
+
+    return {
+        "pontos_importantes": _dedup(all_pontos, 12),
+        "acertos": _dedup(all_acertos, 15),
+        "erros": _dedup(all_erros, 15),
+        "conformidade_geral": False if any_error else (
+            all(p.get("conformidade_geral") for p in parsed_list) if parsed_list else None
+        ),
+        "observacoes": " | ".join(obs_parts[:3]) if obs_parts else "",
+    }
+
+
 async def analyze_document(
     path: Optional[str] = None,
     text: Optional[str] = None,
@@ -133,53 +226,69 @@ async def analyze_document(
             "observacoes": "",
         }
 
-    doc_text = raw_text[:MAX_DOCUMENT_CHARS]
-    if len(raw_text) > MAX_DOCUMENT_CHARS:
-        doc_text += "\n\n[... documento truncado ...]"
-
     sections = extract_sections(raw_text)
     sections_detected = [s.key for s in sections] if sections else []
     document_type = _infer_document_type(raw_text)
+    chunks = _build_analysis_chunks(sections, raw_text)
 
-    # RAG: trechos da Lei 14.133 (limitados para caber no contexto)
-    docs = retrieve(
-        query=doc_text,
-        collection_name=collection_name or CHROMA_COLLECTION,
-        top_k=k,
-        where={"document_type": "lei"},
-    )
-    if not docs:
+    if not chunks:
+        return {
+            "ok": True,
+            "document_type": document_type,
+            "sections_detected": sections_detected,
+            "pontos_importantes": [],
+            "acertos": [],
+            "erros": [],
+            "conformidade_geral": None,
+            "observacoes": "Documento sem conteúdo textual extraível.",
+        }
+
+    parsed_list: List[Dict[str, Any]] = []
+    coll = collection_name or CHROMA_COLLECTION
+
+    for doc_chunk, section_hint in chunks:
         docs = retrieve(
-            query=doc_text,
-            collection_name=collection_name or CHROMA_COLLECTION,
+            query=doc_chunk,
+            collection_name=coll,
             top_k=k,
-            where={"document_type": "outro"},
+            where={"document_type": "lei"},
         )
-        law_docs = [
-            d for d in docs
-            if "lei" in (d.get("metadata") or {}).get("source_file", "").lower()
-            or "14133" in (d.get("metadata") or {}).get("source_file", "")
-        ]
-        docs = law_docs if law_docs else docs[:2]
+        if not docs:
+            docs = retrieve(
+                query=doc_chunk,
+                collection_name=coll,
+                top_k=k,
+                where={"document_type": "outro"},
+            )
+            law_docs = [
+                d for d in docs
+                if "lei" in (d.get("metadata") or {}).get("source_file", "").lower()
+                or "14133" in (d.get("metadata") or {}).get("source_file", "")
+            ]
+            docs = law_docs if law_docs else docs[:2]
 
-    context = "\n\n---\n\n".join(
-        (d.get("content", "") or "")[:MAX_LAW_CHUNK_CHARS] for d in docs[:MAX_LAW_CHUNKS]
-    ) if docs else "Lei 14.133 não indexada. Analise com base em conhecimento geral."
+        context = "\n\n---\n\n".join(
+            (d.get("content", "") or "")[:MAX_LAW_CHUNK_CHARS] for d in docs[:MAX_LAW_CHUNKS]
+        ) if docs else "Lei 14.133 não indexada. Analise com base em conhecimento geral."
 
-    user_part = ANALYSIS_USER_PROMPT_TEMPLATE.format(
-        context=context, document=doc_text
-    )
-    prompt = f"{ANALYSIS_SYSTEM_PROMPT}\n\n{user_part}"
-    llm_response = await _call_llm(prompt)
-    parsed = _parse_analysis_response(llm_response)
+        user_part = ANALYSIS_USER_PROMPT_TEMPLATE.format(
+            context=context,
+            document=doc_chunk,
+            section_hint=section_hint,
+        )
+        prompt = f"{ANALYSIS_SYSTEM_PROMPT}\n\n{user_part}"
+        llm_response = await _call_llm(prompt)
+        parsed_list.append(_parse_analysis_response(llm_response))
+
+    merged = _merge_analysis_results(parsed_list)
 
     return {
         "ok": True,
         "document_type": document_type,
         "sections_detected": sections_detected,
-        "pontos_importantes": parsed.get("pontos_importantes") or [],
-        "acertos": parsed.get("acertos") or [],
-        "erros": parsed.get("erros") or [],
-        "conformidade_geral": parsed.get("conformidade_geral"),
-        "observacoes": (parsed.get("observacoes") or "").strip(),
+        "pontos_importantes": merged["pontos_importantes"],
+        "acertos": merged["acertos"],
+        "erros": merged["erros"],
+        "conformidade_geral": merged["conformidade_geral"],
+        "observacoes": merged["observacoes"],
     }

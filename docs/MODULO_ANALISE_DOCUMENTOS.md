@@ -24,14 +24,19 @@ Analisar documentos (ETP, DFD, TR, contratos, editais) e retornar:
 ## 2. Fluxo
 
 ```
-[Upload DOCX/PDF] → [Extração de texto] → [RAG: busca Lei 14.133] → [LLM analisa] → [Resposta estruturada]
+[Upload DOCX/PDF] → [Extração de texto] → [Seções/chunks] → para cada chunk:
+  [RAG: busca Lei 14.133] → [LLM analisa chunk] → [agrega resultados]
+→ [Resposta estruturada]
 ```
 
 1. **Entrada**: Arquivo DOCX ou PDF (caminho ou upload)
 2. **Extração**: `load_document_text()` (pypdf para PDF, docx2txt para DOCX)
-3. **RAG**: Recuperar trechos da Lei 14.133 (document_type=lei) relevantes ao texto
-4. **LLM**: Prompt enxuto com documento + trechos da lei → análise estruturada
-5. **Saída**: JSON com pontos importantes, conformidade, acertos, erros
+3. **Chunking**: documento é dividido em seções (ou chunks de ~2,8k chars se sem seções)
+4. **Por chunk**: RAG recupera Lei 14.133; LLM analisa; resultado parseado
+5. **Agregação**: merge de pontos_importantes, acertos, erros (com deduplicação)
+6. **Saída**: JSON com pontos importantes, conformidade, acertos, erros
+
+Documentos grandes são analisados inteiramente, sem truncar.
 
 ---
 

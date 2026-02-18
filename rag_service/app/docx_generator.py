@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt, RGBColor
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
@@ -173,8 +174,14 @@ def json_to_docx(
     doc = Document()
     _apply_document_styles(doc)
     doc_type = structure.get("document_type", "documento")
-    doc.add_heading(_document_type_to_title(doc_type), level=0)
-    doc.add_paragraph()
+    title_para = doc.add_paragraph()
+    title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    title_run = title_para.add_run(_document_type_to_title(doc_type))
+    title_run.font.name = FONT_NAME
+    title_run.font.size = Pt(16)
+    title_run.font.bold = True
+    title_run.font.color.rgb = FONT_COLOR
+    title_para.paragraph_format.space_after = Pt(6)
 
     for node in root_sections:
         _render_section(doc, node, section_texts, table_data, level=0)

@@ -10,6 +10,7 @@ cssselect2==0.8.0
 distro==1.9.0
 Django==5.2.6
 django-autocomplete-light==3.12.1
+django-cors-headers==4.3.1
 django-crispy-forms==2.4
 django-nested-admin==4.1.4
 django-unfold==0.67.0
@@ -47,5 +48,6 @@ typing-inspection==0.4.2
 typing_extensions==4.15.0
 urllib3==2.5.0
 weasyprint==66.0
+whitenoise==6.6.0
 webencodings==0.5.1
 zopfli==0.2.3.post1

@@ -194,7 +194,24 @@ curl -X POST "http://localhost:8004/api/rag/render-document?format=json" \
   -d '{"structure": {"document_type": "termo_referencia", "root_sections": [{"key": "objeto", "title": "DO OBJETO", "content_type": "text", "required": true, "children": []}]}, "section_texts": {"objeto": "Objeto do contrato."}}'
 
 # --------------------------------------------
-# VERIFICAR CONFORMIDADE (Lei 14.133)
+# --------------------------------------------
+# ANALISAR DOCUMENTO (Lei 14.133)
+# --------------------------------------------
+# Envia DOCX ou PDF e retorna análise: pontos importantes, acertos, erros, conformidade.
+# Requer: Lei 14.133 ingerida (smart-ingest LEI_14_133).
+
+# Por upload:
+curl -X POST http://localhost:8004/api/rag/analyze-document \
+  -F "file=@/caminho/documento.pdf" \
+  -F "top_k=8"
+
+# Por path (arquivo no servidor):
+curl -X POST http://localhost:8004/api/rag/analyze-document \
+  -F "path=/data/treinamento/ETP/etp_coleta.pdf" \
+  -F "top_k=8"
+
+# --------------------------------------------
+# VERIFICAR CONFORMIDADE (Lei 14.133) - texto solto
 # --------------------------------------------
 
 # Verifica se texto gerado está em conformidade com a lei

@@ -13,7 +13,7 @@ Visão geral de como a autenticação está implementada no backend Django e na 
 | **Session** | Padrão Django | `SessionMiddleware` + `AuthenticationMiddleware`; sessão em banco (db.sqlite3) por padrão. |
 | **CSRF** | `CsrfViewMiddleware` ativo | APIs de login/logout e outras que o frontend chama usam `@csrf_exempt` para aceitar POST sem token CSRF. |
 
-Não há **CORS** configurado no Django. O frontend Vue usa **proxy do Vite** (`/api` → `http://127.0.0.1:8000`), então as requisições saem como mesma origem (localhost:5173) e o cookie de sessão é enviado. Em produção ou sem proxy, será necessário configurar CORS (ex.: `django-cors-headers`) com origem permitida e `Credentials: true`.
+**CORS** está configurado via `django-cors-headers`. Em desenvolvimento (DEBUG=True), as origens `http://localhost:5173` e `http://127.0.0.1:5173` são permitidas. Em produção, defina a variável de ambiente `CORS_ALLOWED_ORIGINS` com as origens separadas por vírgula (ex.: `https://app.exemplo.com`). O frontend usa `credentials: 'include'`, por isso `CORS_ALLOW_CREDENTIALS = True` está ativo.
 
 ---
 

@@ -157,3 +157,17 @@ class CheckComplianceResponse(BaseModel):
         description="Trechos da lei recuperados como referência.",
     )
     error: Optional[str] = Field(None, description="Erro, se houver.")
+
+
+class AnalyzeDocumentResponse(BaseModel):
+    """Resposta da análise de documento contra Lei 14.133."""
+
+    ok: bool = Field(..., description="Indica sucesso.")
+    document_type: str = Field("outro", description="etp, dfd, termo_referencia, contrato, outro")
+    sections_detected: List[str] = Field(default_factory=list, description="Seções identificadas")
+    pontos_importantes: List[str] = Field(default_factory=list, description="Pontos principais do doc")
+    acertos: List[str] = Field(default_factory=list, description="O que está correto conforme a lei")
+    erros: List[str] = Field(default_factory=list, description="O que está incorreto ou viola a lei")
+    conformidade_geral: Optional[bool] = Field(None, description="True=conforme, False=não")
+    observacoes: str = Field("", description="Comentário breve")
+    error: Optional[str] = Field(None, description="Erro, se houver")

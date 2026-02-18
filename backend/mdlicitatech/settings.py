@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -27,10 +28,30 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+# CORS: frontend Vue em origem diferente do Django (necessário para credentials: 'include') em origem diferente do Django (ex.: localhost:5173 ou app em outro domínio)
+_cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "").strip()
+if _cors_origins:
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(",") if o.strip()]
+elif DEBUG:
+    CORS_ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+else:
+    CORS_ALLOWED_ORIGINS = []
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+]
 
 # Application definition (apps internos e terceiros usados pelo painel/admin/UX)
 
 INSTALLED_APPS = [
+    "corsheaders",
     "nested_admin",
     'dal',
     'dal_select2',
@@ -54,6 +75,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -333,11 +356,11 @@ UNFOLD = {
 
 STATIC_URL = "static/"
 
-STATICFILES_DIRS = [BASE_DIR / "static"] 
+STATICFILES_DIRS = [BASE_DIR / "static"]
+# WhiteNoise: compressa arquivos em collectstatic e serve com cache em produção
+STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage" 
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
-
-import os
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

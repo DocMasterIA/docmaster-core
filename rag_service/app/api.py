@@ -7,12 +7,13 @@ from __future__ import annotations
 
 import base64
 import logging
+import tempfile
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, FastAPI, HTTPException, Query
+from fastapi import APIRouter, File, FastAPI, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, field_validator
 
@@ -20,6 +21,7 @@ from .chroma_client import delete_collection, get_chroma_client, list_collection
 from .ingestion import ingest_text
 from .retrieval import check_compliance, generate_answer, retrieve
 from .schemas import (
+    AnalyzeDocumentResponse,
     CheckComplianceRequest,
     CheckComplianceResponse,
     CollectionsResponse,
@@ -403,6 +405,71 @@ async def endpoint_summary(collection: Optional[str] = None) -> dict:
         return {"ok": True, **summary}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+
+@router.post("/analyze-document", response_model=AnalyzeDocumentResponse)
+async def endpoint_analyze_document(
+    file: Optional[UploadFile] = File(None, description="DOCX ou PDF (upload)"),
+    path: Optional[str] = Form(None, description="Caminho do arquivo (alternativa ao upload)"),
+    top_k: int = Query(8, description="Trechos da Lei 14.133 a recuperar"),
+    collection: Optional[str] = Form(None),
+) -> AnalyzeDocumentResponse:
+    """
+    Analisa documento contra a Lei 14.133/2021.
+
+    Envie `file` (upload) OU `path` (caminho no servidor).
+    Retorna pontos importantes, acertos, erros e conformidade.
+    Sem OCR – apenas documentos com texto nativo.
+    """
+    from .document_analyzer import analyze_document
+    from .loaders import load_document_text
+
+    if file and path:
+        raise HTTPException(
+            status_code=400,
+            detail="Informe apenas file (upload) OU path.",
+        )
+    if not file and not path:
+        raise HTTPException(
+            status_code=400,
+            detail="Informe file (upload) ou path do arquivo DOCX/PDF.",
+        )
+
+    try:
+        if file:
+            suffix = Path(file.filename or "doc.pdf").suffix.lower()
+            if suffix not in (".pdf", ".docx", ".doc"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Formato não suportado. Use DOCX ou PDF.",
+                )
+            contents = await file.read()
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                tmp.write(contents)
+                tmp_path = tmp.name
+            try:
+                text = load_document_text(tmp_path)
+                result = await analyze_document(
+                    text=text,
+                    collection_name=collection,
+                    top_k=top_k,
+                )
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
+        else:
+            result = await analyze_document(
+                path=path,
+                collection_name=collection,
+                top_k=top_k,
+            )
+        return AnalyzeDocumentResponse(ok=True, **{k: v for k, v in result.items() if k != "ok"})
+    except FileNotFoundError:
+        return AnalyzeDocumentResponse(ok=False, error=f"Arquivo não encontrado: {path}")
+    except ValueError as e:
+        return AnalyzeDocumentResponse(ok=False, error=str(e))
+    except Exception as e:
+        logger.exception("Erro em analyze-document: %s", e)
+        return AnalyzeDocumentResponse(ok=False, error=str(e))
 
 
 @router.post("/classify")

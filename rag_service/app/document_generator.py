@@ -66,6 +66,54 @@ Regras:
 """
 
 
+def _convert_markdown_table_to_plain(text: str) -> str:
+    """
+    Converte blocos de tabela markdown (| col | col | + | --- | + | val |)
+    em lista numerada legível, preservando o conteúdo.
+    """
+    import re
+    if not text or "|" not in text:
+        return text
+    lines = text.split("\n")
+    result: List[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        # Detecta início de tabela markdown: linha com | ... |
+        if re.match(r"^\s*\|.+\|\s*$", line):
+            block: List[str] = [line]
+            j = i + 1
+            while j < len(lines) and re.match(r"^\s*\|.+\|\s*$", lines[j]):
+                block.append(lines[j])
+                j += 1
+            # Parse: header, separador (|---|), dados
+            rows: List[List[str]] = []
+            for bl in block:
+                cells = [c.strip() for c in bl.strip().strip("|").split("|")]
+                if not cells:
+                    continue
+                # Pula linha separadora (só --- ou vazio)
+                if all(re.match(r"^[\s\-:]*$", c) for c in cells):
+                    continue
+                rows.append(cells)
+            if len(rows) >= 2:
+                # Converte em lista numerada (preserva conteúdo das células)
+                conv = []
+                for i, row in enumerate(rows[1:], 1):
+                    clean = " – ".join(c for c in row if c)
+                    if clean:
+                        conv.append(f"{i}. {clean}")
+                if conv:
+                    result.append("\n".join(conv))
+                    i = j
+                    if i < len(lines) and lines[i].strip():
+                        result.append("")
+                    continue
+        result.append(line)
+        i += 1
+    return "\n".join(result)
+
+
 def _postprocess_clause_text(text: str) -> str:
     """
     Limpa saída do LLM antes de ir para o DOCX.
@@ -124,6 +172,8 @@ def _postprocess_clause_text(text: str) -> str:
         t,
         flags=re.IGNORECASE,
     )
+    # Converte tabelas markdown (| col1 | col2 | + | --- | + | val |) em lista legível
+    t = _convert_markdown_table_to_plain(t)
     # Remove marcadores markdown no início de linha (* ou - , inclusive com espaços)
     t = re.sub(r"^\s*[\*\-]\s+", "", t, flags=re.MULTILINE)
     # Remove títulos/cabeçalhos no início do texto (o título da seção já é inserido automaticamente)

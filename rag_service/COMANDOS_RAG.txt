@@ -264,3 +264,52 @@ curl http://localhost:8004/api/rag/health
 # ~/treinamento/TERMO DE REFERENCIA/
 # ~/treinamento/ETP/
 # ~/treinamento/DFD/
+
+
+
+# doc1 - ETP simples
+curl -X POST "http://localhost:8004/api/rag/generate-document?output_docx=true" \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "Gerar ETP para coleta seletiva."}' -o doc1.docx
+
+# doc2 - ETP com especificações
+curl -X POST "http://localhost:8004/api/rag/generate-document?output_docx=true" \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "Gerar ETP para coleta seletiva. Lista de equipamentos: caminhão, contêineres, EPI. Estimativa com Item, Quantidade, Valor unitário, Total."}' -o doc2.docx
+
+# doc3 - Termo de Referência
+curl -X POST "http://localhost:8004/api/rag/generate-document?output_docx=true" \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "Gerar Termo de Referência para manutenção predial."}' -o doc3.docx
+
+# doc4 - TR com modalidade
+curl -X POST "http://localhost:8004/api/rag/generate-document?output_docx=true" \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "Gerar TR para aquisição de medicamentos. Modalidade: pregão eletrônico. Órgão: Secretaria de Saúde."}' -o doc4.docx
+
+# doc5 - DFD
+curl -X POST "http://localhost:8004/api/rag/generate-document?output_docx=true" \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "Gerar DFD para formalização de demanda de compra de mobiliário escolar."}' -o doc5.docx
+
+# doc6 - ETP pavimentação
+curl -X POST "http://localhost:8004/api/rag/generate-document?output_docx=true" \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "Gerar ETP para pavimentação asfáltica de vias urbanas."}' -o doc6.docx
+
+# doc7 - ETP iluminação
+curl -X POST "http://localhost:8004/api/rag/generate-document?output_docx=true" \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "Gerar ETP para iluminação pública LED. Órgão: Secretaria de Infraestrutura."}' -o doc7.docx
+
+# doc8 - TR serviços
+curl -X POST "http://localhost:8004/api/rag/generate-document?output_docx=true" \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "Gerar TR para contratação de serviços de limpeza urbana."}' -o doc8.docx
+
+# doc9 - DFD com tabela
+curl -X POST "http://localhost:8004/api/rag/generate-document?output_docx=true" \
+  -H "Content-Type: application/json" \
+  -d '{"user_prompt": "Gerar DFD para demanda de TI. Tabela com Item, Descrição, Quantidade, Valor estimado."}' -o doc9.docx
+
+# doc10 - ETP específico

@@ -33,18 +33,17 @@ MAX_LAW_CHUNKS = 4
 ANALYSIS_SYSTEM_PROMPT = """Analise este TRECHO de documento em relação à Lei 14.133/2021.
 Responda APENAS em JSON válido. Sem intro, sem meta-comentários.
 
-REGRAS DE PRECISÃO:
-1. Só cite artigo/parágrafo que SEJA APLICÁVEL ao contexto do trecho. Ex.: Art. 46 § 5º trata de contratação semi-integrada e alteração do projeto básico pelo contratado – não use para parcelamento da solução (isso é § 4º ou outro).
-2. Em erros: descreva o que falta ou viola E cite o dispositivo que exige isso. Confira se o dispositivo citado trata exatamente daquele ponto.
-3. Acertos: cite art. só quando o trecho da lei recuperado realmente comprove o acerto.
-4. Se houver dúvida se o art. se aplica, coloque em observacoes, não em erros.
-5. Não invente dispositivos. Use apenas os trechos da lei fornecidos no contexto.
+REGRAS:
+1. acertos: liste o que o documento FAZ CERTO conforme os trechos da lei fornecidos. Cite art./§ quando o trecho da lei comprovar. Não deixe vazio se houver conformidade.
+2. erros: liste o que FALTA ou VIOLA, citando art./§ que exige. Só inclua se o dispositivo citado tratar exatamente daquele ponto (ex.: Art. 46 § 5º = semi-integrada + alteração de projeto – não usar para parcelamento).
+3. conformidade_geral: true SE erros estiver vazio; false SE houver ao menos um erro.
+4. Use apenas dispositivos presentes nos trechos da lei fornecidos. Não invente.
+5. Em dúvida sobre aplicabilidade: coloque em observacoes, não em erros.
 
 - pontos_importantes: até 5 bullets (o que este trecho trata).
-- acertos: lista do que está CORRETO (cite art. quando o contexto da lei comprovar).
-- erros: lista do que está ERRADO (descreva o problema + art. § que o exige; confira aplicabilidade).
-- conformidade_geral: true SE não houver erros; false SE houver erros confirmados.
-- observacoes: dúvidas ou sugestões que não são erros explícitos."""
+- acertos: itens em conformidade (obrigatório preencher quando houver).
+- erros: itens em desacordo (só com art./§ aplicável).
+- observacoes: sugestões ou dúvidas (opcional)."""
 
 ANALYSIS_USER_PROMPT_TEMPLATE = """TRECHOS DA LEI 14.133:
 {context}
@@ -52,7 +51,7 @@ ANALYSIS_USER_PROMPT_TEMPLATE = """TRECHOS DA LEI 14.133:
 TRECHO DO DOCUMENTO ({section_hint}):
 {document}
 
-Use os trechos da lei acima. Cite apenas o que consta neles. Verifique se cada art./§ citado trata do ponto que você está avaliando.
+Analise: o que está correto (acertos) e o que falta/erro (erros). Cite art. só dos trechos acima. conformidade_geral=false somente se houver erros.
 JSON: {{"pontos_importantes": [...], "acertos": [...], "erros": [...], "conformidade_geral": bool, "observacoes": "..."}}"""
 
 

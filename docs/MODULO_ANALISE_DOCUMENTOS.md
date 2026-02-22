@@ -40,6 +40,22 @@ Documentos grandes são analisados inteiramente, sem truncar.
 
 ---
 
+## 2.1 Arquitetura: mesma coleção, sem interferir no gerador
+
+O RAG usa **uma única coleção** ChromaDB (ex.: `docmaster_docs`), mas o **retrieval é filtrado por metadado `document_type`**:
+
+| Quem | Filtro no retrieval | O que recupera |
+|------|---------------------|----------------|
+| **Gerador de documentos** | `document_type` = `termo_referencia`, `etp` ou `dfd` | Exemplos do tipo de documento que está gerando (TR, ETP, DFD). |
+| **Módulo de análise** | 1) `document_type` = `lei` (fallback `outro`) 2) `document_type` = `guia` (até 2 trechos por chunk) | Lei 14.133 + manuais/modelos de licitações. |
+
+O **documento modelo de licitações** (TR modelo, manuais etc.) deve ser ingerido via **`POST /api/rag/ingest-manual`**. Esse endpoint grava os chunks com **`document_type="guia"`**. Assim:
+
+- O **analisador** passa a recuperar também trechos com `guia` (além da lei) e usa esse contexto na análise.
+- O **gerador** continua buscando apenas `termo_referencia` / `etp` / `dfd`; não usa `guia`. Portanto, ingerir o modelo para enriquecer a análise **não altera** o comportamento do gerador de documentos.
+
+---
+
 ## 3. Contrato da API
 
 ### Request

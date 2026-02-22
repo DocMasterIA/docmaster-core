@@ -151,6 +151,9 @@ def ingest_manual(
             "by_tipo": {},
         }
 
+    # ChromaDB limita o tamanho do batch (ex.: 5461); envia em lotes.
+    CHROMA_ADD_BATCH_SIZE = 2000
+
     client = get_chroma_client()
     coll_name = collection_name or CHROMA_COLLECTION
     embeddings = _get_embedding_function()
@@ -159,7 +162,11 @@ def ingest_manual(
         embedding_function=embeddings,
         client=client,
     )
-    ids = vectorstore.add_documents(docs)
+    all_ids: List[str] = []
+    for i in range(0, len(docs), CHROMA_ADD_BATCH_SIZE):
+        batch = docs[i : i + CHROMA_ADD_BATCH_SIZE]
+        batch_ids = vectorstore.add_documents(batch)
+        all_ids.extend(batch_ids)
 
     by_tipo: Dict[str, int] = {}
     for d in docs:
@@ -169,7 +176,7 @@ def ingest_manual(
     return {
         "file": Path(path).name,
         "document_type": "guia",
-        "chunks_added": len(ids),
+        "chunks_added": len(all_ids),
         "collection": coll_name,
         "by_tipo": by_tipo,
     }

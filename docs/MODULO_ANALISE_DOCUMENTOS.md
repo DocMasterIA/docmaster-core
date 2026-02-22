@@ -49,7 +49,7 @@ O RAG usa **uma única coleção** ChromaDB (ex.: `docmaster_docs`), mas o **ret
 | **Gerador de documentos** | `document_type` = `termo_referencia`, `etp` ou `dfd` | Exemplos do tipo de documento que está gerando (TR, ETP, DFD). |
 | **Módulo de análise** | 1) `document_type` = `lei` (fallback `outro`) 2) `document_type` = `guia` (até 2 trechos por chunk) | Lei 14.133 + manuais/modelos de licitações. |
 
-O **documento modelo de licitações** (TR modelo, manuais etc.) deve ser ingerido via **`POST /api/rag/ingest-manual`**. Esse endpoint grava os chunks com **`document_type="guia"`**. Assim:
+O **documento modelo de licitações** (TR modelo, manuais etc.) deve ser ingerido via **`POST /api/rag/ingest-manual`**. Esse endpoint grava os chunks com **`document_type="guia"`**. Exemplos de curl (path no servidor ou upload) estão em **[INGESTAO_GUIA_ETP_DFD_TR.md](INGESTAO_GUIA_ETP_DFD_TR.md)**. Assim:
 
 - O **analisador** passa a recuperar também trechos com `guia` (além da lei) e usa esse contexto na análise.
 - O **gerador** continua buscando apenas `termo_referencia` / `etp` / `dfd`; não usa `guia`. Portanto, ingerir o modelo para enriquecer a análise **não altera** o comportamento do gerador de documentos.

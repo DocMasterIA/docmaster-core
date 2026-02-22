@@ -90,6 +90,9 @@ Content-Type: multipart/form-data ou application/json (com path)
     "Objeto descrito claramente",
     "Prazo dentro do limite da Lei 14.133 (art. X)"
   ],
+  "ressalvas": [
+    "Justificativa para não elaboração de cronograma está presente, embora seja questionável a necessidade"
+  ],
   "erros": [
     "Vigência de 24 meses excede limite para serviços (art. 98, § 2º)",
     "Garantia de proposta não mencionada"
@@ -104,9 +107,10 @@ Content-Type: multipart/form-data ou application/json (com path)
 | sections_detected  | list     | Seções identificadas no documento        |
 | pontos_importantes | list     | Resumo objetivo (bullets)                |
 | conformidade_geral | bool     | true = em conformidade, false = não      |
-| acertos            | list     | O que está correto                       |
-| erros              | list     | O que está incorreto/viola a lei         |
-| observacoes        | string   | Comentário breve (opcional)              |
+| acertos            | list     | O que está correto (apenas itens claros, sem dúvida) |
+| ressalvas          | list     | Itens ambíguos ou positivos com dúvida/ressalva       |
+| erros              | list     | O que está incorreto/viola a lei                     |
+| observacoes        | string   | Comentário breve (opcional)                          |
 
 ---
 

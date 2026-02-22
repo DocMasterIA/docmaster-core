@@ -464,7 +464,7 @@ async def endpoint_analyze_document(
     Analisa documento contra a Lei 14.133/2021.
 
     Envie `file` (upload) OU `path` (caminho no servidor).
-    Retorna pontos importantes, acertos, erros e conformidade.
+    Retorna pontos importantes, acertos, ressalvas (itens ambíguos), erros e conformidade.
     Sem OCR – apenas documentos com texto nativo.
     """
     from .document_analyzer import analyze_document

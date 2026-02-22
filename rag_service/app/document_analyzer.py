@@ -40,10 +40,11 @@ PREFIRA: "Falta justificativa para a contratação integrada" em vez de "Não h�
 
 REGRAS:
 1. pontos_importantes: até 5 bullets – o que este trecho trata (objeto, justificativa, prazo, etc.).
-2. acertos: o que o documento faz BEM – descreva em linguagem clara. Ex.: "Objeto descrito com clareza", "Justificativa técnica adequada".
-3. erros: o que FALTA ou está INCORRETO – descreva o problema e o que deveria ter, sem citar art. Ex.: "Não há justificativa para não parcelar a solução", "Cronograma físico-financeiro ausente".
-4. conformidade_geral: true SE erros vazio; false SE houver erros.
-5. observacoes: sugestões breves ou dúvidas (opcional)."""
+2. acertos: APENAS o que o documento faz BEM de forma CLARA e INEQUÍVOCA. Frases curtas e diretas, sem "embora", "questionável", "porém". Ex.: "Objeto descrito com clareza", "Justificativa técnica adequada para a contratação integrada". Se houver dúvida ou ressalva, NÃO coloque em acertos.
+3. ressalvas: itens que são em parte positivos mas têm dúvida, ambiguidade ou ressalva. Ex.: "Justificativa para não elaboração de cronograma está presente, embora seja questionável a necessidade", "Cronograma mencionado mas será apresentado posteriormente". Use quando o ponto não é nem acerto claro nem erro claro.
+4. erros: o que FALTA ou está INCORRETO – descreva o problema e o que deveria ter, sem citar art. Ex.: "Não há justificativa para não parcelar a solução", "Cronograma físico-financeiro ausente".
+5. conformidade_geral: true SE erros vazio; false SE houver erros.
+6. observacoes: sugestões breves (opcional)."""
 
 ANALYSIS_USER_PROMPT_TEMPLATE = """CONTEXTO (Lei 14.133 e boas práticas):
 {context}
@@ -51,8 +52,10 @@ ANALYSIS_USER_PROMPT_TEMPLATE = """CONTEXTO (Lei 14.133 e boas práticas):
 TRECHO DO DOCUMENTO ({section_hint}):
 {document}
 
-Use o contexto para avaliar. Responda em linguagem DIRETA e FUNCIONAL. Não cite artigos na saída – descreva o acerto ou o problema de forma que o usuário entenda.
-JSON: {{"pontos_importantes": [...], "acertos": [...], "erros": [...], "conformidade_geral": bool, "observacoes": "..."}}"""
+Use o contexto para avaliar. Responda em linguagem DIRETA e FUNCIONAL. Não cite artigos na saída.
+- acertos: só itens claramente positivos, sem ressalva.
+- ressalvas: itens ambíguos ou positivos com dúvida/ressalva.
+JSON: {{"pontos_importantes": [...], "acertos": [...], "ressalvas": [...], "erros": [...], "conformidade_geral": bool, "observacoes": "..."}}"""
 
 
 def _decode_html(text: str) -> str:
@@ -117,6 +120,7 @@ def _parse_analysis_response(text: Any) -> Dict[str, Any]:
         return {
             "pontos_importantes": [],
             "acertos": [],
+            "ressalvas": [],
             "erros": [],
             "conformidade_geral": None,
             "observacoes": "Resposta do LLM não pôde ser interpretada como JSON.",
@@ -265,6 +269,7 @@ def _merge_analysis_results(
     """Agrega resultados de múltiplas chamadas LLM."""
     all_pontos: List[str] = []
     all_acertos: List[str] = []
+    all_ressalvas: List[str] = []
     all_erros: List[str] = []
     any_error = False
     obs_parts: List[str] = []
@@ -274,6 +279,8 @@ def _merge_analysis_results(
             all_pontos.append(_ensure_str(item))
         for item in p.get("acertos") or []:
             all_acertos.append(_ensure_str(item))
+        for item in p.get("ressalvas") or []:
+            all_ressalvas.append(_ensure_str(item))
         for item in p.get("erros") or []:
             all_erros.append(_ensure_str(item))
         if p.get("conformidade_geral") is False:
@@ -312,13 +319,29 @@ def _merge_analysis_results(
     def _clean(items: List[str]) -> List[str]:
         return [_decode_html(x) for x in items]
 
-    acertos_dedup = _dedup(all_acertos, 25)
+    # Mover acertos ambíguos (embora, questionável, porém) para ressalvas
+    def _is_ambiguous_acerto(s: str) -> bool:
+        low = (s or "").lower()
+        return any(x in low for x in ("embora", "questionável", "porém", "porem", "todavia", "contudo", "entretanto", " no entanto ", "será apresentad", "mencionado que será"))
+
+    acertos_sem_ambiguos: List[str] = []
+    for item in all_acertos:
+        if _is_ambiguous_acerto(item):
+            all_ressalvas.append(item)
+        else:
+            acertos_sem_ambiguos.append(item)
+
+    acertos_dedup = _dedup(acertos_sem_ambiguos, 25)
     erros_dedup = _dedup(all_erros, 25)
     acertos_sub = _drop_subsumed(acertos_dedup)
     erros_sub = _drop_subsumed(erros_dedup)
     acertos_overlap = _merge_by_word_overlap(acertos_sub, threshold=0.6)
     erros_overlap = _merge_by_word_overlap(erros_sub, threshold=0.6)
     acertos_final, erros_final, obs_contrad = _drop_contradictions(acertos_overlap, erros_overlap)
+
+    ressalvas_dedup = _dedup(all_ressalvas, 15)
+    ressalvas_sub = _drop_subsumed(ressalvas_dedup)
+    ressalvas_final = _merge_by_word_overlap(ressalvas_sub, threshold=0.6)
 
     observacoes_base = _decode_html(" | ".join(obs_parts[:3]) if obs_parts else "")
     observacoes_full = " | ".join([observacoes_base, *obs_contrad[:2]]) if obs_contrad else observacoes_base
@@ -327,6 +350,7 @@ def _merge_analysis_results(
     return {
         "pontos_importantes": _clean(_merge_by_word_overlap(_drop_subsumed(_dedup(all_pontos, 12)), 0.65)),
         "acertos": _clean(acertos_final),
+        "ressalvas": _clean(ressalvas_final),
         "erros": _clean(erros_final),
         "conformidade_geral": False if any_error else (
             all(p.get("conformidade_geral") for p in parsed_list) if parsed_list else None
@@ -352,7 +376,7 @@ async def analyze_document(
 
     Returns:
         Dict com document_type, sections_detected, pontos_importantes, acertos,
-        erros, conformidade_geral, observacoes.
+        ressalvas, erros, conformidade_geral, observacoes.
     """
     k = top_k if top_k is not None else MAX_LAW_CHUNKS
 
@@ -368,6 +392,7 @@ async def analyze_document(
             "sections_detected": [],
             "pontos_importantes": [],
             "acertos": [],
+            "ressalvas": [],
             "erros": [],
             "conformidade_geral": None,
             "observacoes": "",
@@ -385,6 +410,7 @@ async def analyze_document(
             "sections_detected": sections_detected,
             "pontos_importantes": [],
             "acertos": [],
+            "ressalvas": [],
             "erros": [],
             "conformidade_geral": None,
             "observacoes": "Documento sem conteúdo textual extraível.",
@@ -448,6 +474,7 @@ async def analyze_document(
         "sections_detected": sections_detected,
         "pontos_importantes": merged["pontos_importantes"],
         "acertos": merged["acertos"],
+        "ressalvas": merged["ressalvas"],
         "erros": merged["erros"],
         "conformidade_geral": merged["conformidade_geral"],
         "observacoes": merged["observacoes"],

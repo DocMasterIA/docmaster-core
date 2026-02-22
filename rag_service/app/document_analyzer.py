@@ -177,6 +177,88 @@ def _build_analysis_chunks(
     return result
 
 
+def _word_tokens(s: str) -> set:
+    """Tokens normalizados (min 2 chars) para comparação de similaridade."""
+    s = (s or "").lower()
+    words = re.findall(r"[a-záàâãéêíóôõúç0-9]{2,}", s)
+    return set(words)
+
+
+def _word_overlap_ratio(a: set, b: set) -> float:
+    """Razão de sobreposição: |a ∩ b| / max(|a|, |b|). Alto quando um é quase subconjunto do outro."""
+    if not a or not b:
+        return 0.0
+    inter = len(a & b)
+    return inter / max(len(a), len(b))
+
+
+def _merge_by_word_overlap(items: List[str], threshold: float = 0.6) -> List[str]:
+    """Mantém um item por 'cluster' de paráfrases (alta sobreposição de palavras). Ordem preservada."""
+    kept: List[str] = []
+    for item in items:
+        item = _ensure_str(item)
+        if not item:
+            continue
+        tokens = _word_tokens(item)
+        if any(_word_overlap_ratio(tokens, _word_tokens(k)) >= threshold for k in kept):
+            continue
+        kept.append(item)
+    return kept
+
+
+def _topic_signature(s: str) -> set:
+    """Palavras de tema (exclui polaridade: presente, ausente, falta, adequada, etc.)."""
+    stop = {
+        "presente", "ausente", "falta", "adequada", "adequado", "clareza", "não", "há",
+        "justificativa", "justificado", "mencionad", "descrito", "suficiente", "para", "com",
+        "da", "de", "do", "em", "a", "o", "e", "ou", "se", "que", "na", "no",
+    }
+    t = _word_tokens(s)
+    return t - stop
+
+
+def _is_positive_phrase(s: str) -> bool:
+    low = (s or "").lower()
+    return any(x in low for x in ("presente", "adequad", "clareza", "suficiente", "atendendo", "evidenciada", "valorizada"))
+
+
+def _is_negative_phrase(s: str) -> bool:
+    low = (s or "").lower()
+    return any(x in low for x in ("ausente", "falta", "não há", "não há ", "incompleta", "incompleto"))
+
+
+def _drop_contradictions(
+    acertos: List[str],
+    erros: List[str],
+) -> Tuple[List[str], List[str], List[str]]:
+    """
+    Remove erros que contradizem acertos (mesmo tema, polaridade oposta).
+    Retorna (acertos_final, erros_final, mensagens_para_observacoes).
+    """
+    acertos_final = list(acertos)
+    erros_final = list(erros)
+    observacoes_extra: List[str] = []
+    for ac in acertos_final[:]:
+        if not _is_positive_phrase(ac):
+            continue
+        sig_ac = _topic_signature(ac)
+        if len(sig_ac) < 2:
+            continue
+        to_remove: List[int] = []
+        for i, er in enumerate(erros_final):
+            if not _is_negative_phrase(er):
+                continue
+            sig_er = _topic_signature(er)
+            if _word_overlap_ratio(sig_ac, sig_er) >= 0.5:
+                to_remove.append(i)
+                if sig_ac & sig_er:
+                    topic = " ".join(sorted(sig_ac & sig_er)[:4])
+                    observacoes_extra.append(f"Inconsistência na análise: menções conflitantes sobre «{topic}».")
+        for i in reversed(to_remove):
+            erros_final.pop(i)
+    return acertos_final, erros_final, observacoes_extra
+
+
 def _merge_analysis_results(
     parsed_list: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
@@ -200,7 +282,7 @@ def _merge_analysis_results(
         if obs:
             obs_parts.append(obs)
 
-    # Deduplica mantendo ordem: 1) igualdade (lowercase) 2) remove quem é subcadeia de outro (fica a versão mais completa)
+    # Deduplica: 1) igualdade (lowercase) 2) subcadeia 3) paráfrases (overlap de palavras)
     def _dedup(items: List[str], limit: int = 20) -> List[str]:
         seen_lower: set = set()
         out = []
@@ -223,7 +305,6 @@ def _merge_analysis_results(
         normalized = [(s, s.lower()) for s in items]
         kept = []
         for s, low in normalized:
-            # Manter s só se não existir outro item que contenha s (e seja diferente)
             if not any(s != t and low in tlow for t, tlow in normalized):
                 kept.append(s)
         return kept
@@ -231,19 +312,26 @@ def _merge_analysis_results(
     def _clean(items: List[str]) -> List[str]:
         return [_decode_html(x) for x in items]
 
-    acertos_dedup = _dedup(all_acertos, 20)
-    erros_dedup = _dedup(all_erros, 20)
-    acertos_final = _drop_subsumed(acertos_dedup)
-    erros_final = _drop_subsumed(erros_dedup)
+    acertos_dedup = _dedup(all_acertos, 25)
+    erros_dedup = _dedup(all_erros, 25)
+    acertos_sub = _drop_subsumed(acertos_dedup)
+    erros_sub = _drop_subsumed(erros_dedup)
+    acertos_overlap = _merge_by_word_overlap(acertos_sub, threshold=0.6)
+    erros_overlap = _merge_by_word_overlap(erros_sub, threshold=0.6)
+    acertos_final, erros_final, obs_contrad = _drop_contradictions(acertos_overlap, erros_overlap)
+
+    observacoes_base = _decode_html(" | ".join(obs_parts[:3]) if obs_parts else "")
+    observacoes_full = " | ".join([observacoes_base, *obs_contrad[:2]]) if obs_contrad else observacoes_base
+    observacoes_full = observacoes_full.strip(" | ")
 
     return {
-        "pontos_importantes": _clean(_drop_subsumed(_dedup(all_pontos, 12))),
+        "pontos_importantes": _clean(_merge_by_word_overlap(_drop_subsumed(_dedup(all_pontos, 12)), 0.65)),
         "acertos": _clean(acertos_final),
         "erros": _clean(erros_final),
         "conformidade_geral": False if any_error else (
             all(p.get("conformidade_geral") for p in parsed_list) if parsed_list else None
         ),
-        "observacoes": _decode_html(" | ".join(obs_parts[:3]) if obs_parts else ""),
+        "observacoes": observacoes_full,
     }
 
 

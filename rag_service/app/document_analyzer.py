@@ -200,7 +200,7 @@ def _merge_analysis_results(
         if obs:
             obs_parts.append(obs)
 
-    # Deduplica mantendo ordem (simples: por igualdade)
+    # Deduplica mantendo ordem: 1) igualdade (lowercase) 2) remove quem é subcadeia de outro (fica a versão mais completa)
     def _dedup(items: List[str], limit: int = 20) -> List[str]:
         seen_lower: set = set()
         out = []
@@ -216,13 +216,30 @@ def _merge_analysis_results(
                     break
         return out
 
+    def _drop_subsumed(items: List[str]) -> List[str]:
+        """Remove itens que são subcadeia estrita de outro (mantém só a versão mais completa)."""
+        if not items:
+            return items
+        normalized = [(s, s.lower()) for s in items]
+        kept = []
+        for s, low in normalized:
+            # Manter s só se não existir outro item que contenha s (e seja diferente)
+            if not any(s != t and low in tlow for t, tlow in normalized):
+                kept.append(s)
+        return kept
+
     def _clean(items: List[str]) -> List[str]:
         return [_decode_html(x) for x in items]
 
+    acertos_dedup = _dedup(all_acertos, 20)
+    erros_dedup = _dedup(all_erros, 20)
+    acertos_final = _drop_subsumed(acertos_dedup)
+    erros_final = _drop_subsumed(erros_dedup)
+
     return {
-        "pontos_importantes": _clean(_dedup(all_pontos, 12)),
-        "acertos": _clean(_dedup(all_acertos, 15)),
-        "erros": _clean(_dedup(all_erros, 15)),
+        "pontos_importantes": _clean(_drop_subsumed(_dedup(all_pontos, 12))),
+        "acertos": _clean(acertos_final),
+        "erros": _clean(erros_final),
         "conformidade_geral": False if any_error else (
             all(p.get("conformidade_geral") for p in parsed_list) if parsed_list else None
         ),

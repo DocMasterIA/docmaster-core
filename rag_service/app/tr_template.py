@@ -179,9 +179,9 @@ def render_tr_from_slots(
         "(Formalizar justificava de acordo com objeto solicitado)": slots.justificativa or "",
         "(Inserir o inciso de acordo com o objeto solicitado)": slots.dispensa.inciso or "",
         "(inserir nome do fiscal)": slots.fiscal.nome or "",
-        # Dotação: "(Inserir Dotação)" recebe o valor ou uma frase padrão;
-        # "(Feito direto pelo usuário)" é apenas anotação do modelo e deve sumir.
-        "(Inserir Dotação)": slots.dotacao or "Dotação orçamentária a ser informada pela unidade gestora no ato da contratação.",
+        # Dotação: não é preenchida pela IA; sempre deixar em branco aqui.
+        # O backend/sistema pode sobrescrever via slots_override.dotacao no futuro.
+        "(Inserir Dotação)": slots.dotacao or "",
         "(Feito direto pelo usuário)": "",
     }
 

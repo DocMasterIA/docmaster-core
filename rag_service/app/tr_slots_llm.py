@@ -38,12 +38,12 @@ REGRAS:
   - A "descricao" deve ser uma especificação técnica mínima do item, não apenas uma palavra solta (ex.: "Caneta esferográfica azul, ponta 1.0 mm").
   - Se o usuário já tiver informado descrição/unidade/quantidade, preserve essas informações e apenas complemente de forma técnica quando fizer sentido.
 - fiscal: objeto com "nome" (nome completo do fiscal do contrato). Se não houver nome de fiscal claramente informado pelo usuário ou contexto, use "" (não invente nomes).
-- dotacao: string com a dotação orçamentária. Se o usuário ou o contexto informar o código (ex: "1.2.3.4.5.00.00.000.0000.0000"), use-o. Se NÃO souber, preencha com uma frase padrão em linguagem formal, por exemplo: "Dotação orçamentária a ser informada pela unidade gestora no ato da contratação" ou "A definir pela secretaria/orçamento". Nunca deixe este campo vazio: o documento deve ter sempre um texto nessa seção.
+- dotacao: sempre deve ser retornado como string vazia \"\". A IA NÃO deve sugerir, inferir ou inventar dotação orçamentária; esse campo será preenchido posteriormente pelo sistema ou por outro fluxo.
 - objeto: frase completa, formal e específica, descrevendo claramente o objeto da contratação, incluindo finalidade e, quando inferível, área/setor atendido (por exemplo: "Aquisição de materiais de escritório para suprir as necessidades da Secretaria Municipal de Administração").
 - justificativa: parágrafo de justificativa técnica/administrativa para a contratação, em linguagem formal.
 - Se o usuário informar itens (descrição, unidade, quantidade), use-os no array itens; senão sugira itens coerentes com o objeto.
 - Cada produto ou serviço diferente mencionado pelo usuário deve virar um item separado no array "itens" (não agrupe vários produtos na mesma "descricao").
-- Use Lei 14.133/2021. Não invente dados que não possam ser inferidos do pedido (ex.: fiscal deixe vazio se não informado; dotação sempre preencha, nem que seja com frase padrão).
+- Use Lei 14.133/2021. Não invente dados que não possam ser inferidos do pedido (ex.: fiscal deixe vazio se não informado; dotação sempre deixe vazia, pois não é responsabilidade da IA preencher).
 """
 
 
@@ -119,13 +119,14 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
     else:
         fiscal = FiscalSlots()
 
+    # Campo dotacao NÃO deve ser preenchido pela IA: sempre vem vazio aqui.
     return TRTemplateSlots(
         objeto=str(data.get("objeto", "")).strip(),
         dispensa=dispensa,
         itens=itens,
         justificativa=str(data.get("justificativa", "")).strip(),
         fiscal=fiscal,
-        dotacao=str(data.get("dotacao", "")).strip(),
+        dotacao="",
     )
 
 

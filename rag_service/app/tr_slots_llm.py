@@ -32,14 +32,17 @@ TR_SLOTS_SYSTEM_PROMPT = """Você preenche os campos (slots) de um Termo de Refe
 REGRAS:
 - Responda APENAS com um JSON válido, sem texto antes ou depois.
 - O JSON deve ter exatamente estas chaves: objeto, dispensa, itens, justificativa, fiscal, dotacao.
+- Use linguagem técnica, formal e objetiva, adequada a documentos administrativos. NÃO use gírias, comentários informais ou meta-observações (ex.: "simples até demais", "ficou meio esquisito", "feito direto pelo usuário").
 - dispensa: objeto com "artigo" (ex: "75") e "inciso" (ex: "I", "II").
 - itens: array de objetos, cada um com "descricao", "unidade" (ex: "un", "cx", "litro"), "quantidade" (número).
-- fiscal: objeto com "nome" (nome completo do fiscal do contrato).
-- dotacao: string com a dotação orçamentária (ex: "1.2.3.4.5.00.00.000.0000.0000"); se não souber, use "".
-- objeto: texto curto e objetivo do objeto da contratação.
-- justificativa: parágrafo de justificativa técnica/administrativa para a contratação.
+  - A "descricao" deve ser uma especificação técnica mínima do item, não apenas uma palavra solta (ex.: "Caneta esferográfica azul, ponta 1.0 mm").
+  - Se o usuário já tiver informado descrição/unidade/quantidade, preserve essas informações e apenas complemente de forma técnica quando fizer sentido.
+- fiscal: objeto com "nome" (nome completo do fiscal do contrato). Se não houver nome de fiscal claramente informado pelo usuário ou contexto, use "" (não invente nomes).
+- dotacao: string com a dotação orçamentária (ex: "1.2.3.4.5.00.00.000.0000.0000"); se não souber ou não estiver explícita, use "" (esse campo normalmente será preenchido depois pelo sistema).
+- objeto: frase completa, formal e específica, descrevendo claramente o objeto da contratação, incluindo finalidade e, quando inferível, área/setor atendido (por exemplo: "Aquisição de materiais de escritório para suprir as necessidades da Secretaria Municipal de Administração").
+- justificativa: parágrafo de justificativa técnica/administrativa para a contratação, em linguagem formal.
 - Se o usuário informar itens (descrição, unidade, quantidade), use-os no array itens; senão sugira itens coerentes com o objeto.
-- Use Lei 14.133/2021. Não invente dados que não possam ser inferidos do pedido (ex.: dotação deixe vazio se não informado).
+- Use Lei 14.133/2021. Não invente dados que não possam ser inferidos do pedido (ex.: dotação ou fiscal deixe vazio se não informado).
 """
 
 

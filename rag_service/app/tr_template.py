@@ -179,7 +179,10 @@ def render_tr_from_slots(
         "(Formalizar justificava de acordo com objeto solicitado)": slots.justificativa or "",
         "(Inserir o inciso de acordo com o objeto solicitado)": slots.dispensa.inciso or "",
         "(inserir nome do fiscal)": slots.fiscal.nome or "",
+        # Dotação: o modelo antigo tinha dois placeholders diferentes;
+        # ambos passam a ser tratados como o valor de slots.dotacao (ou vazio).
         "(Inserir Dotação)": slots.dotacao or "",
+        "(Feito direto pelo usuário)": slots.dotacao or "",
     }
 
     _replace_placeholders_in_paragraphs(doc, mapping)

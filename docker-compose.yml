@@ -63,7 +63,7 @@ services:
     image: chromadb/chroma:latest
     container_name: chromadb
     ports:
-      - "8010:8000"  # host:container (ChromaDB escuta 8000 internamente)
+      - "8000:8000"  # host:container (ChromaDB na 8000 na VPS)
     volumes:
       - chroma_data:/chroma/chroma
     restart: unless-stopped
@@ -94,17 +94,32 @@ services:
       - chromadb
     restart: unless-stopped
 
-  # Exemplo quando o Django estiver em Docker (descomente e ajuste build/command):
-  # backend:
-  #   build:
-  #     context: .
-  #     dockerfile: backend/Dockerfile  # criar quando for containerizar o Django
-  #   environment:
-  #     - LLM_API_BASE_URL=http://llm_api:8002
-  #   depends_on:
-  #     - llm_api
-  #   ports:
-  #     - "8000:8000"
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile  # Dockerfile do backend Django na raiz do projeto
+    image: docmaster-backend
+    container_name: backend
+    environment:
+      - LLM_API_BASE_URL=http://llm_api:8002
+      - RAG_SERVICE_URL=http://rag_service:8004
+    depends_on:
+      - llm_api
+      - rag_service
+    ports:
+      - "8001:8000"  # Django na 8001 no host (8000 já é ChromaDB)
+    restart: unless-stopped
+
+  # Expõe o Django (host:8001) na internet: ngrok gera a URL pública ao subir. Defina NGROK_AUTHTOKEN no .env.
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: ngrok
+    command: http backend:8000
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 volumes:
   chroma_data:

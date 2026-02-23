@@ -123,6 +123,19 @@
                   Prompt de Inteligência Artificial
                   <span class="gov-label__hint">(IA contextual inteligente)</span>
                 </label>
+                <div v-if="sourceMode === 'llm'" class="doc-gen__doc-type">
+                  <label class="gov-label gov-label--inline">Tipo de documento</label>
+                  <div class="doc-gen__doc-type-options">
+                    <label class="doc-gen__doc-type-option">
+                      <input v-model="docTypeMode" type="radio" value="auto" />
+                      <span>Padrão (ETP / DFD / TR)</span>
+                    </label>
+                    <label class="doc-gen__doc-type-option">
+                      <input v-model="docTypeMode" type="radio" value="tr_modelo" />
+                      <span>TR com modelo fixo (slots IA)</span>
+                    </label>
+                  </div>
+                </div>
                 <textarea
                   id="ia-prompt"
                   v-model="iaPrompt"
@@ -287,6 +300,7 @@ const focusedIndex = ref(-1);
 const searchDebounce = ref(null);
 
 const iaPrompt = ref('');
+const docTypeMode = ref('auto'); // 'auto' (generate-document), 'tr_modelo' (TR modelo fixo)
 const isSubmitting = ref(false);
 const documentReady = ref(false);
 const documentDocxUrl = ref('');
@@ -311,12 +325,16 @@ const hasDocumentBase = computed(() => {
 });
 
 const previewHeading = computed(() => {
-  if (sourceMode.value === 'llm') return 'Gerar do zero com IA';
+  if (sourceMode.value === 'llm') return docTypeMode.value === 'tr_modelo' ? 'Gerar Termo de Referência (modelo fixo)' : 'Gerar do zero com IA';
   if (sourceMode.value === 'file' && selectedDocxFile.value) return selectedDocxFile.value.name;
   return selectedTemplate.value?.name || 'Modelo de Documento';
 });
 const previewSub = computed(() => {
-  if (sourceMode.value === 'llm') return 'ETP, DFD ou Termo de Referência gerado via LLM com base no seu prompt.';
+  if (sourceMode.value === 'llm') {
+    return docTypeMode.value === 'tr_modelo'
+      ? 'Termo de Referência baseado no modelo fixo oficial, com slots preenchidos pela IA.'
+      : 'ETP, DFD ou Termo de Referência gerado via LLM com base no seu prompt.';
+  }
   if (sourceMode.value === 'file' && selectedDocxFile.value) return 'Documento enviado — use o prompt e gere para baixar.';
   return selectedTemplate.value ? `Modelo de Documento - ${selectedTemplate.value.name}` : 'Selecione um template ou envie um .docx.';
 });
@@ -449,9 +467,16 @@ async function submitViaLLM() {
     user_prompt: iaPrompt.value.trim(),
     output: 'docx',
   };
-  if (selectedTemplate.value?.id) payload.template_id = selectedTemplate.value.id;
+  if (selectedTemplate.value?.id && docTypeMode.value === 'auto') {
+    payload.template_id = selectedTemplate.value.id;
+  }
 
-  const res = await fetch(`${API_BASE}/api/documentos/gerar-via-llm`, {
+  const endpoint =
+    docTypeMode.value === 'tr_modelo'
+      ? `${API_BASE}/api/documentos/gerar-tr-modelo`
+      : `${API_BASE}/api/documentos/gerar-via-llm`;
+
+  const res = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',

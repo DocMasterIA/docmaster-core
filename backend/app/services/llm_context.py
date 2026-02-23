@@ -28,6 +28,8 @@ def build_llm_context_from_request(request):
 
     ctx["usuario"] = {
         "nome_completo": nome or None,
+        "first_name": (user.first_name or "").strip() or None,
+        "last_name": (user.last_name or "").strip() or None,
         "secretaria": str(sec) if sec else None,
         "prefeitura": pref.nome_municipio if pref else None,
         "orgao": f"Prefeitura Municipal de {pref.nome_municipio}" if pref else None,

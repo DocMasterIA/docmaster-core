@@ -103,6 +103,10 @@ class GenerateTRFromModelRequest(BaseModel):
         None,
         description="Slots já preenchidos pelo usuário (objeto, dispensa, itens, justificativa, fiscal, dotacao). Têm prioridade sobre a IA.",
     )
+    context: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Contexto do usuário logado (usuario: nome_completo, secretaria, prefeitura, orgao). Usado para preencher fiscal e enriquecer o prompt.",
+    )
 
     @field_validator("user_prompt")
     @classmethod
@@ -298,6 +302,21 @@ async def endpoint_render_document(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+def _merge_user_context_into_tr_slots(
+    slots_override: Optional[Dict[str, Any]], context: Optional[Dict[str, Any]]
+) -> Optional[Dict[str, Any]]:
+    """Mescla contexto do usuário (Django) em slots_override: fiscal.nome = usuario.nome_completo quando não informado."""
+    usuario = (context or {}).get("usuario") if isinstance(context, dict) else None
+    if not usuario or not isinstance(usuario, dict) or not usuario.get("nome_completo"):
+        return slots_override
+    slots = dict(slots_override) if slots_override else {}
+    fiscal = (slots.get("fiscal") or {}) if isinstance(slots.get("fiscal"), dict) else {}
+    if not fiscal.get("nome"):
+        fiscal = {**fiscal, "nome": (usuario.get("nome_completo") or "").strip()}
+        slots["fiscal"] = fiscal
+    return slots
+
+
 @router.post("/generate-tr-from-model")
 async def endpoint_generate_tr_from_model(body: GenerateTRFromModelRequest):
     """
@@ -306,7 +325,7 @@ async def endpoint_generate_tr_from_model(body: GenerateTRFromModelRequest):
     Fluxo com IA:
     1. Interpreta o user_prompt via llm_agent (contexto + especificações).
     2. Chama a LLM para preencher os slots (objeto, dispensa, itens, justificativa, fiscal, dotacao).
-    3. Mescla com slots_override (valores enviados pelo usuário têm prioridade).
+    3. Mescla com slots_override (valores enviados pelo usuário têm prioridade); context.usuario preenche fiscal.nome se não informado.
     4. Preenche o template DOCX e retorna o arquivo.
 
     Os itens da tabela de especificações podem vir do prompt (IA extrai) ou do slots_override.itens.
@@ -314,10 +333,12 @@ async def endpoint_generate_tr_from_model(body: GenerateTRFromModelRequest):
     from .tr_slots_llm import fill_tr_slots_with_llm
     from .tr_template import render_tr_from_slots
 
+    slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
     try:
         slots = await fill_tr_slots_with_llm(
             user_prompt=body.user_prompt,
-            slots_override=body.slots_override,
+            slots_override=slots_override,
+            user_context=body.context,
         )
         docx_path = render_tr_from_slots(slots)
         if not Path(docx_path).exists():

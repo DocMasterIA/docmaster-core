@@ -214,6 +214,135 @@ def gerar_via_llm_api(request):
     return JsonResponse({"ok": False, "error": "Resposta inesperada do serviço"}, status=502)
 
 
+@api_login_required
+@csrf_exempt
+def gerar_tr_modelo_api(request):
+    """
+    Gera Termo de Referência a partir do modelo fixo do rag_service (/api/rag/generate-tr-from-model).
+    Usado pelo frontend Vue quando o usuário escolhe TR com modelo fixo.
+    """
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Use POST"}, status=405)
+
+    try:
+        payload = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({"ok": False, "error": "Corpo JSON inválido"}, status=400)
+
+    user_prompt = (payload.get("user_prompt") or "").strip()
+    slots_override = payload.get("slots_override")  # opcional
+
+    if not user_prompt:
+        return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
+
+    context = build_llm_context_from_request(request)
+
+    rag_url = getattr(django_settings, "RAG_SERVICE_URL", "http://127.0.0.1:8004").rstrip("/")
+    url = f"{rag_url}/api/rag/generate-tr-from-model"
+
+    body = {
+        "user_prompt": user_prompt,
+        "slots_override": slots_override or None,
+        "context": context if context else None,
+    }
+
+    try:
+        timeout = getattr(django_settings, "RAG_TIMEOUT", 180)
+        resp = requests.post(url, json=body, timeout=timeout)
+    except requests.exceptions.Timeout:
+        return JsonResponse({"ok": False, "error": "Serviço de geração de TR demorou para responder. Tente novamente."}, status=504)
+    except requests.exceptions.ConnectionError:
+        return JsonResponse({"ok": False, "error": "Serviço de geração de TR indisponível. Verifique se o rag_service está em execução."}, status=503)
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=502)
+
+    content_type = resp.headers.get("content-type", "") or ""
+    if resp.status_code != 200:
+        if "json" in content_type:
+            try:
+                data = resp.json()
+                err = data.get("detail") or data.get("error") or str(data)
+            except Exception:
+                err = resp.text
+        else:
+            err = resp.text
+        return JsonResponse({"ok": False, "error": err}, status=resp.status_code)
+
+    # Esperado: DOCX diretamente (FileResponse do rag_service)
+    if "application/vnd.openxmlformats-officedocument.wordprocessingml.document" in content_type or "octet-stream" in content_type:
+        r = HttpResponse(
+            resp.content,
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        r["Content-Disposition"] = 'attachment; filename=\"termo_referencia_modelo.docx\"'
+        return r
+
+    # Fallback: tentar json e extrair docx_path, se houver
+    try:
+        data = resp.json()
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Resposta inesperada do serviço de TR."}, status=502)
+
+    docx_path = data.get("docx_path")
+    if docx_path and os.path.isfile(docx_path):
+        return FileResponse(
+            open(docx_path, "rb"),
+            as_attachment=True,
+            filename="termo_referencia_modelo.docx",
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+
+    return JsonResponse({"ok": False, "error": "Resposta inesperada do serviço de TR (DOCX não retornado)."}, status=502)
+
+
+@api_login_required
+@csrf_exempt
+def analise_documentos_api(request):
+    """
+    Recebe um arquivo (PDF/DOCX) e delega a análise para o rag_service (/api/rag/analyze-document).
+    Retorna o JSON de AnalyzeDocumentResponse diretamente para o frontend Vue.
+    """
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Use POST"}, status=405)
+
+    uploaded = request.FILES.get("file")
+    if not uploaded:
+        return JsonResponse({"ok": False, "error": "Envie um arquivo PDF ou DOCX no campo 'file'."}, status=400)
+
+    name = uploaded.name or "documento.pdf"
+    suffix = os.path.splitext(name)[1].lower()
+    if suffix not in (".pdf", ".docx", ".doc"):
+        return JsonResponse({"ok": False, "error": "Formato não suportado. Use PDF ou DOCX."}, status=400)
+
+    rag_url = getattr(django_settings, "RAG_SERVICE_URL", "http://127.0.0.1:8004").rstrip("/")
+    url = f"{rag_url}/api/rag/analyze-document"
+
+    files = {
+        "file": (name, uploaded.read(), uploaded.content_type or "application/octet-stream"),
+    }
+    data = {}  # top_k, collection podem ser adicionados futuramente
+
+    try:
+        timeout = getattr(django_settings, "RAG_TIMEOUT", 180)
+        resp = requests.post(url, files=files, data=data, timeout=timeout)
+    except requests.exceptions.Timeout:
+        return JsonResponse({"ok": False, "error": "Serviço de análise demorou para responder. Tente novamente."}, status=504)
+    except requests.exceptions.ConnectionError:
+        return JsonResponse({"ok": False, "error": "Serviço de análise de documentos indisponível. Verifique se o rag_service está em execução."}, status=503)
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=502)
+
+    try:
+        payload = resp.json()
+    except Exception:
+        return JsonResponse({"ok": False, "error": f"Resposta inválida do serviço de análise (status {resp.status_code})."}, status=502)
+
+    if resp.status_code != 200:
+        return JsonResponse({"ok": False, "error": payload.get("detail") or payload.get("error") or str(payload)}, status=resp.status_code)
+
+    return JsonResponse(payload)
+
+
 # API: retorna até 10 templates para autocomplete/busca.
 @require_GET
 @api_login_required

@@ -54,9 +54,29 @@ REGRAS:
 """
 
 
+def _format_user_context_for_tr_prompt(user_context: Optional[Dict[str, Any]]) -> str:
+    """Formata contexto do usuário logado (Django) para inclusão no prompt do TR."""
+    if not user_context or not isinstance(user_context, dict):
+        return ""
+    usuario = user_context.get("usuario")
+    if not usuario or not isinstance(usuario, dict):
+        return ""
+    parts = []
+    if usuario.get("nome_completo"):
+        parts.append(f"Nome do solicitante/fiscal: {usuario['nome_completo']}")
+    if usuario.get("secretaria"):
+        parts.append(f"Secretaria: {usuario['secretaria']}")
+    if usuario.get("prefeitura"):
+        parts.append(f"Prefeitura: {usuario['prefeitura']}")
+    if not parts:
+        return ""
+    return "\nContexto do solicitante (use no TR quando aplicável): " + "; ".join(parts) + "."
+
+
 def _build_tr_slots_user_prompt(
     user_prompt: str,
     context_from_agent: Optional[Dict[str, Any]] = None,
+    user_context: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Monta o prompt de usuário para a LLM preencher os slots do TR."""
     parts = [f"Pedido do usuário:\n{user_prompt}"]
@@ -70,6 +90,7 @@ def _build_tr_slots_user_prompt(
             tabelas = (esp.get("tabelas") or {}) if isinstance(esp, dict) else {}
             if listas or tabelas:
                 parts.append(f"\nEspecificações: listas={listas}, tabelas={tabelas}.")
+    parts.append(_format_user_context_for_tr_prompt(user_context))
     parts.append("\nPreencha o JSON de slots do Termo de Referência (objeto, dispensa, itens, justificativa, fiscal, dotacao). Saída: apenas o JSON.")
     return "\n".join(parts)
 
@@ -213,17 +234,18 @@ async def fetch_context_from_agent(user_prompt: str) -> Optional[Dict[str, Any]]
 async def fill_tr_slots_with_llm(
     user_prompt: str,
     slots_override: Optional[Dict[str, Any]] = None,
+    user_context: Optional[Dict[str, Any]] = None,
 ) -> TRTemplateSlots:
     """
     Preenche os slots do TR usando IA.
 
     - Chama o llm_agent (structure-from-prompt) para obter contexto e especificações.
     - Chama a LLM para gerar o JSON de slots (objeto, dispensa, itens, justificativa, fiscal, dotacao).
-    - Mescla com slots_override (valores enviados pelo usuário têm prioridade).
+    - Mescla com slots_override (valores enviados pelo usuário têm prioridade). user_context (Django) enriquece o prompt com nome/secretaria/prefeitura.
     """
     context_from_agent = await fetch_context_from_agent(user_prompt)
 
-    user_prompt_text = _build_tr_slots_user_prompt(user_prompt, context_from_agent)
+    user_prompt_text = _build_tr_slots_user_prompt(user_prompt, context_from_agent, user_context)
     full_prompt = f"<<SYSTEM>>\n{TR_SLOTS_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{user_prompt_text}"
 
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"

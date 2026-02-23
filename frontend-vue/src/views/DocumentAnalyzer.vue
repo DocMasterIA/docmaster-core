@@ -99,40 +99,87 @@
             </div>
 
             <template v-else>
-              <!-- Conformidade -->
+              <!-- Resumo -->
               <div class="doc-analyzer__block">
                 <h3 class="doc-analyzer__block-title">
-                  <i class="fa-solid fa-circle-check doc-analyzer__block-icon doc-analyzer__block-icon--success" aria-hidden="true"></i>
-                  Conformidade
+                  <i class="fa-solid fa-file-circle-check doc-analyzer__block-icon doc-analyzer__block-icon--success" aria-hidden="true"></i>
+                  Resumo da análise
                 </h3>
-                <ul class="doc-analyzer__check-list">
-                  <li v-for="(item, i) in result.conformidade" :key="i" class="doc-analyzer__check-item">
-                    <i :class="item.ok ? 'fa-solid fa-check' : 'fa-solid fa-xmark'" :aria-hidden="true"></i>
-                    <span>{{ item.descricao }}</span>
-                  </li>
-                </ul>
+                <p class="gov-text-soft gov-text-sm">
+                  <strong>Tipo de documento:</strong> {{ result.document_type || 'não identificado' }}<br />
+                  <strong>Conformidade geral:</strong>
+                  <span v-if="result.conformidade_geral === true">Conforme</span>
+                  <span v-else-if="result.conformidade_geral === false">Não conforme</span>
+                  <span v-else>Indefinida</span>
+                </p>
+                <p v-if="result.observacoes" class="gov-text-soft gov-text-sm mt-2">
+                  <strong>Observações:</strong> {{ result.observacoes }}
+                </p>
               </div>
 
-              <!-- Melhorias sugeridas -->
-              <div class="doc-analyzer__block">
+              <!-- Seções detectadas -->
+              <div v-if="result.sections_detected && result.sections_detected.length" class="doc-analyzer__block">
                 <h3 class="doc-analyzer__block-title">
-                  <i class="fa-solid fa-lightbulb doc-analyzer__block-icon doc-analyzer__block-icon--warning" aria-hidden="true"></i>
-                  Melhorias sugeridas
+                  <i class="fa-solid fa-list doc-analyzer__block-icon" aria-hidden="true"></i>
+                  Seções detectadas
                 </h3>
                 <ul class="doc-analyzer__suggestion-list">
-                  <li v-for="(item, i) in result.melhorias" :key="i" class="doc-analyzer__suggestion-item">
-                    {{ item }}
+                  <li v-for="(s, i) in result.sections_detected" :key="i" class="doc-analyzer__suggestion-item">
+                    {{ s }}
                   </li>
                 </ul>
               </div>
 
-              <!-- Observações -->
-              <div v-if="result.observacoes" class="doc-analyzer__block">
+              <!-- Pontos importantes -->
+              <div v-if="result.pontos_importantes && result.pontos_importantes.length" class="doc-analyzer__block">
                 <h3 class="doc-analyzer__block-title">
-                  <i class="fa-solid fa-comment-dots doc-analyzer__block-icon" aria-hidden="true"></i>
-                  Observações
+                  <i class="fa-solid fa-star doc-analyzer__block-icon doc-analyzer__block-icon--success" aria-hidden="true"></i>
+                  Pontos importantes
                 </h3>
-                <p class="doc-analyzer__observacoes">{{ result.observacoes }}</p>
+                <ul class="doc-analyzer__suggestion-list">
+                  <li v-for="(p, i) in result.pontos_importantes" :key="i" class="doc-analyzer__suggestion-item">
+                    {{ p }}
+                  </li>
+                </ul>
+              </div>
+
+              <!-- Acertos -->
+              <div v-if="result.acertos && result.acertos.length" class="doc-analyzer__block">
+                <h3 class="doc-analyzer__block-title">
+                  <i class="fa-solid fa-circle-check doc-analyzer__block-icon doc-analyzer__block-icon--success" aria-hidden="true"></i>
+                  Acertos (em conformidade)
+                </h3>
+                <ul class="doc-analyzer__suggestion-list">
+                  <li v-for="(a, i) in result.acertos" :key="i" class="doc-analyzer__suggestion-item">
+                    {{ a }}
+                  </li>
+                </ul>
+              </div>
+
+              <!-- Ressalvas -->
+              <div v-if="result.ressalvas && result.ressalvas.length" class="doc-analyzer__block">
+                <h3 class="doc-analyzer__block-title">
+                  <i class="fa-solid fa-triangle-exclamation doc-analyzer__block-icon doc-analyzer__block-icon--warning" aria-hidden="true"></i>
+                  Ressalvas / Itens ambíguos
+                </h3>
+                <ul class="doc-analyzer__suggestion-list">
+                  <li v-for="(r, i) in result.ressalvas" :key="i" class="doc-analyzer__suggestion-item">
+                    {{ r }}
+                  </li>
+                </ul>
+              </div>
+
+              <!-- Erros -->
+              <div v-if="result.erros && result.erros.length" class="doc-analyzer__block">
+                <h3 class="doc-analyzer__block-title">
+                  <i class="fa-solid fa-circle-xmark doc-analyzer__block-icon doc-analyzer__block-icon--danger" aria-hidden="true"></i>
+                  Erros / Não conformidades
+                </h3>
+                <ul class="doc-analyzer__suggestion-list">
+                  <li v-for="(e, i) in result.erros" :key="i" class="doc-analyzer__suggestion-item">
+                    {{ e }}
+                  </li>
+                </ul>
               </div>
             </template>
           </div>
@@ -145,6 +192,8 @@
 <script setup>
 import { ref, reactive, onUnmounted } from 'vue';
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const ACCEPT_TYPES = ['.pdf', '.docx', 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
 
@@ -156,9 +205,15 @@ const isAnalyzing = ref(false);
 const analysisDone = ref(false);
 const analysisError = ref('');
 
+// Estrutura compatível com AnalyzeDocumentResponse do rag_service
 const result = reactive({
-  conformidade: [],
-  melhorias: [],
+  document_type: '',
+  sections_detected: [],
+  pontos_importantes: [],
+  acertos: [],
+  ressalvas: [],
+  erros: [],
+  conformidade_geral: null,
   observacoes: '',
 });
 
@@ -206,21 +261,15 @@ function formatSize(bytes) {
 }
 
 /** Resposta mockada até existir API de análise no backend */
-function getMockResult() {
-  return {
-    conformidade: [
-      { ok: true, descricao: 'Linguagem formal e impessoal adequada' },
-      { ok: true, descricao: 'Numeração e referências consistentes' },
-      { ok: false, descricao: 'Assinatura e carimbo não identificados no documento' },
-      { ok: true, descricao: 'Estrutura de parágrafos e títulos adequada' },
-    ],
-    melhorias: [
-      'Incluir data por extenso no cabeçalho para conformidade com padrões oficiais.',
-      'Revisar alíneas do art. 2º para evitar ambiguidade na redação.',
-      'Sugerir inclusão de cláusula de vigência ao final do documento.',
-    ],
-    observacoes: 'O documento está em bom padrão geral. As melhorias sugeridas aumentam a conformidade com normas de redação oficial e facilitam a interpretação por terceiros.',
-  };
+function mapApiResponse(payload) {
+  result.document_type = payload.document_type || '';
+  result.sections_detected = payload.sections_detected || [];
+  result.pontos_importantes = payload.pontos_importantes || [];
+  result.acertos = payload.acertos || [];
+  result.ressalvas = payload.ressalvas || [];
+  result.erros = payload.erros || [];
+  result.conformidade_geral = payload.conformidade_geral ?? null;
+  result.observacoes = payload.observacoes || '';
 }
 
 async function runAnalysis() {
@@ -228,20 +277,47 @@ async function runAnalysis() {
   isAnalyzing.value = true;
   analysisDone.value = false;
   analysisError.value = '';
-  result.conformidade = [];
-  result.melhorias = [];
+  result.document_type = '';
+  result.sections_detected = [];
+  result.pontos_importantes = [];
+  result.acertos = [];
+  result.ressalvas = [];
+  result.erros = [];
+  result.conformidade_geral = null;
   result.observacoes = '';
 
   try {
-    // TODO: substituir por chamada real à API quando existir
-    // const formData = new FormData();
-    // files.value.forEach(({ file }) => formData.append('files', file));
-    // const res = await fetch(`${API_BASE}/api/analise-documentos/`, { method: 'POST', body: formData, credentials: 'include' });
-    await new Promise((r) => setTimeout(r, 1800));
-    const mock = getMockResult();
-    result.conformidade = mock.conformidade;
-    result.melhorias = mock.melhorias;
-    result.observacoes = mock.observacoes;
+    const formData = new FormData();
+    // Por enquanto, enviamos apenas o primeiro arquivo para análise
+    const primary = files.value[0]?.file;
+    if (!primary) {
+      throw new Error('Nenhum arquivo válido para análise.');
+    }
+    formData.append('file', primary);
+
+    const res = await fetch(`${API_BASE}/api/analise-documentos/`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+    });
+
+    if (!res.ok) {
+      let msg = `Erro na análise (HTTP ${res.status})`;
+      try {
+        const data = await res.json();
+        msg = data.detail || data.error || msg;
+      } catch (e) {
+        // ignore parse error, keep msg
+      }
+      throw new Error(msg);
+    }
+
+    const data = await res.json();
+    if (!data.ok) {
+      throw new Error(data.error || 'Falha na análise do documento.');
+    }
+
+    mapApiResponse(data);
     analysisDone.value = true;
   } catch (e) {
     analysisError.value = e.message || 'Erro ao analisar documentos. Tente novamente.';

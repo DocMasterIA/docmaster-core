@@ -119,7 +119,17 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
     if template_row_idx is None:
         return
 
+    # Mantém a tabela "maleável":
+    # - preserva apenas o cabeçalho e a linha molde com placeholders
+    # - remove quaisquer outras linhas pré-existentes do template,
+    #   evitando sobrar linhas vazias/placeholder quando houver poucos itens.
+    header_row = target_table.rows[0]
     template_row = target_table.rows[template_row_idx]
+    # Remove demais linhas (de baixo para cima para não quebrar índices)
+    for row in list(target_table.rows)[::-1]:
+        if row is header_row or row is template_row:
+            continue
+        target_table._tbl.remove(row._tr)
 
     def _set_cell(cell, text: str) -> None:
         cell.text = str(text) if text is not None else ""
@@ -133,18 +143,15 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
         # Coluna 0: número do item (01, 02, 03...)
         if len(cells) > 0:
             _set_cell(cells[0], f"{i+1:02d}")
-        # Coluna 1: descrição
+        # Coluna 1: descrição (sempre escreve o valor do slot, ignorando texto anterior)
         if len(cells) > 1:
-            text = cells[1].text.replace(desc_ph, str(item.descricao) or "")
-            _set_cell(cells[1], text)
+            _set_cell(cells[1], str(item.descricao) or "")
         # Coluna 2: unidade
         if len(cells) > 2:
-            text = cells[2].text.replace(unid_ph, str(item.unidade) or "")
-            _set_cell(cells[2], text)
+            _set_cell(cells[2], str(item.unidade) or "")
         # Coluna 3: quantidade
         if len(cells) > 3:
-            text = cells[3].text.replace(qtd_ph, str(item.quantidade) or "")
-            _set_cell(cells[3], text)
+            _set_cell(cells[3], str(item.quantidade) or "")
 
 
 def render_tr_from_slots(

@@ -42,6 +42,7 @@ REGRAS:
 - objeto: frase completa, formal e específica, descrevendo claramente o objeto da contratação, incluindo finalidade e, quando inferível, área/setor atendido (por exemplo: "Aquisição de materiais de escritório para suprir as necessidades da Secretaria Municipal de Administração").
 - justificativa: parágrafo de justificativa técnica/administrativa para a contratação, em linguagem formal.
 - Se o usuário informar itens (descrição, unidade, quantidade), use-os no array itens; senão sugira itens coerentes com o objeto.
+- Cada produto ou serviço diferente mencionado pelo usuário deve virar um item separado no array "itens" (não agrupe vários produtos na mesma "descricao").
 - Use Lei 14.133/2021. Não invente dados que não possam ser inferidos do pedido (ex.: dotação ou fiscal deixe vazio se não informado).
 """
 

@@ -154,6 +154,25 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
             _set_cell(cells[3], str(item.quantidade) or "")
 
 
+def _clear_headers(doc: Document) -> None:
+    """
+    Remove todo conteúdo de cabeçalho do documento (texto, tabelas, logotipos).
+
+    Útil quando o modelo DOCX traz cabeçalho padrão de prefeitura que não deve
+    aparecer no TR gerado automaticamente.
+    """
+    for section in doc.sections:
+        header = section.header
+        # Remove parágrafos
+        for para in list(header.paragraphs):
+            p = para._element
+            p.getparent().remove(p)
+        # Remove tabelas (caso logotipo ou layout estejam em tabela no cabeçalho)
+        for table in list(header.tables):
+            tbl = table._element
+            tbl.getparent().remove(tbl)
+
+
 def render_tr_from_slots(
     slots: TRTemplateSlots,
     template_path: Optional[Path | str] = None,
@@ -172,6 +191,10 @@ def render_tr_from_slots(
         raise FileNotFoundError(f"Template TR não encontrado: {tpl_path}")
 
     doc = Document(str(tpl_path))
+
+    # Remove cabeçalho padrão do modelo (ex.: timbre de prefeitura),
+    # deixando o TR gerado sem esse cabeçalho fixo.
+    _clear_headers(doc)
 
     mapping = {
         "(descrever o objeto solicitado)": slots.objeto or "",

@@ -33,7 +33,14 @@ REGRAS:
 - Responda APENAS com um JSON válido, sem texto antes ou depois.
 - O JSON deve ter exatamente estas chaves: objeto, dispensa, itens, justificativa, fiscal, dotacao.
 - Use linguagem técnica, formal e objetiva, adequada a documentos administrativos. NÃO use gírias, comentários informais ou meta-observações (ex.: "simples até demais", "ficou meio esquisito", "feito direto pelo usuário").
-- dispensa: objeto com "artigo" (ex: "75") e "inciso" (ex: "I", "II").
+- dispensa: objeto com "artigo" e "inciso".
+  - O artigo, neste contexto de Termo de Referência, é sempre o art. 75 da Lei 14.133/2021. Portanto, devolva SEMPRE "artigo": "75".
+  - Sua tarefa é calcular apenas o "inciso" correto dentro do art. 75, de forma coerente com o objeto e o contexto, mesmo que o usuário não informe explicitamente o inciso.
+  - Se o objeto indicar obras/serviços de engenharia ou manutenção de veículos até o limite de valor do art. 75, use inciso "I".
+  - Se o objeto indicar outros serviços ou compras até o limite de valor do art. 75, use inciso "II".
+  - Se o usuário mencionar expressamente emergência ou calamidade pública nos termos da lei, considere a possibilidade de usar o inciso "VIII" do art. 75, se isso for coerente com o contexto.
+  - Se o usuário mencionar explicitamente outro inciso, respeite o inciso informado.
+  - Se não for possível determinar um inciso com segurança, deixe o inciso vazio "" e apenas preencha o artigo como "75", para que um humano possa complementar depois.
 - itens: array de objetos, cada um com "descricao", "unidade" (ex: "un", "cx", "litro"), "quantidade" (número).
   - A "descricao" deve ser uma especificação técnica mínima do item, não apenas uma palavra solta (ex.: "Caneta esferográfica azul, ponta 1.0 mm").
   - Se o usuário já tiver informado descrição/unidade/quantidade, preserve essas informações e apenas complemente de forma técnica quando fizer sentido.
@@ -87,9 +94,20 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
     """Converte o dicionário retornado pela LLM em TRTemplateSlots."""
     disp = data.get("dispensa") or {}
     if isinstance(disp, dict):
+        raw_artigo = str(disp.get("artigo", "")).strip()
+        raw_inciso = str(disp.get("inciso", "")).strip()
+        # Sanitiza artigo/inciso:
+        # - artigo: neste contexto, é SEMPRE o art. 75 (texto fixo do modelo);
+        #   mesmo que a IA devolva outra coisa, forçamos "75".
+        # - inciso: pega o primeiro algarismo romano que aparecer em inciso ou artigo (ex.: "inciso II", "art. 75, II" -> "II").
+        artigo_clean = "75"
+        roman_match = re.search(r"\b[IVXLCDM]+\b", raw_inciso, flags=re.IGNORECASE) or re.search(
+            r"\b[IVXLCDM]+\b", raw_artigo, flags=re.IGNORECASE
+        )
+        inciso_clean = roman_match.group(0).upper() if roman_match else raw_inciso
         dispensa = DispensaSlots(
-            artigo=str(disp.get("artigo", "")).strip(),
-            inciso=str(disp.get("inciso", "")).strip(),
+            artigo=artigo_clean,
+            inciso=inciso_clean,
         )
     else:
         dispensa = DispensaSlots()

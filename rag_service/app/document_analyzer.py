@@ -128,8 +128,20 @@ def _parse_analysis_response(text: Any) -> Dict[str, Any]:
 
 
 def _infer_document_type(text: str) -> str:
-    """Infere tipo (etp, dfd, termo_referencia) pelo conteúdo do documento."""
+    """Infere tipo (etp, dfd, termo_referencia) pelo conteúdo do documento.
+
+    OBS: detect_document_type prioriza DFD porque muitos DFD citam TR/ETP.
+    Para o analisador, se houver menção forte a ETP logo no início,
+    forçamos etp mesmo que também apareça referência a DFD.
+    """
     doc_type, _ = detect_document_type(text[:2000])
+
+    # Heurística extra: se o início do texto mencionar explicitamente
+    # "ESTUDO TÉCNICO PRELIMINAR" ou sigla "ETP", priorizar etp.
+    snippet = text[:600]
+    if re.search(r"ESTUDO\s+T[EÉ]CNICO\s+PRELIMINAR", snippet, re.IGNORECASE) or re.search(r"\bETP\b", snippet, re.IGNORECASE):
+        return "etp"
+
     return doc_type.value if hasattr(doc_type, "value") else str(doc_type)
 
 
@@ -223,7 +235,7 @@ def _topic_signature(s: str) -> set:
 
 def _is_positive_phrase(s: str) -> bool:
     low = (s or "").lower()
-    return any(x in low for x in ("presente", "adequad", "clareza", "suficiente", "atendendo", "evidenciada", "valorizada"))
+    return any(x in low for x in ("presente", "adequad", "clareza", "suficiente", "atendendo", "evidenciada", "valorizada", "mencionado", "mencionada"))
 
 
 def _is_negative_phrase(s: str) -> bool:
@@ -401,7 +413,8 @@ async def analyze_document(
         }
 
     sections = extract_sections(raw_text)
-    sections_detected = [s.key for s in sections] if sections else []
+    # Remove duplicatas mantendo a ordem de primeira aparição
+    sections_detected = list(dict.fromkeys([s.key for s in sections])) if sections else []
     document_type = _infer_document_type(raw_text)
     chunks = _build_analysis_chunks(sections, raw_text)
 

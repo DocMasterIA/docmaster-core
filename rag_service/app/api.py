@@ -95,6 +95,24 @@ class SmartIngestFolderRequest(BaseModel):
         description="Forçar tipo (termo_referencia, etp, dfd, lei). Se omitido, infere pelo caminho.",
     )
 
+
+class GenerateTRFromModelRequest(BaseModel):
+    """Request para gerar TR a partir do modelo fixo, com slots preenchidos pela IA (e opcionalmente pelo usuário)."""
+    user_prompt: str = Field(..., description="Pedido livre (ex.: TR para compra de material de escritório)")
+    slots_override: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Slots já preenchidos pelo usuário (objeto, dispensa, itens, justificativa, fiscal, dotacao). Têm prioridade sobre a IA.",
+    )
+
+    @field_validator("user_prompt")
+    @classmethod
+    def _user_prompt_not_empty(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("user_prompt é obrigatório.")
+        return v
+
+
 router = APIRouter(prefix="/rag", tags=["rag"])
 
 
@@ -277,6 +295,44 @@ async def endpoint_render_document(
             filename="documento.docx",
         )
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/generate-tr-from-model")
+async def endpoint_generate_tr_from_model(body: GenerateTRFromModelRequest):
+    """
+    Gera Termo de Referência a partir do modelo fixo (TR_modelo_base.docx).
+
+    Fluxo com IA:
+    1. Interpreta o user_prompt via llm_agent (contexto + especificações).
+    2. Chama a LLM para preencher os slots (objeto, dispensa, itens, justificativa, fiscal, dotacao).
+    3. Mescla com slots_override (valores enviados pelo usuário têm prioridade).
+    4. Preenche o template DOCX e retorna o arquivo.
+
+    Os itens da tabela de especificações podem vir do prompt (IA extrai) ou do slots_override.itens.
+    """
+    from .tr_slots_llm import fill_tr_slots_with_llm
+    from .tr_template import render_tr_from_slots
+
+    try:
+        slots = await fill_tr_slots_with_llm(
+            user_prompt=body.user_prompt,
+            slots_override=body.slots_override,
+        )
+        docx_path = render_tr_from_slots(slots)
+        if not Path(docx_path).exists():
+            raise HTTPException(status_code=500, detail="DOCX do TR não foi gerado.")
+        return FileResponse(
+            docx_path,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            filename="termo_referencia.docx",
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Erro em generate-tr-from-model: %s", e)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

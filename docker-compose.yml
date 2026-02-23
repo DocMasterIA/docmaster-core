@@ -110,13 +110,19 @@ services:
       - "8001:8000"  # Django na 8001 no host (8000 já é ChromaDB)
     restart: unless-stopped
 
-  # Expõe o Django (host:8001) na internet: ngrok gera a URL pública ao subir. Defina NGROK_AUTHTOKEN no .env.
+  # Expõe o Django (host:8001) na internet. Authtoken: use volume (arquivo no host) OU env NGROK_AUTHTOKEN.
+  # URL pública: docker compose logs --tail 80 ngrok
   ngrok:
     image: ngrok/ngrok:latest
     container_name: ngrok
-    command: http backend:8000
+    entrypoint: ["ngrok"]
+    command: ["http", "backend:8000", "--config", "/etc/ngrok/ngrok.yml", "--log=stdout"]
     environment:
+      - NGROK_CONFIG=/etc/ngrok/ngrok.yml
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    volumes:
+      # Descomente e ajuste o caminho se o arquivo existir no host. Senão, use: export NGROK_AUTHTOKEN=seu_token
+      - /home/docmaster/.config/ngrok/ngrok.yml:/etc/ngrok/ngrok.yml:ro
     depends_on:
       - backend
     restart: unless-stopped

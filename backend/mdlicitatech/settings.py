@@ -34,6 +34,16 @@ ALLOWED_HOSTS = [
     ".ngrok.io",
 ]
 
+# CSRF: aceita origem ngrok (Django 4.2+ aceita subdomínio com ponto à esquerda)
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:8001",
+    "http://127.0.0.1:8001",
+    "https://.ngrok-free.app",
+    "http://.ngrok-free.app",
+    "https://.ngrok.io",
+    "http://.ngrok.io",
+]
+
 # CORS: frontend Vue em origem diferente do Django (necessário para credentials: 'include')
 _cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "").strip()
 if _cors_origins:

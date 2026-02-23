@@ -30,7 +30,8 @@ MAX_LAW_CHUNK_CHARS = 350
 MAX_LAW_CHUNKS = 4
 
 # Prompt: análise direta e funcional, sem citação explícita de artigos
-# Inclui: conformidade Lei 14.133, erros formais, riscos jurídicos, sugestões de reescrita
+# Inclui: conformidade Lei 14.133, erros formais, riscos jurídicos, sugestões de reescrita.
+# Objetivo: NÃO inventar nada – apenas descrever o que está claramente presente ou ausente no texto.
 ANALYSIS_SYSTEM_PROMPT = """Analise este TRECHO de documento licitatório (ETP, DFD ou TR) quanto à Lei 14.133/2021.
 Responda APENAS em JSON válido. Sem intro, sem meta-comentários.
 
@@ -38,15 +39,20 @@ ESTILO: Seja DIRETO e FUNCIONAL. Descreva o que está certo/errado em termos pr�
 EVITE: citações diretas de lei ("Art. 46 § 5º"). Use a lei como referência interna; escreva para o usuário entender sem buscar o dispositivo.
 PREFIRA: "Falta justificativa para a contratação integrada" em vez de "Não há menção ao Art. 46 § 5º".
 
-REGRAS:
-1. pontos_importantes: até 5 bullets – o que este trecho trata (objeto, justificativa, prazo, etc.).
-2. acertos: APENAS o que o documento faz BEM de forma CLARA. Frases curtas. Se houver dúvida, NÃO coloque em acertos.
-3. ressalvas: itens em parte positivos mas com dúvida ou ambiguidade. Ex.: "Cronograma mencionado mas será apresentado posteriormente".
-4. erros: o que FALTA ou está INCORRETO (inclua erros formais: vírgulas, redação confusa, omissões de requisito, prazos incoerentes). Ex.: "Cronograma físico-financeiro ausente", "Redação do objeto pouco clara".
-5. riscos_juridicos: até 5 itens – riscos de questionamento, impugnação ou vício (ex.: "Possível questionamento por falta de estimativa de preços", "Prazo de vigência pode ser considerado curto"). Lista vazia se não houver.
-6. sugestoes_reescrita: até 5 itens – sugestões objetivas de como reescrever ou completar trechos (ex.: "Incluir justificativa para dispensa de cronograma detalhado", "Especificar unidade de medida dos itens"). Lista vazia se não houver.
+NÃO INVENTE NADA:
+- NÃO suponha riscos, erros ou acertos que não estejam claramente indicados no texto.
+- Se não houver exemplo CLARO no trecho, deixe a lista correspondente VAZIA.
+- Evite linguagem especulativa ("pode", "poderia", "talvez", "possível", "em tese", "aparenta", "parece").
+
+REGRAS (máximo 3 itens por lista, apenas os mais claros):
+1. pontos_importantes: até 3 bullets – o que este trecho trata (objeto, justificativa, prazo, etc.).
+2. acertos: até 3 itens – APENAS o que o documento faz BEM de forma CLARA, diretamente sustentado pelo texto. Sem dúvida, sem "talvez".
+3. ressalvas: até 3 itens – pontos em parte positivos mas com dúvida/ambiguidade que estejam presentes no texto (ex.: "cronograma será apresentado posteriormente"). Não invente ressalvas genéricas.
+4. erros: até 3 itens – o que FALTA ou está INCORRETO, incluindo erros formais (redação confusa, ausência de requisito, prazos incoerentes). Sempre descreva o problema de forma objetiva, ancorado no texto.
+5. riscos_juridicos: até 3 itens – apenas riscos de questionamento, impugnação ou vício QUE SEJAM CLARAMENTE SUGERIDOS pelo texto (ex.: mencionada falta de estimativa de preços). Se não houver menção explícita, deixe vazio.
+6. sugestoes_reescrita: até 3 itens – sugestões objetivas de como reescrever ou completar trechos, baseadas em lacunas ou problemas claramente observáveis no texto. Sem "poderia ser melhor", apenas o que falta ou está mal redigido.
 7. conformidade_geral: true SE erros vazio; false SE houver erros.
-8. observacoes: sugestões breves adicionais (opcional)."""
+8. observacoes: sugestões breves adicionais (opcional, apenas se úteis e ancoradas no texto)."""
 
 ANALYSIS_USER_PROMPT_TEMPLATE = """CONTEXTO (Lei 14.133 e boas práticas):
 {context}
@@ -55,11 +61,11 @@ TRECHO DO DOCUMENTO ({section_hint}):
 {document}
 
 Avalie com base no contexto. Resposta em linguagem DIRETA. Não cite artigos na saída.
-- acertos: só itens claramente positivos.
-- ressalvas: itens ambíguos ou com dúvida.
-- erros: inclua erros formais e de conteúdo.
-- riscos_juridicos: riscos de impugnação ou vício.
-- sugestoes_reescrita: como reescrever ou completar.
+- acertos: só itens claramente positivos e diretamente sustentados pelo texto.
+- ressalvas: itens ambíguos ou com dúvida que estejam mencionados no texto.
+- erros: inclua apenas erros formais e de conteúdo claramente identificáveis no trecho.
+- riscos_juridicos: apenas riscos explicitamente sugeridos pelo texto (se não houver, deixe lista vazia).
+- sugestoes_reescrita: como reescrever ou completar trechos problemáticos ou incompletos.
 JSON: {{"pontos_importantes": [...], "acertos": [...], "ressalvas": [...], "erros": [...], "riscos_juridicos": [...], "sugestoes_reescrita": [...], "conformidade_geral": bool, "observacoes": "..."}}"""
 
 # Prompt para gerar resumo executivo único a partir do resultado agregado
@@ -270,6 +276,18 @@ def _is_negative_phrase(s: str) -> bool:
     return any(x in low for x in ("ausente", "falta", "não há", "não há ", "incompleta", "incompleto"))
 
 
+def _contains_hedge(s: str) -> bool:
+    """Detecta linguagem especulativa que indica suposição da IA."""
+    low = (s or "").lower()
+    # Palavras típicas de especulação/hipótese – queremos evitá-las
+    hedges = [
+        "pode ", "poderá", "poderia", "talvez", "possível", "possivelmente",
+        "aparenta", "aparentemente", "parece", "indicaria", "eventual", "em tese",
+        "suger", "poderiam", "risco de ser considerado", "pode ser entendido como",
+    ]
+    return any(h in low for h in hedges)
+
+
 def _drop_contradictions(
     acertos: List[str],
     erros: List[str],
@@ -364,6 +382,18 @@ def _merge_analysis_results(
     def _clean(items: List[str]) -> List[str]:
         return [_decode_html(x) for x in items]
 
+    def _remove_hedged(items: List[str]) -> List[str]:
+        """Remove frases com linguagem especulativa (preferimos não considerar esses pontos)."""
+        out: List[str] = []
+        for x in items:
+            xn = _ensure_str(x)
+            if not xn:
+                continue
+            if _contains_hedge(xn):
+                continue
+            out.append(xn)
+        return out
+
     # Mover acertos ambíguos (embora, questionável, porém) para ressalvas
     def _is_ambiguous_acerto(s: str) -> bool:
         low = (s or "").lower()
@@ -376,8 +406,16 @@ def _merge_analysis_results(
         else:
             acertos_sem_ambiguos.append(item)
 
-    acertos_dedup = _dedup(acertos_sem_ambiguos, 25)
-    erros_dedup = _dedup(all_erros, 25)
+    # Remover frases especulativas das listas sensíveis
+    acertos_sem_ambiguos = _remove_hedged(acertos_sem_ambiguos)
+    all_ressalvas = _remove_hedged(all_ressalvas)
+    all_erros = _remove_hedged(all_erros)
+    all_riscos = _remove_hedged(all_riscos)
+    all_sugestoes = _remove_hedged(all_sugestoes)
+
+    # Limites um pouco mais baixos para evitar listões
+    acertos_dedup = _dedup(acertos_sem_ambiguos, 15)
+    erros_dedup = _dedup(all_erros, 15)
     acertos_sub = _drop_subsumed(acertos_dedup)
     erros_sub = _drop_subsumed(erros_dedup)
     acertos_overlap = _merge_by_word_overlap(acertos_sub, threshold=0.6)
@@ -385,21 +423,21 @@ def _merge_analysis_results(
     erros_overlap = _merge_by_word_overlap(erros_sub, threshold=0.55)
     acertos_final, erros_final, obs_contrad = _drop_contradictions(acertos_overlap, erros_overlap)
 
-    ressalvas_dedup = _dedup(all_ressalvas, 15)
+    ressalvas_dedup = _dedup(all_ressalvas, 12)
     ressalvas_sub = _drop_subsumed(ressalvas_dedup)
     ressalvas_final = _merge_by_word_overlap(ressalvas_sub, threshold=0.55)
 
-    riscos_dedup = _dedup(all_riscos, 15)
+    riscos_dedup = _dedup(all_riscos, 10)
     riscos_sub = _drop_subsumed(riscos_dedup)
     riscos_final = _merge_by_word_overlap(riscos_sub, threshold=0.5)
 
-    sugestoes_dedup = _dedup(all_sugestoes, 15)
+    sugestoes_dedup = _dedup(all_sugestoes, 10)
     sugestoes_sub = _drop_subsumed(sugestoes_dedup)
     sugestoes_final = _merge_by_word_overlap(sugestoes_sub, threshold=0.5)
 
+    # Observações: apenas o que veio da própria análise de cada trecho (sem meta-comentários de inconsistência)
     observacoes_base = _decode_html(" | ".join(obs_parts[:3]) if obs_parts else "")
-    observacoes_full = " | ".join([observacoes_base, *obs_contrad[:2]]) if obs_contrad else observacoes_base
-    observacoes_full = observacoes_full.strip(" | ")
+    observacoes_full = observacoes_base.strip(" | ")
 
     return {
         "pontos_importantes": _clean(_merge_by_word_overlap(_drop_subsumed(_dedup(all_pontos, 12)), 0.65)),

@@ -132,10 +132,11 @@ WSGI_APPLICATION = 'backend.mdlicitatech.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# SQLite: db em data/ para persistir quando usar volume Docker (./backend/data:/app/backend/data)
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': BASE_DIR / 'data' / 'db.sqlite3',
     }
 }
 

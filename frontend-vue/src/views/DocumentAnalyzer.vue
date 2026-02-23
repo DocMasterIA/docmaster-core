@@ -117,6 +117,15 @@
                 </p>
               </div>
 
+              <!-- Resumo executivo -->
+              <div v-if="result.resumo_executivo" class="doc-analyzer__block">
+                <h3 class="doc-analyzer__block-title">
+                  <i class="fa-solid fa-file-lines doc-analyzer__block-icon" aria-hidden="true"></i>
+                  Resumo executivo
+                </h3>
+                <p class="doc-analyzer__resumo-executivo gov-text-soft">{{ result.resumo_executivo }}</p>
+              </div>
+
               <!-- Seções detectadas -->
               <div v-if="result.sections_detected && result.sections_detected.length" class="doc-analyzer__block">
                 <h3 class="doc-analyzer__block-title">
@@ -173,11 +182,37 @@
               <div v-if="result.erros && result.erros.length" class="doc-analyzer__block">
                 <h3 class="doc-analyzer__block-title">
                   <i class="fa-solid fa-circle-xmark doc-analyzer__block-icon doc-analyzer__block-icon--danger" aria-hidden="true"></i>
-                  Erros / Não conformidades
+                  Erros formais e não conformidades
                 </h3>
                 <ul class="doc-analyzer__suggestion-list">
                   <li v-for="(e, i) in result.erros" :key="i" class="doc-analyzer__suggestion-item">
                     {{ e }}
+                  </li>
+                </ul>
+              </div>
+
+              <!-- Riscos jurídicos -->
+              <div v-if="result.riscos_juridicos && result.riscos_juridicos.length" class="doc-analyzer__block">
+                <h3 class="doc-analyzer__block-title">
+                  <i class="fa-solid fa-scale-balanced doc-analyzer__block-icon doc-analyzer__block-icon--warning" aria-hidden="true"></i>
+                  Riscos jurídicos
+                </h3>
+                <ul class="doc-analyzer__suggestion-list">
+                  <li v-for="(r, i) in result.riscos_juridicos" :key="i" class="doc-analyzer__suggestion-item">
+                    {{ r }}
+                  </li>
+                </ul>
+              </div>
+
+              <!-- Sugestões de reescrita -->
+              <div v-if="result.sugestoes_reescrita && result.sugestoes_reescrita.length" class="doc-analyzer__block">
+                <h3 class="doc-analyzer__block-title">
+                  <i class="fa-solid fa-pen-to-square doc-analyzer__block-icon" aria-hidden="true"></i>
+                  Sugestões de reescrita
+                </h3>
+                <ul class="doc-analyzer__suggestion-list">
+                  <li v-for="(s, i) in result.sugestoes_reescrita" :key="i" class="doc-analyzer__suggestion-item">
+                    {{ s }}
                   </li>
                 </ul>
               </div>
@@ -213,8 +248,11 @@ const result = reactive({
   acertos: [],
   ressalvas: [],
   erros: [],
+  riscos_juridicos: [],
+  sugestoes_reescrita: [],
   conformidade_geral: null,
   observacoes: '',
+  resumo_executivo: '',
 });
 
 function acceptFile(file) {
@@ -268,8 +306,11 @@ function mapApiResponse(payload) {
   result.acertos = payload.acertos || [];
   result.ressalvas = payload.ressalvas || [];
   result.erros = payload.erros || [];
+  result.riscos_juridicos = payload.riscos_juridicos || [];
+  result.sugestoes_reescrita = payload.sugestoes_reescrita || [];
   result.conformidade_geral = payload.conformidade_geral ?? null;
   result.observacoes = payload.observacoes || '';
+  result.resumo_executivo = payload.resumo_executivo || '';
 }
 
 async function runAnalysis() {
@@ -283,8 +324,11 @@ async function runAnalysis() {
   result.acertos = [];
   result.ressalvas = [];
   result.erros = [];
+  result.riscos_juridicos = [];
+  result.sugestoes_reescrita = [];
   result.conformidade_geral = null;
   result.observacoes = '';
+  result.resumo_executivo = '';
 
   try {
     const formData = new FormData();

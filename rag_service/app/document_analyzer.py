@@ -30,21 +30,23 @@ MAX_LAW_CHUNK_CHARS = 350
 MAX_LAW_CHUNKS = 4
 
 # Prompt: análise direta e funcional, sem citação explícita de artigos
-# Foco no que funciona/não funciona no documento, não em "Art. X diz Y"
-ANALYSIS_SYSTEM_PROMPT = """Analise este TRECHO de documento licitatório (ETP, DFD ou TR).
+# Inclui: conformidade Lei 14.133, erros formais, riscos jurídicos, sugestões de reescrita
+ANALYSIS_SYSTEM_PROMPT = """Analise este TRECHO de documento licitatório (ETP, DFD ou TR) quanto à Lei 14.133/2021.
 Responda APENAS em JSON válido. Sem intro, sem meta-comentários.
 
 ESTILO: Seja DIRETO e FUNCIONAL. Descreva o que está certo/errado em termos práticos.
-EVITE: citações diretas de lei ("Art. 46 § 5º", "conforme art. X"). Use a lei como referência interna, mas escreva para o usuário entender o problema ou o acerto sem precisar buscar o dispositivo.
+EVITE: citações diretas de lei ("Art. 46 § 5º"). Use a lei como referência interna; escreva para o usuário entender sem buscar o dispositivo.
 PREFIRA: "Falta justificativa para a contratação integrada" em vez de "Não há menção ao Art. 46 § 5º".
 
 REGRAS:
 1. pontos_importantes: até 5 bullets – o que este trecho trata (objeto, justificativa, prazo, etc.).
-2. acertos: APENAS o que o documento faz BEM de forma CLARA e INEQUÍVOCA. Frases curtas e diretas, sem "embora", "questionável", "porém". Ex.: "Objeto descrito com clareza", "Justificativa técnica adequada para a contratação integrada". Se houver dúvida ou ressalva, NÃO coloque em acertos.
-3. ressalvas: itens que são em parte positivos mas têm dúvida, ambiguidade ou ressalva. Ex.: "Justificativa para não elaboração de cronograma está presente, embora seja questionável a necessidade", "Cronograma mencionado mas será apresentado posteriormente". Use quando o ponto não é nem acerto claro nem erro claro.
-4. erros: o que FALTA ou está INCORRETO – descreva o problema e o que deveria ter, sem citar art. Ex.: "Não há justificativa para não parcelar a solução", "Cronograma físico-financeiro ausente".
-5. conformidade_geral: true SE erros vazio; false SE houver erros.
-6. observacoes: sugestões breves (opcional)."""
+2. acertos: APENAS o que o documento faz BEM de forma CLARA. Frases curtas. Se houver dúvida, NÃO coloque em acertos.
+3. ressalvas: itens em parte positivos mas com dúvida ou ambiguidade. Ex.: "Cronograma mencionado mas será apresentado posteriormente".
+4. erros: o que FALTA ou está INCORRETO (inclua erros formais: vírgulas, redação confusa, omissões de requisito, prazos incoerentes). Ex.: "Cronograma físico-financeiro ausente", "Redação do objeto pouco clara".
+5. riscos_juridicos: até 5 itens – riscos de questionamento, impugnação ou vício (ex.: "Possível questionamento por falta de estimativa de preços", "Prazo de vigência pode ser considerado curto"). Lista vazia se não houver.
+6. sugestoes_reescrita: até 5 itens – sugestões objetivas de como reescrever ou completar trechos (ex.: "Incluir justificativa para dispensa de cronograma detalhado", "Especificar unidade de medida dos itens"). Lista vazia se não houver.
+7. conformidade_geral: true SE erros vazio; false SE houver erros.
+8. observacoes: sugestões breves adicionais (opcional)."""
 
 ANALYSIS_USER_PROMPT_TEMPLATE = """CONTEXTO (Lei 14.133 e boas práticas):
 {context}
@@ -52,10 +54,33 @@ ANALYSIS_USER_PROMPT_TEMPLATE = """CONTEXTO (Lei 14.133 e boas práticas):
 TRECHO DO DOCUMENTO ({section_hint}):
 {document}
 
-Use o contexto para avaliar. Responda em linguagem DIRETA e FUNCIONAL. Não cite artigos na saída.
-- acertos: só itens claramente positivos, sem ressalva.
-- ressalvas: itens ambíguos ou positivos com dúvida/ressalva.
-JSON: {{"pontos_importantes": [...], "acertos": [...], "ressalvas": [...], "erros": [...], "conformidade_geral": bool, "observacoes": "..."}}"""
+Avalie com base no contexto. Resposta em linguagem DIRETA. Não cite artigos na saída.
+- acertos: só itens claramente positivos.
+- ressalvas: itens ambíguos ou com dúvida.
+- erros: inclua erros formais e de conteúdo.
+- riscos_juridicos: riscos de impugnação ou vício.
+- sugestoes_reescrita: como reescrever ou completar.
+JSON: {{"pontos_importantes": [...], "acertos": [...], "ressalvas": [...], "erros": [...], "riscos_juridicos": [...], "sugestoes_reescrita": [...], "conformidade_geral": bool, "observacoes": "..."}}"""
+
+# Prompt para gerar resumo executivo único a partir do resultado agregado
+RESUMO_EXECUTIVO_PROMPT = """Com base na análise de um documento licitatório (ETP, DFD ou TR) frente à Lei 14.133/2021, redija um RESUMO EXECUTIVO em um único parágrafo (3 a 6 linhas).
+
+O resumo deve: (1) dizer o tipo de documento e a conclusão sobre conformidade; (2) destacar os principais pontos positivos; (3) mencionar os principais problemas ou riscos, se houver; (4) encerrar com uma recomendação breve (ex.: adequar antes de publicar, ou documento em conformidade).
+
+Responda APENAS com o parágrafo do resumo. Sem título, sem bullet points, sem "Resumo executivo:" no início."""
+
+RESUMO_EXECUTIVO_USER_TEMPLATE = """Resultado da análise agregada:
+
+- Pontos importantes: {pontos}
+- Acertos: {acertos}
+- Ressalvas: {ressalvas}
+- Erros / não conformidades: {erros}
+- Riscos jurídicos: {riscos}
+- Sugestões de reescrita: {sugestoes}
+- Conformidade geral: {conformidade}
+- Observações: {observacoes}
+
+Gere o resumo executivo (um único parágrafo)."""
 
 
 def _decode_html(text: str) -> str:
@@ -122,6 +147,8 @@ def _parse_analysis_response(text: Any) -> Dict[str, Any]:
             "acertos": [],
             "ressalvas": [],
             "erros": [],
+            "riscos_juridicos": [],
+            "sugestoes_reescrita": [],
             "conformidade_geral": None,
             "observacoes": "Resposta do LLM não pôde ser interpretada como JSON.",
         }
@@ -283,6 +310,8 @@ def _merge_analysis_results(
     all_acertos: List[str] = []
     all_ressalvas: List[str] = []
     all_erros: List[str] = []
+    all_riscos: List[str] = []
+    all_sugestoes: List[str] = []
     any_error = False
     obs_parts: List[str] = []
 
@@ -295,6 +324,10 @@ def _merge_analysis_results(
             all_ressalvas.append(_ensure_str(item))
         for item in p.get("erros") or []:
             all_erros.append(_ensure_str(item))
+        for item in p.get("riscos_juridicos") or []:
+            all_riscos.append(_ensure_str(item))
+        for item in p.get("sugestoes_reescrita") or []:
+            all_sugestoes.append(_ensure_str(item))
         if p.get("conformidade_geral") is False:
             any_error = True
         obs = _ensure_str(p.get("observacoes"))
@@ -354,8 +387,15 @@ def _merge_analysis_results(
 
     ressalvas_dedup = _dedup(all_ressalvas, 15)
     ressalvas_sub = _drop_subsumed(ressalvas_dedup)
-    # Ressalvas também podem agrupar paráfrases com overlap um pouco menor.
     ressalvas_final = _merge_by_word_overlap(ressalvas_sub, threshold=0.55)
+
+    riscos_dedup = _dedup(all_riscos, 15)
+    riscos_sub = _drop_subsumed(riscos_dedup)
+    riscos_final = _merge_by_word_overlap(riscos_sub, threshold=0.5)
+
+    sugestoes_dedup = _dedup(all_sugestoes, 15)
+    sugestoes_sub = _drop_subsumed(sugestoes_dedup)
+    sugestoes_final = _merge_by_word_overlap(sugestoes_sub, threshold=0.5)
 
     observacoes_base = _decode_html(" | ".join(obs_parts[:3]) if obs_parts else "")
     observacoes_full = " | ".join([observacoes_base, *obs_contrad[:2]]) if obs_contrad else observacoes_base
@@ -366,11 +406,38 @@ def _merge_analysis_results(
         "acertos": _clean(acertos_final),
         "ressalvas": _clean(ressalvas_final),
         "erros": _clean(erros_final),
+        "riscos_juridicos": _clean(riscos_final),
+        "sugestoes_reescrita": _clean(sugestoes_final),
         "conformidade_geral": False if any_error else (
             all(p.get("conformidade_geral") for p in parsed_list) if parsed_list else None
         ),
         "observacoes": observacoes_full,
     }
+
+
+async def _generate_resumo_executivo(merged: Dict[str, Any]) -> str:
+    """Gera um parágrafo de resumo executivo a partir do resultado agregado da análise."""
+    def _join(items: List[str], limit: int = 8) -> str:
+        parts = [_ensure_str(x) for x in (items or [])[:limit] if _ensure_str(x)]
+        return "; ".join(parts) if parts else "Nenhum."
+    try:
+        conf = merged.get("conformidade_geral")
+        conf_str = "Conforme" if conf is True else ("Não conforme" if conf is False else "Indefinida")
+        user_msg = RESUMO_EXECUTIVO_USER_TEMPLATE.format(
+            pontos=_join(merged.get("pontos_importantes") or []),
+            acertos=_join(merged.get("acertos") or []),
+            ressalvas=_join(merged.get("ressalvas") or []),
+            erros=_join(merged.get("erros") or []),
+            riscos=_join(merged.get("riscos_juridicos") or []),
+            sugestoes=_join(merged.get("sugestoes_reescrita") or []),
+            conformidade=conf_str,
+            observacoes=_ensure_str(merged.get("observacoes") or ""),
+        )
+        prompt = f"{RESUMO_EXECUTIVO_PROMPT}\n\n{user_msg}"
+        text = await _call_llm(prompt)
+        return _decode_html(_ensure_str(text))
+    except Exception:
+        return ""
 
 
 async def analyze_document(
@@ -408,8 +475,11 @@ async def analyze_document(
             "acertos": [],
             "ressalvas": [],
             "erros": [],
+            "riscos_juridicos": [],
+            "sugestoes_reescrita": [],
             "conformidade_geral": None,
             "observacoes": "",
+            "resumo_executivo": "",
         }
 
     sections = extract_sections(raw_text)
@@ -427,8 +497,11 @@ async def analyze_document(
             "acertos": [],
             "ressalvas": [],
             "erros": [],
+            "riscos_juridicos": [],
+            "sugestoes_reescrita": [],
             "conformidade_geral": None,
             "observacoes": "Documento sem conteúdo textual extraível.",
+            "resumo_executivo": "",
         }
 
     parsed_list: List[Dict[str, Any]] = []
@@ -482,6 +555,7 @@ async def analyze_document(
         parsed_list.append(_parse_analysis_response(llm_response))
 
     merged = _merge_analysis_results(parsed_list)
+    resumo_executivo = await _generate_resumo_executivo(merged)
 
     return {
         "ok": True,
@@ -491,6 +565,9 @@ async def analyze_document(
         "acertos": merged["acertos"],
         "ressalvas": merged["ressalvas"],
         "erros": merged["erros"],
+        "riscos_juridicos": merged["riscos_juridicos"],
+        "sugestoes_reescrita": merged["sugestoes_reescrita"],
         "conformidade_geral": merged["conformidade_geral"],
         "observacoes": merged["observacoes"],
+        "resumo_executivo": resumo_executivo,
     }

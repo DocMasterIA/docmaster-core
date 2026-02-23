@@ -214,7 +214,7 @@ def _topic_signature(s: str) -> set:
     """Palavras de tema (exclui polaridade: presente, ausente, falta, adequada, etc.)."""
     stop = {
         "presente", "ausente", "falta", "adequada", "adequado", "clareza", "não", "há",
-        "justificativa", "justificado", "mencionad", "descrito", "suficiente", "para", "com",
+        "justificado", "mencionad", "descrito", "suficiente", "para", "com",
         "da", "de", "do", "em", "a", "o", "e", "ou", "se", "que", "na", "no",
     }
     t = _word_tokens(s)
@@ -336,12 +336,14 @@ def _merge_analysis_results(
     acertos_sub = _drop_subsumed(acertos_dedup)
     erros_sub = _drop_subsumed(erros_dedup)
     acertos_overlap = _merge_by_word_overlap(acertos_sub, threshold=0.6)
-    erros_overlap = _merge_by_word_overlap(erros_sub, threshold=0.6)
+    # Para erros, seja um pouco mais agressivo na fusão de paráfrases.
+    erros_overlap = _merge_by_word_overlap(erros_sub, threshold=0.55)
     acertos_final, erros_final, obs_contrad = _drop_contradictions(acertos_overlap, erros_overlap)
 
     ressalvas_dedup = _dedup(all_ressalvas, 15)
     ressalvas_sub = _drop_subsumed(ressalvas_dedup)
-    ressalvas_final = _merge_by_word_overlap(ressalvas_sub, threshold=0.6)
+    # Ressalvas também podem agrupar paráfrases com overlap um pouco menor.
+    ressalvas_final = _merge_by_word_overlap(ressalvas_sub, threshold=0.55)
 
     observacoes_base = _decode_html(" | ".join(obs_parts[:3]) if obs_parts else "")
     observacoes_full = " | ".join([observacoes_base, *obs_contrad[:2]]) if obs_contrad else observacoes_base

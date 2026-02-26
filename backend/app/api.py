@@ -100,8 +100,8 @@ def get_template_list_api(request):
 
 
 # API: gerar documento (DOCX/PDF) a partir de valores recebidos, usando schema (index) ou fallback tokens.
-@api_login_required
 @csrf_exempt  # se for API token-based, prefira auth token em header e remova csrf_exempt
+@api_login_required
 def generate_document_with_values_api(request):
     if request.method != "POST":
         return JsonResponse({"ok": False, "error": "Use POST"}, status=405)
@@ -138,8 +138,8 @@ def generate_document_with_values_api(request):
 
 
 # API: gerar documento via LLM (rag_service) com contexto do usuário.
-@api_login_required
 @csrf_exempt
+@api_login_required
 def gerar_via_llm_api(request):
     """
     Gera documento (ETP, DFD, TR) via serviço RAG/LLM.
@@ -343,6 +343,7 @@ def analise_documentos_api(request):
 
 
 # API: retorna até 10 templates para autocomplete/busca.
+@csrf_exempt
 @require_GET
 @api_login_required
 def template_list_api(request):
@@ -371,6 +372,7 @@ def template_list_api(request):
     return JsonResponse({"templates": data})
 
 # API: retorna URL do preview PDF, gerando se necessário.
+@csrf_exempt
 @api_login_required
 def template_preview_pdf_api(request, template_id):
     tpl = get_object_or_404(Template, id=template_id)
@@ -495,6 +497,7 @@ def api_me(request):
 
 
 # API: lista de documentos do usuário (paginação e busca).
+@csrf_exempt
 @api_login_required
 @require_GET
 def api_me_documents(request):

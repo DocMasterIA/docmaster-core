@@ -40,10 +40,10 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8001",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://.ngrok-free.app",
-    "http://.ngrok-free.app",
-    "https://.ngrok.io",
-    "http://.ngrok.io",
+    "https://*.ngrok-free.app",
+    "http://*.ngrok-free.app",
+    "https://*.ngrok.io",
+    "http://*.ngrok.io",
 ]
 
 # CORS: frontend Vue em origem diferente do Django (necessário para credentials: 'include')

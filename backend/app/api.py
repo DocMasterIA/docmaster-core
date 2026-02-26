@@ -5,6 +5,7 @@ from backend.app.services.preview import generate_docx_preview, generate_docx_pr
 from django.contrib.auth.decorators import login_required
 import json, tempfile, traceback
 from django.http import JsonResponse, FileResponse, HttpResponse
+from django.core.files.base import ContentFile
 from backend.app.models import Template, TemplateSchema, DocumentInstance, Prefeitura
 from backend.app.forms import UserProfileForm, LoginForm
 from django.views.decorators.csrf import csrf_exempt
@@ -197,6 +198,7 @@ def gerar_via_llm_api(request):
         data = resp.json()
         if not data.get("ok"):
             return JsonResponse({"ok": False, "error": data.get("error", "Erro na geração")}, status=500)
+        # Caso especial: se no futuro usarmos docx_path compartilhado via volume, poderíamos salvar em DocumentInstance aqui.
         if output == "docx" and data.get("docx_path") and os.path.isfile(data["docx_path"]):
             return FileResponse(
                 open(data["docx_path"], "rb"),
@@ -207,7 +209,34 @@ def gerar_via_llm_api(request):
         return JsonResponse({"ok": True, **{k: v for k, v in data.items() if k not in ("docx_path", "pdf_path")}})
     # Resposta é o arquivo DOCX diretamente (format=docx)
     if output == "docx" and resp.content:
-        r = HttpResponse(resp.content, content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        # Salva instância do documento para aparecer em "Meus Documentos"
+        try:
+            if template_id is not None:
+                tpl = Template.objects.filter(id=template_id).first()
+                if tpl and request.user.is_authenticated:
+                    inst = DocumentInstance(
+                        template=tpl,
+                        owner=request.user,
+                        data={
+                            "user_prompt": user_prompt,
+                            "context": context,
+                            "document_type_hint": payload.get("document_type_hint") or "",
+                        },
+                        status="final",
+                    )
+                    inst.file_docx.save(
+                        f"{inst.id}.docx",
+                        ContentFile(resp.content),
+                        save=True,
+                    )
+        except Exception:
+            # Não quebra a geração se falhar ao salvar o histórico
+            pass
+
+        r = HttpResponse(
+            resp.content,
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
         r["Content-Disposition"] = 'attachment; filename="documento.docx"'
         return r
     return JsonResponse({"ok": False, "error": "Resposta inesperada do serviço"}, status=502)

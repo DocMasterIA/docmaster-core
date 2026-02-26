@@ -71,6 +71,12 @@ CORS_ALLOW_HEADERS = [
     "x-requested-with",
 ]
 
+# Cookies: necessários para usar sessão/CSRF com frontend em origem diferente via ngrok (HTTPS)
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SAMESITE = "None"
+
 # Application definition (apps internos e terceiros usados pelo painel/admin/UX)
 
 INSTALLED_APPS = [

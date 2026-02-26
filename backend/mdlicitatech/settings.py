@@ -77,6 +77,9 @@ CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SAMESITE = "None"
 CSRF_COOKIE_SAMESITE = "None"
 
+# Diz ao Django que as requisições vindas pelo proxy/ngrok são HTTPS
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 # Application definition (apps internos e terceiros usados pelo painel/admin/UX)
 
 INSTALLED_APPS = [

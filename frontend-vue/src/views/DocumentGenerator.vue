@@ -301,6 +301,7 @@ const searchDebounce = ref(null);
 
 const iaPrompt = ref('');
 const docTypeMode = ref('auto'); // 'auto' (generate-document), 'tr_modelo' (TR modelo fixo)
+const sourceMode = ref('template'); // 'template' | 'file' | 'llm'
 const isSubmitting = ref(false);
 const documentReady = ref(false);
 const documentDocxUrl = ref('');

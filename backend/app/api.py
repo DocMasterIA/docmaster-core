@@ -214,8 +214,8 @@ def gerar_via_llm_api(request):
     return JsonResponse({"ok": False, "error": "Resposta inesperada do serviço"}, status=502)
 
 
-@api_login_required
 @csrf_exempt
+@api_login_required
 def gerar_tr_modelo_api(request):
     """
     Gera Termo de Referência a partir do modelo fixo do rag_service (/api/rag/generate-tr-from-model).
@@ -294,8 +294,8 @@ def gerar_tr_modelo_api(request):
 
     return JsonResponse({"ok": False, "error": "Resposta inesperada do serviço de TR (DOCX não retornado)."}, status=502)
 
-@api_login_required
 @csrf_exempt
+@api_login_required
 def analise_documentos_api(request):
     """
     Recebe um arquivo (PDF/DOCX) e delega a análise para o rag_service (/api/rag/analyze-document).

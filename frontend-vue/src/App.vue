@@ -11,7 +11,9 @@
       <div class="gov-topbar__meta">
         <span>Ambiente Vue.js</span>
         <span>|</span>
-        <span>UF: SP • Órgão: Prefeitura Municipal</span>
+        <span v-if="user">
+          UF: {{ user.prefeitura_uf || '—' }} • Órgão: Prefeitura de {{ user.prefeitura_nome || '—' }}
+        </span>
         <button
           type="button"
           class="gov-topbar__logout"
@@ -87,10 +89,24 @@
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const router = useRouter();
+
+const user = ref(null);
+
+async function fetchMe() {
+  try {
+    const res = await fetch(`${API_BASE}/api/me/`, { credentials: 'include' });
+    if (!res.ok) return;
+    const data = await res.json();
+    user.value = data;
+  } catch (e) {
+    console.warn('fetchMe failed', e);
+  }
+}
 
 async function logout() {
   try {
@@ -98,8 +114,13 @@ async function logout() {
   } catch (e) {
     console.warn('logout request failed', e);
   }
+  user.value = null;
   router.push('/login');
 }
+
+onMounted(() => {
+  fetchMe();
+});
 </script>
 
 <style scoped>

@@ -178,9 +178,8 @@ def gerar_via_llm_api(request):
     }
 
     try:
-        resp = requests.post(url, json=body, params=params, timeout=180)
-    except requests.exceptions.Timeout:
-        return JsonResponse({"ok": False, "error": "Serviço de geração demorou para responder. Tente novamente."}, status=504)
+        # Sem timeout explícito: deixa a chamada ao rag_service rodar até responder
+        resp = requests.post(url, json=body, params=params)
     except requests.exceptions.ConnectionError:
         return JsonResponse({"ok": False, "error": "Serviço de geração indisponível. Verifique se o rag_service está em execução."}, status=503)
     except Exception as e:
@@ -247,10 +246,8 @@ def gerar_tr_modelo_api(request):
     }
 
     try:
-        timeout = getattr(django_settings, "RAG_TIMEOUT", 180)
-        resp = requests.post(url, json=body, timeout=timeout)
-    except requests.exceptions.Timeout:
-        return JsonResponse({"ok": False, "error": "Serviço de geração de TR demorou para responder. Tente novamente."}, status=504)
+        # Sem timeout explícito: deixa a chamada ao rag_service rodar até responder
+        resp = requests.post(url, json=body)
     except requests.exceptions.ConnectionError:
         return JsonResponse({"ok": False, "error": "Serviço de geração de TR indisponível. Verifique se o rag_service está em execução."}, status=503)
     except Exception as e:
@@ -322,10 +319,8 @@ def analise_documentos_api(request):
     data = {}  # top_k, collection podem ser adicionados futuramente
 
     try:
-        timeout = getattr(django_settings, "RAG_TIMEOUT", 180)
-        resp = requests.post(url, files=files, data=data, timeout=timeout)
-    except requests.exceptions.Timeout:
-        return JsonResponse({"ok": False, "error": "Serviço de análise demorou para responder. Tente novamente."}, status=504)
+        # Sem timeout explícito: deixa a chamada ao rag_service rodar até responder
+        resp = requests.post(url, files=files, data=data)
     except requests.exceptions.ConnectionError:
         return JsonResponse({"ok": False, "error": "Serviço de análise de documentos indisponível. Verifique se o rag_service está em execução."}, status=503)
     except Exception as e:
@@ -482,10 +477,15 @@ def api_me(request):
             data["secretaria"] = str(user.secretaria)
         else:
             data["secretaria"] = None
-        if getattr(user, "prefeitura", None):
-            data["prefeitura"] = str(user.prefeitura)
+        pref = getattr(user, "prefeitura", None)
+        if pref:
+            data["prefeitura"] = str(pref)
+            data["prefeitura_uf"] = pref.estado or ""
+            data["prefeitura_nome"] = pref.nome_municipio
         else:
             data["prefeitura"] = None
+            data["prefeitura_uf"] = ""
+            data["prefeitura_nome"] = ""
         return JsonResponse(data)
     if request.method == "POST":
         form = UserProfileForm(request.POST, request.FILES, instance=user)

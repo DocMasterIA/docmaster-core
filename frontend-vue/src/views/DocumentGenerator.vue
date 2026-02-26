@@ -25,29 +25,21 @@
                 <label class="gov-label">Documento Base</label>
                 <div class="doc-gen__source-tabs">
                   <label class="doc-gen__tab">
-                    <input v-model="sourceMode" type="radio" value="template" @change="onSourceChange('template')" />
-                    <span>Template da biblioteca</span>
-                  </label>
-                  <label class="doc-gen__tab">
-                    <input v-model="sourceMode" type="radio" value="file" @change="onSourceChange('file')" />
-                    <span>Enviar meu .docx</span>
-                  </label>
-                  <label class="doc-gen__tab">
-                    <input v-model="sourceMode" type="radio" value="llm" @change="onSourceChange('llm')" />
+                    <input v-model="sourceMode" type="radio" value="llm" disabled />
                     <span>Criar do zero (ETP, DFD, TR)</span>
                   </label>
                 </div>
 
                 <!-- Criar do zero com IA (LLM) -->
-                <div v-show="sourceMode === 'llm'" class="doc-gen__llm-hint">
+                <div class="doc-gen__llm-hint">
                   <p class="gov-text-soft">
                     <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
                     A IA gera o documento completo a partir do seu prompt (ETP, DFD, Termo de Referência). Use o contexto do seu órgão e secretaria.
                   </p>
                 </div>
 
-                <!-- Template da biblioteca -->
-                <div v-show="sourceMode === 'template'" class="doc-gen__search-wrap">
+                <!-- Template da biblioteca (opcional, usado como cabeçalho/rodapé DOCX) -->
+                <div class="doc-gen__search-wrap">
                   <input
                     id="template-search"
                     v-model="searchQuery"
@@ -84,37 +76,6 @@
                   </p>
                 </div>
 
-                <!-- Enviar meu .docx -->
-                <div v-show="sourceMode === 'file'" class="doc-gen__upload-own">
-                  <input
-                    ref="docxFileInput"
-                    type="file"
-                    accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    class="doc-gen__file-input"
-                    @change="onDocxFileSelect"
-                  />
-                  <button
-                    v-if="!selectedDocxFile"
-                    type="button"
-                    class="gov-btn gov-btn--outline doc-gen__upload-btn"
-                    @click="docxFileInput?.click()"
-                  >
-                    <i class="fa-solid fa-upload" aria-hidden="true"></i> Escolher arquivo .docx
-                  </button>
-                  <div v-else class="doc-gen__uploaded-file">
-                    <i class="fa-solid fa-file-word doc-gen__uploaded-icon" aria-hidden="true"></i>
-                    <span class="doc-gen__uploaded-name">{{ selectedDocxFile.name }}</span>
-                    <button
-                      type="button"
-                      class="gov-btn gov-btn--outline gov-btn--sm doc-gen__uploaded-remove"
-                      aria-label="Remover arquivo"
-                      @click="clearDocxFile"
-                    >
-                      <i class="fa-solid fa-times" aria-hidden="true"></i>
-                    </button>
-                  </div>
-                  <p class="gov-text-soft gov-mt-sm">O arquivo será enviado como base e a IA aplicará o prompt. Máx. 10 MB.</p>
-                </div>
               </div>
 
               <!-- Prompt IA -->
@@ -123,7 +84,7 @@
                   Prompt de Inteligência Artificial
                   <span class="gov-label__hint">(IA contextual inteligente)</span>
                 </label>
-                <div v-if="sourceMode === 'llm'" class="doc-gen__doc-type">
+                <div class="doc-gen__doc-type">
                   <label class="gov-label gov-label--inline">Tipo de documento</label>
                   <div class="doc-gen__doc-type-options">
                     <label class="doc-gen__doc-type-option">
@@ -142,7 +103,7 @@
                   name="ia_prompt"
                   class="gov-textarea"
                   rows="6"
-                  :placeholder="sourceMode === 'llm' ? 'Ex: Gerar ETP para coleta seletiva de resíduos em 3 bairros' : 'Digite aqui o prompt que será enviado para a IA contextual inteligente...'"
+                  placeholder="Ex: Gerar ETP para coleta seletiva de resíduos em 3 bairros"
                   required
                 />
                 <p class="gov-text-soft gov-mt-sm">
@@ -207,24 +168,20 @@
             <h3 class="doc-gen__preview-heading">{{ previewHeading }}</h3>
             <p class="gov-text-soft">{{ previewSub }}</p>
             <div class="doc-gen__preview-excerpt">
-              <template v-if="sourceMode === 'llm'">
-                <p class="gov-text-soft">O documento será criado inteiramente pela IA com base no seu prompt. Sem necessidade de template prévio.</p>
-              </template>
-              <template v-else-if="sourceMode === 'file' && selectedDocxFile">
-                <p class="gov-text-soft">Documento enviado: <strong>{{ selectedDocxFile.name }}</strong></p>
-                <p class="gov-text-soft gov-text-sm">Pré-visualização em PDF não disponível para arquivo enviado. Gere o documento para baixar.</p>
-              </template>
-              <template v-else-if="selectedTemplate?.preview_image">
+              <template v-if="selectedTemplate?.preview_image">
                 <p class="gov-text-soft">Pré-visualização do documento:</p>
                 <img :src="previewImageUrl" alt="Preview" class="doc-gen__preview-img" />
               </template>
               <template v-else>
-                <p class="gov-text-soft">Nenhum documento base selecionado. Escolha um template, envie um .docx ou use "Criar do zero".</p>
+                <p class="gov-text-soft">
+                  Nenhum documento base selecionado. A IA criará o documento completo; você pode opcionalmente escolher um template
+                  de cabeçalho/rodapé na área ao lado.
+                </p>
               </template>
             </div>
             <div class="doc-gen__preview-actions">
               <button
-                v-if="selectedTemplate?.id && sourceMode === 'template'"
+                v-if="selectedTemplate?.id"
                 type="button"
                 class="gov-btn gov-btn--primary gov-btn--sm"
                 @click="openPdfModal"
@@ -301,7 +258,7 @@ const searchDebounce = ref(null);
 
 const iaPrompt = ref('');
 const docTypeMode = ref('auto'); // 'auto' (generate-document), 'tr_modelo' (TR modelo fixo)
-const sourceMode = ref('template'); // 'template' | 'file' | 'llm'
+const sourceMode = ref('llm'); // modo único: criar do zero com IA
 const isSubmitting = ref(false);
 const documentReady = ref(false);
 const documentDocxUrl = ref('');
@@ -443,7 +400,7 @@ function clearDocxFile() {
 }
 
 async function onSubmit() {
-  if (!hasDocumentBase.value || !iaPrompt.value.trim()) return;
+  if (!iaPrompt.value.trim()) return;
   isSubmitting.value = true;
   documentReady.value = false;
   documentDocxUrl.value = '';
@@ -451,11 +408,7 @@ async function onSubmit() {
   generateError.value = '';
 
   try {
-    if (sourceMode.value === 'llm') {
-      await submitViaLLM();
-      return;
-    }
-    await submitViaTemplate();
+    await submitViaLLM();
   } catch (e) {
     generateError.value = e.message || 'Erro ao gerar documento';
   } finally {

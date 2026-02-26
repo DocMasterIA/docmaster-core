@@ -294,7 +294,6 @@ def gerar_tr_modelo_api(request):
 
     return JsonResponse({"ok": False, "error": "Resposta inesperada do serviço de TR (DOCX não retornado)."}, status=502)
 
-
 @api_login_required
 @csrf_exempt
 def analise_documentos_api(request):

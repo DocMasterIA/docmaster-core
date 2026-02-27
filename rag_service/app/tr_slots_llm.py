@@ -497,6 +497,29 @@ async def fill_tr_slots_with_llm(
     parsed = _parse_llm_json_response(raw)
     llm_slots = _dict_to_tr_slots(parsed)
 
+    # Se o objeto vier vazio ou praticamente sem conteúdo (ex.: só um "."),
+    # tenta recuperar um objeto útil a partir do interpretador (context_from_agent)
+    # ou, em último caso, do próprio user_prompt.
+    objeto_fallback = ""
+    if isinstance(context_from_agent, dict):
+        ctx = context_from_agent.get("context") or {}
+        if isinstance(ctx, dict):
+            objeto_ctx = str(ctx.get("objeto") or "").strip()
+            if objeto_ctx:
+                objeto_fallback = objeto_ctx
+    if not objeto_fallback:
+        # Usa o próprio user_prompt como fallback bruto (limitado em tamanho)
+        objeto_fallback = user_prompt.strip()[:400]
+
+    def _is_trivial(text: str) -> bool:
+        if not text:
+            return True
+        stripped = text.strip().strip(".;,")
+        return len(stripped) < 5  # ex.: ".", "..", "ok", etc.
+
+    if _is_trivial(llm_slots.objeto) and objeto_fallback:
+        llm_slots.objeto = objeto_fallback
+
     # Se, após o primeiro preenchimento, o inciso do art. 75 ainda estiver vazio,
     # chamamos uma etapa específica de decisão de inciso com base no objeto/itens.
     if not (llm_slots.dispensa and llm_slots.dispensa.inciso):

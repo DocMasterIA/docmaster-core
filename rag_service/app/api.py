@@ -5,18 +5,19 @@ Endpoints para ingestão, consulta e gerenciamento de coleções.
 """
 from __future__ import annotations
 
-import base64i
+import base64
+import logging
 import os
 import tempfile
 import zipfile
 from pathlib import Path
-
-logger = logging.getLogger(__name__)
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, File, FastAPI, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, field_validator
+
+logger = logging.getLogger(__name__)
 
 from .chroma_client import delete_collection, get_chroma_client, list_collections
 from .ingestion import ingest_text

@@ -138,71 +138,55 @@ def smart_ingest_file(
     if doc_type_lower == "lei":
         import re
 
-        lines = text.splitlines()
-        current_article_lines: List[str] = []
-        current_article_num: str | None = None
         docs = []
 
-        def flush_article():
-            nonlocal current_article_lines, current_article_num, docs
-            if not current_article_lines or not current_article_num:
-                current_article_lines = []
-                current_article_num = None
-                return
-            article_text = "\n".join(current_article_lines).strip()
-            if not article_text:
-                current_article_lines = []
-                current_article_num = None
-                return
-            # Se o artigo for muito grande, quebra em chunks
-            if len(article_text) > MAX_CHUNK:
-                chunks = splitter.split_text(article_text)
-                for i, chunk in enumerate(chunks):
+        # Detecta todas as ocorrências de "Art. X" ao longo do texto,
+        # não apenas no início de linha. Usa essas posições como
+        # delimitadores dos artigos.
+        art_pattern = re.compile(r"\bArt\.\s*(\d+)", re.IGNORECASE)
+        matches = list(art_pattern.finditer(text))
+
+        if matches:
+            for idx, m in enumerate(matches):
+                art_num = m.group(1)
+                start = m.start()
+                end = matches[idx + 1].start() if idx + 1 < len(matches) else len(text)
+                article_text = text[start:end].strip()
+                if not article_text:
+                    continue
+
+                # Se o artigo for muito grande, divide em chunks
+                if len(article_text) > MAX_CHUNK:
+                    chunks = splitter.split_text(article_text)
+                    for i, chunk in enumerate(chunks):
+                        docs.append(
+                            Document(
+                                page_content=chunk,
+                                metadata={
+                                    **base_metadata,
+                                    "document_type": doc_type,
+                                    "section_key": f"artigo_{art_num}",
+                                    "section_title": f"Artigo {art_num}",
+                                    "chunk_index": i,
+                                },
+                            )
+                        )
+                else:
                     docs.append(
                         Document(
-                            page_content=chunk,
+                            page_content=article_text,
                             metadata={
                                 **base_metadata,
                                 "document_type": doc_type,
-                                "section_key": f"artigo_{current_article_num}",
-                                "section_title": f"Artigo {current_article_num}",
-                                "chunk_index": i,
+                                "section_key": f"artigo_{art_num}",
+                                "section_title": f"Artigo {art_num}",
                             },
                         )
                     )
-            else:
-                docs.append(
-                    Document(
-                        page_content=article_text,
-                        metadata={
-                            **base_metadata,
-                            "document_type": doc_type,
-                            "section_key": f"artigo_{current_article_num}",
-                            "section_title": f"Artigo {current_article_num}",
-                        },
-                    )
-                )
-            current_article_lines = []
-            current_article_num = None
 
-        # Detecta linhas que iniciam artigos: "Art. 1º", "Art. 2º", "Art. 75."
-        art_pattern = re.compile(r"^\s*Art\.\s*(\d+)", re.IGNORECASE)
-        for line in lines:
-            m = art_pattern.match(line)
-            if m:
-                # Novo artigo encontrado: flush do anterior
-                flush_article()
-                current_article_num = m.group(1)
-                current_article_lines = [line]
-            else:
-                if current_article_lines is not None:
-                    current_article_lines.append(line)
-        # Último artigo
-        flush_article()
-
-        sections_extracted = len(docs)
-        if not docs:
-            # Fallback: ingere como documento único
+            sections_extracted = len(matches)
+        else:
+            # Fallback: se não detectar nenhum "Art. X", ingere como documento único
             chunks = splitter.split_text(text)
             docs = [
                 Document(
@@ -216,6 +200,7 @@ def smart_ingest_file(
                 )
                 for i, chunk in enumerate(chunks)
             ]
+            sections_extracted = 0
     else:
         # Fluxo padrão: extrai seções com o extrator genérico
         sections = extract_sections(text)

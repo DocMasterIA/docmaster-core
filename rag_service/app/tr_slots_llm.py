@@ -152,25 +152,26 @@ e escolher QUAL inciso do art. 75 (dispensa de licitação) se aplica com mais p
 
 Considere APENAS os incisos I a XV do art. 75, com as seguintes ideias centrais:
 - I: obras/serviços de engenharia ou manutenção de veículos até o limite legal.
-- II: outros serviços ou compras em geral até o limite legal.
-- III: repetição de contratação com mesmas condições de edital recente sem interessados/propostas válidas ou com preços inadequados.
-- IV: hipóteses específicas (garantia/exclusividade, contratos entre entes públicos criados para fim específico, P&D até limite, transferência de tecnologia ICT, gêneros perecíveis, alta complexidade/defesa, padronização de material militar).
-- V: serviços para viabilizar acordo internacional aprovado pelo Congresso, vantajosos para o Poder Público.
-- VI: manutenção de equipamentos com assistência técnica exclusiva, acima do limite do inciso I.
+- II: outros serviços ou compras em geral até o limite legal, quando NÃO houver enquadramento mais específico em outro inciso (III a XV). Use II apenas como categoria residual para compras/serviços comuns por valor.
+- III: repetição de contratação com mesmas condições de edital recente sem interessados/propostas válidas ou com preços inadequados (o objeto deve mencionar edital anterior, fracasso/deserto ou preços incompatíveis).
+- IV: hipóteses específicas (garantia/exclusividade de fornecedor, contratos entre entes públicos criados para fim específico, P&D até limite, transferência de tecnologia ICT, gêneros perecíveis, alta complexidade/defesa, padronização de material militar).
+- V: serviços para viabilizar acordo internacional aprovado pelo Congresso, vantajosos para o Poder Público (menciona acordo internacional, tratado, cooperação internacional).
+- VI: manutenção de equipamentos com assistência técnica exclusiva, acima do limite do inciso I (enfatiza exclusividade de assistência técnica do fabricante).
 - VII: instituições de pesquisa/ensino/desenvolvimento institucional ou de recuperação de presos, sem fins lucrativos e com reputação ilibada.
-- VIII: emergência ou calamidade pública, para bens/serviços estritamente necessários, no prazo máximo de 1 ano.
-- IX: aquisição ou locação de imóvel com características que tornem necessária sua escolha.
+- VIII: emergência ou calamidade pública, para bens/serviços estritamente necessários, no prazo máximo de 1 ano (objeto menciona emergência, calamidade, urgência na continuidade de serviço público).
+- IX: aquisição ou locação de imóvel com características que tornem necessária sua escolha (objeto menciona imóvel específico, localização/instalações determinantes).
 - X: insumos estratégicos para saúde produzidos/prestados por entidade pública criada para esse fim, com preço de mercado.
-- XI: associações de catadores de recicláveis, sem fins lucrativos, formadas por pessoas de baixa renda.
+- XI: associações de catadores de recicláveis, sem fins lucrativos, formadas por pessoas de baixa renda (objeto ligado a coleta/triagem/comercialização de recicláveis por associação de catadores).
 - XII: profissionais de notória especialização para comissão de avaliação de critérios de técnica.
-- XIII: empresas que cumprem reserva legal de cargos para pessoas com deficiência ou reabilitados e requisitos de acessibilidade.
-- XIV: organizações sociais para atividades previstas em contrato de gestão.
-- XV: instituições sem fins lucrativos certificadas como entidades beneficentes de assistência social, para serviços de assistência social.
+- XIII: empresas que cumprem reserva legal de cargos para pessoas com deficiência ou reabilitados e requisitos de acessibilidade (objeto deve mencionar essas exigências como condição relevante).
+- XIV: organizações sociais para atividades previstas em contrato de gestão (por exemplo, gestão compartilhada de unidade hospitalar municipal por organização social qualificada, com base em contrato de gestão).
+- XV: instituições sem fins lucrativos certificadas como entidades beneficentes de assistência social, para serviços de assistência social (objeto deve indicar essa certificação/beneficência).
 
 REGRAS DE SAÍDA:
 - Responda APENAS com um JSON no formato {"inciso": "I"}.
 - O valor deve ser um ÚNICO algarismo romano entre "I" e "XV".
-- Você DEVE escolher o inciso que melhor se ajusta ao caso, mesmo que haja alguma incerteza.
+- Você DEVE testar primeiro se o objeto se enquadra claramente em algum inciso específico (III a XV). Só use o inciso II quando NÃO houver correspondência clara com nenhum inciso específico e o objeto for compra/serviço comum por valor.
+- Sempre que o objeto mencionar organização social qualificada, contrato de gestão e gestão de unidade ou serviço público (especialmente unidade hospitalar), você deve, como regra, escolher o inciso XIV, e não o inciso II.
 - NUNCA devolva valor vazio; escolha sempre o inciso mais adequado entre I e XV.
 """
 

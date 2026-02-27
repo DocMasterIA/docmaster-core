@@ -68,10 +68,26 @@ REGRAS:
 - fiscal: objeto com "nome" (nome completo do fiscal do contrato). Se não houver nome de fiscal claramente informado pelo usuário ou contexto, use "" (não invente nomes).
 - dotacao: sempre deve ser retornado como string vazia \"\". A IA NÃO deve sugerir, inferir ou inventar dotação orçamentária; esse campo será preenchido posteriormente pelo sistema ou por outro fluxo.
 - objeto: frase completa, formal e específica, descrevendo claramente o objeto da contratação, incluindo finalidade e, quando inferível, área/setor atendido (por exemplo: "Aquisição de materiais de escritório para suprir as necessidades da Secretaria Municipal de Administração").
+  - Deve ser um parágrafo mais desenvolvido (em geral 2 a 4 frases), formal e específico, descrevendo:
+    * o que será contratado (bens, serviços ou obra), com nível mínimo de detalhamento,
+    * para qual finalidade e quais necessidades administrativas pretende atender,
+    * quando possível, o órgão/setor demandante e o público ou área beneficiada.
+  - Use redação formal típica de cláusula de objeto, em terceira pessoa. Exemplos de inícios aceitáveis:
+    * "O objeto do presente Termo de Referência é ..."
+    * "O presente Termo de Referência tem por objeto ..."
+    * "O objeto deste Termo de Referência consiste em ..."
+  - Evite textos excessivamente curtos ou genéricos como "Aquisição de material de escritório". Sempre acrescente finalidade e contexto mínimo.
+  - Deve ser uma redação extensa, minuciosa e formal. Não deve ser uma frase curta e simplificada.
+  - Evite frases curtas. Expanda a descrição para incluir a finalidade pública do bem ou serviço.
   - Use redação formal típica de cláusula de objeto, em terceira pessoa, evitando informalidades.
   - Prefira construções como: "O objeto do presente Termo de Referência é ..." ou "O objeto tem por finalidade ...", seguidas da descrição clara da contratação.
   - NÃO use reticências ("...") nem múltiplos pontos no final da frase como (".."); Evite duplicar a pontuação que já exista no modelo de documento.
-- justificativa: parágrafo de justificativa técnica/administrativa para a contratação, em linguagem formal.
+- justificativa: parágrafo de justificativa técnica/administrativa para a contratação, em linguagem formal. - Deve ser um texto dissertativo-argumentativo extenso, completo e técnico. Não deve ser uma frase curta e simplificada.
+  - Deve ser um parágrafo de justificativa técnica/administrativa mais rico (idealmente 3 a 6 frases), em linguagem formal, explicando:
+    * por que a contratação é necessária para a Administração,
+    * quais riscos existem se a contratação não for realizada (ex.: prejuízo à continuidade dos serviços, impacto no atendimento ao público),
+    * como a contratação se relaciona com as competências do órgão e com a melhoria da eficiência/regularidade dos serviços.
+  - NÃO invente números, valores, prazos ou dados concretos que não estejam no pedido; limite-se a consequências lógicas e genéricas.
 - Se o usuário informar itens (descrição, unidade, quantidade), use-os no array itens; senão sugira itens coerentes com o objeto.
 - Cada produto ou serviço diferente mencionado pelo usuário deve virar um item separado no array "itens" (não agrupe vários produtos na mesma "descricao").
 - Use Lei 14.133/2021. Não invente dados que não possam ser inferidos do pedido (ex.: fiscal deixe vazio se não informado; dotação sempre deixe vazia, pois não é responsabilidade da IA preencher).

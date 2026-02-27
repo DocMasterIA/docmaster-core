@@ -431,15 +431,16 @@ def _get_etp_preamble() -> str:
     """
     return (
         "\n\n=== DOCUMENTO ETP (ESTUDO TÉCNICO PRELIMINAR) ===\n"
-        "O ETP é um estudo interno da Administração, NÃO um contrato. Regras específicas:\n"
-        "- PRIORIDADE: Use o objeto informado no prompt/contexto. Se o usuário pediu \"limpeza urbana\", NÃO misture com \"coleta seletiva\" ou outros objetos dos exemplos do RAG.\n"
-        "- OBJETO: Defina o que será CONTRATADO (serviços, bens). NUNCA descreva \"o que o ETP deve incluir\" – descreva o escopo da contratação.\n"
-        "- SOLUÇÃO: Descreva solução técnica/operacional. NUNCA transcreva trechos de lei (garantia de proposta, cláusulas do edital).\n"
-        "- NUNCA use \"Art. X.\" no início de parágrafos.\n"
-        "- NUNCA use \"presente artigo\" ou \"neste artigo\" – use \"nesta seção\".\n"
-        "- NUNCA transcreva parágrafos literais de lei.\n"
-        "- NUNCA inclua linhas de tabela em prosa – use \"conforme tabela na seção correspondente\".\n"
-        "- NUNCA repita frases ou parágrafos.\n"
+        "O ETP é um ESTUDO INTERNO da Administração, não um edital nem um contrato.\n"
+        "Regras específicas:\n"
+        "- PRIORIDADE: Use SEMPRE o objeto informado no prompt/contexto. Não mude o tema do estudo com base em exemplos do RAG.\n"
+        "- OBJETO/SEÇÃO \"OBJETO\": descreva com 2 a 4 frases o que será CONTRATADO (bens, serviços ou obra), para qual finalidade e quais necessidades administrativas atende, citando o órgão/setor e, quando couber, o público/área beneficiada. Evite frases genéricas demais.\n"
+        "- SEÇÕES DE NECESSIDADE/MOTIVAÇÃO: explique de forma analítica por que a contratação é necessária, quais problemas pretende resolver e quais riscos existem se não for realizada, SEM inventar números, valores, datas ou normas que não apareçam no contexto.\n"
+        "- SOLUÇÃO PROPOSTA / ALTERNATIVAS: foque em descrever alternativas técnicas e a solução escolhida. NÃO copie cláusulas de edital (garantia de proposta, prazos de homologação, penalidades) e NÃO declare modalidade de licitação ou enquadramento em dispensa/inexigibilidade.\n"
+        "- ANÁLISE DE RISCOS: identifique riscos relevantes ligados à execução do objeto (técnicos, operacionais, de cronograma, de fornecimento), e medidas acauteladoras proporcionais. Evite listas vazias ou genéricas demais.\n"
+        "- REFERÊNCIAS LEGAIS: você pode mencionar a Lei 14.133/2021 de forma geral. NÃO cite decretos, portarias ou leis específicas (nº, ano) que não estejam no contexto ou exemplos do RAG. NÃO transcreva artigos de lei na íntegra.\n"
+        "- LINGUAGEM: use prosa técnica, em português brasileiro, sem \"Art.\", sem \"presente artigo\" – use \"nesta seção\" ou \"no presente estudo\". Não repita parágrafos nem frases inteiras.\n"
+
     )
 
 

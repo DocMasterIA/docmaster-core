@@ -132,6 +132,94 @@ def _parse_llm_json_response(text: str) -> Dict[str, Any]:
     return json.loads(raw)
 
 
+async def _choose_art75_inciso(objeto: str, itens: List[ItemSlot]) -> str:
+    """
+    Chama a LLM especificamente para escolher o inciso do art. 75
+    que melhor se aplica ao objeto (e, opcionalmente, aos itens).
+    """
+    objeto = (objeto or "").strip()
+    itens_desc = [i.descricao for i in itens if getattr(i, "descricao", None)]
+    itens_text = "; ".join(itens_desc)
+
+    if not objeto and not itens_text:
+        return ""
+
+    system_prompt = """
+Você é um assistente jurídico especializado na Lei 14.133/2021.
+
+Sua tarefa é analisar o objeto de uma contratação (e, quando houver, a descrição resumida dos itens)
+e escolher QUAL inciso do art. 75 (dispensa de licitação) se aplica com mais precisão ao caso.
+
+Considere APENAS os incisos I a XV do art. 75, com as seguintes ideias centrais:
+- I: obras/serviços de engenharia ou manutenção de veículos até o limite legal.
+- II: outros serviços ou compras em geral até o limite legal.
+- III: repetição de contratação com mesmas condições de edital recente sem interessados/propostas válidas ou com preços inadequados.
+- IV: hipóteses específicas (garantia/exclusividade, contratos entre entes públicos criados para fim específico, P&D até limite, transferência de tecnologia ICT, gêneros perecíveis, alta complexidade/defesa, padronização de material militar).
+- V: serviços para viabilizar acordo internacional aprovado pelo Congresso, vantajosos para o Poder Público.
+- VI: manutenção de equipamentos com assistência técnica exclusiva, acima do limite do inciso I.
+- VII: instituições de pesquisa/ensino/desenvolvimento institucional ou de recuperação de presos, sem fins lucrativos e com reputação ilibada.
+- VIII: emergência ou calamidade pública, para bens/serviços estritamente necessários, no prazo máximo de 1 ano.
+- IX: aquisição ou locação de imóvel com características que tornem necessária sua escolha.
+- X: insumos estratégicos para saúde produzidos/prestados por entidade pública criada para esse fim, com preço de mercado.
+- XI: associações de catadores de recicláveis, sem fins lucrativos, formadas por pessoas de baixa renda.
+- XII: profissionais de notória especialização para comissão de avaliação de critérios de técnica.
+- XIII: empresas que cumprem reserva legal de cargos para pessoas com deficiência ou reabilitados e requisitos de acessibilidade.
+- XIV: organizações sociais para atividades previstas em contrato de gestão.
+- XV: instituições sem fins lucrativos certificadas como entidades beneficentes de assistência social, para serviços de assistência social.
+
+REGRAS DE SAÍDA:
+- Responda APENAS com um JSON no formato {"inciso": "I"}.
+- O valor deve ser um ÚNICO algarismo romano entre "I" e "XV".
+- Se, mesmo após analisar o objeto e os itens, não for possível determinar com segurança, retorne {"inciso": ""}.
+"""
+
+    user_parts = [f"Objeto: {objeto or '[não informado]'}"]
+    if itens_text:
+        user_parts.append(f"Itens (resumo): {itens_text}")
+    user_prompt = "\n".join(user_parts)
+
+    full_prompt = f"<<SYSTEM>>\n{system_prompt.strip()}\n\n<<USER>>\n{user_prompt}"
+
+    url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
+    payload = {"prompt": full_prompt, "stream": False}
+
+    try:
+        async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            body = resp.json()
+    except Exception:
+        return ""
+
+    text = body.get("data", body) if isinstance(body, dict) else body
+    if isinstance(text, dict):
+        raw_json = text
+    else:
+        try:
+            raw_json = _parse_llm_json_response(str(text))
+        except Exception:
+            return ""
+
+    inciso_val = str(raw_json.get("inciso", "")).strip().upper()
+    valid_incisos = {
+        "I",
+        "II",
+        "III",
+        "IV",
+        "V",
+        "VI",
+        "VII",
+        "VIII",
+        "IX",
+        "X",
+        "XI",
+        "XII",
+        "XIII",
+        "XIV",
+        "XV",
+    }
+    return inciso_val if inciso_val in valid_incisos else ""
+
 def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
     """Converte o dicionário retornado pela LLM em TRTemplateSlots."""
     disp = data.get("dispensa") or {}
@@ -200,10 +288,7 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
                 # evitando casos como "inciso 75".
                 inciso_clean = ""
 
-        dispensa = DispensaSlots(
-            artigo=artigo_clean,
-            inciso=inciso_clean,
-        )
+        dispensa = DispensaSlots(artigo=artigo_clean, inciso=inciso_clean)
     else:
         dispensa = DispensaSlots()
 
@@ -249,6 +334,7 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
         cidade_estado=str(data.get("cidade_estado", "")).strip(),
         cidade=str(data.get("cidade", "")).strip(),
         horario_entrega=str(data.get("horario_entrega", "")).strip(),
+        codigo_uf=str(data.get("codigo_uf", "")).strip(),
     )
 
 
@@ -305,6 +391,11 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         if override.get("horario_entrega") is not None
         else llm_slots.horario_entrega
     )
+    codigo_uf = (
+        (override.get("codigo_uf") or llm_slots.codigo_uf)
+        if override.get("codigo_uf") is not None
+        else llm_slots.codigo_uf
+    )
 
     itens_override = override.get("itens")
     if isinstance(itens_override, list) and len(itens_override) > 0:
@@ -331,6 +422,7 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
                 cidade_estado=cidade_estado,
                 cidade=cidade,
                 horario_entrega=horario_entrega,
+                codigo_uf=codigo_uf,
             )
     itens = llm_slots.itens
 
@@ -346,6 +438,7 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         cidade_estado=cidade_estado,
         cidade=cidade,
         horario_entrega=horario_entrega,
+        codigo_uf=codigo_uf,
     )
 
 
@@ -403,4 +496,15 @@ async def fill_tr_slots_with_llm(
 
     parsed = _parse_llm_json_response(raw)
     llm_slots = _dict_to_tr_slots(parsed)
+
+    # Se, após o primeiro preenchimento, o inciso do art. 75 ainda estiver vazio,
+    # chamamos uma etapa específica de decisão de inciso com base no objeto/itens.
+    if not (llm_slots.dispensa and llm_slots.dispensa.inciso):
+        try:
+            chosen_inciso = await _choose_art75_inciso(llm_slots.objeto, llm_slots.itens)
+        except Exception:
+            chosen_inciso = ""
+        if chosen_inciso:
+            llm_slots.dispensa.inciso = chosen_inciso
+
     return _merge_slots(llm_slots, slots_override or {})

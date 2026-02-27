@@ -56,6 +56,7 @@ class TRTemplateSlots:
     cidade_estado: str = ""
     cidade: str = ""
     horario_entrega: str = ""
+    codigo_uf: str = ""
 
 
 def _style_items_table(table) -> None:
@@ -281,6 +282,7 @@ def render_tr_from_slots(
         "(CIDADE - ESTADO)": slots.cidade_estado or "",
         "(CIDADE)": slots.cidade or "",
         "(HORARIO E DIAS PARA ENTREGA)": slots.horario_entrega or "Preencher horário, dias da semana e outras informações de entrega",
+        "(CÓDIGO UF)": slots.codigo_uf or "",
     }
 
     _replace_placeholders_in_paragraphs(doc, mapping)

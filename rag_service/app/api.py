@@ -339,10 +339,15 @@ def _merge_user_context_into_tr_slots(
 
     cidade = (usuario.get("prefeitura") or "").strip()
     estado_nome = (usuario.get("estado_nome") or usuario.get("estado_uf") or "").strip()
+    estado_uf = (usuario.get("estado_uf") or "").strip()
     if cidade:
         slots.setdefault("cidade", cidade)
     if cidade and estado_nome:
         slots.setdefault("cidade_estado", f"{cidade} - {estado_nome}")
+
+    # Código UF (ex.: PR, SC) para placeholder específico no modelo de TR.
+    if estado_uf:
+        slots.setdefault("codigo_uf", estado_uf)
 
     return slots
 

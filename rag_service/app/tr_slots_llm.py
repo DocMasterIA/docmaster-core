@@ -70,7 +70,7 @@ REGRAS:
 - objeto: frase completa, formal e específica, descrevendo claramente o objeto da contratação, incluindo finalidade e, quando inferível, área/setor atendido (por exemplo: "Aquisição de materiais de escritório para suprir as necessidades da Secretaria Municipal de Administração").
   - Use redação formal típica de cláusula de objeto, em terceira pessoa, evitando informalidades.
   - Prefira construções como: "O objeto do presente Termo de Referência é ..." ou "O objeto tem por finalidade ...", seguidas da descrição clara da contratação.
-  - NÃO use reticências ("...") nem múltiplos pontos ou sinais de pontuação no final; termine com um ÚNICO ponto final ".".
+  - NÃO use reticências ("...") nem múltiplos pontos no final da frase como (".."); Evite duplicar a pontuação que já exista no modelo de documento.
 - justificativa: parágrafo de justificativa técnica/administrativa para a contratação, em linguagem formal.
 - Se o usuário informar itens (descrição, unidade, quantidade), use-os no array itens; senão sugira itens coerentes com o objeto.
 - Cada produto ou serviço diferente mencionado pelo usuário deve virar um item separado no array "itens" (não agrupe vários produtos na mesma "descricao").
@@ -226,19 +226,16 @@ def _normalize_objeto(text: str) -> str:
     """
     Normaliza o campo objeto para ficar mais formal e sem pontuação estranha no final.
     - Remove espaços extras.
-    - Remove reticências ou múltiplos pontos finais.
-    - Garante, quando houver texto, um ÚNICO ponto final.
+    - Remove reticências ou múltiplos pontos/pontuação forte no final.
+    - Deixa a pontuação final a cargo do modelo DOCX (evita gerar "..").
     """
     text = (text or "").strip()
     if not text:
         return ""
-    # Remove reticências/múltiplos pontos no final
-    text = re.sub(r"[.。…]+$", "", text).strip()
+    # Remove reticências/múltiplos pontos e outros sinais fortes no final
+    text = re.sub(r"[.。…;:,]+$", "", text).strip()
     if not text:
         return ""
-    # Garante um único ponto final
-    if not text.endswith("."):
-        text = text + "."
     return text
 
 

@@ -120,6 +120,42 @@ class GenerateTRFromModelRequest(BaseModel):
 router = APIRouter(prefix="/rag", tags=["rag"])
 
 
+class GenerateDFDFromModelRequest(BaseModel):
+    """
+    Request para gerar DFD a partir do modelo fixo (DFD_modelo_base.docx),
+    reutilizando os mesmos slots gerados para o TR.
+
+    Fluxo:
+    1. Gera os slots do TR (objeto, justificativa, cidade, etc.) via IA.
+    2. Preenche o template de TR (TR_modelo_base.docx) – TR complementar.
+    3. Preenche o template de DFD (DFD_modelo_base.docx) copiando:
+       - objeto do TR,
+       - justificativa do TR,
+       - cidade do usuário.
+    """
+
+    user_prompt: str = Field(
+        ...,
+        description="Pedido livre (ex.: TR/DFD para contratação de organização social para gestão de hospital).",
+    )
+    slots_override: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Slots já preenchidos/ajustados pelo usuário (objeto, justificativa, fiscal, etc.). Têm prioridade sobre a IA.",
+    )
+    context: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Contexto do usuário logado (usuario: nome_completo, secretaria, prefeitura, orgao). Usado para preencher cidade, secretaria, etc.",
+    )
+
+    @field_validator("user_prompt")
+    @classmethod
+    def _user_prompt_not_empty(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("user_prompt é obrigatório.")
+        return v
+
+
 def _check_chroma() -> bool:
     """Verifica se a conexão com ChromaDB está ativa."""
     try:
@@ -375,11 +411,22 @@ async def endpoint_generate_tr_from_model(body: GenerateTRFromModelRequest):
             slots_override=slots_override,
             user_context=body.context,
         )
-        docx_path = render_tr_from_slots(slots)
-        if not Path(docx_path).exists():
+        # Gera TR
+        docx_tr_path = render_tr_from_slots(slots)
+        if not Path(docx_tr_path).exists():
             raise HTTPException(status_code=500, detail="DOCX do TR não foi gerado.")
+
+        # Gera DFD complementar (não altera a resposta; TR continua sendo o arquivo retornado)
+        try:
+            from .dfd_template import render_dfd_from_tr_slots
+
+            render_dfd_from_tr_slots(slots)
+        except Exception:
+            # Falha na geração do DFD não deve impedir o TR; apenas registra em log.
+            logger.exception("Falha ao gerar DFD complementar a partir do TR.")
+
         return FileResponse(
-            docx_path,
+            docx_tr_path,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             filename="termo_referencia.docx",
         )

@@ -69,6 +69,7 @@ REGRAS:
 - dotacao: sempre deve ser retornado como string vazia \"\". A IA NÃO deve sugerir, inferir ou inventar dotação orçamentária; esse campo será preenchido posteriormente pelo sistema ou por outro fluxo.
 - objeto: frase completa, formal e específica, descrevendo claramente o objeto da contratação, incluindo finalidade e, quando inferível, área/setor atendido (por exemplo: "Aquisição de materiais de escritório para suprir as necessidades da Secretaria Municipal de Administração").
   - Use redação formal típica de cláusula de objeto, em terceira pessoa, evitando informalidades.
+  - Prefira construções como: "O objeto do presente Termo de Referência é ..." ou "O objeto tem por finalidade ...", seguidas da descrição clara da contratação.
   - NÃO use reticências ("...") nem múltiplos pontos ou sinais de pontuação no final; termine com um ÚNICO ponto final ".".
 - justificativa: parágrafo de justificativa técnica/administrativa para a contratação, em linguagem formal.
 - Se o usuário informar itens (descrição, unidade, quantidade), use-os no array itens; senão sugira itens coerentes com o objeto.
@@ -244,70 +245,13 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
     """Converte o dicionário retornado pela LLM em TRTemplateSlots."""
     disp = data.get("dispensa") or {}
     if isinstance(disp, dict):
-        raw_artigo = str(disp.get("artigo", "")).strip()
-        raw_inciso = str(disp.get("inciso", "")).strip()
-        # Sanitiza artigo/inciso:
+        # Artigo/inciso:
         # - artigo: neste contexto, é SEMPRE o art. 75 (texto fixo do modelo);
         #   mesmo que a IA devolva outra coisa, forçamos "75".
-        # - inciso: extrai um algarismo romano válido (I a XV) ou, se vier em algarismo arábico
-        #   (1 a 15), converte para romano. Qualquer valor fora desse conjunto é tratado como vazio.
+        # - inciso: será escolhido 100% pela etapa dedicada _choose_art75_inciso;
+        #   aqui apenas inicializamos vazio.
         artigo_clean = "75"
-
-        # Primeiro tenta achar algarismo romano na string de inciso ou de artigo.
-        roman_match = re.search(r"\b[IVXLCDM]+\b", raw_inciso, flags=re.IGNORECASE) or re.search(
-            r"\b[IVXLCDM]+\b", raw_artigo, flags=re.IGNORECASE
-        )
-        inciso_candidate = roman_match.group(0).upper() if roman_match else raw_inciso.strip().upper()
-
-        # Conjunto de incisos válidos do art. 75 (Lei 14.133/2021)
-        valid_incisos = {
-            "I",
-            "II",
-            "III",
-            "IV",
-            "V",
-            "VI",
-            "VII",
-            "VIII",
-            "IX",
-            "X",
-            "XI",
-            "XII",
-            "XIII",
-            "XIV",
-            "XV",
-        }
-
-        # Se já é um romano válido, usa direto
-        if inciso_candidate in valid_incisos:
-            inciso_clean = inciso_candidate
-        else:
-            # Se vier como número (ex.: "1", "2", "8"), converte para romano quando possível
-            digit_to_roman = {
-                "1": "I",
-                "2": "II",
-                "3": "III",
-                "4": "IV",
-                "5": "V",
-                "6": "VI",
-                "7": "VII",
-                "8": "VIII",
-                "9": "IX",
-                "10": "X",
-                "11": "XI",
-                "12": "XII",
-                "13": "XIII",
-                "14": "XIV",
-                "15": "XV",
-            }
-            numeric = raw_inciso.strip()
-            if numeric in digit_to_roman:
-                inciso_clean = digit_to_roman[numeric]
-            else:
-                # Qualquer valor fora de I–XV é considerado inválido e tratado como vazio,
-                # evitando casos como "inciso 75".
-                inciso_clean = ""
-
+        inciso_clean = ""
         dispensa = DispensaSlots(artigo=artigo_clean, inciso=inciso_clean)
     else:
         dispensa = DispensaSlots()
@@ -540,59 +484,20 @@ async def fill_tr_slots_with_llm(
     if _is_trivial(llm_slots.objeto) and objeto_fallback:
         llm_slots.objeto = objeto_fallback
 
-    # Se, após o primeiro preenchimento, o inciso do art. 75 ainda estiver vazio,
-    # chamamos uma etapa específica de decisão de inciso com base no objeto/itens.
-    if not (llm_slots.dispensa and llm_slots.dispensa.inciso):
-        try:
-            chosen_inciso = await _choose_art75_inciso(llm_slots.objeto, llm_slots.itens)
-        except Exception:
-            chosen_inciso = ""
-        if chosen_inciso:
-            llm_slots.dispensa.inciso = chosen_inciso
-        else:
-            # NUNCA permitir inciso vazio: se a LLM não conseguiu decidir nem na etapa
-            # dedicada, adotamos um fallback determinístico:
-            # - se texto do objeto/itens sugerir obra/engenharia/manutenção de veículos → I
-            # - se sugerir emergência/calamidade → VIII
-            # - caso geral (outros serviços/compras) → II
-            base_text = (llm_slots.objeto or "").lower()
-            for it in llm_slots.itens:
-                desc = getattr(it, "descricao", "")
-                if desc:
-                    base_text += " " + str(desc).lower()
+    # Escolha do inciso do art. 75:
+    # - SEMPRE delegada à LLM especializada em _choose_art75_inciso,
+    #   usando o texto de objeto (já normalizado/fallback) e os itens.
+    # - O JSON de slots inicial NÃO define mais o inciso; ele é apenas artigo=75, inciso="" aqui.
+    try:
+        chosen_inciso = await _choose_art75_inciso(llm_slots.objeto, llm_slots.itens)
+    except Exception:
+        chosen_inciso = ""
 
-            emergencia_keywords = (
-                "emergência",
-                "emergencia",
-                "calamidade",
-                "situação emergencial",
-                "situacao emergencial",
-                "urgência",
-                "urgencia",
-            )
-            engenharia_keywords = (
-                "obra",
-                "obras",
-                "engenharia",
-                "pavimentação",
-                "pavimentacao",
-                "asfalto",
-                "reforma",
-                "construção",
-                "construcao",
-                "manutenção de veículos",
-                "manutencao de veiculos",
-                "veículo",
-                "veiculo",
-                "frota",
-            )
+    if not chosen_inciso:
+        # Se, mesmo após a etapa dedicada, a LLM não devolver um inciso válido,
+        # não é seguro prosseguir silenciosamente: levantamos erro explícito.
+        raise ValueError("Não foi possível determinar o inciso do art. 75 com base no objeto e nos itens.")
 
-            if any(k in base_text for k in emergencia_keywords):
-                llm_slots.dispensa.inciso = "VIII"
-            elif any(k in base_text for k in engenharia_keywords):
-                llm_slots.dispensa.inciso = "I"
-            else:
-                # Caso padrão: dispensa por valor para outros serviços/compras
-                llm_slots.dispensa.inciso = "II"
+    llm_slots.dispensa.inciso = chosen_inciso
 
     return _merge_slots(llm_slots, slots_override or {})

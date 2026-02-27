@@ -14,6 +14,9 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
 
 # Template base: templates/tr_base/TR_modelo_base.docx (raiz do projeto)
@@ -53,6 +56,42 @@ class TRTemplateSlots:
     cidade_estado: str = ""
     cidade: str = ""
     horario_entrega: str = ""
+
+
+def _style_items_table(table) -> None:
+    """
+    Aplica estilo fixo à tabela de itens:
+    - Estilo de tabela padrão (Table Grid ou equivalente).
+    - Bordas simples em todas as direções com espessura ~0,5pt.
+    """
+    # Estilo base de tabela (deve existir no template/Word)
+    try:
+        table.style = "Table Grid"
+    except Exception:
+        # Se o estilo não existir, segue com o padrão do documento.
+        pass
+
+    tbl = table._tbl
+    tblPr = tbl.tblPr
+    if tblPr is None:
+        tblPr = OxmlElement("w:tblPr")
+        tbl.insert(0, tblPr)
+
+    # Remove bordas anteriores, se houver, para evitar duplicação
+    for el in list(tblPr):
+        if el.tag == qn("w:tblBorders"):
+            tblPr.remove(el)
+
+    tblBorders = OxmlElement("w:tblBorders")
+    for border_name in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        border = OxmlElement(f"w:{border_name}")
+        border.set(qn("w:val"), "single")
+        # w:sz é medido em 1/8 de ponto. 8 ≈ 1pt; usamos 4 para ~0,5pt visual.
+        border.set(qn("w:sz"), "4")
+        border.set(qn("w:space"), "0")
+        border.set(qn("w:color"), "000000")
+        tblBorders.append(border)
+    tblPr.append(tblBorders)
 
 
 def _replace_placeholders_in_paragraphs(doc: Document, mapping: Dict[str, str]) -> None:
@@ -106,8 +145,24 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
             target_table = table
             break
 
+    # Se o modelo não tiver tabela de especificações, cria uma nova no final do documento
     if target_table is None:
-        return
+        target_table = doc.add_table(rows=1, cols=4)
+
+    # Aplica estilo e bordas fixas à tabela
+    _style_items_table(target_table)
+
+    # Garante cabeçalho padronizado
+    header_row = target_table.rows[0] if target_table.rows else target_table.add_row()
+    header_cells = header_row.cells
+    header_labels = ["Item", "Descrição", "Unidade", "Quantidade"]
+    for idx, label in enumerate(header_labels):
+        if idx < len(header_cells):
+            cell = header_cells[idx]
+            cell.text = label
+            for para in cell.paragraphs:
+                for run in para.runs:
+                    run.bold = True
 
     # Localiza linha molde (primeira linha após cabeçalho com placeholders)
     desc_ph = "(Descrever o item de acordo com o solicitado)"
@@ -121,15 +176,16 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
             template_row_idx = idx
             break
 
+    # Se não houver linha molde com placeholders (modelo novo), cria uma linha de dados vazia
     if template_row_idx is None:
-        return
+        template_row = target_table.add_row()
+    else:
+        template_row = target_table.rows[template_row_idx]
 
     # Mantém a tabela "maleável":
-    # - preserva apenas o cabeçalho e a linha molde com placeholders
+    # - preserva apenas o cabeçalho e a linha molde
     # - remove quaisquer outras linhas pré-existentes do template,
     #   evitando sobrar linhas vazias/placeholder quando houver poucos itens.
-    header_row = target_table.rows[0]
-    template_row = target_table.rows[template_row_idx]
     # Remove demais linhas (de baixo para cima para não quebrar índices)
     for row in list(target_table.rows)[::-1]:
         if row is header_row or row is template_row:
@@ -148,15 +204,21 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
         # Coluna 0: número do item (01, 02, 03...)
         if len(cells) > 0:
             _set_cell(cells[0], f"{i+1:02d}")
+            if cells[0].paragraphs:
+                cells[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
         # Coluna 1: descrição (sempre escreve o valor do slot, ignorando texto anterior)
         if len(cells) > 1:
             _set_cell(cells[1], str(item.descricao) or "")
         # Coluna 2: unidade
         if len(cells) > 2:
             _set_cell(cells[2], str(item.unidade) or "")
+            if cells[2].paragraphs:
+                cells[2].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
         # Coluna 3: quantidade
         if len(cells) > 3:
             _set_cell(cells[3], str(item.quantidade) or "")
+            if cells[3].paragraphs:
+                cells[3].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
 
 def _clear_headers(doc: Document) -> None:

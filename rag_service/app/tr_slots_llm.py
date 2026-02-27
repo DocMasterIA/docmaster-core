@@ -33,14 +33,35 @@ REGRAS:
 - Responda APENAS com um JSON válido, sem texto antes ou depois.
 - O JSON deve ter pelo menos estas chaves: objeto, dispensa, itens, justificativa, fiscal, dotacao.
 - Use linguagem técnica, formal e objetiva, adequada a documentos administrativos. NÃO use gírias, comentários informais ou meta-observações (ex.: "simples até demais", "ficou meio esquisito", "feito direto pelo usuário").
+
 - dispensa: objeto com "artigo" e "inciso".
   - O artigo, neste contexto de Termo de Referência, é sempre o art. 75 da Lei 14.133/2021. Portanto, devolva SEMPRE "artigo": "75".
-  - Sua tarefa é calcular apenas o "inciso" correto dentro do art. 75, de forma coerente com o objeto e o contexto, mesmo que o usuário não informe explicitamente o inciso.
+  - SUA TAREFA é escolher o "inciso" correto DENTRO DO ART. 75, em coerência com o objeto e o contexto, usando EXCLUSIVAMENTE os incisos previstos na lei.
+  - O inciso SEMPRE deve ser devolvido como um dos ALGARISMOS ROMANOS válidos do art. 75:
+    ["I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII","XIII","XIV","XV"].
+    NUNCA devolva números arábicos como "1", "2", "8" ou "75" no campo "inciso".
+  - Diretrizes principais de mapeamento (Lei 14.133/2021, art. 75 – dispensa de licitação):
+    * Inciso I  – obras e serviços de engenharia ou serviços de manutenção de veículos automotores, até o limite legal.
+    * Inciso II – outros serviços e compras em geral, até o limite legal.
+    * Inciso III – repetição de contratação com as mesmas condições de edital recente (sem interessados, propostas inválidas ou preços manifestamente inadequados).
+    * Inciso IV – hipóteses específicas como peças/equipamentos em garantia com exclusividade do fornecedor, contratos entre entes da Administração criados para esse fim, P&D limitado a valor, transferência de tecnologia/ICT, gêneros perecíveis, alta complexidade tecnológica/defesa, padronização de materiais de Forças Armadas.
+    * Inciso V  – serviços para viabilizar acordo internacional aprovado pelo Congresso, quando vantajosos.
+    * Inciso VI – manutenção de equipamentos com assistência técnica exclusiva, acima do limite do inciso I.
+    * Inciso VII – contratação de instituição de pesquisa/ensino/desenvolvimento institucional ou de recuperação de preso, sem fins lucrativos e com reputação ilibada.
+    * Inciso VIII – emergência ou calamidade pública, para bens/serviços estritamente necessários, no prazo máximo de 1 ano, vedada prorrogação e recontratação com base no mesmo inciso.
+    * Inciso IX – aquisição ou locação de imóvel com características de instalações/localização que tornem necessária a escolha.
+    * Inciso X – insumos estratégicos para saúde produzidos ou prestados por entidade pública criada para esse fim, com preço compatível com o mercado.
+    * Inciso XI – contratação de associações de catadores de materiais recicláveis/reutilizáveis, sem fins lucrativos e integradas por pessoas de baixa renda.
+    * Inciso XII – contratação de profissionais de notória especialização para comissão de avaliação de critérios de técnica.
+    * Inciso XIII – bens/serviços de empresas que comprovem cumprimento de reserva legal de cargos para pessoas com deficiência ou reabilitados, com acessibilidade adequada.
+    * Inciso XIV – serviços prestados por organizações sociais, para atividades previstas em contrato de gestão.
+    * Inciso XV – serviços prestados por instituições sem fins lucrativos com certificação de entidade beneficente de assistência social, para serviços de assistência social.
   - Se o objeto indicar obras/serviços de engenharia ou manutenção de veículos até o limite de valor do art. 75, use inciso "I".
   - Se o objeto indicar outros serviços ou compras até o limite de valor do art. 75, use inciso "II".
   - Se o usuário mencionar expressamente emergência ou calamidade pública nos termos da lei, considere a possibilidade de usar o inciso "VIII" do art. 75, se isso for coerente com o contexto.
-  - Se o usuário mencionar explicitamente outro inciso, respeite o inciso informado.
+  - Se o usuário mencionar explicitamente outro inciso (I a XV) e isso for compatível com o objeto, respeite o inciso informado.
   - Se não for possível determinar um inciso com segurança, deixe o inciso vazio "" e apenas preencha o artigo como "75", para que um humano possa complementar depois.
+
 - itens: array de objetos, cada um com "descricao", "unidade" (ex: "un", "cx", "litro"), "quantidade" (número).
   - A "descricao" deve ser uma especificação técnica mínima do item, não apenas uma palavra solta (ex.: "Caneta esferográfica azul, ponta 1.0 mm").
   - Se o usuário já tiver informado descrição/unidade/quantidade, preserve essas informações e apenas complemente de forma técnica quando fizer sentido.
@@ -120,12 +141,65 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
         # Sanitiza artigo/inciso:
         # - artigo: neste contexto, é SEMPRE o art. 75 (texto fixo do modelo);
         #   mesmo que a IA devolva outra coisa, forçamos "75".
-        # - inciso: pega o primeiro algarismo romano que aparecer em inciso ou artigo (ex.: "inciso II", "art. 75, II" -> "II").
+        # - inciso: extrai um algarismo romano válido (I a XV) ou, se vier em algarismo arábico
+        #   (1 a 15), converte para romano. Qualquer valor fora desse conjunto é tratado como vazio.
         artigo_clean = "75"
+
+        # Primeiro tenta achar algarismo romano na string de inciso ou de artigo.
         roman_match = re.search(r"\b[IVXLCDM]+\b", raw_inciso, flags=re.IGNORECASE) or re.search(
             r"\b[IVXLCDM]+\b", raw_artigo, flags=re.IGNORECASE
         )
-        inciso_clean = roman_match.group(0).upper() if roman_match else raw_inciso
+        inciso_candidate = roman_match.group(0).upper() if roman_match else raw_inciso.strip().upper()
+
+        # Conjunto de incisos válidos do art. 75 (Lei 14.133/2021)
+        valid_incisos = {
+            "I",
+            "II",
+            "III",
+            "IV",
+            "V",
+            "VI",
+            "VII",
+            "VIII",
+            "IX",
+            "X",
+            "XI",
+            "XII",
+            "XIII",
+            "XIV",
+            "XV",
+        }
+
+        # Se já é um romano válido, usa direto
+        if inciso_candidate in valid_incisos:
+            inciso_clean = inciso_candidate
+        else:
+            # Se vier como número (ex.: "1", "2", "8"), converte para romano quando possível
+            digit_to_roman = {
+                "1": "I",
+                "2": "II",
+                "3": "III",
+                "4": "IV",
+                "5": "V",
+                "6": "VI",
+                "7": "VII",
+                "8": "VIII",
+                "9": "IX",
+                "10": "X",
+                "11": "XI",
+                "12": "XII",
+                "13": "XIII",
+                "14": "XIV",
+                "15": "XV",
+            }
+            numeric = raw_inciso.strip()
+            if numeric in digit_to_roman:
+                inciso_clean = digit_to_roman[numeric]
+            else:
+                # Qualquer valor fora de I–XV é considerado inválido e tratado como vazio,
+                # evitando casos como "inciso 75".
+                inciso_clean = ""
+
         dispensa = DispensaSlots(
             artigo=artigo_clean,
             inciso=inciso_clean,

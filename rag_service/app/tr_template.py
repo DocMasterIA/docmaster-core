@@ -265,7 +265,10 @@ def render_tr_from_slots(
 
     mapping = {
         "(descrever o objeto solicitado)": slots.objeto or "",
-        "(descrever o artigo de acordo com objeto)": slots.dispensa.artigo or "",
+        # No modelo, este placeholder está associado ao texto logo após "inciso".
+        # Embora o rótulo mencione "artigo", na prática ele representa o INCISO
+        # do art. 75, por isso usamos sempre slots.dispensa.inciso aqui.
+        "(descrever o artigo de acordo com objeto)": slots.dispensa.inciso or "",
         "(Formalizar justificava de acordo com objeto solicitado)": slots.justificativa or "",
         "(Inserir o inciso de acordo com o objeto solicitado)": slots.dispensa.inciso or "",
         "(inserir nome do fiscal)": slots.fiscal.nome or "",

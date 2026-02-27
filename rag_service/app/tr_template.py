@@ -130,31 +130,27 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
     if not itens:
         return
 
+    # Tenta reaproveitar uma tabela existente com 4 colunas; caso não encontre, cria uma nova.
     target_table = None
     for table in doc.tables:
         if not table.rows:
             continue
-        header_cells = table.rows[0].cells
-        header_texts = [c.text.strip().lower() for c in header_cells]
-        if (
-            len(header_texts) >= 4
-            and "item" in header_texts[0]
-            and "descri" in header_texts[1]
-            and "unidade" in header_texts[2]
-            and "quantidade" in header_texts[3]
-        ):
+        if len(table.rows[0].cells) >= 4:
             target_table = table
             break
 
-    # Se o modelo não tiver tabela de especificações, cria uma nova no final do documento
     if target_table is None:
-        target_table = doc.add_table(rows=1, cols=4)
+        target_table = doc.add_table(rows=0, cols=4)
+
+    # Remove todas as linhas existentes para reconstruir a tabela do zero
+    for row in list(target_table.rows):
+        target_table._tbl.remove(row._tr)
 
     # Aplica estilo e bordas fixas à tabela
     _style_items_table(target_table)
 
-    # Garante cabeçalho padronizado
-    header_row = target_table.rows[0] if target_table.rows else target_table.add_row()
+    # Cria cabeçalho padronizado
+    header_row = target_table.add_row()
     header_cells = header_row.cells
     header_labels = ["Item", "Descrição", "Unidade", "Quantidade"]
     for idx, label in enumerate(header_labels):
@@ -165,42 +161,11 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
                 for run in para.runs:
                     run.bold = True
 
-    # Localiza linha molde (primeira linha após cabeçalho com placeholders)
-    desc_ph = "(Descrever o item de acordo com o solicitado)"
-    unid_ph = "(Inserir unidade de medida ex: caixa, litro, unidade etc)"
-    qtd_ph = "(Inserir quantidade solicitada)"
-
-    template_row_idx: Optional[int] = None
-    for idx, row in enumerate(target_table.rows[1:], start=1):
-        row_text = " | ".join(c.text for c in row.cells)
-        if any(ph in row_text for ph in (desc_ph, unid_ph, qtd_ph)):
-            template_row_idx = idx
-            break
-
-    # Se não houver linha molde com placeholders (modelo novo), cria uma linha de dados vazia
-    if template_row_idx is None:
-        template_row = target_table.add_row()
-    else:
-        template_row = target_table.rows[template_row_idx]
-
-    # Mantém a tabela "maleável":
-    # - preserva apenas o cabeçalho e a linha molde
-    # - remove quaisquer outras linhas pré-existentes do template,
-    #   evitando sobrar linhas vazias/placeholder quando houver poucos itens.
-    # Remove demais linhas (de baixo para cima para não quebrar índices)
-    for row in list(target_table.rows)[::-1]:
-        if row is header_row or row is template_row:
-            continue
-        target_table._tbl.remove(row._tr)
-
     def _set_cell(cell, text: str) -> None:
         cell.text = str(text) if text is not None else ""
 
     for i, item in enumerate(itens):
-        if i == 0:
-            row = template_row
-        else:
-            row = target_table.add_row()
+        row = target_table.add_row()
         cells = row.cells
         # Coluna 0: número do item (01, 02, 03...)
         if len(cells) > 0:

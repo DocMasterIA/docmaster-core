@@ -5,9 +5,10 @@ Endpoints para ingestão, consulta e gerenciamento de coleções.
 """
 from __future__ import annotations
 
-import base64
-import logging
+import base64i
+import os
 import tempfile
+import zipfile
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -436,6 +437,58 @@ async def endpoint_generate_tr_from_model(body: GenerateTRFromModelRequest):
         raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
         logger.exception("Erro em generate-tr-from-model: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/generate-tr-and-dfd-zip")
+async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
+    """
+    Endpoint de teste: gera TR (modelo fixo) + DFD complementar e devolve ambos em um único ZIP.
+
+    Útil para testes via curl: um único request → ZIP com `termo_referencia.docx` e `dfd.docx`.
+    """
+    from .tr_slots_llm import fill_tr_slots_with_llm
+    from .tr_template import render_tr_from_slots
+    from .dfd_template import render_dfd_from_tr_slots
+
+    slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
+    try:
+        slots = await fill_tr_slots_with_llm(
+            user_prompt=body.user_prompt,
+            slots_override=slots_override,
+            user_context=body.context,
+        )
+
+        # Gera TR e DFD em caminhos temporários
+        docx_tr_path = render_tr_from_slots(slots)
+        if not Path(docx_tr_path).exists():
+            raise HTTPException(status_code=500, detail="DOCX do TR não foi gerado.")
+
+        docx_dfd_path = render_dfd_from_tr_slots(slots)
+        if not Path(docx_dfd_path).exists():
+            raise HTTPException(status_code=500, detail="DOCX do DFD não foi gerado.")
+
+        # Empacota em ZIP temporário
+        tmp_dir = tempfile.gettempdir()
+        zip_path = os.path.join(tmp_dir, "tr_dfd_bundle.zip")
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.write(docx_tr_path, arcname="termo_referencia.docx")
+            zf.write(docx_dfd_path, arcname="dfd.docx")
+
+        if not Path(zip_path).exists():
+            raise HTTPException(status_code=500, detail="ZIP com TR e DFD não foi gerado.")
+
+        return FileResponse(
+            zip_path,
+            media_type="application/zip",
+            filename="tr_dfd.zip",
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Erro em generate-tr-and-dfd-zip: %s", e)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

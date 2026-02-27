@@ -176,23 +176,30 @@ async def check_compliance(
 
     # 2. Monta prompt para o LLM
     context = "\n\n---\n\n".join(d.get("content", "")[:800] for d in docs)
-    query_for_llm = f"""Analise se o texto abaixo está em conformidade com a Lei 14.133/2021 (Lei de Licitações e Contratos).
+    query_for_llm = f"""Você é um parecerista jurídico especializado na Lei 14.133/2021.
 
-TRECHOS RELEVANTES DA LEI:
+Você DEVE basear suas conclusões EXCLUSIVAMENTE:
+- no texto a analisar fornecido abaixo; e
+- nos trechos da Lei 14.133/2021 listados em "TRECHOS RELEVANTES DA LEI".
+
+Regras rígidas:
+- NÃO invente artigos, parágrafos, incisos ou decretos que não apareçam nos trechos fornecidos.
+- Se precisar citar a lei, use apenas o que está em "TRECHOS RELEVANTES DA LEI" (mesmo que você conheça outros dispositivos).
+- Se os trechos não forem suficientes para uma conclusão segura, diga explicitamente que não há base suficiente nos dispositivos apresentados, em vez de supor.
+- Sempre explique, em linguagem clara, COMO o texto legal se relaciona com o caso concreto (passo a passo).
+- Sua resposta deve ser técnica, mas sem copiar longos trechos da lei; resuma e aplique.
+
+TRECHOS RELEVANTES DA LEI (Lei 14.133/2021):
 {context}
 
 TEXTO A ANALISAR:
 {text_trimmed}
 
-Regras:
-- Lei 14.133 limita a vigência de contratos (ex.: serviços até 60 meses, com prorrogação limitada). Vigências muito longas (ex.: 20 anos) tendem a ser incompatíveis.
-- Se o texto viola limites da lei (prazos, valores, modalidades) → responda NÃO.
-- Se há dúvida ou o texto não está claramente previsto na lei → responda NÃO.
-- Responda SIM somente quando houver inequívoca conformidade com os trechos da lei.
+Pergunta: O texto acima está em conformidade com os trechos da Lei 14.133/2021 apresentados?
 
 Formato da resposta (obrigatório):
-1. Primeira linha: exatamente "SIM" ou "NÃO"
-2. Segunda linha: uma frase com a justificativa (cite o artigo ou o que está em desacordo, se NÃO)."""
+1. Primeira linha: exatamente "SIM" ou "NÃO" (com base APENAS nos trechos da lei fornecidos).
+2. Segunda linha: uma frase com a justificativa, mencionando quais trechos da lei suportam a conclusão ou por que não há base suficiente."""
 
     # 3. Chama LLM
     response_text = await generate_answer(query=query_for_llm, context_docs=docs)

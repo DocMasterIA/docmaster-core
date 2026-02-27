@@ -288,7 +288,7 @@ def smart_ingest_folder(
         document_type: Forçar tipo (lei, etp, dfd, etc.). Se None, infere pelo caminho.
 
     Returns:
-        Dict com resultados por arquivo.
+        Dict com resultados por arquivo.,,,
     """
     folder = Path(folder_path)
     results = {

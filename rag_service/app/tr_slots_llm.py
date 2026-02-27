@@ -68,6 +68,8 @@ REGRAS:
 - fiscal: objeto com "nome" (nome completo do fiscal do contrato). Se não houver nome de fiscal claramente informado pelo usuário ou contexto, use "" (não invente nomes).
 - dotacao: sempre deve ser retornado como string vazia \"\". A IA NÃO deve sugerir, inferir ou inventar dotação orçamentária; esse campo será preenchido posteriormente pelo sistema ou por outro fluxo.
 - objeto: frase completa, formal e específica, descrevendo claramente o objeto da contratação, incluindo finalidade e, quando inferível, área/setor atendido (por exemplo: "Aquisição de materiais de escritório para suprir as necessidades da Secretaria Municipal de Administração").
+  - Use redação formal típica de cláusula de objeto, em terceira pessoa, evitando informalidades.
+  - NÃO use reticências ("...") nem múltiplos pontos ou sinais de pontuação no final; termine com um ÚNICO ponto final ".".
 - justificativa: parágrafo de justificativa técnica/administrativa para a contratação, em linguagem formal.
 - Se o usuário informar itens (descrição, unidade, quantidade), use-os no array itens; senão sugira itens coerentes com o objeto.
 - Cada produto ou serviço diferente mencionado pelo usuário deve virar um item separado no array "itens" (não agrupe vários produtos na mesma "descricao").
@@ -218,6 +220,26 @@ REGRAS DE SAÍDA:
     }
     return inciso_val if inciso_val in valid_incisos else ""
 
+def _normalize_objeto(text: str) -> str:
+    """
+    Normaliza o campo objeto para ficar mais formal e sem pontuação estranha no final.
+    - Remove espaços extras.
+    - Remove reticências ou múltiplos pontos finais.
+    - Garante, quando houver texto, um ÚNICO ponto final.
+    """
+    text = (text or "").strip()
+    if not text:
+        return ""
+    # Remove reticências/múltiplos pontos no final
+    text = re.sub(r"[.。…]+$", "", text).strip()
+    if not text:
+        return ""
+    # Garante um único ponto final
+    if not text.endswith("."):
+        text = text + "."
+    return text
+
+
 def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
     """Converte o dicionário retornado pela LLM em TRTemplateSlots."""
     disp = data.get("dispensa") or {}
@@ -317,7 +339,7 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
 
     # Campo dotacao NÃO deve ser preenchido pela IA: sempre vem vazio aqui.
     return TRTemplateSlots(
-        objeto=str(data.get("objeto", "")).strip(),
+        objeto=_normalize_objeto(str(data.get("objeto", "")).strip()),
         dispensa=dispensa,
         itens=itens,
         justificativa=str(data.get("justificativa", "")).strip(),

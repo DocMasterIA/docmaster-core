@@ -305,15 +305,45 @@ async def endpoint_render_document(
 def _merge_user_context_into_tr_slots(
     slots_override: Optional[Dict[str, Any]], context: Optional[Dict[str, Any]]
 ) -> Optional[Dict[str, Any]]:
-    """Mescla contexto do usuário (Django) em slots_override: fiscal.nome = usuario.nome_completo quando não informado."""
-    usuario = (context or {}).get("usuario") if isinstance(context, dict) else None
-    if not usuario or not isinstance(usuario, dict) or not usuario.get("nome_completo"):
+    """
+    Mescla contexto do usuário (Django) em slots_override.
+
+    Regras:
+    - fiscal.nome = usuario.nome_completo quando não informado em slots_override.
+    - SECRETARIA DO USUARIO, Nome do USUARIO, CIDADE - ESTADO e CIDADE
+      são preenchidos diretamente do backend (sem inferência da IA).
+    """
+    if not isinstance(context, dict):
         return slots_override
+
+    usuario = context.get("usuario")
+    if not isinstance(usuario, dict):
+        return slots_override
+
     slots = dict(slots_override) if slots_override else {}
+
+    # Fiscal.nome: se não vier no override, usa nome do usuário logado
     fiscal = (slots.get("fiscal") or {}) if isinstance(slots.get("fiscal"), dict) else {}
-    if not fiscal.get("nome"):
-        fiscal = {**fiscal, "nome": (usuario.get("nome_completo") or "").strip()}
+    nome_completo = (usuario.get("nome_completo") or "").strip()
+    if nome_completo and not fiscal.get("nome"):
+        fiscal = {**fiscal, "nome": nome_completo}
         slots["fiscal"] = fiscal
+
+    # Campos adicionais do template, sempre vindos do backend e não da IA
+    if nome_completo:
+        slots.setdefault("nome_usuario", nome_completo)
+
+    secretaria = (usuario.get("secretaria") or "").strip()
+    if secretaria:
+        slots.setdefault("secretaria_usuario", secretaria)
+
+    cidade = (usuario.get("prefeitura") or "").strip()
+    estado_nome = (usuario.get("estado_nome") or usuario.get("estado_uf") or "").strip()
+    if cidade:
+        slots.setdefault("cidade", cidade)
+    if cidade and estado_nome:
+        slots.setdefault("cidade_estado", f"{cidade} - {estado_nome}")
+
     return slots
 
 

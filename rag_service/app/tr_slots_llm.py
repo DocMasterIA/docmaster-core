@@ -31,7 +31,7 @@ TR_SLOTS_SYSTEM_PROMPT = """Você preenche os campos (slots) de um Termo de Refe
 
 REGRAS:
 - Responda APENAS com um JSON válido, sem texto antes ou depois.
-- O JSON deve ter exatamente estas chaves: objeto, dispensa, itens, justificativa, fiscal, dotacao.
+- O JSON deve ter pelo menos estas chaves: objeto, dispensa, itens, justificativa, fiscal, dotacao.
 - Use linguagem técnica, formal e objetiva, adequada a documentos administrativos. NÃO use gírias, comentários informais ou meta-observações (ex.: "simples até demais", "ficou meio esquisito", "feito direto pelo usuário").
 - dispensa: objeto com "artigo" e "inciso".
   - O artigo, neste contexto de Termo de Referência, é sempre o art. 75 da Lei 14.133/2021. Portanto, devolva SEMPRE "artigo": "75".
@@ -166,6 +166,15 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
         justificativa=str(data.get("justificativa", "")).strip(),
         fiscal=fiscal,
         dotacao="",
+        # Campos adicionais do template que não devem ser inferidos pela IA,
+        # mas que podem, opcionalmente, vir do JSON (por exemplo, quando outra
+        # camada montar esse JSON manualmente). Se não vierem, permanecem vazios
+        # e serão preenchidos com dados do backend/contexto ou mantidos no modelo.
+        secretaria_usuario=str(data.get("secretaria_usuario", "")).strip(),
+        nome_usuario=str(data.get("nome_usuario", "")).strip(),
+        cidade_estado=str(data.get("cidade_estado", "")).strip(),
+        cidade=str(data.get("cidade", "")).strip(),
+        horario_entrega=str(data.get("horario_entrega", "")).strip(),
     )
 
 
@@ -196,6 +205,33 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
     else:
         fiscal = llm_slots.fiscal
 
+    # Campos adicionais simples (não aninhados)
+    secretaria_usuario = (
+        (override.get("secretaria_usuario") or llm_slots.secretaria_usuario)
+        if override.get("secretaria_usuario") is not None
+        else llm_slots.secretaria_usuario
+    )
+    nome_usuario = (
+        (override.get("nome_usuario") or llm_slots.nome_usuario)
+        if override.get("nome_usuario") is not None
+        else llm_slots.nome_usuario
+    )
+    cidade_estado = (
+        (override.get("cidade_estado") or llm_slots.cidade_estado)
+        if override.get("cidade_estado") is not None
+        else llm_slots.cidade_estado
+    )
+    cidade = (
+        (override.get("cidade") or llm_slots.cidade)
+        if override.get("cidade") is not None
+        else llm_slots.cidade
+    )
+    horario_entrega = (
+        (override.get("horario_entrega") or llm_slots.horario_entrega)
+        if override.get("horario_entrega") is not None
+        else llm_slots.horario_entrega
+    )
+
     itens_override = override.get("itens")
     if isinstance(itens_override, list) and len(itens_override) > 0:
         itens = []
@@ -209,10 +245,34 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
                     )
                 )
         if itens:
-            return TRTemplateSlots(objeto=objeto, dispensa=dispensa, itens=itens, justificativa=justificativa, fiscal=fiscal, dotacao=dotacao)
+            return TRTemplateSlots(
+                objeto=objeto,
+                dispensa=dispensa,
+                itens=itens,
+                justificativa=justificativa,
+                fiscal=fiscal,
+                dotacao=dotacao,
+                secretaria_usuario=secretaria_usuario,
+                nome_usuario=nome_usuario,
+                cidade_estado=cidade_estado,
+                cidade=cidade,
+                horario_entrega=horario_entrega,
+            )
     itens = llm_slots.itens
 
-    return TRTemplateSlots(objeto=objeto, dispensa=dispensa, itens=itens, justificativa=justificativa, fiscal=fiscal, dotacao=dotacao)
+    return TRTemplateSlots(
+        objeto=objeto,
+        dispensa=dispensa,
+        itens=itens,
+        justificativa=justificativa,
+        fiscal=fiscal,
+        dotacao=dotacao,
+        secretaria_usuario=secretaria_usuario,
+        nome_usuario=nome_usuario,
+        cidade_estado=cidade_estado,
+        cidade=cidade,
+        horario_entrega=horario_entrega,
+    )
 
 
 async def fetch_context_from_agent(user_prompt: str) -> Optional[Dict[str, Any]]:

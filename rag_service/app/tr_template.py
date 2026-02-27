@@ -48,6 +48,11 @@ class TRTemplateSlots:
     justificativa: str = ""
     fiscal: FiscalSlots = field(default_factory=FiscalSlots)
     dotacao: str = ""
+    secretaria_usuario: str = ""
+    nome_usuario: str = ""
+    cidade_estado: str = ""
+    cidade: str = ""
+    horario_entrega: str = ""
 
 
 def _replace_placeholders_in_paragraphs(doc: Document, mapping: Dict[str, str]) -> None:
@@ -206,6 +211,11 @@ def render_tr_from_slots(
         # O backend/sistema pode sobrescrever via slots_override.dotacao no futuro.
         "(Inserir Dotação)": slots.dotacao or "",
         "(Feito direto pelo usuário)": "",
+        "(SECRETARIA DO USUARIO)": slots.secretaria_usuario or "",
+        "(Nome do USUARIO)": slots.nome_usuario or "",
+        "(CIDADE - ESTADO)": slots.cidade_estado or "",
+        "(CIDADE)": slots.cidade or "",
+        "(HORARIO E DIAS PARA ENTREGA)": slots.horario_entrega or "Preencher horário, dias da semana e outras informações de entrega",
     }
 
     _replace_placeholders_in_paragraphs(doc, mapping)

@@ -32,6 +32,8 @@ def build_llm_context_from_request(request):
         "last_name": (user.last_name or "").strip() or None,
         "secretaria": str(sec) if sec else None,
         "prefeitura": pref.nome_municipio if pref else None,
+        "estado_uf": pref.estado if pref and getattr(pref, "estado", None) else None,
+        "estado_nome": pref.get_estado_display() if pref and hasattr(pref, "get_estado_display") else None,
         "orgao": f"Prefeitura Municipal de {pref.nome_municipio}" if pref else None,
     }
     return ctx

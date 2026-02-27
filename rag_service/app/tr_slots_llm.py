@@ -141,9 +141,6 @@ async def _choose_art75_inciso(objeto: str, itens: List[ItemSlot]) -> str:
     itens_desc = [i.descricao for i in itens if getattr(i, "descricao", None)]
     itens_text = "; ".join(itens_desc)
 
-    if not objeto and not itens_text:
-        return ""
-
     system_prompt = """
 Você é um assistente jurídico especializado na Lei 14.133/2021.
 
@@ -170,7 +167,8 @@ Considere APENAS os incisos I a XV do art. 75, com as seguintes ideias centrais:
 REGRAS DE SAÍDA:
 - Responda APENAS com um JSON no formato {"inciso": "I"}.
 - O valor deve ser um ÚNICO algarismo romano entre "I" e "XV".
-- Se, mesmo após analisar o objeto e os itens, não for possível determinar com segurança, retorne {"inciso": ""}.
+- Você DEVE escolher o inciso que melhor se ajusta ao caso, mesmo que haja alguma incerteza.
+- NUNCA devolva valor vazio; escolha sempre o inciso mais adequado entre I e XV.
 """
 
     user_parts = [f"Objeto: {objeto or '[não informado]'}"]
@@ -529,5 +527,50 @@ async def fill_tr_slots_with_llm(
             chosen_inciso = ""
         if chosen_inciso:
             llm_slots.dispensa.inciso = chosen_inciso
+        else:
+            # NUNCA permitir inciso vazio: se a LLM não conseguiu decidir nem na etapa
+            # dedicada, adotamos um fallback determinístico:
+            # - se texto do objeto/itens sugerir obra/engenharia/manutenção de veículos → I
+            # - se sugerir emergência/calamidade → VIII
+            # - caso geral (outros serviços/compras) → II
+            base_text = (llm_slots.objeto or "").lower()
+            for it in llm_slots.itens:
+                desc = getattr(it, "descricao", "")
+                if desc:
+                    base_text += " " + str(desc).lower()
+
+            emergencia_keywords = (
+                "emergência",
+                "emergencia",
+                "calamidade",
+                "situação emergencial",
+                "situacao emergencial",
+                "urgência",
+                "urgencia",
+            )
+            engenharia_keywords = (
+                "obra",
+                "obras",
+                "engenharia",
+                "pavimentação",
+                "pavimentacao",
+                "asfalto",
+                "reforma",
+                "construção",
+                "construcao",
+                "manutenção de veículos",
+                "manutencao de veiculos",
+                "veículo",
+                "veiculo",
+                "frota",
+            )
+
+            if any(k in base_text for k in emergencia_keywords):
+                llm_slots.dispensa.inciso = "VIII"
+            elif any(k in base_text for k in engenharia_keywords):
+                llm_slots.dispensa.inciso = "I"
+            else:
+                # Caso padrão: dispensa por valor para outros serviços/compras
+                llm_slots.dispensa.inciso = "II"
 
     return _merge_slots(llm_slots, slots_override or {})

@@ -496,8 +496,46 @@ async def fill_tr_slots_with_llm(
 
     if not chosen_inciso:
         # Se, mesmo após a etapa dedicada, a LLM não devolver um inciso válido,
-        # não é seguro prosseguir silenciosamente: levantamos erro explícito.
-        raise ValueError("Não foi possível determinar o inciso do art. 75 com base no objeto e nos itens.")
+        # usamos um fallback mínimo baseado no próprio texto do objeto/itens.
+        base_text = (llm_slots.objeto or "").lower()
+        for it in llm_slots.itens:
+            desc = getattr(it, "descricao", "")
+            if desc:
+                base_text += " " + str(desc).lower()
+
+        emergencia_keywords = (
+            "emergência",
+            "emergencia",
+            "calamidade",
+            "situação emergencial",
+            "situacao emergencial",
+            "urgência",
+            "urgencia",
+        )
+        engenharia_keywords = (
+            "obra",
+            "obras",
+            "engenharia",
+            "pavimentação",
+            "pavimentacao",
+            "asfalto",
+            "reforma",
+            "construção",
+            "construcao",
+            "manutenção de veículos",
+            "manutencao de veiculos",
+            "veículo",
+            "veiculo",
+            "frota",
+        )
+
+        if any(k in base_text for k in emergencia_keywords):
+            chosen_inciso = "VIII"
+        elif any(k in base_text for k in engenharia_keywords):
+            chosen_inciso = "I"
+        else:
+            # Caso padrão: dispensa por valor para outros serviços/compras
+            chosen_inciso = "II"
 
     llm_slots.dispensa.inciso = chosen_inciso
 

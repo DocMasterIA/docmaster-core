@@ -112,9 +112,7 @@ def smart_ingest_file(
     
     # Tipo: usa o informado ou infere pelo caminho
     doc_type = document_type or _infer_document_type_from_path(path)
-    
-    # Extrai seções
-    sections = extract_sections(text)
+    doc_type_lower = (doc_type or "").lower()
     
     # Metadados base
     file_meta = get_file_metadata(path)
@@ -132,45 +130,139 @@ def smart_ingest_file(
         chunk_overlap=50,
         separators=["\n\n", "\n", ". ", " ", ""],
     )
-    
-    # Se não encontrou seções, usa texto completo
-    if not sections:
-        chunks = splitter.split_text(text)
-        docs = [
-            Document(
-                page_content=chunk,
-                metadata={
+
+    docs: List[Document]
+    sections_extracted: int
+
+    # Caso especial: ingestão de lei (ex.: Lei 14.133/2021)
+    if doc_type_lower == "lei":
+        import re
+
+        lines = text.splitlines()
+        current_article_lines: List[str] = []
+        current_article_num: str | None = None
+        docs = []
+
+        def flush_article():
+            nonlocal current_article_lines, current_article_num, docs
+            if not current_article_lines or not current_article_num:
+                current_article_lines = []
+                current_article_num = None
+                return
+            article_text = "\n".join(current_article_lines).strip()
+            if not article_text:
+                current_article_lines = []
+                current_article_num = None
+                return
+            # Se o artigo for muito grande, quebra em chunks
+            if len(article_text) > MAX_CHUNK:
+                chunks = splitter.split_text(article_text)
+                for i, chunk in enumerate(chunks):
+                    docs.append(
+                        Document(
+                            page_content=chunk,
+                            metadata={
+                                **base_metadata,
+                                "document_type": doc_type,
+                                "section_key": f"artigo_{current_article_num}",
+                                "section_title": f"Artigo {current_article_num}",
+                                "chunk_index": i,
+                            },
+                        )
+                    )
+            else:
+                docs.append(
+                    Document(
+                        page_content=article_text,
+                        metadata={
+                            **base_metadata,
+                            "document_type": doc_type,
+                            "section_key": f"artigo_{current_article_num}",
+                            "section_title": f"Artigo {current_article_num}",
+                        },
+                    )
+                )
+            current_article_lines = []
+            current_article_num = None
+
+        # Detecta linhas que iniciam artigos: "Art. 1º", "Art. 2º", "Art. 75."
+        art_pattern = re.compile(r"^\s*Art\.\s*(\d+)", re.IGNORECASE)
+        for line in lines:
+            m = art_pattern.match(line)
+            if m:
+                # Novo artigo encontrado: flush do anterior
+                flush_article()
+                current_article_num = m.group(1)
+                current_article_lines = [line]
+            else:
+                if current_article_lines is not None:
+                    current_article_lines.append(line)
+        # Último artigo
+        flush_article()
+
+        sections_extracted = len(docs)
+        if not docs:
+            # Fallback: ingere como documento único
+            chunks = splitter.split_text(text)
+            docs = [
+                Document(
+                    page_content=chunk,
+                    metadata={
+                        **base_metadata,
+                        "document_type": doc_type,
+                        "section_key": "full_document",
+                        "chunk_index": i,
+                    },
+                )
+                for i, chunk in enumerate(chunks)
+            ]
+    else:
+        # Fluxo padrão: extrai seções com o extrator genérico
+        sections = extract_sections(text)
+        # Se não encontrou seções, usa texto completo
+        if not sections:
+            chunks = splitter.split_text(text)
+            docs = [
+                Document(
+                    page_content=chunk,
+                    metadata={
+                        **base_metadata,
+                        "document_type": doc_type,
+                        "section_key": "full_document",
+                        "chunk_index": i,
+                    },
+                )
+                for i, chunk in enumerate(chunks)
+            ]
+            sections_extracted = 0
+        else:
+            # Converte seções para documents, quebrando as muito grandes
+            docs = []
+            for section in sections:
+                section_meta = {
                     **base_metadata,
                     "document_type": doc_type,
-                    "section_key": "full_document",
-                    "chunk_index": i,
+                    "section_key": section.key,
+                    "section_title": section.title,
                 }
-            )
-            for i, chunk in enumerate(chunks)
-        ]
-    else:
-        # Converte seções para documents, quebrando as muito grandes
-        docs = []
-        for section in sections:
-            section_meta = {
-                **base_metadata,
-                "document_type": doc_type,
-                "section_key": section.key,
-                "section_title": section.title,
-            }
-            if section.number:
-                section_meta["section_number"] = section.number
-            
-            # Se a seção for grande, divide em chunks
-            if len(section.content) > MAX_CHUNK:
-                chunks = splitter.split_text(section.content)
-                for i, chunk in enumerate(chunks):
-                    docs.append(Document(
-                        page_content=chunk,
-                        metadata={**section_meta, "chunk_index": i}
-                    ))
-            else:
-                docs.append(Document(page_content=section.content, metadata=section_meta))
+                if section.number:
+                    section_meta["section_number"] = section.number
+
+                # Se a seção for grande, divide em chunks
+                if len(section.content) > MAX_CHUNK:
+                    chunks = splitter.split_text(section.content)
+                    for i, chunk in enumerate(chunks):
+                        docs.append(
+                            Document(
+                                page_content=chunk,
+                                metadata={**section_meta, "chunk_index": i},
+                            )
+                        )
+                else:
+                    docs.append(
+                        Document(page_content=section.content, metadata=section_meta)
+                    )
+            sections_extracted = len(sections)
     
     # Indexa no ChromaDB
     client = get_chroma_client()
@@ -187,7 +279,7 @@ def smart_ingest_file(
         "file": Path(path).name,
         "document_type": doc_type,
         "inferred_from": "path",
-        "sections_extracted": len(sections),
+        "sections_extracted": sections_extracted,
         "chunks_added": len(ids),  # pode ser > sections se houve split
         "collection": coll_name,
     }

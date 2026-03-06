@@ -222,6 +222,10 @@ def gerar_via_llm_api(request):
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
 
+    # TR+DFD (modelo oficial): mesma URL que ETP, desvio interno para evitar 404 em rotas separadas
+    if output == "tr_dfd":
+        return gerar_tr_e_dfd_api(request)
+
     context = build_llm_context_from_request(request)
     if template_id is not None:
         context["template_id"] = str(template_id)

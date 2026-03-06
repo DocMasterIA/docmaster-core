@@ -282,6 +282,22 @@ def _postprocess_clause_text(text: str) -> str:
         t,
         flags=re.IGNORECASE,
     )
+    # Remove citações que remetem a itens/tabela abaixo (objeto e outras seções = descrição pura)
+    objeto_ref_patterns = [
+        r",?\s*compreendendo\s+os\s+itens\s+descritos\s+abaixo\.?",
+        r",?\s*compreendendo\s+os\s+itens\s+relacionados\s+abaixo\.?",
+        r",?\s*conforme\s+itens\s+(descritos\s+)?abaixo\.?",
+        r",?\s*conforme\s+especificações\s+(a\s+seguir|abaixo)\.?",
+        r",?\s*conforme\s+tabela\s+(a\s+seguir|abaixo|em\s+anexo)\.?",
+        r",?\s*conforme\s+quantitativo\s+(a\s+seguir|abaixo)\.?",
+        r",?\s*conforme\s+detalhamento\s+(na\s+tabela|abaixo)\.?",
+        r",?\s*conforme\s+o\s+quantitativo\s+descrito\s+abaixo\.?",
+        r",?\s*detalhados\s+(na\s+tabela|nos\s+itens)\s+abaixo\.?",
+        r",?\s*especificados\s+(na\s+tabela|nos\s+itens)\s+abaixo\.?",
+    ]
+    for pat in objeto_ref_patterns:
+        t = re.sub(pat, "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s{2,}", " ", t)
     # Converte tabelas markdown (| col1 | col2 | + | --- | + | val |) em lista legível
     t = _convert_markdown_table_to_plain(t)
     # Remove marcadores markdown no início de linha (* ou - , inclusive com espaços)
@@ -434,7 +450,8 @@ def _get_etp_preamble() -> str:
         "O ETP é um ESTUDO INTERNO da Administração, não um edital nem um contrato.\n"
         "Regras específicas:\n"
         "- PRIORIDADE: Use SEMPRE o objeto informado no prompt/contexto. Não mude o tema do estudo com base em exemplos do RAG.\n"
-        "- OBJETO/SEÇÃO \"OBJETO\": descreva com 2 a 4 frases o que será CONTRATADO (bens, serviços ou obra), para qual finalidade e quais necessidades administrativas atende, citando o órgão/setor e, quando couber, o público/área beneficiada. Evite frases genéricas demais.\n"
+        "- OBJETO/SEÇÃO \"OBJETO\": descreva com 2 a 4 frases o que será CONTRATADO (bens, serviços ou obra), para qual finalidade e quais necessidades administrativas atende, citando o órgão/setor e, quando couber, o público/área beneficiada.\n"
+        "  É EXPRESSAMENTE PROIBIDO limitar o OBJETO a uma expressão curta e genérica como apenas \"materiais de limpeza\", \"material de escritório\" ou semelhantes; o texto deve ser completo e autoexplicativo, mesmo que o pedido do usuário seja breve.\n"
         "- SEÇÕES DE NECESSIDADE/MOTIVAÇÃO: explique de forma analítica por que a contratação é necessária, quais problemas pretende resolver e quais riscos existem se não for realizada, SEM inventar números, valores, datas ou normas que não apareçam no contexto.\n"
         "- SOLUÇÃO PROPOSTA / ALTERNATIVAS: foque em descrever alternativas técnicas e a solução escolhida. NÃO copie cláusulas de edital (garantia de proposta, prazos de homologação, penalidades) e NÃO declare modalidade de licitação ou enquadramento em dispensa/inexigibilidade.\n"
         "- ANÁLISE DE RISCOS: identifique riscos relevantes ligados à execução do objeto (técnicos, operacionais, de cronograma, de fornecimento), e medidas acauteladoras proporcionais. Evite listas vazias ou genéricas demais.\n"
@@ -454,6 +471,60 @@ def _document_type_to_rag_filter(document_type: str) -> str:
     if "formalizacao" in dt or "demanda" in dt or dt == "documento_formalizacao_demanda":
         return "dfd"
     return document_type
+
+
+def _is_conclusion_section(node: Dict[str, Any]) -> bool:
+    """
+    Heurística para identificar seções de conclusão/encerramento em ETP.
+    Usa key e title, buscando termos como 'conclus' e 'encerramento'.
+    """
+    if not isinstance(node, dict):
+        return False
+    key = str(node.get("key") or "").lower()
+    title = str(node.get("title") or "").lower()
+    tokens = ("conclus", "encerramento", "fechamento")
+    return any(t in key for t in tokens) or any(t in title for t in tokens)
+
+
+def _reorder_conclusion_sections_in_tree(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Garante que seções de conclusão/encerramento fiquem sempre ao final da lista.
+    Também aplica a mesma regra recursivamente às subseções.
+    """
+    if not isinstance(nodes, list):
+        return nodes
+
+    processed: List[Dict[str, Any]] = []
+    for node in nodes:
+        if isinstance(node, dict):
+            children = node.get("children")
+            if isinstance(children, list):
+                node["children"] = _reorder_conclusion_sections_in_tree(children)
+        processed.append(node)
+
+    conclusion_nodes = [n for n in processed if _is_conclusion_section(n)]
+    other_nodes = [n for n in processed if not _is_conclusion_section(n)]
+    if not conclusion_nodes:
+        return processed
+    return other_nodes + conclusion_nodes
+
+
+def _ensure_etp_conclusion_last(
+    structure: Dict[str, Any],
+    document_type: str,
+) -> Dict[str, Any]:
+    """
+    Para documentos de tipo ETP/estudo, força que seções de conclusão
+    apareçam sempre ao final do documento (root_sections).
+    """
+    dt = (document_type or structure.get("document_type") or "").lower()
+    if "etp" not in dt and "estudo" not in dt:
+        return structure
+
+    root = structure.get("root_sections")
+    if isinstance(root, list):
+        structure["root_sections"] = _reorder_conclusion_sections_in_tree(root)
+    return structure
 
 
 async def _call_llm_agent_structure(user_prompt: str) -> Dict[str, Any]:
@@ -489,7 +560,7 @@ def _get_section_specific_instructions(
     if (key == "objeto" or key.startswith("objeto_")) and is_etp:
         if for_list:
             return "\nINSTRUÇÕES ETP: Liste partes do OBJETO DA CONTRATAÇÃO (o que será contratado). NUNCA descreva o que o ETP deve conter – defina os serviços/bens a serem contratados. NUNCA inclua linhas de tabela.\n"
-        return "\nINSTRUÇÕES ETP: Defina o OBJETO DA CONTRATAÇÃO (o que será contratado – serviços, bens, escopo). NUNCA descreva \"o que o ETP deve incluir\" ou \"aspectos do estudo\". O objeto é o escopo da contratação futura. Inclua alcance e excludentes. Priorize o objeto informado no prompt (ex.: limpeza urbana ≠ coleta seletiva). Sem tabelas inline.\n"
+        return "\nINSTRUÇÕES ETP: Defina o OBJETO DA CONTRATAÇÃO (o que será contratado – serviços, bens, escopo). NUNCA descreva \"o que o ETP deve incluir\" ou \"aspectos do estudo\". O objeto é o escopo da contratação futura. Inclua alcance e excludentes. Priorize o objeto informado no prompt (ex.: limpeza urbana ≠ coleta seletiva). Sem tabelas inline. DESCRIÇÃO PURA: NUNCA use \"compreendendo os itens descritos abaixo\", \"conforme tabela\", \"especificações a seguir\" ou qualquer citação que remeta a outras seções – apenas a descrição do objeto.\n"
 
     # ETP: Solução proposta – técnica/operacional, sem transcrição de lei
     if "soluc" in key and is_etp:
@@ -566,7 +637,7 @@ def _get_section_specific_instructions(
     if key == "objeto" or key.startswith("objeto_"):
         if for_list:
             return "\nINSTRUÇÕES ESPECÍFICAS: Liste as partes ou modalidades do OBJETO DA CONTRATAÇÃO (o que será contratado). Seja específico ao contexto (serviços, bens).\n"
-        return "\nINSTRUÇÕES ESPECÍFICAS: Defina o OBJETO DA CONTRATAÇÃO (o que será contratado – escopo, serviços, bens). NUNCA descreva \"o que o documento deve incluir\". Inclua alcance e excludentes. Priorize o objeto informado no prompt.\n"
+        return "\nINSTRUÇÕES ESPECÍFICAS: Defina o OBJETO DA CONTRATAÇÃO (o que será contratado – escopo, serviços, bens). NUNCA descreva \"o que o documento deve incluir\". Inclua alcance e excludentes. Priorize o objeto informado no prompt. DESCRIÇÃO PURA: NUNCA use \"compreendendo os itens descritos abaixo\", \"conforme tabela\", \"especificações a seguir\" ou qualquer citação que remeta a outras seções – apenas a descrição do objeto.\n"
 
     # Necessidade
     if "necessidade" in key:
@@ -601,6 +672,9 @@ def _format_user_context(context: Dict[str, Any]) -> str:
         parts.append(f"- Secretaria/Gabinete: {usuario['secretaria']}")
     if usuario.get("prefeitura") and not context.get("orgao"):
         parts.append(f"- Prefeitura: {usuario['prefeitura']}")
+    estado = usuario.get("estado_nome") or usuario.get("estado_uf")
+    if estado:
+        parts.append(f"- Estado: {estado}")
     if not parts:
         return ""
     return "Contexto do solicitante:\n" + "\n".join(parts) + "\n\n"
@@ -921,6 +995,9 @@ async def generate_full_document(
             if doc_type_hint:
                 document_type = doc_type_hint
                 doc_type_filter = _document_type_to_rag_filter(document_type)
+
+    # ETP/Estudo: força seções de conclusão/encerramento ao final do documento
+    doc_structure = _ensure_etp_conclusion_last(doc_structure, document_type)
 
     # Coleta seções que precisam de texto
     text_sections: List[Dict[str, str]] = []

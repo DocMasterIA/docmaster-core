@@ -67,21 +67,20 @@ REGRAS:
   - Se o usuário já tiver informado descrição/unidade/quantidade, preserve essas informações e apenas complemente de forma técnica quando fizer sentido.
 - fiscal: objeto com "nome" (nome completo do fiscal do contrato). Se não houver nome de fiscal claramente informado pelo usuário ou contexto, use "" (não invente nomes).
 - dotacao: sempre deve ser retornado como string vazia \"\". A IA NÃO deve sugerir, inferir ou inventar dotação orçamentária; esse campo será preenchido posteriormente pelo sistema ou por outro fluxo.
-- objeto: frase completa, formal e específica, descrevendo claramente o objeto da contratação, incluindo finalidade e, quando inferível, área/setor atendido (por exemplo: "Aquisição de materiais de escritório para suprir as necessidades da Secretaria Municipal de Administração").
-  - Deve ser um parágrafo mais desenvolvido (em geral 2 a 4 frases), formal e específico, descrevendo:
+- objeto: campo textual que descreve o OBJETO DA CONTRATAÇÃO.
+  - Deve ser um parágrafo desenvolvido, com pelo menos 2 e preferencialmente 3 a 4 frases completas, em linguagem formal, descrevendo:
     * o que será contratado (bens, serviços ou obra), com nível mínimo de detalhamento,
     * para qual finalidade e quais necessidades administrativas pretende atender,
     * quando possível, o órgão/setor demandante e o público ou área beneficiada.
-  - Use redação formal típica de cláusula de objeto, em terceira pessoa. Exemplos de inícios aceitáveis:
+  - Exemplos de inícios aceitáveis:
     * "O objeto do presente Termo de Referência é ..."
     * "O presente Termo de Referência tem por objeto ..."
     * "O objeto deste Termo de Referência consiste em ..."
-  - Evite textos excessivamente curtos ou genéricos como "Aquisição de material de escritório". Sempre acrescente finalidade e contexto mínimo.
-  - Deve ser uma redação extensa, minuciosa e formal. Não deve ser uma frase curta e simplificada.
-  - Evite frases curtas. Expanda a descrição para incluir a finalidade pública do bem ou serviço.
-  - Use redação formal típica de cláusula de objeto, em terceira pessoa, evitando informalidades.
-  - Prefira construções como: "O objeto do presente Termo de Referência é ..." ou "O objeto tem por finalidade ...", seguidas da descrição clara da contratação.
+  - É EXPRESSAMENTE PROIBIDO devolver o objeto como uma expressão curta e genérica, como apenas "materiais de limpeza", "material de limpeza", "serviços de limpeza", "material de escritório", "serviços de manutenção" ou semelhantes. Sempre que o pedido do usuário for curto, você DEVE complementar o objeto com finalidade e contexto (órgão/unidade, público ou área atendida) de forma razoável com base nas informações disponíveis.
+  - Nunca devolva o objeto com menos de uma frase completa; respostas de 1 a 3 palavras são sempre ERRADAS para este campo.
+  - Use redação formal típica de cláusula de objeto, em terceira pessoa, evitando informalidades. Prefira construções como: "O objeto do presente Termo de Referência é ..." seguidas da descrição clara da contratação.
   - NÃO use reticências ("...") nem múltiplos pontos no final da frase como (".."); Evite duplicar a pontuação que já exista no modelo de documento.
+  - OBJETO = APENAS DESCRIÇÃO PURA. PROIBIDO qualquer referência a itens, tabelas ou seções do documento: NUNCA use "compreendendo os itens descritos abaixo", "conforme itens abaixo", "especificações a seguir", "conforme tabela", "itens relacionados abaixo", "detalhamento na tabela", "conforme quantitativo" ou expressões equivalentes. O campo objeto deve conter somente a descrição do que será contratado e sua finalidade, sem remeter a outras partes do documento.
 - justificativa: parágrafo de justificativa técnica/administrativa para a contratação, em linguagem formal. - Deve ser um texto dissertativo-argumentativo extenso, completo e técnico. Não deve ser uma frase curta e simplificada.
   - Deve ser um parágrafo de justificativa técnica/administrativa mais rico (idealmente 3 a 6 frases), em linguagem formal, explicando:
     * por que a contratação é necessária para a Administração,
@@ -243,11 +242,53 @@ def _normalize_objeto(text: str) -> str:
     Normaliza o campo objeto para ficar mais formal e sem pontuação estranha no final.
     - Remove espaços extras.
     - Remove reticências ou múltiplos pontos/pontuação forte no final.
-    - Deixa a pontuação final a cargo do modelo DOCX (evita gerar "..").
+    - Remove citações que remetem a itens/tabela abaixo (descrição pura apenas).
     """
     text = (text or "").strip()
     if not text:
         return ""
+
+    # Remove frases que remetem a itens/tabela/especificações abaixo (objeto = apenas descrição pura)
+    objeto_remover = [
+        r",?\s*compreendendo\s+os\s+itens\s+descritos\s+abaixo\.?",
+        r",?\s*compreendendo\s+os\s+itens\s+relacionados\s+abaixo\.?",
+        r",?\s*conforme\s+itens\s+(descritos\s+)?abaixo\.?",
+        r",?\s*conforme\s+especificações\s+(a\s+seguir|abaixo)\.?",
+        r",?\s*conforme\s+tabela\s+(a\s+seguir|abaixo|em\s+anexo)\.?",
+        r",?\s*conforme\s+quantitativo\s+(a\s+seguir|abaixo)\.?",
+        r",?\s*conforme\s+detalhamento\s+(na\s+tabela|abaixo)\.?",
+        r",?\s*conforme\s+o\s+quantitativo\s+descrito\s+abaixo\.?",
+        r",?\s*detalhados\s+(na\s+tabela|nos\s+itens)\s+abaixo\.?",
+        r",?\s*especificados\s+(na\s+tabela|nos\s+itens)\s+abaixo\.?",
+    ]
+    for pat in objeto_remover:
+        text = re.sub(pat, "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s{2,}", " ", text).strip()
+
+    # Heurística extra: evitar objetos extremamente genéricos de 1–3 palavras,
+    # como "materiais de limpeza" ou "material de escritório". Nestes casos,
+    # expande para uma frase completa padrão, mais adequada ao TR.
+    base = re.sub(r"[.。…;:,]+$", "", text).strip()
+    if base:
+        lower = base.lower()
+        generic_terms = {
+            "materiais de limpeza",
+            "material de limpeza",
+            "serviços de limpeza",
+            "servico de limpeza",
+            "material de escritório",
+            "materiais de escritório",
+            "material de expediente",
+            "materiais de expediente",
+        }
+        words = lower.split()
+        if lower in generic_terms or len(words) <= 3:
+            text = (
+                f"O objeto do presente Termo de Referência é a aquisição de {base} "
+                "para atender às necessidades da Administração Pública, garantindo a adequada "
+                "prestação dos serviços e o atendimento ao interesse público."
+            )
+
     # Remove reticências/múltiplos pontos e outros sinais fortes no final
     text = re.sub(r"[.。…;:,]+$", "", text).strip()
     if not text:

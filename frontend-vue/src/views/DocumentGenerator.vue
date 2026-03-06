@@ -281,7 +281,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+// Em dev: usar '' para que a requisição passe pelo proxy do Vite (evita 404 por chamar outro host/porta)
+const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || '');
 const route = useRoute();
 
 const useOwnFile = ref(false);
@@ -481,6 +482,12 @@ async function submitViaLLM() {
 
   const contentType = (res.headers.get('content-type') || '').toLowerCase();
 
+  if (res.status === 404) {
+    generateError.value =
+      'Rota não encontrada (404). Confira se o backend está rodando (docker compose up -d backend) e reconstruído com o código atual (docker compose build --no-cache backend). Em dev, o front usa o proxy do Vite para /api.';
+    return;
+  }
+
   // Modo TR/DFD (modelo oficial): resposta é sempre JSON com base64 dos arquivos
   if (docTypeMode.value === 'tr_modelo') {
     const rawText = await res.text();
@@ -493,7 +500,10 @@ async function submitViaLLM() {
     }
 
     if (!res.ok || !data.ok) {
-      generateError.value = data.error || data.detail || `Erro ${res.status}`;
+      generateError.value =
+        res.status === 500
+          ? (data.error || data.detail || 'Erro 500 no servidor. Veja os logs do container backend.')
+          : (data.error || data.detail || `Erro ${res.status}`);
       return;
     }
 
@@ -537,10 +547,17 @@ async function submitViaLLM() {
 
   // Demais modos: fluxo original (DOCX único)
   if (!res.ok) {
-    const err = contentType.includes('json')
-      ? await res.json().catch(() => ({}))
-      : {};
-    generateError.value = err.error || err.detail || `Erro ${res.status}`;
+    const rawErr = await res.text();
+    let err = {};
+    try {
+      err = contentType.includes('json') && rawErr ? JSON.parse(rawErr) : {};
+    } catch (_e) {
+      err = {};
+    }
+    generateError.value =
+      res.status === 500
+        ? (err.error || err.detail || 'Erro 500 no servidor. Veja os logs do container backend.')
+        : (err.error || err.detail || `Erro ${res.status}`);
     return;
   }
 

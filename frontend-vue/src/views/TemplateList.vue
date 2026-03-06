@@ -128,7 +128,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -161,6 +161,7 @@ const pdfDoc = ref(null);
 const pdfPage = ref(1);
 const pdfTotalPages = ref(0);
 const pdfGotoPage = ref(1);
+let pdfBlobUrl = null;
 
 const filteredTemplates = computed(() => {
   const q = searchQuery.value.toLowerCase().trim();
@@ -212,6 +213,10 @@ function closePdfModal() {
   pdfTotalPages.value = 0;
   pdfModalMeta.value = '';
   currentTemplateId.value = null;
+  if (pdfBlobUrl) {
+    URL.revokeObjectURL(pdfBlobUrl);
+    pdfBlobUrl = null;
+  }
   if (pdfThumbsEl.value) pdfThumbsEl.value.innerHTML = '';
 }
 
@@ -238,12 +243,19 @@ async function loadTemplatePreviewPdf(templateId) {
     const res = await fetch(`${API_BASE}/api/documentos_modelos/${encodeURIComponent(templateId)}/pdf/`, { credentials: 'include' });
     const data = await res.json();
     if (!data?.ok || !data.pdf_url) throw new Error(data?.error || 'Preview indisponível');
-    const url = data.pdf_url.startsWith('http') ? data.pdf_url : `${API_BASE}${data.pdf_url}`;
-    await loadPdf(url);
+    const pdfUrl = data.pdf_url.startsWith('http') ? data.pdf_url : `${API_BASE}${data.pdf_url}`;
+    // Carrega o PDF via fetch (com credentials) e usa blob URL para evitar CORS no pdf.js
+    const pdfRes = await fetch(pdfUrl, { credentials: 'include', mode: 'cors' });
+    if (!pdfRes.ok) throw new Error('Falha ao baixar o PDF');
+    const blob = await pdfRes.blob();
+    if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
+    pdfBlobUrl = URL.createObjectURL(blob);
+    await nextTick();
+    await loadPdf(pdfBlobUrl);
     pdfModalMeta.value = '';
   } catch (e) {
     console.error('loadTemplatePreviewPdf', e);
-    pdfModalMeta.value = 'Erro ao carregar preview';
+    pdfModalMeta.value = e?.message || 'Erro ao carregar preview';
   }
 }
 
@@ -259,7 +271,18 @@ onMounted(() => {
 });
 
 async function loadPdf(url) {
-  if (!pdfjsLib || !pdfCanvasEl.value) return;
+  if (!pdfjsLib) {
+    pdfModalMeta.value = 'Visualizador de PDF não carregado. Recarregue a página.';
+    return;
+  }
+  if (!pdfCanvasEl.value) {
+    pdfModalMeta.value = 'Aguarde...';
+    await nextTick();
+    if (!pdfCanvasEl.value) {
+      pdfModalMeta.value = 'Erro ao preparar visualização.';
+      return;
+    }
+  }
   pdfThumbsEl.value.innerHTML = '';
   try {
     const task = pdfjsLib.getDocument({ url });

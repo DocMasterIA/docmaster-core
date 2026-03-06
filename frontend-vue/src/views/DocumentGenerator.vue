@@ -84,19 +84,6 @@
                   Prompt de Inteligência Artificial
                   <span class="gov-label__hint">(IA contextual inteligente)</span>
                 </label>
-                <div class="doc-gen__doc-type">
-                  <label class="gov-label gov-label--inline">Tipo de documento</label>
-                  <div class="doc-gen__doc-type-options">
-                    <label class="doc-gen__doc-type-option">
-                      <input v-model="docTypeMode" type="radio" value="auto" />
-                      <span>Padrão (ETP / DFD / TR)</span>
-                    </label>
-                    <label class="doc-gen__doc-type-option">
-                      <input v-model="docTypeMode" type="radio" value="tr_modelo" />
-                      <span>TR com modelo fixo (slots IA)</span>
-                    </label>
-                  </div>
-                </div>
                 <textarea
                   id="ia-prompt"
                   v-model="iaPrompt"

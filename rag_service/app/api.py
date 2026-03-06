@@ -441,6 +441,49 @@ async def endpoint_generate_tr_from_model(body: GenerateTRFromModelRequest):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@router.post("/generate-tr-and-dfd")
+async def endpoint_generate_tr_and_dfd(body: GenerateTRFromModelRequest):
+    """
+    Gera TR (modelo fixo) + DFD complementar e retorna os caminhos dos DOCX.
+
+    Use este endpoint quando o chamador (por exemplo, o backend Django) precisar
+    expor Termo de Referência e DFD separadamente ou montar ZIP personalizado.
+    """
+    from .tr_slots_llm import fill_tr_slots_with_llm
+    from .tr_template import render_tr_from_slots
+    from .dfd_template import render_dfd_from_tr_slots
+
+    slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
+    try:
+        slots = await fill_tr_slots_with_llm(
+            user_prompt=body.user_prompt,
+            slots_override=slots_override,
+            user_context=body.context,
+        )
+
+        # Gera TR e DFD em caminhos temporários
+        docx_tr_path = render_tr_from_slots(slots)
+        if not Path(docx_tr_path).exists():
+            raise HTTPException(status_code=500, detail="DOCX do TR não foi gerado.")
+
+        docx_dfd_path = render_dfd_from_tr_slots(slots)
+        if not Path(docx_dfd_path).exists():
+            raise HTTPException(status_code=500, detail="DOCX do DFD não foi gerado.")
+
+        return {
+            "ok": True,
+            "tr_docx_path": docx_tr_path,
+            "dfd_docx_path": docx_dfd_path,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Erro em generate-tr-and-dfd: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @router.post("/generate-tr-and-dfd-zip")
 async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
     """

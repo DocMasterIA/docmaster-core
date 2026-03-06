@@ -26,7 +26,7 @@
                 <div class="doc-gen__source-tabs">
                   <label class="doc-gen__tab">
                     <input v-model="sourceMode" type="radio" value="llm" disabled />
-                    <span>Criar do zero (ETP, DFD, TR)</span>
+                    <span>Criar com IA (ETP, TR, DFD)</span>
                   </label>
                 </div>
 
@@ -34,7 +34,31 @@
                 <div class="doc-gen__llm-hint">
                   <p class="gov-text-soft">
                     <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
-                    A IA gera o documento completo a partir do seu prompt (ETP, DFD, Termo de Referência). Use o contexto do seu órgão e secretaria.
+                    Para Termo de Referência e DFD, a IA preenche o <strong>modelo oficial</strong> (slots) e aplica o template selecionado.
+                    Para ETP, a IA gera o documento completo a partir do seu prompt.
+                  </p>
+                </div>
+
+                <!-- Tipo de documento / modo de geração -->
+                <div class="gov-field gov-mt-sm">
+                  <label class="gov-label">Tipo de documento</label>
+                  <div class="doc-gen__source-tabs">
+                    <label class="doc-gen__tab">
+                      <input v-model="docTypeMode" type="radio" value="auto" />
+                      <span>ETP (IA flexível)</span>
+                    </label>
+                    <label class="doc-gen__tab">
+                      <input v-model="docTypeMode" type="radio" value="tr_modelo" />
+                      <span>TR / DFD (modelo oficial)</span>
+                    </label>
+                  </div>
+                  <p class="gov-text-soft gov-mt-xs">
+                    <span v-if="docTypeMode === 'tr_modelo'">
+                      O Termo de Referência (e o DFD complementar) serão gerados <strong>exclusivamente</strong> a partir dos modelos oficiais internos, com slots preenchidos pela IA.
+                    </span>
+                    <span v-else>
+                      Use este modo apenas para ETP ou rascunhos livres. Para TR/DFD oficiais, use sempre a opção de modelo oficial acima.
+                    </span>
                   </p>
                 </div>
 
@@ -109,22 +133,50 @@
                   <span v-else class="doc-gen__spinner">Processando com IA...</span>
                 </button>
                 <template v-if="documentReady">
-                  <a
-                    v-if="documentDocxUrl"
-                    :href="documentDocxUrl"
-                    download="documento.docx"
-                    class="gov-btn gov-btn--secondary"
-                  >
-                    <i class="fa-solid fa-file-word" aria-hidden="true"></i> Download DOCX
-                  </a>
-                  <a
-                    v-if="documentPdfUrl"
-                    :href="documentPdfUrl"
-                    download="documento.pdf"
-                    class="gov-btn gov-btn--secondary"
-                  >
-                    <i class="fa-solid fa-file-pdf" aria-hidden="true"></i> Download PDF
-                  </a>
+                  <template v-if="docTypeMode === 'tr_modelo'">
+                    <a
+                      v-if="documentTrUrl"
+                      :href="documentTrUrl"
+                      download="termo_referencia.docx"
+                      class="gov-btn gov-btn--secondary"
+                    >
+                      <i class="fa-solid fa-file-word" aria-hidden="true"></i> Download TR (DOCX)
+                    </a>
+                    <a
+                      v-if="documentDfdUrl"
+                      :href="documentDfdUrl"
+                      download="dfd.docx"
+                      class="gov-btn gov-btn--secondary"
+                    >
+                      <i class="fa-solid fa-file-word" aria-hidden="true"></i> Download DFD (DOCX)
+                    </a>
+                    <a
+                      v-if="documentZipUrl"
+                      :href="documentZipUrl"
+                      download="tr_dfd.zip"
+                      class="gov-btn gov-btn--secondary"
+                    >
+                      <i class="fa-solid fa-file-archive" aria-hidden="true"></i> Download TR+DFD (ZIP)
+                    </a>
+                  </template>
+                  <template v-else>
+                    <a
+                      v-if="documentDocxUrl"
+                      :href="documentDocxUrl"
+                      download="documento.docx"
+                      class="gov-btn gov-btn--secondary"
+                    >
+                      <i class="fa-solid fa-file-word" aria-hidden="true"></i> Download DOCX
+                    </a>
+                    <a
+                      v-if="documentPdfUrl"
+                      :href="documentPdfUrl"
+                      download="documento.pdf"
+                      class="gov-btn gov-btn--secondary"
+                    >
+                      <i class="fa-solid fa-file-pdf" aria-hidden="true"></i> Download PDF
+                    </a>
+                  </template>
                 </template>
               </div>
             </div>
@@ -250,6 +302,9 @@ const isSubmitting = ref(false);
 const documentReady = ref(false);
 const documentDocxUrl = ref('');
 const documentPdfUrl = ref('');
+const documentTrUrl = ref('');
+const documentDfdUrl = ref('');
+const documentZipUrl = ref('');
 const successMessage = ref('');
 const generateError = ref('');
 
@@ -392,6 +447,9 @@ async function onSubmit() {
   documentReady.value = false;
   documentDocxUrl.value = '';
   documentPdfUrl.value = '';
+  documentTrUrl.value = '';
+  documentDfdUrl.value = '';
+  documentZipUrl.value = '';
   generateError.value = '';
 
   try {
@@ -408,13 +466,13 @@ async function submitViaLLM() {
     user_prompt: iaPrompt.value.trim(),
     output: 'docx',
   };
-  if (selectedTemplate.value?.id && docTypeMode.value === 'auto') {
+  if (selectedTemplate.value?.id) {
     payload.template_id = selectedTemplate.value.id;
   }
 
   const endpoint =
     docTypeMode.value === 'tr_modelo'
-      ? `${API_BASE}/api/documentos/gerar-tr-modelo`
+      ? `${API_BASE}/api/documentos/gerar-tr-e-dfd`
       : `${API_BASE}/api/documentos/gerar-via-llm`;
 
   const res = await fetch(endpoint, {
@@ -424,7 +482,52 @@ async function submitViaLLM() {
     body: JSON.stringify(payload),
   });
 
-  const contentType = res.headers.get('content-type') || '';
+  const contentType = (res.headers.get('content-type') || '').toLowerCase();
+
+  // Modo TR/DFD (modelo oficial): resposta é sempre JSON com base64 dos arquivos
+  if (docTypeMode.value === 'tr_modelo') {
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      generateError.value = data.error || data.detail || `Erro ${res.status}`;
+      return;
+    }
+
+    const toBlobUrl = (base64, mimeType) => {
+      if (!base64) return '';
+      const binary = atob(base64);
+      const len = binary.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: mimeType });
+      return URL.createObjectURL(blob);
+    };
+
+    documentTrUrl.value = toBlobUrl(
+      data.tr && data.tr.docx_base64,
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    );
+    documentDfdUrl.value = toBlobUrl(
+      data.dfd && data.dfd.docx_base64,
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    );
+    documentZipUrl.value = toBlobUrl(
+      data.zip && data.zip.zip_base64,
+      'application/zip',
+    );
+
+    if (!documentTrUrl.value && !documentDfdUrl.value) {
+      generateError.value = 'Resposta inesperada: TR/DFD não retornados. Tente novamente.';
+      return;
+    }
+
+    documentReady.value = true;
+    successMessage.value = 'Termo de Referência e DFD gerados com sucesso. Baixe os arquivos abaixo.';
+    return;
+  }
+
+  // Demais modos: fluxo original (DOCX único)
   if (!res.ok) {
     const err = contentType.includes('json')
       ? await res.json().catch(() => ({}))
@@ -433,7 +536,13 @@ async function submitViaLLM() {
     return;
   }
 
-  if (contentType.includes('application/vnd.openxmlformats') || contentType.includes('octet-stream')) {
+  // Pedimos DOCX: resposta 200 pode ser o arquivo (Content-Type pode vir oculto por CORS em respostas attachment)
+  const looksLikeDocx =
+    contentType.includes('application/vnd.openxmlformats') ||
+    contentType.includes('octet-stream');
+  const notJson = !contentType.includes('application/json');
+
+  if (looksLikeDocx || (payload.output === 'docx' && notJson)) {
     const blob = await res.blob();
     documentDocxUrl.value = URL.createObjectURL(blob);
     documentPdfUrl.value = '';

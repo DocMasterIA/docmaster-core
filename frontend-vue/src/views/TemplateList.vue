@@ -17,13 +17,23 @@
     <div class="tpl-list__filters gov-surface gov-mb-md">
       <form class="tpl-list__filter-form" @submit.prevent="applyFilters">
         <div class="tpl-list__filter-row">
-          <select v-model="filterEstado" class="gov-select tpl-list__select" name="estado">
-            <option value="">Todos os Estados</option>
-            <option v-for="e in estados" :key="e" :value="e">{{ e }}</option>
-          </select>
+          <div class="tpl-list__estado-filter">
+            <img
+              v-if="estadoFlagUrl"
+              :src="estadoFlagUrl"
+              :alt="`Bandeira do estado ${filterEstado}`"
+              class="tpl-list__estado-flag"
+            />
+            <select v-model="filterEstado" class="gov-select tpl-list__select" name="estado">
+              <option value="">Todos os Estados</option>
+              <option v-for="e in estados" :key="e" :value="e">{{ e }}</option>
+            </select>
+          </div>
           <select v-model="filterPrefeitura" class="gov-select tpl-list__select" name="prefeitura">
             <option value="">Todas Prefeituras</option>
-            <option v-for="p in prefeituras" :key="p.id" :value="p.id">{{ p.nome_municipio }}</option>
+            <option v-for="p in filteredPrefeituras" :key="p.id" :value="p.id">
+              {{ p.nome_municipio }} ({{ p.estado }})
+            </option>
           </select>
           <select v-model="filterSubtopico" class="gov-select tpl-list__select" name="subtopico">
             <option value="">Todos Subtópicos</option>
@@ -163,6 +173,49 @@ const pdfTotalPages = ref(0);
 const pdfGotoPage = ref(1);
 let pdfBlobUrl = null;
 
+const filteredPrefeituras = computed(() =>
+  filterEstado.value
+    ? prefeituras.value.filter((p) => p.estado === filterEstado.value)
+    : prefeituras.value,
+);
+
+const UF_FLAGS = {
+  AC: new URL('../assets/estados/02-acre-full.svg', import.meta.url).href,
+  AL: new URL('../assets/estados/03-alagoas-full.svg', import.meta.url).href,
+  AP: new URL('../assets/estados/04-amapa-full.svg', import.meta.url).href,
+  AM: new URL('../assets/estados/05-amazonas-full.svg', import.meta.url).href,
+  BA: new URL('../assets/estados/06-bahia-full.svg', import.meta.url).href,
+  CE: new URL('../assets/estados/07-ceara-full.svg', import.meta.url).href,
+  DF: new URL('../assets/estados/08-distrito-federal-full.svg', import.meta.url).href,
+  ES: new URL('../assets/estados/09-espirito-santo-full.svg', import.meta.url).href,
+  GO: new URL('../assets/estados/10-goias-full.svg', import.meta.url).href,
+  MA: new URL('../assets/estados/11-maranhao-full.svg', import.meta.url).href,
+  MT: new URL('../assets/estados/12-mato-grosso-full.svg', import.meta.url).href,
+  MS: new URL('../assets/estados/13-mato-grosso-do-sul-full.svg', import.meta.url).href,
+  MG: new URL('../assets/estados/14-minas-gerais-full.svg', import.meta.url).href,
+  PA: new URL('../assets/estados/15-para-full.svg', import.meta.url).href,
+  PB: new URL('../assets/estados/16-paraiba-full.svg', import.meta.url).href,
+  PR: new URL('../assets/estados/17-parana-full.svg', import.meta.url).href,
+  PE: new URL('../assets/estados/18-pernambuco-full.svg', import.meta.url).href,
+  PI: new URL('../assets/estados/19-piaui-full.svg', import.meta.url).href,
+  RJ: new URL('../assets/estados/20-rio-de-janeiro-full.svg', import.meta.url).href,
+  RN: new URL('../assets/estados/21-rio-grande-do-norte-full.svg', import.meta.url).href,
+  RS: new URL('../assets/estados/22-rio-grande-do-sul-full.svg', import.meta.url).href,
+  RO: new URL('../assets/estados/23-rondonia-full.svg', import.meta.url).href,
+  RR: new URL('../assets/estados/24-roraima-full.svg', import.meta.url).href,
+  SC: new URL('../assets/estados/25-santa-catarina-full.svg', import.meta.url).href,
+  SP: new URL('../assets/estados/26-sao-paulo-full.svg', import.meta.url).href,
+  SE: new URL('../assets/estados/27-sergipe-full.svg', import.meta.url).href,
+  TO: new URL('../assets/estados/28-tocantins-full.svg', import.meta.url).href,
+};
+
+const BR_FLAG = new URL('../assets/estados/01-brasil-full.svg', import.meta.url).href;
+
+const estadoFlagUrl = computed(() => {
+  if (!filterEstado.value) return '';
+  return UF_FLAGS[filterEstado.value] || BR_FLAG;
+});
+
 const filteredTemplates = computed(() => {
   const q = searchQuery.value.toLowerCase().trim();
   const list = templates.value;
@@ -179,7 +232,13 @@ function previewUrl(tpl) {
 
 async function loadTemplates() {
   try {
-    const res = await fetch(`${API_BASE}/api/documentos_modelos/`, { credentials: 'include' });
+    const params = new URLSearchParams();
+    if (filterEstado.value) params.append('estado', filterEstado.value);
+    if (filterPrefeitura.value) params.append('prefeitura_id', filterPrefeitura.value);
+    if (filterSubtopico.value) params.append('subtopico_id', filterSubtopico.value);
+
+    const url = `${API_BASE}/api/documentos_modelos/${params.toString() ? `?${params.toString()}` : ''}`;
+    const res = await fetch(url, { credentials: 'include' });
     if (!res.ok) return;
     const data = await res.json();
     templates.value = data.templates || [];
@@ -191,6 +250,22 @@ async function loadTemplates() {
 
 function applyFilters() {
   loadTemplates();
+}
+
+async function loadFilterOptions() {
+  try {
+    const res = await fetch(`${API_BASE}/api/documentos_modelos/filtros`, { credentials: 'include' });
+    if (!res.ok) return;
+    const data = await res.json();
+    estados.value = data.estados || [];
+    prefeituras.value = data.prefeituras || [];
+    subtopicos.value = data.subtopicos || [];
+  } catch (e) {
+    console.warn('loadFilterOptions', e);
+    estados.value = [];
+    prefeituras.value = [];
+    subtopicos.value = [];
+  }
 }
 
 function openPdfModal(tpl) {
@@ -241,8 +316,8 @@ async function loadMockPdf() {
 async function loadTemplatePreviewPdf(templateId) {
   try {
     const res = await fetch(`${API_BASE}/api/documentos_modelos/${encodeURIComponent(templateId)}/pdf/`, { credentials: 'include' });
-    const data = await res.json();
-    if (!data?.ok || !data.pdf_url) throw new Error(data?.error || 'Preview indisponível');
+    const data = await res.json().catch(() => ({}));
+    if (!data?.ok || !data.pdf_url) throw new Error(data?.error || 'Preview indisponível para este template.');
     const pdfUrl = data.pdf_url.startsWith('http') ? data.pdf_url : `${API_BASE}${data.pdf_url}`;
     // Carrega o PDF via fetch (com credentials) e usa blob URL para evitar CORS no pdf.js
     const pdfRes = await fetch(pdfUrl, { credentials: 'include', mode: 'cors' });
@@ -262,6 +337,7 @@ async function loadTemplatePreviewPdf(templateId) {
 let pdfjsLib = null;
 onMounted(() => {
   loadTemplates();
+  loadFilterOptions();
   if (window.pdfjsLib) {
     pdfjsLib = window.pdfjsLib;
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -356,6 +432,19 @@ function goToPage() {
 </script>
 
 <style scoped>
+.tpl-list__estado-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tpl-list__estado-flag {
+  width: 32px;
+  height: 22px;
+  object-fit: cover;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
 .tpl-list__top {
   margin-bottom: 16px;
 }

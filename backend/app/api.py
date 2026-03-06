@@ -12,13 +12,14 @@ from django.contrib.auth.decorators import login_required
 import json, tempfile, traceback
 from django.http import JsonResponse, FileResponse, HttpResponse
 from django.core.files.base import ContentFile
-from backend.app.models import Template, TemplateSchema, DocumentInstance, Prefeitura
+from backend.app.models import Template, TemplateSchema, DocumentInstance, Prefeitura, SubtopicoSecretaria
 from backend.app.forms import UserProfileForm, LoginForm
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login as auth_login, logout as auth_logout
 from backend.app.utils.utils import get_client_ip, is_locked, clear_failed_attempts, record_failed_attempt
 from django.conf import settings as django_settings
 from django.core.paginator import Paginator
+from django.utils import timezone
 from django.shortcuts import get_object_or_404
 import os
 from django.contrib.auth.decorators import login_required
@@ -75,35 +76,89 @@ def upload_template_and_request_mapping_api(request):
         traceback.print_exc()
         return JsonResponse({"ok": False, "error": str(e)}, status=500)
 
-# API: lista templates (ou um específico por id) com info de preview e existência de schema.
+def _serialize_template_for_list(t: Template) -> dict:
+    return {
+        "id": str(t.id),
+        "name": t.name,
+        "has_schema": hasattr(t, "schema"),
+        "preview_image": t.preview_image.url if t.preview_image else None,
+        "prefeitura": {
+            "id": str(t.prefeitura.id),
+            "nome_municipio": t.prefeitura.nome_municipio,
+            "estado": t.prefeitura.estado,
+        } if t.prefeitura else None,
+        "subtopico": {
+            "id": str(t.related_subtopico.id),
+            "nome": t.related_subtopico.nome,
+        } if t.related_subtopico else None,
+    }
+
+
+# API: lista templates (ou um específico por id) com info de preview, prefeitura e subtopico.
 @api_login_required
 def get_template_list_api(request):
     template_id = request.GET.get("id")
     if template_id:
         try:
             t = Template.objects.get(id=template_id)
-            item = {
-                "id": str(t.id),
-                "name": t.name,
-                "has_schema": hasattr(t, "schema"),
-                "preview_image": t.preview_image.url if t.preview_image else None,
-            }
+            item = _serialize_template_for_list(t)
             return JsonResponse({"template": item})
         except Template.DoesNotExist:
             return JsonResponse({"error": "Template não encontrado"}, status=404)
 
-    # fallback: lista de templates
-    qs = Template.objects.all().order_by("-created_at")[:10]
-    items = [
-        {
-            "id": str(t.id),
-            "name": t.name,
-            "has_schema": hasattr(t, "schema"),
-            "preview_image": t.preview_image.url if t.preview_image else None,
-        }
-        for t in qs
-    ]
+    # Filtros opcionais
+    estado = request.GET.get("estado", "").strip()
+    prefeitura_id = request.GET.get("prefeitura_id", "").strip()
+    subtopico_id = request.GET.get("subtopico_id", "").strip()
+
+    qs = Template.objects.all().order_by("-created_at")
+
+    if estado:
+        qs = qs.filter(prefeitura__estado=estado)
+    if prefeitura_id:
+        qs = qs.filter(prefeitura__id=prefeitura_id)
+    if subtopico_id:
+        qs = qs.filter(related_subtopico__id=subtopico_id)
+
+    qs = qs[:50]
+    items = [_serialize_template_for_list(t) for t in qs]
     return JsonResponse({"templates": items})
+
+
+@api_login_required
+def template_filters_api(request):
+    """
+    Retorna listas de Estados, Prefeituras e Subtópicos usados por Templates,
+    para popular os filtros da Biblioteca de Templates.
+    """
+    # Estados e prefeituras apenas onde existem templates associados
+    pref_qs = Prefeitura.objects.filter(template__isnull=False).distinct().order_by("estado", "nome_municipio")
+    estados = sorted({p.estado for p in pref_qs if p.estado})
+    prefeituras = [
+        {
+            "id": str(p.id),
+            "nome_municipio": p.nome_municipio,
+            "estado": p.estado,
+        }
+        for p in pref_qs
+    ]
+
+    sub_qs = SubtopicoSecretaria.objects.filter(template__isnull=False).distinct().order_by("nome")
+    subtopicos = [
+        {
+            "id": str(s.id),
+            "nome": s.nome,
+        }
+        for s in sub_qs
+    ]
+
+    return JsonResponse(
+        {
+            "estados": estados,
+            "prefeituras": prefeituras,
+            "subtopicos": subtopicos,
+        }
+    )
 
 
 # API: gerar documento (DOCX/PDF) a partir de valores recebidos, usando schema (index) ou fallback tokens.
@@ -185,7 +240,6 @@ def gerar_via_llm_api(request):
     }
 
     try:
-        # Sem timeout explícito: deixa a chamada ao rag_service rodar até responder
         resp = requests.post(url, json=body, params=params)
     except requests.exceptions.ConnectionError:
         return JsonResponse({"ok": False, "error": "Serviço de geração indisponível. Verifique se o rag_service está em execução."}, status=503)
@@ -317,6 +371,7 @@ def gerar_tr_modelo_api(request):
 
     user_prompt = (payload.get("user_prompt") or "").strip()
     slots_override = payload.get("slots_override")  # opcional
+    template_id = payload.get("template_id")
 
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
@@ -352,31 +407,212 @@ def gerar_tr_modelo_api(request):
             err = resp.text
         return JsonResponse({"ok": False, "error": err}, status=resp.status_code)
 
+    final_bytes = None
+
     # Esperado: DOCX diretamente (FileResponse do rag_service)
     if "application/vnd.openxmlformats-officedocument.wordprocessingml.document" in content_type or "octet-stream" in content_type:
-        r = HttpResponse(
-            resp.content,
-            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        )
-        r["Content-Disposition"] = 'attachment; filename=\"termo_referencia_modelo.docx\"'
-        return r
+        final_bytes = resp.content
+    else:
+        # Fallback: tentar json e extrair docx_path, se houver
+        try:
+            data = resp.json()
+        except Exception:
+            return JsonResponse({"ok": False, "error": "Resposta inesperada do serviço de TR."}, status=502)
 
-    # Fallback: tentar json e extrair docx_path, se houver
+        docx_path = data.get("docx_path")
+        if docx_path and os.path.isfile(docx_path):
+            with open(docx_path, "rb") as f:
+                final_bytes = f.read()
+
+    if final_bytes is None:
+        return JsonResponse({"ok": False, "error": "Resposta inesperada do serviço de TR (DOCX não retornado)."}, status=502)
+
+    # Se houver template_id, aplicar cabeçalho/rodapé selecionado em cima do modelo oficial de TR
+    if template_id is not None:
+        tpl = Template.objects.filter(id=template_id).first()
+        if tpl:
+            try:
+                tmpdir = tempfile.gettempdir()
+                rag_docx_path = os.path.join(tmpdir, f"tr_modelo_{tpl.id}.docx")
+                out_docx_path = os.path.join(tmpdir, f"tr_modelo_tpl_{tpl.id}.docx")
+                with open(rag_docx_path, "wb") as f:
+                    f.write(final_bytes)
+
+                merge_docx_with_template_body(
+                    source_docx_path=rag_docx_path,
+                    template_docx_path=tpl.file.path,
+                    out_docx_path=out_docx_path,
+                )
+
+                with open(out_docx_path, "rb") as f:
+                    final_bytes = f.read()
+
+                # Opcional: salvar em Meus Documentos, mantendo histórico
+                try:
+                    if request.user.is_authenticated:
+                        inst = DocumentInstance(
+                            template=tpl,
+                            owner=request.user,
+                            data={
+                                "user_prompt": user_prompt,
+                                "context": context,
+                                "document_type_hint": "tr_modelo",
+                            },
+                            status="final",
+                        )
+                        inst.file_docx.save(
+                            f"{inst.id}.docx",
+                            ContentFile(final_bytes),
+                            save=True,
+                        )
+                except Exception:
+                    pass
+            except Exception:
+                # Em caso de falha na mesclagem, volta a usar o DOCX original do TR modelo.
+                final_bytes = resp.content
+
+    r = HttpResponse(
+        final_bytes,
+        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+    r["Content-Disposition"] = 'attachment; filename=\"termo_referencia_modelo.docx\"'
+    return r
+
+
+@csrf_exempt
+@api_login_required
+def gerar_tr_e_dfd_api(request):
+    """
+    Gera Termo de Referência e DFD a partir dos modelos fixos do rag_service,
+    aplicando opcionalmente o template (cabeçalho/rodapé) selecionado, e retorna
+    ambos em JSON com conteúdo em base64 (TR, DFD e ZIP TR+DFD).
+    """
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Use POST"}, status=405)
+
+    try:
+        payload = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({"ok": False, "error": "Corpo JSON inválido"}, status=400)
+
+    user_prompt = (payload.get("user_prompt") or "").strip()
+    slots_override = payload.get("slots_override")  # opcional
+    template_id = payload.get("template_id")
+
+    if not user_prompt:
+        return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
+
+    context = build_llm_context_from_request(request)
+
+    rag_url = getattr(django_settings, "RAG_SERVICE_URL", "http://127.0.0.1:8004").rstrip("/")
+    url = f"{rag_url}/api/rag/generate-tr-and-dfd"
+
+    body = {
+        "user_prompt": user_prompt,
+        "slots_override": slots_override or None,
+        "context": context if context else None,
+    }
+
+    try:
+        resp = requests.post(url, json=body)
+    except requests.exceptions.ConnectionError:
+        return JsonResponse({"ok": False, "error": "Serviço de geração de TR/DFD indisponível. Verifique se o rag_service está em execução."}, status=503)
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=502)
+
     try:
         data = resp.json()
     except Exception:
-        return JsonResponse({"ok": False, "error": "Resposta inesperada do serviço de TR."}, status=502)
+        return JsonResponse({"ok": False, "error": "Resposta inválida do serviço de TR/DFD."}, status=502)
 
-    docx_path = data.get("docx_path")
-    if docx_path and os.path.isfile(docx_path):
-        return FileResponse(
-            open(docx_path, "rb"),
-            as_attachment=True,
-            filename="termo_referencia_modelo.docx",
-            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        )
+    if resp.status_code != 200 or not data.get("ok"):
+        err = data.get("detail") or data.get("error") or str(data)
+        return JsonResponse({"ok": False, "error": err}, status=resp.status_code)
 
-    return JsonResponse({"ok": False, "error": "Resposta inesperada do serviço de TR (DOCX não retornado)."}, status=502)
+    tr_path = data.get("tr_docx_path")
+    dfd_path = data.get("dfd_docx_path")
+    if not tr_path or not os.path.isfile(tr_path):
+        return JsonResponse({"ok": False, "error": "Caminho do TR não retornado ou arquivo inexistente."}, status=502)
+    if not dfd_path or not os.path.isfile(dfd_path):
+        return JsonResponse({"ok": False, "error": "Caminho do DFD não retornado ou arquivo inexistente."}, status=502)
+
+    import base64
+    import io
+    import zipfile
+
+    tpl = Template.objects.filter(id=template_id).first() if template_id is not None else None
+
+    def _load_and_maybe_merge(docx_path: str) -> bytes:
+        with open(docx_path, "rb") as f:
+            raw = f.read()
+        if not tpl:
+            return raw
+        try:
+            tmpdir = tempfile.gettempdir()
+            rag_docx_path = os.path.join(tmpdir, f"tr_dfd_{tpl.id}_{os.path.basename(docx_path)}")
+            out_docx_path = os.path.join(tmpdir, f"tr_dfd_tpl_{tpl.id}_{os.path.basename(docx_path)}")
+            with open(rag_docx_path, "wb") as fw:
+                fw.write(raw)
+
+            merge_docx_with_template_body(
+                source_docx_path=rag_docx_path,
+                template_docx_path=tpl.file.path,
+                out_docx_path=out_docx_path,
+            )
+
+            with open(out_docx_path, "rb") as fr:
+                return fr.read()
+        except Exception:
+            return raw
+
+    tr_bytes = _load_and_maybe_merge(tr_path)
+    dfd_bytes = _load_and_maybe_merge(dfd_path)
+
+    # Opcional: salvar instância principal (TR) em "Meus Documentos"
+    if tpl and request.user.is_authenticated:
+        try:
+            inst = DocumentInstance(
+                template=tpl,
+                owner=request.user,
+                data={
+                    "user_prompt": user_prompt,
+                    "context": context,
+                    "document_type_hint": "tr_dfd_modelo",
+                },
+                status="final",
+            )
+            inst.file_docx.save(
+                f"{inst.id}.docx",
+                ContentFile(tr_bytes),
+                save=True,
+            )
+        except Exception:
+            pass
+
+    # Monta ZIP TR+DFD em memória
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("termo_referencia.docx", tr_bytes)
+        zf.writestr("dfd.docx", dfd_bytes)
+    zip_bytes = zip_buffer.getvalue()
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "tr": {
+                "filename": "termo_referencia.docx",
+                "docx_base64": base64.b64encode(tr_bytes).decode("ascii"),
+            },
+            "dfd": {
+                "filename": "dfd.docx",
+                "docx_base64": base64.b64encode(dfd_bytes).decode("ascii"),
+            },
+            "zip": {
+                "filename": "tr_dfd.zip",
+                "zip_base64": base64.b64encode(zip_bytes).decode("ascii"),
+            },
+        }
+    )
 
 @csrf_exempt
 @api_login_required
@@ -462,11 +698,14 @@ def template_preview_pdf_api(request, template_id):
         url = tpl.preview_pdf.url
         return JsonResponse({"ok": True, "pdf_url": url})
 
-    # se não existir, gera
+    # se não existir, gera (requer LibreOffice no servidor)
     url = generate_docx_preview_pdf(tpl)
     if url:
         return JsonResponse({"ok": True, "pdf_url": url})
-    return JsonResponse({"ok": False, "error": "Não foi possível gerar preview PDF"}, status=500)
+    return JsonResponse({
+        "ok": False,
+        "error": "Preview PDF não disponível. O servidor pode não ter LibreOffice instalado ou o arquivo do template não pôde ser convertido.",
+    })
 
 
 # API: login (POST) — aceita JSON e define sessão.
@@ -541,8 +780,8 @@ def api_auth_logout(request):
 
 
 # API: perfil do usuário logado (GET) e atualização (POST).
-@api_login_required
 @csrf_exempt
+@api_login_required
 def api_me(request):
     user = request.user
     if request.method == "GET":
@@ -553,7 +792,11 @@ def api_me(request):
             "last_name": user.last_name or "",
             "full_name": f"{user.first_name or ''} {user.last_name or ''}".strip() or user.email,
             "role": getattr(user, "role", "") or "",
-            "date_joined": user.date_joined.strftime("%d/%m/%Y %H:%M") if user.date_joined else "",
+            "date_joined": (
+                timezone.localtime(user.date_joined).strftime("%d/%m/%Y %H:%M")
+                if user.date_joined
+                else ""
+            ),
             "is_staff": user.is_staff,
         }
         if user.profile_photo and user.profile_photo.name:
@@ -602,7 +845,11 @@ def api_me_documents(request):
         item = {
             "id": str(doc.id),
             "template_name": doc.template.name if doc.template else "",
-            "updated_at": doc.updated_at.strftime("%d/%m/%Y %H:%M") if doc.updated_at else "",
+            "updated_at": (
+                timezone.localtime(doc.updated_at).strftime("%d/%m/%Y %H:%M")
+                if doc.updated_at
+                else ""
+            ),
             "status": doc.status,
             "status_display": doc.get_status_display(),
         }

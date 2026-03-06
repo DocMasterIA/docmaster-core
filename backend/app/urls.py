@@ -12,6 +12,8 @@ from .api import (
     api_auth_logout,
     gerar_via_llm_api,
     gerar_tr_modelo_api,
+    gerar_tr_e_dfd_api,
+    template_filters_api,
     analise_documentos_api,
 )
 from .llm_proxy import llm_proxy
@@ -29,6 +31,8 @@ urlpatterns = [
     path("api/documentos_modelos/gerar", generate_document_with_values_api, name="documentos_modelos-gerar_api"),
     path("api/documentos/gerar-via-llm", gerar_via_llm_api, name="documentos_gerar_via_llm_api"),
     path("api/documentos/gerar-tr-modelo", gerar_tr_modelo_api, name="documentos_gerar_tr_modelo_api"),
+    path("api/documentos_modelos/filtros", template_filters_api, name="documentos_modelos-filtros_api"),
+    path("api/documentos/gerar-tr-e-dfd", gerar_tr_e_dfd_api, name="documentos_gerar_tr_e_dfd_api"),
     path("api/analise-documentos/", analise_documentos_api, name="analise_documentos_api"),
     path("api/documentos_modelos/lista_10", template_list_api, name="documentos_modelos-lista_10_api"),
     path('api/documentos_modelos/<uuid:template_id>/pdf/', template_preview_pdf_api, name='documentos_modelos-previsualizar'),

@@ -33,6 +33,7 @@ urlpatterns = [
     path("api/documentos/gerar-tr-modelo", gerar_tr_modelo_api, name="documentos_gerar_tr_modelo_api"),
     path("api/documentos_modelos/filtros", template_filters_api, name="documentos_modelos-filtros_api"),
     path("api/documentos/gerar-tr-e-dfd", gerar_tr_e_dfd_api, name="documentos_gerar_tr_e_dfd_api"),
+    path("api/documentos/gerar-tr-e-dfd/", gerar_tr_e_dfd_api, name="documentos_gerar_tr_e_dfd_api_slash"),
     path("api/analise-documentos/", analise_documentos_api, name="analise_documentos_api"),
     path("api/documentos_modelos/lista_10", template_list_api, name="documentos_modelos-lista_10_api"),
     path('api/documentos_modelos/<uuid:template_id>/pdf/', template_preview_pdf_api, name='documentos_modelos-previsualizar'),

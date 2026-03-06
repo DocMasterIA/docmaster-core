@@ -470,10 +470,18 @@ async def endpoint_generate_tr_and_dfd(body: GenerateTRFromModelRequest):
         if not Path(docx_dfd_path).exists():
             raise HTTPException(status_code=500, detail="DOCX do DFD não foi gerado.")
 
+        import base64
+        with open(docx_tr_path, "rb") as f:
+            tr_b64 = base64.b64encode(f.read()).decode("ascii")
+        with open(docx_dfd_path, "rb") as f:
+            dfd_b64 = base64.b64encode(f.read()).decode("ascii")
+
         return {
             "ok": True,
             "tr_docx_path": docx_tr_path,
             "dfd_docx_path": docx_dfd_path,
+            "tr_docx_base64": tr_b64,
+            "dfd_docx_base64": dfd_b64,
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

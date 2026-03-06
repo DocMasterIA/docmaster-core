@@ -32,6 +32,7 @@ services:
     environment:
       - PORT=8002
       - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:latest}
       - LLM_TIMEOUT=120
       - LLM_MAX_RETRIES=3
       # LLM_AUDIT_LOG_DIR opcional; se vazio, o app usa /app/logs automaticamente

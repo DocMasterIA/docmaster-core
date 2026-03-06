@@ -224,7 +224,10 @@ def gerar_via_llm_api(request):
 
     # TR+DFD (modelo oficial): mesma URL que ETP, desvio interno para evitar 404 em rotas separadas
     if output == "tr_dfd":
-        return gerar_tr_e_dfd_api(request)
+        try:
+            return gerar_tr_e_dfd_api(request)
+        except Exception as e:
+            return JsonResponse({"ok": False, "error": str(e)}, status=500)
 
     context = build_llm_context_from_request(request)
     if template_id is not None:
@@ -533,44 +536,54 @@ def gerar_tr_e_dfd_api(request):
         err = data.get("detail") or data.get("error") or str(data)
         return JsonResponse({"ok": False, "error": err}, status=resp.status_code)
 
-    tr_path = data.get("tr_docx_path")
-    dfd_path = data.get("dfd_docx_path")
-    if not tr_path or not os.path.isfile(tr_path):
-        return JsonResponse({"ok": False, "error": "Caminho do TR não retornado ou arquivo inexistente."}, status=502)
-    if not dfd_path or not os.path.isfile(dfd_path):
-        return JsonResponse({"ok": False, "error": "Caminho do DFD não retornado ou arquivo inexistente."}, status=502)
-
     import base64
     import io
     import zipfile
 
+    # Preferir base64 vindo do RAG (evita ler paths do outro container)
+    tr_b64 = data.get("tr_docx_base64")
+    dfd_b64 = data.get("dfd_docx_base64")
+    if tr_b64 and dfd_b64:
+        try:
+            tr_bytes = base64.b64decode(tr_b64)
+            dfd_bytes = base64.b64decode(dfd_b64)
+        except Exception as e:
+            return JsonResponse({"ok": False, "error": f"Conteúdo TR/DFD inválido: {e}"}, status=502)
+    else:
+        tr_path = data.get("tr_docx_path")
+        dfd_path = data.get("dfd_docx_path")
+        if not tr_path or not os.path.isfile(tr_path):
+            return JsonResponse({"ok": False, "error": "Caminho do TR não retornado ou arquivo inexistente. RAG deve retornar tr_docx_base64."}, status=502)
+        if not dfd_path or not os.path.isfile(dfd_path):
+            return JsonResponse({"ok": False, "error": "Caminho do DFD não retornado ou arquivo inexistente. RAG deve retornar dfd_docx_base64."}, status=502)
+        with open(tr_path, "rb") as f:
+            tr_bytes = f.read()
+        with open(dfd_path, "rb") as f:
+            dfd_bytes = f.read()
+
     tpl = Template.objects.filter(id=template_id).first() if template_id is not None else None
 
-    def _load_and_maybe_merge(docx_path: str) -> bytes:
-        with open(docx_path, "rb") as f:
-            raw = f.read()
+    def _maybe_merge_with_template(raw: bytes, name: str) -> bytes:
         if not tpl:
             return raw
         try:
             tmpdir = tempfile.gettempdir()
-            rag_docx_path = os.path.join(tmpdir, f"tr_dfd_{tpl.id}_{os.path.basename(docx_path)}")
-            out_docx_path = os.path.join(tmpdir, f"tr_dfd_tpl_{tpl.id}_{os.path.basename(docx_path)}")
+            rag_docx_path = os.path.join(tmpdir, f"tr_dfd_{tpl.id}_{name}")
+            out_docx_path = os.path.join(tmpdir, f"tr_dfd_tpl_{tpl.id}_{name}")
             with open(rag_docx_path, "wb") as fw:
                 fw.write(raw)
-
             merge_docx_with_template_body(
                 source_docx_path=rag_docx_path,
                 template_docx_path=tpl.file.path,
                 out_docx_path=out_docx_path,
             )
-
             with open(out_docx_path, "rb") as fr:
                 return fr.read()
         except Exception:
             return raw
 
-    tr_bytes = _load_and_maybe_merge(tr_path)
-    dfd_bytes = _load_and_maybe_merge(dfd_path)
+    tr_bytes = _maybe_merge_with_template(tr_bytes, "termo_referencia.docx")
+    dfd_bytes = _maybe_merge_with_template(dfd_bytes, "dfd.docx")
 
     # Opcional: salvar instância principal (TR) em "Meus Documentos"
     if tpl and request.user.is_authenticated:

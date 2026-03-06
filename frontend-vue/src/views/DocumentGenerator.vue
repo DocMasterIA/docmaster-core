@@ -446,12 +446,28 @@ async function onSubmit() {
   if (!iaPrompt.value.trim()) return;
   isSubmitting.value = true;
   documentReady.value = false;
-  documentDocxUrl.value = '';
-  documentPdfUrl.value = '';
-  documentTrUrl.value = '';
-  documentDfdUrl.value = '';
-  documentZipUrl.value = '';
   generateError.value = '';
+  // Revogar blobs antigos antes de limpar, para não deixar links inválidos e evitar vazamento
+  if (documentDocxUrl.value) {
+    URL.revokeObjectURL(documentDocxUrl.value);
+    documentDocxUrl.value = '';
+  }
+  if (documentPdfUrl.value) {
+    URL.revokeObjectURL(documentPdfUrl.value);
+    documentPdfUrl.value = '';
+  }
+  if (documentTrUrl.value) {
+    URL.revokeObjectURL(documentTrUrl.value);
+    documentTrUrl.value = '';
+  }
+  if (documentDfdUrl.value) {
+    URL.revokeObjectURL(documentDfdUrl.value);
+    documentDfdUrl.value = '';
+  }
+  if (documentZipUrl.value) {
+    URL.revokeObjectURL(documentZipUrl.value);
+    documentZipUrl.value = '';
+  }
 
   try {
     await submitViaLLM();
@@ -524,17 +540,24 @@ async function submitViaLLM() {
     };
 
     try {
-      documentTrUrl.value = toBlobUrl(
+      const trUrl = toBlobUrl(
         data.tr.docx_base64,
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       );
-      documentDfdUrl.value = toBlobUrl(
+      const dfdUrl = toBlobUrl(
         data.dfd.docx_base64,
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       );
-      documentZipUrl.value = data.zip?.zip_base64
+      const zipUrl = data.zip?.zip_base64
         ? toBlobUrl(data.zip.zip_base64, 'application/zip')
         : '';
+      // Revogar blobs antigos (se houver) antes de atribuir os novos, para todos os três botões ficarem consistentes
+      if (documentTrUrl.value) URL.revokeObjectURL(documentTrUrl.value);
+      if (documentDfdUrl.value) URL.revokeObjectURL(documentDfdUrl.value);
+      if (documentZipUrl.value) URL.revokeObjectURL(documentZipUrl.value);
+      documentTrUrl.value = trUrl;
+      documentDfdUrl.value = dfdUrl;
+      documentZipUrl.value = zipUrl;
     } catch (e) {
       generateError.value = `Falha ao processar arquivos: ${e?.message || 'dados inválidos'}. Tente novamente.`;
       return;
@@ -684,6 +707,9 @@ onUnmounted(() => {
   document.removeEventListener('click', clickOutside);
   if (documentDocxUrl.value) URL.revokeObjectURL(documentDocxUrl.value);
   if (documentPdfUrl.value) URL.revokeObjectURL(documentPdfUrl.value);
+  if (documentTrUrl.value) URL.revokeObjectURL(documentTrUrl.value);
+  if (documentDfdUrl.value) URL.revokeObjectURL(documentDfdUrl.value);
+  if (documentZipUrl.value) URL.revokeObjectURL(documentZipUrl.value);
 });
 
 async function loadPdf(url) {

@@ -497,14 +497,25 @@ async def fill_tr_slots_with_llm(
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
     payload = {"prompt": full_prompt, "stream": False}
 
-    async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
-        resp = await client.post(url, json=payload)
-        resp.raise_for_status()
-        body = resp.json()
+    try:
+        async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
+            resp = await client.post(url, json=payload)
+            if resp.status_code == 404:
+                raise ValueError(
+                    "Orquestração LLM retornou 404 (modelo não encontrado no Ollama). "
+                    "No host do Ollama execute: ollama pull <modelo> (ex.: ollama pull llama3.2)."
+                )
+            resp.raise_for_status()
+            body = resp.json()
+    except httpx.ConnectError as e:
+        raise ValueError(
+            f"Não foi possível conectar à orquestração LLM ({url}). "
+            "Verifique se llm_api está em execução (docker compose up -d llm_api ollama)."
+        ) from e
 
     if isinstance(body, dict) and body.get("detail"):
         detail = str(body["detail"]).strip()
-        if any(kw in detail.lower() for kw in ("falha", "erro", "timeout", "error")):
+        if any(kw in detail.lower() for kw in ("falha", "erro", "timeout", "error", "404", "modelo")):
             raise ValueError(f"Orquestração LLM retornou erro: {detail}")
 
     data = body.get("data", body) if isinstance(body, dict) else {}

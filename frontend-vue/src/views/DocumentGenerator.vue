@@ -483,9 +483,22 @@ async function submitViaLLM() {
 
   // Modo TR/DFD (modelo oficial): resposta é sempre JSON com base64 dos arquivos
   if (docTypeMode.value === 'tr_modelo') {
-    const data = await res.json().catch(() => ({}));
+    const rawText = await res.text();
+    let data = {};
+    try {
+      data = rawText ? JSON.parse(rawText) : {};
+    } catch (_e) {
+      generateError.value = `Resposta inválida do servidor (não é JSON). Status: ${res.status}. Verifique se o backend respondeu corretamente.`;
+      return;
+    }
+
     if (!res.ok || !data.ok) {
       generateError.value = data.error || data.detail || `Erro ${res.status}`;
+      return;
+    }
+
+    if (!data.tr?.docx_base64 || !data.dfd?.docx_base64) {
+      generateError.value = data.error || 'TR ou DFD não vieram na resposta. Tente novamente.';
       return;
     }
 
@@ -497,25 +510,23 @@ async function submitViaLLM() {
       for (let i = 0; i < len; i += 1) {
         bytes[i] = binary.charCodeAt(i);
       }
-      const blob = new Blob([bytes], { type: mimeType });
-      return URL.createObjectURL(blob);
+      return URL.createObjectURL(new Blob([bytes], { type: mimeType }));
     };
 
-    documentTrUrl.value = toBlobUrl(
-      data.tr && data.tr.docx_base64,
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    );
-    documentDfdUrl.value = toBlobUrl(
-      data.dfd && data.dfd.docx_base64,
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    );
-    documentZipUrl.value = toBlobUrl(
-      data.zip && data.zip.zip_base64,
-      'application/zip',
-    );
-
-    if (!documentTrUrl.value && !documentDfdUrl.value) {
-      generateError.value = 'Resposta inesperada: TR/DFD não retornados. Tente novamente.';
+    try {
+      documentTrUrl.value = toBlobUrl(
+        data.tr.docx_base64,
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      );
+      documentDfdUrl.value = toBlobUrl(
+        data.dfd.docx_base64,
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      );
+      documentZipUrl.value = data.zip?.zip_base64
+        ? toBlobUrl(data.zip.zip_base64, 'application/zip')
+        : '';
+    } catch (e) {
+      generateError.value = `Falha ao processar arquivos: ${e?.message || 'dados inválidos'}. Tente novamente.`;
       return;
     }
 

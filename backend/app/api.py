@@ -1,4 +1,10 @@
-from backend.app.services.services import extract_docx_structure, validate_mapping_response, save_template_schema, generate_pdf_from_docx
+from backend.app.services.services import (
+    extract_docx_structure,
+    validate_mapping_response,
+    save_template_schema,
+    generate_pdf_from_docx,
+    merge_docx_with_template_body,
+)
 from backend.app.services.llm_context import build_llm_context_from_request
 from backend.app.services.render import render_docx_by_index, render_docx_with_tokens
 from backend.app.services.preview import generate_docx_preview, generate_docx_preview_pdf
@@ -207,38 +213,90 @@ def gerar_via_llm_api(request):
                 content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             )
         return JsonResponse({"ok": True, **{k: v for k, v in data.items() if k not in ("docx_path", "pdf_path")}})
+
     # Resposta é o arquivo DOCX diretamente (format=docx)
     if output == "docx" and resp.content:
-        # Salva instância do documento para aparecer em "Meus Documentos"
-        try:
-            if template_id is not None:
-                tpl = Template.objects.filter(id=template_id).first()
-                if tpl and request.user.is_authenticated:
-                    inst = DocumentInstance(
-                        template=tpl,
-                        owner=request.user,
-                        data={
-                            "user_prompt": user_prompt,
-                            "context": context,
-                            "document_type_hint": payload.get("document_type_hint") or "",
-                        },
-                        status="final",
+        final_path_bytes = resp.content
+
+        # Se houver template_id, combinar cabeçalho/footer do template com corpo do DOCX gerado pelo RAG.
+        if template_id is not None:
+            tpl = Template.objects.filter(id=template_id).first()
+            if tpl:
+                try:
+                    tmpdir = tempfile.gettempdir()
+                    rag_docx_path = os.path.join(tmpdir, f"rag_{tpl.id}.docx")
+                    out_docx_path = os.path.join(tmpdir, f"doc_{tpl.id}.docx")
+                    with open(rag_docx_path, "wb") as f:
+                        f.write(resp.content)
+
+                    merge_docx_with_template_body(
+                        source_docx_path=rag_docx_path,
+                        template_docx_path=tpl.file.path,
+                        out_docx_path=out_docx_path,
                     )
-                    inst.file_docx.save(
-                        f"{inst.id}.docx",
-                        ContentFile(resp.content),
-                        save=True,
-                    )
-        except Exception:
-            # Não quebra a geração se falhar ao salvar o histórico
-            pass
+
+                    with open(out_docx_path, "rb") as f:
+                        final_path_bytes = f.read()
+
+                    # Salva instância do documento para aparecer em "Meus Documentos"
+                    try:
+                        if request.user.is_authenticated:
+                            inst = DocumentInstance(
+                                template=tpl,
+                                owner=request.user,
+                                data={
+                                    "user_prompt": user_prompt,
+                                    "context": context,
+                                    "document_type_hint": payload.get("document_type_hint") or "",
+                                },
+                                status="final",
+                            )
+                            inst.file_docx.save(
+                                f"{inst.id}.docx",
+                                ContentFile(final_path_bytes),
+                                save=True,
+                            )
+                    except Exception:
+                        # Não quebra a geração se falhar ao salvar o histórico
+                        pass
+                except Exception:
+                    # Em caso de falha na mesclagem, volta a usar o DOCX original do RAG.
+                    final_path_bytes = resp.content
+
+            else:
+                final_path_bytes = resp.content
+        else:
+            # Sem template_id: mantém fluxo original, salvando histórico se Template existir
+            try:
+                if template_id is not None:
+                    tpl = Template.objects.filter(id=template_id).first()
+                    if tpl and request.user.is_authenticated:
+                        inst = DocumentInstance(
+                            template=tpl,
+                            owner=request.user,
+                            data={
+                                "user_prompt": user_prompt,
+                                "context": context,
+                                "document_type_hint": payload.get("document_type_hint") or "",
+                            },
+                            status="final",
+                        )
+                        inst.file_docx.save(
+                            f"{inst.id}.docx",
+                            ContentFile(resp.content),
+                            save=True,
+                        )
+            except Exception:
+                # Não quebra a geração se falhar ao salvar o histórico
+                pass
 
         r = HttpResponse(
-            resp.content,
+            final_path_bytes,
             content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         )
-        r["Content-Disposition"] = 'attachment; filename="documento.docx"'
+        r["Content-Disposition"] = 'attachment; filename=\"documento.docx\"'
         return r
+
     return JsonResponse({"ok": False, "error": "Resposta inesperada do serviço"}, status=502)
 
 

@@ -14,11 +14,13 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from .config import (
+    CHROMA_COLLECTION,
     LLM_AGENT_BASE_URL,
     LLM_ORCHESTRATION_BASE_URL,
     LLM_ORCHESTRATION_GENERATE_PATH,
     RAG_HTTP_TIMEOUT,
 )
+from .retrieval import retrieve
 from .tr_template import (
     TRTemplateSlots,
     DispensaSlots,
@@ -67,21 +69,17 @@ REGRAS:
   - Se o usuário já tiver informado descrição/unidade/quantidade, preserve essas informações e apenas complemente de forma técnica quando fizer sentido.
 - fiscal: objeto com "nome" (nome completo do fiscal do contrato). Se não houver nome de fiscal claramente informado pelo usuário ou contexto, use "" (não invente nomes).
 - dotacao: sempre deve ser retornado como string vazia \"\". A IA NÃO deve sugerir, inferir ou inventar dotação orçamentária; esse campo será preenchido posteriormente pelo sistema ou por outro fluxo.
-- objeto: frase completa, formal e específica, descrevendo claramente o objeto da contratação, incluindo finalidade e, quando inferível, área/setor atendido (por exemplo: "Aquisição de materiais de escritório para suprir as necessidades da Secretaria Municipal de Administração").
-  - Deve ser um parágrafo mais desenvolvido (em geral 2 a 4 frases), formal e específico, descrevendo:
-    * o que será contratado (bens, serviços ou obra), com nível mínimo de detalhamento,
-    * para qual finalidade e quais necessidades administrativas pretende atender,
-    * quando possível, o órgão/setor demandante e o público ou área beneficiada.
-  - Use redação formal típica de cláusula de objeto, em terceira pessoa. Exemplos de inícios aceitáveis:
-    * "O objeto do presente Termo de Referência é ..."
-    * "O presente Termo de Referência tem por objeto ..."
-    * "O objeto deste Termo de Referência consiste em ..."
-  - Evite textos excessivamente curtos ou genéricos como "Aquisição de material de escritório". Sempre acrescente finalidade e contexto mínimo.
-  - Deve ser uma redação extensa, minuciosa e formal. Não deve ser uma frase curta e simplificada.
-  - Evite frases curtas. Expanda a descrição para incluir a finalidade pública do bem ou serviço.
-  - Use redação formal típica de cláusula de objeto, em terceira pessoa, evitando informalidades.
-  - Prefira construções como: "O objeto do presente Termo de Referência é ..." ou "O objeto tem por finalidade ...", seguidas da descrição clara da contratação.
-  - NÃO use reticências ("...") nem múltiplos pontos no final da frase como (".."); Evite duplicar a pontuação que já exista no modelo de documento.
+- objeto: campo OBRIGATORIAMENTE redigido como UMA CLÁUSULA FORMAL COMPLETA (nunca lista, nunca palavra solta, nunca cópia do pedido).
+  - REGRA INEGOCIÁVEL: o valor do campo "objeto" DEVE começar com uma das fórmulas: "O objeto do presente Termo de Referência é ", "O presente Termo de Referência tem por objeto " ou "O objeto deste Termo de Referência consiste em ", seguida de uma ou mais frases que DESCREVAM em prosa (não em lista) o que será contratado e a finalidade. O texto total do objeto deve ter no mínimo 80 caracteres e pelo menos duas orações (duas frases ou uma frase com pelo menos uma vírgula e continuação).
+  - PROIBIÇÃO ABSOLUTA – NUNCA faça isto no campo objeto:
+    * Copiar ou colar o texto do pedido do usuário (ex.: se o usuário escrever "Aquisição de 10 pneus 1000R20, 10 câmaras...", o objeto NÃO pode ser esse texto repetido; você DEVE reformular em cláusula contínua).
+    * Devolver uma única palavra ou duas palavras (ex.: "pneus", "material de construção", "equipamentos", "material de escritório"). Qualquer resposta com menos de 4 palavras ou menos de 40 caracteres no objeto é INVÁLIDA.
+    * Devolver uma lista solta (ex.: "10 pneus, 10 câmaras, 50 válvulas"). O objeto deve ser redação em prosa, não enumeração.
+  - OBRIGATÓRIO: a partir do pedido do usuário, INTERPRETE o que foi solicitado e REDIJA uma cláusula de objeto em terceira pessoa, em prosa, com começo formal. Exemplo de formato correto: "O objeto do presente Termo de Referência é a aquisição de pneus, câmaras de ar, válvulas e protetores de câmara, nas quantidades e especificações necessárias ao departamento de Infraestrutura, para atender às necessidades de frota e manutenção veicular da Administração."
+  - Deve incluir: (a) o que será contratado (bens/serviços), em linguagem de cláusula; (b) a finalidade ou o setor/órgão beneficiado quando informado no pedido.
+  - É EXPRESSAMENTE PROIBIDO devolver o objeto como expressão curta ou genérica ("materiais de limpeza", "material de escritório", "serviços de manutenção", "equipamentos" sozinhos). Sempre desenvolva em pelo menos uma frase completa com verbo e finalidade.
+  - OBJETO = DESCRIÇÃO PURA EM PROSA. NUNCA use "compreendendo os itens descritos abaixo", "conforme itens abaixo", "especificações a seguir", "conforme tabela", "conforme quantitativo" ou equivalentes.
+  - NÃO use reticências ("...") nem múltiplos pontos no final.
 - justificativa: parágrafo de justificativa técnica/administrativa para a contratação, em linguagem formal. - Deve ser um texto dissertativo-argumentativo extenso, completo e técnico. Não deve ser uma frase curta e simplificada.
   - Deve ser um parágrafo de justificativa técnica/administrativa mais rico (idealmente 3 a 6 frases), em linguagem formal, explicando:
     * por que a contratação é necessária para a Administração,
@@ -117,6 +115,8 @@ def _build_tr_slots_user_prompt(
     user_prompt: str,
     context_from_agent: Optional[Dict[str, Any]] = None,
     user_context: Optional[Dict[str, Any]] = None,
+    skip_context_in_prompt: bool = False,
+    rag_objeto_examples: Optional[str] = None,
 ) -> str:
     """Monta o prompt de usuário para a LLM preencher os slots do TR."""
     parts = [f"Pedido do usuário:\n{user_prompt}"]
@@ -124,13 +124,20 @@ def _build_tr_slots_user_prompt(
         ctx = context_from_agent.get("context") or {}
         esp = context_from_agent.get("especificacoes")
         if ctx:
-            parts.append(f"\nContexto extraído: objeto={ctx.get('objeto', '')}, órgão={ctx.get('orgao', '')}, modalidade={ctx.get('modalidade', '')}.")
+            # Não incluir objeto= no prompt: evita que a LLM copie o pedido ou o objeto bruto do llm_agent como redação final
+            parts.append(f"\nContexto extraído: órgão={ctx.get('orgao', '')}, modalidade={ctx.get('modalidade', '')}.")
         if esp:
             listas = (esp.get("listas") or {}) if isinstance(esp, dict) else {}
             tabelas = (esp.get("tabelas") or {}) if isinstance(esp, dict) else {}
             if listas or tabelas:
                 parts.append(f"\nEspecificações: listas={listas}, tabelas={tabelas}.")
-    parts.append(_format_user_context_for_tr_prompt(user_context))
+    if not skip_context_in_prompt:
+        parts.append(_format_user_context_for_tr_prompt(user_context))
+    if rag_objeto_examples:
+        parts.append(
+            "\nExemplos de redação de OBJETO (documentos reais – use como referência de extensão e estilo; o campo objeto do JSON deve ter esse nível de desenvolvimento):\n"
+            + rag_objeto_examples
+        )
     parts.append("\nPreencha o JSON de slots do Termo de Referência (objeto, dispensa, itens, justificativa, fiscal, dotacao). Saída: apenas o JSON.")
     return "\n".join(parts)
 
@@ -243,11 +250,53 @@ def _normalize_objeto(text: str) -> str:
     Normaliza o campo objeto para ficar mais formal e sem pontuação estranha no final.
     - Remove espaços extras.
     - Remove reticências ou múltiplos pontos/pontuação forte no final.
-    - Deixa a pontuação final a cargo do modelo DOCX (evita gerar "..").
+    - Remove citações que remetem a itens/tabela abaixo (descrição pura apenas).
     """
     text = (text or "").strip()
     if not text:
         return ""
+
+    # Remove frases que remetem a itens/tabela/especificações abaixo (objeto = apenas descrição pura)
+    objeto_remover = [
+        r",?\s*compreendendo\s+os\s+itens\s+descritos\s+abaixo\.?",
+        r",?\s*compreendendo\s+os\s+itens\s+relacionados\s+abaixo\.?",
+        r",?\s*conforme\s+itens\s+(descritos\s+)?abaixo\.?",
+        r",?\s*conforme\s+especificações\s+(a\s+seguir|abaixo)\.?",
+        r",?\s*conforme\s+tabela\s+(a\s+seguir|abaixo|em\s+anexo)\.?",
+        r",?\s*conforme\s+quantitativo\s+(a\s+seguir|abaixo)\.?",
+        r",?\s*conforme\s+detalhamento\s+(na\s+tabela|abaixo)\.?",
+        r",?\s*conforme\s+o\s+quantitativo\s+descrito\s+abaixo\.?",
+        r",?\s*detalhados\s+(na\s+tabela|nos\s+itens)\s+abaixo\.?",
+        r",?\s*especificados\s+(na\s+tabela|nos\s+itens)\s+abaixo\.?",
+    ]
+    for pat in objeto_remover:
+        text = re.sub(pat, "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s{2,}", " ", text).strip()
+
+    # Heurística extra: evitar objetos extremamente genéricos de 1–3 palavras,
+    # como "materiais de limpeza" ou "material de escritório". Nestes casos,
+    # expande para uma frase completa padrão, mais adequada ao TR.
+    base = re.sub(r"[.。…;:,]+$", "", text).strip()
+    if base:
+        lower = base.lower()
+        generic_terms = {
+            "materiais de limpeza",
+            "material de limpeza",
+            "serviços de limpeza",
+            "servico de limpeza",
+            "material de escritório",
+            "materiais de escritório",
+            "material de expediente",
+            "materiais de expediente",
+        }
+        words = lower.split()
+        if lower in generic_terms or len(words) <= 3:
+            text = (
+                f"O objeto do presente Termo de Referência é a aquisição de {base} "
+                "para atender às necessidades da Administração Pública, garantindo a adequada "
+                "prestação dos serviços e o atendimento ao interesse público."
+            )
+
     # Remove reticências/múltiplos pontos e outros sinais fortes no final
     text = re.sub(r"[.。…;:,]+$", "", text).strip()
     if not text:
@@ -440,30 +489,63 @@ async def fill_tr_slots_with_llm(
     user_prompt: str,
     slots_override: Optional[Dict[str, Any]] = None,
     user_context: Optional[Dict[str, Any]] = None,
+    skip_context_in_prompt: bool = False,
 ) -> TRTemplateSlots:
     """
     Preenche os slots do TR usando IA.
 
     - Chama o llm_agent (structure-from-prompt) para obter contexto e especificações.
     - Chama a LLM para gerar o JSON de slots (objeto, dispensa, itens, justificativa, fiscal, dotacao).
-    - Mescla com slots_override (valores enviados pelo usuário têm prioridade). user_context (Django) enriquece o prompt com nome/secretaria/prefeitura.
+    - Mescla com slots_override (valores enviados pelo usuário têm prioridade). user_context (Django) enriquece o prompt com nome/secretaria/prefeitura, a menos que skip_context_in_prompt=True.
     """
     context_from_agent = await fetch_context_from_agent(user_prompt)
 
-    user_prompt_text = _build_tr_slots_user_prompt(user_prompt, context_from_agent, user_context)
+    # Busca exemplos RAG de cláusulas de objeto (como no fluxo generate_full_document) para enriquecer o prompt
+    rag_objeto_examples = ""
+    try:
+        query_objeto = f"{user_prompt[:200]} cláusula objeto termo de referência"
+        docs = retrieve(
+            query=query_objeto,
+            collection_name=CHROMA_COLLECTION,
+            top_k=2,
+            where={"document_type": "termo_referencia"},
+        )
+        if not docs:
+            docs = retrieve(query=query_objeto, collection_name=CHROMA_COLLECTION, top_k=2)
+        if docs:
+            rag_objeto_examples = "\n\n---\n\n".join(
+                (d.get("content", "") or "")[:1200] for d in docs
+            )
+    except Exception:
+        pass
+
+    user_prompt_text = _build_tr_slots_user_prompt(
+        user_prompt, context_from_agent, user_context, skip_context_in_prompt, rag_objeto_examples or None
+    )
     full_prompt = f"<<SYSTEM>>\n{TR_SLOTS_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{user_prompt_text}"
 
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
     payload = {"prompt": full_prompt, "stream": False}
 
-    async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
-        resp = await client.post(url, json=payload)
-        resp.raise_for_status()
-        body = resp.json()
+    try:
+        async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
+            resp = await client.post(url, json=payload)
+            if resp.status_code == 404:
+                raise ValueError(
+                    "Orquestração LLM retornou 404 (modelo não encontrado no Ollama). "
+                    "No host do Ollama execute: ollama pull <modelo> (ex.: ollama pull llama3.2)."
+                )
+            resp.raise_for_status()
+            body = resp.json()
+    except httpx.ConnectError as e:
+        raise ValueError(
+            f"Não foi possível conectar à orquestração LLM ({url}). "
+            "Verifique se llm_api está em execução (docker compose up -d llm_api ollama)."
+        ) from e
 
     if isinstance(body, dict) and body.get("detail"):
         detail = str(body["detail"]).strip()
-        if any(kw in detail.lower() for kw in ("falha", "erro", "timeout", "error")):
+        if any(kw in detail.lower() for kw in ("falha", "erro", "timeout", "error", "404", "modelo")):
             raise ValueError(f"Orquestração LLM retornou erro: {detail}")
 
     data = body.get("data", body) if isinstance(body, dict) else {}
@@ -496,7 +578,13 @@ async def fill_tr_slots_with_llm(
         return len(stripped) < 5  # ex.: ".", "..", "ok", etc.
 
     if _is_trivial(llm_slots.objeto) and objeto_fallback:
-        llm_slots.objeto = objeto_fallback
+        # Nunca colar o prompt cru no objeto: formatar como cláusula formal
+        if objeto_fallback.strip().lower().startswith(("o objeto", "o presente termo", "a aquisição", "a contratação")):
+            llm_slots.objeto = _normalize_objeto(objeto_fallback) or objeto_fallback
+        else:
+            llm_slots.objeto = _normalize_objeto(
+                f"O objeto do presente Termo de Referência é {objeto_fallback.strip().rstrip('.;')}."
+            ) or objeto_fallback
 
     # Escolha do inciso do art. 75:
     # - SEMPRE delegada à LLM especializada em _choose_art75_inciso,

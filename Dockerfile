@@ -9,7 +9,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Dependências de sistema: WeasyPrint (cairo, pango, fontes) e utilitários
+# Dependências de sistema: WeasyPrint (cairo, pango, fontes), LibreOffice (preview DOCX→PDF) e utilitários
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
     libpango-1.0-0 \
@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-liberation \
     fonts-dejavu-core \
     poppler-utils \
+    libreoffice-writer \
     && rm -rf /var/lib/apt/lists/*
 
 # Dependências Python

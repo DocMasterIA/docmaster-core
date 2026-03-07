@@ -109,6 +109,10 @@ class GenerateTRFromModelRequest(BaseModel):
         None,
         description="Contexto do usuário logado (usuario: nome_completo, secretaria, prefeitura, orgao). Usado para preencher fiscal e enriquecer o prompt.",
     )
+    skip_context_in_prompt: Optional[bool] = Field(
+        False,
+        description="Se True, não inclui 'Contexto do solicitante' no prompt da LLM (evita objeto vir como palavra/item); fiscal e cidade continuam vindos do context.",
+    )
 
     @field_validator("user_prompt")
     @classmethod
@@ -297,6 +301,20 @@ async def endpoint_generate_document(
     except Exception as e:
         logger.exception("Erro em generate-document: %s", e)
         detail = str(e).strip() or f"{type(e).__name__} (sem mensagem)"
+        # Extrair mensagem limpa quando vier "Orquestração retornou status 404: {\"detail\":\"...\"}"
+        if "404" in detail or "Orquestração" in detail:
+            import re
+            match = re.search(r'"detail"\s*:\s*"([^"]+)"', detail)
+            if match:
+                inner = match.group(1).strip()
+                if inner:
+                    detail = inner
+            if "404" in detail and "Ollama" not in detail:
+                detail = (
+                    "Modelo não encontrado no Ollama (404). "
+                    "No host do Ollama execute: ollama pull <modelo> (ex.: ollama pull llama3.2). "
+                    "Verifique OLLAMA_MODEL no llm_api e se ollama list mostra o modelo."
+                )
         raise HTTPException(status_code=500, detail=detail) from e
 
 
@@ -441,6 +459,66 @@ async def endpoint_generate_tr_from_model(body: GenerateTRFromModelRequest):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@router.post("/generate-tr-and-dfd")
+async def endpoint_generate_tr_and_dfd(body: GenerateTRFromModelRequest):
+    """
+    Gera TR (modelo fixo) + DFD complementar e retorna os caminhos dos DOCX.
+
+    Use este endpoint quando o chamador (por exemplo, o backend Django) precisar
+    expor Termo de Referência e DFD separadamente ou montar ZIP personalizado.
+    """
+    from .tr_slots_llm import fill_tr_slots_with_llm
+    from .tr_template import render_tr_from_slots
+    from .dfd_template import render_dfd_from_tr_slots
+
+    slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
+    try:
+        slots = await fill_tr_slots_with_llm(
+            user_prompt=body.user_prompt,
+            slots_override=slots_override,
+            user_context=body.context,
+        )
+
+        # Gera TR e DFD em caminhos temporários
+        docx_tr_path = render_tr_from_slots(slots)
+        if not Path(docx_tr_path).exists():
+            raise HTTPException(status_code=500, detail="DOCX do TR não foi gerado.")
+
+        docx_dfd_path = render_dfd_from_tr_slots(slots)
+        if not Path(docx_dfd_path).exists():
+            raise HTTPException(status_code=500, detail="DOCX do DFD não foi gerado.")
+
+        import base64
+        with open(docx_tr_path, "rb") as f:
+            tr_b64 = base64.b64encode(f.read()).decode("ascii")
+        with open(docx_dfd_path, "rb") as f:
+            dfd_b64 = base64.b64encode(f.read()).decode("ascii")
+
+        return {
+            "ok": True,
+            "tr_docx_path": docx_tr_path,
+            "dfd_docx_path": docx_dfd_path,
+            "tr_docx_base64": tr_b64,
+            "dfd_docx_base64": dfd_b64,
+        }
+    except ValueError as e:
+        msg = str(e).strip()
+        if any(x in msg for x in ("Orquestração", "LLM", "Resposta da LLM", "404", "modelo")):
+            raise HTTPException(status_code=502, detail=msg) from e
+        raise HTTPException(status_code=400, detail=msg) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("Erro em generate-tr-and-dfd: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/generate-tr-and-dfd/")
+async def endpoint_generate_tr_and_dfd_trailing(body: GenerateTRFromModelRequest):
+    """Mesma lógica de generate-tr-and-dfd, para clientes que enviam URL com barra final."""
+    return await endpoint_generate_tr_and_dfd(body)
+
+
 @router.post("/generate-tr-and-dfd-zip")
 async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
     """
@@ -453,11 +531,13 @@ async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
     from .dfd_template import render_dfd_from_tr_slots
 
     slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
+    skip_ctx = getattr(body, "skip_context_in_prompt", False)
     try:
         slots = await fill_tr_slots_with_llm(
             user_prompt=body.user_prompt,
             slots_override=slots_override,
             user_context=body.context,
+            skip_context_in_prompt=skip_ctx,
         )
 
         # Gera TR e DFD em caminhos temporários
@@ -485,7 +565,11 @@ async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
             filename="tr_dfd.zip",
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        msg = str(e).strip()
+        # Erro de orquestração/LLM (modelo, timeout, resposta vazia) → 502; validação → 400
+        if any(x in msg for x in ("Orquestração", "LLM", "Resposta da LLM", "404", "modelo")):
+            raise HTTPException(status_code=502, detail=msg) from e
+        raise HTTPException(status_code=400, detail=msg) from e
     except FileNotFoundError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:

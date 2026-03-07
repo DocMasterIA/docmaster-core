@@ -26,7 +26,7 @@
                 <div class="doc-gen__source-tabs">
                   <label class="doc-gen__tab">
                     <input v-model="sourceMode" type="radio" value="llm" disabled />
-                    <span>Criar do zero (ETP, DFD, TR)</span>
+                    <span>Criar com IA (ETP, TR, DFD)</span>
                   </label>
                 </div>
 
@@ -34,7 +34,31 @@
                 <div class="doc-gen__llm-hint">
                   <p class="gov-text-soft">
                     <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
-                    A IA gera o documento completo a partir do seu prompt (ETP, DFD, Termo de Referência). Use o contexto do seu órgão e secretaria.
+                    Para Termo de Referência e DFD, a IA preenche o <strong>modelo oficial</strong> (slots) e aplica o template selecionado.
+                    Para ETP, a IA gera o documento completo a partir do seu prompt.
+                  </p>
+                </div>
+
+                <!-- Tipo de documento / modo de geração -->
+                <div class="gov-field gov-mt-sm">
+                  <label class="gov-label">Tipo de documento</label>
+                  <div class="doc-gen__source-tabs">
+                    <label class="doc-gen__tab">
+                      <input v-model="docTypeMode" type="radio" value="auto" />
+                      <span>ETP (IA flexível)</span>
+                    </label>
+                    <label class="doc-gen__tab">
+                      <input v-model="docTypeMode" type="radio" value="tr_modelo" />
+                      <span>TR / DFD (modelo oficial)</span>
+                    </label>
+                  </div>
+                  <p class="gov-text-soft gov-mt-xs">
+                    <span v-if="docTypeMode === 'tr_modelo'">
+                      O Termo de Referência (e o DFD complementar) serão gerados <strong>exclusivamente</strong> a partir dos modelos oficiais internos, com slots preenchidos pela IA.
+                    </span>
+                    <span v-else>
+                      Use este modo apenas para ETP ou rascunhos livres. Para TR/DFD oficiais, use sempre a opção de modelo oficial acima.
+                    </span>
                   </p>
                 </div>
 
@@ -84,19 +108,6 @@
                   Prompt de Inteligência Artificial
                   <span class="gov-label__hint">(IA contextual inteligente)</span>
                 </label>
-                <div class="doc-gen__doc-type">
-                  <label class="gov-label gov-label--inline">Tipo de documento</label>
-                  <div class="doc-gen__doc-type-options">
-                    <label class="doc-gen__doc-type-option">
-                      <input v-model="docTypeMode" type="radio" value="auto" />
-                      <span>Padrão (ETP / DFD / TR)</span>
-                    </label>
-                    <label class="doc-gen__doc-type-option">
-                      <input v-model="docTypeMode" type="radio" value="tr_modelo" />
-                      <span>TR com modelo fixo (slots IA)</span>
-                    </label>
-                  </div>
-                </div>
                 <textarea
                   id="ia-prompt"
                   v-model="iaPrompt"
@@ -122,22 +133,50 @@
                   <span v-else class="doc-gen__spinner">Processando com IA...</span>
                 </button>
                 <template v-if="documentReady">
-                  <a
-                    v-if="documentDocxUrl"
-                    :href="documentDocxUrl"
-                    download="documento.docx"
-                    class="gov-btn gov-btn--secondary"
-                  >
-                    <i class="fa-solid fa-file-word" aria-hidden="true"></i> Download DOCX
-                  </a>
-                  <a
-                    v-if="documentPdfUrl"
-                    :href="documentPdfUrl"
-                    download="documento.pdf"
-                    class="gov-btn gov-btn--secondary"
-                  >
-                    <i class="fa-solid fa-file-pdf" aria-hidden="true"></i> Download PDF
-                  </a>
+                  <template v-if="docTypeMode === 'tr_modelo'">
+                    <a
+                      v-if="documentTrUrl"
+                      :href="documentTrUrl"
+                      download="termo_referencia.docx"
+                      class="gov-btn gov-btn--secondary"
+                    >
+                      <i class="fa-solid fa-file-word" aria-hidden="true"></i> Download TR (DOCX)
+                    </a>
+                    <a
+                      v-if="documentDfdUrl"
+                      :href="documentDfdUrl"
+                      download="dfd.docx"
+                      class="gov-btn gov-btn--secondary"
+                    >
+                      <i class="fa-solid fa-file-word" aria-hidden="true"></i> Download DFD (DOCX)
+                    </a>
+                    <a
+                      v-if="documentZipUrl"
+                      :href="documentZipUrl"
+                      download="tr_dfd.zip"
+                      class="gov-btn gov-btn--secondary"
+                    >
+                      <i class="fa-solid fa-file-archive" aria-hidden="true"></i> Download TR+DFD (ZIP)
+                    </a>
+                  </template>
+                  <template v-else>
+                    <a
+                      v-if="documentDocxUrl"
+                      :href="documentDocxUrl"
+                      download="documento.docx"
+                      class="gov-btn gov-btn--secondary"
+                    >
+                      <i class="fa-solid fa-file-word" aria-hidden="true"></i> Download DOCX
+                    </a>
+                    <a
+                      v-if="documentPdfUrl"
+                      :href="documentPdfUrl"
+                      download="documento.pdf"
+                      class="gov-btn gov-btn--secondary"
+                    >
+                      <i class="fa-solid fa-file-pdf" aria-hidden="true"></i> Download PDF
+                    </a>
+                  </template>
                 </template>
               </div>
             </div>
@@ -242,7 +281,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+// Em dev: usar '' para que a requisição passe pelo proxy do Vite (evita 404 por chamar outro host/porta)
+const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || '');
 const route = useRoute();
 
 const useOwnFile = ref(false);
@@ -263,6 +303,9 @@ const isSubmitting = ref(false);
 const documentReady = ref(false);
 const documentDocxUrl = ref('');
 const documentPdfUrl = ref('');
+const documentTrUrl = ref('');
+const documentDfdUrl = ref('');
+const documentZipUrl = ref('');
 const successMessage = ref('');
 const generateError = ref('');
 
@@ -403,9 +446,28 @@ async function onSubmit() {
   if (!iaPrompt.value.trim()) return;
   isSubmitting.value = true;
   documentReady.value = false;
-  documentDocxUrl.value = '';
-  documentPdfUrl.value = '';
   generateError.value = '';
+  // Revogar blobs antigos antes de limpar, para não deixar links inválidos e evitar vazamento
+  if (documentDocxUrl.value) {
+    URL.revokeObjectURL(documentDocxUrl.value);
+    documentDocxUrl.value = '';
+  }
+  if (documentPdfUrl.value) {
+    URL.revokeObjectURL(documentPdfUrl.value);
+    documentPdfUrl.value = '';
+  }
+  if (documentTrUrl.value) {
+    URL.revokeObjectURL(documentTrUrl.value);
+    documentTrUrl.value = '';
+  }
+  if (documentDfdUrl.value) {
+    URL.revokeObjectURL(documentDfdUrl.value);
+    documentDfdUrl.value = '';
+  }
+  if (documentZipUrl.value) {
+    URL.revokeObjectURL(documentZipUrl.value);
+    documentZipUrl.value = '';
+  }
 
   try {
     await submitViaLLM();
@@ -417,18 +479,21 @@ async function onSubmit() {
 }
 
 async function submitViaLLM() {
-  const payload = {
-    user_prompt: iaPrompt.value.trim(),
-    output: 'docx',
-  };
-  if (selectedTemplate.value?.id && docTypeMode.value === 'auto') {
+  const isTrDfd = docTypeMode.value === 'tr_modelo';
+
+  const payload = isTrDfd
+    ? { user_prompt: iaPrompt.value.trim() }
+    : {
+        user_prompt: iaPrompt.value.trim(),
+        output: 'docx',
+      };
+  if (selectedTemplate.value?.id) {
     payload.template_id = selectedTemplate.value.id;
   }
 
-  const endpoint =
-    docTypeMode.value === 'tr_modelo'
-      ? `${API_BASE}/api/documentos/gerar-tr-modelo`
-      : `${API_BASE}/api/documentos/gerar-via-llm`;
+  const endpoint = isTrDfd
+    ? `${API_BASE}/api/documentos/gerar-tr-e-dfd`
+    : `${API_BASE}/api/documentos/gerar-via-llm`;
 
   const res = await fetch(endpoint, {
     method: 'POST',
@@ -437,16 +502,101 @@ async function submitViaLLM() {
     body: JSON.stringify(payload),
   });
 
-  const contentType = res.headers.get('content-type') || '';
-  if (!res.ok) {
-    const err = contentType.includes('json')
-      ? await res.json().catch(() => ({}))
-      : {};
-    generateError.value = err.error || err.detail || `Erro ${res.status}`;
+  const contentType = (res.headers.get('content-type') || '').toLowerCase();
+
+  if (res.status === 404) {
+    generateError.value =
+      'Rota não encontrada (404). Confira se o backend está rodando (docker compose up -d backend) e reconstruído com o código atual (docker compose build --no-cache backend). Em dev, o front usa o proxy do Vite para /api.';
     return;
   }
 
-  if (contentType.includes('application/vnd.openxmlformats') || contentType.includes('octet-stream')) {
+  // Modo TR/DFD (modelo oficial): resposta é sempre JSON com base64 dos arquivos
+  if (docTypeMode.value === 'tr_modelo') {
+    const rawText = await res.text();
+    let data = {};
+    try {
+      data = rawText ? JSON.parse(rawText) : {};
+    } catch (_e) {
+      generateError.value = `Resposta inválida do servidor (não é JSON). Status: ${res.status}. Verifique se o backend respondeu corretamente.`;
+      return;
+    }
+
+    if (!res.ok || !data.ok) {
+      generateError.value =
+        res.status === 500
+          ? (data.error || data.detail || 'Erro 500 no servidor. Veja os logs do container backend.')
+          : (data.error || data.detail || `Erro ${res.status}`);
+      return;
+    }
+
+    if (!data.tr?.docx_base64 || !data.dfd?.docx_base64) {
+      generateError.value = data.error || 'TR ou DFD não vieram na resposta. Tente novamente.';
+      return;
+    }
+
+    const toBlobUrl = (base64, mimeType) => {
+      if (!base64) return '';
+      const binary = atob(base64);
+      const len = binary.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+    };
+
+    try {
+      const trUrl = toBlobUrl(
+        data.tr.docx_base64,
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      );
+      const dfdUrl = toBlobUrl(
+        data.dfd.docx_base64,
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      );
+      const zipUrl = data.zip?.zip_base64
+        ? toBlobUrl(data.zip.zip_base64, 'application/zip')
+        : '';
+      // Revogar blobs antigos (se houver) antes de atribuir os novos, para todos os três botões ficarem consistentes
+      if (documentTrUrl.value) URL.revokeObjectURL(documentTrUrl.value);
+      if (documentDfdUrl.value) URL.revokeObjectURL(documentDfdUrl.value);
+      if (documentZipUrl.value) URL.revokeObjectURL(documentZipUrl.value);
+      documentTrUrl.value = trUrl;
+      documentDfdUrl.value = dfdUrl;
+      documentZipUrl.value = zipUrl;
+    } catch (e) {
+      generateError.value = `Falha ao processar arquivos: ${e?.message || 'dados inválidos'}. Tente novamente.`;
+      return;
+    }
+
+    documentReady.value = true;
+    successMessage.value = 'Termo de Referência e DFD gerados com sucesso. Baixe os arquivos abaixo.';
+    return;
+  }
+
+  // Demais modos: fluxo original (DOCX único)
+  if (!res.ok) {
+    const rawErr = await res.text();
+    let err = {};
+    try {
+      err = contentType.includes('json') && rawErr ? JSON.parse(rawErr) : {};
+    } catch (_e) {
+      err = {};
+    }
+    generateError.value =
+      res.status === 500
+        ? (err.error || err.detail || 'Erro 500 no servidor. Veja os logs do container backend.')
+        : (err.error || err.detail || `Erro ${res.status}`);
+    return;
+  }
+
+  // Pedimos DOCX: resposta 200 pode ser o arquivo (Content-Type pode vir oculto por CORS em respostas attachment)
+  const looksLikeDocx =
+    contentType.includes('application/vnd.openxmlformats') ||
+    contentType.includes('octet-stream');
+  const notJson = !contentType.includes('application/json');
+
+  if (looksLikeDocx || (payload.output === 'docx' && notJson)) {
     const blob = await res.blob();
     documentDocxUrl.value = URL.createObjectURL(blob);
     documentPdfUrl.value = '';
@@ -563,6 +713,9 @@ onUnmounted(() => {
   document.removeEventListener('click', clickOutside);
   if (documentDocxUrl.value) URL.revokeObjectURL(documentDocxUrl.value);
   if (documentPdfUrl.value) URL.revokeObjectURL(documentPdfUrl.value);
+  if (documentTrUrl.value) URL.revokeObjectURL(documentTrUrl.value);
+  if (documentDfdUrl.value) URL.revokeObjectURL(documentDfdUrl.value);
+  if (documentZipUrl.value) URL.revokeObjectURL(documentZipUrl.value);
 });
 
 async function loadPdf(url) {

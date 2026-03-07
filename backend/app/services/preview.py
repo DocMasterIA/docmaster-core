@@ -25,7 +25,7 @@ def generate_docx_preview(template):
     docx_path = Path(template.file.path)
     pdf_path = tmp_dir / f"{docx_path.stem}.pdf"
 
-    # 1️⃣ Converter DOCX -> PDF via LibreOffice
+    # 1️⃣ Converter DOCX -> PDF via LibreOffice (opcional: se não instalado, não gera preview)
     try:
         subprocess.run([
             "libreoffice",
@@ -33,9 +33,13 @@ def generate_docx_preview(template):
             "--convert-to", "pdf",
             "--outdir", str(tmp_dir),
             str(docx_path)
-        ], check=True)
-    except subprocess.CalledProcessError:
-        print("Erro ao converter DOCX para PDF")
+        ], check=True, timeout=60)
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as e:
+        # FileNotFoundError = LibreOffice não instalado; CalledProcessError = falha na conversão
+        if isinstance(e, FileNotFoundError):
+            print("LibreOffice não encontrado. Instale com: apt-get install libreoffice (preview de template desabilitado)")
+        else:
+            print("Erro ao converter DOCX para PDF:", e)
         return None
 
     if not pdf_path.exists():
@@ -81,14 +85,16 @@ def generate_docx_preview_pdf(template):
     docx_path = Path(template.file.path)
     tmp_dir = Path(tempfile.mkdtemp(prefix="tpl_preview_"))
     try:
-        # Converter DOCX -> PDF via libreoffice
+        # Converter DOCX -> PDF via libreoffice (opcional)
         subprocess.run([
             "libreoffice",
             "--headless",
             "--convert-to", "pdf",
             "--outdir", str(tmp_dir),
             str(docx_path)
-        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        return None
 
         generated_pdf = tmp_dir / f"{docx_path.stem}.pdf"
         if not generated_pdf.exists():

@@ -6,6 +6,7 @@ from django.core.files import File
 from weasyprint import HTML  # se usar WeasyPrint para PDF (pode trocar)
 import subprocess
 from docx import Document
+import copy
 
 # Utilitário: garante pasta dentro do MEDIA_ROOT.
 def _ensure_media_subdir(*parts) -> str:
@@ -32,6 +33,42 @@ def generate_pdf_from_docx(docx_path):
         docx_path
     ], check=True)
     return pdf_path
+
+
+def merge_docx_with_template_body(source_docx_path: str, template_docx_path: str, out_docx_path: str) -> str:
+    """
+    Cria um novo DOCX usando o template (cabeçalho/footer, estilos) e
+    substitui TODO o corpo pelo conteúdo do DOCX gerado via RAG.
+
+    - template_docx_path: DOCX da biblioteca de templates (com cabeçalho/footer configurados).
+    - source_docx_path: DOCX completo gerado pelo rag_service.
+    - out_docx_path: caminho do DOCX de saída.
+    """
+    src_doc = Document(source_docx_path)
+    tpl_doc = Document(template_docx_path)
+
+    body_tpl = tpl_doc.element.body
+
+    # Guardar sectPr (configuração de seção do template, incluindo referências a cabeçalho/footer)
+    sectPr_tpl = None
+    for el in list(body_tpl):
+        if el.tag.endswith("sectPr"):
+            sectPr_tpl = copy.deepcopy(el)
+        body_tpl.remove(el)
+
+    # Copiar todo o corpo do documento-fonte, exceto o sectPr final (para não sobrescrever cabeçalho/footer do template)
+    body_src = src_doc.element.body
+    for el in list(body_src):
+        if el.tag.endswith("sectPr"):
+            continue
+        body_tpl.append(copy.deepcopy(el))
+
+    # Reaplicar sectPr original do template (se existir)
+    if sectPr_tpl is not None:
+        body_tpl.append(sectPr_tpl)
+
+    tpl_doc.save(out_docx_path)
+    return out_docx_path
 
 
 def extract_docx_structure(path):

@@ -45,6 +45,15 @@ def _raise_for_status(response: httpx.Response) -> None:
             status_code=response.status_code,
             body=response.text,
         )
+    if response.status_code == 404:
+        raise LLMClientError(
+            message=(
+                "Modelo não encontrado no Ollama (404). "
+                "Verifique OLLAMA_MODEL e execute 'ollama pull <modelo>' no host do Ollama."
+            ),
+            status_code=404,
+            body=response.text,
+        )
     if response.status_code >= 400:
         raise LLMClientError(
             message=f"Erro HTTP {response.status_code}",

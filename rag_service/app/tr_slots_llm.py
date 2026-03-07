@@ -14,11 +14,13 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from .config import (
+    CHROMA_COLLECTION,
     LLM_AGENT_BASE_URL,
     LLM_ORCHESTRATION_BASE_URL,
     LLM_ORCHESTRATION_GENERATE_PATH,
     RAG_HTTP_TIMEOUT,
 )
+from .retrieval import retrieve
 from .tr_template import (
     TRTemplateSlots,
     DispensaSlots,
@@ -114,6 +116,7 @@ def _build_tr_slots_user_prompt(
     context_from_agent: Optional[Dict[str, Any]] = None,
     user_context: Optional[Dict[str, Any]] = None,
     skip_context_in_prompt: bool = False,
+    rag_objeto_examples: Optional[str] = None,
 ) -> str:
     """Monta o prompt de usuário para a LLM preencher os slots do TR."""
     parts = [f"Pedido do usuário:\n{user_prompt}"]
@@ -130,6 +133,11 @@ def _build_tr_slots_user_prompt(
                 parts.append(f"\nEspecificações: listas={listas}, tabelas={tabelas}.")
     if not skip_context_in_prompt:
         parts.append(_format_user_context_for_tr_prompt(user_context))
+    if rag_objeto_examples:
+        parts.append(
+            "\nExemplos de redação de OBJETO (documentos reais – use como referência de extensão e estilo; o campo objeto do JSON deve ter esse nível de desenvolvimento):\n"
+            + rag_objeto_examples
+        )
     parts.append("\nPreencha o JSON de slots do Termo de Referência (objeto, dispensa, itens, justificativa, fiscal, dotacao). Saída: apenas o JSON.")
     return "\n".join(parts)
 
@@ -492,7 +500,28 @@ async def fill_tr_slots_with_llm(
     """
     context_from_agent = await fetch_context_from_agent(user_prompt)
 
-    user_prompt_text = _build_tr_slots_user_prompt(user_prompt, context_from_agent, user_context, skip_context_in_prompt)
+    # Busca exemplos RAG de cláusulas de objeto (como no fluxo generate_full_document) para enriquecer o prompt
+    rag_objeto_examples = ""
+    try:
+        query_objeto = f"{user_prompt[:200]} cláusula objeto termo de referência"
+        docs = retrieve(
+            query=query_objeto,
+            collection_name=CHROMA_COLLECTION,
+            top_k=2,
+            where={"document_type": "termo_referencia"},
+        )
+        if not docs:
+            docs = retrieve(query=query_objeto, collection_name=CHROMA_COLLECTION, top_k=2)
+        if docs:
+            rag_objeto_examples = "\n\n---\n\n".join(
+                (d.get("content", "") or "")[:1200] for d in docs
+            )
+    except Exception:
+        pass
+
+    user_prompt_text = _build_tr_slots_user_prompt(
+        user_prompt, context_from_agent, user_context, skip_context_in_prompt, rag_objeto_examples or None
+    )
     full_prompt = f"<<SYSTEM>>\n{TR_SLOTS_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{user_prompt_text}"
 
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"

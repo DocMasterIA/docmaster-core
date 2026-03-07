@@ -109,6 +109,10 @@ class GenerateTRFromModelRequest(BaseModel):
         None,
         description="Contexto do usuário logado (usuario: nome_completo, secretaria, prefeitura, orgao). Usado para preencher fiscal e enriquecer o prompt.",
     )
+    skip_context_in_prompt: Optional[bool] = Field(
+        False,
+        description="Se True, não inclui 'Contexto do solicitante' no prompt da LLM (evita objeto vir como palavra/item); fiscal e cidade continuam vindos do context.",
+    )
 
     @field_validator("user_prompt")
     @classmethod
@@ -498,7 +502,10 @@ async def endpoint_generate_tr_and_dfd(body: GenerateTRFromModelRequest):
             "dfd_docx_base64": dfd_b64,
         }
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        msg = str(e).strip()
+        if any(x in msg for x in ("Orquestração", "LLM", "Resposta da LLM", "404", "modelo")):
+            raise HTTPException(status_code=502, detail=msg) from e
+        raise HTTPException(status_code=400, detail=msg) from e
     except FileNotFoundError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:
@@ -524,11 +531,13 @@ async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
     from .dfd_template import render_dfd_from_tr_slots
 
     slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
+    skip_ctx = getattr(body, "skip_context_in_prompt", False)
     try:
         slots = await fill_tr_slots_with_llm(
             user_prompt=body.user_prompt,
             slots_override=slots_override,
             user_context=body.context,
+            skip_context_in_prompt=skip_ctx,
         )
 
         # Gera TR e DFD em caminhos temporários
@@ -556,7 +565,11 @@ async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
             filename="tr_dfd.zip",
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        msg = str(e).strip()
+        # Erro de orquestração/LLM (modelo, timeout, resposta vazia) → 502; validação → 400
+        if any(x in msg for x in ("Orquestração", "LLM", "Resposta da LLM", "404", "modelo")):
+            raise HTTPException(status_code=502, detail=msg) from e
+        raise HTTPException(status_code=400, detail=msg) from e
     except FileNotFoundError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
     except Exception as e:

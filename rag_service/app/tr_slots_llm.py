@@ -116,6 +116,7 @@ def _build_tr_slots_user_prompt(
     user_prompt: str,
     context_from_agent: Optional[Dict[str, Any]] = None,
     user_context: Optional[Dict[str, Any]] = None,
+    skip_context_in_prompt: bool = False,
 ) -> str:
     """Monta o prompt de usuário para a LLM preencher os slots do TR."""
     parts = [f"Pedido do usuário:\n{user_prompt}"]
@@ -123,13 +124,15 @@ def _build_tr_slots_user_prompt(
         ctx = context_from_agent.get("context") or {}
         esp = context_from_agent.get("especificacoes")
         if ctx:
-            parts.append(f"\nContexto extraído: objeto={ctx.get('objeto', '')}, órgão={ctx.get('orgao', '')}, modalidade={ctx.get('modalidade', '')}.")
+            # Não incluir objeto= no prompt: evita que a LLM copie o pedido ou o objeto bruto do llm_agent como redação final
+            parts.append(f"\nContexto extraído: órgão={ctx.get('orgao', '')}, modalidade={ctx.get('modalidade', '')}.")
         if esp:
             listas = (esp.get("listas") or {}) if isinstance(esp, dict) else {}
             tabelas = (esp.get("tabelas") or {}) if isinstance(esp, dict) else {}
             if listas or tabelas:
                 parts.append(f"\nEspecificações: listas={listas}, tabelas={tabelas}.")
-    parts.append(_format_user_context_for_tr_prompt(user_context))
+    if not skip_context_in_prompt:
+        parts.append(_format_user_context_for_tr_prompt(user_context))
     parts.append("\nPreencha o JSON de slots do Termo de Referência (objeto, dispensa, itens, justificativa, fiscal, dotacao). Saída: apenas o JSON.")
     return "\n".join(parts)
 
@@ -481,17 +484,18 @@ async def fill_tr_slots_with_llm(
     user_prompt: str,
     slots_override: Optional[Dict[str, Any]] = None,
     user_context: Optional[Dict[str, Any]] = None,
+    skip_context_in_prompt: bool = False,
 ) -> TRTemplateSlots:
     """
     Preenche os slots do TR usando IA.
 
     - Chama o llm_agent (structure-from-prompt) para obter contexto e especificações.
     - Chama a LLM para gerar o JSON de slots (objeto, dispensa, itens, justificativa, fiscal, dotacao).
-    - Mescla com slots_override (valores enviados pelo usuário têm prioridade). user_context (Django) enriquece o prompt com nome/secretaria/prefeitura.
+    - Mescla com slots_override (valores enviados pelo usuário têm prioridade). user_context (Django) enriquece o prompt com nome/secretaria/prefeitura, a menos que skip_context_in_prompt=True.
     """
     context_from_agent = await fetch_context_from_agent(user_prompt)
 
-    user_prompt_text = _build_tr_slots_user_prompt(user_prompt, context_from_agent, user_context)
+    user_prompt_text = _build_tr_slots_user_prompt(user_prompt, context_from_agent, user_context, skip_context_in_prompt)
     full_prompt = f"<<SYSTEM>>\n{TR_SLOTS_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{user_prompt_text}"
 
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
@@ -548,7 +552,13 @@ async def fill_tr_slots_with_llm(
         return len(stripped) < 5  # ex.: ".", "..", "ok", etc.
 
     if _is_trivial(llm_slots.objeto) and objeto_fallback:
-        llm_slots.objeto = objeto_fallback
+        # Nunca colar o prompt cru no objeto: formatar como cláusula formal
+        if objeto_fallback.strip().lower().startswith(("o objeto", "o presente termo", "a aquisição", "a contratação")):
+            llm_slots.objeto = _normalize_objeto(objeto_fallback) or objeto_fallback
+        else:
+            llm_slots.objeto = _normalize_objeto(
+                f"O objeto do presente Termo de Referência é {objeto_fallback.strip().rstrip('.;')}."
+            ) or objeto_fallback
 
     # Escolha do inciso do art. 75:
     # - SEMPRE delegada à LLM especializada em _choose_art75_inciso,

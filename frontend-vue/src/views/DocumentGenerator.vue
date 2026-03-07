@@ -479,15 +479,21 @@ async function onSubmit() {
 }
 
 async function submitViaLLM() {
-  const payload = {
-    user_prompt: iaPrompt.value.trim(),
-    output: docTypeMode.value === 'tr_modelo' ? 'tr_dfd' : 'docx',
-  };
+  const isTrDfd = docTypeMode.value === 'tr_modelo';
+
+  const payload = isTrDfd
+    ? { user_prompt: iaPrompt.value.trim() }
+    : {
+        user_prompt: iaPrompt.value.trim(),
+        output: 'docx',
+      };
   if (selectedTemplate.value?.id) {
     payload.template_id = selectedTemplate.value.id;
   }
 
-  const endpoint = `${API_BASE}/api/documentos/gerar-via-llm`;
+  const endpoint = isTrDfd
+    ? `${API_BASE}/api/documentos/gerar-tr-e-dfd`
+    : `${API_BASE}/api/documentos/gerar-via-llm`;
 
   const res = await fetch(endpoint, {
     method: 'POST',

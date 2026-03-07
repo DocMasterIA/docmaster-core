@@ -518,6 +518,7 @@ def gerar_tr_e_dfd_api(request):
         "user_prompt": user_prompt,
         "slots_override": slots_override or None,
         "context": context if context else None,
+        "skip_context_in_prompt": True,
     }
 
     try:

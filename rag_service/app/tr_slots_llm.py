@@ -67,20 +67,17 @@ REGRAS:
   - Se o usuário já tiver informado descrição/unidade/quantidade, preserve essas informações e apenas complemente de forma técnica quando fizer sentido.
 - fiscal: objeto com "nome" (nome completo do fiscal do contrato). Se não houver nome de fiscal claramente informado pelo usuário ou contexto, use "" (não invente nomes).
 - dotacao: sempre deve ser retornado como string vazia \"\". A IA NÃO deve sugerir, inferir ou inventar dotação orçamentária; esse campo será preenchido posteriormente pelo sistema ou por outro fluxo.
-- objeto: campo textual que descreve o OBJETO DA CONTRATAÇÃO.
-  - Deve ser um parágrafo desenvolvido, com pelo menos 2 e preferencialmente 3 a 4 frases completas, em linguagem formal, descrevendo:
-    * o que será contratado (bens, serviços ou obra), com nível mínimo de detalhamento,
-    * para qual finalidade e quais necessidades administrativas pretende atender,
-    * quando possível, o órgão/setor demandante e o público ou área beneficiada.
-  - Exemplos de inícios aceitáveis:
-    * "O objeto do presente Termo de Referência é ..."
-    * "O presente Termo de Referência tem por objeto ..."
-    * "O objeto deste Termo de Referência consiste em ..."
-  - É EXPRESSAMENTE PROIBIDO devolver o objeto como uma expressão curta e genérica, como apenas "materiais de limpeza", "material de limpeza", "serviços de limpeza", "material de escritório", "serviços de manutenção" ou semelhantes. Sempre que o pedido do usuário for curto, você DEVE complementar o objeto com finalidade e contexto (órgão/unidade, público ou área atendida) de forma razoável com base nas informações disponíveis.
-  - Nunca devolva o objeto com menos de uma frase completa; respostas de 1 a 3 palavras são sempre ERRADAS para este campo.
-  - Use redação formal típica de cláusula de objeto, em terceira pessoa, evitando informalidades. Prefira construções como: "O objeto do presente Termo de Referência é ..." seguidas da descrição clara da contratação.
-  - NÃO use reticências ("...") nem múltiplos pontos no final da frase como (".."); Evite duplicar a pontuação que já exista no modelo de documento.
-  - OBJETO = APENAS DESCRIÇÃO PURA. PROIBIDO qualquer referência a itens, tabelas ou seções do documento: NUNCA use "compreendendo os itens descritos abaixo", "conforme itens abaixo", "especificações a seguir", "conforme tabela", "itens relacionados abaixo", "detalhamento na tabela", "conforme quantitativo" ou expressões equivalentes. O campo objeto deve conter somente a descrição do que será contratado e sua finalidade, sem remeter a outras partes do documento.
+- objeto: campo OBRIGATORIAMENTE redigido como UMA CLÁUSULA FORMAL COMPLETA (nunca lista, nunca palavra solta, nunca cópia do pedido).
+  - REGRA INEGOCIÁVEL: o valor do campo "objeto" DEVE começar com uma das fórmulas: "O objeto do presente Termo de Referência é ", "O presente Termo de Referência tem por objeto " ou "O objeto deste Termo de Referência consiste em ", seguida de uma ou mais frases que DESCREVAM em prosa (não em lista) o que será contratado e a finalidade. O texto total do objeto deve ter no mínimo 80 caracteres e pelo menos duas orações (duas frases ou uma frase com pelo menos uma vírgula e continuação).
+  - PROIBIÇÃO ABSOLUTA – NUNCA faça isto no campo objeto:
+    * Copiar ou colar o texto do pedido do usuário (ex.: se o usuário escrever "Aquisição de 10 pneus 1000R20, 10 câmaras...", o objeto NÃO pode ser esse texto repetido; você DEVE reformular em cláusula contínua).
+    * Devolver uma única palavra ou duas palavras (ex.: "pneus", "material de construção", "equipamentos", "material de escritório"). Qualquer resposta com menos de 4 palavras ou menos de 40 caracteres no objeto é INVÁLIDA.
+    * Devolver uma lista solta (ex.: "10 pneus, 10 câmaras, 50 válvulas"). O objeto deve ser redação em prosa, não enumeração.
+  - OBRIGATÓRIO: a partir do pedido do usuário, INTERPRETE o que foi solicitado e REDIJA uma cláusula de objeto em terceira pessoa, em prosa, com começo formal. Exemplo de formato correto: "O objeto do presente Termo de Referência é a aquisição de pneus, câmaras de ar, válvulas e protetores de câmara, nas quantidades e especificações necessárias ao departamento de Infraestrutura, para atender às necessidades de frota e manutenção veicular da Administração."
+  - Deve incluir: (a) o que será contratado (bens/serviços), em linguagem de cláusula; (b) a finalidade ou o setor/órgão beneficiado quando informado no pedido.
+  - É EXPRESSAMENTE PROIBIDO devolver o objeto como expressão curta ou genérica ("materiais de limpeza", "material de escritório", "serviços de manutenção", "equipamentos" sozinhos). Sempre desenvolva em pelo menos uma frase completa com verbo e finalidade.
+  - OBJETO = DESCRIÇÃO PURA EM PROSA. NUNCA use "compreendendo os itens descritos abaixo", "conforme itens abaixo", "especificações a seguir", "conforme tabela", "conforme quantitativo" ou equivalentes.
+  - NÃO use reticências ("...") nem múltiplos pontos no final.
 - justificativa: parágrafo de justificativa técnica/administrativa para a contratação, em linguagem formal. - Deve ser um texto dissertativo-argumentativo extenso, completo e técnico. Não deve ser uma frase curta e simplificada.
   - Deve ser um parágrafo de justificativa técnica/administrativa mais rico (idealmente 3 a 6 frases), em linguagem formal, explicando:
     * por que a contratação é necessária para a Administração,

@@ -531,10 +531,21 @@ async def _call_llm_agent_structure(user_prompt: str) -> Dict[str, Any]:
     """Chama llm_agent para obter estrutura, context e especificacoes a partir do prompt livre."""
     url = f"{LLM_AGENT_BASE_URL}/api/agent/structure-from-prompt"
     payload = {"user_prompt": user_prompt}
-    async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
-        resp = await client.post(url, json=payload)
-        resp.raise_for_status()
-        data = resp.json()
+    try:
+        async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
+            resp = await client.post(url, json=payload)
+            if resp.status_code == 404:
+                raise ValueError(
+                    "Orquestração retornou 404 (modelo não encontrado no Ollama). "
+                    "Execute no host do Ollama: ollama pull <modelo> (ex.: ollama pull llama3.2)."
+                )
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.ConnectError as e:
+        raise ValueError(
+            f"Não foi possível conectar ao llm_agent ({url}). "
+            "Verifique se llm_agent está em execução (docker compose up -d llm_api llm_agent)."
+        ) from e
     if not data.get("ok") or not data.get("structure"):
         raise ValueError(data.get("error", "Estrutura não retornada pelo llm_agent"))
     return data

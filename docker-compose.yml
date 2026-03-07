@@ -110,8 +110,9 @@ services:
     ports:
       - "8001:8000"  # Django na 8001 no host (8000 já é ChromaDB)
     volumes:
-      # Diretório (não arquivo) para o SQLite persistir entre rebuilds
-      - ./backend/data:/app/backend/data
+      # Volume nomeado: o SQLite persiste entre build/up/down (não some ao reconstruir)
+      # Para apagar o banco: docker compose down -v (remove volumes)
+      - backend_data:/app/backend/data
     restart: unless-stopped
 
   # Expõe o Django (host:8001) na internet. Authtoken: use volume (arquivo no host) OU env NGROK_AUTHTOKEN.
@@ -134,3 +135,4 @@ services:
 volumes:
   chroma_data:
   ollama_data:
+  backend_data:   # SQLite do Django (persiste entre build/up)

@@ -512,7 +512,7 @@ def gerar_tr_e_dfd_api(request):
     context = build_llm_context_from_request(request)
 
     rag_url = getattr(django_settings, "RAG_SERVICE_URL", "http://127.0.0.1:8004").rstrip("/")
-    url = f"{rag_url}/api/rag/generate-tr-and-dfd"
+    url = f"{rag_url}/api/rag/generate-tr-and-dfd-zip"
 
     body = {
         "user_prompt": user_prompt,
@@ -527,39 +527,29 @@ def gerar_tr_e_dfd_api(request):
     except Exception as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=502)
 
-    try:
-        data = resp.json()
-    except Exception:
-        return JsonResponse({"ok": False, "error": "Resposta inválida do serviço de TR/DFD."}, status=502)
-
-    if resp.status_code != 200 or not data.get("ok"):
-        err = data.get("detail") or data.get("error") or str(data)
+    if resp.status_code != 200:
+        try:
+            err = resp.json().get("detail", resp.json().get("error", resp.text))
+        except Exception:
+            err = resp.text
         return JsonResponse({"ok": False, "error": err}, status=resp.status_code)
 
     import base64
     import io
     import zipfile
 
-    # Preferir base64 vindo do RAG (evita ler paths do outro container)
-    tr_b64 = data.get("tr_docx_base64")
-    dfd_b64 = data.get("dfd_docx_base64")
-    if tr_b64 and dfd_b64:
-        try:
-            tr_bytes = base64.b64decode(tr_b64)
-            dfd_bytes = base64.b64decode(dfd_b64)
-        except Exception as e:
-            return JsonResponse({"ok": False, "error": f"Conteúdo TR/DFD inválido: {e}"}, status=502)
-    else:
-        tr_path = data.get("tr_docx_path")
-        dfd_path = data.get("dfd_docx_path")
-        if not tr_path or not os.path.isfile(tr_path):
-            return JsonResponse({"ok": False, "error": "Caminho do TR não retornado ou arquivo inexistente. RAG deve retornar tr_docx_base64."}, status=502)
-        if not dfd_path or not os.path.isfile(dfd_path):
-            return JsonResponse({"ok": False, "error": "Caminho do DFD não retornado ou arquivo inexistente. RAG deve retornar dfd_docx_base64."}, status=502)
-        with open(tr_path, "rb") as f:
-            tr_bytes = f.read()
-        with open(dfd_path, "rb") as f:
-            dfd_bytes = f.read()
+    # Resposta é o ZIP (generate-tr-and-dfd-zip devolve arquivo único)
+    zip_bytes_raw = resp.content
+    if not zip_bytes_raw:
+        return JsonResponse({"ok": False, "error": "Serviço retornou ZIP vazio."}, status=502)
+    try:
+        with zipfile.ZipFile(io.BytesIO(zip_bytes_raw), "r") as zf:
+            tr_bytes = zf.read("termo_referencia.docx")
+            dfd_bytes = zf.read("dfd.docx")
+    except KeyError as e:
+        return JsonResponse({"ok": False, "error": f"ZIP sem arquivo esperado: {e}"}, status=502)
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": f"ZIP inválido: {e}"}, status=502)
 
     tpl = Template.objects.filter(id=template_id).first() if template_id is not None else None
 

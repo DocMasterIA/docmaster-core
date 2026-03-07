@@ -297,6 +297,20 @@ async def endpoint_generate_document(
     except Exception as e:
         logger.exception("Erro em generate-document: %s", e)
         detail = str(e).strip() or f"{type(e).__name__} (sem mensagem)"
+        # Extrair mensagem limpa quando vier "Orquestração retornou status 404: {\"detail\":\"...\"}"
+        if "404" in detail or "Orquestração" in detail:
+            import re
+            match = re.search(r'"detail"\s*:\s*"([^"]+)"', detail)
+            if match:
+                inner = match.group(1).strip()
+                if inner:
+                    detail = inner
+            if "404" in detail and "Ollama" not in detail:
+                detail = (
+                    "Modelo não encontrado no Ollama (404). "
+                    "No host do Ollama execute: ollama pull <modelo> (ex.: ollama pull llama3.2). "
+                    "Verifique OLLAMA_MODEL no llm_api e se ollama list mostra o modelo."
+                )
         raise HTTPException(status_code=500, detail=detail) from e
 
 
@@ -490,6 +504,12 @@ async def endpoint_generate_tr_and_dfd(body: GenerateTRFromModelRequest):
     except Exception as e:
         logger.exception("Erro em generate-tr-and-dfd: %s", e)
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/generate-tr-and-dfd/")
+async def endpoint_generate_tr_and_dfd_trailing(body: GenerateTRFromModelRequest):
+    """Mesma lógica de generate-tr-and-dfd, para clientes que enviam URL com barra final."""
+    return await endpoint_generate_tr_and_dfd(body)
 
 
 @router.post("/generate-tr-and-dfd-zip")

@@ -135,10 +135,16 @@ def _build_tr_slots_user_prompt(
         parts.append(_format_user_context_for_tr_prompt(user_context))
     if rag_objeto_examples:
         parts.append(
-            "\nExemplos de redação de OBJETO (documentos reais – use como referência de extensão e estilo; o campo objeto do JSON deve ter esse nível de desenvolvimento):\n"
+            "\nExemplos de redação de OBJETO (documentos reais – use como referência de extensão e estilo; o campo objeto do JSON deve ter esse nível de desenvolvimento em termos de tamanho, formalidade e completude):\n"
             + rag_objeto_examples
         )
-    parts.append("\nPreencha o JSON de slots do Termo de Referência (objeto, dispensa, itens, justificativa, fiscal, dotacao). Saída: apenas o JSON.")
+        parts.append(
+            "\nAo preencher o campo \"objeto\" do JSON, SIGA o mesmo nível de detalhamento, formalidade e extensão destes exemplos. "
+            "NÃO resuma o objeto em uma frase curta ou genérica; desenvolva em cláusula contínua completa."
+        )
+    parts.append(
+        "\nPreencha o JSON de slots do Termo de Referência (objeto, dispensa, itens, justificativa, fiscal, dotacao). Saída: apenas o JSON."
+    )
     return "\n".join(parts)
 
 
@@ -572,10 +578,19 @@ async def fill_tr_slots_with_llm(
         objeto_fallback = user_prompt.strip()[:400]
 
     def _is_trivial(text: str) -> bool:
+        """
+        Determina se o objeto vindo da LLM é claramente insuficiente
+        (muito curto ou praticamente vazio) a ponto de exigir fallback.
+        """
         if not text:
             return True
         stripped = text.strip().strip(".;,")
-        return len(stripped) < 5  # ex.: ".", "..", "ok", etc.
+        # Considera trivial apenas textos extremamente curtos (1–2 palavras muito pequenas),
+        # evitando acionar o fallback quando a LLM já produziu uma cláusula razoável.
+        if len(stripped) < 15:
+            return True
+        words = stripped.split()
+        return len(words) <= 3
 
     if _is_trivial(llm_slots.objeto) and objeto_fallback:
         # Nunca colar o prompt cru no objeto: formatar como cláusula formal

@@ -306,19 +306,41 @@ def _normalize_objeto(text: str) -> str:
             flags=re.IGNORECASE,
         )
         complemento = None
+        comp_words: List[str] = []
         if m:
             complemento = m.group(1).strip()
-        if complemento:
             complemento = re.sub(r"[.。…;:,]+$", "", complemento).strip()
             comp_words = complemento.split()
-            if complemento in generic_terms or len(comp_words) <= 3:
-                base_for_clause = complemento
-            else:
-                base_for_clause = complemento
-        else:
-            base_for_clause = base
 
-        if (lower in generic_terms or len(words) <= 3) or complemento:
+        def _clean_head(s: str) -> str:
+            s = s.strip()
+            # Remove cabeçalhos redundantes como "a contratação de", "contratação de", "elaborar termo de referência para"
+            patterns = [
+                r"^a\s+contratação\s+de\s+",
+                r"^contratação\s+de\s+",
+                r"^contratacao\s+de\s+",
+                r"^elaborar\s+termo\s+de\s+referência\s+para\s+",
+                r"^elaborar\s+termo\s+de\s+referencia\s+para\s+",
+                r"^elaborar\s+",
+            ]
+            for pat in patterns:
+                s = re.sub(pat, "", s, flags=re.IGNORECASE)
+            return s.strip()
+
+        base_for_clause = base
+        use_template = False
+
+        # Dispara template se:
+        # - o texto inteiro é muito curto/genérico; OU
+        # - o complemento após "é" for curto/genérico.
+        if lower in generic_terms or len(words) <= 3:
+            base_for_clause = _clean_head(base)
+            use_template = True
+        elif complemento and (complemento in generic_terms or len(comp_words) <= 3):
+            base_for_clause = _clean_head(complemento)
+            use_template = True
+
+        if use_template and base_for_clause:
             text = (
                 f"O objeto do presente Termo de Referência é a contratação de {base_for_clause} "
                 "para atender às necessidades da Administração Pública, garantindo a adequada "

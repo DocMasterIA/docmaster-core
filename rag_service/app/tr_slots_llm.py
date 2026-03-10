@@ -296,9 +296,31 @@ def _normalize_objeto(text: str) -> str:
             "materiais de expediente",
         }
         words = lower.split()
-        if lower in generic_terms or len(words) <= 3:
+
+        # Caso especial: frases do tipo
+        # "O objeto do presente Termo de Referência é serviços de limpeza."
+        # ou equivalentes, onde o complemento após "é" é curto e genérico.
+        m = re.search(
+            r"^o objeto do presente termo de referência é\s+(.*)$",
+            lower,
+            flags=re.IGNORECASE,
+        )
+        complemento = None
+        if m:
+            complemento = m.group(1).strip()
+        if complemento:
+            complemento = re.sub(r"[.。…;:,]+$", "", complemento).strip()
+            comp_words = complemento.split()
+            if complemento in generic_terms or len(comp_words) <= 3:
+                base_for_clause = complemento
+            else:
+                base_for_clause = complemento
+        else:
+            base_for_clause = base
+
+        if (lower in generic_terms or len(words) <= 3) or complemento:
             text = (
-                f"O objeto do presente Termo de Referência é a aquisição de {base} "
+                f"O objeto do presente Termo de Referência é a contratação de {base_for_clause} "
                 "para atender às necessidades da Administração Pública, garantindo a adequada "
                 "prestação dos serviços e o atendimento ao interesse público."
             )

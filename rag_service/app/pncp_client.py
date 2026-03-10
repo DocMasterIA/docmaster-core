@@ -52,7 +52,8 @@ async def search_contracts(
         "dataFinal": data_final,
         "codigoModalidadeContratacao": codigo_modalidade,
         "pagina": max(1, pagina),
-        "tamanhoPagina": max(1, min(tamanho_pagina, 500)),
+        # Manual impõe tamanho mínimo de página (>= 10)
+        "tamanhoPagina": max(10, min(tamanho_pagina, 500)),
     }
     if uf:
         params["uf"] = uf

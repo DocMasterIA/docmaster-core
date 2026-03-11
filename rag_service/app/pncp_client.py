@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from .config import RAG_HTTP_TIMEOUT
-from .pncp_types import PNCPContractRef
+from .pncp_types import PNCPContractRef, infer_tema_objeto
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +106,9 @@ async def search_contracts(
             orgao_entidade = raw.get("orgaoEntidade") or {}
             unidade_orgao = raw.get("unidadeOrgao") or {}
 
+            objeto_resumido = raw.get("objetoCompra")
+            tema = infer_tema_objeto(str(objeto_resumido or ""))
+
             ref = PNCPContractRef(
                 numero_pncp=numero_pncp,
                 id_licitacao=None,
@@ -115,9 +118,10 @@ async def search_contracts(
                 municipio=unidade_orgao.get("municipioNome"),
                 uf=unidade_orgao.get("ufSigla"),
                 modalidade=raw.get("modalidadeNome"),
-                objeto_resumido=raw.get("objetoCompra"),
+                objeto_resumido=objeto_resumido,
                 valor_global=float(raw.get("valorTotalEstimado") or 0) or None,
                 situacao=raw.get("situacaoCompraNome"),
+                tema_objeto=tema,
                 raw=raw,
             )
             refs.append(ref)

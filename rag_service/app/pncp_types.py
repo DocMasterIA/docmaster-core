@@ -34,6 +34,8 @@ class PNCPContractRef:
 
     # Metadados auxiliares
     fonte: str = "pncp"
+    # Tema inferido do objeto (ex.: "material_limpeza", "ti_infraestrutura", etc.).
+    tema_objeto: Optional[str] = None
     raw: Optional[Dict[str, Any]] = None  # payload bruto da API, se for útil para debug
 
 
@@ -74,4 +76,54 @@ def pncp_contract_to_text(ref: PNCPContractRef) -> str:
         partes.append(f"Situação: {ref.situacao}.")
 
     return " ".join(partes)
+
+
+def infer_tema_objeto(text: str) -> Optional[str]:
+    """
+    Inferência simples de tema do objeto a partir de palavras‑chave.
+
+    Esta função é propositalmente heurística e leve; pode ser substituída
+    por algo mais sofisticado (inclusive via LLM) no futuro.
+    """
+    if not text:
+        return None
+    t = text.lower()
+
+    # Material/serviço de limpeza
+    if any(k in t for k in ("material de limpeza", "materiais de limpeza", "desinfecção", "desinfeccao", "detergente", "sabão", "sabao", "desinfetante")):
+        return "material_limpeza"
+    if any(k in t for k in ("serviços de limpeza", "servico de limpeza", "limpeza predial", "limpeza urbana", "varrição", "varricao", "coleta de lixo", "coleta de resíduos", "coleta de residuos")):
+        return "servicos_limpeza"
+
+    # TI – infraestrutura e serviços
+    if any(k in t for k in ("rede cabeada", "cabeamento estruturado", "switch", "roteador", "servidor", "datacenter", "firewall")):
+        return "ti_infraestrutura"
+    if any(k in t for k in ("licença de software", "licenca de software", "sistema de gestão", "sistema de gestao", "software de gestão", "software de gestao", "sistema informatizado")):
+        return "ti_software"
+    if any(k in t for k in ("serviços de ti", "servico de ti", "suporte técnico", "suporte tecnico", "manutenção de computadores", "manutencao de computadores")):
+        return "ti_servicos"
+
+    # Saúde – medicamentos e serviços
+    if any(k in t for k in ("medicamento", "medicamentos", "fármaco", "farmaco", "fármaco", "hospitalar", "insumo hospitalar")):
+        return "saude_medicamentos_insumos"
+    if any(k in t for k in ("serviços médicos", "servico medico", "serviços de saúde", "servicos de saude", "exames laboratoriais", "exames de imagem")):
+        return "saude_servicos"
+
+    # Obras e engenharia
+    if any(k in t for k in ("obra", "obras", "pavimentação", "pavimentacao", "reforma", "construção", "construcao", "engenharia", "manutenção predial", "manutencao predial")):
+        return "obras_engenharia"
+
+    # Veículos e pneus
+    if any(k in t for k in ("aquisição de pneus", "aquisicao de pneus", "pneus", "câmaras de ar", "camaras de ar", "protetores de pneus", "frota de veículos", "frota de veiculos")):
+        return "frota_pneus"
+
+    # Educação – material didático
+    if any(k in t for k in ("material didático", "material didatico", "livros didáticos", "livros didaticos", "kit escolar", "material escolar")):
+        return "educacao_material"
+
+    # Serviços gerais (fallback genérico, ainda assim com alguma categorização)
+    if any(k in t for k in ("serviços continuados", "servicos continuados", "terceirização", "terceirizacao", "mão de obra", "mao de obra")):
+        return "servicos_gerais"
+
+    return None
 

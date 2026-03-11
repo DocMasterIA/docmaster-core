@@ -70,8 +70,17 @@ async def download_attachments(
             contrato_dir = base_dir / att.numero_pncp
             contrato_dir.mkdir(parents=True, exist_ok=True)
 
-            # Monta nome de arquivo seguro
-            safe_name = att.nome_arquivo or f"doc_{att.tipo_documento_codigo}"
+            # Monta nome de arquivo seguro (sem barras ou separadores de diretório)
+            raw_name = att.nome_arquivo or f"doc_{att.tipo_documento_codigo}"
+            # Substitui barras e separadores problemáticos por "_"
+            safe_name = (
+                str(raw_name)
+                .replace("/", "_")
+                .replace("\\", "_")
+                .replace("..", "_")
+                .strip()
+            ) or f"doc_{att.tipo_documento_codigo}"
+
             out_path = contrato_dir / safe_name
 
             try:

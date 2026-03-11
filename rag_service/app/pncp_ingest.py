@@ -20,6 +20,7 @@ from .pncp_types import PNCPContractRef, pncp_contract_to_text
 from .pncp_attachments import PNCPAttachment, list_attachments_for_contract
 from .pncp_downloader import download_attachments
 from .pncp_text_extractor import extract_text_from_attachment
+from .ingestion import ingest_text
 
 logger = logging.getLogger(__name__)
 
@@ -153,25 +154,76 @@ async def ingest_contracts_periodo(
 
         saved_paths = await download_attachments(anexos_filtrados, base_dir=base_dir)
 
-        for path in saved_paths:
+        # Assumimos que a ordem de saved_paths segue a ordem de anexos_filtrados.
+        for att, path in zip(anexos_filtrados, saved_paths):
             try:
                 texto = extract_text_from_attachment(path)
             except Exception as e:
                 logger.warning(
-                    "PNCP ingest: falha ao extrair texto de %s (numero_pncp=%s) erro=%s",
+                    "PNCP ingest: falha ao extrair texto de %s (numero_pncp=%s, tipo=%s) erro=%s",
                     path,
                     ref.numero_pncp,
+                    att.document_type_inferido,
+                    e,
+                )
+                continue
+
+            if not texto or not texto.strip():
+                logger.info(
+                    "PNCP ingest: texto vazio ou muito curto em %s (numero_pncp=%s, tipo=%s)",
+                    path,
+                    ref.numero_pncp,
+                    att.document_type_inferido,
+                )
+                continue
+
+            logger.info(
+                "PNCP ingest: texto extraído de %s (numero_pncp=%s, tipo=%s, tamanho=%s caracteres)",
+                path,
+                ref.numero_pncp,
+                att.document_type_inferido,
+                len(texto),
+            )
+
+            # Metadados ricos para o RAG / Chroma.
+            metadata = {
+                "document_type": att.document_type_inferido,
+                "fonte": "pncp",
+                "numero_pncp": ref.numero_pncp,
+                "cnpj_orgao": ref.cnpj_orgao,
+                "ano_compra": ref.ano_compra,
+                "sequencial_compra": ref.sequencial_compra,
+                "orgao": ref.orgao,
+                "unidade_compradora": ref.unidade_compradora,
+                "municipio": ref.municipio,
+                "uf": ref.uf,
+                "modalidade": ref.modalidade,
+                "valor_global": ref.valor_global,
+                "situacao": ref.situacao,
+                "tema_objeto": ref.tema_objeto,
+                "tipo_documento_codigo": att.tipo_documento_codigo,
+                "tipo_documento_nome": att.tipo_documento_nome,
+                "nome_arquivo": att.nome_arquivo,
+                "arquivo_path": str(path),
+            }
+
+            try:
+                chunks_added = ingest_text(texto, metadata=metadata, collection_name=None)
+            except Exception as e:
+                logger.warning(
+                    "PNCP ingest: falha ao ingerir texto no Chroma (numero_pncp=%s, tipo=%s, arquivo=%s) erro=%s",
+                    ref.numero_pncp,
+                    att.document_type_inferido,
+                    path,
                     e,
                 )
                 continue
 
             logger.info(
-                "PNCP ingest: texto extraído de %s (numero_pncp=%s, tamanho=%s caracteres)",
-                path,
+                "PNCP ingest: %s chunks adicionados ao índice para numero_pncp=%s, tipo=%s, arquivo=%s",
+                chunks_added,
                 ref.numero_pncp,
-                len(texto),
+                att.document_type_inferido,
+                path,
             )
-
-            # Ponto de extensão: enviar (texto, metadados) para criação de chunks
-            # e gravação no repositório vetorial (Chroma, etc.).
 

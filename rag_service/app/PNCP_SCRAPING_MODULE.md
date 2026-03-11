@@ -176,3 +176,37 @@ Em tempo de geração (ETP, TR, DFD, etc.), a ideia é:
   - A ingestão em massa e offline evita reprocessar PDFs a cada solicitação.
   - Em tempo real, o sistema apenas consulta o índice RAG e, se necessário, faz uma chamada leve à API PNCP.
 
+---
+
+#### 9. Estado atual da implementação (mar/2026)
+
+- **API de consultas PNCP (`/api/consulta`)**
+  - `pncp_client.search_contracts(...)` implementado com o endpoint oficial `GET /v1/contratacoes/publicacao`, incluindo:
+    - filtros por período, modalidade, UF e município;
+    - mapeamento para `PNCPContractRef` com campos técnicos (`cnpj_orgao`, `ano_compra`, `sequencial_compra`) e `tema_objeto` inferido.
+- **Descoberta de contratações**
+  - `pncp_discovery.list_contracts_periodo(...)` encapsula a busca paginada por período/modalidade.
+  - `pncp_ingest.inspect_contracts_periodo(...)` gera logs de diagnóstico com tema, número PNCP e resumo.
+- **Descoberta de anexos via `/pncp-api`**
+  - `pncp_files_client._build_arquivos_base_url(ref)` monta `https://pncp.gov.br/pncp-api/v1/orgaos/{cnpj}/compras/{ano}/{seq}`.
+  - `pncp_files_client.list_arquivos_for_contract(ref)` chama `GET .../arquivos` e retorna uma lista de arquivos com:
+    - `url`, `titulo`, `tipoDocumentoId`, `tipoDocumentoNome`, `sequencialDocumento`.
+  - `pncp_attachments.list_attachments_for_contract(ref)` converte isso em `PNCPAttachment` com:
+    - `url_download` pronta para cada anexo;
+    - `document_type_inferido` (`termo_referencia`, `etp`, `dfd`, `contrato`, `outro`) com base em `tipoDocumentoId`.
+- **Download e extração de texto**
+  - `pncp_downloader.download_attachments(...)` baixa apenas anexos selecionados e:
+    - organiza em `base_dir / numero_pncp / <nome_saneado>`;
+    - saneia nomes de arquivo removendo barras e sequências perigosas.
+  - `pncp_text_extractor.extract_text_from_attachment(path)` usa `load_document_text` para extrair texto de PDF/DOCX.
+- **Pipeline de ingestão PNCP (primeira etapa)**
+  - `pncp_ingest.ingest_contracts_periodo(...)` hoje:
+    - descobre contratações via API de consultas;
+    - lista anexos de cada contratação;
+    - **filtra anexos** por `document_type_inferido` em `("termo_referencia", "etp", "dfd", "contrato")`;
+    - baixa anexos relevantes para disco;
+    - extrai texto e registra em log (tamanho, número PNCP, caminho).
+  - **Próximo passo planejado**:
+    - integrar diretamente com o pipeline de chunking/ingestão do RAG (Chroma), gravando:
+      - `document_type`, `fonte="pncp"`, `numero_pncp`, `orgao`, `municipio`, `uf`, `modalidade`, `tema_objeto`, `lei_regente` etc.,
+      - para uso imediato em TR/ETP/DFD gerados pelo sistema.

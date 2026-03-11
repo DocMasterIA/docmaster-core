@@ -5,7 +5,7 @@ from typing import List, Optional
 
 import httpx
 
-from .config import PNCP_BASE_URL
+from .pncp_client import PNCP_BASE_URL
 from .pncp_types import PNCPContractRef
 from .pncp_attachments import PNCPAttachment
 

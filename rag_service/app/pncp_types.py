@@ -25,6 +25,11 @@ class PNCPContractRef:
     municipio: Optional[str] = None
     uf: Optional[str] = None
 
+    # Identificadores técnicos da compra no PNCP (úteis para montar URLs de anexos)
+    cnpj_orgao: Optional[str] = None
+    ano_compra: Optional[int] = None
+    sequencial_compra: Optional[int] = None
+
     # Informações da contratação
     modalidade: Optional[str] = None
     objeto_resumido: Optional[str] = None

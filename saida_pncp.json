@@ -1,0 +1,37 @@
+NUMERO PNCP: 00394684000153-1-000477/2023
+RAW:
+{
+  "dataAtualizacao": "2024-01-02T13:53:57",
+  "orgaoEntidade": {
+    "cnpj": "00394684000153",
+    "razaoSocial": "SECRETARIA DE ESTADO DE ECONOMIA DO DISTRITO FEDERAL",      
+    "poderId": "E",
+    "esferaId": "D"
+  },
+  "anoCompra": 2023,
+  "sequencialCompra": 477,
+  },
+  "dataAberturaProposta": "2024-01-02T13:53:55",
+  "dataEncerramentoProposta": "2024-01-09T07:59:59",
+  },
+  "dataAberturaProposta": "2024-01-02T13:53:55",
+  "dataEncerramentoProposta": "2024-01-09T07:59:59",
+  "informacaoComplementar": "Atendimento da determinação judicial, haja vista o prazo exíguo determinado pelo magistrado, sem prejuízo ao paciente.",
+  "linkSistemaOrigem": null,
+  "justificativaPresencial": null,
+  "dataPublicacaoPncp": "2024-01-02T13:53:57",
+  "modalidadeId": 8,
+  "dataAtualizacaoGlobal": "2024-01-02T13:53:57",
+  "linkProcessoEletronico": null,
+  "numeroControlePNCP": "00394684000153-1-000477/2023",
+  "modoDisputaId": 4,
+  "tipoInstrumentoConvocatorioNome": "Aviso de Contratação Direta",
+  "tipoInstrumentoConvocatorioCodigo": 2,
+  "modoDisputaNome": "Dispensa Com Disputa",
+  "valorTotalEstimado": 55.31,
+  "modalidadeNome": "Dispensa",
+  "fontesOrcamentarias": [],
+  "situacaoCompraId": 1,
+  "situacaoCompraNome": "Divulgada no PNCP",
+  "usuarioNome": "Compras.gov.br"
+}

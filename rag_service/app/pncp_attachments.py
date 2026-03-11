@@ -125,15 +125,19 @@ async def list_attachments_for_contract(ref: PNCPContractRef) -> List[PNCPAttach
         return []
 
     for arquivo in arquivos:
-        url_download = f"{base}/{arquivo.id_arquivo}"
+        # Mapeia tipoDocumentoId (quando disponível) para nosso tipo lógico.
+        tipo_codigo = arquivo.tipo_documento_id or 0
+        tipo_nome = arquivo.tipo_documento_nome or (arquivo.titulo or "")
+        document_type = _infer_document_type_from_codigo(tipo_codigo)
+
         attachments.append(
             PNCPAttachment(
                 numero_pncp=ref.numero_pncp,
-                tipo_documento_codigo=0,
-                tipo_documento_nome="Desconhecido",
-                nome_arquivo=arquivo.nome_arquivo or f"arquivo_{arquivo.id_arquivo}",
-                url_download=url_download,
-                document_type_inferido="outro",
+                tipo_documento_codigo=tipo_codigo,
+                tipo_documento_nome=tipo_nome,
+                nome_arquivo=arquivo.titulo or f"arquivo_{arquivo.id_arquivo}",
+                url_download=arquivo.url,
+                document_type_inferido=document_type,
             )
         )
 

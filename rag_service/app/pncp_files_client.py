@@ -5,25 +5,35 @@ from typing import List, Optional
 
 import httpx
 
-from .pncp_client import PNCP_BASE_URL
 from .pncp_types import PNCPContractRef
+
+
+# Base específica para download de arquivos no PNCP (não é a mesma da API de consulta).
+PNCP_FILES_BASE_URL = "https://pncp.gov.br/pncp-api"
 
 
 @dataclass
 class PNCPFileMeta:
     """
-    Metadados simples de um arquivo retornado pelo endpoint de arquivos do PNCP.
+    Metadados simples de um arquivo associado a uma contratação PNCP,
+    baseados na resposta JSON de /v1/orgaos/{cnpj}/compras/{ano}/{seq}/arquivos.
     """
 
     id_arquivo: int
-    nome_arquivo: Optional[str]
-    conteudo_tipo: Optional[str]
+    url: str
+    titulo: Optional[str]
+    tipo_documento_id: Optional[int]
+    tipo_documento_nome: Optional[str]
 
 
 def _build_arquivos_base_url(ref: PNCPContractRef) -> Optional[str]:
     """
-    Monta a URL base para arquivos de uma compra PNCP, a partir dos campos
-    técnicos disponíveis no PNCPContractRef (ou em ref.raw como fallback).
+    Monta a URL base para uma compra PNCP na API de arquivos,
+    a partir dos campos técnicos disponíveis no PNCPContractRef
+    (ou em ref.raw como fallback).
+
+    Exemplo:
+        https://pncp.gov.br/pncp-api/v1/orgaos/{cnpj}/compras/{ano}/{seq}
     """
     cnpj = ref.cnpj_orgao
     ano = ref.ano_compra
@@ -41,51 +51,80 @@ def _build_arquivos_base_url(ref: PNCPContractRef) -> Optional[str]:
     if not (cnpj and ano and seq):
         return None
 
-    return f"{PNCP_BASE_URL}/v1/orgaos/{cnpj}/compras/{ano}/{seq}/arquivos"
+    return f"{PNCP_FILES_BASE_URL}/v1/orgaos/{cnpj}/compras/{ano}/{seq}"
 
 
-async def list_arquivos_for_contract(ref: PNCPContractRef) -> List[PNCPFileMeta]:
+async def list_arquivos_for_contract(ref: PNCPContractRef, max_ids: int = 10) -> List[PNCPFileMeta]:
     """
-    Lista arquivos conhecidos para uma contratação PNCP, usando o endpoint
-    de arquivos quando disponível.
+    Consulta a lista de arquivos de uma contratação PNCP.
 
-    Retorna apenas metadados mínimos (id, nome, content-type).
+    Endpoint observado (resposta de exemplo fornecida pelo usuário):
+        GET /v1/orgaos/{cnpj}/compras/{ano}/{seq}/arquivos
+
+    que retorna um array JSON com itens contendo, entre outros:
+        - url / uri
+        - sequencialDocumento
+        - titulo
+        - tipoDocumentoId / tipoDocumentoNome
     """
     base = _build_arquivos_base_url(ref)
     if not base:
         return []
 
-    url = base
+    resultados: List[PNCPFileMeta] = []
+
     async with httpx.AsyncClient() as client:
+        url = f"{base}/arquivos"
         try:
             resp = await client.get(url)
-            resp.raise_for_status()
-        except Exception:
-            # Se o endpoint de listagem não existir ou falhar, retornamos vazio;
-            # o chamador pode optar por uma estratégia de sondagem (arquivos/1, 2, 3...).
+        except httpx.RequestError:
             return []
 
-    data = resp.json()
-    # A estrutura exata ainda não é 100% conhecida; assumimos alguns campos comuns.
-    items = data if isinstance(data, list) else data.get("data") or []
+    if not resp.is_success:
+        return []
 
-    resultados: List[PNCPFileMeta] = []
-    for item in items:
+    try:
+        data = resp.json()
+    except ValueError:
+        return []
+
+    if not isinstance(data, list):
+        return []
+
+    for item in data:
         try:
-            file_id = int(item.get("id") or item.get("sequencial") or item.get("numero") or 0)
+            file_id = int(item.get("sequencialDocumento") or 0)
         except Exception:
-            continue
+            file_id = 0
+        if not file_id:
+            # fallback: extrair do final da URL, se existir
+            try:
+                url_item = str(item.get("url") or item.get("uri") or "")
+                file_id = int(url_item.rstrip("/").split("/")[-1])
+            except Exception:
+                file_id = 0
         if not file_id:
             continue
 
-        nome = item.get("nomeArquivo") or item.get("nome") or None
-        content_type = item.get("contentType") or item.get("tipoMime") or None
+        url_item = str(item.get("url") or item.get("uri") or "").strip()
+        if not url_item:
+            # constrói a partir da base, se necessário
+            url_item = f"{base}/arquivos/{file_id}"
+
+        titulo = item.get("titulo") or None
+        try:
+            tipo_id = int(item.get("tipoDocumentoId")) if item.get("tipoDocumentoId") is not None else None
+        except Exception:
+            tipo_id = None
+        tipo_nome = item.get("tipoDocumentoNome") or None
 
         resultados.append(
             PNCPFileMeta(
                 id_arquivo=file_id,
-                nome_arquivo=nome,
-                conteudo_tipo=content_type,
+                url=url_item,
+                titulo=titulo,
+                tipo_documento_id=tipo_id,
+                tipo_documento_nome=tipo_nome,
             )
         )
 

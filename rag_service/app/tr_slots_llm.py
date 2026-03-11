@@ -135,7 +135,7 @@ def _build_tr_slots_user_prompt(
         parts.append(_format_user_context_for_tr_prompt(user_context))
     if rag_objeto_examples:
         parts.append(
-            "\nExemplos de redação de OBJETO (documentos reais – use como referência de extensão e estilo; o campo objeto do JSON deve ter esse nível de desenvolvimento em termos de tamanho, formalidade e completude):\n"
+            "\nExemplos de redação de OBJETO (documentos reais, preferencialmente Termos de Referência e estudos extraídos de contratações cadastradas no PNCP – use como referência de extensão e estilo; o campo objeto do JSON deve ter esse nível de desenvolvimento em termos de tamanho, formalidade e completude):\n"
             + rag_objeto_examples
         )
         parts.append(
@@ -550,18 +550,37 @@ async def fill_tr_slots_with_llm(
     """
     context_from_agent = await fetch_context_from_agent(user_prompt)
 
-    # Busca exemplos RAG de cláusulas de objeto (como no fluxo generate_full_document) para enriquecer o prompt
+    # Busca exemplos RAG de cláusulas de objeto (como no fluxo generate_full_document) para enriquecer o prompt.
+    # Estratégia: priorizar exemplos oriundos do PNCP (fonte="pncp") e, se necessário,
+    # complementar com outros TR já ingeridos.
     rag_objeto_examples = ""
     try:
         query_objeto = f"{user_prompt[:200]} cláusula objeto termo de referência"
+        # 1) PNCP primeiro
         docs = retrieve(
             query=query_objeto,
             collection_name=CHROMA_COLLECTION,
             top_k=2,
-            where={"document_type": "termo_referencia"},
+            where={"document_type": "termo_referencia", "fonte": "pncp"},
         )
+        # 2) Complementa com outros TR (sem restringir fonte) se necessário
+        if len(docs) < 2:
+            remaining = 2 - len(docs)
+            extra = retrieve(
+                query=query_objeto,
+                collection_name=CHROMA_COLLECTION,
+                top_k=remaining,
+                where={"document_type": "termo_referencia"},
+            )
+            if extra:
+                docs.extend(extra)
+        # 3) Fallback geral se absolutamente nada vier
         if not docs:
-            docs = retrieve(query=query_objeto, collection_name=CHROMA_COLLECTION, top_k=2)
+            docs = retrieve(
+                query=query_objeto,
+                collection_name=CHROMA_COLLECTION,
+                top_k=2,
+            )
         if docs:
             rag_objeto_examples = "\n\n---\n\n".join(
                 (d.get("content", "") or "")[:1200] for d in docs

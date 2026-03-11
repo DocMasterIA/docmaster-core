@@ -486,6 +486,77 @@ def _is_conclusion_section(node: Dict[str, Any]) -> bool:
     return any(t in key for t in tokens) or any(t in title for t in tokens)
 
 
+def _retrieve_with_pncp_priority(
+    query: str,
+    collection_name: str,
+    top_k: int,
+    doc_type_filter: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Recupera exemplos do RAG priorizando documentos oriundos do PNCP.
+
+    Estratégia:
+    - Primeiro tenta buscar até top_k itens com filtro fonte=pncp (+ document_type, se fornecido);
+    - Se vierem menos que top_k, completa com documentos de outras fontes
+      com o mesmo document_type;
+    - Se ainda assim não houver nada, faz uma busca geral sem filtro.
+    """
+    where_pncp: Dict[str, Any] = {"fonte": "pncp"}
+    if doc_type_filter:
+        where_pncp["document_type"] = doc_type_filter
+
+    docs: List[Dict[str, Any]] = []
+
+    # 1) PNCP primeiro
+    try:
+        docs = retrieve(
+            query=query,
+            collection_name=collection_name,
+            top_k=top_k,
+            where=where_pncp,
+        )
+    except Exception:
+        docs = []
+
+    if len(docs) >= top_k:
+        return docs[:top_k]
+
+    # 2) Completa com mesma seção de outras fontes (sem fonte=pncp)
+    remaining = top_k - len(docs)
+    where_others: Optional[Dict[str, Any]] = None
+    if doc_type_filter:
+        # Filtro por tipo, mas sem restringir fonte
+        where_others = {"document_type": doc_type_filter}
+
+    try:
+        extra = retrieve(
+            query=query,
+            collection_name=collection_name,
+            top_k=remaining,
+            where=where_others,
+        )
+    except Exception:
+        extra = []
+
+    if extra:
+        docs.extend(extra)
+
+    if docs:
+        return docs[:top_k]
+
+    # 3) Fallback final: sem filtro algum
+    try:
+        docs = retrieve(
+            query=query,
+            collection_name=collection_name,
+            top_k=top_k,
+        )
+    except Exception:
+        docs = []
+
+    return docs
+
+
 def _reorder_conclusion_sections_in_tree(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Garante que seções de conclusão/encerramento fiquem sempre ao final da lista.
@@ -732,7 +803,7 @@ Contexto do documento:
 - Órgão: {context.get("orgao", "não informado")}
 - Modalidade: {context.get("modalidade", "não informado")}
 {user_ctx}{section_hint}
-{espec_text}EXEMPLOS DE CLÁUSULAS SIMILARES (extraídos de documentos reais):
+{espec_text}EXEMPLOS DE CLÁUSULAS SIMILARES (extraídos de documentos reais, com prioridade para Termos de Referência, ETPs e contratos oriundos do PNCP quando disponíveis):
 {rag_context}
 
 ATENÇÃO AO CONTEXTO RAG: Alguns exemplos podem conter trechos de citação legal pura (transcrição literal de artigos de lei). NÃO copie esses trechos como cláusulas narrativas – use-os apenas como referência para fundamentar; redija em prosa contratual adequada ao documento.
@@ -1023,19 +1094,12 @@ async def generate_full_document(
         title = sec["title"]
         # Query RAG: busca exemplos da seção + contexto
         query = f"{ctx.get('objeto', '')} cláusula {title} {key}"
-        docs = retrieve(
+        docs = _retrieve_with_pncp_priority(
             query=query,
             collection_name=coll,
             top_k=top_k_per_section,
-            where={"document_type": doc_type_filter},
+            doc_type_filter=doc_type_filter,
         )
-        # Fallback sem filtro se não encontrou
-        if not docs:
-            docs = retrieve(
-                query=query,
-                collection_name=coll,
-                top_k=top_k_per_section,
-            )
         rag_context = "\n\n---\n\n".join(
             (d.get("content", "") or "")[:600] for d in docs
         )
@@ -1060,14 +1124,12 @@ async def generate_full_document(
         key = sec["key"]
         title = sec["title"]
         query = f"{ctx.get('objeto', '')} {title} {key} obrigações critérios itens"
-        docs = retrieve(
+        docs = _retrieve_with_pncp_priority(
             query=query,
             collection_name=coll,
             top_k=top_k_per_section,
-            where={"document_type": doc_type_filter},
+            doc_type_filter=doc_type_filter,
         )
-        if not docs:
-            docs = retrieve(query=query, collection_name=coll, top_k=top_k_per_section)
         rag_context = "\n\n---\n\n".join((d.get("content", "") or "")[:600] for d in docs)
         if not rag_context:
             rag_context = "(Nenhum exemplo encontrado. Gere itens genéricos mas pertinentes à seção.)"
@@ -1104,11 +1166,11 @@ async def generate_full_document(
         if not cols:
             continue
         query = f"{ctx.get('objeto', '')} tabela {sec.get('title', key)} estimativa custos"
-        docs = retrieve(
+        docs = _retrieve_with_pncp_priority(
             query=query,
             collection_name=coll,
             top_k=3,
-            where={"document_type": doc_type_filter},
+            doc_type_filter=doc_type_filter,
         )
         rag_ctx = "\n\n---\n\n".join((d.get("content", "") or "")[:500] for d in docs)
         rag_ctx = _sanitize_rag_context_for_legislation(rag_ctx)

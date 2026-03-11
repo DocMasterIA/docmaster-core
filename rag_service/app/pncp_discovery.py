@@ -41,7 +41,8 @@ async def list_contracts_periodo(
 
     while len(resultados) < limite:
         restantes = limite - len(resultados)
-        tamanho_pagina = min(restantes, 100)
+        # API PNCP: tamanhoPagina mínimo 10, máximo 50.
+        tamanho_pagina = max(10, min(restantes, 50))
 
         refs = await search_contracts(
             data_inicial=data_inicial,

@@ -135,10 +135,16 @@ def _build_tr_slots_user_prompt(
         parts.append(_format_user_context_for_tr_prompt(user_context))
     if rag_objeto_examples:
         parts.append(
-            "\nExemplos de redação de OBJETO (documentos reais – use como referência de extensão e estilo; o campo objeto do JSON deve ter esse nível de desenvolvimento):\n"
+            "\nExemplos de redação de OBJETO (documentos reais – use como referência de extensão e estilo; o campo objeto do JSON deve ter esse nível de desenvolvimento em termos de tamanho, formalidade e completude):\n"
             + rag_objeto_examples
         )
-    parts.append("\nPreencha o JSON de slots do Termo de Referência (objeto, dispensa, itens, justificativa, fiscal, dotacao). Saída: apenas o JSON.")
+        parts.append(
+            "\nAo preencher o campo \"objeto\" do JSON, SIGA o mesmo nível de detalhamento, formalidade e extensão destes exemplos. "
+            "NÃO resuma o objeto em uma frase curta ou genérica; desenvolva em cláusula contínua completa."
+        )
+    parts.append(
+        "\nPreencha o JSON de slots do Termo de Referência (objeto, dispensa, itens, justificativa, fiscal, dotacao). Saída: apenas o JSON."
+    )
     return "\n".join(parts)
 
 
@@ -290,9 +296,53 @@ def _normalize_objeto(text: str) -> str:
             "materiais de expediente",
         }
         words = lower.split()
+
+        # Caso especial: frases do tipo
+        # "O objeto do presente Termo de Referência é serviços de limpeza."
+        # ou equivalentes, onde o complemento após "é" é curto e genérico.
+        m = re.search(
+            r"^o objeto do presente termo de referência é\s+(.*)$",
+            lower,
+            flags=re.IGNORECASE,
+        )
+        complemento = None
+        comp_words: List[str] = []
+        if m:
+            complemento = m.group(1).strip()
+            complemento = re.sub(r"[.。…;:,]+$", "", complemento).strip()
+            comp_words = complemento.split()
+
+        def _clean_head(s: str) -> str:
+            s = s.strip()
+            # Remove cabeçalhos redundantes como "a contratação de", "contratação de", "elaborar termo de referência para"
+            patterns = [
+                r"^a\s+contratação\s+de\s+",
+                r"^contratação\s+de\s+",
+                r"^contratacao\s+de\s+",
+                r"^elaborar\s+termo\s+de\s+referência\s+para\s+",
+                r"^elaborar\s+termo\s+de\s+referencia\s+para\s+",
+                r"^elaborar\s+",
+            ]
+            for pat in patterns:
+                s = re.sub(pat, "", s, flags=re.IGNORECASE)
+            return s.strip()
+
+        base_for_clause = base
+        use_template = False
+
+        # Dispara template se:
+        # - o texto inteiro é muito curto/genérico; OU
+        # - o complemento após "é" for curto/genérico.
         if lower in generic_terms or len(words) <= 3:
+            base_for_clause = _clean_head(base)
+            use_template = True
+        elif complemento and (complemento in generic_terms or len(comp_words) <= 3):
+            base_for_clause = _clean_head(complemento)
+            use_template = True
+
+        if use_template and base_for_clause:
             text = (
-                f"O objeto do presente Termo de Referência é a aquisição de {base} "
+                f"O objeto do presente Termo de Referência é a contratação de {base_for_clause} "
                 "para atender às necessidades da Administração Pública, garantindo a adequada "
                 "prestação dos serviços e o atendimento ao interesse público."
             )
@@ -572,10 +622,19 @@ async def fill_tr_slots_with_llm(
         objeto_fallback = user_prompt.strip()[:400]
 
     def _is_trivial(text: str) -> bool:
+        """
+        Determina se o objeto vindo da LLM é claramente insuficiente
+        (muito curto ou praticamente vazio) a ponto de exigir fallback.
+        """
         if not text:
             return True
         stripped = text.strip().strip(".;,")
-        return len(stripped) < 5  # ex.: ".", "..", "ok", etc.
+        # Considera trivial apenas textos extremamente curtos (1–2 palavras muito pequenas),
+        # evitando acionar o fallback quando a LLM já produziu uma cláusula razoável.
+        if len(stripped) < 15:
+            return True
+        words = stripped.split()
+        return len(words) <= 3
 
     if _is_trivial(llm_slots.objeto) and objeto_fallback:
         # Nunca colar o prompt cru no objeto: formatar como cláusula formal

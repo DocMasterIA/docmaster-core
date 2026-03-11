@@ -7,7 +7,6 @@ import httpx
 
 from .pncp_client import PNCP_BASE_URL
 from .pncp_types import PNCPContractRef
-from .pncp_attachments import PNCPAttachment
 
 
 @dataclass
@@ -91,34 +90,4 @@ async def list_arquivos_for_contract(ref: PNCPContractRef) -> List[PNCPFileMeta]
         )
 
     return resultados
-
-
-async def build_attachments_for_contract(ref: PNCPContractRef) -> List[PNCPAttachment]:
-    """
-    Constrói uma lista de PNCPAttachment com base nos metadados retornados por
-    list_arquivos_for_contract. Neste momento, o tipo lógico do documento é
-    marcado como \"outro\" por padrão, podendo ser refinado futuramente quando
-    houver metadados mais ricos.
-    """
-    base = _build_arquivos_base_url(ref)
-    if not base:
-        return []
-
-    arquivos = await list_arquivos_for_contract(ref)
-    attachments: List[PNCPAttachment] = []
-    for arquivo in arquivos:
-        url_download = f"{base}/{arquivo.id_arquivo}"
-
-        attachments.append(
-            PNCPAttachment(
-                numero_pncp=ref.numero_pncp,
-                tipo_documento_codigo=0,
-                tipo_documento_nome="Desconhecido",
-                nome_arquivo=arquivo.nome_arquivo or f"arquivo_{arquivo.id_arquivo}",
-                url_download=url_download,
-                document_type_inferido="outro",
-            )
-        )
-
-    return attachments
 

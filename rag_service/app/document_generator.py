@@ -602,6 +602,28 @@ def _ensure_etp_conclusion_last(
     return structure
 
 
+def _sanitize_table_schema_mismatch(structure: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Garante que apenas seções com content_type='table' mantenham table_schema.
+    Remove table_schema de nós text/list para evitar erros de validação do backend.
+    """
+    def _clean_nodes(nodes: List[Dict[str, Any]]) -> None:
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            ctype = node.get("content_type")
+            if ctype != "table" and "table_schema" in node:
+                node.pop("table_schema", None)
+            children = node.get("children")
+            if isinstance(children, list):
+                _clean_nodes(children)
+
+    root = structure.get("root_sections")
+    if isinstance(root, list):
+        _clean_nodes(root)
+    return structure
+
+
 async def _call_llm_agent_structure(user_prompt: str) -> Dict[str, Any]:
     """Chama llm_agent para obter estrutura, context e especificacoes a partir do prompt livre."""
     url = f"{LLM_AGENT_BASE_URL}/api/agent/structure-from-prompt"
@@ -1102,6 +1124,8 @@ async def generate_full_document(
 
     # ETP/Estudo: força seções de conclusão/encerramento ao final do documento
     doc_structure = _ensure_etp_conclusion_last(doc_structure, document_type)
+    # Sanitiza inconsistências de table_schema vindo do llm_agent
+    doc_structure = _sanitize_table_schema_mismatch(doc_structure)
 
     # Coleta seções que precisam de texto
     text_sections: List[Dict[str, str]] = []

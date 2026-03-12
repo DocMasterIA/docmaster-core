@@ -47,7 +47,7 @@ OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 # - RAG_TIMEOUT controla o timeout padrão (em segundos) para chamadas HTTP usadas no RAG,
 #   incluindo consultas ao PNCP. Valor maior é útil para ingestões em massa.
 # - Por padrão, usamos 120s para evitar ReadTimeout frequentes em chamadas pesadas.
-RAG_TIMEOUT: float = float(os.getenv("RAG_TIMEOUT", "120"))
+RAG_TIMEOUT: float = float(os.getenv("RAG_TIMEOUT", "300"))
 RAG_HTTP_TIMEOUT: float | None = None if RAG_TIMEOUT <= 0 else RAG_TIMEOUT
 EMBEDDING_TIMEOUT: float = float(os.getenv("EMBEDDING_TIMEOUT", "30.0"))
 

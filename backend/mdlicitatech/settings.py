@@ -30,6 +30,8 @@ DEBUG = True
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
+    "docmasteria.com.br"
+    "www.docmasteria.com.br",
     "api.docmasteria.com.br",
     "www.api.docmasteria.com.br",
 ]

@@ -24,7 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = '...'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 # Aceita localhost e qualquer subdomínio ngrok (para testes em produção com túnel)
 ALLOWED_HOSTS = [
@@ -57,13 +57,13 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 # CORS: frontend Vue em origem diferente do Django (necessário para credentials: 'include')
-_cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "").strip()
+_cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "https://docmasteria.com.br",).strip()
 if _cors_origins:
     CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(",") if o.strip()]
 elif DEBUG:
     CORS_ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
 else:
-    CORS_ALLOWED_ORIGINS = []
+    CORS_ALLOWED_ORIGINS = ["https://docmasteria.com.br"]
 # Permite qualquer origem ngrok (URL muda a cada reinício) – uso em teste/produção com túnel
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https?://[a-zA-Z0-9-]+\.ngrok-free\.app$",

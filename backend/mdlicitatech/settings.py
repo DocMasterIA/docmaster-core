@@ -30,8 +30,8 @@ DEBUG = True
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
-    ".ngrok-free.app",
-    ".ngrok.io",
+    "api.docmasteria.com.br",
+    "www.api.docmasteria.com.br",
 ]
 
 # CSRF: aceita origem ngrok (Django 4.2+ aceita subdomínio com ponto à esquerda)
@@ -40,6 +40,14 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8001",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://api.docmasteria.com.br",
+    "http://api.docmasteria.com.br",
+    "https://www.api.docmasteria.com.br",
+    "http://www.api.docmasteria.com.br",
+    "https://docmasteria.com.br",
+    "http://docmasteria.com.br",
+    "https://www.docmasteria.com.br",
+    "http://www.docmasteria.com.br",
     "https://*.ngrok-free.app",
     "http://*.ngrok-free.app",
     "https://*.ngrok.io",
@@ -229,24 +237,24 @@ UNFOLD = {
     "SITE_TITLE": "Painel MDLicitaTech",
     "SITE_HEADER": "Painel MDLicitaTech",
     "SITE_SUBHEADER": "Seu sistema de Licitações",
-    "SITE_URL": "/",  # para onde o logo do header aponta
+    "SITE_URL": "https://api.docmasteria.com.br/",  # para onde o logo do header aponta
     "SITE_ICON": lambda request: static("logo_licita.png"),
     "SITE_SYMBOL": "speed",  # symbol from icon set
     "SITE_DROPDOWN": [
         {
             "icon": "web",
             "title": _("Acessar Site"),
-            "link": "http://localhost:8000",
+            "link": "https://api.docmasteria.com.br/",
         },
         {
             "icon": "person",
             "title": _("Gerir Usuários"),
-            "link": "http://localhost:8000/admin/app/user/?",
+            "link": "https://api.docmasteria.com.br/admin/app/user/?",
         },
         {
             "icon": "diamond",
             "title": _("Gerir Administradores"),
-            "link": "http://localhost:8000/admin/app/user/?role__exact=ADMIN",
+            "link": "https://api.docmasteria.com.br/admin/app/user/?role__exact=ADMIN",
         },
     ],
 

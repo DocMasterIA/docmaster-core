@@ -39,15 +39,52 @@
             <div class="gov-nav__section-label">Navegação</div>
             <ul class="gov-nav">
               <li class="gov-nav__item">
-                <router-link
-                  to="/"
-                  class="gov-nav__link"
-                  :class="{ 'gov-nav__link--active': $route.name === 'DocumentGenerator' }"
-                  active-class="gov-nav__link--active"
+                <button
+                  type="button"
+                  class="gov-nav__link gov-nav__link--expandable"
+                  :class="{ 'gov-nav__link--active': isGenerationSectionActive }"
+                  @click="generationMenuOpen = !generationMenuOpen"
                 >
-                  <i class="gov-nav__link-icon fa-solid fa-file-lines" aria-hidden="true"></i>
-                  Geração de Documentos
-                </router-link>
+                  <span class="gov-nav__link-main">
+                    <i class="gov-nav__link-icon fa-solid fa-file-lines" aria-hidden="true"></i>
+                    Geração de Documentos
+                  </span>
+                  <i
+                    class="fa-solid"
+                    :class="generationMenuOpen ? 'fa-chevron-up' : 'fa-chevron-down'"
+                    aria-hidden="true"
+                  ></i>
+                </button>
+                <ul v-if="generationMenuOpen" class="gov-subnav">
+                  <li
+                    v-for="page in generationPages"
+                    :key="page.name"
+                    class="gov-subnav__item"
+                  >
+                    <router-link
+                      :to="page.to"
+                      class="gov-subnav__link"
+                      :class="{ 'gov-subnav__link--active': isRouteActive(page.name) }"
+                    >
+                      {{ page.label }}
+                    </router-link>
+                    <ul v-if="page.children?.length" class="gov-subsubnav">
+                      <li
+                        v-for="child in page.children"
+                        :key="child.name"
+                        class="gov-subsubnav__item"
+                      >
+                        <router-link
+                          :to="child.to"
+                          class="gov-subsubnav__link"
+                          :class="{ 'gov-subsubnav__link--active': isRouteActive(child.name) }"
+                        >
+                          {{ child.label }}
+                        </router-link>
+                      </li>
+                    </ul>
+                  </li>
+                </ul>
               </li>
               <li class="gov-nav__item">
                 <router-link
@@ -96,12 +133,64 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const router = useRouter();
+const route = useRoute();
 
 const user = ref(null);
+const generationMenuOpen = ref(true);
+
+const generationPages = [
+  {
+    name: 'DispensaArt75I',
+    label: 'Dispensa - Art. 75, I',
+    to: '/geracao/dispensa-art-75-i',
+    children: [
+      {
+        name: 'DispensaArt75IObrasEngenharia',
+        label: 'Obras e serviços de engenharia',
+        to: '/geracao/dispensa-art-75-i/obras-servicos-engenharia',
+      },
+      {
+        name: 'DispensaArt75IManutencaoVeiculos',
+        label: 'Manutenção de veículos',
+        to: '/geracao/dispensa-art-75-i/manutencao-veiculos',
+      },
+    ],
+  },
+  {
+    name: 'DispensaArt75II',
+    label: 'Dispensa - Art. 75, II',
+    to: '/geracao/dispensa-art-75-ii',
+    children: [],
+  },
+  {
+    name: 'InexigibilidadeArt74I',
+    label: 'Inexigibilidade - Art. 74, I',
+    to: '/geracao/inexigibilidade-art-74-i',
+    children: [
+      {
+        name: 'InexigibilidadeArt74IShowArtistico',
+        label: 'Show artístico',
+        to: '/geracao/inexigibilidade-art-74-i/show-artistico',
+      },
+    ],
+  },
+];
+
+const generationRouteNames = new Set(
+  generationPages.flatMap((page) => [page.name, ...(page.children || []).map((child) => child.name)]),
+);
+
+const isGenerationSectionActive = computed(() => {
+  return route.name === 'DocumentGenerator' || generationRouteNames.has(route.name);
+});
+
+function isRouteActive(name) {
+  return route.name === name;
+}
 
 const UF_FLAGS = {
   AC: new URL('./assets/estados/02-acre-full.svg', import.meta.url).href,
@@ -164,6 +253,9 @@ async function logout() {
 
 onMounted(() => {
   fetchMe();
+  if (isGenerationSectionActive.value) {
+    generationMenuOpen.value = true;
+  }
 });
 </script>
 
@@ -200,5 +292,57 @@ onMounted(() => {
 .gov-topbar__logout:hover {
   background: rgba(255, 255, 255, 0.25);
   border-color: rgba(255, 255, 255, 0.6);
+}
+
+.gov-nav__link--expandable {
+  justify-content: space-between;
+}
+
+.gov-nav__link-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gov-subnav,
+.gov-subsubnav {
+  list-style: none;
+  margin: 4px 0 8px;
+  padding: 0;
+}
+
+.gov-subnav {
+  padding-left: 12px;
+}
+
+.gov-subsubnav {
+  padding-left: 14px;
+}
+
+.gov-subnav__item,
+.gov-subsubnav__item {
+  margin: 2px 0;
+}
+
+.gov-subnav__link,
+.gov-subsubnav__link {
+  display: block;
+  border-radius: var(--radius-md);
+  padding: 5px 8px;
+  color: var(--color-text);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.gov-subnav__link:hover,
+.gov-subsubnav__link:hover {
+  background: #dde4ef;
+  text-decoration: none;
+}
+
+.gov-subnav__link--active,
+.gov-subsubnav__link--active {
+  border: 1px solid var(--color-primary);
+  background-color: #d5edf7;
 }
 </style>

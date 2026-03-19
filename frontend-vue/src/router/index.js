@@ -16,6 +16,42 @@ const routes = [
     meta: { title: 'Gerador de Documentos' },
   },
   {
+    path: '/geracao/dispensa-art-75-i',
+    name: 'DispensaArt75I',
+    component: () => import('../views/DocumentGenerator.vue'),
+    meta: { title: 'Dispensa - Art. 75, I' },
+  },
+  {
+    path: '/geracao/dispensa-art-75-i/obras-servicos-engenharia',
+    name: 'DispensaArt75IObrasEngenharia',
+    component: () => import('../views/DocumentGenerator.vue'),
+    meta: { title: 'Dispensa - Art. 75, I - Obras e Serviços de Engenharia' },
+  },
+  {
+    path: '/geracao/dispensa-art-75-i/manutencao-veiculos',
+    name: 'DispensaArt75IManutencaoVeiculos',
+    component: () => import('../views/DocumentGenerator.vue'),
+    meta: { title: 'Dispensa - Art. 75, I - Manutenção de Veículos' },
+  },
+  {
+    path: '/geracao/dispensa-art-75-ii',
+    name: 'DispensaArt75II',
+    component: () => import('../views/DocumentGenerator.vue'),
+    meta: { title: 'Dispensa - Art. 75, II' },
+  },
+  {
+    path: '/geracao/inexigibilidade-art-74-i',
+    name: 'InexigibilidadeArt74I',
+    component: () => import('../views/DocumentGenerator.vue'),
+    meta: { title: 'Inexigibilidade - Art. 74, I' },
+  },
+  {
+    path: '/geracao/inexigibilidade-art-74-i/show-artistico',
+    name: 'InexigibilidadeArt74IShowArtistico',
+    component: () => import('../views/DocumentGenerator.vue'),
+    meta: { title: 'Inexigibilidade - Art. 74, I - Show Artístico' },
+  },
+  {
     path: '/gerador-documentos',
     redirect: '/',
   },

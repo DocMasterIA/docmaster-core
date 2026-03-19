@@ -61,14 +61,23 @@
                     :key="page.name"
                     class="gov-subnav__item"
                   >
-                    <router-link
-                      :to="page.to"
-                      class="gov-subnav__link"
-                      :class="{ 'gov-subnav__link--active': isRouteActive(page.name) }"
+                    <button
+                      type="button"
+                      class="gov-subnav__link gov-subnav__link--expandable"
+                      :class="{ 'gov-subnav__link--active': isGroupActive(page) }"
+                      @click="toggleGroup(page.name)"
                     >
-                      {{ page.label }}
-                    </router-link>
-                    <ul v-if="page.children?.length" class="gov-subsubnav">
+                      <span class="gov-subnav__link-main">
+                        <i class="gov-nav__link-icon fa-solid" :class="page.icon" aria-hidden="true"></i>
+                        {{ page.label }}
+                      </span>
+                      <i
+                        class="fa-solid"
+                        :class="isGroupOpen(page.name) ? 'fa-chevron-up' : 'fa-chevron-down'"
+                        aria-hidden="true"
+                      ></i>
+                    </button>
+                    <ul v-if="isGroupOpen(page.name) && page.children?.length" class="gov-subsubnav">
                       <li
                         v-for="child in page.children"
                         :key="child.name"
@@ -79,10 +88,17 @@
                           class="gov-subsubnav__link"
                           :class="{ 'gov-subsubnav__link--active': isRouteActive(child.name) }"
                         >
+                          <i class="gov-nav__link-icon fa-solid" :class="child.icon" aria-hidden="true"></i>
                           {{ child.label }}
                         </router-link>
                       </li>
                     </ul>
+                    <div
+                      v-else-if="isGroupOpen(page.name)"
+                      class="gov-subsubnav__empty"
+                    >
+                      Em breve...
+                    </div>
                   </li>
                 </ul>
               </li>
@@ -141,21 +157,28 @@ const route = useRoute();
 
 const user = ref(null);
 const generationMenuOpen = ref(true);
+const groupOpenState = ref({
+  DispensaArt75I: true,
+  DispensaArt75II: false,
+  InexigibilidadeArt74I: false,
+});
 
 const generationPages = [
   {
     name: 'DispensaArt75I',
     label: 'Dispensa - Art. 75, I',
-    to: '/geracao/dispensa-art-75-i',
+    icon: 'fa-gavel',
     children: [
       {
         name: 'DispensaArt75IObrasEngenharia',
         label: 'Obras e serviços de engenharia',
+        icon: 'fa-compass-drafting',
         to: '/geracao/dispensa-art-75-i/obras-servicos-engenharia',
       },
       {
         name: 'DispensaArt75IManutencaoVeiculos',
         label: 'Manutenção de veículos',
+        icon: 'fa-car-side',
         to: '/geracao/dispensa-art-75-i/manutencao-veiculos',
       },
     ],
@@ -163,17 +186,18 @@ const generationPages = [
   {
     name: 'DispensaArt75II',
     label: 'Dispensa - Art. 75, II',
-    to: '/geracao/dispensa-art-75-ii',
+    icon: 'fa-scale-balanced',
     children: [],
   },
   {
     name: 'InexigibilidadeArt74I',
     label: 'Inexigibilidade - Art. 74, I',
-    to: '/geracao/inexigibilidade-art-74-i',
+    icon: 'fa-file-circle-check',
     children: [
       {
         name: 'InexigibilidadeArt74IShowArtistico',
         label: 'Show artístico',
+        icon: 'fa-music',
         to: '/geracao/inexigibilidade-art-74-i/show-artistico',
       },
     ],
@@ -190,6 +214,18 @@ const isGenerationSectionActive = computed(() => {
 
 function isRouteActive(name) {
   return route.name === name;
+}
+
+function toggleGroup(name) {
+  groupOpenState.value[name] = !groupOpenState.value[name];
+}
+
+function isGroupOpen(name) {
+  return !!groupOpenState.value[name];
+}
+
+function isGroupActive(page) {
+  return page.children?.some((child) => child.name === route.name) || false;
 }
 
 const UF_FLAGS = {
@@ -255,6 +291,12 @@ onMounted(() => {
   fetchMe();
   if (isGenerationSectionActive.value) {
     generationMenuOpen.value = true;
+    const activeGroup = generationPages.find((page) =>
+      page.children?.some((child) => child.name === route.name),
+    );
+    if (activeGroup) {
+      groupOpenState.value[activeGroup.name] = true;
+    }
   }
 });
 </script>
@@ -344,5 +386,34 @@ onMounted(() => {
 .gov-subsubnav__link--active {
   border: 1px solid var(--color-primary);
   background-color: #d5edf7;
+}
+
+.gov-subnav__link--expandable {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid transparent;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.gov-subnav__link-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gov-subsubnav__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gov-subsubnav__empty {
+  margin: 4px 0 8px 14px;
+  color: var(--color-text-soft);
+  font-size: 12px;
 }
 </style>

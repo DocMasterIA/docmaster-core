@@ -70,7 +70,7 @@ REGRAS:
 - fiscal: objeto com "nome" (nome completo do fiscal do contrato). Se não houver nome de fiscal claramente informado pelo usuário ou contexto, use "" (não invente nomes).
 - dotacao: sempre deve ser retornado como string vazia \"\". A IA NÃO deve sugerir, inferir ou inventar dotação orçamentária; esse campo será preenchido posteriormente pelo sistema ou por outro fluxo.
 - objeto: campo OBRIGATORIAMENTE redigido como UMA CLÁUSULA FORMAL COMPLETA (nunca lista, nunca palavra solta, nunca cópia do pedido).
-  - REGRA INEGOCIÁVEL: o valor do campo "objeto" DEVE começar com uma das fórmulas: "O objeto do presente Termo de Referência é ", "O presente Termo de Referência tem por objeto " ou "O objeto deste Termo de Referência consiste em ", seguida de uma ou mais frases que DESCREVAM em prosa (não em lista) o que será contratado e a finalidade. O texto total do objeto deve ter no mínimo 80 caracteres e pelo menos duas orações (duas frases ou uma frase com pelo menos uma vírgula e continuação).
+  - REGRA INEGOCIÁVEL: o valor do campo "objeto" DEVE começar com uma das fórmulas: "O objeto do presente Termo de Referência é ", "O presente Termo de Referência tem por objeto " ou "O objeto deste Termo de Referência consiste em ", seguida de frases que DESCREVAM em prosa (não em lista) o que será contratado, para quem e com qual finalidade administrativa. O texto total do objeto deve ter no mínimo 180 caracteres e pelo menos três orações.
   - PROIBIÇÃO ABSOLUTA – NUNCA faça isto no campo objeto:
     * Copiar ou colar o texto do pedido do usuário (ex.: se o usuário escrever "Aquisição de 10 pneus 1000R20, 10 câmaras...", o objeto NÃO pode ser esse texto repetido; você DEVE reformular em cláusula contínua).
     * Devolver uma única palavra ou duas palavras (ex.: "pneus", "material de construção", "equipamentos", "material de escritório"). Qualquer resposta com menos de 4 palavras ou menos de 40 caracteres no objeto é INVÁLIDA.
@@ -354,6 +354,32 @@ def _normalize_objeto(text: str) -> str:
     return text
 
 
+def _expand_objeto_if_too_short(text: str) -> str:
+    """
+    Expande objetos muito curtos/simples para um nível mínimo de formalidade
+    esperado em TR, sem depender de nova chamada de LLM.
+    """
+    t = (text or "").strip()
+    if not t:
+        return t
+
+    words = t.split()
+    if len(words) >= 24 and len(t) >= 180:
+        return t
+
+    base = re.sub(r"^[Oo]\s+objeto\s+do\s+presente\s+Termo\s+de\s+Refer[êe]ncia\s+[ée]\s+", "", t).strip()
+    base = re.sub(r"[.。…;:,]+$", "", base).strip()
+    if not base:
+        base = t
+
+    return (
+        f"O objeto do presente Termo de Referência é a contratação de {base}, "
+        "contemplando as atividades necessárias à adequada execução do objeto, "
+        "com observância dos requisitos técnicos e operacionais pertinentes, "
+        "a fim de atender de forma contínua e eficiente às necessidades da Administração Pública."
+    )
+
+
 def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
     """Converte o dicionário retornado pela LLM em TRTemplateSlots."""
     disp = data.get("dispensa") or {}
@@ -560,12 +586,12 @@ async def fill_tr_slots_with_llm(
         docs = retrieve(
             query=query_objeto,
             collection_name=CHROMA_COLLECTION,
-            top_k=2,
+            top_k=3,
             where={"document_type": "termo_referencia", "fonte": "pncp"},
         )
         # 2) Complementa com outros TR (sem restringir fonte) se necessário
-        if len(docs) < 2:
-            remaining = 2 - len(docs)
+        if len(docs) < 3:
+            remaining = 3 - len(docs)
             extra = retrieve(
                 query=query_objeto,
                 collection_name=CHROMA_COLLECTION,
@@ -583,7 +609,7 @@ async def fill_tr_slots_with_llm(
             )
         if docs:
             rag_objeto_examples = "\n\n---\n\n".join(
-                (d.get("content", "") or "")[:1200] for d in docs
+                (d.get("content", "") or "")[:1800] for d in docs
             )
     except Exception:
         pass
@@ -663,6 +689,9 @@ async def fill_tr_slots_with_llm(
             llm_slots.objeto = _normalize_objeto(
                 f"O objeto do presente Termo de Referência é {objeto_fallback.strip().rstrip('.;')}."
             ) or objeto_fallback
+
+    # Reforço final: evita objeto curto/simples mesmo quando não é "trivial"
+    llm_slots.objeto = _expand_objeto_if_too_short(_normalize_objeto(llm_slots.objeto))
 
     # Escolha do inciso do art. 75:
     # - SEMPRE delegada à LLM especializada em _choose_art75_inciso,

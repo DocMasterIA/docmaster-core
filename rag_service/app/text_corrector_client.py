@@ -53,7 +53,13 @@ async def correct_section_texts(
                 resp.raise_for_status()
                 data = resp.json() if resp.content else {}
                 text = data.get("corrected_text") if isinstance(data, dict) else None
-                corrected[key] = text if isinstance(text, str) and text.strip() else value
+                lt_applied = bool(data.get("language_tool_applied")) if isinstance(data, dict) else False
+                # Garante dependência principal do LanguageTool:
+                # sem LT ativo, preserva texto original (evita depender apenas de regras manuais).
+                if lt_applied and isinstance(text, str) and text.strip():
+                    corrected[key] = text
+                else:
+                    corrected[key] = value
             except Exception:
                 corrected[key] = value
 

@@ -66,7 +66,7 @@ _CUSTOM_REPLACEMENTS: Dict[str, str] = {
     # Órgãos e Agentes
     "prefeitura": "prefeitura", "prefeitrua": "prefeitura", "prefeittura": "prefeitura",
     "governo": "governo", "governoo": "governo",
-    "secretaria": "secretária", "secretariaa": "secretária", "secretraria": "secretária",
+    "secretaria": "secretaria", "secretariaa": "secretaria", "secretraria": "secretaria",
     "comissao": "comissão", "comissaoo": "comissão", "comisao": "comissão",
     "pregoeiro": "pregoeiro", "pregoeiroo": "pregoeiro", "pregoero": "pregoeiro",
     "leiloeiro": "leiloeiro", "leloieiro": "leiloeiro",
@@ -166,6 +166,7 @@ _CUSTOM_REPLACEMENTS: Dict[str, str] = {
     "plenejamento": "planejamento",
     "contigencia": "contingência",
     "contingecia": "contingência",
+    "virtue": "virtude",
     "fundametação": "fundamentação",
     "fundamentaçao": "fundamentação",
     "fundametaçao": "fundamentação",

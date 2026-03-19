@@ -193,7 +193,7 @@ def _convert_markdown_table_to_plain(text: str) -> str:
     return "\n".join(result)
 
 
-def _postprocess_clause_text(text: str) -> str:
+def _postprocess_clause_text(text: str, section_key: str = "") -> str:
     """
     Limpa saída do LLM antes de ir para o DOCX.
 
@@ -228,6 +228,14 @@ def _postprocess_clause_text(text: str) -> str:
     t = re.sub(r"Lei\s*8\.666", "Lei 14.133/2021", t, flags=re.IGNORECASE)
     t = re.sub(r"Lei\s*(?:n[º°]?|n\.?\s*[º°]?)?\s*8\.333/1991", "Lei 14.133/2021", t, flags=re.IGNORECASE)
     t = re.sub(r"Lei\s*8\.333", "Lei 14.133/2021", t, flags=re.IGNORECASE)
+    # Evita numeração legal potencialmente inventada no texto final:
+    # mantemos referência genérica à lei.
+    t = re.sub(
+        r"\bart(?:igo)?\.?\s*\d+[º°]?(?:\s*,\s*§\s*\d+[º°]?)?\s*(?:,?\s*(?:inciso|alínea)\s*[IVXLCDM\d]+)?\s+da\s+Lei\s+14\.133/2021\b",
+        "Lei 14.133/2021",
+        t,
+        flags=re.IGNORECASE,
+    )
     # Placeholders: substitui por texto genérico plausível
     placeholder_fixes = [
         (r"R\$\s*\[conforme\s+edital\]", "conforme edital"),
@@ -348,6 +356,19 @@ def _postprocess_clause_text(text: str) -> str:
     ]
     for pat in heading_patterns:
         t = re.sub(pat, "", t, flags=re.IGNORECASE)
+    # Evita vazamento de conteúdo de "análise de riscos" em seção de solução proposta.
+    if "soluc" in (section_key or "").lower():
+        paras = re.split(r"\n\s*\n", t)
+        risk_markers = (
+            "nesta seção, são identificados os principais riscos",
+            "riscos técnicos",
+            "riscos operacionais",
+            "riscos de cronograma",
+            "riscos de fornecimento",
+            "medidas acauteladoras",
+        )
+        paras = [p for p in paras if not any(m in p.lower() for m in risk_markers)]
+        t = "\n\n".join(paras)
     # Remove parágrafos duplicados (repetição – mantém apenas a primeira ocorrência)
     t = _remove_duplicate_paragraphs(t)
     # Remove linhas vazias excessivas (mais de 2 seguidas)
@@ -874,7 +895,7 @@ Instruções: O PRIMEIRO caractere da sua resposta deve ser o início do conteú
     text = data.get("response", data.get("text", ""))
     raw = (text or "").strip()
     raw = await _llm_sanitize_meta_comments(raw)
-    return _postprocess_clause_text(raw)
+    return _postprocess_clause_text(raw, section_key=section_key)
 
 
 def _is_meta_comment_line(line: str) -> bool:

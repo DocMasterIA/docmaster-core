@@ -69,6 +69,28 @@ services:
       - chroma_data:/chroma/chroma
     restart: unless-stopped
 
+  languagetool:
+    image: silviof/docker-languagetool:latest
+    container_name: languagetool
+    restart: unless-stopped
+
+  text_corrector_service:
+    build:
+      context: .
+      dockerfile: text_corrector_service/Dockerfile
+    image: docmaster-text_corrector_service
+    container_name: text_corrector_service
+    ports:
+      - "8011:8011"
+    environment:
+      - PORT=8011
+      - LANGUAGETOOL_BASE_URL=http://languagetool:8010
+      - LANGUAGETOOL_CHECK_PATH=/v2/check
+      - CORRECTOR_HTTP_TIMEOUT=30
+    depends_on:
+      - languagetool
+    restart: unless-stopped
+
   rag_service:
     build:
       context: .
@@ -84,6 +106,8 @@ services:
       - OLLAMA_BASE_URL=http://ollama:11434
       - LLM_ORCHESTRATION_BASE_URL=http://llm_api:8002
       - LLM_AGENT_BASE_URL=http://llm_agent:8003
+      - TEXT_CORRECTOR_ENABLED=1
+      - TEXT_CORRECTOR_BASE_URL=http://text_corrector_service:8011
       - RAG_TOP_K=5
       - RAG_TIMEOUT=0
     volumes:
@@ -93,6 +117,7 @@ services:
       - llm_api
       - llm_agent
       - chromadb
+      - text_corrector_service
     restart: unless-stopped
 
   backend:

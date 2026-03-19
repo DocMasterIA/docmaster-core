@@ -124,4 +124,19 @@ def apply_post_rules(text: str) -> Tuple[str, List[ChangeItem]]:
         t = t2
         changes.append(ChangeItem(from_text="Atenção:", to_text="", rule="post_rule:strip_atencao_prefix"))
 
+    # Preserva nomenclatura institucional comum em documentos públicos.
+    t2 = re.sub(r"\bsecretária\b(?=\s+(?:de|municipal|estadual|da|do)\b)", "secretaria", t, flags=re.IGNORECASE)
+    t2 = re.sub(r"\bprefeitura\s+municipal\b", "Prefeitura Municipal", t2, flags=re.IGNORECASE)
+    t2 = re.sub(r"\bsecretaria\s+municipal\b", "Secretaria Municipal", t2, flags=re.IGNORECASE)
+    t2 = re.sub(r"\bsecretaria\s+de\s+([a-zà-ÿ])", lambda m: "Secretaria de " + m.group(1).upper(), t2, flags=re.IGNORECASE)
+    if t2 != t:
+        changes.append(
+            ChangeItem(
+                from_text="formas institucionais inconsistentes",
+                to_text="formas institucionais normalizadas",
+                rule="post_rule:normalize_institutional_forms",
+            )
+        )
+        t = t2
+
     return t, changes

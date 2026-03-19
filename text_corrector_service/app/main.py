@@ -27,20 +27,33 @@ async def correct_text(body: CorrectRequest) -> CorrectResponse:
     try:
         text = normalize_text(body.text)
 
-        text, c1 = apply_custom_replacements(text)
-
-        text, c2, warnings, lt_applied = await language_tool_correct(
+        # 1) Primeiro, deixa o LanguageTool fazer a correção gramatical principal.
+        text, c1, warnings1, lt_applied_1 = await language_tool_correct(
             text=text,
             language=body.language,
         )
 
-        text, c3 = apply_post_rules(text)
+        # 2) Depois aplica correções pontuais de OCR/digitação do dicionário customizado.
+        text, c2 = apply_custom_replacements(text)
+
+        # 3) Segunda passada do LanguageTool para ajustar concordância/acentuação
+        # após as trocas do dicionário.
+        text, c3, warnings2, lt_applied_2 = await language_tool_correct(
+            text=text,
+            language=body.language,
+        )
+
+        # 4) Pós-regras leves e determinísticas.
+        text, c4 = apply_post_rules(text)
+
+        warnings = [*warnings1, *warnings2]
+        lt_applied = lt_applied_1 or lt_applied_2
 
         return CorrectResponse(
             ok=True,
             corrected_text=text,
             warnings=warnings,
-            changes=[*c1, *c2, *c3],
+            changes=[*c1, *c2, *c3, *c4],
             language_tool_applied=lt_applied,
         )
     except Exception as e:

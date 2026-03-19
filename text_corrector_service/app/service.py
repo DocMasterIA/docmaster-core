@@ -156,4 +156,30 @@ def apply_post_rules(text: str) -> Tuple[str, List[ChangeItem]]:
         )
         t = t2
 
+    # Ajustes de regência e sujeito institucional em objetos de contratação.
+    t2 = re.sub(
+        r"(?i)\bA Administração\s+Prefeitura Municipal\b",
+        "A Prefeitura Municipal",
+        t,
+    )
+    t2 = re.sub(
+        r"(?i)\batendendo necessidades específicas\b",
+        "atendendo às necessidades específicas",
+        t2,
+    )
+    t2 = re.sub(
+        r"(?i)\bmelhoria do ambiente urbano e a saúde pública\b",
+        "melhoria do ambiente urbano e da saúde pública",
+        t2,
+    )
+    if t2 != t:
+        changes.append(
+            ChangeItem(
+                from_text="regência/sujeito institucional inconsistente",
+                to_text="regência/sujeito institucional normalizado",
+                rule="post_rule:public_admin_object_fixes",
+            )
+        )
+        t = t2
+
     return t, changes

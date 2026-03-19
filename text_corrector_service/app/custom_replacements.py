@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Dict
+import unicodedata
+from typing import Dict, Set
 
 _CUSTOM_REPLACEMENTS: Dict[str, str] = {
     # Termos Jurídicos e Administrativos
@@ -148,6 +149,8 @@ _CUSTOM_REPLACEMENTS: Dict[str, str] = {
     "critérioss": "critérios",
     "analíse": "análise",
     "analisee": "análise",
+    "alterativas": "alternativas",
+    "alterativa": "alternativa",
     "conclussao": "conclusão",
     "conclução": "conclusão",
     "confornidade": "conformidade",
@@ -347,3 +350,64 @@ _CUSTOM_REPLACEMENTS: Dict[str, str] = {
     "federaçãoo": "federação",
     "regimennte": "regimental",
 }
+
+
+# Reaproveitamento seguro da ideia de auto-geração:
+# - apenas variações conservadoras (acento/cedilha e sufixos comuns);
+# - sem remoção de caracteres e sem mutações agressivas.
+_AUTO_TERMS_SAFE = (
+    "licitação",
+    "contratação",
+    "manutenção",
+    "fiscalização",
+    "justificativa",
+    "orçamentário",
+    "orçamentária",
+    "execução",
+    "contingência",
+    "conformidade",
+    "administração",
+    "município",
+    "resíduos",
+    "análise",
+    "conclusão",
+    "obrigações",
+    "especificações",
+    "alternativas",
+)
+
+
+def _strip_accents(text: str) -> str:
+    normalized = unicodedata.normalize("NFD", text)
+    return "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
+
+
+def _generate_safe_typo_forms(term: str) -> Set[str]:
+    base = term.strip().lower()
+    forms: Set[str] = {_strip_accents(base)}
+    swaps = (
+        ("ção", "cao"),
+        ("ções", "coes"),
+        ("ssão", "ssao"),
+        ("ão", "ao"),
+        ("ões", "oes"),
+        ("ç", "c"),
+    )
+    for src, dst in swaps:
+        if src in base:
+            forms.add(base.replace(src, dst))
+            forms.add(_strip_accents(base.replace(src, dst)))
+    return {f for f in forms if f and f != base}
+
+
+def _build_auto_replacements_safe(existing: Dict[str, str]) -> Dict[str, str]:
+    generated: Dict[str, str] = {}
+    for canonical in _AUTO_TERMS_SAFE:
+        canonical_norm = canonical.strip().lower()
+        for typo in _generate_safe_typo_forms(canonical_norm):
+            if typo not in existing and typo not in generated:
+                generated[typo] = canonical_norm
+    return generated
+
+
+_CUSTOM_REPLACEMENTS.update(_build_auto_replacements_safe(_CUSTOM_REPLACEMENTS))

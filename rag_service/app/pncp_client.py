@@ -47,13 +47,14 @@ async def search_contracts(
 
     endpoint = f"{PNCP_BASE_URL}/v1/contratacoes/publicacao"
 
+    # Manual PNCP: tamanhoPagina mínimo 10, máximo 50.
     params: Dict[str, Any] = {
         "dataInicial": data_inicial,
         "dataFinal": data_final,
         "codigoModalidadeContratacao": codigo_modalidade,
         "pagina": max(1, pagina),
-        # Manual impõe tamanho mínimo de página (>= 10)
-        "tamanhoPagina": max(10, min(tamanho_pagina, 500)),
+        # Manual impõe tamanho mínimo de página (>= 10) e máximo de 50
+        "tamanhoPagina": max(10, min(tamanho_pagina, 50)),
     }
     if uf:
         params["uf"] = uf

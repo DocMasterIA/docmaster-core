@@ -53,11 +53,12 @@ Regras obrigatórias:
 2. Não ser verboso nem repetitivo – ir direto ao ponto, com clareza e precisão técnica.
 3. Usar os exemplos do contexto RAG como referência – adaptar ao objeto/contexto informado, mantendo estrutura jurídica e requisitos essenciais.
 4. LEGISLAÇÃO: Use APENAS a Lei 14.133/2021. NUNCA cite a Lei 8.666/1993 (foi revogada em 2021).
-5. Incluir obrigações, prazos, responsabilidades e condições quando fizerem parte da natureza da cláusula.
-6. NUNCA inventar fundamentos legais ou disposições que não estejam nos exemplos ou na lei – em dúvida, seja conservador.
-7. NUNCA use placeholders: proibido [preencher], [prazo determinado], [valor], [X], [objeto], etc. Use valores genéricos plausíveis quando não houver dado específico (ex.: "30 dias", "conforme edital", "no prazo estabelecido no contrato").
-8. REPETIÇÃO É INACEITÁVEL: NUNCA repita frases ou parágrafos idênticos ou quase idênticos na MESMA seção. Cada parágrafo deve ter redação única. Evite fórmulas genéricas repetidas (ex.: "encontra-se detalhada nas partes específicas", "A Administração fará o acompanhamento e o controle das obras e serviços", "nos termos das necessidades específicas"). Se precisar reiterar uma ideia, reformule completamente.
-9. NUNCA use formatação markdown para tabelas (ex.: | col1 | col2 | ou linhas com ---). Tabelas são renderizadas em seções separadas pelo sistema. Se precisar mencionar dados tabulares, descreva em prosa ou indique "conforme tabela na seção correspondente".
+5. CITAÇÕES LEGAIS: SALVO se o artigo, inciso ou parágrafo aparecerem EXPLICITAMENTE (com o mesmo número) no contexto fornecido (exemplos do RAG ou texto do usuário), NÃO invente números de artigos, incisos ou parágrafos (ex.: "art. 40", "art. 10, § 1º"). Quando não houver certeza absoluta, mencione apenas "Lei 14.133/2021" de forma genérica (ex.: "conforme a Lei 14.133/2021"), sem indicar artigo ou parágrafo.
+6. Incluir obrigações, prazos, responsabilidades e condições quando fizerem parte da natureza da cláusula.
+7. NUNCA inventar fundamentos legais ou disposições que não estejam nos exemplos ou na lei – em dúvida, seja conservador e cite apenas a lei em termos genéricos, sem numeração de artigos ou parágrafos.
+8. NUNCA use placeholders: proibido [preencher], [prazo determinado], [valor], [X], [objeto], etc. Use valores genéricos plausíveis quando não houver dado específico (ex.: "30 dias", "conforme edital", "no prazo estabelecido no contrato").
+9. REPETIÇÃO É INACEITÁVEL: NUNCA repita frases ou parágrafos idênticos ou quase idênticos na MESMA seção. Cada parágrafo deve ter redação única. Evite fórmulas genéricas repetidas (ex.: "encontra-se detalhada nas partes específicas", "A Administração fará o acompanhamento e o controle das obras e serviços", "nos termos das necessidades específicas"). Se precisar reiterar uma ideia, reformule completamente.
+10. NUNCA use formatação markdown para tabelas (ex.: | col1 | col2 | ou linhas com ---). Tabelas são renderizadas em seções separadas pelo sistema. Se precisar mencionar dados tabulares, descreva em prosa ou indique "conforme tabela na seção correspondente".
 
 Formato de saída: APENAS o texto da cláusula. Sem prefácios, sem intros, sem notas, sem explicações. O primeiro caractere da sua resposta deve ser o início do conteúdo jurídico, não uma frase sobre a seção.
 - NUNCA use títulos ou cabeçalhos no texto. O título da seção já é inserido automaticamente pelo sistema.
@@ -307,8 +308,10 @@ def _postprocess_clause_text(text: str) -> str:
     t = re.sub(r"^.*\(section_key\s*:\s*[a-z_]+\)[^.\n]*\.?\s*(?:\n|$)", "", t, flags=_M)
     t = re.sub(r"^Nota:\s*[^\n]*(?:\n|$)", "", t, flags=_M)
     t = re.sub(r"^Notas:\s*[^\n]*(?:\n|$)", "", t, flags=_M)
-    t = re.sub(r"^Atenção:\s*[^\n]*(?:instruções|meta|gerado|texto foi|conforme|use|não use)[^\n]*(?:\n|$)", "", t, flags=_M)
-    t = re.sub(r"^Observação:\s*[^\n]*(?:instruções|meta|gerado|texto foi|conforme)[^\n]*(?:\n|$)", "", t, flags=_M)
+    # Remove qualquer linha iniciada por "Atenção:" (mesmo quando o texto em seguida é jurídico),
+    # para evitar prefácios do tipo "Atenção:" no documento final.
+    t = re.sub(r"^Atenção:\s*", "", t, flags=_M)
+    t = re.sub(r"^Observação:\s*[^\n]*(?:\n|$)", "", t, flags=_M)
     t = re.sub(r"^(?:A cláusula deve|Segue(?:m)?|Aqui estão)\s+[^\n]*(?:\n|$)", "", t, flags=_M)
 
     # Remove parágrafos inteiros que são citação legal pura (transcrição de lei)
@@ -453,9 +456,10 @@ def _get_etp_preamble() -> str:
         "- OBJETO/SEÇÃO \"OBJETO\": descreva com 2 a 4 frases o que será CONTRATADO (bens, serviços ou obra), para qual finalidade e quais necessidades administrativas atende, citando o órgão/setor e, quando couber, o público/área beneficiada.\n"
         "  É EXPRESSAMENTE PROIBIDO limitar o OBJETO a uma expressão curta e genérica como apenas \"materiais de limpeza\", \"material de escritório\" ou semelhantes; o texto deve ser completo e autoexplicativo, mesmo que o pedido do usuário seja breve.\n"
         "- SEÇÕES DE NECESSIDADE/MOTIVAÇÃO: explique de forma analítica por que a contratação é necessária, quais problemas pretende resolver e quais riscos existem se não for realizada, SEM inventar números, valores, datas ou normas que não apareçam no contexto.\n"
-        "- SOLUÇÃO PROPOSTA / ALTERNATIVAS: foque em descrever alternativas técnicas e a solução escolhida. NÃO copie cláusulas de edital (garantia de proposta, prazos de homologação, penalidades) e NÃO declare modalidade de licitação ou enquadramento em dispensa/inexigibilidade.\n"
+        "- SOLUÇÃO PROPOSTA / ALTERNATIVAS: foque em descrever alternativas técnicas e a solução escolhida. NÃO copie cláusulas de edital (garantia de proposta, prazos de homologação, penalidades) e NÃO declare modalidade de licitação ou enquadramento em dispensa/inexigibilidade. Redija SEMPRE em prosa contínua (2 a 4 parágrafos), integrando objeto, equipe, rotinas e resultados esperados; NÃO gere listas soltas, itens isolados ou cabeçalhos desconectados (ex.: \"Coleta seletiva\", \"Eficiência e economia\" sozinhos em linhas separadas).\n"
         "- ANÁLISE DE RISCOS: identifique riscos relevantes ligados à execução do objeto (técnicos, operacionais, de cronograma, de fornecimento), e medidas acauteladoras proporcionais. Evite listas vazias ou genéricas demais.\n"
         "- REFERÊNCIAS LEGAIS: você pode mencionar a Lei 14.133/2021 de forma geral. NÃO cite decretos, portarias ou leis específicas (nº, ano) que não estejam no contexto ou exemplos do RAG. NÃO transcreva artigos de lei na íntegra.\n"
+        "- VALORES E PRAZOS: quando o valor estimado ou prazos não forem informados no contexto, NÃO invente números (R$ X,00, quantidade de postos, dias exatos). Use formulações genéricas como \"valor estimado a ser definido em estudo orçamentário próprio\" ou \"no prazo a ser fixado no edital\".\n"
         "- LINGUAGEM: use prosa técnica, em português brasileiro, sem \"Art.\", sem \"presente artigo\" – use \"nesta seção\" ou \"no presente estudo\". Não repita parágrafos nem frases inteiras.\n"
 
     )
@@ -484,6 +488,77 @@ def _is_conclusion_section(node: Dict[str, Any]) -> bool:
     title = str(node.get("title") or "").lower()
     tokens = ("conclus", "encerramento", "fechamento")
     return any(t in key for t in tokens) or any(t in title for t in tokens)
+
+
+def _retrieve_with_pncp_priority(
+    query: str,
+    collection_name: str,
+    top_k: int,
+    doc_type_filter: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Recupera exemplos do RAG priorizando documentos oriundos do PNCP.
+
+    Estratégia:
+    - Primeiro tenta buscar até top_k itens com filtro fonte=pncp (+ document_type, se fornecido);
+    - Se vierem menos que top_k, completa com documentos de outras fontes
+      com o mesmo document_type;
+    - Se ainda assim não houver nada, faz uma busca geral sem filtro.
+    """
+    where_pncp: Dict[str, Any] = {"fonte": "pncp"}
+    if doc_type_filter:
+        where_pncp["document_type"] = doc_type_filter
+
+    docs: List[Dict[str, Any]] = []
+
+    # 1) PNCP primeiro
+    try:
+        docs = retrieve(
+            query=query,
+            collection_name=collection_name,
+            top_k=top_k,
+            where=where_pncp,
+        )
+    except Exception:
+        docs = []
+
+    if len(docs) >= top_k:
+        return docs[:top_k]
+
+    # 2) Completa com mesma seção de outras fontes (sem fonte=pncp)
+    remaining = top_k - len(docs)
+    where_others: Optional[Dict[str, Any]] = None
+    if doc_type_filter:
+        # Filtro por tipo, mas sem restringir fonte
+        where_others = {"document_type": doc_type_filter}
+
+    try:
+        extra = retrieve(
+            query=query,
+            collection_name=collection_name,
+            top_k=remaining,
+            where=where_others,
+        )
+    except Exception:
+        extra = []
+
+    if extra:
+        docs.extend(extra)
+
+    if docs:
+        return docs[:top_k]
+
+    # 3) Fallback final: sem filtro algum
+    try:
+        docs = retrieve(
+            query=query,
+            collection_name=collection_name,
+            top_k=top_k,
+        )
+    except Exception:
+        docs = []
+
+    return docs
 
 
 def _reorder_conclusion_sections_in_tree(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -524,6 +599,28 @@ def _ensure_etp_conclusion_last(
     root = structure.get("root_sections")
     if isinstance(root, list):
         structure["root_sections"] = _reorder_conclusion_sections_in_tree(root)
+    return structure
+
+
+def _sanitize_table_schema_mismatch(structure: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Garante que apenas seções com content_type='table' mantenham table_schema.
+    Remove table_schema de nós text/list para evitar erros de validação do backend.
+    """
+    def _clean_nodes(nodes: List[Dict[str, Any]]) -> None:
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            ctype = node.get("content_type")
+            if ctype != "table" and "table_schema" in node:
+                node.pop("table_schema", None)
+            children = node.get("children")
+            if isinstance(children, list):
+                _clean_nodes(children)
+
+    root = structure.get("root_sections")
+    if isinstance(root, list):
+        _clean_nodes(root)
     return structure
 
 
@@ -575,7 +672,14 @@ def _get_section_specific_instructions(
 
     # ETP: Solução proposta – técnica/operacional, sem transcrição de lei
     if "soluc" in key and is_etp:
-        return "\nINSTRUÇÕES ETP: Descreva a solução TÉCNICA/OPERACIONAL (como o serviço será prestado, requisitos técnicos, modalidade). NUNCA transcreva trechos de lei (garantia de proposta, cláusula do edital, critérios de desempate detalhados). NUNCA inclua linhas de tabela de custos – use \"conforme tabela na seção correspondente\". Não repita.\n"
+        return (
+            "\nINSTRUÇÕES ETP: Descreva a solução TÉCNICA/OPERACIONAL (como o serviço será prestado, requisitos técnicos, rotinas, equipe, equipamentos). "
+            "Redija em PROSA CONTÍNUA, em 2 a 4 parágrafos, integrando os elementos (não use listas soltas, títulos isolados ou linhas únicas como \"Coleta seletiva\", \"Eficiência e economia\"). "
+            "NUNCA transcreva trechos de lei (garantia de proposta, cláusula do edital, critérios de desempate detalhados). "
+            "NUNCA inclua linhas de tabela de custos – use \"conforme tabela na seção correspondente\". "
+            "Quando o contexto não trouxer valores ou quantidades exatas, NÃO invente valores monetários (R$ X,00) nem números de postos; use formulações genéricas como "
+            "\"valor estimado a ser definido em estudo orçamentário próprio\" ou \"quantitativos a serem detalhados em planilha específica\". Não repita parágrafos.\n"
+        )
 
     # ETP: Conformidade – sem lista de colunas
     if ("conformidade" in key or "legislacao" in key or "legislação" in key) and is_etp:
@@ -635,8 +739,19 @@ def _get_section_specific_instructions(
     # Garantia
     if "garantia" in key:
         if for_list:
-            return "\nINSTRUÇÕES ESPECÍFICAS: Liste tipos de garantia (proposta, execução, etc.) e percentuais. Lei 14.133: garantia de proposta até 5% do valor estimado. NÃO cite Lei 8.666.\n"
-        return "\nINSTRUÇÕES ESPECÍFICAS: Garantia de proposta não superior a 5% (Lei 14.133/2021). NÃO cite Lei 8.666. Especifique prazos de devolução e exigência.\n"
+            return (
+                "\nINSTRUÇÕES ESPECÍFICAS: Liste tipos de garantia (proposta, execução, etc.) e as formas admitidas, "
+                "evitando inventar percentuais concretos quando eles não estiverem no contexto. "
+                "Lei 14.133: garantia de proposta até o limite legal (ex.: 5% do valor estimado), mas, se o percentual exato não estiver informado, "
+                "use formulações genéricas como \"até o limite previsto na Lei 14.133/2021\". NÃO cite Lei 8.666.\n"
+            )
+        return (
+            "\nINSTRUÇÕES ESPECÍFICAS: Descreva a garantia de proposta e/ou de execução com base na Lei 14.133/2021, "
+            "sem inventar percentuais ou valores monetários quando não estiverem no contexto. "
+            "Use expressões como \"até o limite previsto na Lei 14.133/2021\" em vez de chutar números (R$ X,00, Y%). "
+            "Especifique, de forma qualitativa, prazos de prestação e devolução da garantia, e as formas admitidas (caução, seguro-garantia, etc.). "
+            "NÃO cite Lei 8.666.\n"
+        )
 
     # Forma de Pagamento
     if "pagamento" in key or "forma_pagamento" in key:
@@ -732,7 +847,7 @@ Contexto do documento:
 - Órgão: {context.get("orgao", "não informado")}
 - Modalidade: {context.get("modalidade", "não informado")}
 {user_ctx}{section_hint}
-{espec_text}EXEMPLOS DE CLÁUSULAS SIMILARES (extraídos de documentos reais):
+{espec_text}EXEMPLOS DE CLÁUSULAS SIMILARES (extraídos de documentos reais, com prioridade para Termos de Referência, ETPs e contratos oriundos do PNCP quando disponíveis):
 {rag_context}
 
 ATENÇÃO AO CONTEXTO RAG: Alguns exemplos podem conter trechos de citação legal pura (transcrição literal de artigos de lei). NÃO copie esses trechos como cláusulas narrativas – use-os apenas como referência para fundamentar; redija em prosa contratual adequada ao documento.
@@ -1009,6 +1124,8 @@ async def generate_full_document(
 
     # ETP/Estudo: força seções de conclusão/encerramento ao final do documento
     doc_structure = _ensure_etp_conclusion_last(doc_structure, document_type)
+    # Sanitiza inconsistências de table_schema vindo do llm_agent
+    doc_structure = _sanitize_table_schema_mismatch(doc_structure)
 
     # Coleta seções que precisam de texto
     text_sections: List[Dict[str, str]] = []
@@ -1023,19 +1140,12 @@ async def generate_full_document(
         title = sec["title"]
         # Query RAG: busca exemplos da seção + contexto
         query = f"{ctx.get('objeto', '')} cláusula {title} {key}"
-        docs = retrieve(
+        docs = _retrieve_with_pncp_priority(
             query=query,
             collection_name=coll,
             top_k=top_k_per_section,
-            where={"document_type": doc_type_filter},
+            doc_type_filter=doc_type_filter,
         )
-        # Fallback sem filtro se não encontrou
-        if not docs:
-            docs = retrieve(
-                query=query,
-                collection_name=coll,
-                top_k=top_k_per_section,
-            )
         rag_context = "\n\n---\n\n".join(
             (d.get("content", "") or "")[:600] for d in docs
         )
@@ -1060,14 +1170,12 @@ async def generate_full_document(
         key = sec["key"]
         title = sec["title"]
         query = f"{ctx.get('objeto', '')} {title} {key} obrigações critérios itens"
-        docs = retrieve(
+        docs = _retrieve_with_pncp_priority(
             query=query,
             collection_name=coll,
             top_k=top_k_per_section,
-            where={"document_type": doc_type_filter},
+            doc_type_filter=doc_type_filter,
         )
-        if not docs:
-            docs = retrieve(query=query, collection_name=coll, top_k=top_k_per_section)
         rag_context = "\n\n---\n\n".join((d.get("content", "") or "")[:600] for d in docs)
         if not rag_context:
             rag_context = "(Nenhum exemplo encontrado. Gere itens genéricos mas pertinentes à seção.)"
@@ -1104,11 +1212,11 @@ async def generate_full_document(
         if not cols:
             continue
         query = f"{ctx.get('objeto', '')} tabela {sec.get('title', key)} estimativa custos"
-        docs = retrieve(
+        docs = _retrieve_with_pncp_priority(
             query=query,
             collection_name=coll,
             top_k=3,
-            where={"document_type": doc_type_filter},
+            doc_type_filter=doc_type_filter,
         )
         rag_ctx = "\n\n---\n\n".join((d.get("content", "") or "")[:500] for d in docs)
         rag_ctx = _sanitize_rag_context_for_legislation(rag_ctx)

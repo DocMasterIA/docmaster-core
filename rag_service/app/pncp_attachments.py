@@ -17,7 +17,11 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from .pncp_types import PNCPContractRef
-from .pncp_files_client import build_attachments_for_contract
+from .pncp_files_client import (
+    _build_arquivos_base_url,
+    list_arquivos_for_contract,
+    PNCPFileMeta,
+)
 
 
 @dataclass
@@ -108,13 +112,34 @@ async def list_attachments_for_contract(ref: PNCPContractRef) -> List[PNCPAttach
 
     # Se o payload bruto não trouxer anexos estruturados, usamos o cliente
     # de arquivos baseado em /v1/orgaos/{cnpj}/compras/{ano}/{seq}/arquivos.
-    if not attachments:
-        try:
-            attachments = await build_attachments_for_contract(ref)
-        except Exception:
-            # Em caso de erro na descoberta via API de arquivos, retornamos
-            # o que já foi possível montar (vazio, na maioria dos casos).
-            return []
+    if attachments:
+        return attachments
+
+    base = _build_arquivos_base_url(ref)
+    if not base:
+        return []
+
+    try:
+        arquivos: List[PNCPFileMeta] = await list_arquivos_for_contract(ref)
+    except Exception:
+        return []
+
+    for arquivo in arquivos:
+        # Mapeia tipoDocumentoId (quando disponível) para nosso tipo lógico.
+        tipo_codigo = arquivo.tipo_documento_id or 0
+        tipo_nome = arquivo.tipo_documento_nome or (arquivo.titulo or "")
+        document_type = _infer_document_type_from_codigo(tipo_codigo)
+
+        attachments.append(
+            PNCPAttachment(
+                numero_pncp=ref.numero_pncp,
+                tipo_documento_codigo=tipo_codigo,
+                tipo_documento_nome=tipo_nome,
+                nome_arquivo=arquivo.titulo or f"arquivo_{arquivo.id_arquivo}",
+                url_download=arquivo.url,
+                document_type_inferido=document_type,
+            )
+        )
 
     return attachments
 

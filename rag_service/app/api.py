@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 from .chroma_client import delete_collection, get_chroma_client, list_collections
 from .ingestion import ingest_text
 from .retrieval import check_compliance, generate_answer, retrieve
+from .text_corrector_client import correct_section_texts
 from .schemas import (
     AnalyzeDocumentResponse,
     CheckComplianceRequest,
@@ -278,6 +279,10 @@ async def endpoint_generate_document(
             top_k_per_section=body.top_k_per_section,
             context_override=body.context,
         )
+        result["section_texts"] = await correct_section_texts(
+            result.get("section_texts") or {},
+            document_type=result.get("document_type"),
+        )
         out = {"ok": True, **result}
 
         if output_docx:
@@ -337,7 +342,10 @@ async def endpoint_render_document(
     try:
         data = {
             "structure": body.structure,
-            "section_texts": body.section_texts,
+            "section_texts": await correct_section_texts(
+                body.section_texts or {},
+                document_type=(body.structure or {}).get("document_type"),
+            ),
         }
         result = json_to_docx_and_pdf(
             data,

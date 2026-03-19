@@ -19,7 +19,16 @@ app = FastAPI(
 
 @app.get("/health")
 async def health() -> dict:
-    return {"ok": True, "service": "text_corrector"}
+    _, _, warnings, lt_applied = await language_tool_correct(
+        text="Teste rápido de disponibilidade.",
+        language="pt-BR",
+    )
+    return {
+        "ok": True,
+        "service": "text_corrector",
+        "languagetool_available": lt_applied,
+        "warnings": warnings,
+    }
 
 
 @app.post("/correct", response_model=CorrectResponse)

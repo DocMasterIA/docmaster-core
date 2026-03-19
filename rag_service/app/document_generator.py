@@ -236,6 +236,10 @@ def _postprocess_clause_text(text: str, section_key: str = "") -> str:
         t,
         flags=re.IGNORECASE,
     )
+    # Normaliza sigla incorreta ETC -> ETP no contexto de estudo técnico preliminar.
+    t = re.sub(r"(?i)\bEstudo Técnico Preliminar\s*\(ETC\)", "Estudo Técnico Preliminar (ETP)", t)
+    t = re.sub(r"(?i)\bpresente\s+Estudo Técnico Preliminar\s*\(ETC\)", "presente Estudo Técnico Preliminar (ETP)", t)
+    t = re.sub(r"(?i)\bETC\b(?=[\s\),\.;:])", "ETP", t)
     # Placeholders: substitui por texto genérico plausível
     placeholder_fixes = [
         (r"R\$\s*\[conforme\s+edital\]", "conforme edital"),
@@ -473,6 +477,7 @@ def _get_etp_preamble() -> str:
         "\n\n=== DOCUMENTO ETP (ESTUDO TÉCNICO PRELIMINAR) ===\n"
         "O ETP é um ESTUDO INTERNO da Administração, não um edital nem um contrato.\n"
         "Regras específicas:\n"
+        "- SIGLA OFICIAL: use SEMPRE \"ETP\" para Estudo Técnico Preliminar. NUNCA use \"ETC\".\n"
         "- PRIORIDADE: Use SEMPRE o objeto informado no prompt/contexto. Não mude o tema do estudo com base em exemplos do RAG.\n"
         "- OBJETO/SEÇÃO \"OBJETO\": descreva com 2 a 4 frases o que será CONTRATADO (bens, serviços ou obra), para qual finalidade e quais necessidades administrativas atende, citando o órgão/setor e, quando couber, o público/área beneficiada.\n"
         "  É EXPRESSAMENTE PROIBIDO limitar o OBJETO a uma expressão curta e genérica como apenas \"materiais de limpeza\", \"material de escritório\" ou semelhantes; o texto deve ser completo e autoexplicativo, mesmo que o pedido do usuário seja breve.\n"

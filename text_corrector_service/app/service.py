@@ -139,4 +139,21 @@ def apply_post_rules(text: str) -> Tuple[str, List[ChangeItem]]:
         )
         t = t2
 
+    # Ajustes gramaticais frequentes em ETP que o LanguageTool pode não capturar.
+    t2 = re.sub(
+        r"(?i)\bObjeto do Estudo Técnico Preliminar\s+consistente\b",
+        "Objeto do Estudo Técnico Preliminar consiste",
+        t,
+    )
+    t2 = re.sub(r"(?i)\babordagem\s+continua-se\s+sustentável\b", "abordagem contínua e sustentável", t2)
+    if t2 != t:
+        changes.append(
+            ChangeItem(
+                from_text="construções gramaticais recorrentes em ETP",
+                to_text="construções gramaticais normalizadas",
+                rule="post_rule:etp_grammar_fixes",
+            )
+        )
+        t = t2
+
     return t, changes

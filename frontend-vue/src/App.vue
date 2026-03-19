@@ -187,7 +187,26 @@ const generationPages = [
     name: 'DispensaArt75II',
     label: 'Dispensa - Art. 75, II',
     icon: 'fa-scale-balanced',
-    children: [],
+    children: [
+      {
+        name: 'DispensaArt75IICompras',
+        label: 'Compras',
+        icon: 'fa-cart-shopping',
+        to: '/geracao/dispensa-art-75-ii/compras',
+      },
+      {
+        name: 'DispensaArt75IIServicos',
+        label: 'Serviços',
+        icon: 'fa-screwdriver-wrench',
+        to: '/geracao/dispensa-art-75-ii/servicos',
+      },
+      {
+        name: 'DispensaArt75IIComprasServicosInclusos',
+        label: 'Compras com serviços inclusos',
+        icon: 'fa-boxes-stacked',
+        to: '/geracao/dispensa-art-75-ii/compras-servicos-inclusos',
+      },
+    ],
   },
   {
     name: 'InexigibilidadeArt74I',

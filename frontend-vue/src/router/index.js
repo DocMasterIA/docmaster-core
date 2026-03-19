@@ -40,6 +40,24 @@ const routes = [
     meta: { title: 'Dispensa - Art. 75, II' },
   },
   {
+    path: '/geracao/dispensa-art-75-ii/compras',
+    name: 'DispensaArt75IICompras',
+    component: () => import('../views/DocumentGenerator.vue'),
+    meta: { title: 'Dispensa - Art. 75, II - Compras' },
+  },
+  {
+    path: '/geracao/dispensa-art-75-ii/servicos',
+    name: 'DispensaArt75IIServicos',
+    component: () => import('../views/DocumentGenerator.vue'),
+    meta: { title: 'Dispensa - Art. 75, II - Serviços' },
+  },
+  {
+    path: '/geracao/dispensa-art-75-ii/compras-servicos-inclusos',
+    name: 'DispensaArt75IIComprasServicosInclusos',
+    component: () => import('../views/DocumentGenerator.vue'),
+    meta: { title: 'Dispensa - Art. 75, II - Compras com Serviços Inclusos' },
+  },
+  {
     path: '/geracao/inexigibilidade-art-74-i',
     name: 'InexigibilidadeArt74I',
     component: () => import('../views/DocumentGenerator.vue'),

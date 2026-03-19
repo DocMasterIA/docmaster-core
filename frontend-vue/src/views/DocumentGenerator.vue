@@ -194,41 +194,37 @@
         </section>
       </div>
 
-      <!-- Coluna direita: preview -->
+      <!-- Coluna direita: variáveis -->
       <aside class="doc-gen__aside">
-        <section class="gov-surface doc-gen__preview-card">
+        <section class="gov-surface doc-gen__variables-card">
           <div class="gov-surface__header">
             <div>
-              <h2 class="gov-surface__title">Pré-visualização de Documento</h2>
-              <p class="gov-surface__subtitle">Veja o modelo antes de gerar</p>
+              <h2 class="gov-surface__title">Seleção de Variáveis do Documento</h2>
+              <p class="gov-surface__subtitle">{{ selectedFlow.title }}</p>
             </div>
           </div>
-          <div class="doc-gen__preview-body">
-            <h3 class="doc-gen__preview-heading">{{ previewHeading }}</h3>
-            <p class="gov-text-soft">{{ previewSub }}</p>
-            <div class="doc-gen__preview-excerpt">
-              <template v-if="selectedTemplate?.preview_image">
-                <p class="gov-text-soft">Pré-visualização do documento:</p>
-                <img :src="previewImageUrl" alt="Preview" class="doc-gen__preview-img" />
-              </template>
-              <template v-else>
-                <p class="gov-text-soft">
-                  Nenhum documento base selecionado. A IA criará o documento completo; você pode opcionalmente escolher um template
-                  de cabeçalho/rodapé na área ao lado.
-                </p>
-              </template>
+          <div class="doc-gen__variables-body">
+            <p class="gov-text-soft doc-gen__variables-desc">
+              Selecione os campos que devem compor este fluxo de geração.
+            </p>
+            <div
+              v-for="section in selectedFlow.sections"
+              :key="section.key"
+              class="doc-gen__var-section"
+            >
+              <h3 class="doc-gen__var-heading">{{ section.title }}</h3>
+              <ul class="doc-gen__var-list">
+                <li v-for="field in section.fields" :key="field.id" class="doc-gen__var-item">
+                  <label class="doc-gen__var-check">
+                    <input v-model="selectedVariables" type="checkbox" :value="field.id" />
+                    <span>{{ field.label }}</span>
+                  </label>
+                </li>
+              </ul>
             </div>
-            <div class="doc-gen__preview-actions">
-              <button
-                v-if="selectedTemplate?.id"
-                type="button"
-                class="gov-btn gov-btn--primary gov-btn--sm"
-                @click="openPdfModal"
-              >
-                Pré-visualizar
-              </button>
-              <router-link to="/biblioteca" class="gov-btn gov-btn--outline gov-btn--sm">Biblioteca</router-link>
-            </div>
+            <p class="gov-text-soft doc-gen__var-footnote">
+              Campos selecionados: <strong>{{ selectedVariables.length }}</strong>
+            </p>
           </div>
         </section>
       </aside>
@@ -278,7 +274,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 // Em dev: usar '' para que a requisição passe pelo proxy do Vite (evita 404 por chamar outro host/porta)
@@ -318,6 +314,93 @@ const pdfDoc = ref(null);
 const pdfPage = ref(1);
 const pdfTotalPages = ref(0);
 const pdfGotoPage = ref(1);
+const selectedVariables = ref([]);
+
+const FLOW_CONFIG = {
+  DispensaArt75IManutencaoVeiculos: {
+    title: 'Assistente de Criação - Dispensa de Licitação - Art. 75, Inciso I - Manutenção de Veículos (Lei nº 14.133/2021)',
+    sections: [
+      {
+        key: 'solicitacao',
+        title: '1. Solicitação / Ofício',
+        fields: [
+          { id: 'solicitacao_destinatario_nome', label: '1.1 Destinatário - Nome' },
+          { id: 'solicitacao_destinatario_cargo', label: '1.1 Destinatário - Função / Cargo' },
+          { id: 'solicitacao_responsavel_nome', label: '1.2 Responsável pela Solicitação - Nome' },
+          { id: 'solicitacao_responsavel_cargo', label: '1.2 Responsável pela Solicitação - Função / Cargo' },
+        ],
+      },
+      {
+        key: 'dfd',
+        title: '2. DFD – Documento de Formalização da Demanda',
+        fields: [
+          { id: 'dfd_setor_requisitante', label: 'Setor Requisitante (Unidade / Setor / Departamento)' },
+          { id: 'dfd_responsavel_demanda', label: 'Responsável pela Demanda' },
+          { id: 'dfd_email', label: 'E-mail' },
+          { id: 'dfd_gestor_contratos', label: 'Nome do(a) Gestor(a) de Contratos' },
+          { id: 'dfd_fiscal_contratos', label: 'Nome do(a) Fiscal de Contratos' },
+          { id: 'dfd_assinatura_cargo', label: 'Função / Cargo do responsável pela assinatura da DFD' },
+        ],
+      },
+      {
+        key: 'tr',
+        title: '3. Termo de Referência',
+        fields: [
+          { id: 'tr_endereco_propostas', label: 'Endereço presencial para envio ou entrega de propostas' },
+          { id: 'tr_data_termo', label: 'Data do Termo' },
+          { id: 'tr_email_propostas', label: 'E-mail para recebimento de propostas' },
+          { id: 'tr_assinatura_digital', label: 'Opção: Datado e assinado digitalmente' },
+          { id: 'tr_data_automatica', label: 'Opção: Inserir data atual automaticamente' },
+          { id: 'tr_nome_assinante', label: 'Nome de quem assinará o Termo de Referência' },
+          { id: 'tr_cargo_assinante', label: 'Função / Cargo de quem assina o Termo' },
+        ],
+      },
+    ],
+  },
+  DispensaArt75IObrasEngenharia: {
+    title: 'Assistente de Criação - Dispensa de Licitação - Art. 75, Inciso I - Obras e Serviços de Engenharia',
+    sections: [
+      {
+        key: 'base',
+        title: 'Campos principais',
+        fields: [
+          { id: 'objeto_obra', label: 'Objeto da contratação' },
+          { id: 'escopo_tecnico', label: 'Escopo técnico da obra/serviço' },
+          { id: 'responsavel_tecnico', label: 'Responsável técnico' },
+        ],
+      },
+    ],
+  },
+  InexigibilidadeArt74IShowArtistico: {
+    title: 'Assistente de Criação - Inexigibilidade - Art. 74, Inciso I - Show Artístico',
+    sections: [
+      {
+        key: 'base',
+        title: 'Campos principais',
+        fields: [
+          { id: 'artista', label: 'Artista / atração' },
+          { id: 'data_evento', label: 'Data do evento' },
+          { id: 'justificativa_inviabilidade', label: 'Justificativa de inviabilidade de competição' },
+        ],
+      },
+    ],
+  },
+};
+
+const DEFAULT_FLOW = {
+  title: 'Assistente de Criação - Fluxo Geral de Geração de Documentos',
+  sections: [
+    {
+      key: 'base',
+      title: 'Campos principais',
+      fields: [
+        { id: 'objeto', label: 'Objeto da contratação' },
+        { id: 'justificativa', label: 'Justificativa da necessidade' },
+        { id: 'setor_responsavel', label: 'Setor responsável' },
+      ],
+    },
+  ],
+};
 
 const hasDocumentBase = computed(() => {
   if (sourceMode.value === 'llm') return true;
@@ -344,6 +427,11 @@ const previewImageUrl = computed(() => {
   if (!img) return '';
   return img.startsWith('http') ? img : `${API_BASE}${img}`;
 });
+
+const selectedFlow = computed(() => FLOW_CONFIG[route.name] || DEFAULT_FLOW);
+const selectedFlowFieldIds = computed(() =>
+  selectedFlow.value.sections.flatMap((section) => section.fields.map((field) => field.id)),
+);
 
 async function fetchTemplates(q) {
   const url = `${API_BASE}/api/documentos_modelos/lista_10?q=${encodeURIComponent(q || '')}`;
@@ -708,6 +796,7 @@ onMounted(() => {
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.9.179/pdf.worker.min.js';
     }
   }
+  selectedVariables.value = [...selectedFlowFieldIds.value];
 });
 onUnmounted(() => {
   document.removeEventListener('click', clickOutside);
@@ -717,6 +806,13 @@ onUnmounted(() => {
   if (documentDfdUrl.value) URL.revokeObjectURL(documentDfdUrl.value);
   if (documentZipUrl.value) URL.revokeObjectURL(documentZipUrl.value);
 });
+
+watch(
+  () => route.name,
+  () => {
+    selectedVariables.value = [...selectedFlowFieldIds.value];
+  },
+);
 
 async function loadPdf(url) {
   if (!pdfjsLib || !pdfCanvasEl.value) return;
@@ -991,28 +1087,41 @@ function goToPage() {
 .doc-gen__aside {
   min-width: 0;
 }
-.doc-gen__preview-card {
+.doc-gen__variables-card {
   padding: 20px 24px;
 }
-.doc-gen__preview-heading {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 4px;
+.doc-gen__variables-desc {
+  margin: 0 0 10px;
 }
-.doc-gen__preview-excerpt {
-  margin-top: 12px;
-}
-.doc-gen__preview-img {
-  width: 100%;
-  max-height: 200px;
-  object-fit: contain;
-  border-radius: var(--radius-md);
+.doc-gen__var-section {
+  margin-top: 14px;
+  padding: 10px 12px;
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #fafbfd;
 }
-.doc-gen__preview-actions {
-  margin-top: 16px;
-  display: flex;
+.doc-gen__var-heading {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.doc-gen__var-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.doc-gen__var-item + .doc-gen__var-item {
+  margin-top: 6px;
+}
+.doc-gen__var-check {
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
+  font-size: 12px;
+  color: var(--color-text);
+}
+.doc-gen__var-footnote {
+  margin-top: 12px;
 }
 .doc-gen__modal {
   position: fixed;

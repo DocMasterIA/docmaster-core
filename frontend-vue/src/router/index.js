@@ -10,6 +10,12 @@ const routes = [
     meta: { title: 'Entrar', public: true },
   },
   {
+    path: '/preview/slots-card',
+    name: 'SlotsCardPreview',
+    component: () => import('../views/SlotsCardPreview.vue'),
+    meta: { title: 'Preview Card TR/DFD', public: true },
+  },
+  {
     path: '/',
     name: 'DocumentGenerator',
     component: () => import('../views/DocumentGenerator.vue'),

@@ -213,17 +213,7 @@
               :key="section.key"
               class="doc-gen__var-section"
             >
-              <div class="doc-gen__slot-section-head">
-                <h3 class="doc-gen__var-heading">{{ section.title }}</h3>
-                <label class="doc-gen__ia-section-toggle">
-                  <span class="doc-gen__ia-section-toggle-label">IA Contextual Inteligente</span>
-                  <input
-                    v-model="sectionIaEnabled[section.key]"
-                    type="checkbox"
-                    class="doc-gen__ia-section-toggle-input"
-                  />
-                </label>
-              </div>
+              <h3 class="doc-gen__var-heading">{{ section.title }}</h3>
               <div class="doc-gen__slot-grid">
                 <template v-for="field in section.fields" :key="field.id">
                   <h4 v-if="field.input === 'heading'" class="doc-gen__slot-subheading">
@@ -252,25 +242,53 @@
                       type="date"
                       class="gov-input doc-gen__slot-input"
                     />
-                    <input
-                      v-else-if="field.input === 'email'"
-                      :id="'slot-' + field.id"
-                      v-model="slotForm[field.id]"
-                      type="email"
-                      class="gov-input doc-gen__slot-input"
-                      autocomplete="email"
-                    />
-                    <div v-else-if="field.input === 'datalist'" class="doc-gen__datalist-wrap">
+                    <div v-else-if="field.input === 'email' || field.input === 'text'" class="doc-gen__combo-wrap">
+                      <input
+                        :id="'slot-' + field.id"
+                        v-model="slotForm[field.id]"
+                        :type="field.input === 'email' ? 'email' : 'text'"
+                        class="gov-input doc-gen__slot-input"
+                        :autocomplete="field.input === 'email' ? 'email' : 'off'"
+                        :list="'slot-dl-' + field.id"
+                        :placeholder="field.placeholder || 'Selecione, digite ou adicione novo valor'"
+                      />
+                      <datalist :id="'slot-dl-' + field.id">
+                        <option
+                          v-for="opt in slotFieldOptions[field.id] || []"
+                          :key="field.id + '-opt-' + opt"
+                          :value="opt"
+                        />
+                      </datalist>
+                      <button
+                        type="button"
+                        class="gov-btn gov-btn--outline gov-btn--sm doc-gen__combo-add"
+                        @click="addFieldOption(field.id)"
+                      >
+                        + Adicionar
+                      </button>
+                    </div>
+                    <div v-else-if="field.input === 'datalist'" class="doc-gen__combo-wrap">
                       <input
                         :id="'slot-' + field.id"
                         v-model="slotForm[field.id]"
                         class="gov-input doc-gen__slot-input"
-                        :list="'cargo-dl-' + field.id"
+                        :list="'slot-dl-' + field.id"
                         :placeholder="field.placeholder || 'Escolha ou digite o cargo'"
                       />
-                      <datalist :id="'cargo-dl-' + field.id">
-                        <option v-for="opt in CARGO_DATALIST_OPTIONS" :key="field.id + opt" :value="opt" />
+                      <datalist :id="'slot-dl-' + field.id">
+                        <option
+                          v-for="opt in slotFieldOptions[field.id] || CARGO_DATALIST_OPTIONS"
+                          :key="field.id + '-opt-' + opt"
+                          :value="opt"
+                        />
                       </datalist>
+                      <button
+                        type="button"
+                        class="gov-btn gov-btn--outline gov-btn--sm doc-gen__combo-add"
+                        @click="addFieldOption(field.id)"
+                      >
+                        + Adicionar
+                      </button>
                     </div>
                     <label
                       v-else-if="field.input === 'checkbox'"
@@ -450,7 +468,7 @@ const FLOW_CONFIG = {
           {
             id: 'tr_endereco_propostas',
             label: 'Endereço presencial para envio ou entrega de propostas',
-            input: 'textarea',
+            input: 'text',
             fullWidth: true,
           },
           { id: 'tr_data_termo', label: 'Data do termo', input: 'date' },
@@ -557,21 +575,48 @@ const selectedFlow = computed(() => FLOW_CONFIG[route.name] || DEFAULT_FLOW);
 
 /** Valores do formulário lateral (TR/DFD com slots). */
 const slotForm = reactive({});
-/** Por seção: usar IA contextual para enriquecer (quando desligado, o prompt indica priorizar só os dados fixos). */
-const sectionIaEnabled = reactive({});
+/** Opções por campo (selecionáveis via datalist), com suporte a adicionar novos valores. */
+const slotFieldOptions = reactive({});
+
+const SLOT_FIELD_PRESETS = {
+  solicitacao_destinatario_nome: ['João da Silva', 'Maria Oliveira'],
+  solicitacao_responsavel_nome: ['Ana Souza', 'Carlos Pereira'],
+  dfd_setor_requisitante: ['Secretaria de Administração', 'Secretaria de Saúde', 'Secretaria de Educação'],
+  dfd_responsavel_demanda: ['Coordenadoria de Compras', 'Diretoria Administrativa'],
+  dfd_email: ['compras@prefeitura.gov.br', 'licitacao@prefeitura.gov.br'],
+  dfd_gestor_contratos: ['Mariana Costa', 'Rafael Mendes'],
+  dfd_fiscal_contratos: ['Patrícia Lima', 'Bruno Almeida'],
+  tr_endereco_propostas: ['Rua Principal, 123 - Centro', 'Av. Brasil, 450 - Setor Administrativo'],
+  tr_email_propostas: ['propostas@prefeitura.gov.br', 'licitacao@prefeitura.gov.br'],
+  tr_nome_assinante: ['Secretário(a) Municipal', 'Diretor(a) Administrativo(a)'],
+};
+
+function addFieldOption(fieldId) {
+  const raw = slotForm[fieldId];
+  const value = typeof raw === 'string' ? raw.trim() : '';
+  if (!value) return;
+  if (!Array.isArray(slotFieldOptions[fieldId])) slotFieldOptions[fieldId] = [];
+  if (!slotFieldOptions[fieldId].includes(value)) {
+    slotFieldOptions[fieldId] = [...slotFieldOptions[fieldId], value];
+  }
+}
 
 function resetSlotFormAndSections() {
   Object.keys(slotForm).forEach((k) => {
     delete slotForm[k];
   });
-  Object.keys(sectionIaEnabled).forEach((k) => {
-    delete sectionIaEnabled[k];
+  Object.keys(slotFieldOptions).forEach((k) => {
+    delete slotFieldOptions[k];
   });
   for (const section of selectedFlow.value.sections) {
-    sectionIaEnabled[section.key] = true;
     for (const field of section.fields) {
       if (field.input === 'heading') continue;
       slotForm[field.id] = field.input === 'checkbox' ? false : '';
+      if (field.input === 'text' || field.input === 'email' || field.input === 'datalist') {
+        const isCargoField = field.input === 'datalist';
+        const base = isCargoField ? CARGO_DATALIST_OPTIONS : (SLOT_FIELD_PRESETS[field.id] || []);
+        slotFieldOptions[field.id] = [...base];
+      }
     }
   }
 }
@@ -617,10 +662,7 @@ function buildFormPromptAppendix() {
   ];
   let any = false;
   for (const section of selectedFlow.value.sections) {
-    const iaOn = sectionIaEnabled[section.key] !== false;
-    lines.push(
-      `**${section.title}** — IA contextual nesta seção: ${iaOn ? 'sim' : 'não (priorizar apenas os valores fixos abaixo, sem suposições)'}`,
-    );
+    lines.push(`**${section.title}**`);
     for (const field of section.fields) {
       if (field.input === 'heading') {
         lines.push(`_(${field.label})_`);
@@ -1109,8 +1151,8 @@ function goToPage() {
 <style scoped>
 .doc-gen__grid {
   display: grid;
-  grid-template-columns: 1fr 340px;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
 }
 .doc-gen__grid--no-aside {
   grid-template-columns: 1fr;
@@ -1309,79 +1351,64 @@ function goToPage() {
   min-width: 0;
 }
 .doc-gen__variables-card {
-  padding: 20px 24px;
+  padding: 14px 12px;
+  height: 72vh;
+  max-height: 72vh;
+  overflow: hidden;
+}
+.doc-gen__variables-body {
+  margin-top: 6px;
+  height: calc(100% - 62px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
 }
 .doc-gen__variables-desc {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
+  font-size: 12px;
 }
 .doc-gen__var-section {
-  margin-top: 14px;
-  padding: 10px 12px;
+  margin-top: 8px;
+  padding: 8px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: #fafbfd;
 }
 .doc-gen__var-heading {
-  margin: 0;
-  font-size: 13px;
+  margin: 0 0 6px;
+  font-size: 12px;
   font-weight: 600;
-  flex: 1;
-  min-width: 0;
-  padding-right: 8px;
-}
-.doc-gen__slot-section-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-.doc-gen__ia-section-toggle {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--color-text-soft);
-  cursor: pointer;
-  flex-shrink: 0;
-  max-width: 120px;
-  text-align: right;
-}
-.doc-gen__ia-section-toggle-input {
-  width: 36px;
-  height: 20px;
-  accent-color: var(--color-primary);
-  cursor: pointer;
 }
 .doc-gen__slot-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px 12px;
+  grid-template-columns: 1fr;
+  gap: 8px;
   align-items: start;
 }
 .doc-gen__slot-field--full {
   grid-column: 1 / -1;
 }
 .doc-gen__slot-subheading {
-  margin: 8px 0 4px;
-  font-size: 12px;
+  margin: 6px 0 2px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--color-text);
   grid-column: 1 / -1;
 }
 .doc-gen__slot-field {
   margin: 0;
+  min-width: 0;
 }
 .doc-gen__slot-field .gov-label {
   font-size: 11px;
   line-height: 1.3;
+  margin-bottom: 3px;
 }
 .doc-gen__slot-input {
   width: 100%;
   font-size: 12px;
   padding: 6px 8px;
+  min-width: 0;
 }
 .doc-gen__required {
   color: #c62828;
@@ -1402,6 +1429,20 @@ function goToPage() {
 }
 .doc-gen__datalist-wrap {
   width: 100%;
+}
+.doc-gen__combo-wrap {
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+  min-width: 0;
+}
+.doc-gen__combo-wrap .doc-gen__slot-input {
+  flex: 1;
+}
+.doc-gen__combo-add {
+  white-space: nowrap;
+  padding: 5px 8px;
+  font-size: 11px;
 }
 .doc-gen__modal {
   position: fixed;

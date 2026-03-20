@@ -7,7 +7,7 @@
       </p>
     </header>
 
-    <div class="doc-gen__grid">
+    <div class="doc-gen__grid" :class="{ 'doc-gen__grid--no-aside': docTypeMode !== 'tr_modelo' }">
       <!-- Coluna esquerda: wizard -->
       <div class="doc-gen__main">
         <section class="gov-surface doc-gen__wizard">
@@ -194,37 +194,108 @@
         </section>
       </div>
 
-      <!-- Coluna direita: variáveis -->
-      <aside class="doc-gen__aside">
+      <!-- Coluna direita: dados para slots (somente TR/DFD modelo oficial) -->
+      <aside v-if="docTypeMode === 'tr_modelo'" class="doc-gen__aside">
         <section class="gov-surface doc-gen__variables-card">
           <div class="gov-surface__header">
             <div>
-              <h2 class="gov-surface__title">Seleção de Variáveis do Documento</h2>
+              <h2 class="gov-surface__title">Dados do assistente (slots)</h2>
               <p class="gov-surface__subtitle">{{ selectedFlow.title }}</p>
             </div>
           </div>
           <div class="doc-gen__variables-body">
             <p class="gov-text-soft doc-gen__variables-desc">
-              Selecione os campos que devem compor este fluxo de geração.
+              Preencha os campos com os valores que devem constar no documento (texto livre, lista sugerida ou registro na hora).
+              Eles são enviados à IA e aos placeholders do modelo oficial quando aplicável.
             </p>
             <div
               v-for="section in selectedFlow.sections"
               :key="section.key"
               class="doc-gen__var-section"
             >
-              <h3 class="doc-gen__var-heading">{{ section.title }}</h3>
-              <ul class="doc-gen__var-list">
-                <li v-for="field in section.fields" :key="field.id" class="doc-gen__var-item">
-                  <label class="doc-gen__var-check">
-                    <input v-model="selectedVariables" type="checkbox" :value="field.id" />
-                    <span>{{ field.label }}</span>
-                  </label>
-                </li>
-              </ul>
+              <div class="doc-gen__slot-section-head">
+                <h3 class="doc-gen__var-heading">{{ section.title }}</h3>
+                <label class="doc-gen__ia-section-toggle">
+                  <span class="doc-gen__ia-section-toggle-label">IA Contextual Inteligente</span>
+                  <input
+                    v-model="sectionIaEnabled[section.key]"
+                    type="checkbox"
+                    class="doc-gen__ia-section-toggle-input"
+                  />
+                </label>
+              </div>
+              <div class="doc-gen__slot-grid">
+                <template v-for="field in section.fields" :key="field.id">
+                  <h4 v-if="field.input === 'heading'" class="doc-gen__slot-subheading">
+                    {{ field.label }}
+                  </h4>
+                  <div
+                    v-else
+                    class="gov-field doc-gen__slot-field"
+                    :class="{ 'doc-gen__slot-field--full': field.fullWidth }"
+                  >
+                    <label class="gov-label" :for="'slot-' + field.id">
+                      {{ field.label }}
+                      <span v-if="field.required" class="doc-gen__required" aria-hidden="true">*</span>
+                    </label>
+                    <textarea
+                      v-if="field.input === 'textarea'"
+                      :id="'slot-' + field.id"
+                      v-model="slotForm[field.id]"
+                      class="gov-textarea doc-gen__slot-input"
+                      rows="3"
+                    />
+                    <input
+                      v-else-if="field.input === 'date'"
+                      :id="'slot-' + field.id"
+                      v-model="slotForm[field.id]"
+                      type="date"
+                      class="gov-input doc-gen__slot-input"
+                    />
+                    <input
+                      v-else-if="field.input === 'email'"
+                      :id="'slot-' + field.id"
+                      v-model="slotForm[field.id]"
+                      type="email"
+                      class="gov-input doc-gen__slot-input"
+                      autocomplete="email"
+                    />
+                    <div v-else-if="field.input === 'datalist'" class="doc-gen__datalist-wrap">
+                      <input
+                        :id="'slot-' + field.id"
+                        v-model="slotForm[field.id]"
+                        class="gov-input doc-gen__slot-input"
+                        :list="'cargo-dl-' + field.id"
+                        :placeholder="field.placeholder || 'Escolha ou digite o cargo'"
+                      />
+                      <datalist :id="'cargo-dl-' + field.id">
+                        <option v-for="opt in CARGO_DATALIST_OPTIONS" :key="field.id + opt" :value="opt" />
+                      </datalist>
+                    </div>
+                    <label
+                      v-else-if="field.input === 'checkbox'"
+                      class="doc-gen__slot-checkbox-label"
+                      :for="'slot-' + field.id"
+                    >
+                      <input
+                        :id="'slot-' + field.id"
+                        v-model="slotForm[field.id]"
+                        type="checkbox"
+                        class="doc-gen__slot-checkbox"
+                      />
+                      <span>{{ field.checkboxHint || field.label }}</span>
+                    </label>
+                    <input
+                      v-else
+                      :id="'slot-' + field.id"
+                      v-model="slotForm[field.id]"
+                      type="text"
+                      class="gov-input doc-gen__slot-input"
+                    />
+                  </div>
+                </template>
+              </div>
             </div>
-            <p class="gov-text-soft doc-gen__var-footnote">
-              Campos selecionados: <strong>{{ selectedVariables.length }}</strong>
-            </p>
           </div>
         </section>
       </aside>
@@ -274,7 +345,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 // Em dev: usar '' para que a requisição passe pelo proxy do Vite (evita 404 por chamar outro host/porta)
@@ -314,7 +385,19 @@ const pdfDoc = ref(null);
 const pdfPage = ref(1);
 const pdfTotalPages = ref(0);
 const pdfGotoPage = ref(1);
-const selectedVariables = ref([]);
+
+/** Sugestões para Função/Cargo (o usuário pode digitar outro valor). */
+const CARGO_DATALIST_OPTIONS = [
+  'Prefeito(a)',
+  'Secretário(a) Municipal',
+  'Diretor(a) de Departamento',
+  'Coordenador(a)',
+  'Chefe de Setor',
+  'Procurador(a) do Município',
+  'Fiscal de Contratos',
+  'Gestor(a) de Contratos',
+  'Outro (registrar no campo)',
+];
 
 const FLOW_CONFIG = {
   DispensaArt75IManutencaoVeiculos: {
@@ -324,35 +407,77 @@ const FLOW_CONFIG = {
         key: 'solicitacao',
         title: '1. Solicitação / Ofício',
         fields: [
-          { id: 'solicitacao_destinatario_nome', label: '1.1 Destinatário - Nome' },
-          { id: 'solicitacao_destinatario_cargo', label: '1.1 Destinatário - Função / Cargo' },
-          { id: 'solicitacao_responsavel_nome', label: '1.2 Responsável pela Solicitação - Nome' },
-          { id: 'solicitacao_responsavel_cargo', label: '1.2 Responsável pela Solicitação - Função / Cargo' },
+          { id: 'solicitacao_destinatario_nome', label: '1.1 A quem é direcionada a solicitação — Nome', input: 'text' },
+          {
+            id: 'solicitacao_destinatario_cargo',
+            label: '1.1 A quem é direcionada a solicitação — Função / Cargo',
+            input: 'datalist',
+          },
+          { id: 'solicitacao_responsavel_nome', label: '1.2 Responsável pela solicitação — Nome', input: 'text' },
+          {
+            id: 'solicitacao_responsavel_cargo',
+            label: '1.2 Responsável pela solicitação — Função / Cargo',
+            input: 'datalist',
+          },
         ],
       },
       {
         key: 'dfd',
         title: '2. DFD – Documento de Formalização da Demanda',
         fields: [
-          { id: 'dfd_setor_requisitante', label: 'Setor Requisitante (Unidade / Setor / Departamento)' },
-          { id: 'dfd_responsavel_demanda', label: 'Responsável pela Demanda' },
-          { id: 'dfd_email', label: 'E-mail' },
-          { id: 'dfd_gestor_contratos', label: 'Nome do(a) Gestor(a) de Contratos' },
-          { id: 'dfd_fiscal_contratos', label: 'Nome do(a) Fiscal de Contratos' },
-          { id: 'dfd_assinatura_cargo', label: 'Função / Cargo do responsável pela assinatura da DFD' },
+          {
+            id: 'dfd_setor_requisitante',
+            label: 'Setor requisitante (Unidade / Setor / Departamento)',
+            input: 'text',
+            required: true,
+          },
+          { id: 'dfd_responsavel_demanda', label: 'Responsável pela demanda', input: 'text', required: true },
+          { id: 'dfd_email', label: 'E-mail', input: 'email', required: true },
+          { id: 'dfd_gestor_contratos', label: 'Nome do(a) gestor(a) de contratos', input: 'text', required: true },
+          { id: 'dfd_fiscal_contratos', label: 'Nome do(a) fiscal de contratos', input: 'text', required: true },
+          {
+            id: 'dfd_assinatura_cargo',
+            label: 'Função / cargo do responsável pela assinatura da DFD',
+            input: 'text',
+            required: true,
+          },
         ],
       },
       {
         key: 'tr',
         title: '3. Termo de Referência',
         fields: [
-          { id: 'tr_endereco_propostas', label: 'Endereço presencial para envio ou entrega de propostas' },
-          { id: 'tr_data_termo', label: 'Data do Termo' },
-          { id: 'tr_email_propostas', label: 'E-mail para recebimento de propostas' },
-          { id: 'tr_assinatura_digital', label: 'Opção: Datado e assinado digitalmente' },
-          { id: 'tr_data_automatica', label: 'Opção: Inserir data atual automaticamente' },
-          { id: 'tr_nome_assinante', label: 'Nome de quem assinará o Termo de Referência' },
-          { id: 'tr_cargo_assinante', label: 'Função / Cargo de quem assina o Termo' },
+          {
+            id: 'tr_endereco_propostas',
+            label: 'Endereço presencial para envio ou entrega de propostas',
+            input: 'textarea',
+            fullWidth: true,
+          },
+          { id: 'tr_data_termo', label: 'Data do termo', input: 'date' },
+          { id: 'tr_email_propostas', label: 'E-mail para recebimento de propostas', input: 'email' },
+          {
+            id: 'tr_assinatura_digital',
+            label: 'Datado e assinado digitalmente',
+            input: 'checkbox',
+            checkboxHint: 'Datado e assinado digitalmente.',
+          },
+          {
+            id: 'tr_data_automatica',
+            label: 'Data automática',
+            input: 'checkbox',
+            checkboxHint: 'Inserir data atual automaticamente.',
+          },
+          { id: '_h_tr_assin', label: 'Assinatura do termo', input: 'heading', fullWidth: true },
+          {
+            id: 'tr_nome_assinante',
+            label: 'Nome de quem assinará o Termo de Referência',
+            input: 'text',
+          },
+          {
+            id: 'tr_cargo_assinante',
+            label: 'Função / cargo de quem assina o termo',
+            input: 'datalist',
+          },
         ],
       },
     ],
@@ -364,9 +489,9 @@ const FLOW_CONFIG = {
         key: 'base',
         title: 'Campos principais',
         fields: [
-          { id: 'objeto_obra', label: 'Objeto da contratação' },
-          { id: 'escopo_tecnico', label: 'Escopo técnico da obra/serviço' },
-          { id: 'responsavel_tecnico', label: 'Responsável técnico' },
+          { id: 'objeto_obra', label: 'Objeto da contratação', input: 'text' },
+          { id: 'escopo_tecnico', label: 'Escopo técnico da obra/serviço', input: 'textarea', fullWidth: true },
+          { id: 'responsavel_tecnico', label: 'Responsável técnico', input: 'text' },
         ],
       },
     ],
@@ -378,9 +503,9 @@ const FLOW_CONFIG = {
         key: 'base',
         title: 'Campos principais',
         fields: [
-          { id: 'artista', label: 'Artista / atração' },
-          { id: 'data_evento', label: 'Data do evento' },
-          { id: 'justificativa_inviabilidade', label: 'Justificativa de inviabilidade de competição' },
+          { id: 'artista', label: 'Artista / atração', input: 'text' },
+          { id: 'data_evento', label: 'Data do evento', input: 'date' },
+          { id: 'justificativa_inviabilidade', label: 'Justificativa de inviabilidade de competição', input: 'textarea', fullWidth: true },
         ],
       },
     ],
@@ -394,9 +519,9 @@ const DEFAULT_FLOW = {
       key: 'base',
       title: 'Campos principais',
       fields: [
-        { id: 'objeto', label: 'Objeto da contratação' },
-        { id: 'justificativa', label: 'Justificativa da necessidade' },
-        { id: 'setor_responsavel', label: 'Setor responsável' },
+        { id: 'objeto', label: 'Objeto da contratação', input: 'text' },
+        { id: 'justificativa', label: 'Justificativa da necessidade', input: 'textarea', fullWidth: true },
+        { id: 'setor_responsavel', label: 'Setor responsável', input: 'text' },
       ],
     },
   ],
@@ -429,9 +554,95 @@ const previewImageUrl = computed(() => {
 });
 
 const selectedFlow = computed(() => FLOW_CONFIG[route.name] || DEFAULT_FLOW);
-const selectedFlowFieldIds = computed(() =>
-  selectedFlow.value.sections.flatMap((section) => section.fields.map((field) => field.id)),
-);
+
+/** Valores do formulário lateral (TR/DFD com slots). */
+const slotForm = reactive({});
+/** Por seção: usar IA contextual para enriquecer (quando desligado, o prompt indica priorizar só os dados fixos). */
+const sectionIaEnabled = reactive({});
+
+function resetSlotFormAndSections() {
+  Object.keys(slotForm).forEach((k) => {
+    delete slotForm[k];
+  });
+  Object.keys(sectionIaEnabled).forEach((k) => {
+    delete sectionIaEnabled[k];
+  });
+  for (const section of selectedFlow.value.sections) {
+    sectionIaEnabled[section.key] = true;
+    for (const field of section.fields) {
+      if (field.input === 'heading') continue;
+      slotForm[field.id] = field.input === 'checkbox' ? false : '';
+    }
+  }
+}
+
+/** Mapeia campos do fluxo “Dispensa / DFD” para chaves aceitas em `slots_override` no backend. */
+function buildTrSlotsOverride() {
+  const f = slotForm;
+  const o = {};
+
+  const fiscalNome = (f.dfd_fiscal_contratos || '').trim();
+  if (fiscalNome) o.fiscal = { nome: fiscalNome };
+
+  const setor = (f.dfd_setor_requisitante || '').trim();
+  if (setor) o.secretaria_usuario = setor;
+
+  const respDemanda = (f.dfd_responsavel_demanda || '').trim();
+  if (respDemanda) o.nome_usuario = respDemanda;
+
+  const deliveryParts = [];
+  const end = (f.tr_endereco_propostas || '').trim();
+  const em = (f.tr_email_propostas || '').trim();
+  if (end) deliveryParts.push(`Endereço presencial para propostas: ${end}`);
+  if (em) deliveryParts.push(`E-mail para recebimento de propostas: ${em}`);
+  if (deliveryParts.length) o.horario_entrega = deliveryParts.join('\n');
+
+  const objeto = (f.objeto || f.objeto_obra || '').trim();
+  if (objeto) o.objeto = objeto;
+
+  const justificativa = (f.justificativa || f.justificativa_inviabilidade || '').trim();
+  if (justificativa) o.justificativa = justificativa;
+
+  const setorResp = (f.setor_responsavel || '').trim();
+  if (setorResp && !o.secretaria_usuario) o.secretaria_usuario = setorResp;
+
+  return Object.keys(o).length ? o : null;
+}
+
+/** Texto extra anexado ao prompt para a IA considerar todos os campos preenchidos. */
+function buildFormPromptAppendix() {
+  const lines = [
+    '### Dados informados no assistente (use de forma literal quando couber; não invente valores para itens já preenchidos abaixo):',
+    '',
+  ];
+  let any = false;
+  for (const section of selectedFlow.value.sections) {
+    const iaOn = sectionIaEnabled[section.key] !== false;
+    lines.push(
+      `**${section.title}** — IA contextual nesta seção: ${iaOn ? 'sim' : 'não (priorizar apenas os valores fixos abaixo, sem suposições)'}`,
+    );
+    for (const field of section.fields) {
+      if (field.input === 'heading') {
+        lines.push(`_(${field.label})_`);
+        continue;
+      }
+      const v = slotForm[field.id];
+      if (field.input === 'checkbox') {
+        lines.push(`- ${field.checkboxHint || field.label}: ${v ? 'sim' : 'não'}`);
+        any = true;
+        continue;
+      }
+      const s = typeof v === 'string' ? v.trim() : v != null && v !== '' ? String(v) : '';
+      if (s) {
+        lines.push(`- ${field.label}: ${s}`);
+        any = true;
+      }
+    }
+    lines.push('');
+  }
+  if (!any) return '';
+  return lines.join('\n');
+}
 
 async function fetchTemplates(q) {
   const url = `${API_BASE}/api/documentos_modelos/lista_10?q=${encodeURIComponent(q || '')}`;
@@ -568,11 +779,14 @@ async function onSubmit() {
 
 async function submitViaLLM() {
   const isTrDfd = docTypeMode.value === 'tr_modelo';
+  const basePrompt = iaPrompt.value.trim();
+  const appendix = isTrDfd ? buildFormPromptAppendix() : '';
+  const userPromptFinal = appendix ? `${basePrompt}\n\n${appendix}` : basePrompt;
 
   const payload = isTrDfd
-    ? { user_prompt: iaPrompt.value.trim() }
+    ? { user_prompt: userPromptFinal, slots_override: buildTrSlotsOverride() }
     : {
-        user_prompt: iaPrompt.value.trim(),
+        user_prompt: basePrompt,
         output: 'docx',
       };
   if (selectedTemplate.value?.id) {
@@ -796,7 +1010,7 @@ onMounted(() => {
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.9.179/pdf.worker.min.js';
     }
   }
-  selectedVariables.value = [...selectedFlowFieldIds.value];
+  resetSlotFormAndSections();
 });
 onUnmounted(() => {
   document.removeEventListener('click', clickOutside);
@@ -810,9 +1024,13 @@ onUnmounted(() => {
 watch(
   () => route.name,
   () => {
-    selectedVariables.value = [...selectedFlowFieldIds.value];
+    resetSlotFormAndSections();
   },
 );
+
+watch(docTypeMode, (m) => {
+  if (m === 'tr_modelo') resetSlotFormAndSections();
+});
 
 async function loadPdf(url) {
   if (!pdfjsLib || !pdfCanvasEl.value) return;
@@ -893,6 +1111,9 @@ function goToPage() {
   display: grid;
   grid-template-columns: 1fr 340px;
   gap: 24px;
+}
+.doc-gen__grid--no-aside {
+  grid-template-columns: 1fr;
 }
 @media (max-width: 960px) {
   .doc-gen__grid {
@@ -1101,27 +1322,86 @@ function goToPage() {
   background: #fafbfd;
 }
 .doc-gen__var-heading {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 13px;
   font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  padding-right: 8px;
 }
-.doc-gen__var-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.doc-gen__slot-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
 }
-.doc-gen__var-item + .doc-gen__var-item {
-  margin-top: 6px;
-}
-.doc-gen__var-check {
+.doc-gen__ia-section-toggle {
   display: inline-flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--color-text-soft);
+  cursor: pointer;
+  flex-shrink: 0;
+  max-width: 120px;
+  text-align: right;
+}
+.doc-gen__ia-section-toggle-input {
+  width: 36px;
+  height: 20px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+.doc-gen__slot-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+  align-items: start;
+}
+.doc-gen__slot-field--full {
+  grid-column: 1 / -1;
+}
+.doc-gen__slot-subheading {
+  margin: 8px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  grid-column: 1 / -1;
+}
+.doc-gen__slot-field {
+  margin: 0;
+}
+.doc-gen__slot-field .gov-label {
+  font-size: 11px;
+  line-height: 1.3;
+}
+.doc-gen__slot-input {
+  width: 100%;
+  font-size: 12px;
+  padding: 6px 8px;
+}
+.doc-gen__required {
+  color: #c62828;
+  margin-left: 2px;
+}
+.doc-gen__slot-checkbox-label {
+  display: flex;
+  align-items: flex-start;
   gap: 8px;
   font-size: 12px;
-  color: var(--color-text);
+  cursor: pointer;
+  line-height: 1.35;
 }
-.doc-gen__var-footnote {
-  margin-top: 12px;
+.doc-gen__slot-checkbox {
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--color-primary);
+}
+.doc-gen__datalist-wrap {
+  width: 100%;
 }
 .doc-gen__modal {
   position: fixed;

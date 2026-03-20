@@ -774,12 +774,33 @@ function buildTrSlotsOverride() {
 
   const fiscalNome = (f.dfd_fiscal_contratos || '').trim();
   if (fiscalNome) o.fiscal = { nome: fiscalNome };
+  if (fiscalNome) o.dfd_fiscal_contratos = fiscalNome;
+
+  const solDestNome = (f.solicitacao_destinatario_nome || '').trim();
+  const solDestCargo = (f.solicitacao_destinatario_cargo || '').trim();
+  const solRespNome = (f.solicitacao_responsavel_nome || '').trim();
+  const solRespCargo = (f.solicitacao_responsavel_cargo || '').trim();
+  if (solDestNome) o.sol_oficio_destinatario_nome = solDestNome;
+  if (solDestCargo) o.sol_oficio_destinatario_cargo = solDestCargo;
+  if (solRespNome) o.sol_oficio_responsavel_nome = solRespNome;
+  if (solRespCargo) o.sol_oficio_responsavel_cargo = solRespCargo;
 
   const setor = (f.dfd_setor_requisitante || '').trim();
   if (setor) o.secretaria_usuario = setor;
+  if (setor) o.dfd_setor_requisitante = setor;
 
   const respDemanda = (f.dfd_responsavel_demanda || '').trim();
   if (respDemanda) o.nome_usuario = respDemanda;
+  if (respDemanda) o.dfd_responsavel_demanda = respDemanda;
+
+  const dfdEmail = (f.dfd_email || '').trim();
+  if (dfdEmail) o.dfd_email = dfdEmail;
+
+  const dfdGestor = (f.dfd_gestor_contratos || '').trim();
+  if (dfdGestor) o.dfd_gestor_contratos = dfdGestor;
+
+  const dfdAssCargo = (f.dfd_assinatura_cargo || '').trim();
+  if (dfdAssCargo) o.dfd_assinatura_cargo = dfdAssCargo;
 
   const end = (f.tr_endereco_propostas || '').trim();
   const em = (f.tr_email_propostas || '').trim();

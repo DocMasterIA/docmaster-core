@@ -62,6 +62,15 @@ class TRTemplateSlots:
     data_termo: str = ""
     nome_assinante_termo: str = ""
     cargo_assinante_termo: str = ""
+    dfd_setor_requisitante: str = ""
+    dfd_numero_processo: str = ""
+    dfd_responsavel_demanda: str = ""
+    dfd_email: str = ""
+    dfd_gestor_contratos: str = ""
+    dfd_fiscal_contratos: str = ""
+    dfd_assinatura_cargo: str = ""
+    dfd_assinatura_nome: str = ""
+    dfd_data: str = ""
 
 
 def _style_items_table(table) -> None:
@@ -235,6 +244,23 @@ def render_tr_from_slots(
     _clear_headers(doc)
 
     mapping = {
+        # Placeholders padronizados (preferenciais)
+        "(TR_OBJETO)": slots.objeto or "",
+        "(TR_DISPENSA_INCISO)": slots.dispensa.inciso or "",
+        "(TR_JUSTIFICATIVA)": slots.justificativa or "",
+        "(TR_FISCAL_NOME)": slots.fiscal.nome or "",
+        "(TR_DOTACAO)": slots.dotacao or "",
+        "(TR_SECRETARIA_USUARIO)": slots.secretaria_usuario or "",
+        "(TR_NOME_USUARIO)": slots.nome_usuario or "",
+        "(TR_CIDADE_ESTADO)": slots.cidade_estado or "",
+        "(TR_CIDADE)": slots.cidade or "",
+        "(TR_CODIGO_UF)": slots.codigo_uf or "",
+        "(TR_ENDERECO_ENTREGA)": slots.endereco_entrega or "",
+        "(TR_EMAIL_ENVIO_PROPOSTAS)": slots.email_envio_propostas or "",
+        "(TR_DATA_TERMO)": slots.data_termo or "",
+        "(TR_NOME_ASSINANTE_TERMO)": slots.nome_assinante_termo or "",
+        "(TR_CARGO_ASSINANTE_TERMO)": slots.cargo_assinante_termo or "",
+        # Compatibilidade com placeholders legados
         "(descrever o objeto solicitado)": slots.objeto or "",
         # No modelo, este placeholder está associado ao texto logo após "inciso".
         # Embora o rótulo mencione "artigo", na prática ele representa o INCISO

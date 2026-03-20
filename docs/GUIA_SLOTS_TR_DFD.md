@@ -1,0 +1,163 @@
+# Guia de Slots TR/DFD
+
+Este documento centraliza o mapeamento entre:
+
+- campos do card `Dados do assistente (slots)` no frontend;
+- chaves enviadas em `slots_override`;
+- placeholders no `TR_modelo_base.docx` e `DFD_modelo_base.docx`;
+- aplicação no `rag_service`.
+
+---
+
+## Fluxo resumido
+
+1. Frontend (`DocumentGenerator.vue`) monta `slots_override`.
+2. Backend Django repassa `slots_override` para o `rag_service`.
+3. `rag_service/app/tr_slots_llm.py` faz merge IA + override.
+4. `tr_template.py` e `dfd_template.py` substituem placeholders no DOCX.
+
+---
+
+## Padrão oficial de placeholders
+
+Adotar sempre:
+
+- prefixo por documento (`TR_`, `DFD_`, `SOL_OFICIO_`);
+- caixa alta;
+- palavras separadas por `_`;
+- texto entre parênteses no DOCX.
+
+Ex.: `(TR_OBJETO)`, `(DFD_EMAIL)`, `(SOL_OFICIO_DESTINATARIO_NOME)`.
+
+---
+
+## TR - Placeholders e slots
+
+### Placeholders padronizados (preferenciais)
+
+- `(TR_OBJETO)` -> `objeto`
+- `(TR_DISPENSA_INCISO)` -> `dispensa.inciso`
+- `(TR_JUSTIFICATIVA)` -> `justificativa`
+- `(TR_FISCAL_NOME)` -> `fiscal.nome`
+- `(TR_DOTACAO)` -> `dotacao`
+- `(TR_CIDADE)` -> `cidade`
+- `(TR_CODIGO_UF)` -> `codigo_uf`
+- `(TR_CIDADE_ESTADO)` -> `cidade_estado`
+- `(TR_SECRETARIA_USUARIO)` -> `secretaria_usuario`
+- `(TR_NOME_USUARIO)` -> `nome_usuario`
+- `(TR_ENDERECO_ENTREGA)` -> `endereco_entrega`
+- `(TR_EMAIL_ENVIO_PROPOSTAS)` -> `email_envio_propostas`
+- `(TR_DATA_TERMO)` -> `data_termo`
+- `(TR_NOME_ASSINANTE_TERMO)` -> `nome_assinante_termo`
+- `(TR_CARGO_ASSINANTE_TERMO)` -> `cargo_assinante_termo`
+
+### Placeholders legados (compatibilidade)
+
+- `(descrever o objeto solicitado)` -> `objeto`
+- `(descrever o artigo de acordo com objeto)` -> `dispensa.inciso`
+- `(Formalizar justificava de acordo com objeto solicitado)` -> `justificativa`
+- `(Inserir o inciso de acordo com o objeto solicitado)` -> `dispensa.inciso`
+- `(inserir nome do fiscal)` -> `fiscal.nome`
+- `(Inserir Dotação)` -> `dotacao`
+- `(CIDADE)` -> `cidade`
+- `(CÓDIGO UF)` -> `codigo_uf`
+- `(CIDADE - ESTADO)` -> `cidade_estado`
+- `(SECRETARIA DO USUARIO)` -> `secretaria_usuario`
+- `(Nome do USUARIO)` -> `nome_usuario`
+
+## DFD - Placeholders e slots
+
+### Placeholders padronizados (preferenciais)
+
+- `(DFD_OBJETO_REFERENCIA)` -> `objeto`
+- `(DFD_JUSTIFICATIVA)` -> `justificativa`
+- `(DFD_CIDADE)` -> `cidade`
+- `(DFD_SETOR_REQUISITANTE)` -> `dfd_setor_requisitante`
+- `(DFD_NUMERO_PROCESSO)` -> `dfd_numero_processo`
+- `(DFD_RESPONSAVEL_DEMANDA)` -> `dfd_responsavel_demanda`
+- `(DFD_EMAIL)` -> `dfd_email`
+- `(DFD_GESTOR_CONTRATOS)` -> `dfd_gestor_contratos`
+- `(DFD_FISCAL_CONTRATOS)` -> `dfd_fiscal_contratos`
+- `(DFD_CARGO_ASSINATURA)` -> `dfd_assinatura_cargo`
+- `(DFD_NOME_ASSINATURA)` -> `dfd_assinatura_nome`
+- `(DFD_DATA)` -> `dfd_data`
+
+### Placeholders legados (compatibilidade)
+
+- `(Descrever objeto do termo de referencia)` -> `objeto`
+- `(descrever a justificativa usada no termo de referencias)` -> `justificativa`
+- `(CIDADE)` -> `cidade`
+
+---
+
+## Solicitação / Ofício - esquema de slots (pré-template)
+
+Ainda sem documento base oficial de Solicitação/Ofício no pipeline, mas o esquema
+já pode ficar padronizado para integração futura.
+
+### Campos do card e chaves sugeridas
+
+- `solicitacao_destinatario_nome` -> `sol_oficio_destinatario_nome`
+- `solicitacao_destinatario_cargo` -> `sol_oficio_destinatario_cargo`
+- `solicitacao_responsavel_nome` -> `sol_oficio_responsavel_nome`
+- `solicitacao_responsavel_cargo` -> `sol_oficio_responsavel_cargo`
+
+### Placeholders sugeridos para o futuro DOCX
+
+- `(SOL_OFICIO_DESTINATARIO_NOME)` -> `sol_oficio_destinatario_nome`
+- `(SOL_OFICIO_DESTINATARIO_CARGO)` -> `sol_oficio_destinatario_cargo`
+- `(SOL_OFICIO_RESPONSAVEL_NOME)` -> `sol_oficio_responsavel_nome`
+- `(SOL_OFICIO_RESPONSAVEL_CARGO)` -> `sol_oficio_responsavel_cargo`
+
+### Estratégia
+
+Enquanto não existir template de Solicitação/Ofício:
+
+- manter essas chaves no `slots_override` e no bloco de contexto do prompt;
+- não aplicar substituição em DOCX (sem placeholders no modelo);
+- quando o documento existir, adicionar mapping no renderer correspondente.
+
+---
+
+## Frontend -> slots_override (referência)
+
+Campos principais do card:
+
+- `tr_endereco_propostas` -> `endereco_entrega`
+- `tr_email_propostas` -> `email_envio_propostas`
+- `tr_data_termo` / `tr_data_automatica` -> `data_termo`
+- `tr_nome_assinante` -> `nome_assinante_termo`
+- `tr_cargo_assinante` -> `cargo_assinante_termo`
+- `dfd_setor_requisitante` -> `dfd_setor_requisitante`
+- `dfd_responsavel_demanda` -> `dfd_responsavel_demanda`
+- `dfd_email` -> `dfd_email`
+- `dfd_gestor_contratos` -> `dfd_gestor_contratos`
+- `dfd_fiscal_contratos` -> `dfd_fiscal_contratos`
+- `dfd_assinatura_cargo` -> `dfd_assinatura_cargo`
+- `solicitacao_destinatario_nome` -> `sol_oficio_destinatario_nome`
+- `solicitacao_destinatario_cargo` -> `sol_oficio_destinatario_cargo`
+- `solicitacao_responsavel_nome` -> `sol_oficio_responsavel_nome`
+- `solicitacao_responsavel_cargo` -> `sol_oficio_responsavel_cargo`
+
+Obs.: `dfd_numero_processo`, `dfd_assinatura_nome` e `dfd_data` já estão previstos no backend e podem ser adicionados ao card quando desejado.
+
+---
+
+## Arquivos de código relevantes
+
+- `frontend-vue/src/views/DocumentGenerator.vue`
+- `backend/app/api.py`
+- `rag_service/app/tr_slots_llm.py`
+- `rag_service/app/tr_template.py`
+- `rag_service/app/dfd_template.py`
+
+---
+
+## Checklist ao alterar modelo DOCX
+
+1. Atualizar placeholders no `.docx`.
+2. Atualizar mapping em `tr_template.py` e/ou `dfd_template.py`.
+3. Garantir campo em `TRTemplateSlots`.
+4. Garantir merge em `tr_slots_llm.py`.
+5. Atualizar `slots_override` no frontend.
+6. Testar geração TR e DFD no fluxo completo.

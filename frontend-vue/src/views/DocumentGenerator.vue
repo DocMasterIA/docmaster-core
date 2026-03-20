@@ -614,18 +614,7 @@ const slotForm = reactive({});
 /** Opções por campo (selecionáveis via datalist), com suporte a adicionar novos valores. */
 const slotFieldOptions = reactive({});
 
-const SLOT_FIELD_PRESETS = {
-  solicitacao_destinatario_nome: ['João da Silva', 'Maria Oliveira'],
-  solicitacao_responsavel_nome: ['Ana Souza', 'Carlos Pereira'],
-  dfd_setor_requisitante: ['Secretaria de Administração', 'Secretaria de Saúde', 'Secretaria de Educação'],
-  dfd_responsavel_demanda: ['Coordenadoria de Compras', 'Diretoria Administrativa'],
-  dfd_email: ['compras@prefeitura.gov.br', 'licitacao@prefeitura.gov.br'],
-  dfd_gestor_contratos: ['Mariana Costa', 'Rafael Mendes'],
-  dfd_fiscal_contratos: ['Patrícia Lima', 'Bruno Almeida'],
-  tr_endereco_propostas: ['Rua Principal, 123 - Centro', 'Av. Brasil, 450 - Setor Administrativo'],
-  tr_email_propostas: ['propostas@prefeitura.gov.br', 'licitacao@prefeitura.gov.br'],
-  tr_nome_assinante: ['Secretário(a) Municipal', 'Diretor(a) Administrativo(a)'],
-};
+const SLOT_FIELD_PRESETS = {};
 
 function addFieldOption(fieldId) {
   const raw = slotForm[fieldId];

@@ -26,10 +26,12 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_GET
 import requests
 import re
+from functools import wraps
 
 
 def api_login_required(view_func):
     """Decorator que retorna 401 JSON para APIs quando o usuário não está autenticado (em vez de redirect)."""
+    @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated:
             return JsonResponse({"error": "Não autenticado. Faça login."}, status=401)

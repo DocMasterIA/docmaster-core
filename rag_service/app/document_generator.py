@@ -851,6 +851,16 @@ def _format_especificacoes(especificacoes: Dict[str, Any] | None) -> str:
     return "Especificações indicadas pelo usuário (use quando fizer sentido para esta seção):\n" + "\n".join(parts) + "\n\n"
 
 
+def _contains_cjk_chars(text: str) -> bool:
+    """Detecta presença de ideogramas CJK (sinal forte de idioma incorreto no contexto pt-BR)."""
+    import re
+
+    if not text:
+        return False
+    hits = re.findall(r"[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]", text)
+    return len(hits) >= 4
+
+
 async def _generate_clause_text(
     section_key: str,
     section_title: str,
@@ -881,26 +891,36 @@ ATENÇÃO AO CONTEXTO RAG: Alguns exemplos podem conter trechos de citação leg
 Instruções: O PRIMEIRO caractere da sua resposta deve ser o início do conteúdo jurídico. Não comece com "Aqui estão...", "A cláusula deve...", "Segue..." ou qualquer intro. PROIBIDO: Nota:, Notas:, Atenção:, Observação: (meta), section_key. Redija DIRETAMENTE a cláusula. Português brasileiro. Sem markdown. Sem placeholders []. Cite Lei 14.133/2021. Não repita frases ou parágrafos."""
 
 
-    full_prompt = f"<<SYSTEM>>\n{CLAUSE_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{query}"
-    url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
-    payload = {"prompt": full_prompt, "stream": False}
+    async def _run_once(extra_instruction: str = "") -> str:
+        q = query if not extra_instruction else f"{query}\n\n{extra_instruction}"
+        full_prompt = f"<<SYSTEM>>\n{CLAUSE_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{q}"
+        url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
+        payload = {"prompt": full_prompt, "stream": False}
 
-    async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
-        resp = await client.post(url, json=payload)
-        resp.raise_for_status()
-        body = resp.json()
+        async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            body = resp.json()
 
-    # Se a resposta contiver "detail" com mensagem de erro (ex.: proxy retorna 200 com erro), não inserir no documento
-    if isinstance(body, dict) and body.get("detail"):
-        detail = str(body["detail"]).strip()
-        if any(kw in detail.lower() for kw in ("falha", "erro", "timeout", "error", "verifique")):
-            raise ValueError(f"Orquestração retornou erro: {detail}")
+        # Se a resposta contiver "detail" com mensagem de erro (ex.: proxy retorna 200 com erro), não inserir no documento
+        if isinstance(body, dict) and body.get("detail"):
+            detail = str(body["detail"]).strip()
+            if any(kw in detail.lower() for kw in ("falha", "erro", "timeout", "error", "verifique")):
+                raise ValueError(f"Orquestração retornou erro: {detail}")
 
-    data = body.get("data", body) if isinstance(body, dict) else {}
-    text = data.get("response", data.get("text", ""))
-    raw = (text or "").strip()
-    raw = await _llm_sanitize_meta_comments(raw)
-    return _postprocess_clause_text(raw, section_key=section_key)
+        data = body.get("data", body) if isinstance(body, dict) else {}
+        text = data.get("response", data.get("text", ""))
+        raw = (text or "").strip()
+        raw = await _llm_sanitize_meta_comments(raw)
+        return _postprocess_clause_text(raw, section_key=section_key)
+
+    out = await _run_once()
+    if _contains_cjk_chars(out):
+        out = await _run_once(
+            "RETENTATIVA OBRIGATÓRIA: a resposta anterior veio em idioma inválido. "
+            "Reescreva integralmente em português brasileiro (pt-BR), sem qualquer trecho em chinês, japonês ou outro idioma."
+        )
+    return out
 
 
 def _is_meta_comment_line(line: str) -> bool:
@@ -969,25 +989,35 @@ Contexto: {document_type}. Objeto: {context.get("objeto", "não informado")}. Ó
 
 ATENÇÃO: Não copie trechos de citação legal pura (transcrição de artigos) dos exemplos – use como referência e redija em prosa adequada. O PRIMEIRO caractere da resposta deve ser o primeiro item. Não comece com intro. Cada item em uma linha. Sem numeração, sem marcadores. Sem placeholders. Lei 14.133/2021."""
 
-    full_prompt = f"<<SYSTEM>>\n{LIST_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{query}"
-    url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
-    payload = {"prompt": full_prompt, "stream": False}
+    async def _run_once(extra_instruction: str = "") -> str:
+        q = query if not extra_instruction else f"{query}\n\n{extra_instruction}"
+        full_prompt = f"<<SYSTEM>>\n{LIST_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{q}"
+        url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
+        payload = {"prompt": full_prompt, "stream": False}
 
-    async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
-        resp = await client.post(url, json=payload)
-        resp.raise_for_status()
-        body = resp.json()
+        async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            body = resp.json()
 
-    if isinstance(body, dict) and body.get("detail"):
-        detail = str(body["detail"]).strip()
-        if any(kw in detail.lower() for kw in ("falha", "erro", "timeout", "error", "verifique")):
-            raise ValueError(f"Orquestração retornou erro: {detail}")
+        if isinstance(body, dict) and body.get("detail"):
+            detail = str(body["detail"]).strip()
+            if any(kw in detail.lower() for kw in ("falha", "erro", "timeout", "error", "verifique")):
+                raise ValueError(f"Orquestração retornou erro: {detail}")
 
-    data = body.get("data", body) if isinstance(body, dict) else {}
-    text = data.get("response", data.get("text", ""))
-    raw = (text or "").strip()
-    raw = await _llm_sanitize_meta_comments(raw)
-    return _postprocess_list_text(raw)
+        data = body.get("data", body) if isinstance(body, dict) else {}
+        text = data.get("response", data.get("text", ""))
+        raw = (text or "").strip()
+        raw = await _llm_sanitize_meta_comments(raw)
+        return _postprocess_list_text(raw)
+
+    out = await _run_once()
+    if _contains_cjk_chars(out):
+        out = await _run_once(
+            "RETENTATIVA OBRIGATÓRIA: a resposta anterior veio em idioma inválido. "
+            "Reescreva integralmente em português brasileiro (pt-BR), sem qualquer trecho em chinês, japonês ou outro idioma."
+        )
+    return out
 
 
 def _collect_text_sections(nodes: List[Dict], acc: List[Dict]) -> None:

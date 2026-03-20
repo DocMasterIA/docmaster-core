@@ -124,6 +124,19 @@ def apply_post_rules(text: str) -> Tuple[str, List[ChangeItem]]:
         t = t2
         changes.append(ChangeItem(from_text="Atenção:", to_text="", rule="post_rule:strip_atencao_prefix"))
 
+    # Corrige confusão recorrente entre ETP (Estudo Técnico Preliminar)
+    # e ETC em sigla maiúscula.
+    t2 = re.sub(r"\bETC\b", "ETP", t)
+    if t2 != t:
+        t = t2
+        changes.append(
+            ChangeItem(
+                from_text="ETC",
+                to_text="ETP",
+                rule="post_rule:normalize_etp_acronym",
+            )
+        )
+
     # Preserva nomenclatura institucional comum em documentos públicos.
     t2 = re.sub(r"\bsecretária\b(?=\s+(?:de|municipal|estadual|da|do)\b)", "secretaria", t, flags=re.IGNORECASE)
     t2 = re.sub(r"\bprefeitura\s+municipal\b", "Prefeitura Municipal", t2, flags=re.IGNORECASE)

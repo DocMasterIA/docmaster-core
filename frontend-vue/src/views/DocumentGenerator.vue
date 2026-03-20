@@ -270,16 +270,10 @@
                         :type="field.input === 'email' ? 'email' : 'text'"
                         class="gov-input doc-gen__slot-input"
                         :autocomplete="field.input === 'email' ? 'email' : 'off'"
-                        :list="'slot-dl-' + field.id"
                         :placeholder="field.placeholder || 'Selecione, digite ou adicione novo valor'"
+                        @focus="openFieldSuggestions(field.id)"
+                        @input="openFieldSuggestions(field.id)"
                       />
-                      <datalist :id="'slot-dl-' + field.id">
-                        <option
-                          v-for="opt in slotFieldOptions[field.id] || []"
-                          :key="field.id + '-opt-' + opt"
-                          :value="opt"
-                        />
-                      </datalist>
                       <button
                         type="button"
                         class="gov-btn gov-btn--outline gov-btn--sm doc-gen__combo-add"
@@ -287,22 +281,35 @@
                       >
                         + Adicionar
                       </button>
+                      <div
+                        v-if="isFieldSuggestionsOpen(field.id)"
+                        class="doc-gen__slot-suggestions"
+                      >
+                        <button
+                          v-for="opt in getFieldSuggestions(field.id)"
+                          :key="field.id + '-opt-' + opt"
+                          type="button"
+                          class="doc-gen__slot-suggestion-item"
+                          @click="selectFieldSuggestion(field.id, opt)"
+                        >
+                          <span class="doc-gen__slot-suggestion-label">{{ opt }}</span>
+                          <span
+                            class="doc-gen__slot-suggestion-remove"
+                            title="Excluir valor"
+                            @click.stop="removeFieldOption(field.id, opt)"
+                          >×</span>
+                        </button>
+                      </div>
                     </div>
                     <div v-else-if="field.input === 'datalist'" class="doc-gen__combo-wrap">
                       <input
                         :id="'slot-' + field.id"
                         v-model="slotForm[field.id]"
                         class="gov-input doc-gen__slot-input"
-                        :list="'slot-dl-' + field.id"
                         :placeholder="field.placeholder || 'Escolha ou digite o cargo'"
+                        @focus="openFieldSuggestions(field.id)"
+                        @input="openFieldSuggestions(field.id)"
                       />
-                      <datalist :id="'slot-dl-' + field.id">
-                        <option
-                          v-for="opt in slotFieldOptions[field.id] || CARGO_DATALIST_OPTIONS"
-                          :key="field.id + '-opt-' + opt"
-                          :value="opt"
-                        />
-                      </datalist>
                       <button
                         type="button"
                         class="gov-btn gov-btn--outline gov-btn--sm doc-gen__combo-add"
@@ -310,6 +317,25 @@
                       >
                         + Adicionar
                       </button>
+                      <div
+                        v-if="isFieldSuggestionsOpen(field.id)"
+                        class="doc-gen__slot-suggestions"
+                      >
+                        <button
+                          v-for="opt in getFieldSuggestions(field.id)"
+                          :key="field.id + '-opt-' + opt"
+                          type="button"
+                          class="doc-gen__slot-suggestion-item"
+                          @click="selectFieldSuggestion(field.id, opt)"
+                        >
+                          <span class="doc-gen__slot-suggestion-label">{{ opt }}</span>
+                          <span
+                            class="doc-gen__slot-suggestion-remove"
+                            title="Excluir valor"
+                            @click.stop="removeFieldOption(field.id, opt)"
+                          >×</span>
+                        </button>
+                      </div>
                     </div>
                     <label
                       v-else-if="field.input === 'checkbox'"
@@ -424,6 +450,7 @@ const pdfDoc = ref(null);
 const pdfPage = ref(1);
 const pdfTotalPages = ref(0);
 const pdfGotoPage = ref(1);
+const suggestionOpenField = ref('');
 
 /** Sugestões para Função/Cargo (o usuário pode digitar outro valor). */
 const CARGO_DATALIST_OPTIONS = [
@@ -625,6 +652,41 @@ function addFieldOption(fieldId) {
     slotFieldOptions[fieldId] = [...slotFieldOptions[fieldId], value];
   }
   persistSlotEntries([{ field_key: fieldId, value }]);
+}
+
+function getFieldSuggestions(fieldId) {
+  const all = slotFieldOptions[fieldId] || [];
+  const q = String(slotForm[fieldId] || '').trim().toLowerCase();
+  if (!q) return all;
+  return all.filter((x) => String(x).toLowerCase().includes(q));
+}
+
+function openFieldSuggestions(fieldId) {
+  suggestionOpenField.value = fieldId;
+}
+
+function isFieldSuggestionsOpen(fieldId) {
+  return suggestionOpenField.value === fieldId;
+}
+
+function selectFieldSuggestion(fieldId, value) {
+  slotForm[fieldId] = value;
+  suggestionOpenField.value = '';
+}
+
+async function removeFieldOption(fieldId, value) {
+  const list = Array.isArray(slotFieldOptions[fieldId]) ? slotFieldOptions[fieldId] : [];
+  slotFieldOptions[fieldId] = list.filter((v) => v !== value);
+  try {
+    await fetch(`${API_BASE}/api/slots/catalog/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ field_key: fieldId, value }),
+    });
+  } catch (_e) {
+    // silencioso
+  }
 }
 
 async function persistSlotEntries(entries) {
@@ -841,6 +903,9 @@ function selectFocusedResult() {
 function clickOutside(e) {
   if (!e.target.closest('.doc-gen__search-wrap') && !e.target.closest('.doc-gen__results')) {
     showTemplateDropdown.value = false;
+  }
+  if (!e.target.closest('.doc-gen__combo-wrap')) {
+    suggestionOpenField.value = '';
   }
 }
 
@@ -1729,6 +1794,7 @@ function goToPage() {
   gap: 4px;
   align-items: stretch;
   min-width: 0;
+  position: relative;
 }
 .doc-gen__combo-wrap .doc-gen__slot-input {
   flex: 1;
@@ -1737,6 +1803,49 @@ function goToPage() {
   white-space: nowrap;
   padding: 5px 8px;
   font-size: 11px;
+}
+.doc-gen__slot-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  max-height: 260px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+}
+.doc-gen__slot-suggestion-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.doc-gen__slot-suggestion-item:hover {
+  background: #edf5fc;
+}
+.doc-gen__slot-suggestion-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.doc-gen__slot-suggestion-remove {
+  color: #c62828;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+  padding: 0 4px;
 }
 @media (max-width: 960px) {
   .doc-gen__wizard,

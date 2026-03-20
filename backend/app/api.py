@@ -965,3 +965,29 @@ def slot_catalog_upsert_api(request):
         updated += 1
 
     return JsonResponse({"ok": True, "created": created, "updated": updated})
+
+
+@api_login_required
+@csrf_exempt
+def slot_catalog_delete_api(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Use POST"}, status=405)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Corpo JSON inválido"}, status=400)
+
+    field_key = str(payload.get("field_key") or "").strip()
+    value = str(payload.get("value") or "").strip()
+    if not field_key or not value:
+        return JsonResponse({"ok": False, "error": "field_key e value são obrigatórios"}, status=400)
+
+    normalized = _normalize_slot_value(value)
+    rows = SlotValueCatalog.objects.filter(
+        owner=request.user,
+        field_key=field_key,
+        normalized_value=normalized,
+        is_active=True,
+    ).update(is_active=False)
+    return JsonResponse({"ok": True, "deleted": rows})

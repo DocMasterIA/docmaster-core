@@ -636,6 +636,20 @@ const slotCardFlowTitle = computed(() => {
   return DEFAULT_FLOW.title;
 });
 
+const SLOT_PACKAGE_BY_ROUTE = {
+  DispensaArt75IManutencaoVeiculos: 'dispensa_75_i_manutencao_veiculos',
+  DispensaArt75IObrasEngenharia: 'dispensa_75_i_obras_engenharia',
+  DispensaArt75IICompras: 'dispensa_75_ii_compras',
+  DispensaArt75IIServicos: 'dispensa_75_ii_servicos',
+  DispensaArt75IIComprasServicosInclusos: 'dispensa_75_ii_compras_servicos_inclusos',
+  InexigibilidadeArt74IShowArtistico: 'inexigibilidade_74_i_show_artistico',
+};
+
+const slotPackageKey = computed(() => {
+  if (isEtpLivreRoute.value) return 'etp_livre';
+  return SLOT_PACKAGE_BY_ROUTE[route.name] || 'tr_dfd_generico';
+});
+
 /** Valores do formulário lateral (TR/DFD com slots). */
 const slotForm = reactive({});
 /** Opções por campo (selecionáveis via datalist), com suporte a adicionar novos valores. */
@@ -1007,10 +1021,11 @@ async function submitViaLLM() {
   const userPromptFinal = appendix ? `${basePrompt}\n\n${appendix}` : basePrompt;
 
   const payload = isTrDfd
-    ? { user_prompt: userPromptFinal, slots_override: buildTrSlotsOverride() }
+    ? { user_prompt: userPromptFinal, slots_override: buildTrSlotsOverride(), slot_package_key: slotPackageKey.value }
     : {
         user_prompt: basePrompt,
         output: 'docx',
+        slot_package_key: slotPackageKey.value,
       };
   if (selectedTemplate.value?.id) {
     payload.template_id = selectedTemplate.value.id;

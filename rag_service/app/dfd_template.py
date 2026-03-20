@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """
 Geração de Documento de Formalização da Demanda (DFD) a partir do modelo fixo
-`templates/tr_base/DFD_modelo_base.docx`, preenchendo apenas os slots
+`template_packages/tr_base/DFD_modelo_base.docx`, preenchendo apenas os slots
 marcados entre parênteses.
 
 Este módulo NÃO chama IA – ele só aplica os dados já gerados para o TR
@@ -18,7 +18,7 @@ from .tr_template import TRTemplateSlots
 
 
 TEMPLATE_DFD_PATH_DEFAULT = (
-    Path(__file__).resolve().parents[2] / "templates" / "tr_base" / "DFD_modelo_base.docx"
+    Path(__file__).resolve().parents[2] / "template_packages" / "tr_base" / "DFD_modelo_base.docx"
 )
 
 

@@ -17,9 +17,7 @@ const routes = [
   },
   {
     path: '/',
-    name: 'DocumentGenerator',
-    component: () => import('../views/DocumentGenerator.vue'),
-    meta: { title: 'Gerador de Documentos' },
+    redirect: '/geracao/etp-livre',
   },
   {
     path: '/geracao/dispensa-art-75-i',

@@ -12,9 +12,25 @@ Este documento centraliza o mapeamento entre:
 ## Fluxo resumido
 
 1. Frontend (`DocumentGenerator.vue`) monta `slots_override`.
-2. Backend Django repassa `slots_override` para o `rag_service`.
-3. `rag_service/app/tr_slots_llm.py` faz merge IA + override.
-4. `tr_template.py` e `dfd_template.py` substituem placeholders no DOCX.
+2. Frontend envia também `slot_package_key` conforme a rota (pacote de documentos).
+3. Backend Django repassa `slots_override` + `slot_package_key` para o `rag_service` (em `context`).
+4. `rag_service/app/tr_slots_llm.py` faz merge IA + override.
+5. `tr_template.py` e `dfd_template.py` substituem placeholders no DOCX.
+
+---
+
+## Pacotes por rota (`slot_package_key`)
+
+Para suportar múltiplos pacotes de TR/DFD/Ofício por página:
+
+- `DispensaArt75IManutencaoVeiculos` -> `dispensa_75_i_manutencao_veiculos`
+- `DispensaArt75IObrasEngenharia` -> `dispensa_75_i_obras_engenharia`
+- `DispensaArt75IICompras` -> `dispensa_75_ii_compras`
+- `DispensaArt75IIServicos` -> `dispensa_75_ii_servicos`
+- `DispensaArt75IIComprasServicosInclusos` -> `dispensa_75_ii_compras_servicos_inclusos`
+- `InexigibilidadeArt74IShowArtistico` -> `inexigibilidade_74_i_show_artistico`
+- `EtpLivre` -> `etp_livre`
+- fallback -> `tr_dfd_generico`
 
 ---
 
@@ -33,7 +49,7 @@ Ex.: `(TR_OBJETO)`, `(DFD_EMAIL)`, `(SOL_OFICIO_DESTINATARIO_NOME)`.
 
 ## TR - Placeholders e slots
 
-### Placeholders padronizados (preferenciais)
+### Placeholders padronizados TR (preferenciais)
 
 - `(TR_OBJETO)` -> `objeto`
 - `(TR_DISPENSA_INCISO)` -> `dispensa.inciso`
@@ -51,7 +67,7 @@ Ex.: `(TR_OBJETO)`, `(DFD_EMAIL)`, `(SOL_OFICIO_DESTINATARIO_NOME)`.
 - `(TR_NOME_ASSINANTE_TERMO)` -> `nome_assinante_termo`
 - `(TR_CARGO_ASSINANTE_TERMO)` -> `cargo_assinante_termo`
 
-### Placeholders legados (compatibilidade)
+### Placeholders legados TR (compatibilidade)
 
 - `(descrever o objeto solicitado)` -> `objeto`
 - `(descrever o artigo de acordo com objeto)` -> `dispensa.inciso`
@@ -67,7 +83,7 @@ Ex.: `(TR_OBJETO)`, `(DFD_EMAIL)`, `(SOL_OFICIO_DESTINATARIO_NOME)`.
 
 ## DFD - Placeholders e slots
 
-### Placeholders padronizados (preferenciais)
+### Placeholders padronizados DFD (preferenciais)
 
 - `(DFD_OBJETO_REFERENCIA)` -> `objeto`
 - `(DFD_JUSTIFICATIVA)` -> `justificativa`
@@ -82,7 +98,7 @@ Ex.: `(TR_OBJETO)`, `(DFD_EMAIL)`, `(SOL_OFICIO_DESTINATARIO_NOME)`.
 - `(DFD_NOME_ASSINATURA)` -> `dfd_assinatura_nome`
 - `(DFD_DATA)` -> `dfd_data`
 
-### Placeholders legados (compatibilidade)
+### Placeholders legados DFD (compatibilidade)
 
 - `(Descrever objeto do termo de referencia)` -> `objeto`
 - `(descrever a justificativa usada no termo de referencias)` -> `justificativa`

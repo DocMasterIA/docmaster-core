@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """
 Geração de Termo de Referência a partir do modelo fixo
-`templates/tr_base/TR_modelo_base.docx`, preenchendo apenas os slots
+`template_packages/tr_base/TR_modelo_base.docx`, preenchendo apenas os slots
 marcados entre parênteses.
 
 Este módulo NÃO chama IA – ele só aplica um dicionário de slots em cima
@@ -19,9 +19,9 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
 
-# Template base: templates/tr_base/TR_modelo_base.docx (raiz do projeto)
+# Template base legado: template_packages/tr_base/TR_modelo_base.docx (raiz do projeto)
 TEMPLATE_PATH_DEFAULT = (
-    Path(__file__).resolve().parents[2] / "templates" / "tr_base" / "TR_modelo_base.docx"
+    Path(__file__).resolve().parents[2] / "template_packages" / "tr_base" / "TR_modelo_base.docx"
 )
 
 

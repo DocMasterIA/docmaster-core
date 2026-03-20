@@ -226,6 +226,7 @@ def gerar_via_llm_api(request):
     user_prompt = (payload.get("user_prompt") or "").strip()
     template_id = payload.get("template_id")
     output = (payload.get("output") or "docx").lower()
+    slot_package_key = (payload.get("slot_package_key") or "").strip()
 
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
@@ -242,6 +243,8 @@ def gerar_via_llm_api(request):
         context["template_id"] = str(template_id)
     if payload.get("document_type_hint"):
         context["document_type_hint"] = payload["document_type_hint"]
+    if slot_package_key:
+        context["slot_package_key"] = slot_package_key
 
     rag_url = getattr(django_settings, "RAG_SERVICE_URL", "http://127.0.0.1:8004").rstrip("/")
     url = f"{rag_url}/api/rag/generate-document"
@@ -387,11 +390,14 @@ def gerar_tr_modelo_api(request):
     user_prompt = (payload.get("user_prompt") or "").strip()
     slots_override = payload.get("slots_override")  # opcional
     template_id = payload.get("template_id")
+    slot_package_key = (payload.get("slot_package_key") or "").strip()
 
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
 
     context = build_llm_context_from_request(request)
+    if slot_package_key:
+        context["slot_package_key"] = slot_package_key
 
     rag_url = getattr(django_settings, "RAG_SERVICE_URL", "http://127.0.0.1:8004").rstrip("/")
     url = f"{rag_url}/api/rag/generate-tr-from-model"

@@ -17,11 +17,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Código da aplicação
 COPY rag_service/ ./rag_service/
 
-# Templates compartilhados (ex.: TR_modelo_base.docx)
-# O código do RAG espera encontrar o template em:
-#   /app/templates/tr_base/TR_modelo_base.docx
-# por causa de TEMPLATE_PATH_DEFAULT em rag_service/app/tr_template.py
-COPY templates/ ./templates/
+# Templates de pacotes (TR/DFD/Ofício)
+# O código do RAG usa:
+#   /app/template_packages/lei_14133/<pacote>/*.docx
+# com fallback em:
+#   /app/template_packages/tr_base/*.docx
+COPY template_packages/ ./template_packages/
 
 # Porta do serviço (override com -e PORT=...)
 ENV PORT=8004

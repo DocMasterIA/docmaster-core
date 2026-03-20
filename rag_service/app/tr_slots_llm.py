@@ -438,6 +438,11 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
         cidade=str(data.get("cidade", "")).strip(),
         horario_entrega=str(data.get("horario_entrega", "")).strip(),
         codigo_uf=str(data.get("codigo_uf", "")).strip(),
+        endereco_entrega=str(data.get("endereco_entrega", "")).strip(),
+        email_envio_propostas=str(data.get("email_envio_propostas", "")).strip(),
+        data_termo=str(data.get("data_termo", "")).strip(),
+        nome_assinante_termo=str(data.get("nome_assinante_termo", "")).strip(),
+        cargo_assinante_termo=str(data.get("cargo_assinante_termo", "")).strip(),
     )
 
 
@@ -499,6 +504,31 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         if override.get("codigo_uf") is not None
         else llm_slots.codigo_uf
     )
+    endereco_entrega = (
+        (override.get("endereco_entrega") or llm_slots.endereco_entrega)
+        if override.get("endereco_entrega") is not None
+        else llm_slots.endereco_entrega
+    )
+    email_envio_propostas = (
+        (override.get("email_envio_propostas") or llm_slots.email_envio_propostas)
+        if override.get("email_envio_propostas") is not None
+        else llm_slots.email_envio_propostas
+    )
+    data_termo = (
+        (override.get("data_termo") or llm_slots.data_termo)
+        if override.get("data_termo") is not None
+        else llm_slots.data_termo
+    )
+    nome_assinante_termo = (
+        (override.get("nome_assinante_termo") or llm_slots.nome_assinante_termo)
+        if override.get("nome_assinante_termo") is not None
+        else llm_slots.nome_assinante_termo
+    )
+    cargo_assinante_termo = (
+        (override.get("cargo_assinante_termo") or llm_slots.cargo_assinante_termo)
+        if override.get("cargo_assinante_termo") is not None
+        else llm_slots.cargo_assinante_termo
+    )
 
     itens_override = override.get("itens")
     if isinstance(itens_override, list) and len(itens_override) > 0:
@@ -526,6 +556,11 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
                 cidade=cidade,
                 horario_entrega=horario_entrega,
                 codigo_uf=codigo_uf,
+                endereco_entrega=endereco_entrega,
+                email_envio_propostas=email_envio_propostas,
+                data_termo=data_termo,
+                nome_assinante_termo=nome_assinante_termo,
+                cargo_assinante_termo=cargo_assinante_termo,
             )
     itens = llm_slots.itens
 
@@ -542,6 +577,11 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         cidade=cidade,
         horario_entrega=horario_entrega,
         codigo_uf=codigo_uf,
+        endereco_entrega=endereco_entrega,
+        email_envio_propostas=email_envio_propostas,
+        data_termo=data_termo,
+        nome_assinante_termo=nome_assinante_termo,
+        cargo_assinante_termo=cargo_assinante_termo,
     )
 
 

@@ -635,6 +635,58 @@ function addFieldOption(fieldId) {
   if (!slotFieldOptions[fieldId].includes(value)) {
     slotFieldOptions[fieldId] = [...slotFieldOptions[fieldId], value];
   }
+  persistSlotEntries([{ field_key: fieldId, value }]);
+}
+
+async function persistSlotEntries(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) return;
+  try {
+    await fetch(`${API_BASE}/api/slots/catalog/upsert`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ entries }),
+    });
+  } catch (_e) {
+    // silencioso: não deve interromper o fluxo principal de geração
+  }
+}
+
+async function loadSlotCatalogSuggestions() {
+  if (!showSlotsCard.value) return;
+  const fieldIds = selectedFlow.value.sections
+    .flatMap((section) => section.fields)
+    .filter((field) => field.input === 'text' || field.input === 'email' || field.input === 'datalist')
+    .map((field) => field.id);
+  if (!fieldIds.length) return;
+
+  try {
+    const url = `${API_BASE}/api/slots/catalog/batch?fields=${encodeURIComponent(fieldIds.join(','))}&limit=25`;
+    const res = await fetch(url, { credentials: 'include' });
+    if (!res.ok) return;
+    const data = await res.json().catch(() => ({}));
+    const items = data?.items || {};
+    for (const fieldId of fieldIds) {
+      const current = Array.isArray(slotFieldOptions[fieldId]) ? slotFieldOptions[fieldId] : [];
+      const incoming = Array.isArray(items[fieldId]) ? items[fieldId] : [];
+      slotFieldOptions[fieldId] = [...new Set([...current, ...incoming])];
+    }
+  } catch (_e) {
+    // silencioso: usa presets locais se API não estiver disponível
+  }
+}
+
+function buildSlotEntriesFromForm() {
+  const entries = [];
+  for (const section of selectedFlow.value.sections) {
+    for (const field of section.fields) {
+      if (field.input === 'heading' || field.input === 'checkbox') continue;
+      const value = String(slotForm[field.id] || '').trim();
+      if (!value) continue;
+      entries.push({ field_key: field.id, value });
+    }
+  }
+  return entries;
 }
 
 function resetSlotFormAndSections() {
@@ -661,6 +713,13 @@ function resetSlotFormAndSections() {
 function buildTrSlotsOverride() {
   const f = slotForm;
   const o = {};
+  const toBrDate = (iso) => {
+    const v = String(iso || '').trim();
+    if (!v) return '';
+    const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return v;
+    return `${m[3]}/${m[2]}/${m[1]}`;
+  };
 
   const fiscalNome = (f.dfd_fiscal_contratos || '').trim();
   if (fiscalNome) o.fiscal = { nome: fiscalNome };
@@ -671,12 +730,23 @@ function buildTrSlotsOverride() {
   const respDemanda = (f.dfd_responsavel_demanda || '').trim();
   if (respDemanda) o.nome_usuario = respDemanda;
 
-  const deliveryParts = [];
   const end = (f.tr_endereco_propostas || '').trim();
   const em = (f.tr_email_propostas || '').trim();
-  if (end) deliveryParts.push(`Endereço presencial para propostas: ${end}`);
-  if (em) deliveryParts.push(`E-mail para recebimento de propostas: ${em}`);
-  if (deliveryParts.length) o.horario_entrega = deliveryParts.join('\n');
+  if (end) o.endereco_entrega = end;
+  if (em) o.email_envio_propostas = em;
+
+  const dataManual = toBrDate(f.tr_data_termo);
+  if (f.tr_data_automatica) {
+    const now = new Date();
+    o.data_termo = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+  } else if (dataManual) {
+    o.data_termo = dataManual;
+  }
+
+  const nomeAss = (f.tr_nome_assinante || '').trim();
+  const cargoAss = (f.tr_cargo_assinante || '').trim();
+  if (nomeAss) o.nome_assinante_termo = nomeAss;
+  if (cargoAss) o.cargo_assinante_termo = cargoAss;
 
   const objeto = (f.objeto || f.objeto_obra || '').trim();
   if (objeto) o.objeto = objeto;
@@ -951,6 +1021,7 @@ async function submitViaLLM() {
 
     documentReady.value = true;
     successMessage.value = 'Termo de Referência e DFD gerados com sucesso. Baixe os arquivos abaixo.';
+    persistSlotEntries(buildSlotEntriesFromForm());
     return;
   }
 
@@ -982,6 +1053,7 @@ async function submitViaLLM() {
     documentPdfUrl.value = '';
     documentReady.value = true;
     successMessage.value = 'Documento gerado pela IA. Baixe o DOCX abaixo.';
+    persistSlotEntries(buildSlotEntriesFromForm());
   } else {
     const data = await res.json().catch(() => ({}));
     if (data.ok && data.docx_path) {
@@ -1090,6 +1162,7 @@ onMounted(() => {
     }
   }
   resetSlotFormAndSections();
+  loadSlotCatalogSuggestions();
 });
 onUnmounted(() => {
   document.removeEventListener('click', clickOutside);
@@ -1105,6 +1178,7 @@ watch(
   () => {
     docTypeMode.value = isEtpLivreRoute.value ? 'auto' : 'tr_modelo';
     resetSlotFormAndSections();
+    loadSlotCatalogSuggestions();
   },
 );
 

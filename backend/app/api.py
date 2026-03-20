@@ -12,7 +12,7 @@ from django.contrib.auth.decorators import login_required
 import json, tempfile, traceback
 from django.http import JsonResponse, FileResponse, HttpResponse
 from django.core.files.base import ContentFile
-from backend.app.models import Template, TemplateSchema, DocumentInstance, Prefeitura, SubtopicoSecretaria
+from backend.app.models import Template, TemplateSchema, DocumentInstance, Prefeitura, SubtopicoSecretaria, SlotValueCatalog
 from backend.app.forms import UserProfileForm, LoginForm
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login as auth_login, logout as auth_logout
@@ -25,6 +25,7 @@ import os
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_GET
 import requests
+import re
 
 
 def api_login_required(view_func):
@@ -34,6 +35,11 @@ def api_login_required(view_func):
             return JsonResponse({"error": "Não autenticado. Faça login."}, status=401)
         return view_func(request, *args, **kwargs)
     return wrapper
+
+
+def _normalize_slot_value(v: str) -> str:
+    s = re.sub(r"\s+", " ", (v or "").strip())
+    return s.casefold()
 
 
 # API: upload de Template (DOCX) e solicitação de mapeamento de campos via IA.
@@ -880,3 +886,80 @@ def api_me_documents(request):
         "start_index": page_obj.start_index(),
         "end_index": page_obj.end_index(),
     })
+
+
+@api_login_required
+@require_GET
+def slot_catalog_batch_api(request):
+    raw_fields = (request.GET.get("fields") or "").strip()
+    if not raw_fields:
+        return JsonResponse({"ok": True, "items": {}})
+
+    fields = [f.strip() for f in raw_fields.split(",") if f.strip()][:80]
+    try:
+        limit = int(request.GET.get("limit", 20) or 20)
+    except Exception:
+        limit = 20
+    limit = min(max(limit, 1), 100)
+
+    items = {}
+    for field_key in fields:
+        values = (
+            SlotValueCatalog.objects.filter(
+                owner=request.user,
+                field_key=field_key,
+                is_active=True,
+            )
+            .order_by("-usage_count", "-last_used_at")
+            .values_list("value", flat=True)[:limit]
+        )
+        items[field_key] = list(values)
+
+    return JsonResponse({"ok": True, "items": items})
+
+
+@api_login_required
+@csrf_exempt
+def slot_catalog_upsert_api(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Use POST"}, status=405)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Corpo JSON inválido"}, status=400)
+
+    entries = payload.get("entries") or []
+    if not isinstance(entries, list):
+        return JsonResponse({"ok": False, "error": "entries deve ser uma lista"}, status=400)
+
+    created = 0
+    updated = 0
+    for item in entries[:300]:
+        if not isinstance(item, dict):
+            continue
+        field_key = str(item.get("field_key") or "").strip()
+        value = str(item.get("value") or "").strip()
+        if not field_key or not value:
+            continue
+        normalized = _normalize_slot_value(value)
+        if not normalized:
+            continue
+
+        obj, was_created = SlotValueCatalog.objects.get_or_create(
+            owner=request.user,
+            field_key=field_key,
+            normalized_value=normalized,
+            defaults={"value": value, "usage_count": 1, "is_active": True},
+        )
+        if was_created:
+            created += 1
+            continue
+
+        obj.value = value
+        obj.usage_count = (obj.usage_count or 0) + 1
+        obj.is_active = True
+        obj.save(update_fields=["value", "usage_count", "is_active", "last_used_at", "updated_at"])
+        updated += 1
+
+    return JsonResponse({"ok": True, "created": created, "updated": updated})

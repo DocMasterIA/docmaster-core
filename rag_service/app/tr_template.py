@@ -57,6 +57,11 @@ class TRTemplateSlots:
     cidade: str = ""
     horario_entrega: str = ""
     codigo_uf: str = ""
+    endereco_entrega: str = ""
+    email_envio_propostas: str = ""
+    data_termo: str = ""
+    nome_assinante_termo: str = ""
+    cargo_assinante_termo: str = ""
 
 
 def _style_items_table(table) -> None:
@@ -248,6 +253,11 @@ def render_tr_from_slots(
         "(CIDADE)": slots.cidade or "",
         "(HORARIO E DIAS PARA ENTREGA)": slots.horario_entrega or "Preencher horário, dias da semana e outras informações de entrega",
         "(CÓDIGO UF)": slots.codigo_uf or "",
+        "(ENDERECO ENTREGA)": slots.endereco_entrega or "",
+        "(E-mail de envio de propostas)": slots.email_envio_propostas or "",
+        "(DATA DO TERMO)": slots.data_termo or "",
+        "(NOME DO ASSINANTE DO TERMO)": slots.nome_assinante_termo or "",
+        "(CARGO DO ASSINANTE DO TERMO)": slots.cargo_assinante_termo or "",
     }
 
     _replace_placeholders_in_paragraphs(doc, mapping)

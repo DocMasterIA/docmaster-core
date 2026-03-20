@@ -160,3 +160,32 @@ class DocumentInstance(models.Model):
 
     def __str__(self):
         return f"{self.template.name} ({self.owner.email})"
+
+
+class SlotValueCatalog(models.Model):
+    """
+    Catálogo de valores por campo de slot, por usuário.
+    Permite reaproveitar endereços, nomes, cargos e e-mails no formulário.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="slot_values")
+    field_key = models.CharField(_("Chave do Campo"), max_length=120)
+    value = models.TextField(_("Valor"))
+    normalized_value = models.TextField(_("Valor Normalizado"))
+    usage_count = models.PositiveIntegerField(_("Quantidade de Uso"), default=1)
+    last_used_at = models.DateTimeField(_("Último Uso"), auto_now=True)
+    is_active = models.BooleanField(_("Ativo"), default=True)
+    created_at = models.DateTimeField(_("Data de Criação"), auto_now_add=True)
+    updated_at = models.DateTimeField(_("Data de Atualização"), auto_now=True)
+
+    class Meta:
+        verbose_name = _("Catálogo de Valor de Slot")
+        verbose_name_plural = _("Catálogo de Valores de Slot")
+        unique_together = ("owner", "field_key", "normalized_value")
+        indexes = [
+            models.Index(fields=["owner", "field_key", "-usage_count", "-last_used_at"], name="slotcat_owner_field_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.owner_id}:{self.field_key} -> {self.value[:40]}"

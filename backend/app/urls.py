@@ -15,6 +15,8 @@ from .api import (
     gerar_tr_e_dfd_api,
     template_filters_api,
     analise_documentos_api,
+    slot_catalog_batch_api,
+    slot_catalog_upsert_api,
 )
 from .llm_proxy import llm_proxy
 from .ajax import area_do_usuario_ajax
@@ -40,6 +42,8 @@ urlpatterns = [
     path('api/me/documents/', api_me_documents, name='api_me_documents'),
     path('api/auth/login/', api_auth_login, name='api_auth_login'),
     path('api/auth/logout/', api_auth_logout, name='api_auth_logout'),
+    path("api/slots/catalog/batch", slot_catalog_batch_api, name="slots_catalog_batch_api"),
+    path("api/slots/catalog/upsert", slot_catalog_upsert_api, name="slots_catalog_upsert_api"),
     # Proxy LLM: sessão Django obrigatória; repassa para FastAPI (LLM_API_BASE_URL)
     path('api/llm/<path:path>', llm_proxy, name='api_llm_proxy'),
     path('secretaria-autocomplete/ajax/', SecretariaAutocomplete.as_view(), name='secretaria-autocomplete'),

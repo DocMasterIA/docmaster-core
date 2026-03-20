@@ -200,7 +200,7 @@
           <div class="gov-surface__header">
             <div>
               <h2 class="gov-surface__title">Dados do assistente (slots)</h2>
-              <p class="gov-surface__subtitle">{{ selectedFlow.title }}</p>
+              <p class="gov-surface__subtitle">{{ slotCardFlowTitle }}</p>
             </div>
           </div>
           <div class="doc-gen__variables-body">
@@ -530,6 +530,8 @@ const FLOW_CONFIG = {
   },
 };
 
+const TR_DFD_SLOTS_FLOW = FLOW_CONFIG.DispensaArt75IManutencaoVeiculos;
+
 const DEFAULT_FLOW = {
   title: 'Assistente de Criação - Fluxo Geral de Geração de Documentos',
   sections: [
@@ -571,7 +573,17 @@ const previewImageUrl = computed(() => {
   return img.startsWith('http') ? img : `${API_BASE}${img}`;
 });
 
-const selectedFlow = computed(() => FLOW_CONFIG[route.name] || DEFAULT_FLOW);
+const selectedFlow = computed(() => TR_DFD_SLOTS_FLOW);
+
+const slotCardFlowTitle = computed(() => {
+  const routeFlowTitle = FLOW_CONFIG[route.name]?.title;
+  if (routeFlowTitle) return routeFlowTitle;
+
+  const routeMetaTitle = typeof route.meta?.title === 'string' ? route.meta.title : '';
+  if (routeMetaTitle) return `Assistente de Criação - ${routeMetaTitle}`;
+
+  return DEFAULT_FLOW.title;
+});
 
 /** Valores do formulário lateral (TR/DFD com slots). */
 const slotForm = reactive({});
@@ -1153,7 +1165,7 @@ function goToPage() {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 16px;
-  align-items: stretch;
+  align-items: start;
 }
 @media (max-width: 960px) {
   .doc-gen__grid {
@@ -1162,13 +1174,13 @@ function goToPage() {
 }
 .doc-gen__main {
   min-width: 0;
-  display: flex;
 }
 .doc-gen__wizard {
   padding: 20px 24px;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
+  height: 72vh;
+  max-height: 72vh;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .doc-gen__form {
   margin-top: 8px;
@@ -1351,19 +1363,16 @@ function goToPage() {
 }
 .doc-gen__aside {
   min-width: 0;
-  display: flex;
 }
 .doc-gen__variables-card {
   padding: 14px 12px;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
+  height: 72vh;
+  max-height: 72vh;
+  overflow: hidden;
 }
 .doc-gen__variables-body {
   margin-top: 6px;
-  flex: 1;
-  min-height: 0;
+  height: calc(100% - 62px);
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 2px;
@@ -1450,16 +1459,13 @@ function goToPage() {
   font-size: 11px;
 }
 @media (max-width: 960px) {
-  .doc-gen__main,
-  .doc-gen__aside {
-    display: block;
-  }
   .doc-gen__wizard,
   .doc-gen__variables-card {
-    display: block;
+    height: auto;
+    max-height: none;
   }
   .doc-gen__variables-body {
-    max-height: none;
+    height: auto;
     overflow: visible;
   }
 }

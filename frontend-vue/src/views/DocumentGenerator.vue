@@ -7,7 +7,7 @@
       </p>
     </header>
 
-    <div class="doc-gen__grid" :class="{ 'doc-gen__grid--no-aside': docTypeMode !== 'tr_modelo' }">
+    <div class="doc-gen__grid">
       <!-- Coluna esquerda: wizard -->
       <div class="doc-gen__main">
         <section class="gov-surface doc-gen__wizard">
@@ -195,7 +195,7 @@
       </div>
 
       <!-- Coluna direita: dados para slots (somente TR/DFD modelo oficial) -->
-      <aside v-if="docTypeMode === 'tr_modelo'" class="doc-gen__aside">
+      <aside class="doc-gen__aside">
         <section class="gov-surface doc-gen__variables-card">
           <div class="gov-surface__header">
             <div>
@@ -1153,9 +1153,7 @@ function goToPage() {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 16px;
-}
-.doc-gen__grid--no-aside {
-  grid-template-columns: 1fr;
+  align-items: stretch;
 }
 @media (max-width: 960px) {
   .doc-gen__grid {
@@ -1164,9 +1162,13 @@ function goToPage() {
 }
 .doc-gen__main {
   min-width: 0;
+  display: flex;
 }
 .doc-gen__wizard {
   padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 .doc-gen__form {
   margin-top: 8px;
@@ -1349,16 +1351,19 @@ function goToPage() {
 }
 .doc-gen__aside {
   min-width: 0;
+  display: flex;
 }
 .doc-gen__variables-card {
   padding: 14px 12px;
-  height: 72vh;
-  max-height: 72vh;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 .doc-gen__variables-body {
   margin-top: 6px;
-  height: calc(100% - 62px);
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 2px;
@@ -1443,6 +1448,20 @@ function goToPage() {
   white-space: nowrap;
   padding: 5px 8px;
   font-size: 11px;
+}
+@media (max-width: 960px) {
+  .doc-gen__main,
+  .doc-gen__aside {
+    display: block;
+  }
+  .doc-gen__wizard,
+  .doc-gen__variables-card {
+    display: block;
+  }
+  .doc-gen__variables-body {
+    max-height: none;
+    overflow: visible;
+  }
 }
 .doc-gen__modal {
   position: fixed;

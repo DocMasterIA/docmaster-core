@@ -7,7 +7,7 @@
       </p>
     </header>
 
-    <div class="doc-gen__grid">
+    <div class="doc-gen__grid" :class="{ 'doc-gen__grid--single': !showSlotsCard }">
       <!-- Coluna esquerda: wizard -->
       <div class="doc-gen__main">
         <section class="gov-surface doc-gen__wizard">
@@ -23,41 +23,14 @@
               <!-- Escolha do documento base: template ou arquivo -->
               <div class="gov-field doc-gen__field-template">
                 <label class="gov-label">Documento Base</label>
-                <div class="doc-gen__source-tabs">
-                  <label class="doc-gen__tab">
-                    <input v-model="sourceMode" type="radio" value="llm" disabled />
-                    <span>Criar com IA (ETP, TR, DFD)</span>
-                  </label>
-                </div>
-
-                <!-- Criar do zero com IA (LLM) -->
                 <div class="doc-gen__llm-hint">
                   <p class="gov-text-soft">
                     <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
-                    Para Termo de Referência e DFD, a IA preenche o <strong>modelo oficial</strong> (slots) e aplica o template selecionado.
-                    Para ETP, a IA gera o documento completo a partir do seu prompt.
-                  </p>
-                </div>
-
-                <!-- Tipo de documento / modo de geração -->
-                <div class="gov-field gov-mt-sm">
-                  <label class="gov-label">Tipo de documento</label>
-                  <div class="doc-gen__source-tabs">
-                    <label class="doc-gen__tab">
-                      <input v-model="docTypeMode" type="radio" value="auto" />
-                      <span>ETP (IA flexível)</span>
-                    </label>
-                    <label class="doc-gen__tab">
-                      <input v-model="docTypeMode" type="radio" value="tr_modelo" />
-                      <span>TR / DFD (modelo oficial)</span>
-                    </label>
-                  </div>
-                  <p class="gov-text-soft gov-mt-xs">
                     <span v-if="docTypeMode === 'tr_modelo'">
-                      O Termo de Referência (e o DFD complementar) serão gerados <strong>exclusivamente</strong> a partir dos modelos oficiais internos, com slots preenchidos pela IA.
+                      Esta página gera <strong>TR / DFD com modelo oficial (slots)</strong>. O modo é inferido automaticamente pela rota selecionada.
                     </span>
                     <span v-else>
-                      Use este modo apenas para ETP ou rascunhos livres. Para TR/DFD oficiais, use sempre a opção de modelo oficial acima.
+                      Esta página gera <strong>ETP Livre (IA flexível)</strong>. O modo é inferido automaticamente pela rota selecionada.
                     </span>
                   </p>
                 </div>
@@ -195,7 +168,7 @@
       </div>
 
       <!-- Coluna direita: dados para slots (somente TR/DFD modelo oficial) -->
-      <aside class="doc-gen__aside">
+      <aside v-if="showSlotsCard" class="doc-gen__aside">
         <section class="gov-surface doc-gen__variables-card">
           <div class="gov-surface__header">
             <div>
@@ -572,6 +545,9 @@ const previewImageUrl = computed(() => {
   if (!img) return '';
   return img.startsWith('http') ? img : `${API_BASE}${img}`;
 });
+
+const isEtpLivreRoute = computed(() => route.name === 'EtpLivre');
+const showSlotsCard = computed(() => !isEtpLivreRoute.value);
 
 const selectedFlow = computed(() => TR_DFD_SLOTS_FLOW);
 
@@ -1052,6 +1028,7 @@ async function loadTemplatePreviewPdf(templateId) {
 let pdfjsLib = null;
 onMounted(() => {
   document.addEventListener('click', clickOutside);
+  docTypeMode.value = isEtpLivreRoute.value ? 'auto' : 'tr_modelo';
   const templateId = route.query.template_id;
   if (templateId) {
     fetchTemplateDetails(templateId).then(() => {
@@ -1078,12 +1055,13 @@ onUnmounted(() => {
 watch(
   () => route.name,
   () => {
+    docTypeMode.value = isEtpLivreRoute.value ? 'auto' : 'tr_modelo';
     resetSlotFormAndSections();
   },
 );
 
-watch(docTypeMode, (m) => {
-  if (m === 'tr_modelo') resetSlotFormAndSections();
+watch(isEtpLivreRoute, (isEtp) => {
+  docTypeMode.value = isEtp ? 'auto' : 'tr_modelo';
 });
 
 async function loadPdf(url) {
@@ -1166,6 +1144,9 @@ function goToPage() {
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 16px;
   align-items: start;
+}
+.doc-gen__grid--single {
+  grid-template-columns: 1fr;
 }
 @media (max-width: 960px) {
   .doc-gen__grid {

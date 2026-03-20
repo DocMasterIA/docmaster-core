@@ -76,6 +76,12 @@ const routes = [
     meta: { title: 'Inexigibilidade - Art. 74, I - Show Artístico' },
   },
   {
+    path: '/geracao/etp-livre',
+    name: 'EtpLivre',
+    component: () => import('../views/DocumentGenerator.vue'),
+    meta: { title: 'ETP Livre' },
+  },
+  {
     path: '/gerador-documentos',
     redirect: '/',
   },

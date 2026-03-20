@@ -161,6 +161,7 @@ const groupOpenState = ref({
   DispensaArt75I: true,
   DispensaArt75II: false,
   InexigibilidadeArt74I: false,
+  EtpLivreGroup: false,
 });
 
 const generationPages = [
@@ -218,6 +219,19 @@ const generationPages = [
         label: 'Show artístico',
         icon: 'fa-music',
         to: '/geracao/inexigibilidade-art-74-i/show-artistico',
+      },
+    ],
+  },
+  {
+    name: 'EtpLivreGroup',
+    label: 'ETP Livre',
+    icon: 'fa-file-pen',
+    children: [
+      {
+        name: 'EtpLivre',
+        label: 'ETP Livre',
+        icon: 'fa-file-signature',
+        to: '/geracao/etp-livre',
       },
     ],
   },

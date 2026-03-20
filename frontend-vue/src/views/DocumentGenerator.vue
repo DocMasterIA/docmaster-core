@@ -152,6 +152,54 @@
                   </template>
                 </template>
               </div>
+
+              <div v-if="isSubmitting" class="doc-gen__loader-wrap" role="status" aria-live="polite">
+                <svg class="doc-gen__pl" width="240" height="240" viewBox="0 0 240 240" aria-hidden="true">
+                  <circle
+                    class="doc-gen__pl-ring doc-gen__pl-ring--a"
+                    cx="120"
+                    cy="120"
+                    r="105"
+                    fill="none"
+                    stroke-width="20"
+                    stroke-dasharray="0 660"
+                    stroke-dashoffset="-330"
+                    stroke-linecap="round"
+                  ></circle>
+                  <circle
+                    class="doc-gen__pl-ring doc-gen__pl-ring--b"
+                    cx="120"
+                    cy="120"
+                    r="35"
+                    fill="none"
+                    stroke-width="20"
+                    stroke-dasharray="0 220"
+                    stroke-dashoffset="-110"
+                    stroke-linecap="round"
+                  ></circle>
+                  <circle
+                    class="doc-gen__pl-ring doc-gen__pl-ring--c"
+                    cx="85"
+                    cy="120"
+                    r="70"
+                    fill="none"
+                    stroke-width="20"
+                    stroke-dasharray="0 440"
+                    stroke-linecap="round"
+                  ></circle>
+                  <circle
+                    class="doc-gen__pl-ring doc-gen__pl-ring--d"
+                    cx="155"
+                    cy="120"
+                    r="70"
+                    fill="none"
+                    stroke-width="20"
+                    stroke-dasharray="0 440"
+                    stroke-linecap="round"
+                  ></circle>
+                </svg>
+                <p class="doc-gen__loader-text">Gerando documento com IA...</p>
+              </div>
             </div>
           </form>
 
@@ -1310,6 +1358,194 @@ function goToPage() {
 }
 .doc-gen__spinner {
   opacity: 0.9;
+}
+.doc-gen__loader-wrap {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #f4f9fe;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.doc-gen__loader-text {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-primary-dark);
+  font-weight: 600;
+}
+.doc-gen__pl {
+  width: 5.4em;
+  height: 5.4em;
+}
+.doc-gen__pl-ring {
+  animation: docGenRingA 2s linear infinite;
+}
+.doc-gen__pl-ring--a {
+  stroke: #0d6efd;
+}
+.doc-gen__pl-ring--b {
+  animation-name: docGenRingB;
+  stroke: #2a8cff;
+}
+.doc-gen__pl-ring--c {
+  animation-name: docGenRingC;
+  stroke: #1b74e4;
+}
+.doc-gen__pl-ring--d {
+  animation-name: docGenRingD;
+  stroke: #59a8ff;
+}
+@keyframes docGenRingA {
+  from, 4% {
+    stroke-dasharray: 0 660;
+    stroke-width: 20;
+    stroke-dashoffset: -330;
+  }
+  12% {
+    stroke-dasharray: 60 600;
+    stroke-width: 30;
+    stroke-dashoffset: -335;
+  }
+  32% {
+    stroke-dasharray: 60 600;
+    stroke-width: 30;
+    stroke-dashoffset: -595;
+  }
+  40%, 54% {
+    stroke-dasharray: 0 660;
+    stroke-width: 20;
+    stroke-dashoffset: -660;
+  }
+  62% {
+    stroke-dasharray: 60 600;
+    stroke-width: 30;
+    stroke-dashoffset: -665;
+  }
+  82% {
+    stroke-dasharray: 60 600;
+    stroke-width: 30;
+    stroke-dashoffset: -925;
+  }
+  90%, to {
+    stroke-dasharray: 0 660;
+    stroke-width: 20;
+    stroke-dashoffset: -990;
+  }
+}
+@keyframes docGenRingB {
+  from, 12% {
+    stroke-dasharray: 0 220;
+    stroke-width: 20;
+    stroke-dashoffset: -110;
+  }
+  20% {
+    stroke-dasharray: 20 200;
+    stroke-width: 30;
+    stroke-dashoffset: -115;
+  }
+  40% {
+    stroke-dasharray: 20 200;
+    stroke-width: 30;
+    stroke-dashoffset: -195;
+  }
+  48%, 62% {
+    stroke-dasharray: 0 220;
+    stroke-width: 20;
+    stroke-dashoffset: -220;
+  }
+  70% {
+    stroke-dasharray: 20 200;
+    stroke-width: 30;
+    stroke-dashoffset: -225;
+  }
+  90% {
+    stroke-dasharray: 20 200;
+    stroke-width: 30;
+    stroke-dashoffset: -305;
+  }
+  98%, to {
+    stroke-dasharray: 0 220;
+    stroke-width: 20;
+    stroke-dashoffset: -330;
+  }
+}
+@keyframes docGenRingC {
+  from {
+    stroke-dasharray: 0 440;
+    stroke-width: 20;
+    stroke-dashoffset: 0;
+  }
+  8% {
+    stroke-dasharray: 40 400;
+    stroke-width: 30;
+    stroke-dashoffset: -5;
+  }
+  28% {
+    stroke-dasharray: 40 400;
+    stroke-width: 30;
+    stroke-dashoffset: -175;
+  }
+  36%, 58% {
+    stroke-dasharray: 0 440;
+    stroke-width: 20;
+    stroke-dashoffset: -220;
+  }
+  66% {
+    stroke-dasharray: 40 400;
+    stroke-width: 30;
+    stroke-dashoffset: -225;
+  }
+  86% {
+    stroke-dasharray: 40 400;
+    stroke-width: 30;
+    stroke-dashoffset: -395;
+  }
+  94%, to {
+    stroke-dasharray: 0 440;
+    stroke-width: 20;
+    stroke-dashoffset: -440;
+  }
+}
+@keyframes docGenRingD {
+  from, 8% {
+    stroke-dasharray: 0 440;
+    stroke-width: 20;
+    stroke-dashoffset: 0;
+  }
+  16% {
+    stroke-dasharray: 40 400;
+    stroke-width: 30;
+    stroke-dashoffset: -5;
+  }
+  36% {
+    stroke-dasharray: 40 400;
+    stroke-width: 30;
+    stroke-dashoffset: -175;
+  }
+  44%, 50% {
+    stroke-dasharray: 0 440;
+    stroke-width: 20;
+    stroke-dashoffset: -220;
+  }
+  58% {
+    stroke-dasharray: 40 400;
+    stroke-width: 30;
+    stroke-dashoffset: -225;
+  }
+  78% {
+    stroke-dasharray: 40 400;
+    stroke-width: 30;
+    stroke-dashoffset: -395;
+  }
+  86%, to {
+    stroke-dasharray: 0 440;
+    stroke-width: 20;
+    stroke-dashoffset: -440;
+  }
 }
 .doc-gen__success {
   margin-top: 20px;

@@ -528,6 +528,18 @@ def gerar_tr_e_dfd_api(request):
     if slot_package_key:
         context["slot_package_key"] = slot_package_key
 
+    def _slug(v: str) -> str:
+        s = re.sub(r"[^a-zA-Z0-9_\\-]+", "_", (v or "").strip().lower())
+        s = re.sub(r"_+", "_", s).strip("_")
+        return s or "tr_dfd_generico"
+
+    now = timezone.localtime(timezone.now())
+    stamp = now.strftime("%d_%m_%Y_%H-%M")
+    package_slug = _slug(slot_package_key or "tr_dfd_generico")
+    tr_filename = f"tr_{package_slug}_{stamp}_docmasteria.docx"
+    dfd_filename = f"dfd_{package_slug}_{stamp}_docmasteria.docx"
+    zip_filename = f"tr_dfd_{package_slug}_{stamp}_docmasteria.zip"
+
     rag_url = getattr(django_settings, "RAG_SERVICE_URL", "http://127.0.0.1:8004").rstrip("/")
     url = f"{rag_url}/api/rag/generate-tr-and-dfd-zip"
 
@@ -571,9 +583,12 @@ def gerar_tr_e_dfd_api(request):
 
     tpl = Template.objects.filter(id=template_id).first() if template_id is not None else None
 
-    def _maybe_merge_with_template(raw: bytes, name: str) -> bytes:
+    def _maybe_merge_with_template(raw: bytes, name: str):
+        """
+        Retorna (bytes, applied, error_message).
+        """
         if not tpl:
-            return raw
+            return raw, False, "template_id não informado ou template não encontrado"
         try:
             tmpdir = tempfile.gettempdir()
             rag_docx_path = os.path.join(tmpdir, f"tr_dfd_{tpl.id}_{name}")
@@ -586,12 +601,15 @@ def gerar_tr_e_dfd_api(request):
                 out_docx_path=out_docx_path,
             )
             with open(out_docx_path, "rb") as fr:
-                return fr.read()
-        except Exception:
-            return raw
+                return fr.read(), True, ""
+        except Exception as e:
+            # Não quebrar geração: devolve original, mas registra para diagnóstico.
+            err = f"{type(e).__name__}: {e}"
+            print(f"[merge_docx_with_template_body] falha ao aplicar template_id={getattr(tpl, 'id', None)} arquivo={name}: {err}")
+            return raw, False, err
 
-    tr_bytes = _maybe_merge_with_template(tr_bytes, "termo_referencia.docx")
-    dfd_bytes = _maybe_merge_with_template(dfd_bytes, "dfd.docx")
+    tr_bytes, tr_template_applied, tr_merge_error = _maybe_merge_with_template(tr_bytes, "termo_referencia.docx")
+    dfd_bytes, dfd_template_applied, dfd_merge_error = _maybe_merge_with_template(dfd_bytes, "dfd.docx")
 
     # Opcional: salvar instância principal (TR) em "Meus Documentos"
     if tpl and request.user.is_authenticated:
@@ -617,23 +635,27 @@ def gerar_tr_e_dfd_api(request):
     # Monta ZIP TR+DFD em memória
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("termo_referencia.docx", tr_bytes)
-        zf.writestr("dfd.docx", dfd_bytes)
+        zf.writestr(tr_filename, tr_bytes)
+        zf.writestr(dfd_filename, dfd_bytes)
     zip_bytes = zip_buffer.getvalue()
 
     return JsonResponse(
         {
             "ok": True,
             "tr": {
-                "filename": "termo_referencia.docx",
+                "filename": tr_filename,
                 "docx_base64": base64.b64encode(tr_bytes).decode("ascii"),
+                "template_applied": tr_template_applied,
+                "merge_error": tr_merge_error or None,
             },
             "dfd": {
-                "filename": "dfd.docx",
+                "filename": dfd_filename,
                 "docx_base64": base64.b64encode(dfd_bytes).decode("ascii"),
+                "template_applied": dfd_template_applied,
+                "merge_error": dfd_merge_error or None,
             },
             "zip": {
-                "filename": "tr_dfd.zip",
+                "filename": zip_filename,
                 "zip_base64": base64.b64encode(zip_bytes).decode("ascii"),
             },
         }

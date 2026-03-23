@@ -110,7 +110,7 @@
                     <a
                       v-if="documentTrUrl"
                       :href="documentTrUrl"
-                      download="termo_referencia.docx"
+                      :download="documentTrFilename"
                       class="gov-btn gov-btn--secondary"
                     >
                       <i class="fa-solid fa-file-word" aria-hidden="true"></i> Download TR (DOCX)
@@ -118,7 +118,7 @@
                     <a
                       v-if="documentDfdUrl"
                       :href="documentDfdUrl"
-                      download="dfd.docx"
+                      :download="documentDfdFilename"
                       class="gov-btn gov-btn--secondary"
                     >
                       <i class="fa-solid fa-file-word" aria-hidden="true"></i> Download DFD (DOCX)
@@ -126,7 +126,7 @@
                     <a
                       v-if="documentZipUrl"
                       :href="documentZipUrl"
-                      download="tr_dfd.zip"
+                      :download="documentZipFilename"
                       class="gov-btn gov-btn--secondary"
                     >
                       <i class="fa-solid fa-file-archive" aria-hidden="true"></i> Download TR+DFD (ZIP)
@@ -439,6 +439,9 @@ const documentPdfUrl = ref('');
 const documentTrUrl = ref('');
 const documentDfdUrl = ref('');
 const documentZipUrl = ref('');
+const documentTrFilename = ref('termo_referencia.docx');
+const documentDfdFilename = ref('dfd.docx');
+const documentZipFilename = ref('tr_dfd.zip');
 const successMessage = ref('');
 const generateError = ref('');
 
@@ -1017,6 +1020,9 @@ async function onSubmit() {
     URL.revokeObjectURL(documentZipUrl.value);
     documentZipUrl.value = '';
   }
+  documentTrFilename.value = 'termo_referencia.docx';
+  documentDfdFilename.value = 'dfd.docx';
+  documentZipFilename.value = 'tr_dfd.zip';
 
   try {
     await submitViaLLM();
@@ -1117,6 +1123,9 @@ async function submitViaLLM() {
       documentTrUrl.value = trUrl;
       documentDfdUrl.value = dfdUrl;
       documentZipUrl.value = zipUrl;
+      documentTrFilename.value = data.tr?.filename || 'termo_referencia.docx';
+      documentDfdFilename.value = data.dfd?.filename || 'dfd.docx';
+      documentZipFilename.value = data.zip?.filename || 'tr_dfd.zip';
     } catch (e) {
       generateError.value = `Falha ao processar arquivos: ${e?.message || 'dados inválidos'}. Tente novamente.`;
       return;

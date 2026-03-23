@@ -18,6 +18,8 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
+TR_ITEMS_TABLE_ANCHOR = "(TR_TABELA_ITENS)"
+
 
 # Template base legado: template_packages/tr_base/TR_modelo_base.docx (raiz do projeto)
 TEMPLATE_PATH_DEFAULT = (
@@ -144,15 +146,46 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
     if not itens:
         return
 
-    # Tenta reaproveitar uma tabela existente com 4 colunas; caso não encontre, cria uma nova.
+    # 1) Prioriza tabela que contenha o marcador explícito de ancoragem.
     target_table = None
     for table in doc.tables:
-        if not table.rows:
-            continue
-        if len(table.rows[0].cells) >= 4:
+        found_anchor_in_table = False
+        for row in table.rows:
+            for cell in row.cells:
+                if TR_ITEMS_TABLE_ANCHOR in (cell.text or ""):
+                    cell.text = (cell.text or "").replace(TR_ITEMS_TABLE_ANCHOR, "").strip()
+                    found_anchor_in_table = True
+                    break
+            if found_anchor_in_table:
+                break
+        if found_anchor_in_table:
             target_table = table
             break
 
+    # 2) Se não houver tabela com marcador, tenta marcador em parágrafo:
+    # insere a tabela imediatamente após o parágrafo âncora.
+    if target_table is None:
+        anchor_paragraph = None
+        for p in doc.paragraphs:
+            if TR_ITEMS_TABLE_ANCHOR in (p.text or ""):
+                p.text = (p.text or "").replace(TR_ITEMS_TABLE_ANCHOR, "").strip()
+                anchor_paragraph = p
+                break
+        if anchor_paragraph is not None:
+            target_table = doc.add_table(rows=0, cols=4)
+            anchor_paragraph._p.addnext(target_table._tbl)
+
+    # 3) Fallback legado: primeira tabela com 4 colunas.
+    if target_table is None:
+        # Tenta reaproveitar uma tabela existente com 4 colunas; caso não encontre, cria uma nova.
+        for table in doc.tables:
+            if not table.rows:
+                continue
+            if len(table.rows[0].cells) >= 4:
+                target_table = table
+                break
+
+    # 4) Fallback final: cria no fim do documento.
     if target_table is None:
         target_table = doc.add_table(rows=0, cols=4)
 
@@ -260,6 +293,7 @@ def render_tr_from_slots(
         "(TR_DATA_TERMO)": slots.data_termo or "",
         "(TR_NOME_ASSINANTE_TERMO)": slots.nome_assinante_termo or "",
         "(TR_CARGO_ASSINANTE_TERMO)": slots.cargo_assinante_termo or "",
+        "(TR_TABELA_ITENS)": "",
         # Compatibilidade com placeholders legados
         "(descrever o objeto solicitado)": slots.objeto or "",
         # No modelo, este placeholder está associado ao texto logo após "inciso".

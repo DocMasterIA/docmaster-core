@@ -66,6 +66,7 @@ Ex.: `(TR_OBJETO)`, `(DFD_EMAIL)`, `(SOL_OFICIO_DESTINATARIO_NOME)`.
 - `(TR_DATA_TERMO)` -> `data_termo`
 - `(TR_NOME_ASSINANTE_TERMO)` -> `nome_assinante_termo`
 - `(TR_CARGO_ASSINANTE_TERMO)` -> `cargo_assinante_termo`
+- `(TR_TABELA_ITENS)` -> âncora de posicionamento da tabela de itens (não é valor textual)
 
 ### Placeholders legados TR (compatibilidade)
 
@@ -142,6 +143,7 @@ Campos principais do card:
 - `tr_endereco_propostas` -> `endereco_entrega`
 - `tr_email_propostas` -> `email_envio_propostas`
 - `tr_data_termo` / `tr_data_automatica` -> `data_termo`
+- `tr_assinatura_digital` -> sufixa `data_termo` com `", datado e assinado digitalmente"` (ou define apenas esse texto quando não há data)
 - `tr_nome_assinante` -> `nome_assinante_termo`
 - `tr_cargo_assinante` -> `cargo_assinante_termo`
 - `dfd_setor_requisitante` -> `dfd_setor_requisitante`
@@ -172,8 +174,9 @@ Obs.: `dfd_numero_processo`, `dfd_assinatura_nome` e `dfd_data` já estão previ
 ## Checklist ao alterar modelo DOCX
 
 1. Atualizar placeholders no `.docx`.
-2. Atualizar mapping em `tr_template.py` e/ou `dfd_template.py`.
-3. Garantir campo em `TRTemplateSlots`.
-4. Garantir merge em `tr_slots_llm.py`.
-5. Atualizar `slots_override` no frontend.
-6. Testar geração TR e DFD no fluxo completo.
+2. Se quiser posicionamento determinístico da tabela de itens, inserir `(TR_TABELA_ITENS)` no ponto desejado.
+3. Atualizar mapping em `tr_template.py` e/ou `dfd_template.py`.
+4. Garantir campo em `TRTemplateSlots`.
+5. Garantir merge em `tr_slots_llm.py`.
+6. Atualizar `slots_override` no frontend.
+7. Testar geração TR e DFD no fluxo completo.

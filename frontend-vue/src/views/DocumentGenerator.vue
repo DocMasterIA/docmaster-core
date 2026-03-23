@@ -262,6 +262,7 @@
                       v-model="slotForm[field.id]"
                       type="date"
                       class="gov-input doc-gen__slot-input"
+                      :disabled="isSlotFieldDisabled(field)"
                     />
                     <div v-else-if="field.input === 'email' || field.input === 'text'" class="doc-gen__combo-wrap">
                       <input
@@ -774,6 +775,11 @@ function resetSlotFormAndSections() {
   }
 }
 
+function isSlotFieldDisabled(field) {
+  if (!field || field.input !== 'date') return false;
+  return field.id === 'tr_data_termo' && !!slotForm.tr_data_automatica;
+}
+
 /** Mapeia campos do fluxo “Dispensa / DFD” para chaves aceitas em `slots_override` no backend. */
 function buildTrSlotsOverride() {
   const f = slotForm;
@@ -822,11 +828,18 @@ function buildTrSlotsOverride() {
   if (em) o.email_envio_propostas = em;
 
   const dataManual = toBrDate(f.tr_data_termo);
+  let dataTermo = '';
   if (f.tr_data_automatica) {
     const now = new Date();
-    o.data_termo = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+    dataTermo = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
   } else if (dataManual) {
-    o.data_termo = dataManual;
+    dataTermo = dataManual;
+  }
+  if (f.tr_assinatura_digital) {
+    dataTermo = dataTermo ? `${dataTermo}, datado e assinado digitalmente` : 'datado e assinado digitalmente';
+  }
+  if (dataTermo) {
+    o.data_termo = dataTermo;
   }
 
   const nomeAss = (f.tr_nome_assinante || '').trim();
@@ -1275,6 +1288,13 @@ watch(
 watch(isEtpLivreRoute, (isEtp) => {
   docTypeMode.value = isEtp ? 'auto' : 'tr_modelo';
 });
+
+watch(
+  () => slotForm.tr_data_automatica,
+  (enabled) => {
+    if (enabled) slotForm.tr_data_termo = '';
+  },
+);
 
 async function loadPdf(url) {
   if (!pdfjsLib || !pdfCanvasEl.value) return;

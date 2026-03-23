@@ -19,6 +19,11 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
 TR_ITEMS_TABLE_ANCHOR = "(TR_TABELA_ITENS)"
+TR_ITEMS_LEGACY_CELL_PLACEHOLDERS = {
+    "(Descrever o item de acordo com o solicitado)",
+    "(Inserir unidade de medida ex: caixa, litro, unidade etc)",
+    "(Inserir quantidade solicitada)",
+}
 
 
 # Template base legado: template_packages/tr_base/TR_modelo_base.docx (raiz do projeto)
@@ -175,19 +180,39 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
             target_table = doc.add_table(rows=0, cols=4)
             anchor_paragraph._p.addnext(target_table._tbl)
 
-    # 3) Fallback legado: primeira tabela com 4 colunas.
+    # 3) Fallback legado: reutiliza tabela que tenha placeholders antigos
+    # de itens ou cabeçalho típico (Item/Descrição/Unidade/Quantidade).
     if target_table is None:
-        # Tenta reaproveitar uma tabela existente com 4 colunas; caso não encontre, cria uma nova.
         for table in doc.tables:
             if not table.rows:
                 continue
-            if len(table.rows[0].cells) >= 4:
+            has_legacy_item_placeholder = False
+            for row in table.rows:
+                for cell in row.cells:
+                    cell_text = (cell.text or "")
+                    if any(ph in cell_text for ph in TR_ITEMS_LEGACY_CELL_PLACEHOLDERS):
+                        has_legacy_item_placeholder = True
+                        break
+                if has_legacy_item_placeholder:
+                    break
+
+            header = [(c.text or "").strip().lower() for c in table.rows[0].cells]
+            has_item_header = (
+                len(header) >= 4
+                and "item" in header[0]
+                and "descr" in header[1]
+                and "unidade" in header[2]
+                and "quantidade" in header[3]
+            )
+
+            if has_legacy_item_placeholder or has_item_header:
                 target_table = table
                 break
 
-    # 4) Fallback final: cria no fim do documento.
+    # 4) Sem âncora explícita ou tabela legada reconhecida, não injeta tabela.
+    # Isso evita criar tabela indevida no final do documento.
     if target_table is None:
-        target_table = doc.add_table(rows=0, cols=4)
+        return
 
     # Remove todas as linhas existentes para reconstruir a tabela do zero
     for row in list(target_table.rows):

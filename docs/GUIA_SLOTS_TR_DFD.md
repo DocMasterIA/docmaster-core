@@ -81,6 +81,9 @@ Ex.: `(TR_OBJETO)`, `(DFD_EMAIL)`, `(SOL_OFICIO_DESTINATARIO_NOME)`.
 - `(CIDADE - ESTADO)` -> `cidade_estado`
 - `(SECRETARIA DO USUARIO)` -> `secretaria_usuario`
 - `(Nome do USUARIO)` -> `nome_usuario`
+- `(TR_OBJETO_MANUAL)` -> `objeto`
+- `(TR_BENEFICIO_ESPERADO)` -> `justificativa` (fallback provisório)
+- `(TR_PROBLEMA_ADMINISTRATIVO)` -> `justificativa` (fallback provisório)
 
 ## DFD - Placeholders e slots
 

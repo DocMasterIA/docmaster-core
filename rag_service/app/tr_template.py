@@ -294,6 +294,10 @@ def render_tr_from_slots(
         "(TR_NOME_ASSINANTE_TERMO)": slots.nome_assinante_termo or "",
         "(TR_CARGO_ASSINANTE_TERMO)": slots.cargo_assinante_termo or "",
         "(TR_TABELA_ITENS)": "",
+        # Compatibilidade entre variantes de pacotes TR_modelo_base
+        "(TR_OBJETO_MANUAL)": slots.objeto or "",
+        "(TR_BENEFICIO_ESPERADO)": slots.justificativa or "",
+        "(TR_PROBLEMA_ADMINISTRATIVO)": slots.justificativa or "",
         # Compatibilidade com placeholders legados
         "(descrever o objeto solicitado)": slots.objeto or "",
         # No modelo, este placeholder está associado ao texto logo após "inciso".

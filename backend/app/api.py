@@ -391,11 +391,14 @@ def gerar_tr_modelo_api(request):
     slots_override = payload.get("slots_override")  # opcional
     template_id = payload.get("template_id")
     slot_package_key = (payload.get("slot_package_key") or "").strip()
+    slot_package_key = (payload.get("slot_package_key") or "").strip()
 
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
 
     context = build_llm_context_from_request(request)
+    if slot_package_key:
+        context["slot_package_key"] = slot_package_key
     if slot_package_key:
         context["slot_package_key"] = slot_package_key
 

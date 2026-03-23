@@ -42,4 +42,23 @@ def ensure_fallback_path(path: Path, legacy_filename: str) -> Path:
     """
     if path.exists():
         return path
-    return LEGACY_TR_BASE_DIR / legacy_filename
+
+    # Fallback principal (/app/template_packages/tr_base/<arquivo>)
+    legacy_default = LEGACY_TR_BASE_DIR / legacy_filename
+    if legacy_default.exists():
+        return legacy_default
+
+    # Fallback adicional para cenários de build/volume em caminhos alternativos.
+    alt_candidates = [
+        Path(__file__).resolve().parents[1] / "template_packages" / "tr_base" / legacy_filename,  # /app/rag_service/template_packages/...
+        Path.cwd() / "template_packages" / "tr_base" / legacy_filename,
+    ]
+    for candidate in alt_candidates:
+        if candidate.exists():
+            return candidate
+
+    checked = [str(path), str(legacy_default)] + [str(c) for c in alt_candidates]
+    raise FileNotFoundError(
+        "Template não encontrado em nenhum caminho esperado. "
+        f"arquivo={legacy_filename}; caminhos_verificados={checked}"
+    )

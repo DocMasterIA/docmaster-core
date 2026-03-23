@@ -27,6 +27,7 @@ from django.views.decorators.http import require_GET
 import requests
 import re
 from functools import wraps
+from urllib.parse import urlparse
 
 
 def api_login_required(view_func):
@@ -42,6 +43,33 @@ def api_login_required(view_func):
 def _normalize_slot_value(v: str) -> str:
     s = re.sub(r"\s+", " ", (v or "").strip())
     return s.casefold()
+
+
+def _resolve_slot_package_key(payload: dict, request) -> str:
+    """
+    Resolve slot_package_key com fallback por rota do frontend (Referer),
+    para manter funcionamento mesmo quando frontend/backend estão defasados.
+    """
+    explicit = str((payload or {}).get("slot_package_key") or "").strip().lower()
+    if explicit:
+        return explicit
+
+    referer = str(getattr(request, "META", {}).get("HTTP_REFERER") or "").strip()
+    if not referer:
+        return ""
+    path = (urlparse(referer).path or "").lower()
+    route_map = {
+        "/geracao/dispensa-art-75-i/manutencao-veiculos": "dispensa_75_i_manutencao_veiculos",
+        "/geracao/dispensa-art-75-i/obras-servicos-engenharia": "dispensa_75_i_obras_engenharia",
+        "/geracao/dispensa-art-75-ii/compras": "dispensa_75_ii_compras",
+        "/geracao/dispensa-art-75-ii/servicos": "dispensa_75_ii_servicos",
+        "/geracao/dispensa-art-75-ii/compras-servicos-inclusos": "dispensa_75_ii_compras_servicos_inclusos",
+        "/geracao/inexigibilidade-art-74-i/show-artistico": "inexigibilidade_74_i_show_artistico",
+    }
+    for route_path, package_key in route_map.items():
+        if path.startswith(route_path):
+            return package_key
+    return ""
 
 
 # API: upload de Template (DOCX) e solicitação de mapeamento de campos via IA.
@@ -226,7 +254,7 @@ def gerar_via_llm_api(request):
     user_prompt = (payload.get("user_prompt") or "").strip()
     template_id = payload.get("template_id")
     output = (payload.get("output") or "docx").lower()
-    slot_package_key = (payload.get("slot_package_key") or "").strip()
+    slot_package_key = _resolve_slot_package_key(payload, request)
 
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
@@ -390,7 +418,7 @@ def gerar_tr_modelo_api(request):
     user_prompt = (payload.get("user_prompt") or "").strip()
     slots_override = payload.get("slots_override")  # opcional
     template_id = payload.get("template_id")
-    slot_package_key = (payload.get("slot_package_key") or "").strip()
+    slot_package_key = _resolve_slot_package_key(payload, request)
 
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
@@ -519,7 +547,7 @@ def gerar_tr_e_dfd_api(request):
     user_prompt = (payload.get("user_prompt") or "").strip()
     slots_override = payload.get("slots_override")  # opcional
     template_id = payload.get("template_id")
-    slot_package_key = (payload.get("slot_package_key") or "").strip()
+    slot_package_key = _resolve_slot_package_key(payload, request)
 
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)

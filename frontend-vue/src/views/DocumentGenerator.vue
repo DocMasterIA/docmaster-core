@@ -7,7 +7,7 @@
       </p>
     </header>
 
-    <div class="doc-gen__grid">
+    <div class="doc-gen__grid" :class="{ 'doc-gen__grid--single': !showSlotsCard }">
       <!-- Coluna esquerda: wizard -->
       <div class="doc-gen__main">
         <section class="gov-surface doc-gen__wizard">
@@ -23,41 +23,14 @@
               <!-- Escolha do documento base: template ou arquivo -->
               <div class="gov-field doc-gen__field-template">
                 <label class="gov-label">Documento Base</label>
-                <div class="doc-gen__source-tabs">
-                  <label class="doc-gen__tab">
-                    <input v-model="sourceMode" type="radio" value="llm" disabled />
-                    <span>Criar com IA (ETP, TR, DFD)</span>
-                  </label>
-                </div>
-
-                <!-- Criar do zero com IA (LLM) -->
                 <div class="doc-gen__llm-hint">
                   <p class="gov-text-soft">
                     <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
-                    Para Termo de Referência e DFD, a IA preenche o <strong>modelo oficial</strong> (slots) e aplica o template selecionado.
-                    Para ETP, a IA gera o documento completo a partir do seu prompt.
-                  </p>
-                </div>
-
-                <!-- Tipo de documento / modo de geração -->
-                <div class="gov-field gov-mt-sm">
-                  <label class="gov-label">Tipo de documento</label>
-                  <div class="doc-gen__source-tabs">
-                    <label class="doc-gen__tab">
-                      <input v-model="docTypeMode" type="radio" value="auto" />
-                      <span>ETP (IA flexível)</span>
-                    </label>
-                    <label class="doc-gen__tab">
-                      <input v-model="docTypeMode" type="radio" value="tr_modelo" />
-                      <span>TR / DFD (modelo oficial)</span>
-                    </label>
-                  </div>
-                  <p class="gov-text-soft gov-mt-xs">
                     <span v-if="docTypeMode === 'tr_modelo'">
-                      O Termo de Referência (e o DFD complementar) serão gerados <strong>exclusivamente</strong> a partir dos modelos oficiais internos, com slots preenchidos pela IA.
+                      Esta página gera <strong>TR / DFD com modelo oficial (slots)</strong>. O modo é inferido automaticamente pela rota selecionada.
                     </span>
                     <span v-else>
-                      Use este modo apenas para ETP ou rascunhos livres. Para TR/DFD oficiais, use sempre a opção de modelo oficial acima.
+                      Esta página gera <strong>ETP Livre (IA flexível)</strong>. O modo é inferido automaticamente pela rota selecionada.
                     </span>
                   </p>
                 </div>
@@ -137,7 +110,7 @@
                     <a
                       v-if="documentTrUrl"
                       :href="documentTrUrl"
-                      download="termo_referencia.docx"
+                      :download="documentTrFilename"
                       class="gov-btn gov-btn--secondary"
                     >
                       <i class="fa-solid fa-file-word" aria-hidden="true"></i> Download TR (DOCX)
@@ -145,7 +118,7 @@
                     <a
                       v-if="documentDfdUrl"
                       :href="documentDfdUrl"
-                      download="dfd.docx"
+                      :download="documentDfdFilename"
                       class="gov-btn gov-btn--secondary"
                     >
                       <i class="fa-solid fa-file-word" aria-hidden="true"></i> Download DFD (DOCX)
@@ -153,7 +126,7 @@
                     <a
                       v-if="documentZipUrl"
                       :href="documentZipUrl"
-                      download="tr_dfd.zip"
+                      :download="documentZipFilename"
                       class="gov-btn gov-btn--secondary"
                     >
                       <i class="fa-solid fa-file-archive" aria-hidden="true"></i> Download TR+DFD (ZIP)
@@ -179,6 +152,54 @@
                   </template>
                 </template>
               </div>
+
+              <div v-if="isSubmitting" class="doc-gen__loader-wrap" role="status" aria-live="polite">
+                <svg class="doc-gen__pl" width="240" height="240" viewBox="0 0 240 240" aria-hidden="true">
+                  <circle
+                    class="doc-gen__pl-ring doc-gen__pl-ring--a"
+                    cx="120"
+                    cy="120"
+                    r="105"
+                    fill="none"
+                    stroke-width="20"
+                    stroke-dasharray="0 660"
+                    stroke-dashoffset="-330"
+                    stroke-linecap="round"
+                  ></circle>
+                  <circle
+                    class="doc-gen__pl-ring doc-gen__pl-ring--b"
+                    cx="120"
+                    cy="120"
+                    r="35"
+                    fill="none"
+                    stroke-width="20"
+                    stroke-dasharray="0 220"
+                    stroke-dashoffset="-110"
+                    stroke-linecap="round"
+                  ></circle>
+                  <circle
+                    class="doc-gen__pl-ring doc-gen__pl-ring--c"
+                    cx="85"
+                    cy="120"
+                    r="70"
+                    fill="none"
+                    stroke-width="20"
+                    stroke-dasharray="0 440"
+                    stroke-linecap="round"
+                  ></circle>
+                  <circle
+                    class="doc-gen__pl-ring doc-gen__pl-ring--d"
+                    cx="155"
+                    cy="120"
+                    r="70"
+                    fill="none"
+                    stroke-width="20"
+                    stroke-dasharray="0 440"
+                    stroke-linecap="round"
+                  ></circle>
+                </svg>
+                <p class="doc-gen__loader-text">Gerando documento com IA...</p>
+              </div>
             </div>
           </form>
 
@@ -194,40 +215,152 @@
         </section>
       </div>
 
-      <!-- Coluna direita: preview -->
-      <aside class="doc-gen__aside">
-        <section class="gov-surface doc-gen__preview-card">
+      <!-- Coluna direita: dados para slots (somente TR/DFD modelo oficial) -->
+      <aside v-if="showSlotsCard" class="doc-gen__aside">
+        <section class="gov-surface doc-gen__variables-card">
           <div class="gov-surface__header">
             <div>
-              <h2 class="gov-surface__title">Pré-visualização de Documento</h2>
-              <p class="gov-surface__subtitle">Veja o modelo antes de gerar</p>
+              <h2 class="gov-surface__title">Dados do assistente (slots)</h2>
+              <p class="gov-surface__subtitle">{{ slotCardFlowTitle }}</p>
             </div>
           </div>
-          <div class="doc-gen__preview-body">
-            <h3 class="doc-gen__preview-heading">{{ previewHeading }}</h3>
-            <p class="gov-text-soft">{{ previewSub }}</p>
-            <div class="doc-gen__preview-excerpt">
-              <template v-if="selectedTemplate?.preview_image">
-                <p class="gov-text-soft">Pré-visualização do documento:</p>
-                <img :src="previewImageUrl" alt="Preview" class="doc-gen__preview-img" />
-              </template>
-              <template v-else>
-                <p class="gov-text-soft">
-                  Nenhum documento base selecionado. A IA criará o documento completo; você pode opcionalmente escolher um template
-                  de cabeçalho/rodapé na área ao lado.
-                </p>
-              </template>
-            </div>
-            <div class="doc-gen__preview-actions">
-              <button
-                v-if="selectedTemplate?.id"
-                type="button"
-                class="gov-btn gov-btn--primary gov-btn--sm"
-                @click="openPdfModal"
-              >
-                Pré-visualizar
-              </button>
-              <router-link to="/biblioteca" class="gov-btn gov-btn--outline gov-btn--sm">Biblioteca</router-link>
+          <div class="doc-gen__variables-body">
+            <p class="gov-text-soft doc-gen__variables-desc">
+              Preencha os campos com os valores que devem constar no documento (texto livre, lista sugerida ou registro na hora).
+              Eles são enviados à IA e aos placeholders do modelo oficial quando aplicável.
+            </p>
+            <div
+              v-for="section in selectedFlow.sections"
+              :key="section.key"
+              class="doc-gen__var-section"
+            >
+              <h3 class="doc-gen__var-heading">{{ section.title }}</h3>
+              <div class="doc-gen__slot-grid">
+                <template v-for="field in section.fields" :key="field.id">
+                  <h4 v-if="field.input === 'heading'" class="doc-gen__slot-subheading">
+                    {{ field.label }}
+                  </h4>
+                  <div
+                    v-else
+                    class="gov-field doc-gen__slot-field"
+                    :class="{ 'doc-gen__slot-field--full': field.fullWidth }"
+                  >
+                    <label class="gov-label" :for="'slot-' + field.id">
+                      {{ field.label }}
+                      <span v-if="field.required" class="doc-gen__required" aria-hidden="true">*</span>
+                    </label>
+                    <textarea
+                      v-if="field.input === 'textarea'"
+                      :id="'slot-' + field.id"
+                      v-model="slotForm[field.id]"
+                      class="gov-textarea doc-gen__slot-input"
+                      rows="3"
+                    />
+                    <input
+                      v-else-if="field.input === 'date'"
+                      :id="'slot-' + field.id"
+                      v-model="slotForm[field.id]"
+                      type="date"
+                      class="gov-input doc-gen__slot-input"
+                      :disabled="isSlotFieldDisabled(field)"
+                    />
+                    <div v-else-if="field.input === 'email' || field.input === 'text'" class="doc-gen__combo-wrap">
+                      <input
+                        :id="'slot-' + field.id"
+                        v-model="slotForm[field.id]"
+                        :type="field.input === 'email' ? 'email' : 'text'"
+                        class="gov-input doc-gen__slot-input"
+                        :autocomplete="field.input === 'email' ? 'email' : 'off'"
+                        :placeholder="field.placeholder || 'Selecione, digite ou adicione novo valor'"
+                        @focus="openFieldSuggestions(field.id)"
+                        @input="openFieldSuggestions(field.id)"
+                      />
+                      <button
+                        type="button"
+                        class="gov-btn gov-btn--outline gov-btn--sm doc-gen__combo-add"
+                        @click="addFieldOption(field.id)"
+                      >
+                        + Adicionar
+                      </button>
+                      <div
+                        v-if="isFieldSuggestionsOpen(field.id)"
+                        class="doc-gen__slot-suggestions"
+                      >
+                        <button
+                          v-for="opt in getFieldSuggestions(field.id)"
+                          :key="field.id + '-opt-' + opt"
+                          type="button"
+                          class="doc-gen__slot-suggestion-item"
+                          @click="selectFieldSuggestion(field.id, opt)"
+                        >
+                          <span class="doc-gen__slot-suggestion-label">{{ opt }}</span>
+                          <span
+                            class="doc-gen__slot-suggestion-remove"
+                            title="Excluir valor"
+                            @click.stop="removeFieldOption(field.id, opt)"
+                          >×</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div v-else-if="field.input === 'datalist'" class="doc-gen__combo-wrap">
+                      <input
+                        :id="'slot-' + field.id"
+                        v-model="slotForm[field.id]"
+                        class="gov-input doc-gen__slot-input"
+                        :placeholder="field.placeholder || 'Escolha ou digite o cargo'"
+                        @focus="openFieldSuggestions(field.id)"
+                        @input="openFieldSuggestions(field.id)"
+                      />
+                      <button
+                        type="button"
+                        class="gov-btn gov-btn--outline gov-btn--sm doc-gen__combo-add"
+                        @click="addFieldOption(field.id)"
+                      >
+                        + Adicionar
+                      </button>
+                      <div
+                        v-if="isFieldSuggestionsOpen(field.id)"
+                        class="doc-gen__slot-suggestions"
+                      >
+                        <button
+                          v-for="opt in getFieldSuggestions(field.id)"
+                          :key="field.id + '-opt-' + opt"
+                          type="button"
+                          class="doc-gen__slot-suggestion-item"
+                          @click="selectFieldSuggestion(field.id, opt)"
+                        >
+                          <span class="doc-gen__slot-suggestion-label">{{ opt }}</span>
+                          <span
+                            class="doc-gen__slot-suggestion-remove"
+                            title="Excluir valor"
+                            @click.stop="removeFieldOption(field.id, opt)"
+                          >×</span>
+                        </button>
+                      </div>
+                    </div>
+                    <label
+                      v-else-if="field.input === 'checkbox'"
+                      class="doc-gen__slot-checkbox-label"
+                      :for="'slot-' + field.id"
+                    >
+                      <input
+                        :id="'slot-' + field.id"
+                        v-model="slotForm[field.id]"
+                        type="checkbox"
+                        class="doc-gen__slot-checkbox"
+                      />
+                      <span>{{ field.checkboxHint || field.label }}</span>
+                    </label>
+                    <input
+                      v-else
+                      :id="'slot-' + field.id"
+                      v-model="slotForm[field.id]"
+                      type="text"
+                      class="gov-input doc-gen__slot-input"
+                    />
+                  </div>
+                </template>
+              </div>
             </div>
           </div>
         </section>
@@ -278,7 +411,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 // Em dev: usar '' para que a requisição passe pelo proxy do Vite (evita 404 por chamar outro host/porta)
@@ -306,6 +439,9 @@ const documentPdfUrl = ref('');
 const documentTrUrl = ref('');
 const documentDfdUrl = ref('');
 const documentZipUrl = ref('');
+const documentTrFilename = ref('termo_referencia.docx');
+const documentDfdFilename = ref('dfd.docx');
+const documentZipFilename = ref('tr_dfd.zip');
 const successMessage = ref('');
 const generateError = ref('');
 
@@ -318,6 +454,150 @@ const pdfDoc = ref(null);
 const pdfPage = ref(1);
 const pdfTotalPages = ref(0);
 const pdfGotoPage = ref(1);
+const suggestionOpenField = ref('');
+
+/** Sugestões para Função/Cargo (o usuário pode digitar outro valor). */
+const CARGO_DATALIST_OPTIONS = [
+  'Prefeito(a)',
+  'Secretário(a) Municipal',
+  'Diretor(a) de Departamento',
+  'Coordenador(a)',
+  'Chefe de Setor',
+  'Procurador(a) do Município',
+  'Fiscal de Contratos',
+  'Gestor(a) de Contratos',
+  'Outro (registrar no campo)',
+];
+
+const FLOW_CONFIG = {
+  DispensaArt75IManutencaoVeiculos: {
+    title: 'Assistente de Criação - Dispensa de Licitação - Art. 75, Inciso I - Manutenção de Veículos (Lei nº 14.133/2021)',
+    sections: [
+      {
+        key: 'solicitacao',
+        title: '1. Solicitação / Ofício',
+        fields: [
+          { id: 'solicitacao_destinatario_nome', label: '1.1 A quem é direcionada a solicitação — Nome', input: 'text' },
+          {
+            id: 'solicitacao_destinatario_cargo',
+            label: '1.1 A quem é direcionada a solicitação — Função / Cargo',
+            input: 'datalist',
+          },
+          { id: 'solicitacao_responsavel_nome', label: '1.2 Responsável pela solicitação — Nome', input: 'text' },
+          {
+            id: 'solicitacao_responsavel_cargo',
+            label: '1.2 Responsável pela solicitação — Função / Cargo',
+            input: 'datalist',
+          },
+        ],
+      },
+      {
+        key: 'dfd',
+        title: '2. DFD – Documento de Formalização da Demanda',
+        fields: [
+          {
+            id: 'dfd_setor_requisitante',
+            label: 'Setor requisitante (Unidade / Setor / Departamento)',
+            input: 'text',
+            required: true,
+          },
+          { id: 'dfd_responsavel_demanda', label: 'Responsável pela demanda', input: 'text', required: true },
+          { id: 'dfd_email', label: 'E-mail', input: 'email', required: true },
+          { id: 'dfd_gestor_contratos', label: 'Nome do(a) gestor(a) de contratos', input: 'text', required: true },
+          { id: 'dfd_fiscal_contratos', label: 'Nome do(a) fiscal de contratos', input: 'text', required: true },
+          {
+            id: 'dfd_assinatura_cargo',
+            label: 'Função / cargo do responsável pela assinatura da DFD',
+            input: 'text',
+            required: true,
+          },
+        ],
+      },
+      {
+        key: 'tr',
+        title: '3. Termo de Referência',
+        fields: [
+          {
+            id: 'tr_endereco_propostas',
+            label: 'Endereço presencial para envio ou entrega de propostas',
+            input: 'text',
+            fullWidth: true,
+          },
+          { id: 'tr_data_termo', label: 'Data do termo', input: 'date' },
+          { id: 'tr_email_propostas', label: 'E-mail para recebimento de propostas', input: 'email' },
+          {
+            id: 'tr_assinatura_digital',
+            label: 'Datado e assinado digitalmente',
+            input: 'checkbox',
+            checkboxHint: 'Datado e assinado digitalmente.',
+          },
+          {
+            id: 'tr_data_automatica',
+            label: 'Data automática',
+            input: 'checkbox',
+            checkboxHint: 'Inserir data atual automaticamente.',
+          },
+          { id: '_h_tr_assin', label: 'Assinatura do termo', input: 'heading', fullWidth: true },
+          {
+            id: 'tr_nome_assinante',
+            label: 'Nome de quem assinará o Termo de Referência',
+            input: 'text',
+          },
+          {
+            id: 'tr_cargo_assinante',
+            label: 'Função / cargo de quem assina o termo',
+            input: 'datalist',
+          },
+        ],
+      },
+    ],
+  },
+  DispensaArt75IObrasEngenharia: {
+    title: 'Assistente de Criação - Dispensa de Licitação - Art. 75, Inciso I - Obras e Serviços de Engenharia',
+    sections: [
+      {
+        key: 'base',
+        title: 'Campos principais',
+        fields: [
+          { id: 'objeto_obra', label: 'Objeto da contratação', input: 'text' },
+          { id: 'escopo_tecnico', label: 'Escopo técnico da obra/serviço', input: 'textarea', fullWidth: true },
+          { id: 'responsavel_tecnico', label: 'Responsável técnico', input: 'text' },
+        ],
+      },
+    ],
+  },
+  InexigibilidadeArt74IShowArtistico: {
+    title: 'Assistente de Criação - Inexigibilidade - Art. 74, Inciso I - Show Artístico',
+    sections: [
+      {
+        key: 'base',
+        title: 'Campos principais',
+        fields: [
+          { id: 'artista', label: 'Artista / atração', input: 'text' },
+          { id: 'data_evento', label: 'Data do evento', input: 'date' },
+          { id: 'justificativa_inviabilidade', label: 'Justificativa de inviabilidade de competição', input: 'textarea', fullWidth: true },
+        ],
+      },
+    ],
+  },
+};
+
+const TR_DFD_SLOTS_FLOW = FLOW_CONFIG.DispensaArt75IManutencaoVeiculos;
+
+const DEFAULT_FLOW = {
+  title: 'Assistente de Criação - Fluxo Geral de Geração de Documentos',
+  sections: [
+    {
+      key: 'base',
+      title: 'Campos principais',
+      fields: [
+        { id: 'objeto', label: 'Objeto da contratação', input: 'text' },
+        { id: 'justificativa', label: 'Justificativa da necessidade', input: 'textarea', fullWidth: true },
+        { id: 'setor_responsavel', label: 'Setor responsável', input: 'text' },
+      ],
+    },
+  ],
+};
 
 const hasDocumentBase = computed(() => {
   if (sourceMode.value === 'llm') return true;
@@ -344,6 +624,275 @@ const previewImageUrl = computed(() => {
   if (!img) return '';
   return img.startsWith('http') ? img : `${API_BASE}${img}`;
 });
+
+const isEtpLivreRoute = computed(() => route.name === 'EtpLivre');
+const showSlotsCard = computed(() => !isEtpLivreRoute.value);
+
+const selectedFlow = computed(() => TR_DFD_SLOTS_FLOW);
+
+const slotCardFlowTitle = computed(() => {
+  const routeFlowTitle = FLOW_CONFIG[route.name]?.title;
+  if (routeFlowTitle) return routeFlowTitle;
+
+  const routeMetaTitle = typeof route.meta?.title === 'string' ? route.meta.title : '';
+  if (routeMetaTitle) return `Assistente de Criação - ${routeMetaTitle}`;
+
+  return DEFAULT_FLOW.title;
+});
+
+const SLOT_PACKAGE_BY_ROUTE = {
+  DispensaArt75IManutencaoVeiculos: 'dispensa_75_i_manutencao_veiculos',
+  DispensaArt75IObrasEngenharia: 'dispensa_75_i_obras_engenharia',
+  DispensaArt75IICompras: 'dispensa_75_ii_compras',
+  DispensaArt75IIServicos: 'dispensa_75_ii_servicos',
+  DispensaArt75IIComprasServicosInclusos: 'dispensa_75_ii_compras_servicos_inclusos',
+  InexigibilidadeArt74IShowArtistico: 'inexigibilidade_74_i_show_artistico',
+};
+
+const slotPackageKey = computed(() => {
+  if (isEtpLivreRoute.value) return 'etp_livre';
+  return SLOT_PACKAGE_BY_ROUTE[route.name] || 'tr_dfd_generico';
+});
+
+/** Valores do formulário lateral (TR/DFD com slots). */
+const slotForm = reactive({});
+/** Opções por campo (selecionáveis via datalist), com suporte a adicionar novos valores. */
+const slotFieldOptions = reactive({});
+
+const SLOT_FIELD_PRESETS = {};
+
+function addFieldOption(fieldId) {
+  const raw = slotForm[fieldId];
+  const value = typeof raw === 'string' ? raw.trim() : '';
+  if (!value) return;
+  if (!Array.isArray(slotFieldOptions[fieldId])) slotFieldOptions[fieldId] = [];
+  if (!slotFieldOptions[fieldId].includes(value)) {
+    slotFieldOptions[fieldId] = [...slotFieldOptions[fieldId], value];
+  }
+  persistSlotEntries([{ field_key: fieldId, value }]);
+}
+
+function getFieldSuggestions(fieldId) {
+  const all = slotFieldOptions[fieldId] || [];
+  const q = String(slotForm[fieldId] || '').trim().toLowerCase();
+  if (!q) return all;
+  return all.filter((x) => String(x).toLowerCase().includes(q));
+}
+
+function openFieldSuggestions(fieldId) {
+  suggestionOpenField.value = fieldId;
+}
+
+function isFieldSuggestionsOpen(fieldId) {
+  return suggestionOpenField.value === fieldId;
+}
+
+function selectFieldSuggestion(fieldId, value) {
+  slotForm[fieldId] = value;
+  suggestionOpenField.value = '';
+}
+
+async function removeFieldOption(fieldId, value) {
+  const list = Array.isArray(slotFieldOptions[fieldId]) ? slotFieldOptions[fieldId] : [];
+  slotFieldOptions[fieldId] = list.filter((v) => v !== value);
+  try {
+    await fetch(`${API_BASE}/api/slots/catalog/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ field_key: fieldId, value }),
+    });
+  } catch (_e) {
+    // silencioso
+  }
+}
+
+async function persistSlotEntries(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) return;
+  try {
+    await fetch(`${API_BASE}/api/slots/catalog/upsert`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ entries }),
+    });
+  } catch (_e) {
+    // silencioso: não deve interromper o fluxo principal de geração
+  }
+}
+
+async function loadSlotCatalogSuggestions() {
+  if (!showSlotsCard.value) return;
+  const fieldIds = selectedFlow.value.sections
+    .flatMap((section) => section.fields)
+    .filter((field) => field.input === 'text' || field.input === 'email' || field.input === 'datalist')
+    .map((field) => field.id);
+  if (!fieldIds.length) return;
+
+  try {
+    const url = `${API_BASE}/api/slots/catalog/batch?fields=${encodeURIComponent(fieldIds.join(','))}&limit=25`;
+    const res = await fetch(url, { credentials: 'include' });
+    if (!res.ok) return;
+    const data = await res.json().catch(() => ({}));
+    const items = data?.items || {};
+    for (const fieldId of fieldIds) {
+      const current = Array.isArray(slotFieldOptions[fieldId]) ? slotFieldOptions[fieldId] : [];
+      const incoming = Array.isArray(items[fieldId]) ? items[fieldId] : [];
+      slotFieldOptions[fieldId] = [...new Set([...current, ...incoming])];
+    }
+  } catch (_e) {
+    // silencioso: usa presets locais se API não estiver disponível
+  }
+}
+
+function buildSlotEntriesFromForm() {
+  const entries = [];
+  for (const section of selectedFlow.value.sections) {
+    for (const field of section.fields) {
+      if (field.input === 'heading' || field.input === 'checkbox') continue;
+      const value = String(slotForm[field.id] || '').trim();
+      if (!value) continue;
+      entries.push({ field_key: field.id, value });
+    }
+  }
+  return entries;
+}
+
+function resetSlotFormAndSections() {
+  Object.keys(slotForm).forEach((k) => {
+    delete slotForm[k];
+  });
+  Object.keys(slotFieldOptions).forEach((k) => {
+    delete slotFieldOptions[k];
+  });
+  for (const section of selectedFlow.value.sections) {
+    for (const field of section.fields) {
+      if (field.input === 'heading') continue;
+      slotForm[field.id] = field.input === 'checkbox' ? false : '';
+      if (field.input === 'text' || field.input === 'email' || field.input === 'datalist') {
+        const isCargoField = field.input === 'datalist';
+        const base = isCargoField ? CARGO_DATALIST_OPTIONS : (SLOT_FIELD_PRESETS[field.id] || []);
+        slotFieldOptions[field.id] = [...base];
+      }
+    }
+  }
+}
+
+function isSlotFieldDisabled(field) {
+  if (!field || field.input !== 'date') return false;
+  return field.id === 'tr_data_termo' && !!slotForm.tr_data_automatica;
+}
+
+/** Mapeia campos do fluxo “Dispensa / DFD” para chaves aceitas em `slots_override` no backend. */
+function buildTrSlotsOverride() {
+  const f = slotForm;
+  const o = {};
+  const toBrDate = (iso) => {
+    const v = String(iso || '').trim();
+    if (!v) return '';
+    const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return v;
+    return `${m[3]}/${m[2]}/${m[1]}`;
+  };
+
+  const fiscalNome = (f.dfd_fiscal_contratos || '').trim();
+  if (fiscalNome) o.fiscal = { nome: fiscalNome };
+  if (fiscalNome) o.dfd_fiscal_contratos = fiscalNome;
+
+  const solDestNome = (f.solicitacao_destinatario_nome || '').trim();
+  const solDestCargo = (f.solicitacao_destinatario_cargo || '').trim();
+  const solRespNome = (f.solicitacao_responsavel_nome || '').trim();
+  const solRespCargo = (f.solicitacao_responsavel_cargo || '').trim();
+  if (solDestNome) o.sol_oficio_destinatario_nome = solDestNome;
+  if (solDestCargo) o.sol_oficio_destinatario_cargo = solDestCargo;
+  if (solRespNome) o.sol_oficio_responsavel_nome = solRespNome;
+  if (solRespCargo) o.sol_oficio_responsavel_cargo = solRespCargo;
+
+  const setor = (f.dfd_setor_requisitante || '').trim();
+  if (setor) o.secretaria_usuario = setor;
+  if (setor) o.dfd_setor_requisitante = setor;
+
+  const respDemanda = (f.dfd_responsavel_demanda || '').trim();
+  if (respDemanda) o.nome_usuario = respDemanda;
+  if (respDemanda) o.dfd_responsavel_demanda = respDemanda;
+
+  const dfdEmail = (f.dfd_email || '').trim();
+  if (dfdEmail) o.dfd_email = dfdEmail;
+
+  const dfdGestor = (f.dfd_gestor_contratos || '').trim();
+  if (dfdGestor) o.dfd_gestor_contratos = dfdGestor;
+
+  const dfdAssCargo = (f.dfd_assinatura_cargo || '').trim();
+  if (dfdAssCargo) o.dfd_assinatura_cargo = dfdAssCargo;
+
+  const end = (f.tr_endereco_propostas || '').trim();
+  const em = (f.tr_email_propostas || '').trim();
+  if (end) o.endereco_entrega = end;
+  if (em) o.email_envio_propostas = em;
+
+  const dataManual = toBrDate(f.tr_data_termo);
+  let dataTermo = '';
+  if (f.tr_data_automatica) {
+    const now = new Date();
+    dataTermo = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+  } else if (dataManual) {
+    dataTermo = dataManual;
+  }
+  if (f.tr_assinatura_digital) {
+    dataTermo = dataTermo ? `${dataTermo}, datado e assinado digitalmente` : 'datado e assinado digitalmente';
+  }
+  if (dataTermo) {
+    o.data_termo = dataTermo;
+  }
+
+  const nomeAss = (f.tr_nome_assinante || '').trim();
+  const cargoAss = (f.tr_cargo_assinante || '').trim();
+  if (nomeAss) o.nome_assinante_termo = nomeAss;
+  if (cargoAss) o.cargo_assinante_termo = cargoAss;
+
+  const objeto = (f.objeto || f.objeto_obra || '').trim();
+  if (objeto) o.objeto = objeto;
+
+  const justificativa = (f.justificativa || f.justificativa_inviabilidade || '').trim();
+  if (justificativa) o.justificativa = justificativa;
+
+  const setorResp = (f.setor_responsavel || '').trim();
+  if (setorResp && !o.secretaria_usuario) o.secretaria_usuario = setorResp;
+
+  return Object.keys(o).length ? o : null;
+}
+
+/** Texto extra anexado ao prompt para a IA considerar todos os campos preenchidos. */
+function buildFormPromptAppendix() {
+  const lines = [
+    '### Dados informados no assistente (use de forma literal quando couber; não invente valores para itens já preenchidos abaixo):',
+    '',
+  ];
+  let any = false;
+  for (const section of selectedFlow.value.sections) {
+    lines.push(`**${section.title}**`);
+    for (const field of section.fields) {
+      if (field.input === 'heading') {
+        lines.push(`_(${field.label})_`);
+        continue;
+      }
+      const v = slotForm[field.id];
+      if (field.input === 'checkbox') {
+        lines.push(`- ${field.checkboxHint || field.label}: ${v ? 'sim' : 'não'}`);
+        any = true;
+        continue;
+      }
+      const s = typeof v === 'string' ? v.trim() : v != null && v !== '' ? String(v) : '';
+      if (s) {
+        lines.push(`- ${field.label}: ${s}`);
+        any = true;
+      }
+    }
+    lines.push('');
+  }
+  if (!any) return '';
+  return lines.join('\n');
+}
 
 async function fetchTemplates(q) {
   const url = `${API_BASE}/api/documentos_modelos/lista_10?q=${encodeURIComponent(q || '')}`;
@@ -405,6 +954,9 @@ function selectFocusedResult() {
 function clickOutside(e) {
   if (!e.target.closest('.doc-gen__search-wrap') && !e.target.closest('.doc-gen__results')) {
     showTemplateDropdown.value = false;
+  }
+  if (!e.target.closest('.doc-gen__combo-wrap')) {
+    suggestionOpenField.value = '';
   }
 }
 
@@ -468,6 +1020,9 @@ async function onSubmit() {
     URL.revokeObjectURL(documentZipUrl.value);
     documentZipUrl.value = '';
   }
+  documentTrFilename.value = 'termo_referencia.docx';
+  documentDfdFilename.value = 'dfd.docx';
+  documentZipFilename.value = 'tr_dfd.zip';
 
   try {
     await submitViaLLM();
@@ -480,12 +1035,16 @@ async function onSubmit() {
 
 async function submitViaLLM() {
   const isTrDfd = docTypeMode.value === 'tr_modelo';
+  const basePrompt = iaPrompt.value.trim();
+  const appendix = isTrDfd ? buildFormPromptAppendix() : '';
+  const userPromptFinal = appendix ? `${basePrompt}\n\n${appendix}` : basePrompt;
 
   const payload = isTrDfd
-    ? { user_prompt: iaPrompt.value.trim() }
+    ? { user_prompt: userPromptFinal, slots_override: buildTrSlotsOverride(), slot_package_key: slotPackageKey.value }
     : {
-        user_prompt: iaPrompt.value.trim(),
+        user_prompt: basePrompt,
         output: 'docx',
+        slot_package_key: slotPackageKey.value,
       };
   if (selectedTemplate.value?.id) {
     payload.template_id = selectedTemplate.value.id;
@@ -564,6 +1123,9 @@ async function submitViaLLM() {
       documentTrUrl.value = trUrl;
       documentDfdUrl.value = dfdUrl;
       documentZipUrl.value = zipUrl;
+      documentTrFilename.value = data.tr?.filename || 'termo_referencia.docx';
+      documentDfdFilename.value = data.dfd?.filename || 'dfd.docx';
+      documentZipFilename.value = data.zip?.filename || 'tr_dfd.zip';
     } catch (e) {
       generateError.value = `Falha ao processar arquivos: ${e?.message || 'dados inválidos'}. Tente novamente.`;
       return;
@@ -571,6 +1133,7 @@ async function submitViaLLM() {
 
     documentReady.value = true;
     successMessage.value = 'Termo de Referência e DFD gerados com sucesso. Baixe os arquivos abaixo.';
+    persistSlotEntries(buildSlotEntriesFromForm());
     return;
   }
 
@@ -602,6 +1165,7 @@ async function submitViaLLM() {
     documentPdfUrl.value = '';
     documentReady.value = true;
     successMessage.value = 'Documento gerado pela IA. Baixe o DOCX abaixo.';
+    persistSlotEntries(buildSlotEntriesFromForm());
   } else {
     const data = await res.json().catch(() => ({}));
     if (data.ok && data.docx_path) {
@@ -696,6 +1260,7 @@ async function loadTemplatePreviewPdf(templateId) {
 let pdfjsLib = null;
 onMounted(() => {
   document.addEventListener('click', clickOutside);
+  docTypeMode.value = isEtpLivreRoute.value ? 'auto' : 'tr_modelo';
   const templateId = route.query.template_id;
   if (templateId) {
     fetchTemplateDetails(templateId).then(() => {
@@ -708,6 +1273,8 @@ onMounted(() => {
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.9.179/pdf.worker.min.js';
     }
   }
+  resetSlotFormAndSections();
+  loadSlotCatalogSuggestions();
 });
 onUnmounted(() => {
   document.removeEventListener('click', clickOutside);
@@ -717,6 +1284,26 @@ onUnmounted(() => {
   if (documentDfdUrl.value) URL.revokeObjectURL(documentDfdUrl.value);
   if (documentZipUrl.value) URL.revokeObjectURL(documentZipUrl.value);
 });
+
+watch(
+  () => route.name,
+  () => {
+    docTypeMode.value = isEtpLivreRoute.value ? 'auto' : 'tr_modelo';
+    resetSlotFormAndSections();
+    loadSlotCatalogSuggestions();
+  },
+);
+
+watch(isEtpLivreRoute, (isEtp) => {
+  docTypeMode.value = isEtp ? 'auto' : 'tr_modelo';
+});
+
+watch(
+  () => slotForm.tr_data_automatica,
+  (enabled) => {
+    if (enabled) slotForm.tr_data_termo = '';
+  },
+);
 
 async function loadPdf(url) {
   if (!pdfjsLib || !pdfCanvasEl.value) return;
@@ -795,8 +1382,12 @@ function goToPage() {
 <style scoped>
 .doc-gen__grid {
   display: grid;
-  grid-template-columns: 1fr 340px;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+}
+.doc-gen__grid--single {
+  grid-template-columns: 1fr;
 }
 @media (max-width: 960px) {
   .doc-gen__grid {
@@ -808,6 +1399,10 @@ function goToPage() {
 }
 .doc-gen__wizard {
   padding: 20px 24px;
+  height: 72vh;
+  max-height: 72vh;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .doc-gen__form {
   margin-top: 8px;
@@ -957,6 +1552,194 @@ function goToPage() {
 .doc-gen__spinner {
   opacity: 0.9;
 }
+.doc-gen__loader-wrap {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #f4f9fe;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.doc-gen__loader-text {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-primary-dark);
+  font-weight: 600;
+}
+.doc-gen__pl {
+  width: 5.4em;
+  height: 5.4em;
+}
+.doc-gen__pl-ring {
+  animation: docGenRingA 2s linear infinite;
+}
+.doc-gen__pl-ring--a {
+  stroke: #0d6efd;
+}
+.doc-gen__pl-ring--b {
+  animation-name: docGenRingB;
+  stroke: #2a8cff;
+}
+.doc-gen__pl-ring--c {
+  animation-name: docGenRingC;
+  stroke: #1b74e4;
+}
+.doc-gen__pl-ring--d {
+  animation-name: docGenRingD;
+  stroke: #59a8ff;
+}
+@keyframes docGenRingA {
+  from, 4% {
+    stroke-dasharray: 0 660;
+    stroke-width: 20;
+    stroke-dashoffset: -330;
+  }
+  12% {
+    stroke-dasharray: 60 600;
+    stroke-width: 30;
+    stroke-dashoffset: -335;
+  }
+  32% {
+    stroke-dasharray: 60 600;
+    stroke-width: 30;
+    stroke-dashoffset: -595;
+  }
+  40%, 54% {
+    stroke-dasharray: 0 660;
+    stroke-width: 20;
+    stroke-dashoffset: -660;
+  }
+  62% {
+    stroke-dasharray: 60 600;
+    stroke-width: 30;
+    stroke-dashoffset: -665;
+  }
+  82% {
+    stroke-dasharray: 60 600;
+    stroke-width: 30;
+    stroke-dashoffset: -925;
+  }
+  90%, to {
+    stroke-dasharray: 0 660;
+    stroke-width: 20;
+    stroke-dashoffset: -990;
+  }
+}
+@keyframes docGenRingB {
+  from, 12% {
+    stroke-dasharray: 0 220;
+    stroke-width: 20;
+    stroke-dashoffset: -110;
+  }
+  20% {
+    stroke-dasharray: 20 200;
+    stroke-width: 30;
+    stroke-dashoffset: -115;
+  }
+  40% {
+    stroke-dasharray: 20 200;
+    stroke-width: 30;
+    stroke-dashoffset: -195;
+  }
+  48%, 62% {
+    stroke-dasharray: 0 220;
+    stroke-width: 20;
+    stroke-dashoffset: -220;
+  }
+  70% {
+    stroke-dasharray: 20 200;
+    stroke-width: 30;
+    stroke-dashoffset: -225;
+  }
+  90% {
+    stroke-dasharray: 20 200;
+    stroke-width: 30;
+    stroke-dashoffset: -305;
+  }
+  98%, to {
+    stroke-dasharray: 0 220;
+    stroke-width: 20;
+    stroke-dashoffset: -330;
+  }
+}
+@keyframes docGenRingC {
+  from {
+    stroke-dasharray: 0 440;
+    stroke-width: 20;
+    stroke-dashoffset: 0;
+  }
+  8% {
+    stroke-dasharray: 40 400;
+    stroke-width: 30;
+    stroke-dashoffset: -5;
+  }
+  28% {
+    stroke-dasharray: 40 400;
+    stroke-width: 30;
+    stroke-dashoffset: -175;
+  }
+  36%, 58% {
+    stroke-dasharray: 0 440;
+    stroke-width: 20;
+    stroke-dashoffset: -220;
+  }
+  66% {
+    stroke-dasharray: 40 400;
+    stroke-width: 30;
+    stroke-dashoffset: -225;
+  }
+  86% {
+    stroke-dasharray: 40 400;
+    stroke-width: 30;
+    stroke-dashoffset: -395;
+  }
+  94%, to {
+    stroke-dasharray: 0 440;
+    stroke-width: 20;
+    stroke-dashoffset: -440;
+  }
+}
+@keyframes docGenRingD {
+  from, 8% {
+    stroke-dasharray: 0 440;
+    stroke-width: 20;
+    stroke-dashoffset: 0;
+  }
+  16% {
+    stroke-dasharray: 40 400;
+    stroke-width: 30;
+    stroke-dashoffset: -5;
+  }
+  36% {
+    stroke-dasharray: 40 400;
+    stroke-width: 30;
+    stroke-dashoffset: -175;
+  }
+  44%, 50% {
+    stroke-dasharray: 0 440;
+    stroke-width: 20;
+    stroke-dashoffset: -220;
+  }
+  58% {
+    stroke-dasharray: 40 400;
+    stroke-width: 30;
+    stroke-dashoffset: -225;
+  }
+  78% {
+    stroke-dasharray: 40 400;
+    stroke-width: 30;
+    stroke-dashoffset: -395;
+  }
+  86%, to {
+    stroke-dasharray: 0 440;
+    stroke-width: 20;
+    stroke-dashoffset: -440;
+  }
+}
 .doc-gen__success {
   margin-top: 20px;
   padding: 16px 20px;
@@ -991,28 +1774,154 @@ function goToPage() {
 .doc-gen__aside {
   min-width: 0;
 }
-.doc-gen__preview-card {
-  padding: 20px 24px;
+.doc-gen__variables-card {
+  padding: 14px 12px;
+  height: 72vh;
+  max-height: 72vh;
+  overflow: hidden;
 }
-.doc-gen__preview-heading {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 4px;
+.doc-gen__variables-body {
+  margin-top: 6px;
+  height: calc(100% - 62px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
 }
-.doc-gen__preview-excerpt {
-  margin-top: 12px;
+.doc-gen__variables-desc {
+  margin: 0 0 8px;
+  font-size: 12px;
 }
-.doc-gen__preview-img {
-  width: 100%;
-  max-height: 200px;
-  object-fit: contain;
-  border-radius: var(--radius-md);
+.doc-gen__var-section {
+  margin-top: 8px;
+  padding: 8px;
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #fafbfd;
 }
-.doc-gen__preview-actions {
-  margin-top: 16px;
-  display: flex;
+.doc-gen__var-heading {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.doc-gen__slot-grid {
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 8px;
+  align-items: start;
+}
+.doc-gen__slot-field--full {
+  grid-column: 1 / -1;
+}
+.doc-gen__slot-subheading {
+  margin: 6px 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text);
+  grid-column: 1 / -1;
+}
+.doc-gen__slot-field {
+  margin: 0;
+  min-width: 0;
+}
+.doc-gen__slot-field .gov-label {
+  font-size: 11px;
+  line-height: 1.3;
+  margin-bottom: 3px;
+}
+.doc-gen__slot-input {
+  width: 100%;
+  font-size: 12px;
+  padding: 6px 8px;
+  min-width: 0;
+}
+.doc-gen__required {
+  color: #c62828;
+  margin-left: 2px;
+}
+.doc-gen__slot-checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  line-height: 1.35;
+}
+.doc-gen__slot-checkbox {
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--color-primary);
+}
+.doc-gen__datalist-wrap {
+  width: 100%;
+}
+.doc-gen__combo-wrap {
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+  min-width: 0;
+  position: relative;
+}
+.doc-gen__combo-wrap .doc-gen__slot-input {
+  flex: 1;
+}
+.doc-gen__combo-add {
+  white-space: nowrap;
+  padding: 5px 8px;
+  font-size: 11px;
+}
+.doc-gen__slot-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  max-height: 260px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+}
+.doc-gen__slot-suggestion-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.doc-gen__slot-suggestion-item:hover {
+  background: #edf5fc;
+}
+.doc-gen__slot-suggestion-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.doc-gen__slot-suggestion-remove {
+  color: #c62828;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+  padding: 0 4px;
+}
+@media (max-width: 960px) {
+  .doc-gen__wizard,
+  .doc-gen__variables-card {
+    height: auto;
+    max-height: none;
+  }
+  .doc-gen__variables-body {
+    height: auto;
+    overflow: visible;
+  }
 }
 .doc-gen__modal {
   position: fixed;

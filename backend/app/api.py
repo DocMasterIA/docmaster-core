@@ -12,7 +12,7 @@ from django.contrib.auth.decorators import login_required
 import json, tempfile, traceback
 from django.http import JsonResponse, FileResponse, HttpResponse
 from django.core.files.base import ContentFile
-from backend.app.models import Template, TemplateSchema, DocumentInstance, Prefeitura, SubtopicoSecretaria
+from backend.app.models import Template, TemplateSchema, DocumentInstance, Prefeitura, SubtopicoSecretaria, SlotValueCatalog
 from backend.app.forms import UserProfileForm, LoginForm
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login as auth_login, logout as auth_logout
@@ -25,15 +25,51 @@ import os
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_GET
 import requests
+import re
+from functools import wraps
+from urllib.parse import urlparse
 
 
 def api_login_required(view_func):
     """Decorator que retorna 401 JSON para APIs quando o usuário não está autenticado (em vez de redirect)."""
+    @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated:
             return JsonResponse({"error": "Não autenticado. Faça login."}, status=401)
         return view_func(request, *args, **kwargs)
     return wrapper
+
+
+def _normalize_slot_value(v: str) -> str:
+    s = re.sub(r"\s+", " ", (v or "").strip())
+    return s.casefold()
+
+
+def _resolve_slot_package_key(payload: dict, request) -> str:
+    """
+    Resolve slot_package_key com fallback por rota do frontend (Referer),
+    para manter funcionamento mesmo quando frontend/backend estão defasados.
+    """
+    explicit = str((payload or {}).get("slot_package_key") or "").strip().lower()
+    if explicit:
+        return explicit
+
+    referer = str(getattr(request, "META", {}).get("HTTP_REFERER") or "").strip()
+    if not referer:
+        return ""
+    path = (urlparse(referer).path or "").lower()
+    route_map = {
+        "/geracao/dispensa-art-75-i/manutencao-veiculos": "dispensa_75_i_manutencao_veiculos",
+        "/geracao/dispensa-art-75-i/obras-servicos-engenharia": "dispensa_75_i_obras_engenharia",
+        "/geracao/dispensa-art-75-ii/compras": "dispensa_75_ii_compras",
+        "/geracao/dispensa-art-75-ii/servicos": "dispensa_75_ii_servicos",
+        "/geracao/dispensa-art-75-ii/compras-servicos-inclusos": "dispensa_75_ii_compras_servicos_inclusos",
+        "/geracao/inexigibilidade-art-74-i/show-artistico": "inexigibilidade_74_i_show_artistico",
+    }
+    for route_path, package_key in route_map.items():
+        if path.startswith(route_path):
+            return package_key
+    return ""
 
 
 # API: upload de Template (DOCX) e solicitação de mapeamento de campos via IA.
@@ -218,6 +254,7 @@ def gerar_via_llm_api(request):
     user_prompt = (payload.get("user_prompt") or "").strip()
     template_id = payload.get("template_id")
     output = (payload.get("output") or "docx").lower()
+    slot_package_key = _resolve_slot_package_key(payload, request)
 
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
@@ -234,6 +271,8 @@ def gerar_via_llm_api(request):
         context["template_id"] = str(template_id)
     if payload.get("document_type_hint"):
         context["document_type_hint"] = payload["document_type_hint"]
+    if slot_package_key:
+        context["slot_package_key"] = slot_package_key
 
     rag_url = getattr(django_settings, "RAG_SERVICE_URL", "http://127.0.0.1:8004").rstrip("/")
     url = f"{rag_url}/api/rag/generate-document"
@@ -379,11 +418,14 @@ def gerar_tr_modelo_api(request):
     user_prompt = (payload.get("user_prompt") or "").strip()
     slots_override = payload.get("slots_override")  # opcional
     template_id = payload.get("template_id")
+    slot_package_key = _resolve_slot_package_key(payload, request)
 
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
 
     context = build_llm_context_from_request(request)
+    if slot_package_key:
+        context["slot_package_key"] = slot_package_key
 
     rag_url = getattr(django_settings, "RAG_SERVICE_URL", "http://127.0.0.1:8004").rstrip("/")
     url = f"{rag_url}/api/rag/generate-tr-from-model"
@@ -505,11 +547,26 @@ def gerar_tr_e_dfd_api(request):
     user_prompt = (payload.get("user_prompt") or "").strip()
     slots_override = payload.get("slots_override")  # opcional
     template_id = payload.get("template_id")
+    slot_package_key = _resolve_slot_package_key(payload, request)
 
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
 
     context = build_llm_context_from_request(request)
+    if slot_package_key:
+        context["slot_package_key"] = slot_package_key
+
+    def _slug(v: str) -> str:
+        s = re.sub(r"[^a-zA-Z0-9_\\-]+", "_", (v or "").strip().lower())
+        s = re.sub(r"_+", "_", s).strip("_")
+        return s or "tr_dfd_generico"
+
+    now = timezone.localtime(timezone.now())
+    stamp = now.strftime("%d_%m_%Y_%H-%M")
+    package_slug = _slug(slot_package_key or "tr_dfd_generico")
+    tr_filename = f"tr_{package_slug}_{stamp}_docmasteria.docx"
+    dfd_filename = f"dfd_{package_slug}_{stamp}_docmasteria.docx"
+    zip_filename = f"tr_dfd_{package_slug}_{stamp}_docmasteria.zip"
 
     rag_url = getattr(django_settings, "RAG_SERVICE_URL", "http://127.0.0.1:8004").rstrip("/")
     url = f"{rag_url}/api/rag/generate-tr-and-dfd-zip"
@@ -554,9 +611,12 @@ def gerar_tr_e_dfd_api(request):
 
     tpl = Template.objects.filter(id=template_id).first() if template_id is not None else None
 
-    def _maybe_merge_with_template(raw: bytes, name: str) -> bytes:
+    def _maybe_merge_with_template(raw: bytes, name: str):
+        """
+        Retorna (bytes, applied, error_message).
+        """
         if not tpl:
-            return raw
+            return raw, False, "template_id não informado ou template não encontrado"
         try:
             tmpdir = tempfile.gettempdir()
             rag_docx_path = os.path.join(tmpdir, f"tr_dfd_{tpl.id}_{name}")
@@ -569,12 +629,15 @@ def gerar_tr_e_dfd_api(request):
                 out_docx_path=out_docx_path,
             )
             with open(out_docx_path, "rb") as fr:
-                return fr.read()
-        except Exception:
-            return raw
+                return fr.read(), True, ""
+        except Exception as e:
+            # Não quebrar geração: devolve original, mas registra para diagnóstico.
+            err = f"{type(e).__name__}: {e}"
+            print(f"[merge_docx_with_template_body] falha ao aplicar template_id={getattr(tpl, 'id', None)} arquivo={name}: {err}")
+            return raw, False, err
 
-    tr_bytes = _maybe_merge_with_template(tr_bytes, "termo_referencia.docx")
-    dfd_bytes = _maybe_merge_with_template(dfd_bytes, "dfd.docx")
+    tr_bytes, tr_template_applied, tr_merge_error = _maybe_merge_with_template(tr_bytes, "termo_referencia.docx")
+    dfd_bytes, dfd_template_applied, dfd_merge_error = _maybe_merge_with_template(dfd_bytes, "dfd.docx")
 
     # Opcional: salvar instância principal (TR) em "Meus Documentos"
     if tpl and request.user.is_authenticated:
@@ -600,23 +663,27 @@ def gerar_tr_e_dfd_api(request):
     # Monta ZIP TR+DFD em memória
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("termo_referencia.docx", tr_bytes)
-        zf.writestr("dfd.docx", dfd_bytes)
+        zf.writestr(tr_filename, tr_bytes)
+        zf.writestr(dfd_filename, dfd_bytes)
     zip_bytes = zip_buffer.getvalue()
 
     return JsonResponse(
         {
             "ok": True,
             "tr": {
-                "filename": "termo_referencia.docx",
+                "filename": tr_filename,
                 "docx_base64": base64.b64encode(tr_bytes).decode("ascii"),
+                "template_applied": tr_template_applied,
+                "merge_error": tr_merge_error or None,
             },
             "dfd": {
-                "filename": "dfd.docx",
+                "filename": dfd_filename,
                 "docx_base64": base64.b64encode(dfd_bytes).decode("ascii"),
+                "template_applied": dfd_template_applied,
+                "merge_error": dfd_merge_error or None,
             },
             "zip": {
-                "filename": "tr_dfd.zip",
+                "filename": zip_filename,
                 "zip_base64": base64.b64encode(zip_bytes).decode("ascii"),
             },
         }
@@ -880,3 +947,106 @@ def api_me_documents(request):
         "start_index": page_obj.start_index(),
         "end_index": page_obj.end_index(),
     })
+
+
+@api_login_required
+@require_GET
+def slot_catalog_batch_api(request):
+    raw_fields = (request.GET.get("fields") or "").strip()
+    if not raw_fields:
+        return JsonResponse({"ok": True, "items": {}})
+
+    fields = [f.strip() for f in raw_fields.split(",") if f.strip()][:80]
+    try:
+        limit = int(request.GET.get("limit", 20) or 20)
+    except Exception:
+        limit = 20
+    limit = min(max(limit, 1), 100)
+
+    items = {}
+    for field_key in fields:
+        values = (
+            SlotValueCatalog.objects.filter(
+                owner=request.user,
+                field_key=field_key,
+                is_active=True,
+            )
+            .order_by("-usage_count", "-last_used_at")
+            .values_list("value", flat=True)[:limit]
+        )
+        items[field_key] = list(values)
+
+    return JsonResponse({"ok": True, "items": items})
+
+
+@api_login_required
+@csrf_exempt
+def slot_catalog_upsert_api(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Use POST"}, status=405)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Corpo JSON inválido"}, status=400)
+
+    entries = payload.get("entries") or []
+    if not isinstance(entries, list):
+        return JsonResponse({"ok": False, "error": "entries deve ser uma lista"}, status=400)
+
+    created = 0
+    updated = 0
+    for item in entries[:300]:
+        if not isinstance(item, dict):
+            continue
+        field_key = str(item.get("field_key") or "").strip()
+        value = str(item.get("value") or "").strip()
+        if not field_key or not value:
+            continue
+        normalized = _normalize_slot_value(value)
+        if not normalized:
+            continue
+
+        obj, was_created = SlotValueCatalog.objects.get_or_create(
+            owner=request.user,
+            field_key=field_key,
+            normalized_value=normalized,
+            defaults={"value": value, "usage_count": 1, "is_active": True},
+        )
+        if was_created:
+            created += 1
+            continue
+
+        obj.value = value
+        obj.usage_count = (obj.usage_count or 0) + 1
+        obj.is_active = True
+        obj.save(update_fields=["value", "usage_count", "is_active", "last_used_at", "updated_at"])
+        updated += 1
+
+    return JsonResponse({"ok": True, "created": created, "updated": updated})
+
+
+@api_login_required
+@csrf_exempt
+def slot_catalog_delete_api(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Use POST"}, status=405)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Corpo JSON inválido"}, status=400)
+
+    field_key = str(payload.get("field_key") or "").strip()
+    value = str(payload.get("value") or "").strip()
+    if not field_key or not value:
+        return JsonResponse({"ok": False, "error": "field_key e value são obrigatórios"}, status=400)
+
+    normalized = _normalize_slot_value(value)
+    rows = SlotValueCatalog.objects.filter(
+        owner=request.user,
+        field_key=field_key,
+        normalized_value=normalized,
+        is_active=True,
+    ).update(is_active=False)
+    return JsonResponse({"ok": True, "deleted": rows})

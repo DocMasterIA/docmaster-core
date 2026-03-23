@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 from .chroma_client import delete_collection, get_chroma_client, list_collections
 from .ingestion import ingest_text
 from .retrieval import check_compliance, generate_answer, retrieve
+from .text_corrector_client import correct_section_texts
+from .template_packages import get_package_template_paths, ensure_fallback_path
 from .schemas import (
     AnalyzeDocumentResponse,
     CheckComplianceRequest,
@@ -278,6 +280,10 @@ async def endpoint_generate_document(
             top_k_per_section=body.top_k_per_section,
             context_override=body.context,
         )
+        result["section_texts"] = await correct_section_texts(
+            result.get("section_texts") or {},
+            document_type=result.get("document_type"),
+        )
         out = {"ok": True, **result}
 
         if output_docx:
@@ -337,7 +343,10 @@ async def endpoint_render_document(
     try:
         data = {
             "structure": body.structure,
-            "section_texts": body.section_texts,
+            "section_texts": await correct_section_texts(
+                body.section_texts or {},
+                document_type=(body.structure or {}).get("document_type"),
+            ),
         }
         result = json_to_docx_and_pdf(
             data,
@@ -408,6 +417,17 @@ def _merge_user_context_into_tr_slots(
     return slots
 
 
+def _resolve_tr_dfd_template_paths(context: Optional[Dict[str, Any]]) -> Dict[str, Path]:
+    slot_package_key = ""
+    if isinstance(context, dict):
+        slot_package_key = str(context.get("slot_package_key") or "").strip()
+    paths = get_package_template_paths(slot_package_key)
+    return {
+        "tr": ensure_fallback_path(paths["tr"], "TR_modelo_base.docx"),
+        "dfd": ensure_fallback_path(paths["dfd"], "DFD_modelo_base.docx"),
+    }
+
+
 @router.post("/generate-tr-from-model")
 async def endpoint_generate_tr_from_model(body: GenerateTRFromModelRequest):
     """
@@ -431,8 +451,9 @@ async def endpoint_generate_tr_from_model(body: GenerateTRFromModelRequest):
             slots_override=slots_override,
             user_context=body.context,
         )
+        template_paths = _resolve_tr_dfd_template_paths(body.context)
         # Gera TR
-        docx_tr_path = render_tr_from_slots(slots)
+        docx_tr_path = render_tr_from_slots(slots, template_path=template_paths["tr"])
         if not Path(docx_tr_path).exists():
             raise HTTPException(status_code=500, detail="DOCX do TR não foi gerado.")
 
@@ -440,7 +461,7 @@ async def endpoint_generate_tr_from_model(body: GenerateTRFromModelRequest):
         try:
             from .dfd_template import render_dfd_from_tr_slots
 
-            render_dfd_from_tr_slots(slots)
+            render_dfd_from_tr_slots(slots, template_path=template_paths["dfd"])
         except Exception:
             # Falha na geração do DFD não deve impedir o TR; apenas registra em log.
             logger.exception("Falha ao gerar DFD complementar a partir do TR.")
@@ -479,12 +500,13 @@ async def endpoint_generate_tr_and_dfd(body: GenerateTRFromModelRequest):
             user_context=body.context,
         )
 
+        template_paths = _resolve_tr_dfd_template_paths(body.context)
         # Gera TR e DFD em caminhos temporários
-        docx_tr_path = render_tr_from_slots(slots)
+        docx_tr_path = render_tr_from_slots(slots, template_path=template_paths["tr"])
         if not Path(docx_tr_path).exists():
             raise HTTPException(status_code=500, detail="DOCX do TR não foi gerado.")
 
-        docx_dfd_path = render_dfd_from_tr_slots(slots)
+        docx_dfd_path = render_dfd_from_tr_slots(slots, template_path=template_paths["dfd"])
         if not Path(docx_dfd_path).exists():
             raise HTTPException(status_code=500, detail="DOCX do DFD não foi gerado.")
 
@@ -540,12 +562,13 @@ async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
             skip_context_in_prompt=skip_ctx,
         )
 
+        template_paths = _resolve_tr_dfd_template_paths(body.context)
         # Gera TR e DFD em caminhos temporários
-        docx_tr_path = render_tr_from_slots(slots)
+        docx_tr_path = render_tr_from_slots(slots, template_path=template_paths["tr"])
         if not Path(docx_tr_path).exists():
             raise HTTPException(status_code=500, detail="DOCX do TR não foi gerado.")
 
-        docx_dfd_path = render_dfd_from_tr_slots(slots)
+        docx_dfd_path = render_dfd_from_tr_slots(slots, template_path=template_paths["dfd"])
         if not Path(docx_dfd_path).exists():
             raise HTTPException(status_code=500, detail="DOCX do DFD não foi gerado.")
 

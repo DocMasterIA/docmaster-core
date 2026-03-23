@@ -39,15 +39,68 @@
             <div class="gov-nav__section-label">Navegação</div>
             <ul class="gov-nav">
               <li class="gov-nav__item">
-                <router-link
-                  to="/"
-                  class="gov-nav__link"
-                  :class="{ 'gov-nav__link--active': $route.name === 'DocumentGenerator' }"
-                  active-class="gov-nav__link--active"
+                <button
+                  type="button"
+                  class="gov-nav__link gov-nav__link--expandable"
+                  :class="{ 'gov-nav__link--active': isGenerationSectionActive }"
+                  @click="generationMenuOpen = !generationMenuOpen"
                 >
-                  <i class="gov-nav__link-icon fa-solid fa-file-lines" aria-hidden="true"></i>
-                  Geração de Documentos
-                </router-link>
+                  <span class="gov-nav__link-main">
+                    <i class="gov-nav__link-icon fa-solid fa-file-lines" aria-hidden="true"></i>
+                    Geração de Documentos
+                  </span>
+                  <i
+                    class="fa-solid"
+                    :class="generationMenuOpen ? 'fa-chevron-up' : 'fa-chevron-down'"
+                    aria-hidden="true"
+                  ></i>
+                </button>
+                <ul v-if="generationMenuOpen" class="gov-subnav">
+                  <li
+                    v-for="page in generationPages"
+                    :key="page.name"
+                    class="gov-subnav__item"
+                  >
+                    <button
+                      type="button"
+                      class="gov-subnav__link gov-subnav__link--expandable"
+                      :class="{ 'gov-subnav__link--active': isGroupActive(page) }"
+                      @click="toggleGroup(page.name)"
+                    >
+                      <span class="gov-subnav__link-main">
+                        <i class="gov-nav__link-icon fa-solid" :class="page.icon" aria-hidden="true"></i>
+                        {{ page.label }}
+                      </span>
+                      <i
+                        class="fa-solid"
+                        :class="isGroupOpen(page.name) ? 'fa-chevron-up' : 'fa-chevron-down'"
+                        aria-hidden="true"
+                      ></i>
+                    </button>
+                    <ul v-if="isGroupOpen(page.name) && page.children?.length" class="gov-subsubnav">
+                      <li
+                        v-for="child in page.children"
+                        :key="child.name"
+                        class="gov-subsubnav__item"
+                      >
+                        <router-link
+                          :to="child.to"
+                          class="gov-subsubnav__link"
+                          :class="{ 'gov-subsubnav__link--active': isRouteActive(child.name) }"
+                        >
+                          <i class="gov-nav__link-icon fa-solid" :class="child.icon" aria-hidden="true"></i>
+                          {{ child.label }}
+                        </router-link>
+                      </li>
+                    </ul>
+                    <div
+                      v-else-if="isGroupOpen(page.name)"
+                      class="gov-subsubnav__empty"
+                    >
+                      Em breve...
+                    </div>
+                  </li>
+                </ul>
               </li>
               <li class="gov-nav__item">
                 <router-link
@@ -96,12 +149,117 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const router = useRouter();
+const route = useRoute();
 
 const user = ref(null);
+const generationMenuOpen = ref(true);
+const groupOpenState = ref({
+  DispensaArt75I: true,
+  DispensaArt75II: false,
+  InexigibilidadeArt74I: false,
+  EtpLivreGroup: false,
+});
+
+const generationPages = [
+  {
+    name: 'DispensaArt75I',
+    label: 'Dispensa - Art. 75, I',
+    icon: 'fa-gavel',
+    children: [
+      {
+        name: 'DispensaArt75IObrasEngenharia',
+        label: 'Obras e serviços de engenharia',
+        icon: 'fa-compass-drafting',
+        to: '/geracao/dispensa-art-75-i/obras-servicos-engenharia',
+      },
+      {
+        name: 'DispensaArt75IManutencaoVeiculos',
+        label: 'Manutenção de veículos',
+        icon: 'fa-car-side',
+        to: '/geracao/dispensa-art-75-i/manutencao-veiculos',
+      },
+    ],
+  },
+  {
+    name: 'DispensaArt75II',
+    label: 'Dispensa - Art. 75, II',
+    icon: 'fa-scale-balanced',
+    children: [
+      {
+        name: 'DispensaArt75IICompras',
+        label: 'Compras',
+        icon: 'fa-cart-shopping',
+        to: '/geracao/dispensa-art-75-ii/compras',
+      },
+      {
+        name: 'DispensaArt75IIServicos',
+        label: 'Serviços',
+        icon: 'fa-screwdriver-wrench',
+        to: '/geracao/dispensa-art-75-ii/servicos',
+      },
+      {
+        name: 'DispensaArt75IIComprasServicosInclusos',
+        label: 'Compras com serviços inclusos',
+        icon: 'fa-boxes-stacked',
+        to: '/geracao/dispensa-art-75-ii/compras-servicos-inclusos',
+      },
+    ],
+  },
+  {
+    name: 'InexigibilidadeArt74I',
+    label: 'Inexigibilidade - Art. 74, I',
+    icon: 'fa-file-circle-check',
+    children: [
+      {
+        name: 'InexigibilidadeArt74IShowArtistico',
+        label: 'Show artístico',
+        icon: 'fa-music',
+        to: '/geracao/inexigibilidade-art-74-i/show-artistico',
+      },
+    ],
+  },
+  {
+    name: 'EtpLivreGroup',
+    label: 'ETP Livre',
+    icon: 'fa-file-pen',
+    children: [
+      {
+        name: 'EtpLivre',
+        label: 'ETP Livre',
+        icon: 'fa-file-signature',
+        to: '/geracao/etp-livre',
+      },
+    ],
+  },
+];
+
+const generationRouteNames = new Set(
+  generationPages.flatMap((page) => [page.name, ...(page.children || []).map((child) => child.name)]),
+);
+
+const isGenerationSectionActive = computed(() => {
+  return route.name === 'DocumentGenerator' || generationRouteNames.has(route.name);
+});
+
+function isRouteActive(name) {
+  return route.name === name;
+}
+
+function toggleGroup(name) {
+  groupOpenState.value[name] = !groupOpenState.value[name];
+}
+
+function isGroupOpen(name) {
+  return !!groupOpenState.value[name];
+}
+
+function isGroupActive(page) {
+  return page.children?.some((child) => child.name === route.name) || false;
+}
 
 const UF_FLAGS = {
   AC: new URL('./assets/estados/02-acre-full.svg', import.meta.url).href,
@@ -164,6 +322,15 @@ async function logout() {
 
 onMounted(() => {
   fetchMe();
+  if (isGenerationSectionActive.value) {
+    generationMenuOpen.value = true;
+    const activeGroup = generationPages.find((page) =>
+      page.children?.some((child) => child.name === route.name),
+    );
+    if (activeGroup) {
+      groupOpenState.value[activeGroup.name] = true;
+    }
+  }
 });
 </script>
 
@@ -200,5 +367,86 @@ onMounted(() => {
 .gov-topbar__logout:hover {
   background: rgba(255, 255, 255, 0.25);
   border-color: rgba(255, 255, 255, 0.6);
+}
+
+.gov-nav__link--expandable {
+  justify-content: space-between;
+}
+
+.gov-nav__link-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gov-subnav,
+.gov-subsubnav {
+  list-style: none;
+  margin: 4px 0 8px;
+  padding: 0;
+}
+
+.gov-subnav {
+  padding-left: 12px;
+}
+
+.gov-subsubnav {
+  padding-left: 14px;
+}
+
+.gov-subnav__item,
+.gov-subsubnav__item {
+  margin: 2px 0;
+}
+
+.gov-subnav__link,
+.gov-subsubnav__link {
+  display: block;
+  border-radius: var(--radius-md);
+  padding: 5px 8px;
+  color: var(--color-text);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.gov-subnav__link:hover,
+.gov-subsubnav__link:hover {
+  background: #dde4ef;
+  text-decoration: none;
+}
+
+.gov-subnav__link--active,
+.gov-subsubnav__link--active {
+  border: 1px solid var(--color-primary);
+  background-color: #d5edf7;
+}
+
+.gov-subnav__link--expandable {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid transparent;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.gov-subnav__link-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gov-subsubnav__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gov-subsubnav__empty {
+  margin: 4px 0 8px 14px;
+  color: var(--color-text-soft);
+  font-size: 12px;
 }
 </style>

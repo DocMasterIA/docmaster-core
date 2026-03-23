@@ -59,3 +59,7 @@ RAG_POSTPROCESS: bool = os.getenv("RAG_POSTPROCESS", "1").strip() not in ("0", "
 
 # Sanitização via LLM: remove meta-comentários usando a IA (1 = ativo). Alternativa à lista manual de regex.
 RAG_LLM_SANITIZE: bool = os.getenv("RAG_LLM_SANITIZE", "1").strip() not in ("0", "false", "False", "no")
+
+# Text corrector microservice (pós-correção antes de montar DOCX)
+TEXT_CORRECTOR_ENABLED: bool = os.getenv("TEXT_CORRECTOR_ENABLED", "1").strip() not in ("0", "false", "False", "no")
+TEXT_CORRECTOR_BASE_URL: str = os.getenv("TEXT_CORRECTOR_BASE_URL", "http://text_corrector_service:8011").rstrip("/")

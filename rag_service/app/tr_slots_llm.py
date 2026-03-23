@@ -438,6 +438,20 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
         cidade=str(data.get("cidade", "")).strip(),
         horario_entrega=str(data.get("horario_entrega", "")).strip(),
         codigo_uf=str(data.get("codigo_uf", "")).strip(),
+        endereco_entrega=str(data.get("endereco_entrega", "")).strip(),
+        email_envio_propostas=str(data.get("email_envio_propostas", "")).strip(),
+        data_termo=str(data.get("data_termo", "")).strip(),
+        nome_assinante_termo=str(data.get("nome_assinante_termo", "")).strip(),
+        cargo_assinante_termo=str(data.get("cargo_assinante_termo", "")).strip(),
+        dfd_setor_requisitante=str(data.get("dfd_setor_requisitante", "")).strip(),
+        dfd_numero_processo=str(data.get("dfd_numero_processo", "")).strip(),
+        dfd_responsavel_demanda=str(data.get("dfd_responsavel_demanda", "")).strip(),
+        dfd_email=str(data.get("dfd_email", "")).strip(),
+        dfd_gestor_contratos=str(data.get("dfd_gestor_contratos", "")).strip(),
+        dfd_fiscal_contratos=str(data.get("dfd_fiscal_contratos", "")).strip(),
+        dfd_assinatura_cargo=str(data.get("dfd_assinatura_cargo", "")).strip(),
+        dfd_assinatura_nome=str(data.get("dfd_assinatura_nome", "")).strip(),
+        dfd_data=str(data.get("dfd_data", "")).strip(),
     )
 
 
@@ -499,6 +513,76 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         if override.get("codigo_uf") is not None
         else llm_slots.codigo_uf
     )
+    endereco_entrega = (
+        (override.get("endereco_entrega") or llm_slots.endereco_entrega)
+        if override.get("endereco_entrega") is not None
+        else llm_slots.endereco_entrega
+    )
+    email_envio_propostas = (
+        (override.get("email_envio_propostas") or llm_slots.email_envio_propostas)
+        if override.get("email_envio_propostas") is not None
+        else llm_slots.email_envio_propostas
+    )
+    data_termo = (
+        (override.get("data_termo") or llm_slots.data_termo)
+        if override.get("data_termo") is not None
+        else llm_slots.data_termo
+    )
+    nome_assinante_termo = (
+        (override.get("nome_assinante_termo") or llm_slots.nome_assinante_termo)
+        if override.get("nome_assinante_termo") is not None
+        else llm_slots.nome_assinante_termo
+    )
+    cargo_assinante_termo = (
+        (override.get("cargo_assinante_termo") or llm_slots.cargo_assinante_termo)
+        if override.get("cargo_assinante_termo") is not None
+        else llm_slots.cargo_assinante_termo
+    )
+    dfd_setor_requisitante = (
+        (override.get("dfd_setor_requisitante") or llm_slots.dfd_setor_requisitante)
+        if override.get("dfd_setor_requisitante") is not None
+        else llm_slots.dfd_setor_requisitante
+    )
+    dfd_numero_processo = (
+        (override.get("dfd_numero_processo") or llm_slots.dfd_numero_processo)
+        if override.get("dfd_numero_processo") is not None
+        else llm_slots.dfd_numero_processo
+    )
+    dfd_responsavel_demanda = (
+        (override.get("dfd_responsavel_demanda") or llm_slots.dfd_responsavel_demanda)
+        if override.get("dfd_responsavel_demanda") is not None
+        else llm_slots.dfd_responsavel_demanda
+    )
+    dfd_email = (
+        (override.get("dfd_email") or llm_slots.dfd_email)
+        if override.get("dfd_email") is not None
+        else llm_slots.dfd_email
+    )
+    dfd_gestor_contratos = (
+        (override.get("dfd_gestor_contratos") or llm_slots.dfd_gestor_contratos)
+        if override.get("dfd_gestor_contratos") is not None
+        else llm_slots.dfd_gestor_contratos
+    )
+    dfd_fiscal_contratos = (
+        (override.get("dfd_fiscal_contratos") or llm_slots.dfd_fiscal_contratos)
+        if override.get("dfd_fiscal_contratos") is not None
+        else llm_slots.dfd_fiscal_contratos
+    )
+    dfd_assinatura_cargo = (
+        (override.get("dfd_assinatura_cargo") or llm_slots.dfd_assinatura_cargo)
+        if override.get("dfd_assinatura_cargo") is not None
+        else llm_slots.dfd_assinatura_cargo
+    )
+    dfd_assinatura_nome = (
+        (override.get("dfd_assinatura_nome") or llm_slots.dfd_assinatura_nome)
+        if override.get("dfd_assinatura_nome") is not None
+        else llm_slots.dfd_assinatura_nome
+    )
+    dfd_data = (
+        (override.get("dfd_data") or llm_slots.dfd_data)
+        if override.get("dfd_data") is not None
+        else llm_slots.dfd_data
+    )
 
     itens_override = override.get("itens")
     if isinstance(itens_override, list) and len(itens_override) > 0:
@@ -526,6 +610,20 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
                 cidade=cidade,
                 horario_entrega=horario_entrega,
                 codigo_uf=codigo_uf,
+                endereco_entrega=endereco_entrega,
+                email_envio_propostas=email_envio_propostas,
+                data_termo=data_termo,
+                nome_assinante_termo=nome_assinante_termo,
+                cargo_assinante_termo=cargo_assinante_termo,
+                dfd_setor_requisitante=dfd_setor_requisitante,
+                dfd_numero_processo=dfd_numero_processo,
+                dfd_responsavel_demanda=dfd_responsavel_demanda,
+                dfd_email=dfd_email,
+                dfd_gestor_contratos=dfd_gestor_contratos,
+                dfd_fiscal_contratos=dfd_fiscal_contratos,
+                dfd_assinatura_cargo=dfd_assinatura_cargo,
+                dfd_assinatura_nome=dfd_assinatura_nome,
+                dfd_data=dfd_data,
             )
     itens = llm_slots.itens
 
@@ -542,6 +640,20 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         cidade=cidade,
         horario_entrega=horario_entrega,
         codigo_uf=codigo_uf,
+        endereco_entrega=endereco_entrega,
+        email_envio_propostas=email_envio_propostas,
+        data_termo=data_termo,
+        nome_assinante_termo=nome_assinante_termo,
+        cargo_assinante_termo=cargo_assinante_termo,
+        dfd_setor_requisitante=dfd_setor_requisitante,
+        dfd_numero_processo=dfd_numero_processo,
+        dfd_responsavel_demanda=dfd_responsavel_demanda,
+        dfd_email=dfd_email,
+        dfd_gestor_contratos=dfd_gestor_contratos,
+        dfd_fiscal_contratos=dfd_fiscal_contratos,
+        dfd_assinatura_cargo=dfd_assinatura_cargo,
+        dfd_assinatura_nome=dfd_assinatura_nome,
+        dfd_data=dfd_data,
     )
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """
 Geração de Termo de Referência a partir do modelo fixo
-`templates/tr_base/TR_modelo_base.docx`, preenchendo apenas os slots
+`template_packages/tr_base/TR_modelo_base.docx`, preenchendo apenas os slots
 marcados entre parênteses.
 
 Este módulo NÃO chama IA – ele só aplica um dicionário de slots em cima
@@ -18,10 +18,17 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
+TR_ITEMS_TABLE_ANCHOR = "(TR_TABELA_ITENS)"
+TR_ITEMS_LEGACY_CELL_PLACEHOLDERS = {
+    "(Descrever o item de acordo com o solicitado)",
+    "(Inserir unidade de medida ex: caixa, litro, unidade etc)",
+    "(Inserir quantidade solicitada)",
+}
 
-# Template base: templates/tr_base/TR_modelo_base.docx (raiz do projeto)
+
+# Template base legado: template_packages/tr_base/TR_modelo_base.docx (raiz do projeto)
 TEMPLATE_PATH_DEFAULT = (
-    Path(__file__).resolve().parents[2] / "templates" / "tr_base" / "TR_modelo_base.docx"
+    Path(__file__).resolve().parents[2] / "template_packages" / "tr_base" / "TR_modelo_base.docx"
 )
 
 
@@ -57,6 +64,20 @@ class TRTemplateSlots:
     cidade: str = ""
     horario_entrega: str = ""
     codigo_uf: str = ""
+    endereco_entrega: str = ""
+    email_envio_propostas: str = ""
+    data_termo: str = ""
+    nome_assinante_termo: str = ""
+    cargo_assinante_termo: str = ""
+    dfd_setor_requisitante: str = ""
+    dfd_numero_processo: str = ""
+    dfd_responsavel_demanda: str = ""
+    dfd_email: str = ""
+    dfd_gestor_contratos: str = ""
+    dfd_fiscal_contratos: str = ""
+    dfd_assinatura_cargo: str = ""
+    dfd_assinatura_nome: str = ""
+    dfd_data: str = ""
 
 
 def _style_items_table(table) -> None:
@@ -130,17 +151,68 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
     if not itens:
         return
 
-    # Tenta reaproveitar uma tabela existente com 4 colunas; caso não encontre, cria uma nova.
+    # 1) Prioriza tabela que contenha o marcador explícito de ancoragem.
     target_table = None
     for table in doc.tables:
-        if not table.rows:
-            continue
-        if len(table.rows[0].cells) >= 4:
+        found_anchor_in_table = False
+        for row in table.rows:
+            for cell in row.cells:
+                if TR_ITEMS_TABLE_ANCHOR in (cell.text or ""):
+                    cell.text = (cell.text or "").replace(TR_ITEMS_TABLE_ANCHOR, "").strip()
+                    found_anchor_in_table = True
+                    break
+            if found_anchor_in_table:
+                break
+        if found_anchor_in_table:
             target_table = table
             break
 
+    # 2) Se não houver tabela com marcador, tenta marcador em parágrafo:
+    # insere a tabela imediatamente após o parágrafo âncora.
     if target_table is None:
-        target_table = doc.add_table(rows=0, cols=4)
+        anchor_paragraph = None
+        for p in doc.paragraphs:
+            if TR_ITEMS_TABLE_ANCHOR in (p.text or ""):
+                p.text = (p.text or "").replace(TR_ITEMS_TABLE_ANCHOR, "").strip()
+                anchor_paragraph = p
+                break
+        if anchor_paragraph is not None:
+            target_table = doc.add_table(rows=0, cols=4)
+            anchor_paragraph._p.addnext(target_table._tbl)
+
+    # 3) Fallback legado: reutiliza tabela que tenha placeholders antigos
+    # de itens ou cabeçalho típico (Item/Descrição/Unidade/Quantidade).
+    if target_table is None:
+        for table in doc.tables:
+            if not table.rows:
+                continue
+            has_legacy_item_placeholder = False
+            for row in table.rows:
+                for cell in row.cells:
+                    cell_text = (cell.text or "")
+                    if any(ph in cell_text for ph in TR_ITEMS_LEGACY_CELL_PLACEHOLDERS):
+                        has_legacy_item_placeholder = True
+                        break
+                if has_legacy_item_placeholder:
+                    break
+
+            header = [(c.text or "").strip().lower() for c in table.rows[0].cells]
+            has_item_header = (
+                len(header) >= 4
+                and "item" in header[0]
+                and "descr" in header[1]
+                and "unidade" in header[2]
+                and "quantidade" in header[3]
+            )
+
+            if has_legacy_item_placeholder or has_item_header:
+                target_table = table
+                break
+
+    # 4) Sem âncora explícita ou tabela legada reconhecida, não injeta tabela.
+    # Isso evita criar tabela indevida no final do documento.
+    if target_table is None:
+        return
 
     # Remove todas as linhas existentes para reconstruir a tabela do zero
     for row in list(target_table.rows):
@@ -230,6 +302,28 @@ def render_tr_from_slots(
     _clear_headers(doc)
 
     mapping = {
+        # Placeholders padronizados (preferenciais)
+        "(TR_OBJETO)": slots.objeto or "",
+        "(TR_DISPENSA_INCISO)": slots.dispensa.inciso or "",
+        "(TR_JUSTIFICATIVA)": slots.justificativa or "",
+        "(TR_FISCAL_NOME)": slots.fiscal.nome or "",
+        "(TR_DOTACAO)": slots.dotacao or "",
+        "(TR_SECRETARIA_USUARIO)": slots.secretaria_usuario or "",
+        "(TR_NOME_USUARIO)": slots.nome_usuario or "",
+        "(TR_CIDADE_ESTADO)": slots.cidade_estado or "",
+        "(TR_CIDADE)": slots.cidade or "",
+        "(TR_CODIGO_UF)": slots.codigo_uf or "",
+        "(TR_ENDERECO_ENTREGA)": slots.endereco_entrega or "",
+        "(TR_EMAIL_ENVIO_PROPOSTAS)": slots.email_envio_propostas or "",
+        "(TR_DATA_TERMO)": slots.data_termo or "",
+        "(TR_NOME_ASSINANTE_TERMO)": slots.nome_assinante_termo or "",
+        "(TR_CARGO_ASSINANTE_TERMO)": slots.cargo_assinante_termo or "",
+        "(TR_TABELA_ITENS)": "",
+        # Compatibilidade entre variantes de pacotes TR_modelo_base
+        "(TR_OBJETO_MANUAL)": slots.objeto or "",
+        "(TR_BENEFICIO_ESPERADO)": slots.justificativa or "",
+        "(TR_PROBLEMA_ADMINISTRATIVO)": slots.justificativa or "",
+        # Compatibilidade com placeholders legados
         "(descrever o objeto solicitado)": slots.objeto or "",
         # No modelo, este placeholder está associado ao texto logo após "inciso".
         # Embora o rótulo mencione "artigo", na prática ele representa o INCISO
@@ -248,6 +342,11 @@ def render_tr_from_slots(
         "(CIDADE)": slots.cidade or "",
         "(HORARIO E DIAS PARA ENTREGA)": slots.horario_entrega or "Preencher horário, dias da semana e outras informações de entrega",
         "(CÓDIGO UF)": slots.codigo_uf or "",
+        "(ENDERECO ENTREGA)": slots.endereco_entrega or "",
+        "(E-mail de envio de propostas)": slots.email_envio_propostas or "",
+        "(DATA DO TERMO)": slots.data_termo or "",
+        "(NOME DO ASSINANTE DO TERMO)": slots.nome_assinante_termo or "",
+        "(CARGO DO ASSINANTE DO TERMO)": slots.cargo_assinante_termo or "",
     }
 
     _replace_placeholders_in_paragraphs(doc, mapping)

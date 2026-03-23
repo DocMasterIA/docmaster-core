@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """
 Geração de Documento de Formalização da Demanda (DFD) a partir do modelo fixo
-`templates/tr_base/DFD_modelo_base.docx`, preenchendo apenas os slots
+`template_packages/tr_base/DFD_modelo_base.docx`, preenchendo apenas os slots
 marcados entre parênteses.
 
 Este módulo NÃO chama IA – ele só aplica os dados já gerados para o TR
@@ -18,7 +18,7 @@ from .tr_template import TRTemplateSlots
 
 
 TEMPLATE_DFD_PATH_DEFAULT = (
-    Path(__file__).resolve().parents[2] / "templates" / "tr_base" / "DFD_modelo_base.docx"
+    Path(__file__).resolve().parents[2] / "template_packages" / "tr_base" / "DFD_modelo_base.docx"
 )
 
 
@@ -64,9 +64,18 @@ def render_dfd_from_tr_slots(
     - da cidade do usuário (preenchida em slots.cidade pelo backend).
 
     Mapeamento de placeholders no DFD_modelo_base.docx:
-    - (Descrever objeto do termo de referencia)           -> slots.objeto
-    - (descrever a justificativa usada no termo de referencias) -> slots.justificativa
-    - (CIDADE)                                            -> slots.cidade
+    - (Descrever objeto do termo de referencia)                    -> slots.objeto
+    - (descrever a justificativa usada no termo de referencias)    -> slots.justificativa
+    - (CIDADE)                                                     -> slots.cidade
+    - (SETOR REQUISITANTE)                                         -> slots.dfd_setor_requisitante
+    - (NUMERO PROCESSO)                                            -> slots.dfd_numero_processo
+    - (RESPONSAVEL DEMANDA)                                        -> slots.dfd_responsavel_demanda
+    - (EMAIL DFD)                                                  -> slots.dfd_email
+    - (GESTORA CONTRATOS)                                          -> slots.dfd_gestor_contratos
+    - (FISCAL CONTRATOS)                                           -> slots.dfd_fiscal_contratos
+    - (CARGO ASSINATURA DFD)                                       -> slots.dfd_assinatura_cargo
+    - (NOME ASSINATURA DFD)                                        -> slots.dfd_assinatura_nome
+    - (DATA DFD)                                                   -> slots.dfd_data
     """
     tpl_path = Path(template_path) if template_path else TEMPLATE_DFD_PATH_DEFAULT
     if not tpl_path.exists():
@@ -75,9 +84,33 @@ def render_dfd_from_tr_slots(
     doc = Document(str(tpl_path))
 
     mapping = {
+        # Placeholders padronizados (preferenciais)
+        "(DFD_OBJETO_REFERENCIA)": slots.objeto or "",
+        "(DFD_JUSTIFICATIVA)": slots.justificativa or "",
+        "(DFD_CIDADE)": slots.cidade or "",
+        "(DFD_SETOR_REQUISITANTE)": slots.dfd_setor_requisitante or "",
+        "(DFD_NUMERO_PROCESSO)": slots.dfd_numero_processo or "",
+        "(DFD_RESPONSAVEL_DEMANDA)": slots.dfd_responsavel_demanda or "",
+        "(DFD_EMAIL)": slots.dfd_email or "",
+        "(DFD_GESTOR_CONTRATOS)": slots.dfd_gestor_contratos or "",
+        "(DFD_FISCAL_CONTRATOS)": slots.dfd_fiscal_contratos or "",
+        "(DFD_CARGO_ASSINATURA)": slots.dfd_assinatura_cargo or "",
+        "(DFD_NOME_ASSINATURA)": slots.dfd_assinatura_nome or "",
+        "(DFD_DATA)": slots.dfd_data or "",
+        # Placeholders legados
         "(Descrever objeto do termo de referencia)": slots.objeto or "",
         "(descrever a justificativa usada no termo de referencias)": slots.justificativa or "",
         "(CIDADE)": slots.cidade or "",
+        # Placeholders novos de identificação/assinatura do DFD
+        "(SETOR REQUISITANTE)": slots.dfd_setor_requisitante or "",
+        "(NUMERO PROCESSO)": slots.dfd_numero_processo or "",
+        "(RESPONSAVEL DEMANDA)": slots.dfd_responsavel_demanda or "",
+        "(EMAIL DFD)": slots.dfd_email or "",
+        "(GESTORA CONTRATOS)": slots.dfd_gestor_contratos or "",
+        "(FISCAL CONTRATOS)": slots.dfd_fiscal_contratos or "",
+        "(CARGO ASSINATURA DFD)": slots.dfd_assinatura_cargo or "",
+        "(NOME ASSINATURA DFD)": slots.dfd_assinatura_nome or "",
+        "(DATA DFD)": slots.dfd_data or "",
     }
 
     _replace_placeholders(doc, mapping)

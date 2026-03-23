@@ -193,7 +193,7 @@ def _convert_markdown_table_to_plain(text: str) -> str:
     return "\n".join(result)
 
 
-def _postprocess_clause_text(text: str) -> str:
+def _postprocess_clause_text(text: str, section_key: str = "") -> str:
     """
     Limpa saída do LLM antes de ir para o DOCX.
 
@@ -228,6 +228,18 @@ def _postprocess_clause_text(text: str) -> str:
     t = re.sub(r"Lei\s*8\.666", "Lei 14.133/2021", t, flags=re.IGNORECASE)
     t = re.sub(r"Lei\s*(?:n[º°]?|n\.?\s*[º°]?)?\s*8\.333/1991", "Lei 14.133/2021", t, flags=re.IGNORECASE)
     t = re.sub(r"Lei\s*8\.333", "Lei 14.133/2021", t, flags=re.IGNORECASE)
+    # Evita numeração legal potencialmente inventada no texto final:
+    # mantemos referência genérica à lei.
+    t = re.sub(
+        r"\bart(?:igo)?\.?\s*\d+[º°]?(?:\s*,\s*§\s*\d+[º°]?)?\s*(?:,?\s*(?:inciso|alínea)\s*[IVXLCDM\d]+)?\s+da\s+Lei\s+14\.133/2021\b",
+        "Lei 14.133/2021",
+        t,
+        flags=re.IGNORECASE,
+    )
+    # Normaliza sigla incorreta ETC -> ETP no contexto de estudo técnico preliminar.
+    t = re.sub(r"(?i)\bEstudo Técnico Preliminar\s*\(ETC\)", "Estudo Técnico Preliminar (ETP)", t)
+    t = re.sub(r"(?i)\bpresente\s+Estudo Técnico Preliminar\s*\(ETC\)", "presente Estudo Técnico Preliminar (ETP)", t)
+    t = re.sub(r"(?i)\bETC\b(?=[\s\),\.;:])", "ETP", t)
     # Placeholders: substitui por texto genérico plausível
     placeholder_fixes = [
         (r"R\$\s*\[conforme\s+edital\]", "conforme edital"),
@@ -348,6 +360,19 @@ def _postprocess_clause_text(text: str) -> str:
     ]
     for pat in heading_patterns:
         t = re.sub(pat, "", t, flags=re.IGNORECASE)
+    # Evita vazamento de conteúdo de "análise de riscos" em seção de solução proposta.
+    if "soluc" in (section_key or "").lower():
+        paras = re.split(r"\n\s*\n", t)
+        risk_markers = (
+            "nesta seção, são identificados os principais riscos",
+            "riscos técnicos",
+            "riscos operacionais",
+            "riscos de cronograma",
+            "riscos de fornecimento",
+            "medidas acauteladoras",
+        )
+        paras = [p for p in paras if not any(m in p.lower() for m in risk_markers)]
+        t = "\n\n".join(paras)
     # Remove parágrafos duplicados (repetição – mantém apenas a primeira ocorrência)
     t = _remove_duplicate_paragraphs(t)
     # Remove linhas vazias excessivas (mais de 2 seguidas)
@@ -452,6 +477,7 @@ def _get_etp_preamble() -> str:
         "\n\n=== DOCUMENTO ETP (ESTUDO TÉCNICO PRELIMINAR) ===\n"
         "O ETP é um ESTUDO INTERNO da Administração, não um edital nem um contrato.\n"
         "Regras específicas:\n"
+        "- SIGLA OFICIAL: use SEMPRE \"ETP\" para Estudo Técnico Preliminar. NUNCA use \"ETC\".\n"
         "- PRIORIDADE: Use SEMPRE o objeto informado no prompt/contexto. Não mude o tema do estudo com base em exemplos do RAG.\n"
         "- OBJETO/SEÇÃO \"OBJETO\": descreva com 2 a 4 frases o que será CONTRATADO (bens, serviços ou obra), para qual finalidade e quais necessidades administrativas atende, citando o órgão/setor e, quando couber, o público/área beneficiada.\n"
         "  É EXPRESSAMENTE PROIBIDO limitar o OBJETO a uma expressão curta e genérica como apenas \"materiais de limpeza\", \"material de escritório\" ou semelhantes; o texto deve ser completo e autoexplicativo, mesmo que o pedido do usuário seja breve.\n"
@@ -825,6 +851,16 @@ def _format_especificacoes(especificacoes: Dict[str, Any] | None) -> str:
     return "Especificações indicadas pelo usuário (use quando fizer sentido para esta seção):\n" + "\n".join(parts) + "\n\n"
 
 
+def _contains_cjk_chars(text: str) -> bool:
+    """Detecta presença de ideogramas CJK (sinal forte de idioma incorreto no contexto pt-BR)."""
+    import re
+
+    if not text:
+        return False
+    hits = re.findall(r"[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]", text)
+    return len(hits) >= 4
+
+
 async def _generate_clause_text(
     section_key: str,
     section_title: str,
@@ -855,26 +891,36 @@ ATENÇÃO AO CONTEXTO RAG: Alguns exemplos podem conter trechos de citação leg
 Instruções: O PRIMEIRO caractere da sua resposta deve ser o início do conteúdo jurídico. Não comece com "Aqui estão...", "A cláusula deve...", "Segue..." ou qualquer intro. PROIBIDO: Nota:, Notas:, Atenção:, Observação: (meta), section_key. Redija DIRETAMENTE a cláusula. Português brasileiro. Sem markdown. Sem placeholders []. Cite Lei 14.133/2021. Não repita frases ou parágrafos."""
 
 
-    full_prompt = f"<<SYSTEM>>\n{CLAUSE_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{query}"
-    url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
-    payload = {"prompt": full_prompt, "stream": False}
+    async def _run_once(extra_instruction: str = "") -> str:
+        q = query if not extra_instruction else f"{query}\n\n{extra_instruction}"
+        full_prompt = f"<<SYSTEM>>\n{CLAUSE_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{q}"
+        url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
+        payload = {"prompt": full_prompt, "stream": False}
 
-    async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
-        resp = await client.post(url, json=payload)
-        resp.raise_for_status()
-        body = resp.json()
+        async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            body = resp.json()
 
-    # Se a resposta contiver "detail" com mensagem de erro (ex.: proxy retorna 200 com erro), não inserir no documento
-    if isinstance(body, dict) and body.get("detail"):
-        detail = str(body["detail"]).strip()
-        if any(kw in detail.lower() for kw in ("falha", "erro", "timeout", "error", "verifique")):
-            raise ValueError(f"Orquestração retornou erro: {detail}")
+        # Se a resposta contiver "detail" com mensagem de erro (ex.: proxy retorna 200 com erro), não inserir no documento
+        if isinstance(body, dict) and body.get("detail"):
+            detail = str(body["detail"]).strip()
+            if any(kw in detail.lower() for kw in ("falha", "erro", "timeout", "error", "verifique")):
+                raise ValueError(f"Orquestração retornou erro: {detail}")
 
-    data = body.get("data", body) if isinstance(body, dict) else {}
-    text = data.get("response", data.get("text", ""))
-    raw = (text or "").strip()
-    raw = await _llm_sanitize_meta_comments(raw)
-    return _postprocess_clause_text(raw)
+        data = body.get("data", body) if isinstance(body, dict) else {}
+        text = data.get("response", data.get("text", ""))
+        raw = (text or "").strip()
+        raw = await _llm_sanitize_meta_comments(raw)
+        return _postprocess_clause_text(raw, section_key=section_key)
+
+    out = await _run_once()
+    if _contains_cjk_chars(out):
+        out = await _run_once(
+            "RETENTATIVA OBRIGATÓRIA: a resposta anterior veio em idioma inválido. "
+            "Reescreva integralmente em português brasileiro (pt-BR), sem qualquer trecho em chinês, japonês ou outro idioma."
+        )
+    return out
 
 
 def _is_meta_comment_line(line: str) -> bool:
@@ -943,25 +989,35 @@ Contexto: {document_type}. Objeto: {context.get("objeto", "não informado")}. Ó
 
 ATENÇÃO: Não copie trechos de citação legal pura (transcrição de artigos) dos exemplos – use como referência e redija em prosa adequada. O PRIMEIRO caractere da resposta deve ser o primeiro item. Não comece com intro. Cada item em uma linha. Sem numeração, sem marcadores. Sem placeholders. Lei 14.133/2021."""
 
-    full_prompt = f"<<SYSTEM>>\n{LIST_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{query}"
-    url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
-    payload = {"prompt": full_prompt, "stream": False}
+    async def _run_once(extra_instruction: str = "") -> str:
+        q = query if not extra_instruction else f"{query}\n\n{extra_instruction}"
+        full_prompt = f"<<SYSTEM>>\n{LIST_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{q}"
+        url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
+        payload = {"prompt": full_prompt, "stream": False}
 
-    async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
-        resp = await client.post(url, json=payload)
-        resp.raise_for_status()
-        body = resp.json()
+        async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            body = resp.json()
 
-    if isinstance(body, dict) and body.get("detail"):
-        detail = str(body["detail"]).strip()
-        if any(kw in detail.lower() for kw in ("falha", "erro", "timeout", "error", "verifique")):
-            raise ValueError(f"Orquestração retornou erro: {detail}")
+        if isinstance(body, dict) and body.get("detail"):
+            detail = str(body["detail"]).strip()
+            if any(kw in detail.lower() for kw in ("falha", "erro", "timeout", "error", "verifique")):
+                raise ValueError(f"Orquestração retornou erro: {detail}")
 
-    data = body.get("data", body) if isinstance(body, dict) else {}
-    text = data.get("response", data.get("text", ""))
-    raw = (text or "").strip()
-    raw = await _llm_sanitize_meta_comments(raw)
-    return _postprocess_list_text(raw)
+        data = body.get("data", body) if isinstance(body, dict) else {}
+        text = data.get("response", data.get("text", ""))
+        raw = (text or "").strip()
+        raw = await _llm_sanitize_meta_comments(raw)
+        return _postprocess_list_text(raw)
+
+    out = await _run_once()
+    if _contains_cjk_chars(out):
+        out = await _run_once(
+            "RETENTATIVA OBRIGATÓRIA: a resposta anterior veio em idioma inválido. "
+            "Reescreva integralmente em português brasileiro (pt-BR), sem qualquer trecho em chinês, japonês ou outro idioma."
+        )
+    return out
 
 
 def _collect_text_sections(nodes: List[Dict], acc: List[Dict]) -> None:

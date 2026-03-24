@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 """
 Geração de Termo de Referência a partir do modelo fixo
 `template_packages/tr_base/TR_modelo_base.docx`, preenchendo apenas os slots

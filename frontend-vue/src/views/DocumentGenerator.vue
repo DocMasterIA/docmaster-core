@@ -27,7 +27,7 @@
                   <p class="gov-text-soft">
                     <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
                     <span v-if="docTypeMode === 'tr_modelo'">
-                      Esta página gera <strong>TR / DFD com modelo oficial (slots)</strong>. O modo é inferido automaticamente pela rota selecionada.
+                      Esta página gera <strong>TR, DFD e Solicitação / Ofício com modelo oficial (slots)</strong>. O modo é inferido automaticamente pela rota selecionada.
                     </span>
                     <span v-else>
                       Esta página gera <strong>ETP Livre (IA flexível)</strong>. O modo é inferido automaticamente pela rota selecionada.
@@ -223,7 +223,7 @@
         </section>
       </div>
 
-      <!-- Coluna direita: dados para slots (somente TR/DFD modelo oficial) -->
+      <!-- Coluna direita: dados para slots (TR / DFD / Solicitação Ofício — modelo oficial) -->
       <aside v-if="showSlotsCard" class="doc-gen__aside">
         <section class="gov-surface doc-gen__variables-card">
           <div class="gov-surface__header">
@@ -466,8 +466,12 @@ const pdfTotalPages = ref(0);
 const pdfGotoPage = ref(1);
 const suggestionOpenField = ref('');
 const slotStateSaveDebounce = ref(null);
+const templatePresetSaveDebounce = ref(null);
 const isHydratingSlotState = ref(false);
 const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
+/** Chaves reservadas no preset global (backend) para cabeçalho/rodapé da Biblioteca. */
+const LIBRARY_TEMPLATE_ID_KEY = '__library_template_id__';
+const LIBRARY_TEMPLATE_NAME_KEY = '__library_template_name__';
 
 /** Sugestões para Função/Cargo (o usuário pode digitar outro valor). */
 const CARGO_DATALIST_OPTIONS = [
@@ -789,8 +793,21 @@ function collectSlotFormStatePayload() {
   return data;
 }
 
+/** Preset global: slots do assistente + template da biblioteca (merge no backend). */
+function buildGlobalPresetPayload() {
+  const data = showSlotsCard.value ? collectSlotFormStatePayload() : {};
+  if (selectedTemplate.value?.id) {
+    data[LIBRARY_TEMPLATE_ID_KEY] = String(selectedTemplate.value.id);
+    data[LIBRARY_TEMPLATE_NAME_KEY] = String(selectedTemplate.value.name || '');
+  } else {
+    data[LIBRARY_TEMPLATE_ID_KEY] = '';
+    data[LIBRARY_TEMPLATE_NAME_KEY] = '';
+  }
+  return data;
+}
+
 async function saveSlotFormState() {
-  if (!showSlotsCard.value || isHydratingSlotState.value) return;
+  if (isHydratingSlotState.value) return;
   try {
     await fetch(`${API_BASE}/api/slots/form-state/save`, {
       method: 'POST',
@@ -798,7 +815,7 @@ async function saveSlotFormState() {
       credentials: 'include',
       body: JSON.stringify({
         slot_package_key: GLOBAL_SLOT_FORM_PRESET_KEY,
-        data: collectSlotFormStatePayload(),
+        data: buildGlobalPresetPayload(),
       }),
     });
   } catch (_e) {
@@ -807,7 +824,6 @@ async function saveSlotFormState() {
 }
 
 async function loadSlotFormState() {
-  if (!showSlotsCard.value) return;
   isHydratingSlotState.value = true;
   try {
     const url = `${API_BASE}/api/slots/form-state?slot_package_key=${encodeURIComponent(GLOBAL_SLOT_FORM_PRESET_KEY)}`;
@@ -816,6 +832,20 @@ async function loadSlotFormState() {
     const payload = await res.json().catch(() => ({}));
     const data = payload?.data || {};
     if (!data || typeof data !== 'object') return;
+
+    const libId = data[LIBRARY_TEMPLATE_ID_KEY] || data._library_template_id;
+    const libName = data[LIBRARY_TEMPLATE_NAME_KEY] || '';
+    if (libId && String(libId).trim()) {
+      const tid = String(libId).trim();
+      selectedTemplate.value = { id: tid, name: libName, preview_image: null };
+      searchQuery.value = libName || '';
+      await fetchTemplateDetails(tid);
+    } else {
+      selectedTemplate.value = null;
+      searchQuery.value = '';
+    }
+
+    if (!showSlotsCard.value) return;
 
     for (const section of selectedFlow.value.sections) {
       for (const field of section.fields) {
@@ -1390,15 +1420,9 @@ async function loadTemplatePreviewPdf(templateId) {
 }
 
 let pdfjsLib = null;
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('click', clickOutside);
   docTypeMode.value = isEtpLivreRoute.value ? 'auto' : 'tr_modelo';
-  const templateId = route.query.template_id;
-  if (templateId) {
-    fetchTemplateDetails(templateId).then(() => {
-      if (selectedTemplate.value) searchQuery.value = selectedTemplate.value.name;
-    });
-  }
   if (window.pdfjsLib) {
     pdfjsLib = window.pdfjsLib;
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -1407,11 +1431,17 @@ onMounted(() => {
   }
   resetSlotFormAndSections();
   loadSlotCatalogSuggestions();
-  loadSlotFormState();
+  await loadSlotFormState();
+  const qTemplate = route.query.template_id;
+  if (qTemplate) {
+    await fetchTemplateDetails(String(qTemplate));
+    if (selectedTemplate.value) searchQuery.value = selectedTemplate.value.name;
+  }
 });
 onUnmounted(() => {
   document.removeEventListener('click', clickOutside);
   clearTimeout(slotStateSaveDebounce.value);
+  clearTimeout(templatePresetSaveDebounce.value);
   if (documentDocxUrl.value) URL.revokeObjectURL(documentDocxUrl.value);
   if (documentPdfUrl.value) URL.revokeObjectURL(documentPdfUrl.value);
   if (documentTrUrl.value) URL.revokeObjectURL(documentTrUrl.value);
@@ -1422,11 +1452,11 @@ onUnmounted(() => {
 
 watch(
   () => route.name,
-  () => {
+  async () => {
     docTypeMode.value = isEtpLivreRoute.value ? 'auto' : 'tr_modelo';
     resetSlotFormAndSections();
     loadSlotCatalogSuggestions();
-    loadSlotFormState();
+    await loadSlotFormState();
   },
 );
 
@@ -1451,6 +1481,17 @@ watch(
     }, 500);
   },
   { deep: true },
+);
+
+watch(
+  () => selectedTemplate.value?.id,
+  () => {
+    if (isHydratingSlotState.value) return;
+    clearTimeout(templatePresetSaveDebounce.value);
+    templatePresetSaveDebounce.value = setTimeout(() => {
+      saveSlotFormState();
+    }, 400);
+  },
 );
 
 async function loadPdf(url) {

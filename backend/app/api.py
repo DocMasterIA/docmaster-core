@@ -72,6 +72,45 @@ def _resolve_slot_package_key(payload: dict, request) -> str:
     return ""
 
 
+# Preset global do gerador (mesma chave do frontend: global_slots_preset_v1)
+GLOBAL_SLOT_PRESET_KEY = "global_slots_preset_v1"
+LIBRARY_TEMPLATE_ID_KEY = "__library_template_id__"
+LIBRARY_TEMPLATE_NAME_KEY = "__library_template_name__"
+
+
+def _resolve_merge_template_id(request, payload):
+    """
+    `template_id` no JSON tem prioridade. Caso contrário, usa o template da
+    Biblioteca de Documentos salvo no preset global do usuário (cabeçalho/rodapé).
+    """
+    raw = payload.get("template_id")
+    if raw not in (None, ""):
+        tid = str(raw).strip()
+        if Template.objects.filter(id=tid).exists():
+            return tid
+        # ID inválido no payload: tenta preset salvo (ex.: template removido do banco)
+
+    if not getattr(request.user, "is_authenticated", False):
+        return None
+
+    try:
+        obj = SlotFormState.objects.filter(
+            owner=request.user,
+            slot_package_key=GLOBAL_SLOT_PRESET_KEY,
+        ).first()
+        if not obj or not isinstance(obj.data, dict):
+            return None
+        lib = obj.data.get(LIBRARY_TEMPLATE_ID_KEY) or obj.data.get("_library_template_id")
+        if not lib:
+            return None
+        tid = str(lib).strip()
+        if tid and Template.objects.filter(id=tid).exists():
+            return tid
+    except Exception:
+        pass
+    return None
+
+
 # API: upload de Template (DOCX) e solicitação de mapeamento de campos via IA.
 @api_login_required
 @csrf_exempt
@@ -252,7 +291,7 @@ def gerar_via_llm_api(request):
         return JsonResponse({"ok": False, "error": "Corpo JSON inválido"}, status=400)
 
     user_prompt = (payload.get("user_prompt") or "").strip()
-    template_id = payload.get("template_id")
+    template_id = _resolve_merge_template_id(request, payload)
     output = (payload.get("output") or "docx").lower()
     slot_package_key = _resolve_slot_package_key(payload, request)
 
@@ -417,7 +456,7 @@ def gerar_tr_modelo_api(request):
 
     user_prompt = (payload.get("user_prompt") or "").strip()
     slots_override = payload.get("slots_override")  # opcional
-    template_id = payload.get("template_id")
+    template_id = _resolve_merge_template_id(request, payload)
     slot_package_key = _resolve_slot_package_key(payload, request)
 
     if not user_prompt:
@@ -546,7 +585,7 @@ def gerar_tr_e_dfd_api(request):
 
     user_prompt = (payload.get("user_prompt") or "").strip()
     slots_override = payload.get("slots_override")  # opcional
-    template_id = payload.get("template_id")
+    template_id = _resolve_merge_template_id(request, payload)
     slot_package_key = _resolve_slot_package_key(payload, request)
 
     if not user_prompt:
@@ -1086,13 +1125,19 @@ def slot_form_state_save_api(request):
     if not isinstance(data, dict):
         return JsonResponse({"ok": False, "error": "data deve ser um objeto JSON"}, status=400)
 
+    merged = {}
+    existing = SlotFormState.objects.filter(owner=request.user, slot_package_key=slot_package_key).first()
+    if existing and isinstance(existing.data, dict):
+        merged = dict(existing.data)
+    merged.update(data)
+
     # Limite simples defensivo de volume.
-    if len(json.dumps(data, ensure_ascii=False)) > 100_000:
+    if len(json.dumps(merged, ensure_ascii=False)) > 100_000:
         return JsonResponse({"ok": False, "error": "data excede tamanho máximo permitido"}, status=400)
 
     obj, _ = SlotFormState.objects.update_or_create(
         owner=request.user,
         slot_package_key=slot_package_key,
-        defaults={"data": data},
+        defaults={"data": merged},
     )
     return JsonResponse({"ok": True, "id": str(obj.id), "slot_package_key": slot_package_key})

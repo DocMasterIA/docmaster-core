@@ -467,6 +467,7 @@ const pdfGotoPage = ref(1);
 const suggestionOpenField = ref('');
 const slotStateSaveDebounce = ref(null);
 const isHydratingSlotState = ref(false);
+const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
 
 /** Sugestões para Função/Cargo (o usuário pode digitar outro valor). */
 const CARGO_DATALIST_OPTIONS = [
@@ -796,7 +797,7 @@ async function saveSlotFormState() {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({
-        slot_package_key: slotPackageKey.value,
+        slot_package_key: GLOBAL_SLOT_FORM_PRESET_KEY,
         data: collectSlotFormStatePayload(),
       }),
     });
@@ -809,7 +810,7 @@ async function loadSlotFormState() {
   if (!showSlotsCard.value) return;
   isHydratingSlotState.value = true;
   try {
-    const url = `${API_BASE}/api/slots/form-state?slot_package_key=${encodeURIComponent(slotPackageKey.value)}`;
+    const url = `${API_BASE}/api/slots/form-state?slot_package_key=${encodeURIComponent(GLOBAL_SLOT_FORM_PRESET_KEY)}`;
     const res = await fetch(url, { credentials: 'include' });
     if (!res.ok) return;
     const payload = await res.json().catch(() => ({}));

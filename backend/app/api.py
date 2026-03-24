@@ -566,7 +566,8 @@ def gerar_tr_e_dfd_api(request):
     package_slug = _slug(slot_package_key or "tr_dfd_generico")
     tr_filename = f"tr_{package_slug}_{stamp}_docmasteria.docx"
     dfd_filename = f"dfd_{package_slug}_{stamp}_docmasteria.docx"
-    zip_filename = f"tr_dfd_{package_slug}_{stamp}_docmasteria.zip"
+    oficio_filename = f"oficio_{package_slug}_{stamp}_docmasteria.docx"
+    zip_filename = f"tr_dfd_oficio_{package_slug}_{stamp}_docmasteria.zip"
 
     rag_url = getattr(django_settings, "RAG_SERVICE_URL", "http://127.0.0.1:8004").rstrip("/")
     url = f"{rag_url}/api/rag/generate-tr-and-dfd-zip"
@@ -604,6 +605,7 @@ def gerar_tr_e_dfd_api(request):
         with zipfile.ZipFile(io.BytesIO(zip_bytes_raw), "r") as zf:
             tr_bytes = zf.read("termo_referencia.docx")
             dfd_bytes = zf.read("dfd.docx")
+            oficio_bytes = zf.read("solicitacao_oficio.docx")
     except KeyError as e:
         return JsonResponse({"ok": False, "error": f"ZIP sem arquivo esperado: {e}"}, status=502)
     except Exception as e:
@@ -638,6 +640,7 @@ def gerar_tr_e_dfd_api(request):
 
     tr_bytes, tr_template_applied, tr_merge_error = _maybe_merge_with_template(tr_bytes, "termo_referencia.docx")
     dfd_bytes, dfd_template_applied, dfd_merge_error = _maybe_merge_with_template(dfd_bytes, "dfd.docx")
+    oficio_bytes, oficio_template_applied, oficio_merge_error = _maybe_merge_with_template(oficio_bytes, "solicitacao_oficio.docx")
 
     # Opcional: salvar instância principal (TR) em "Meus Documentos"
     if tpl and request.user.is_authenticated:
@@ -660,11 +663,12 @@ def gerar_tr_e_dfd_api(request):
         except Exception:
             pass
 
-    # Monta ZIP TR+DFD em memória
+    # Monta ZIP TR+DFD+Ofício em memória
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr(tr_filename, tr_bytes)
         zf.writestr(dfd_filename, dfd_bytes)
+        zf.writestr(oficio_filename, oficio_bytes)
     zip_bytes = zip_buffer.getvalue()
 
     return JsonResponse(
@@ -681,6 +685,12 @@ def gerar_tr_e_dfd_api(request):
                 "docx_base64": base64.b64encode(dfd_bytes).decode("ascii"),
                 "template_applied": dfd_template_applied,
                 "merge_error": dfd_merge_error or None,
+            },
+            "oficio": {
+                "filename": oficio_filename,
+                "docx_base64": base64.b64encode(oficio_bytes).decode("ascii"),
+                "template_applied": oficio_template_applied,
+                "merge_error": oficio_merge_error or None,
             },
             "zip": {
                 "filename": zip_filename,

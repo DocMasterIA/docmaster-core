@@ -124,12 +124,20 @@
                       <i class="fa-solid fa-file-word" aria-hidden="true"></i> Download DFD (DOCX)
                     </a>
                     <a
+                      v-if="documentOficioUrl"
+                      :href="documentOficioUrl"
+                      :download="documentOficioFilename"
+                      class="gov-btn gov-btn--secondary"
+                    >
+                      <i class="fa-solid fa-file-word" aria-hidden="true"></i> Download Solicitação/Ofício (DOCX)
+                    </a>
+                    <a
                       v-if="documentZipUrl"
                       :href="documentZipUrl"
                       :download="documentZipFilename"
                       class="gov-btn gov-btn--secondary"
                     >
-                      <i class="fa-solid fa-file-archive" aria-hidden="true"></i> Download TR+DFD (ZIP)
+                      <i class="fa-solid fa-file-archive" aria-hidden="true"></i> Download TR+DFD+Ofício (ZIP)
                     </a>
                   </template>
                   <template v-else>
@@ -438,10 +446,12 @@ const documentDocxUrl = ref('');
 const documentPdfUrl = ref('');
 const documentTrUrl = ref('');
 const documentDfdUrl = ref('');
+const documentOficioUrl = ref('');
 const documentZipUrl = ref('');
 const documentTrFilename = ref('termo_referencia.docx');
 const documentDfdFilename = ref('dfd.docx');
-const documentZipFilename = ref('tr_dfd.zip');
+const documentOficioFilename = ref('oficio.docx');
+const documentZipFilename = ref('tr_dfd_oficio.zip');
 const successMessage = ref('');
 const generateError = ref('');
 
@@ -1054,13 +1064,18 @@ async function onSubmit() {
     URL.revokeObjectURL(documentDfdUrl.value);
     documentDfdUrl.value = '';
   }
+  if (documentOficioUrl.value) {
+    URL.revokeObjectURL(documentOficioUrl.value);
+    documentOficioUrl.value = '';
+  }
   if (documentZipUrl.value) {
     URL.revokeObjectURL(documentZipUrl.value);
     documentZipUrl.value = '';
   }
   documentTrFilename.value = 'termo_referencia.docx';
   documentDfdFilename.value = 'dfd.docx';
-  documentZipFilename.value = 'tr_dfd.zip';
+  documentOficioFilename.value = 'oficio.docx';
+  documentZipFilename.value = 'tr_dfd_oficio.zip';
 
   try {
     await submitViaLLM();
@@ -1126,8 +1141,8 @@ async function submitViaLLM() {
       return;
     }
 
-    if (!data.tr?.docx_base64 || !data.dfd?.docx_base64) {
-      generateError.value = data.error || 'TR ou DFD não vieram na resposta. Tente novamente.';
+    if (!data.tr?.docx_base64 || !data.dfd?.docx_base64 || !data.oficio?.docx_base64) {
+      generateError.value = data.error || 'TR, DFD ou Solicitação/Ofício não vieram na resposta. Tente novamente.';
       return;
     }
 
@@ -1151,26 +1166,33 @@ async function submitViaLLM() {
         data.dfd.docx_base64,
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       );
+      const oficioUrl = toBlobUrl(
+        data.oficio.docx_base64,
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      );
       const zipUrl = data.zip?.zip_base64
         ? toBlobUrl(data.zip.zip_base64, 'application/zip')
         : '';
       // Revogar blobs antigos (se houver) antes de atribuir os novos, para todos os três botões ficarem consistentes
       if (documentTrUrl.value) URL.revokeObjectURL(documentTrUrl.value);
       if (documentDfdUrl.value) URL.revokeObjectURL(documentDfdUrl.value);
+      if (documentOficioUrl.value) URL.revokeObjectURL(documentOficioUrl.value);
       if (documentZipUrl.value) URL.revokeObjectURL(documentZipUrl.value);
       documentTrUrl.value = trUrl;
       documentDfdUrl.value = dfdUrl;
+      documentOficioUrl.value = oficioUrl;
       documentZipUrl.value = zipUrl;
       documentTrFilename.value = data.tr?.filename || 'termo_referencia.docx';
       documentDfdFilename.value = data.dfd?.filename || 'dfd.docx';
-      documentZipFilename.value = data.zip?.filename || 'tr_dfd.zip';
+      documentOficioFilename.value = data.oficio?.filename || 'oficio.docx';
+      documentZipFilename.value = data.zip?.filename || 'tr_dfd_oficio.zip';
     } catch (e) {
       generateError.value = `Falha ao processar arquivos: ${e?.message || 'dados inválidos'}. Tente novamente.`;
       return;
     }
 
     documentReady.value = true;
-    successMessage.value = 'Termo de Referência e DFD gerados com sucesso. Baixe os arquivos abaixo.';
+    successMessage.value = 'Termo de Referência, DFD e Solicitação/Ofício gerados com sucesso. Baixe os arquivos abaixo.';
     persistSlotEntries(buildSlotEntriesFromForm());
     return;
   }
@@ -1320,6 +1342,7 @@ onUnmounted(() => {
   if (documentPdfUrl.value) URL.revokeObjectURL(documentPdfUrl.value);
   if (documentTrUrl.value) URL.revokeObjectURL(documentTrUrl.value);
   if (documentDfdUrl.value) URL.revokeObjectURL(documentDfdUrl.value);
+  if (documentOficioUrl.value) URL.revokeObjectURL(documentOficioUrl.value);
   if (documentZipUrl.value) URL.revokeObjectURL(documentZipUrl.value);
 });
 

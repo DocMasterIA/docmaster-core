@@ -448,6 +448,17 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
         data_termo=str(data.get("data_termo", "")).strip(),
         nome_assinante_termo=str(data.get("nome_assinante_termo", "")).strip(),
         cargo_assinante_termo=str(data.get("cargo_assinante_termo", "")).strip(),
+        sol_oficio_artigo_inciso=str(data.get("sol_oficio_artigo_inciso", "")).strip(),
+        sol_oficio_destinatario_nome=str(data.get("sol_oficio_destinatario_nome", "")).strip(),
+        sol_oficio_destinatario_cargo=str(data.get("sol_oficio_destinatario_cargo", "")).strip(),
+        sol_oficio_destinatario_orgao=str(data.get("sol_oficio_destinatario_orgao", "")).strip(),
+        sol_oficio_assunto=str(data.get("sol_oficio_assunto", "")).strip(),
+        sol_oficio_objeto=str(data.get("sol_oficio_objeto", "")).strip(),
+        sol_oficio_justificativa=str(data.get("sol_oficio_justificativa", "")).strip(),
+        sol_oficio_prazo_resposta=str(data.get("sol_oficio_prazo_resposta", "")).strip(),
+        sol_oficio_responsavel_nome=str(data.get("sol_oficio_responsavel_nome", "")).strip(),
+        sol_oficio_responsavel_cargo=str(data.get("sol_oficio_responsavel_cargo", "")).strip(),
+        sol_oficio_responsavel_setor=str(data.get("sol_oficio_responsavel_setor", "")).strip(),
         dfd_setor_requisitante=str(data.get("dfd_setor_requisitante", "")).strip(),
         dfd_numero_processo=str(data.get("dfd_numero_processo", "")).strip(),
         dfd_responsavel_demanda=str(data.get("dfd_responsavel_demanda", "")).strip(),
@@ -553,6 +564,61 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         if override.get("cargo_assinante_termo") is not None
         else llm_slots.cargo_assinante_termo
     )
+    sol_oficio_artigo_inciso = (
+        (override.get("sol_oficio_artigo_inciso") or llm_slots.sol_oficio_artigo_inciso)
+        if override.get("sol_oficio_artigo_inciso") is not None
+        else llm_slots.sol_oficio_artigo_inciso
+    )
+    sol_oficio_destinatario_nome = (
+        (override.get("sol_oficio_destinatario_nome") or llm_slots.sol_oficio_destinatario_nome)
+        if override.get("sol_oficio_destinatario_nome") is not None
+        else llm_slots.sol_oficio_destinatario_nome
+    )
+    sol_oficio_destinatario_cargo = (
+        (override.get("sol_oficio_destinatario_cargo") or llm_slots.sol_oficio_destinatario_cargo)
+        if override.get("sol_oficio_destinatario_cargo") is not None
+        else llm_slots.sol_oficio_destinatario_cargo
+    )
+    sol_oficio_destinatario_orgao = (
+        (override.get("sol_oficio_destinatario_orgao") or llm_slots.sol_oficio_destinatario_orgao)
+        if override.get("sol_oficio_destinatario_orgao") is not None
+        else llm_slots.sol_oficio_destinatario_orgao
+    )
+    sol_oficio_assunto = (
+        (override.get("sol_oficio_assunto") or llm_slots.sol_oficio_assunto)
+        if override.get("sol_oficio_assunto") is not None
+        else llm_slots.sol_oficio_assunto
+    )
+    sol_oficio_objeto = (
+        (override.get("sol_oficio_objeto") or llm_slots.sol_oficio_objeto)
+        if override.get("sol_oficio_objeto") is not None
+        else llm_slots.sol_oficio_objeto
+    )
+    sol_oficio_justificativa = (
+        (override.get("sol_oficio_justificativa") or llm_slots.sol_oficio_justificativa)
+        if override.get("sol_oficio_justificativa") is not None
+        else llm_slots.sol_oficio_justificativa
+    )
+    sol_oficio_prazo_resposta = (
+        (override.get("sol_oficio_prazo_resposta") or llm_slots.sol_oficio_prazo_resposta)
+        if override.get("sol_oficio_prazo_resposta") is not None
+        else llm_slots.sol_oficio_prazo_resposta
+    )
+    sol_oficio_responsavel_nome = (
+        (override.get("sol_oficio_responsavel_nome") or llm_slots.sol_oficio_responsavel_nome)
+        if override.get("sol_oficio_responsavel_nome") is not None
+        else llm_slots.sol_oficio_responsavel_nome
+    )
+    sol_oficio_responsavel_cargo = (
+        (override.get("sol_oficio_responsavel_cargo") or llm_slots.sol_oficio_responsavel_cargo)
+        if override.get("sol_oficio_responsavel_cargo") is not None
+        else llm_slots.sol_oficio_responsavel_cargo
+    )
+    sol_oficio_responsavel_setor = (
+        (override.get("sol_oficio_responsavel_setor") or llm_slots.sol_oficio_responsavel_setor)
+        if override.get("sol_oficio_responsavel_setor") is not None
+        else llm_slots.sol_oficio_responsavel_setor
+    )
     dfd_setor_requisitante = (
         (override.get("dfd_setor_requisitante") or llm_slots.dfd_setor_requisitante)
         if override.get("dfd_setor_requisitante") is not None
@@ -632,6 +698,17 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
                 data_termo=data_termo,
                 nome_assinante_termo=nome_assinante_termo,
                 cargo_assinante_termo=cargo_assinante_termo,
+                sol_oficio_artigo_inciso=sol_oficio_artigo_inciso,
+                sol_oficio_destinatario_nome=sol_oficio_destinatario_nome,
+                sol_oficio_destinatario_cargo=sol_oficio_destinatario_cargo,
+                sol_oficio_destinatario_orgao=sol_oficio_destinatario_orgao,
+                sol_oficio_assunto=sol_oficio_assunto,
+                sol_oficio_objeto=sol_oficio_objeto,
+                sol_oficio_justificativa=sol_oficio_justificativa,
+                sol_oficio_prazo_resposta=sol_oficio_prazo_resposta,
+                sol_oficio_responsavel_nome=sol_oficio_responsavel_nome,
+                sol_oficio_responsavel_cargo=sol_oficio_responsavel_cargo,
+                sol_oficio_responsavel_setor=sol_oficio_responsavel_setor,
                 dfd_setor_requisitante=dfd_setor_requisitante,
                 dfd_numero_processo=dfd_numero_processo,
                 dfd_responsavel_demanda=dfd_responsavel_demanda,
@@ -664,6 +741,17 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         data_termo=data_termo,
         nome_assinante_termo=nome_assinante_termo,
         cargo_assinante_termo=cargo_assinante_termo,
+        sol_oficio_artigo_inciso=sol_oficio_artigo_inciso,
+        sol_oficio_destinatario_nome=sol_oficio_destinatario_nome,
+        sol_oficio_destinatario_cargo=sol_oficio_destinatario_cargo,
+        sol_oficio_destinatario_orgao=sol_oficio_destinatario_orgao,
+        sol_oficio_assunto=sol_oficio_assunto,
+        sol_oficio_objeto=sol_oficio_objeto,
+        sol_oficio_justificativa=sol_oficio_justificativa,
+        sol_oficio_prazo_resposta=sol_oficio_prazo_resposta,
+        sol_oficio_responsavel_nome=sol_oficio_responsavel_nome,
+        sol_oficio_responsavel_cargo=sol_oficio_responsavel_cargo,
+        sol_oficio_responsavel_setor=sol_oficio_responsavel_setor,
         dfd_setor_requisitante=dfd_setor_requisitante,
         dfd_numero_processo=dfd_numero_processo,
         dfd_responsavel_demanda=dfd_responsavel_demanda,

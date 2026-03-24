@@ -428,6 +428,14 @@ def _resolve_tr_dfd_template_paths(context: Optional[Dict[str, Any]]) -> Dict[st
     }
 
 
+def _resolve_oficio_template_path(context: Optional[Dict[str, Any]]) -> Path:
+    slot_package_key = ""
+    if isinstance(context, dict):
+        slot_package_key = str(context.get("slot_package_key") or "").strip()
+    paths = get_package_template_paths(slot_package_key)
+    return ensure_fallback_path(paths["oficio"], "OFICIO_modelo_base.docx")
+
+
 @router.post("/generate-tr-from-model")
 async def endpoint_generate_tr_from_model(body: GenerateTRFromModelRequest):
     """
@@ -546,11 +554,12 @@ async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
     """
     Endpoint de teste: gera TR (modelo fixo) + DFD complementar e devolve ambos em um único ZIP.
 
-    Útil para testes via curl: um único request → ZIP com `termo_referencia.docx` e `dfd.docx`.
+    Útil para testes via curl: um único request → ZIP com `termo_referencia.docx`, `dfd.docx` e `solicitacao_oficio.docx`.
     """
     from .tr_slots_llm import fill_tr_slots_with_llm
     from .tr_template import render_tr_from_slots
     from .dfd_template import render_dfd_from_tr_slots
+    from .oficio_template import render_oficio_from_slots
 
     slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
     skip_ctx = getattr(body, "skip_context_in_prompt", False)
@@ -563,7 +572,7 @@ async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
         )
 
         template_paths = _resolve_tr_dfd_template_paths(body.context)
-        # Gera TR e DFD em caminhos temporários
+        # Gera TR, DFD e Ofício em caminhos temporários
         docx_tr_path = render_tr_from_slots(slots, template_path=template_paths["tr"])
         if not Path(docx_tr_path).exists():
             raise HTTPException(status_code=500, detail="DOCX do TR não foi gerado.")
@@ -571,21 +580,25 @@ async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
         docx_dfd_path = render_dfd_from_tr_slots(slots, template_path=template_paths["dfd"])
         if not Path(docx_dfd_path).exists():
             raise HTTPException(status_code=500, detail="DOCX do DFD não foi gerado.")
+        docx_oficio_path = render_oficio_from_slots(slots, template_path=_resolve_oficio_template_path(body.context))
+        if not Path(docx_oficio_path).exists():
+            raise HTTPException(status_code=500, detail="DOCX da Solicitação/Ofício não foi gerado.")
 
         # Empacota em ZIP temporário
         tmp_dir = tempfile.gettempdir()
-        zip_path = os.path.join(tmp_dir, "tr_dfd_bundle.zip")
+        zip_path = os.path.join(tmp_dir, "tr_dfd_oficio_bundle.zip")
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
             zf.write(docx_tr_path, arcname="termo_referencia.docx")
             zf.write(docx_dfd_path, arcname="dfd.docx")
+            zf.write(docx_oficio_path, arcname="solicitacao_oficio.docx")
 
         if not Path(zip_path).exists():
-            raise HTTPException(status_code=500, detail="ZIP com TR e DFD não foi gerado.")
+            raise HTTPException(status_code=500, detail="ZIP com TR, DFD e Solicitação/Ofício não foi gerado.")
 
         return FileResponse(
             zip_path,
             media_type="application/zip",
-            filename="tr_dfd.zip",
+            filename="tr_dfd_oficio.zip",
         )
     except ValueError as e:
         msg = str(e).strip()

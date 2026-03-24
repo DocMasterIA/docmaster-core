@@ -314,16 +314,21 @@ def render_tr_from_slots(
     # deixando o TR gerado sem esse cabeçalho fixo.
     _clear_headers(doc)
 
-    justificativa_text = slots.justificativa or ""
-    problema_text = slots.problema_administrativo or slots.justificativa or ""
-    beneficio_text = slots.beneficio_esperado or slots.justificativa or ""
+    def _normalize_slot_block(text: str) -> str:
+        t = str(text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+        # Evita "double space"/linhas em branco duplas entre blocos
+        t = re.sub(r"\n{2,}", "\n", t)
+        return t
 
-    # Quando esses três slots aparecem em sequência no template, preserva
-    # um espaçamento visual entre blocos.
+    justificativa_text = _normalize_slot_block(slots.justificativa or "")
+    problema_text = _normalize_slot_block(slots.problema_administrativo or slots.justificativa or "")
+    beneficio_text = _normalize_slot_block(slots.beneficio_esperado or slots.justificativa or "")
+
+    # Entre blocos sequenciais, garante no máximo uma quebra de linha.
     if justificativa_text and (problema_text or beneficio_text):
-        justificativa_text = f"{justificativa_text}\n\n"
+        justificativa_text = f"{justificativa_text}\n"
     if problema_text and beneficio_text:
-        problema_text = f"{problema_text}\n\n"
+        problema_text = f"{problema_text}\n"
 
     mapping = {
         # Placeholders padronizados (preferenciais)

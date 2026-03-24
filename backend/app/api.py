@@ -12,7 +12,7 @@ from django.contrib.auth.decorators import login_required
 import json, tempfile, traceback
 from django.http import JsonResponse, FileResponse, HttpResponse
 from django.core.files.base import ContentFile
-from backend.app.models import Template, TemplateSchema, DocumentInstance, Prefeitura, SubtopicoSecretaria, SlotValueCatalog
+from backend.app.models import Template, TemplateSchema, DocumentInstance, Prefeitura, SubtopicoSecretaria, SlotValueCatalog, SlotFormState
 from backend.app.forms import UserProfileForm, LoginForm
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login as auth_login, logout as auth_logout
@@ -1060,3 +1060,39 @@ def slot_catalog_delete_api(request):
         is_active=True,
     ).update(is_active=False)
     return JsonResponse({"ok": True, "deleted": rows})
+
+
+@api_login_required
+@require_GET
+def slot_form_state_get_api(request):
+    slot_package_key = str(request.GET.get("slot_package_key") or "").strip() or "tr_dfd_generico"
+    obj = SlotFormState.objects.filter(owner=request.user, slot_package_key=slot_package_key).first()
+    return JsonResponse({"ok": True, "slot_package_key": slot_package_key, "data": (obj.data if obj else {})})
+
+
+@api_login_required
+@csrf_exempt
+def slot_form_state_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Use POST"}, status=405)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Corpo JSON inválido"}, status=400)
+
+    slot_package_key = str(payload.get("slot_package_key") or "").strip() or "tr_dfd_generico"
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        return JsonResponse({"ok": False, "error": "data deve ser um objeto JSON"}, status=400)
+
+    # Limite simples defensivo de volume.
+    if len(json.dumps(data, ensure_ascii=False)) > 100_000:
+        return JsonResponse({"ok": False, "error": "data excede tamanho máximo permitido"}, status=400)
+
+    obj, _ = SlotFormState.objects.update_or_create(
+        owner=request.user,
+        slot_package_key=slot_package_key,
+        defaults={"data": data},
+    )
+    return JsonResponse({"ok": True, "id": str(obj.id), "slot_package_key": slot_package_key})

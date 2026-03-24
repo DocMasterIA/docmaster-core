@@ -189,3 +189,28 @@ class SlotValueCatalog(models.Model):
 
     def __str__(self):
         return f"{self.owner_id}:{self.field_key} -> {self.value[:40]}"
+
+
+class SlotFormState(models.Model):
+    """
+    Estado salvo do formulário de slots por usuário e por pacote de página.
+    Mantém campos selecionados/preenchidos após recarregar ou relogar.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="slot_form_states")
+    slot_package_key = models.CharField(_("Pacote de Slots"), max_length=120, default="tr_dfd_generico")
+    data = models.JSONField(_("Dados do Formulário"), default=dict)
+    updated_at = models.DateTimeField(_("Data de Atualização"), auto_now=True)
+    created_at = models.DateTimeField(_("Data de Criação"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Estado do Formulário de Slots")
+        verbose_name_plural = _("Estados do Formulário de Slots")
+        unique_together = ("owner", "slot_package_key")
+        indexes = [
+            models.Index(fields=["owner", "slot_package_key"], name="slotstate_owner_pkg_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.owner_id}:{self.slot_package_key}"

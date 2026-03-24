@@ -465,6 +465,8 @@ const pdfPage = ref(1);
 const pdfTotalPages = ref(0);
 const pdfGotoPage = ref(1);
 const suggestionOpenField = ref('');
+const slotStateSaveDebounce = ref(null);
+const isHydratingSlotState = ref(false);
 
 /** Sugestões para Função/Cargo (o usuário pode digitar outro valor). */
 const CARGO_DATALIST_OPTIONS = [
@@ -767,6 +769,75 @@ async function loadSlotCatalogSuggestions() {
     }
   } catch (_e) {
     // silencioso: usa presets locais se API não estiver disponível
+  }
+}
+
+function collectSlotFormStatePayload() {
+  const data = {};
+  for (const section of selectedFlow.value.sections) {
+    for (const field of section.fields) {
+      if (field.input === 'heading') continue;
+      const raw = slotForm[field.id];
+      if (field.input === 'checkbox') {
+        data[field.id] = !!raw;
+        continue;
+      }
+      data[field.id] = typeof raw === 'string' ? raw : (raw ?? '');
+    }
+  }
+  return data;
+}
+
+async function saveSlotFormState() {
+  if (!showSlotsCard.value || isHydratingSlotState.value) return;
+  try {
+    await fetch(`${API_BASE}/api/slots/form-state/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        slot_package_key: slotPackageKey.value,
+        data: collectSlotFormStatePayload(),
+      }),
+    });
+  } catch (_e) {
+    // silencioso
+  }
+}
+
+async function loadSlotFormState() {
+  if (!showSlotsCard.value) return;
+  isHydratingSlotState.value = true;
+  try {
+    const url = `${API_BASE}/api/slots/form-state?slot_package_key=${encodeURIComponent(slotPackageKey.value)}`;
+    const res = await fetch(url, { credentials: 'include' });
+    if (!res.ok) return;
+    const payload = await res.json().catch(() => ({}));
+    const data = payload?.data || {};
+    if (!data || typeof data !== 'object') return;
+
+    for (const section of selectedFlow.value.sections) {
+      for (const field of section.fields) {
+        if (field.input === 'heading') continue;
+        if (!(field.id in data)) continue;
+        const value = data[field.id];
+        if (field.input === 'checkbox') {
+          slotForm[field.id] = !!value;
+        } else {
+          slotForm[field.id] = value == null ? '' : String(value);
+          if ((field.input === 'text' || field.input === 'email' || field.input === 'datalist') && slotForm[field.id]) {
+            const current = Array.isArray(slotFieldOptions[field.id]) ? slotFieldOptions[field.id] : [];
+            if (!current.includes(slotForm[field.id])) {
+              slotFieldOptions[field.id] = [...current, slotForm[field.id]];
+            }
+          }
+        }
+      }
+    }
+  } catch (_e) {
+    // silencioso
+  } finally {
+    isHydratingSlotState.value = false;
   }
 }
 
@@ -1335,9 +1406,11 @@ onMounted(() => {
   }
   resetSlotFormAndSections();
   loadSlotCatalogSuggestions();
+  loadSlotFormState();
 });
 onUnmounted(() => {
   document.removeEventListener('click', clickOutside);
+  clearTimeout(slotStateSaveDebounce.value);
   if (documentDocxUrl.value) URL.revokeObjectURL(documentDocxUrl.value);
   if (documentPdfUrl.value) URL.revokeObjectURL(documentPdfUrl.value);
   if (documentTrUrl.value) URL.revokeObjectURL(documentTrUrl.value);
@@ -1352,6 +1425,7 @@ watch(
     docTypeMode.value = isEtpLivreRoute.value ? 'auto' : 'tr_modelo';
     resetSlotFormAndSections();
     loadSlotCatalogSuggestions();
+    loadSlotFormState();
   },
 );
 
@@ -1364,6 +1438,18 @@ watch(
   (enabled) => {
     if (enabled) slotForm.tr_data_termo = '';
   },
+);
+
+watch(
+  slotForm,
+  () => {
+    if (!showSlotsCard.value || isHydratingSlotState.value) return;
+    clearTimeout(slotStateSaveDebounce.value);
+    slotStateSaveDebounce.value = setTimeout(() => {
+      saveSlotFormState();
+    }, 500);
+  },
+  { deep: true },
 );
 
 async function loadPdf(url) {

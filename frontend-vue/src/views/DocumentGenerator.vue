@@ -518,6 +518,12 @@ const FLOW_CONFIG = {
         title: '3. Termo de Referência',
         fields: [
           {
+            id: 'tr_objeto_manual',
+            label: 'Objeto do TR (manual, sem geração por IA)',
+            input: 'textarea',
+            fullWidth: true,
+          },
+          {
             id: 'tr_endereco_propostas',
             label: 'Endereço presencial para envio ou entrega de propostas',
             input: 'text',
@@ -850,8 +856,14 @@ function buildTrSlotsOverride() {
   if (nomeAss) o.nome_assinante_termo = nomeAss;
   if (cargoAss) o.cargo_assinante_termo = cargoAss;
 
-  const objeto = (f.objeto || f.objeto_obra || '').trim();
-  if (objeto) o.objeto = objeto;
+  const objetoManualTR = (f.tr_objeto_manual || '').trim();
+  if (route.name === 'DispensaArt75IObrasEngenharia') {
+    // Nesta rota o objeto é sempre manual (sem geração por IA).
+    if (objetoManualTR) o.objeto = objetoManualTR;
+  } else {
+    const objeto = (f.objeto || f.objeto_obra || '').trim();
+    if (objeto) o.objeto = objeto;
+  }
 
   const justificativa = (f.justificativa || f.justificativa_inviabilidade || '').trim();
   if (justificativa) o.justificativa = justificativa;
@@ -996,6 +1008,13 @@ function clearDocxFile() {
 
 async function onSubmit() {
   if (!iaPrompt.value.trim()) return;
+  if (docTypeMode.value === 'tr_modelo' && route.name === 'DispensaArt75IObrasEngenharia') {
+    const manualObject = String(slotForm.tr_objeto_manual || '').trim();
+    if (!manualObject) {
+      generateError.value = 'Preencha o campo "Objeto do TR (manual, sem geração por IA)" para gerar nesta página.';
+      return;
+    }
+  }
   isSubmitting.value = true;
   documentReady.value = false;
   generateError.value = '';

@@ -314,11 +314,22 @@ def render_tr_from_slots(
     # deixando o TR gerado sem esse cabeçalho fixo.
     _clear_headers(doc)
 
+    justificativa_text = slots.justificativa or ""
+    problema_text = slots.problema_administrativo or slots.justificativa or ""
+    beneficio_text = slots.beneficio_esperado or slots.justificativa or ""
+
+    # Quando esses três slots aparecem em sequência no template, preserva
+    # um espaçamento visual entre blocos.
+    if justificativa_text and (problema_text or beneficio_text):
+        justificativa_text = f"{justificativa_text}\n\n"
+    if problema_text and beneficio_text:
+        problema_text = f"{problema_text}\n\n"
+
     mapping = {
         # Placeholders padronizados (preferenciais)
         "(TR_OBJETO)": slots.objeto or "",
         "(TR_DISPENSA_INCISO)": slots.dispensa.inciso or "",
-        "(TR_JUSTIFICATIVA)": slots.justificativa or "",
+        "(TR_JUSTIFICATIVA)": justificativa_text,
         "(TR_FISCAL_NOME)": slots.fiscal.nome or "",
         "(TR_DOTACAO)": slots.dotacao or "",
         "(TR_SECRETARIA_USUARIO)": slots.secretaria_usuario or "",
@@ -331,11 +342,10 @@ def render_tr_from_slots(
         "(TR_DATA_TERMO)": slots.data_termo or "",
         "(TR_NOME_ASSINANTE_TERMO)": slots.nome_assinante_termo or "",
         "(TR_CARGO_ASSINANTE_TERMO)": slots.cargo_assinante_termo or "",
-        "(TR_TABELA_ITENS)": "",
         # Compatibilidade entre variantes de pacotes TR_modelo_base
         "(TR_OBJETO_MANUAL)": slots.objeto or "",
-        "(TR_BENEFICIO_ESPERADO)": slots.beneficio_esperado or slots.justificativa or "",
-        "(TR_PROBLEMA_ADMINISTRATIVO)": slots.problema_administrativo or slots.justificativa or "",
+        "(TR_BENEFICIO_ESPERADO)": beneficio_text,
+        "(TR_PROBLEMA_ADMINISTRATIVO)": problema_text,
         # Compatibilidade com placeholders legados
         "(descrever o objeto solicitado)": slots.objeto or "",
         # No modelo, este placeholder está associado ao texto logo após "inciso".

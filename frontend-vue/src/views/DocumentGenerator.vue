@@ -237,11 +237,11 @@
               <h3 class="doc-gen__var-heading">{{ section.title }}</h3>
               <div class="doc-gen__slot-grid">
                 <template v-for="field in section.fields" :key="field.id">
-                  <h4 v-if="field.input === 'heading'" class="doc-gen__slot-subheading">
+                  <h4 v-if="field.input === 'heading' && shouldRenderField(field)" class="doc-gen__slot-subheading">
                     {{ field.label }}
                   </h4>
                   <div
-                    v-else
+                    v-else-if="shouldRenderField(field)"
                     class="gov-field doc-gen__slot-field"
                     :class="{ 'doc-gen__slot-field--full': field.fullWidth }"
                   >
@@ -655,6 +655,15 @@ const SLOT_PACKAGE_BY_ROUTE = {
   InexigibilidadeArt74IShowArtistico: 'inexigibilidade_74_i_show_artistico',
 };
 
+const SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE = {
+  DispensaArt75IManutencaoVeiculos: 'Art. 75, Inciso I, da Lei nº 14.133/2021',
+  DispensaArt75IObrasEngenharia: 'Art. 75, Inciso I, da Lei nº 14.133/2021',
+  DispensaArt75IICompras: 'Art. 75, Inciso II, da Lei nº 14.133/2021',
+  DispensaArt75IIServicos: 'Art. 75, Inciso II, da Lei nº 14.133/2021',
+  DispensaArt75IIComprasServicosInclusos: 'Art. 75, Inciso II, da Lei nº 14.133/2021',
+  InexigibilidadeArt74IShowArtistico: 'Art. 74, Inciso I, da Lei nº 14.133/2021',
+};
+
 const slotPackageKey = computed(() => {
   if (isEtpLivreRoute.value) return 'etp_livre';
   return SLOT_PACKAGE_BY_ROUTE[route.name] || 'tr_dfd_generico';
@@ -789,6 +798,13 @@ function isSlotFieldDisabled(field) {
   return field.id === 'tr_data_termo' && !!slotForm.tr_data_automatica;
 }
 
+function shouldRenderField(field) {
+  if (!field) return true;
+  // Campo exclusivo da rota de Obras e Serviços de Engenharia.
+  if (field.id === 'tr_objeto_manual') return route.name === 'DispensaArt75IObrasEngenharia';
+  return true;
+}
+
 /** Mapeia campos do fluxo “Dispensa / DFD” para chaves aceitas em `slots_override` no backend. */
 function buildTrSlotsOverride() {
   const f = slotForm;
@@ -870,6 +886,9 @@ function buildTrSlotsOverride() {
 
   const setorResp = (f.setor_responsavel || '').trim();
   if (setorResp && !o.secretaria_usuario) o.secretaria_usuario = setorResp;
+
+  const fundamentoLegal = SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE[route.name];
+  if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;
 
   return Object.keys(o).length ? o : null;
 }

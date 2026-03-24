@@ -33,7 +33,7 @@ TR_SLOTS_SYSTEM_PROMPT = """Você preenche os campos (slots) de um Termo de Refe
 
 REGRAS:
 - Responda APENAS com um JSON válido, sem texto antes ou depois.
-- O JSON deve ter pelo menos estas chaves: objeto, dispensa, itens, justificativa, fiscal, dotacao.
+- O JSON deve ter pelo menos estas chaves: objeto, dispensa, itens, justificativa, problema_administrativo, beneficio_esperado, fiscal, dotacao.
 - Use linguagem técnica, formal e objetiva, adequada a documentos administrativos. NÃO use gírias, comentários informais ou meta-observações (ex.: "simples até demais", "ficou meio esquisito", "feito direto pelo usuário").
 
 - dispensa: objeto com "artigo" e "inciso".
@@ -69,13 +69,15 @@ REGRAS:
   - Se o usuário já tiver informado descrição/unidade/quantidade, preserve essas informações e apenas complemente de forma técnica quando fizer sentido.
 - fiscal: objeto com "nome" (nome completo do fiscal do contrato). Se não houver nome de fiscal claramente informado pelo usuário ou contexto, use "" (não invente nomes).
 - dotacao: sempre deve ser retornado como string vazia \"\". A IA NÃO deve sugerir, inferir ou inventar dotação orçamentária; esse campo será preenchido posteriormente pelo sistema ou por outro fluxo.
-- objeto: campo OBRIGATORIAMENTE redigido como UMA CLÁUSULA FORMAL COMPLETA (nunca lista, nunca palavra solta, nunca cópia do pedido).
-  - REGRA INEGOCIÁVEL: o valor do campo "objeto" DEVE começar com uma das fórmulas: "O objeto do presente Termo de Referência é ", "O presente Termo de Referência tem por objeto " ou "O objeto deste Termo de Referência consiste em ", seguida de frases que DESCREVAM em prosa (não em lista) o que será contratado, para quem e com qual finalidade administrativa. O texto total do objeto deve ter no mínimo 180 caracteres e pelo menos três orações.
-  - PROIBIÇÃO ABSOLUTA – NUNCA faça isto no campo objeto:
+- objeto: redigir como cláusula formal completa (em prosa, sem lista solta, sem palavra isolada).
+  - Preferencialmente iniciar com fórmula formal, como: "O objeto do presente Termo de Referência é ", "O presente Termo de Referência tem por objeto " ou "O objeto deste Termo de Referência consiste em ".
+  - O texto deve descrever o que será contratado, para quem e com qual finalidade administrativa, com extensão adequada ao caso (em geral 2 a 5 frases).
+  - Evite respostas curtas demais; priorize redação objetiva, técnica e suficientemente detalhada.
+  - NÃO faça isto no campo objeto:
     * Copiar ou colar o texto do pedido do usuário (ex.: se o usuário escrever "Aquisição de 10 pneus 1000R20, 10 câmaras...", o objeto NÃO pode ser esse texto repetido; você DEVE reformular em cláusula contínua).
     * Devolver uma única palavra ou duas palavras (ex.: "pneus", "material de construção", "equipamentos", "material de escritório"). Qualquer resposta com menos de 4 palavras ou menos de 40 caracteres no objeto é INVÁLIDA.
     * Devolver uma lista solta (ex.: "10 pneus, 10 câmaras, 50 válvulas"). O objeto deve ser redação em prosa, não enumeração.
-  - OBRIGATÓRIO: a partir do pedido do usuário, INTERPRETE o que foi solicitado e REDIJA uma cláusula de objeto em terceira pessoa, em prosa, com começo formal. Exemplo de formato correto: "O objeto do presente Termo de Referência é a aquisição de pneus, câmaras de ar, válvulas e protetores de câmara, nas quantidades e especificações necessárias ao departamento de Infraestrutura, para atender às necessidades de frota e manutenção veicular da Administração."
+  - A partir do pedido do usuário, interprete o que foi solicitado e redija uma cláusula de objeto em terceira pessoa, em prosa e com linguagem formal.
   - Deve incluir: (a) o que será contratado (bens/serviços), em linguagem de cláusula; (b) a finalidade ou o setor/órgão beneficiado quando informado no pedido.
   - É EXPRESSAMENTE PROIBIDO devolver o objeto como expressão curta ou genérica ("materiais de limpeza", "material de escritório", "serviços de manutenção", "equipamentos" sozinhos). Sempre desenvolva em pelo menos uma frase completa com verbo e finalidade.
   - OBJETO = DESCRIÇÃO PURA EM PROSA. NUNCA use "compreendendo os itens descritos abaixo", "conforme itens abaixo", "especificações a seguir", "conforme tabela", "conforme quantitativo" ou equivalentes.
@@ -86,6 +88,8 @@ REGRAS:
     * quais riscos existem se a contratação não for realizada (ex.: prejuízo à continuidade dos serviços, impacto no atendimento ao público),
     * como a contratação se relaciona com as competências do órgão e com a melhoria da eficiência/regularidade dos serviços.
   - NÃO invente números, valores, prazos ou dados concretos que não estejam no pedido; limite-se a consequências lógicas e genéricas.
+- problema_administrativo: texto técnico (2 a 4 frases) descrevendo o problema atual da Administração que a contratação pretende resolver, com foco em dor operacional/risco de continuidade/impacto no atendimento.
+- beneficio_esperado: texto técnico (2 a 4 frases) descrevendo os resultados esperados da contratação (eficiência, continuidade, qualidade, redução de riscos e melhoria do serviço público).
 - Se o usuário informar itens (descrição, unidade, quantidade), use-os no array itens; senão sugira itens coerentes com o objeto.
 - Cada produto ou serviço diferente mencionado pelo usuário deve virar um item separado no array "itens" (não agrupe vários produtos na mesma "descricao").
 - Use Lei 14.133/2021. Não invente dados que não possam ser inferidos do pedido (ex.: fiscal deixe vazio se não informado; dotação sempre deixe vazia, pois não é responsabilidade da IA preencher).
@@ -143,7 +147,7 @@ def _build_tr_slots_user_prompt(
             "NÃO resuma o objeto em uma frase curta ou genérica; desenvolva em cláusula contínua completa."
         )
     parts.append(
-        "\nPreencha o JSON de slots do Termo de Referência (objeto, dispensa, itens, justificativa, fiscal, dotacao). Saída: apenas o JSON."
+        "\nPreencha o JSON de slots do Termo de Referência (objeto, dispensa, itens, justificativa, problema_administrativo, beneficio_esperado, fiscal, dotacao). Saída: apenas o JSON."
     )
     return "\n".join(parts)
 
@@ -364,7 +368,7 @@ def _expand_objeto_if_too_short(text: str) -> str:
         return t
 
     words = t.split()
-    if len(words) >= 24 and len(t) >= 180:
+    if len(words) >= 16 and len(t) >= 120:
         return t
 
     base = re.sub(r"^[Oo]\s+objeto\s+do\s+presente\s+Termo\s+de\s+Refer[êe]ncia\s+[ée]\s+", "", t).strip()
@@ -374,9 +378,8 @@ def _expand_objeto_if_too_short(text: str) -> str:
 
     return (
         f"O objeto do presente Termo de Referência é a contratação de {base}, "
-        "contemplando as atividades necessárias à adequada execução do objeto, "
-        "com observância dos requisitos técnicos e operacionais pertinentes, "
-        "a fim de atender de forma contínua e eficiente às necessidades da Administração Pública."
+        "com observância dos requisitos técnicos e operacionais aplicáveis, "
+        "de modo a atender às necessidades da Administração Pública com regularidade e eficiência."
     )
 
 
@@ -426,6 +429,8 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
         dispensa=dispensa,
         itens=itens,
         justificativa=str(data.get("justificativa", "")).strip(),
+        problema_administrativo=str(data.get("problema_administrativo", "")).strip(),
+        beneficio_esperado=str(data.get("beneficio_esperado", "")).strip(),
         fiscal=fiscal,
         dotacao="",
         # Campos adicionais do template que não devem ser inferidos pela IA,
@@ -465,6 +470,16 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
 
     objeto = (override.get("objeto") or llm_slots.objeto) if override.get("objeto") is not None else llm_slots.objeto
     justificativa = (override.get("justificativa") or llm_slots.justificativa) if override.get("justificativa") is not None else llm_slots.justificativa
+    problema_administrativo = (
+        (override.get("problema_administrativo") or llm_slots.problema_administrativo)
+        if override.get("problema_administrativo") is not None
+        else llm_slots.problema_administrativo
+    )
+    beneficio_esperado = (
+        (override.get("beneficio_esperado") or llm_slots.beneficio_esperado)
+        if override.get("beneficio_esperado") is not None
+        else llm_slots.beneficio_esperado
+    )
     dotacao = (override.get("dotacao") or llm_slots.dotacao) if override.get("dotacao") is not None else llm_slots.dotacao
 
     disp = override.get("dispensa")
@@ -602,6 +617,8 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
                 dispensa=dispensa,
                 itens=itens,
                 justificativa=justificativa,
+                problema_administrativo=problema_administrativo,
+                beneficio_esperado=beneficio_esperado,
                 fiscal=fiscal,
                 dotacao=dotacao,
                 secretaria_usuario=secretaria_usuario,
@@ -632,6 +649,8 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         dispensa=dispensa,
         itens=itens,
         justificativa=justificativa,
+        problema_administrativo=problema_administrativo,
+        beneficio_esperado=beneficio_esperado,
         fiscal=fiscal,
         dotacao=dotacao,
         secretaria_usuario=secretaria_usuario,
@@ -804,6 +823,13 @@ async def fill_tr_slots_with_llm(
 
     # Reforço final: evita objeto curto/simples mesmo quando não é "trivial"
     llm_slots.objeto = _expand_objeto_if_too_short(_normalize_objeto(llm_slots.objeto))
+
+    # Campos adicionais do TR: se a LLM não retornar textos dedicados,
+    # usa a justificativa como fallback para não deixar placeholder vazio.
+    if not (llm_slots.problema_administrativo or "").strip():
+        llm_slots.problema_administrativo = (llm_slots.justificativa or "").strip()
+    if not (llm_slots.beneficio_esperado or "").strip():
+        llm_slots.beneficio_esperado = (llm_slots.justificativa or "").strip()
 
     # Escolha do inciso do art. 75:
     # - SEMPRE delegada à LLM especializada em _choose_art75_inciso,

@@ -69,6 +69,8 @@ class TRTemplateSlots:
     data_termo: str = ""
     nome_assinante_termo: str = ""
     cargo_assinante_termo: str = ""
+    problema_administrativo: str = ""
+    beneficio_esperado: str = ""
     dfd_setor_requisitante: str = ""
     dfd_numero_processo: str = ""
     dfd_responsavel_demanda: str = ""
@@ -321,8 +323,8 @@ def render_tr_from_slots(
         "(TR_TABELA_ITENS)": "",
         # Compatibilidade entre variantes de pacotes TR_modelo_base
         "(TR_OBJETO_MANUAL)": slots.objeto or "",
-        "(TR_BENEFICIO_ESPERADO)": slots.justificativa or "",
-        "(TR_PROBLEMA_ADMINISTRATIVO)": slots.justificativa or "",
+        "(TR_BENEFICIO_ESPERADO)": slots.beneficio_esperado or slots.justificativa or "",
+        "(TR_PROBLEMA_ADMINISTRATIVO)": slots.problema_administrativo or slots.justificativa or "",
         # Compatibilidade com placeholders legados
         "(descrever o objeto solicitado)": slots.objeto or "",
         # No modelo, este placeholder está associado ao texto logo após "inciso".

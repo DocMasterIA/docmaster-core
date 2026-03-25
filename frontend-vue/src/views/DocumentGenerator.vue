@@ -27,7 +27,7 @@
                   <p class="gov-text-soft">
                     <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
                     <span v-if="docTypeMode === 'tr_modelo'">
-                      Esta página gera <strong>TR / DFD com modelo oficial (slots)</strong>. O modo é inferido automaticamente pela rota selecionada.
+                      Esta página gera <strong>TR, DFD e Solicitação / Ofício com modelo oficial (slots)</strong>. O modo é inferido automaticamente pela rota selecionada.
                     </span>
                     <span v-else>
                       Esta página gera <strong>ETP Livre (IA flexível)</strong>. O modo é inferido automaticamente pela rota selecionada.
@@ -124,12 +124,20 @@
                       <i class="fa-solid fa-file-word" aria-hidden="true"></i> Download DFD (DOCX)
                     </a>
                     <a
+                      v-if="documentOficioUrl"
+                      :href="documentOficioUrl"
+                      :download="documentOficioFilename"
+                      class="gov-btn gov-btn--secondary"
+                    >
+                      <i class="fa-solid fa-file-word" aria-hidden="true"></i> Download Solicitação/Ofício (DOCX)
+                    </a>
+                    <a
                       v-if="documentZipUrl"
                       :href="documentZipUrl"
                       :download="documentZipFilename"
                       class="gov-btn gov-btn--secondary"
                     >
-                      <i class="fa-solid fa-file-archive" aria-hidden="true"></i> Download TR+DFD (ZIP)
+                      <i class="fa-solid fa-file-archive" aria-hidden="true"></i> Download TR+DFD+Ofício (ZIP)
                     </a>
                   </template>
                   <template v-else>
@@ -215,7 +223,7 @@
         </section>
       </div>
 
-      <!-- Coluna direita: dados para slots (somente TR/DFD modelo oficial) -->
+      <!-- Coluna direita: dados para slots (TR / DFD / Solicitação Ofício — modelo oficial) -->
       <aside v-if="showSlotsCard" class="doc-gen__aside">
         <section class="gov-surface doc-gen__variables-card">
           <div class="gov-surface__header">
@@ -237,11 +245,11 @@
               <h3 class="doc-gen__var-heading">{{ section.title }}</h3>
               <div class="doc-gen__slot-grid">
                 <template v-for="field in section.fields" :key="field.id">
-                  <h4 v-if="field.input === 'heading'" class="doc-gen__slot-subheading">
+                  <h4 v-if="field.input === 'heading' && shouldRenderField(field)" class="doc-gen__slot-subheading">
                     {{ field.label }}
                   </h4>
                   <div
-                    v-else
+                    v-else-if="shouldRenderField(field)"
                     class="gov-field doc-gen__slot-field"
                     :class="{ 'doc-gen__slot-field--full': field.fullWidth }"
                   >
@@ -438,10 +446,12 @@ const documentDocxUrl = ref('');
 const documentPdfUrl = ref('');
 const documentTrUrl = ref('');
 const documentDfdUrl = ref('');
+const documentOficioUrl = ref('');
 const documentZipUrl = ref('');
 const documentTrFilename = ref('termo_referencia.docx');
 const documentDfdFilename = ref('dfd.docx');
-const documentZipFilename = ref('tr_dfd.zip');
+const documentOficioFilename = ref('oficio.docx');
+const documentZipFilename = ref('tr_dfd_oficio.zip');
 const successMessage = ref('');
 const generateError = ref('');
 
@@ -455,6 +465,13 @@ const pdfPage = ref(1);
 const pdfTotalPages = ref(0);
 const pdfGotoPage = ref(1);
 const suggestionOpenField = ref('');
+const slotStateSaveDebounce = ref(null);
+const templatePresetSaveDebounce = ref(null);
+const isHydratingSlotState = ref(false);
+const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
+/** Chaves reservadas no preset global (backend) para cabeçalho/rodapé da Biblioteca. */
+const LIBRARY_TEMPLATE_ID_KEY = '__library_template_id__';
+const LIBRARY_TEMPLATE_NAME_KEY = '__library_template_name__';
 
 /** Sugestões para Função/Cargo (o usuário pode digitar outro valor). */
 const CARGO_DATALIST_OPTIONS = [
@@ -517,6 +534,12 @@ const FLOW_CONFIG = {
         key: 'tr',
         title: '3. Termo de Referência',
         fields: [
+          {
+            id: 'tr_objeto_manual',
+            label: 'Objeto do TR (manual, sem geração por IA)',
+            input: 'textarea',
+            fullWidth: true,
+          },
           {
             id: 'tr_endereco_propostas',
             label: 'Endereço presencial para envio ou entrega de propostas',
@@ -649,6 +672,15 @@ const SLOT_PACKAGE_BY_ROUTE = {
   InexigibilidadeArt74IShowArtistico: 'inexigibilidade_74_i_show_artistico',
 };
 
+const SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE = {
+  DispensaArt75IManutencaoVeiculos: 'Art. 75, Inciso I, da Lei nº 14.133/2021',
+  DispensaArt75IObrasEngenharia: 'Art. 75, Inciso I, da Lei nº 14.133/2021',
+  DispensaArt75IICompras: 'Art. 75, Inciso II, da Lei nº 14.133/2021',
+  DispensaArt75IIServicos: 'Art. 75, Inciso II, da Lei nº 14.133/2021',
+  DispensaArt75IIComprasServicosInclusos: 'Art. 75, Inciso II, da Lei nº 14.133/2021',
+  InexigibilidadeArt74IShowArtistico: 'Art. 74, Inciso I, da Lei nº 14.133/2021',
+};
+
 const slotPackageKey = computed(() => {
   if (isEtpLivreRoute.value) return 'etp_livre';
   return SLOT_PACKAGE_BY_ROUTE[route.name] || 'tr_dfd_generico';
@@ -745,6 +777,101 @@ async function loadSlotCatalogSuggestions() {
   }
 }
 
+function collectSlotFormStatePayload() {
+  const data = {};
+  for (const section of selectedFlow.value.sections) {
+    for (const field of section.fields) {
+      if (field.input === 'heading') continue;
+      const raw = slotForm[field.id];
+      if (field.input === 'checkbox') {
+        data[field.id] = !!raw;
+        continue;
+      }
+      data[field.id] = typeof raw === 'string' ? raw : (raw ?? '');
+    }
+  }
+  return data;
+}
+
+/** Preset global: slots do assistente + template da biblioteca (merge no backend). */
+function buildGlobalPresetPayload() {
+  const data = showSlotsCard.value ? collectSlotFormStatePayload() : {};
+  if (selectedTemplate.value?.id) {
+    data[LIBRARY_TEMPLATE_ID_KEY] = String(selectedTemplate.value.id);
+    data[LIBRARY_TEMPLATE_NAME_KEY] = String(selectedTemplate.value.name || '');
+  } else {
+    data[LIBRARY_TEMPLATE_ID_KEY] = '';
+    data[LIBRARY_TEMPLATE_NAME_KEY] = '';
+  }
+  return data;
+}
+
+async function saveSlotFormState() {
+  if (isHydratingSlotState.value) return;
+  try {
+    await fetch(`${API_BASE}/api/slots/form-state/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        slot_package_key: GLOBAL_SLOT_FORM_PRESET_KEY,
+        data: buildGlobalPresetPayload(),
+      }),
+    });
+  } catch (_e) {
+    // silencioso
+  }
+}
+
+async function loadSlotFormState() {
+  isHydratingSlotState.value = true;
+  try {
+    const url = `${API_BASE}/api/slots/form-state?slot_package_key=${encodeURIComponent(GLOBAL_SLOT_FORM_PRESET_KEY)}`;
+    const res = await fetch(url, { credentials: 'include' });
+    if (!res.ok) return;
+    const payload = await res.json().catch(() => ({}));
+    const data = payload?.data || {};
+    if (!data || typeof data !== 'object') return;
+
+    const libId = data[LIBRARY_TEMPLATE_ID_KEY] || data._library_template_id;
+    const libName = data[LIBRARY_TEMPLATE_NAME_KEY] || '';
+    if (libId && String(libId).trim()) {
+      const tid = String(libId).trim();
+      selectedTemplate.value = { id: tid, name: libName, preview_image: null };
+      searchQuery.value = libName || '';
+      await fetchTemplateDetails(tid);
+    } else {
+      selectedTemplate.value = null;
+      searchQuery.value = '';
+    }
+
+    if (!showSlotsCard.value) return;
+
+    for (const section of selectedFlow.value.sections) {
+      for (const field of section.fields) {
+        if (field.input === 'heading') continue;
+        if (!(field.id in data)) continue;
+        const value = data[field.id];
+        if (field.input === 'checkbox') {
+          slotForm[field.id] = !!value;
+        } else {
+          slotForm[field.id] = value == null ? '' : String(value);
+          if ((field.input === 'text' || field.input === 'email' || field.input === 'datalist') && slotForm[field.id]) {
+            const current = Array.isArray(slotFieldOptions[field.id]) ? slotFieldOptions[field.id] : [];
+            if (!current.includes(slotForm[field.id])) {
+              slotFieldOptions[field.id] = [...current, slotForm[field.id]];
+            }
+          }
+        }
+      }
+    }
+  } catch (_e) {
+    // silencioso
+  } finally {
+    isHydratingSlotState.value = false;
+  }
+}
+
 function buildSlotEntriesFromForm() {
   const entries = [];
   for (const section of selectedFlow.value.sections) {
@@ -781,6 +908,13 @@ function resetSlotFormAndSections() {
 function isSlotFieldDisabled(field) {
   if (!field || field.input !== 'date') return false;
   return field.id === 'tr_data_termo' && !!slotForm.tr_data_automatica;
+}
+
+function shouldRenderField(field) {
+  if (!field) return true;
+  // Campo exclusivo da rota de Obras e Serviços de Engenharia.
+  if (field.id === 'tr_objeto_manual') return route.name === 'DispensaArt75IObrasEngenharia';
+  return true;
 }
 
 /** Mapeia campos do fluxo “Dispensa / DFD” para chaves aceitas em `slots_override` no backend. */
@@ -850,14 +984,23 @@ function buildTrSlotsOverride() {
   if (nomeAss) o.nome_assinante_termo = nomeAss;
   if (cargoAss) o.cargo_assinante_termo = cargoAss;
 
-  const objeto = (f.objeto || f.objeto_obra || '').trim();
-  if (objeto) o.objeto = objeto;
+  const objetoManualTR = (f.tr_objeto_manual || '').trim();
+  if (route.name === 'DispensaArt75IObrasEngenharia') {
+    // Nesta rota o objeto é sempre manual (sem geração por IA).
+    if (objetoManualTR) o.objeto = objetoManualTR;
+  } else {
+    const objeto = (f.objeto || f.objeto_obra || '').trim();
+    if (objeto) o.objeto = objeto;
+  }
 
   const justificativa = (f.justificativa || f.justificativa_inviabilidade || '').trim();
   if (justificativa) o.justificativa = justificativa;
 
   const setorResp = (f.setor_responsavel || '').trim();
   if (setorResp && !o.secretaria_usuario) o.secretaria_usuario = setorResp;
+
+  const fundamentoLegal = SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE[route.name];
+  if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;
 
   return Object.keys(o).length ? o : null;
 }
@@ -996,6 +1139,13 @@ function clearDocxFile() {
 
 async function onSubmit() {
   if (!iaPrompt.value.trim()) return;
+  if (docTypeMode.value === 'tr_modelo' && route.name === 'DispensaArt75IObrasEngenharia') {
+    const manualObject = String(slotForm.tr_objeto_manual || '').trim();
+    if (!manualObject) {
+      generateError.value = 'Preencha o campo "Objeto do TR (manual, sem geração por IA)" para gerar nesta página.';
+      return;
+    }
+  }
   isSubmitting.value = true;
   documentReady.value = false;
   generateError.value = '';
@@ -1016,13 +1166,18 @@ async function onSubmit() {
     URL.revokeObjectURL(documentDfdUrl.value);
     documentDfdUrl.value = '';
   }
+  if (documentOficioUrl.value) {
+    URL.revokeObjectURL(documentOficioUrl.value);
+    documentOficioUrl.value = '';
+  }
   if (documentZipUrl.value) {
     URL.revokeObjectURL(documentZipUrl.value);
     documentZipUrl.value = '';
   }
   documentTrFilename.value = 'termo_referencia.docx';
   documentDfdFilename.value = 'dfd.docx';
-  documentZipFilename.value = 'tr_dfd.zip';
+  documentOficioFilename.value = 'oficio.docx';
+  documentZipFilename.value = 'tr_dfd_oficio.zip';
 
   try {
     await submitViaLLM();
@@ -1088,8 +1243,8 @@ async function submitViaLLM() {
       return;
     }
 
-    if (!data.tr?.docx_base64 || !data.dfd?.docx_base64) {
-      generateError.value = data.error || 'TR ou DFD não vieram na resposta. Tente novamente.';
+    if (!data.tr?.docx_base64 || !data.dfd?.docx_base64 || !data.oficio?.docx_base64) {
+      generateError.value = data.error || 'TR, DFD ou Solicitação/Ofício não vieram na resposta. Tente novamente.';
       return;
     }
 
@@ -1113,26 +1268,33 @@ async function submitViaLLM() {
         data.dfd.docx_base64,
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       );
+      const oficioUrl = toBlobUrl(
+        data.oficio.docx_base64,
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      );
       const zipUrl = data.zip?.zip_base64
         ? toBlobUrl(data.zip.zip_base64, 'application/zip')
         : '';
       // Revogar blobs antigos (se houver) antes de atribuir os novos, para todos os três botões ficarem consistentes
       if (documentTrUrl.value) URL.revokeObjectURL(documentTrUrl.value);
       if (documentDfdUrl.value) URL.revokeObjectURL(documentDfdUrl.value);
+      if (documentOficioUrl.value) URL.revokeObjectURL(documentOficioUrl.value);
       if (documentZipUrl.value) URL.revokeObjectURL(documentZipUrl.value);
       documentTrUrl.value = trUrl;
       documentDfdUrl.value = dfdUrl;
+      documentOficioUrl.value = oficioUrl;
       documentZipUrl.value = zipUrl;
       documentTrFilename.value = data.tr?.filename || 'termo_referencia.docx';
       documentDfdFilename.value = data.dfd?.filename || 'dfd.docx';
-      documentZipFilename.value = data.zip?.filename || 'tr_dfd.zip';
+      documentOficioFilename.value = data.oficio?.filename || 'oficio.docx';
+      documentZipFilename.value = data.zip?.filename || 'tr_dfd_oficio.zip';
     } catch (e) {
       generateError.value = `Falha ao processar arquivos: ${e?.message || 'dados inválidos'}. Tente novamente.`;
       return;
     }
 
     documentReady.value = true;
-    successMessage.value = 'Termo de Referência e DFD gerados com sucesso. Baixe os arquivos abaixo.';
+    successMessage.value = 'Termo de Referência, DFD e Solicitação/Ofício gerados com sucesso. Baixe os arquivos abaixo.';
     persistSlotEntries(buildSlotEntriesFromForm());
     return;
   }
@@ -1258,15 +1420,9 @@ async function loadTemplatePreviewPdf(templateId) {
 }
 
 let pdfjsLib = null;
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('click', clickOutside);
   docTypeMode.value = isEtpLivreRoute.value ? 'auto' : 'tr_modelo';
-  const templateId = route.query.template_id;
-  if (templateId) {
-    fetchTemplateDetails(templateId).then(() => {
-      if (selectedTemplate.value) searchQuery.value = selectedTemplate.value.name;
-    });
-  }
   if (window.pdfjsLib) {
     pdfjsLib = window.pdfjsLib;
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
@@ -1275,22 +1431,32 @@ onMounted(() => {
   }
   resetSlotFormAndSections();
   loadSlotCatalogSuggestions();
+  await loadSlotFormState();
+  const qTemplate = route.query.template_id;
+  if (qTemplate) {
+    await fetchTemplateDetails(String(qTemplate));
+    if (selectedTemplate.value) searchQuery.value = selectedTemplate.value.name;
+  }
 });
 onUnmounted(() => {
   document.removeEventListener('click', clickOutside);
+  clearTimeout(slotStateSaveDebounce.value);
+  clearTimeout(templatePresetSaveDebounce.value);
   if (documentDocxUrl.value) URL.revokeObjectURL(documentDocxUrl.value);
   if (documentPdfUrl.value) URL.revokeObjectURL(documentPdfUrl.value);
   if (documentTrUrl.value) URL.revokeObjectURL(documentTrUrl.value);
   if (documentDfdUrl.value) URL.revokeObjectURL(documentDfdUrl.value);
+  if (documentOficioUrl.value) URL.revokeObjectURL(documentOficioUrl.value);
   if (documentZipUrl.value) URL.revokeObjectURL(documentZipUrl.value);
 });
 
 watch(
   () => route.name,
-  () => {
+  async () => {
     docTypeMode.value = isEtpLivreRoute.value ? 'auto' : 'tr_modelo';
     resetSlotFormAndSections();
     loadSlotCatalogSuggestions();
+    await loadSlotFormState();
   },
 );
 
@@ -1302,6 +1468,29 @@ watch(
   () => slotForm.tr_data_automatica,
   (enabled) => {
     if (enabled) slotForm.tr_data_termo = '';
+  },
+);
+
+watch(
+  slotForm,
+  () => {
+    if (!showSlotsCard.value || isHydratingSlotState.value) return;
+    clearTimeout(slotStateSaveDebounce.value);
+    slotStateSaveDebounce.value = setTimeout(() => {
+      saveSlotFormState();
+    }, 500);
+  },
+  { deep: true },
+);
+
+watch(
+  () => selectedTemplate.value?.id,
+  () => {
+    if (isHydratingSlotState.value) return;
+    clearTimeout(templatePresetSaveDebounce.value);
+    templatePresetSaveDebounce.value = setTimeout(() => {
+      saveSlotFormState();
+    }, 400);
   },
 );
 

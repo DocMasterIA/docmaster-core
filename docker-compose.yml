@@ -138,6 +138,8 @@ services:
       # Volume nomeado: o SQLite persiste entre build/up/down (não some ao reconstruir)
       # Para apagar o banco: docker compose down -v (remove volumes)
       - backend_data:/app/backend/data
+      # MEDIA do Django (uploads/templates/docx) precisa persistir entre rebuilds
+      - backend_media:/app/backend/media
     restart: unless-stopped
 
   # Expõe o Django (host:8001) na internet. Authtoken: use volume (arquivo no host) OU env NGROK_AUTHTOKEN.
@@ -161,3 +163,4 @@ volumes:
   chroma_data:
   ollama_data:
   backend_data:   # SQLite do Django (persiste entre build/up)
+  backend_media:  # MEDIA_ROOT do Django (templates/docx, previews, etc.)

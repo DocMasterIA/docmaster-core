@@ -93,9 +93,6 @@ def generate_docx_preview_pdf(template):
             "--outdir", str(tmp_dir),
             str(docx_path)
         ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
-    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
-        return None
-
         generated_pdf = tmp_dir / f"{docx_path.stem}.pdf"
         if not generated_pdf.exists():
             # fallback: procura qualquer .pdf gerado no tmp_dir
@@ -111,9 +108,8 @@ def generate_docx_preview_pdf(template):
             template.preview_pdf.save(fname, ContentFile(f.read()), save=True)
 
         return template.preview_pdf.url
-
-    except subprocess.CalledProcessError:
-        # erro ao converter
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        # LibreOffice ausente / timeout / falha na conversão
         return None
     finally:
         # cleanup temporário (não remove o arquivo salvo no storage)

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 """
 Geração de Termo de Referência a partir do modelo fixo
 `template_packages/tr_base/TR_modelo_base.docx`, preenchendo apenas os slots
@@ -69,6 +71,19 @@ class TRTemplateSlots:
     data_termo: str = ""
     nome_assinante_termo: str = ""
     cargo_assinante_termo: str = ""
+    problema_administrativo: str = ""
+    beneficio_esperado: str = ""
+    sol_oficio_artigo_inciso: str = ""
+    sol_oficio_destinatario_nome: str = ""
+    sol_oficio_destinatario_cargo: str = ""
+    sol_oficio_destinatario_orgao: str = ""
+    sol_oficio_assunto: str = ""
+    sol_oficio_objeto: str = ""
+    sol_oficio_justificativa: str = ""
+    sol_oficio_prazo_resposta: str = ""
+    sol_oficio_responsavel_nome: str = ""
+    sol_oficio_responsavel_cargo: str = ""
+    sol_oficio_responsavel_setor: str = ""
     dfd_setor_requisitante: str = ""
     dfd_numero_processo: str = ""
     dfd_responsavel_demanda: str = ""
@@ -301,11 +316,27 @@ def render_tr_from_slots(
     # deixando o TR gerado sem esse cabeçalho fixo.
     _clear_headers(doc)
 
+    def _normalize_slot_block(text: str) -> str:
+        t = str(text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+        # Evita "double space"/linhas em branco duplas entre blocos
+        t = re.sub(r"\n{2,}", "\n", t)
+        return t
+
+    justificativa_text = _normalize_slot_block(slots.justificativa or "")
+    problema_text = _normalize_slot_block(slots.problema_administrativo or slots.justificativa or "")
+    beneficio_text = _normalize_slot_block(slots.beneficio_esperado or slots.justificativa or "")
+
+    # Entre blocos sequenciais, garante no máximo uma quebra de linha.
+    if justificativa_text and (problema_text or beneficio_text):
+        justificativa_text = f"{justificativa_text}\n"
+    if problema_text and beneficio_text:
+        problema_text = f"{problema_text}\n"
+
     mapping = {
         # Placeholders padronizados (preferenciais)
         "(TR_OBJETO)": slots.objeto or "",
         "(TR_DISPENSA_INCISO)": slots.dispensa.inciso or "",
-        "(TR_JUSTIFICATIVA)": slots.justificativa or "",
+        "(TR_JUSTIFICATIVA)": justificativa_text,
         "(TR_FISCAL_NOME)": slots.fiscal.nome or "",
         "(TR_DOTACAO)": slots.dotacao or "",
         "(TR_SECRETARIA_USUARIO)": slots.secretaria_usuario or "",
@@ -318,11 +349,10 @@ def render_tr_from_slots(
         "(TR_DATA_TERMO)": slots.data_termo or "",
         "(TR_NOME_ASSINANTE_TERMO)": slots.nome_assinante_termo or "",
         "(TR_CARGO_ASSINANTE_TERMO)": slots.cargo_assinante_termo or "",
-        "(TR_TABELA_ITENS)": "",
         # Compatibilidade entre variantes de pacotes TR_modelo_base
         "(TR_OBJETO_MANUAL)": slots.objeto or "",
-        "(TR_BENEFICIO_ESPERADO)": slots.justificativa or "",
-        "(TR_PROBLEMA_ADMINISTRATIVO)": slots.justificativa or "",
+        "(TR_BENEFICIO_ESPERADO)": beneficio_text,
+        "(TR_PROBLEMA_ADMINISTRATIVO)": problema_text,
         # Compatibilidade com placeholders legados
         "(descrever o objeto solicitado)": slots.objeto or "",
         # No modelo, este placeholder está associado ao texto logo após "inciso".

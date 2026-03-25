@@ -124,10 +124,30 @@ já pode ficar padronizado para integração futura.
 
 ### Placeholders sugeridos para o futuro DOCX
 
+Estrutura base recomendada para o template `OFICIO_modelo_base.docx`:
+
+- **Identificação do documento**
+- `(SOL_OFICIO_NUMERO)` -> `sol_oficio_numero`
+- `(SOL_OFICIO_ANO)` -> `sol_oficio_ano`
+- `(SOL_OFICIO_CIDADE)` -> `sol_oficio_cidade`
+- `(SOL_OFICIO_DATA)` -> `sol_oficio_data`
+
+- **Destinatário**
 - `(SOL_OFICIO_DESTINATARIO_NOME)` -> `sol_oficio_destinatario_nome`
 - `(SOL_OFICIO_DESTINATARIO_CARGO)` -> `sol_oficio_destinatario_cargo`
+- `(SOL_OFICIO_DESTINATARIO_ORGAO)` -> `sol_oficio_destinatario_orgao`
+- `(SOL_OFICIO_ARTIGO_INCISO)` -> `sol_oficio_artigo_inciso` (preenchimento automático por rota/pacote)
+
+- **Corpo da solicitação**
+- `(SOL_OFICIO_ASSUNTO)` -> `sol_oficio_assunto`
+- `(SOL_OFICIO_OBJETO)` -> `sol_oficio_objeto`
+- `(SOL_OFICIO_JUSTIFICATIVA)` -> `sol_oficio_justificativa`
+- `(SOL_OFICIO_PRAZO_RESPOSTA)` -> `sol_oficio_prazo_resposta`
+
+- **Assinatura / responsável**
 - `(SOL_OFICIO_RESPONSAVEL_NOME)` -> `sol_oficio_responsavel_nome`
 - `(SOL_OFICIO_RESPONSAVEL_CARGO)` -> `sol_oficio_responsavel_cargo`
+- `(SOL_OFICIO_RESPONSAVEL_SETOR)` -> `sol_oficio_responsavel_setor`
 
 ### Estratégia
 
@@ -159,6 +179,7 @@ Campos principais do card:
 - `solicitacao_destinatario_cargo` -> `sol_oficio_destinatario_cargo`
 - `solicitacao_responsavel_nome` -> `sol_oficio_responsavel_nome`
 - `solicitacao_responsavel_cargo` -> `sol_oficio_responsavel_cargo`
+- automático por rota: `sol_oficio_artigo_inciso` (ex.: `Art. 75, Inciso II, da Lei nº 14.133/2021`)
 
 Obs.: `dfd_numero_processo`, `dfd_assinatura_nome` e `dfd_data` já estão previstos no backend e podem ser adicionados ao card quando desejado.
 

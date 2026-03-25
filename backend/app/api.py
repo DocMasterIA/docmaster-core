@@ -12,7 +12,7 @@ from django.contrib.auth.decorators import login_required
 import json, tempfile, traceback
 from django.http import JsonResponse, FileResponse, HttpResponse
 from django.core.files.base import ContentFile
-from backend.app.models import Template, TemplateSchema, DocumentInstance, Prefeitura, SubtopicoSecretaria, SlotValueCatalog
+from backend.app.models import Template, TemplateSchema, DocumentInstance, Prefeitura, SubtopicoSecretaria, SlotValueCatalog, SlotFormState
 from backend.app.forms import UserProfileForm, LoginForm
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login as auth_login, logout as auth_logout
@@ -70,6 +70,45 @@ def _resolve_slot_package_key(payload: dict, request) -> str:
         if path.startswith(route_path):
             return package_key
     return ""
+
+
+# Preset global do gerador (mesma chave do frontend: global_slots_preset_v1)
+GLOBAL_SLOT_PRESET_KEY = "global_slots_preset_v1"
+LIBRARY_TEMPLATE_ID_KEY = "__library_template_id__"
+LIBRARY_TEMPLATE_NAME_KEY = "__library_template_name__"
+
+
+def _resolve_merge_template_id(request, payload):
+    """
+    `template_id` no JSON tem prioridade. Caso contrário, usa o template da
+    Biblioteca de Documentos salvo no preset global do usuário (cabeçalho/rodapé).
+    """
+    raw = payload.get("template_id")
+    if raw not in (None, ""):
+        tid = str(raw).strip()
+        if Template.objects.filter(id=tid).exists():
+            return tid
+        # ID inválido no payload: tenta preset salvo (ex.: template removido do banco)
+
+    if not getattr(request.user, "is_authenticated", False):
+        return None
+
+    try:
+        obj = SlotFormState.objects.filter(
+            owner=request.user,
+            slot_package_key=GLOBAL_SLOT_PRESET_KEY,
+        ).first()
+        if not obj or not isinstance(obj.data, dict):
+            return None
+        lib = obj.data.get(LIBRARY_TEMPLATE_ID_KEY) or obj.data.get("_library_template_id")
+        if not lib:
+            return None
+        tid = str(lib).strip()
+        if tid and Template.objects.filter(id=tid).exists():
+            return tid
+    except Exception:
+        pass
+    return None
 
 
 # API: upload de Template (DOCX) e solicitação de mapeamento de campos via IA.
@@ -252,7 +291,7 @@ def gerar_via_llm_api(request):
         return JsonResponse({"ok": False, "error": "Corpo JSON inválido"}, status=400)
 
     user_prompt = (payload.get("user_prompt") or "").strip()
-    template_id = payload.get("template_id")
+    template_id = _resolve_merge_template_id(request, payload)
     output = (payload.get("output") or "docx").lower()
     slot_package_key = _resolve_slot_package_key(payload, request)
 
@@ -417,7 +456,7 @@ def gerar_tr_modelo_api(request):
 
     user_prompt = (payload.get("user_prompt") or "").strip()
     slots_override = payload.get("slots_override")  # opcional
-    template_id = payload.get("template_id")
+    template_id = _resolve_merge_template_id(request, payload)
     slot_package_key = _resolve_slot_package_key(payload, request)
 
     if not user_prompt:
@@ -546,7 +585,7 @@ def gerar_tr_e_dfd_api(request):
 
     user_prompt = (payload.get("user_prompt") or "").strip()
     slots_override = payload.get("slots_override")  # opcional
-    template_id = payload.get("template_id")
+    template_id = _resolve_merge_template_id(request, payload)
     slot_package_key = _resolve_slot_package_key(payload, request)
 
     if not user_prompt:
@@ -566,7 +605,8 @@ def gerar_tr_e_dfd_api(request):
     package_slug = _slug(slot_package_key or "tr_dfd_generico")
     tr_filename = f"tr_{package_slug}_{stamp}_docmasteria.docx"
     dfd_filename = f"dfd_{package_slug}_{stamp}_docmasteria.docx"
-    zip_filename = f"tr_dfd_{package_slug}_{stamp}_docmasteria.zip"
+    oficio_filename = f"oficio_{package_slug}_{stamp}_docmasteria.docx"
+    zip_filename = f"tr_dfd_oficio_{package_slug}_{stamp}_docmasteria.zip"
 
     rag_url = getattr(django_settings, "RAG_SERVICE_URL", "http://127.0.0.1:8004").rstrip("/")
     url = f"{rag_url}/api/rag/generate-tr-and-dfd-zip"
@@ -604,6 +644,7 @@ def gerar_tr_e_dfd_api(request):
         with zipfile.ZipFile(io.BytesIO(zip_bytes_raw), "r") as zf:
             tr_bytes = zf.read("termo_referencia.docx")
             dfd_bytes = zf.read("dfd.docx")
+            oficio_bytes = zf.read("solicitacao_oficio.docx")
     except KeyError as e:
         return JsonResponse({"ok": False, "error": f"ZIP sem arquivo esperado: {e}"}, status=502)
     except Exception as e:
@@ -638,6 +679,7 @@ def gerar_tr_e_dfd_api(request):
 
     tr_bytes, tr_template_applied, tr_merge_error = _maybe_merge_with_template(tr_bytes, "termo_referencia.docx")
     dfd_bytes, dfd_template_applied, dfd_merge_error = _maybe_merge_with_template(dfd_bytes, "dfd.docx")
+    oficio_bytes, oficio_template_applied, oficio_merge_error = _maybe_merge_with_template(oficio_bytes, "solicitacao_oficio.docx")
 
     # Opcional: salvar instância principal (TR) em "Meus Documentos"
     if tpl and request.user.is_authenticated:
@@ -660,11 +702,12 @@ def gerar_tr_e_dfd_api(request):
         except Exception:
             pass
 
-    # Monta ZIP TR+DFD em memória
+    # Monta ZIP TR+DFD+Ofício em memória
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr(tr_filename, tr_bytes)
         zf.writestr(dfd_filename, dfd_bytes)
+        zf.writestr(oficio_filename, oficio_bytes)
     zip_bytes = zip_buffer.getvalue()
 
     return JsonResponse(
@@ -681,6 +724,12 @@ def gerar_tr_e_dfd_api(request):
                 "docx_base64": base64.b64encode(dfd_bytes).decode("ascii"),
                 "template_applied": dfd_template_applied,
                 "merge_error": dfd_merge_error or None,
+            },
+            "oficio": {
+                "filename": oficio_filename,
+                "docx_base64": base64.b64encode(oficio_bytes).decode("ascii"),
+                "template_applied": oficio_template_applied,
+                "merge_error": oficio_merge_error or None,
             },
             "zip": {
                 "filename": zip_filename,
@@ -770,8 +819,24 @@ def template_list_api(request):
 def template_preview_pdf_api(request, template_id):
     tpl = get_object_or_404(Template, id=template_id)
     if tpl.preview_pdf and tpl.preview_pdf.name:
-        url = tpl.preview_pdf.url
-        return JsonResponse({"ok": True, "pdf_url": url})
+        # Se o arquivo sumiu do MEDIA (ex.: container recriado sem volume),
+        # regenerar em vez de retornar URL quebrada.
+        try:
+            exists = tpl.preview_pdf.storage.exists(tpl.preview_pdf.name)
+        except Exception:
+            exists = False
+        if exists:
+            url = tpl.preview_pdf.url
+            return JsonResponse({"ok": True, "pdf_url": url})
+        try:
+            tpl.preview_pdf.delete(save=False)
+        except Exception:
+            pass
+        tpl.preview_pdf = None
+        try:
+            tpl.save(update_fields=["preview_pdf"])
+        except Exception:
+            pass
 
     # se não existir, gera (requer LibreOffice no servidor)
     url = generate_docx_preview_pdf(tpl)
@@ -804,15 +869,17 @@ def api_auth_login(request):
         return JsonResponse({"ok": True, "message": "Já autenticado."})
 
     prefeitura = None
+    enforce_prefeitura_match = False
     if prefeitura_url:
         try:
             prefeitura = Prefeitura.objects.get(url=prefeitura_url)
+            enforce_prefeitura_match = True
         except Prefeitura.DoesNotExist:
             return JsonResponse({"ok": False, "error": "Prefeitura inválida."}, status=400)
     else:
-        prefeitura = Prefeitura.objects.first()
-        if not prefeitura:
-            return JsonResponse({"ok": False, "error": "Nenhuma prefeitura configurada."}, status=503)
+        # Login por SPA/API sem contexto explícito de prefeitura:
+        # não deve bloquear usuário válido por fallback arbitrário de tenant.
+        prefeitura = None
 
     ip_key = f"ip:{get_client_ip(request)}"
     if is_locked(ip_key):
@@ -829,7 +896,7 @@ def api_auth_login(request):
         return JsonResponse({"ok": False, "error": "E-mail/usuário ou senha inválidos."}, status=401)
 
     user = form.get_user()
-    if not user.is_staff and not user.is_superuser:
+    if enforce_prefeitura_match and not user.is_staff and not user.is_superuser:
         if user.prefeitura_id != prefeitura.id:
             return JsonResponse({"ok": False, "error": "Usuário não pertence a esta prefeitura."}, status=403)
     user_key = f"user:{user.get_username()}"
@@ -842,7 +909,8 @@ def api_auth_login(request):
         request.session.set_expiry(60 * 60 * 24 * 30)
     else:
         request.session.set_expiry(0)
-    return JsonResponse({"ok": True, "message": "Login realizado com sucesso.", "prefeitura_url": prefeitura.url})
+    resolved_prefeitura_url = prefeitura.url if prefeitura else getattr(getattr(user, "prefeitura", None), "url", "")
+    return JsonResponse({"ok": True, "message": "Login realizado com sucesso.", "prefeitura_url": resolved_prefeitura_url})
 
 
 # API: logout (encerra sessão e retorna OK para o front redirecionar ao login).
@@ -1050,3 +1118,45 @@ def slot_catalog_delete_api(request):
         is_active=True,
     ).update(is_active=False)
     return JsonResponse({"ok": True, "deleted": rows})
+
+
+@api_login_required
+@require_GET
+def slot_form_state_get_api(request):
+    slot_package_key = str(request.GET.get("slot_package_key") or "").strip() or "tr_dfd_generico"
+    obj = SlotFormState.objects.filter(owner=request.user, slot_package_key=slot_package_key).first()
+    return JsonResponse({"ok": True, "slot_package_key": slot_package_key, "data": (obj.data if obj else {})})
+
+
+@api_login_required
+@csrf_exempt
+def slot_form_state_save_api(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Use POST"}, status=405)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Corpo JSON inválido"}, status=400)
+
+    slot_package_key = str(payload.get("slot_package_key") or "").strip() or "tr_dfd_generico"
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        return JsonResponse({"ok": False, "error": "data deve ser um objeto JSON"}, status=400)
+
+    merged = {}
+    existing = SlotFormState.objects.filter(owner=request.user, slot_package_key=slot_package_key).first()
+    if existing and isinstance(existing.data, dict):
+        merged = dict(existing.data)
+    merged.update(data)
+
+    # Limite simples defensivo de volume.
+    if len(json.dumps(merged, ensure_ascii=False)) > 100_000:
+        return JsonResponse({"ok": False, "error": "data excede tamanho máximo permitido"}, status=400)
+
+    obj, _ = SlotFormState.objects.update_or_create(
+        owner=request.user,
+        slot_package_key=slot_package_key,
+        defaults={"data": merged},
+    )
+    return JsonResponse({"ok": True, "id": str(obj.id), "slot_package_key": slot_package_key})

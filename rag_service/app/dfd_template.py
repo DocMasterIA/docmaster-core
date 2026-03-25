@@ -102,6 +102,7 @@ def render_dfd_from_tr_slots(
         raise FileNotFoundError(f"Template DFD não encontrado: {tpl_path}")
 
     doc = Document(str(tpl_path))
+    dfd_data_text = slots.dfd_data or slots.data_termo or ""
 
     mapping = {
         # Placeholders padronizados (preferenciais)
@@ -116,7 +117,7 @@ def render_dfd_from_tr_slots(
         "(DFD_FISCAL_CONTRATOS)": slots.dfd_fiscal_contratos or "",
         "(DFD_CARGO_ASSINATURA)": slots.dfd_assinatura_cargo or "",
         "(DFD_NOME_ASSINATURA)": slots.dfd_assinatura_nome or "",
-        "(DFD_DATA)": slots.dfd_data or "",
+        "(DFD_DATA)": dfd_data_text,
         # Placeholders legados
         "(Descrever objeto do termo de referencia)": slots.objeto or "",
         "(descrever a justificativa usada no termo de referencias)": slots.justificativa or "",
@@ -130,7 +131,7 @@ def render_dfd_from_tr_slots(
         "(FISCAL CONTRATOS)": slots.dfd_fiscal_contratos or "",
         "(CARGO ASSINATURA DFD)": slots.dfd_assinatura_cargo or "",
         "(NOME ASSINATURA DFD)": slots.dfd_assinatura_nome or "",
-        "(DATA DFD)": slots.dfd_data or "",
+        "(DATA DFD)": dfd_data_text,
     }
 
     _replace_placeholders(doc, mapping)

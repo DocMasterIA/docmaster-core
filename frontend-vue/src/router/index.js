@@ -96,6 +96,12 @@ const routes = [
     meta: { title: 'Analisador de Documentos' },
   },
   {
+    path: '/pesquisador-pncp',
+    name: 'PncpResearcher',
+    component: () => import('../views/PncpResearcher.vue'),
+    meta: { title: 'Pesquisador de Dados PNCP' },
+  },
+  {
     path: '/area-do-usuario',
     name: 'AreaDoUsuario',
     component: () => import('../views/AreaDoUsuario.vue'),

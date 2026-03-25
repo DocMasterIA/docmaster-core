@@ -100,6 +100,25 @@ class SmartIngestFolderRequest(BaseModel):
     )
 
 
+class PNCPMarketSearchRequest(BaseModel):
+    """Request do Agente Pesquisador de Dados PNCP (mercado/preços)."""
+    termo_busca: str = Field(..., description="Termo principal do objeto (ex.: pavimentação asfáltica CBUQ).")
+    uf: Optional[str] = Field(None, description="UF para recorte geográfico (ex.: SC).")
+    codigo_municipio_ibge: Optional[str] = Field(None, description="Código IBGE do município (7 dígitos).")
+    data_inicial: Optional[str] = Field(None, description="AAAAMMDD. Se omitido, usa janela padrão.")
+    data_final: Optional[str] = Field(None, description="AAAAMMDD. Se omitido, usa data atual UTC.")
+    codigo_modalidade: int = Field(8, description="Código de modalidade no PNCP (padrão: 8 - dispensa).")
+    limite: int = Field(80, description="Quantidade máxima de contratações para análise.")
+
+    @field_validator("termo_busca")
+    @classmethod
+    def _termo_not_empty(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("termo_busca é obrigatório.")
+        return v
+
+
 class GenerateTRFromModelRequest(BaseModel):
     """Request para gerar TR a partir do modelo fixo, com slots preenchidos pela IA (e opcionalmente pelo usuário)."""
     user_prompt: str = Field(..., description="Pedido livre (ex.: TR para compra de material de escritório)")
@@ -246,6 +265,29 @@ async def endpoint_query(body: QueryRequest) -> QueryResponse:
         )
     except Exception as e:
         return QueryResponse(ok=False, error=str(e))
+
+
+@router.post("/pncp/market-search")
+async def endpoint_pncp_market_search(body: PNCPMarketSearchRequest) -> dict:
+    """
+    Agente Pesquisador PNCP:
+    busca registros de contratações públicas e retorna painel de preços/tendência.
+    """
+    from .pncp_service import search_market_prices
+
+    try:
+        return await search_market_prices(
+            termo_busca=body.termo_busca,
+            uf=body.uf,
+            codigo_municipio_ibge=body.codigo_municipio_ibge,
+            data_inicial=body.data_inicial,
+            data_final=body.data_final,
+            codigo_modalidade=body.codigo_modalidade,
+            limite=body.limite,
+        )
+    except Exception as e:
+        logger.exception("Erro em pncp/market-search: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/generate-document")

@@ -126,6 +126,17 @@
               </li>
               <li class="gov-nav__item">
                 <router-link
+                  to="/pesquisador-pncp"
+                  class="gov-nav__link"
+                  :class="{ 'gov-nav__link--active': $route.name === 'PncpResearcher' }"
+                  active-class="gov-nav__link--active"
+                >
+                  <i class="gov-nav__link-icon fa-solid fa-database" aria-hidden="true"></i>
+                  Pesquisador de Dados PNCP
+                </router-link>
+              </li>
+              <li class="gov-nav__item">
+                <router-link
                   to="/area-do-usuario"
                   class="gov-nav__link"
                   :class="{ 'gov-nav__link--active': $route.name === 'AreaDoUsuario' }"

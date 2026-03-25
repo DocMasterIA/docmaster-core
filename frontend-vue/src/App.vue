@@ -169,7 +169,7 @@ const route = useRoute();
 const user = ref(null);
 const generationMenuOpen = ref(true);
 const groupOpenState = ref({
-  DispensaArt75I: true,
+  DispensaArt75I: false,
   DispensaArt75II: false,
   InexigibilidadeArt74I: false,
   EtpLivreGroup: false,

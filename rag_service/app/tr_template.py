@@ -70,6 +70,9 @@ class ItemSlot:
 @dataclass
 class TRTemplateSlots:
     objeto: str = ""
+    objeto_escopo: str = ""
+    objeto_entregas: str = ""
+    objeto_resultados: str = ""
     dispensa: DispensaSlots = field(default_factory=DispensaSlots)
     itens: List[ItemSlot] = field(default_factory=list)
     justificativa: str = ""
@@ -353,6 +356,9 @@ def render_tr_from_slots(
     mapping = {
         # Placeholders padronizados (preferenciais)
         "(TR_OBJETO)": slots.objeto or "",
+        "(TR_OBJETO_ESCOPO)": slots.objeto_escopo or slots.objeto or "",
+        "(TR_OBJETO_ENTREGAS)": slots.objeto_entregas or slots.objeto or "",
+        "(TR_OBJETO_RESULTADOS_ESPERADOS)": slots.objeto_resultados or slots.objeto or "",
         "(TR_DISPENSA_INCISO)": slots.dispensa.inciso or "",
         "(TR_JUSTIFICATIVA)": justificativa_text,
         "(TR_FISCAL_NOME)": slots.fiscal.nome or "",

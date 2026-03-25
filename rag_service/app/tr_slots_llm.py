@@ -33,7 +33,7 @@ TR_SLOTS_SYSTEM_PROMPT = """Você preenche os campos (slots) de um Termo de Refe
 
 REGRAS:
 - Responda APENAS com um JSON válido, sem texto antes ou depois.
-- O JSON deve ter pelo menos estas chaves: objeto, dispensa, itens, justificativa, problema_administrativo, beneficio_esperado, fiscal, dotacao.
+- O JSON deve ter pelo menos estas chaves: objeto, objeto_escopo, objeto_entregas, objeto_resultados, dispensa, itens, justificativa, problema_administrativo, beneficio_esperado, fiscal, dotacao.
 - Use linguagem técnica, formal e objetiva, adequada a documentos administrativos. NÃO use gírias, comentários informais ou meta-observações (ex.: "simples até demais", "ficou meio esquisito", "feito direto pelo usuário").
 
 - dispensa: objeto com "artigo" e "inciso".
@@ -82,6 +82,9 @@ REGRAS:
   - É EXPRESSAMENTE PROIBIDO devolver o objeto como expressão curta ou genérica ("materiais de limpeza", "material de escritório", "serviços de manutenção", "equipamentos" sozinhos). Sempre desenvolva em pelo menos uma frase completa com verbo e finalidade.
   - OBJETO = DESCRIÇÃO PURA EM PROSA. NUNCA use "compreendendo os itens descritos abaixo", "conforme itens abaixo", "especificações a seguir", "conforme tabela", "conforme quantitativo" ou equivalentes.
   - NÃO use reticências ("...") nem múltiplos pontos no final.
+- objeto_escopo: texto complementar (1 a 2 frases) com delimitação do escopo técnico/operacional do objeto.
+- objeto_entregas: texto complementar (1 a 2 frases) com principais entregas/resultados verificáveis esperados da contratação.
+- objeto_resultados: texto complementar (1 a 2 frases) com impactos/resultados esperados para a Administração e usuários do serviço.
 - justificativa: parágrafo de justificativa técnica/administrativa para a contratação, em linguagem formal. - Deve ser um texto dissertativo-argumentativo extenso, completo e técnico. Não deve ser uma frase curta e simplificada.
   - Deve ser um parágrafo de justificativa técnica/administrativa mais rico (idealmente 3 a 6 frases), em linguagem formal, explicando:
     * por que a contratação é necessária para a Administração,
@@ -147,7 +150,7 @@ def _build_tr_slots_user_prompt(
             "NÃO resuma o objeto em uma frase curta ou genérica; desenvolva em cláusula contínua completa."
         )
     parts.append(
-        "\nPreencha o JSON de slots do Termo de Referência (objeto, dispensa, itens, justificativa, problema_administrativo, beneficio_esperado, fiscal, dotacao). Saída: apenas o JSON."
+        "\nPreencha o JSON de slots do Termo de Referência (objeto, objeto_escopo, objeto_entregas, objeto_resultados, dispensa, itens, justificativa, problema_administrativo, beneficio_esperado, fiscal, dotacao). Saída: apenas o JSON."
     )
     return "\n".join(parts)
 
@@ -368,7 +371,8 @@ def _expand_objeto_if_too_short(text: str) -> str:
         return t
 
     words = t.split()
-    if len(words) >= 16 and len(t) >= 120:
+    paragraph_count = len([p for p in re.split(r"\n\s*\n", t) if p.strip()])
+    if len(words) >= 20 and len(t) >= 150 and paragraph_count >= 2:
         return t
 
     base = re.sub(r"^[Oo]\s+objeto\s+do\s+presente\s+Termo\s+de\s+Refer[êe]ncia\s+[ée]\s+", "", t).strip()
@@ -378,8 +382,11 @@ def _expand_objeto_if_too_short(text: str) -> str:
 
     return (
         f"O objeto do presente Termo de Referência é a contratação de {base}, "
-        "com observância dos requisitos técnicos e operacionais aplicáveis, "
-        "de modo a atender às necessidades da Administração Pública com regularidade e eficiência."
+        "com definição clara do escopo técnico e operacional, em conformidade com os requisitos normativos aplicáveis.\n\n"
+        "A execução deverá contemplar todas as atividades, insumos, rotinas e controles necessários à entrega adequada do objeto, "
+        "incluindo padrões mínimos de desempenho, qualidade e continuidade da prestação.\n\n"
+        "Como resultado esperado, busca-se assegurar maior eficiência administrativa, mitigação de riscos operacionais e melhoria "
+        "do atendimento ao interesse público, com regularidade e efetividade."
     )
 
 
@@ -426,6 +433,9 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
     # Campo dotacao NÃO deve ser preenchido pela IA: sempre vem vazio aqui.
     return TRTemplateSlots(
         objeto=_normalize_objeto(str(data.get("objeto", "")).strip()),
+        objeto_escopo=str(data.get("objeto_escopo", "")).strip(),
+        objeto_entregas=str(data.get("objeto_entregas", "")).strip(),
+        objeto_resultados=str(data.get("objeto_resultados", "")).strip(),
         dispensa=dispensa,
         itens=itens,
         justificativa=str(data.get("justificativa", "")).strip(),
@@ -480,6 +490,21 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         return llm_slots
 
     objeto = (override.get("objeto") or llm_slots.objeto) if override.get("objeto") is not None else llm_slots.objeto
+    objeto_escopo = (
+        (override.get("objeto_escopo") or llm_slots.objeto_escopo)
+        if override.get("objeto_escopo") is not None
+        else llm_slots.objeto_escopo
+    )
+    objeto_entregas = (
+        (override.get("objeto_entregas") or llm_slots.objeto_entregas)
+        if override.get("objeto_entregas") is not None
+        else llm_slots.objeto_entregas
+    )
+    objeto_resultados = (
+        (override.get("objeto_resultados") or llm_slots.objeto_resultados)
+        if override.get("objeto_resultados") is not None
+        else llm_slots.objeto_resultados
+    )
     justificativa = (override.get("justificativa") or llm_slots.justificativa) if override.get("justificativa") is not None else llm_slots.justificativa
     problema_administrativo = (
         (override.get("problema_administrativo") or llm_slots.problema_administrativo)
@@ -680,6 +705,9 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         if itens:
             return TRTemplateSlots(
                 objeto=objeto,
+                objeto_escopo=objeto_escopo,
+                objeto_entregas=objeto_entregas,
+                objeto_resultados=objeto_resultados,
                 dispensa=dispensa,
                 itens=itens,
                 justificativa=justificativa,
@@ -723,6 +751,9 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
 
     return TRTemplateSlots(
         objeto=objeto,
+        objeto_escopo=objeto_escopo,
+        objeto_entregas=objeto_entregas,
+        objeto_resultados=objeto_resultados,
         dispensa=dispensa,
         itens=itens,
         justificativa=justificativa,
@@ -911,6 +942,20 @@ async def fill_tr_slots_with_llm(
 
     # Reforço final: evita objeto curto/simples mesmo quando não é "trivial"
     llm_slots.objeto = _expand_objeto_if_too_short(_normalize_objeto(llm_slots.objeto))
+
+    # Complementos de objeto: se vierem vazios, derivar automaticamente do objeto final.
+    if not (llm_slots.objeto_escopo or "").strip():
+        llm_slots.objeto_escopo = (
+            "O escopo compreende o planejamento, execução, controle e validação técnica das atividades necessárias ao atendimento da demanda administrativa."
+        )
+    if not (llm_slots.objeto_entregas or "").strip():
+        llm_slots.objeto_entregas = (
+            "As entregas deverão observar critérios objetivos de qualidade, conformidade e desempenho, com documentação comprobatória das etapas executadas."
+        )
+    if not (llm_slots.objeto_resultados or "").strip():
+        llm_slots.objeto_resultados = (
+            "Espera-se como resultado a melhoria da eficiência operacional, a continuidade do serviço público e a redução de riscos de desatendimento ao interesse coletivo."
+        )
 
     # Campos adicionais do TR: se a LLM não retornar textos dedicados,
     # usa a justificativa como fallback para não deixar placeholder vazio.

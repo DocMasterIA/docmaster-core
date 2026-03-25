@@ -819,8 +819,24 @@ def template_list_api(request):
 def template_preview_pdf_api(request, template_id):
     tpl = get_object_or_404(Template, id=template_id)
     if tpl.preview_pdf and tpl.preview_pdf.name:
-        url = tpl.preview_pdf.url
-        return JsonResponse({"ok": True, "pdf_url": url})
+        # Se o arquivo sumiu do MEDIA (ex.: container recriado sem volume),
+        # regenerar em vez de retornar URL quebrada.
+        try:
+            exists = tpl.preview_pdf.storage.exists(tpl.preview_pdf.name)
+        except Exception:
+            exists = False
+        if exists:
+            url = tpl.preview_pdf.url
+            return JsonResponse({"ok": True, "pdf_url": url})
+        try:
+            tpl.preview_pdf.delete(save=False)
+        except Exception:
+            pass
+        tpl.preview_pdf = None
+        try:
+            tpl.save(update_fields=["preview_pdf"])
+        except Exception:
+            pass
 
     # se não existir, gera (requer LibreOffice no servidor)
     url = generate_docx_preview_pdf(tpl)

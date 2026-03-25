@@ -853,15 +853,17 @@ def api_auth_login(request):
         return JsonResponse({"ok": True, "message": "Já autenticado."})
 
     prefeitura = None
+    enforce_prefeitura_match = False
     if prefeitura_url:
         try:
             prefeitura = Prefeitura.objects.get(url=prefeitura_url)
+            enforce_prefeitura_match = True
         except Prefeitura.DoesNotExist:
             return JsonResponse({"ok": False, "error": "Prefeitura inválida."}, status=400)
     else:
-        prefeitura = Prefeitura.objects.first()
-        if not prefeitura:
-            return JsonResponse({"ok": False, "error": "Nenhuma prefeitura configurada."}, status=503)
+        # Login por SPA/API sem contexto explícito de prefeitura:
+        # não deve bloquear usuário válido por fallback arbitrário de tenant.
+        prefeitura = None
 
     ip_key = f"ip:{get_client_ip(request)}"
     if is_locked(ip_key):
@@ -878,7 +880,7 @@ def api_auth_login(request):
         return JsonResponse({"ok": False, "error": "E-mail/usuário ou senha inválidos."}, status=401)
 
     user = form.get_user()
-    if not user.is_staff and not user.is_superuser:
+    if enforce_prefeitura_match and not user.is_staff and not user.is_superuser:
         if user.prefeitura_id != prefeitura.id:
             return JsonResponse({"ok": False, "error": "Usuário não pertence a esta prefeitura."}, status=403)
     user_key = f"user:{user.get_username()}"
@@ -891,7 +893,8 @@ def api_auth_login(request):
         request.session.set_expiry(60 * 60 * 24 * 30)
     else:
         request.session.set_expiry(0)
-    return JsonResponse({"ok": True, "message": "Login realizado com sucesso.", "prefeitura_url": prefeitura.url})
+    resolved_prefeitura_url = prefeitura.url if prefeitura else getattr(getattr(user, "prefeitura", None), "url", "")
+    return JsonResponse({"ok": True, "message": "Login realizado com sucesso.", "prefeitura_url": resolved_prefeitura_url})
 
 
 # API: logout (encerra sessão e retorna OK para o front redirecionar ao login).

@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Optional
 
 from docx import Document
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
 from .tr_template import TRTemplateSlots
 
@@ -20,6 +22,21 @@ from .tr_template import TRTemplateSlots
 TEMPLATE_DFD_PATH_DEFAULT = (
     Path(__file__).resolve().parents[2] / "template_packages" / "tr_base" / "DFD_modelo_base.docx"
 )
+SLOT_TEXT_FONT_FAMILY = "Times New Roman"
+
+
+def _apply_times_new_roman(paragraph) -> None:
+    for run in paragraph.runs:
+        run.font.name = SLOT_TEXT_FONT_FAMILY
+        r_pr = run._element.get_or_add_rPr()
+        r_fonts = r_pr.find(qn("w:rFonts"))
+        if r_fonts is None:
+            r_fonts = OxmlElement("w:rFonts")
+            r_pr.append(r_fonts)
+        r_fonts.set(qn("w:ascii"), SLOT_TEXT_FONT_FAMILY)
+        r_fonts.set(qn("w:hAnsi"), SLOT_TEXT_FONT_FAMILY)
+        r_fonts.set(qn("w:cs"), SLOT_TEXT_FONT_FAMILY)
+        r_fonts.set(qn("w:eastAsia"), SLOT_TEXT_FONT_FAMILY)
 
 
 def _replace_placeholders(doc: Document, mapping: dict[str, str]) -> None:
@@ -36,6 +53,7 @@ def _replace_placeholders(doc: Document, mapping: dict[str, str]) -> None:
                 changed = True
         if changed:
             p.text = text
+            _apply_times_new_roman(p)
 
     # Células de tabela
     for table in doc.tables:
@@ -51,6 +69,8 @@ def _replace_placeholders(doc: Document, mapping: dict[str, str]) -> None:
                         changed = True
                 if changed:
                     cell.text = text
+                    for para in cell.paragraphs:
+                        _apply_times_new_roman(para)
 
 
 def render_dfd_from_tr_slots(

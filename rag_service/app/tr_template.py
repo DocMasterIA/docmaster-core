@@ -21,11 +21,26 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
 TR_ITEMS_TABLE_ANCHOR = "(TR_TABELA_ITENS)"
+SLOT_TEXT_FONT_FAMILY = "Times New Roman"
 TR_ITEMS_LEGACY_CELL_PLACEHOLDERS = {
     "(Descrever o item de acordo com o solicitado)",
     "(Inserir unidade de medida ex: caixa, litro, unidade etc)",
     "(Inserir quantidade solicitada)",
 }
+
+
+def _apply_times_new_roman(paragraph) -> None:
+    for run in paragraph.runs:
+        run.font.name = SLOT_TEXT_FONT_FAMILY
+        r_pr = run._element.get_or_add_rPr()
+        r_fonts = r_pr.find(qn("w:rFonts"))
+        if r_fonts is None:
+            r_fonts = OxmlElement("w:rFonts")
+            r_pr.append(r_fonts)
+        r_fonts.set(qn("w:ascii"), SLOT_TEXT_FONT_FAMILY)
+        r_fonts.set(qn("w:hAnsi"), SLOT_TEXT_FONT_FAMILY)
+        r_fonts.set(qn("w:cs"), SLOT_TEXT_FONT_FAMILY)
+        r_fonts.set(qn("w:eastAsia"), SLOT_TEXT_FONT_FAMILY)
 
 
 # Template base legado: template_packages/tr_base/TR_modelo_base.docx (raiz do projeto)
@@ -149,6 +164,7 @@ def _replace_placeholders_in_paragraphs(doc: Document, mapping: Dict[str, str]) 
                 changed = True
         if changed:
             p.text = text
+            _apply_times_new_roman(p)
 
 
 def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
@@ -250,6 +266,8 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
 
     def _set_cell(cell, text: str) -> None:
         cell.text = str(text) if text is not None else ""
+        for para in cell.paragraphs:
+            _apply_times_new_roman(para)
 
     for i, item in enumerate(itens):
         row = target_table.add_row()
@@ -392,6 +410,8 @@ def render_tr_from_slots(
                         changed = True
                 if changed:
                     cell.text = text
+                    for para in cell.paragraphs:
+                        _apply_times_new_roman(para)
 
     _fill_items_table(doc, slots.itens)
 

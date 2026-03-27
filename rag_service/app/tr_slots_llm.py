@@ -86,6 +86,7 @@ REGRAS:
     * Sempre que natural, use "número + (extenso)" para reforçar precisão formal.
     * Em aquisição, prefira fechamento com "conforme quantidades e demais condições estabelecidas neste Termo de Referência".
     * Em contratação (qualquer natureza), prefira fechamento com "conforme requisitos técnicos e demais condições estabelecidas neste Termo de Referência".
+    * Quando houver muitos itens de aquisição (lista extensa), NÃO enumerar item por item no objeto; resumir por macrogrupos e manter o detalhamento no array "itens" (tabela).
     * Não mencionar preço/valor unitário/estimado, salvo se o usuário tiver informado explicitamente.
     * Não remeter a "itens abaixo", "tabela", "anexo" ou equivalentes.
   - Consistência semântica obrigatória:
@@ -156,6 +157,7 @@ PROIBIÇÕES:
 CRITÉRIO DE ACEITAÇÃO:
 - O texto final deve responder, em uma leitura única:
   "o que", "em que extensão mínima", "para qual finalidade administrativa" e "sob quais balizas técnicas".
+- Se houver lista extensa de itens de aquisição, o objeto deve ser sintético por macrogrupos (sem enumeração integral), deixando os itens detalhados para a tabela.
 """
 
 
@@ -371,6 +373,41 @@ def _is_objeto_redacao_fraca(text: str) -> bool:
     low = t.lower()
     has_finalidade = any(k in low for k in ("finalidad", "destinad", "atendimento", "necessidades"))
     return not has_finalidade
+
+
+async def _summarize_objeto_many_aquisicao_items(
+    objeto: str,
+    itens: List[ItemSlot],
+    user_prompt: str,
+) -> str:
+    """
+    Em aquisições com lista extensa, pede à própria IA para resumir o objeto
+    por macrogrupos (sem enumeração item a item), mantendo detalhes na tabela.
+    """
+    t = (objeto or "").strip()
+    if not t or len(itens) < 6:
+        return t
+
+    low_prompt = (user_prompt or "").lower()
+    low_obj = t.lower()
+    is_aquisicao = bool(
+        re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", low_prompt)
+        or re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", low_obj)
+    )
+    if not is_aquisicao:
+        return t
+
+    return await _rewrite_objeto_clause(
+        user_prompt=(
+            f"{user_prompt}\n\n"
+            "Há muitos itens na aquisição. Resuma o OBJETO por macrogrupos (sem listar item por item), "
+            "deixando o detalhamento para a tabela de itens. "
+            "Mantenha linguagem formal, finalidade administrativa e fechamento: "
+            "\"conforme quantidades e demais condições estabelecidas neste Termo de Referência\"."
+        ),
+        draft_objeto=t,
+        itens=itens,
+    )
 
 
 def _numero_extenso_pt_br_ate_9999(n: int, feminino: bool = False) -> str:
@@ -1366,6 +1403,12 @@ async def fill_tr_slots_with_llm(
             draft_objeto=llm_slots.objeto,
             itens=llm_slots.itens,
         )
+    # Em aquisições com muitos itens, resume objeto por macrogrupos.
+    llm_slots.objeto = await _summarize_objeto_many_aquisicao_items(
+        llm_slots.objeto,
+        llm_slots.itens,
+        user_prompt,
+    )
     # Lapidação final para cenários de aquisição com quantidade explícita nos itens.
     llm_slots.objeto = _polish_objeto_with_itens(llm_slots.objeto, llm_slots.itens, user_prompt)
     # Sanidade mínima pós-LLM (sem engessar estilo).

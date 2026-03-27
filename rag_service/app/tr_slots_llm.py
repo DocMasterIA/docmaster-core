@@ -69,35 +69,38 @@ REGRAS:
   - Se o usuário já tiver informado descrição/unidade/quantidade, preserve essas informações e apenas complemente de forma técnica quando fizer sentido.
 - fiscal: objeto com "nome" (nome completo do fiscal do contrato). Se não houver nome de fiscal claramente informado pelo usuário ou contexto, use "" (não invente nomes).
 - dotacao: sempre deve ser retornado como string vazia \"\". A IA NÃO deve sugerir, inferir ou inventar dotação orçamentária; esse campo será preenchido posteriormente pelo sistema ou por outro fluxo.
-- objeto: redigir como cláusula formal completa (em prosa, sem lista solta, sem palavra isolada).
-  - Preferencialmente iniciar com fórmula formal, como: "O objeto do presente Termo de Referência é ", "O presente Termo de Referência tem por objeto " ou "O objeto deste Termo de Referência consiste em ".
-  - O texto deve descrever o que será contratado, para quem e com qual finalidade administrativa, com extensão adequada e objetiva (preferencialmente 1 a 2 frases, em torno de 2 a 3 linhas).
-  - Priorize fluidez textual e precisão técnica, sem verborragia.
-  - Evite simplificação excessiva, mas também evite redação longa e repetitiva.
-  - A redação deve ser ORIGINAL para cada caso concreto; não reutilize molde fixo com mera troca de variáveis.
-  - Use o exemplo de estilo apenas como referência de qualidade textual (clareza, técnica, concisão), e não como template obrigatório.
-  - NÃO faça isto no campo objeto:
-    * Copiar ou colar o texto do pedido do usuário (ex.: se o usuário escrever "Aquisição de 10 pneus 1000R20, 10 câmaras...", o objeto NÃO pode ser esse texto repetido; você DEVE reformular em cláusula contínua).
-    * Devolver uma única palavra ou duas palavras (ex.: "pneus", "material de construção", "equipamentos", "material de escritório"). Qualquer resposta com menos de 4 palavras ou menos de 40 caracteres no objeto é INVÁLIDA.
-    * Devolver uma lista solta (ex.: "10 pneus, 10 câmaras, 50 válvulas"). O objeto deve ser redação em prosa, não enumeração.
-  - A partir do pedido do usuário, interprete o que foi solicitado e redija uma cláusula de objeto em terceira pessoa, em prosa e com linguagem formal.
-  - Deve incluir: (a) o que será contratado (bens/serviços), em linguagem de cláusula; (b) a finalidade ou o setor/órgão beneficiado quando informado no pedido.
-  - Se o pedido trouxer quantitativo/unidade explícitos, incorpore esses dados no objeto com precisão (ex.: "300 unidades de ..."), sem remeter a "itens abaixo" ou "tabela".
-  - Quando houver quantidade numérica explícita e o contexto permitir, prefira o padrão "número + (número por extenso)" para reforçar clareza formal.
-  - CONSISTÊNCIA SEMÂNTICA OBRIGATÓRIA:
-    * "aquisição" = compra de bens/materiais/produtos;
-    * "contratação" = prestação de serviços, locação, manutenção, execução de obra ou solução continuada.
-    * NÃO misture os dois termos de forma incoerente no mesmo objeto (ex.: "aquisição de serviço", "contratação de material" sem justificar modelo híbrido).
-    * Se o caso for híbrido (ex.: fornecimento com instalação), explicite a principal natureza e o complemento, com fluidez e sem contradição.
-  - CONTEXTO ESPECÍFICO:
-    * Evite observações genéricas desconectadas do item (ex.: compliance amplo, menções abstratas sem relação com o objeto concreto).
-    * Cada frase deve estar ligada ao objeto pedido (ex.: se o pedido é seringa, o texto deve tratar de insumo médico correlato, uso e finalidade assistencial, sem deriva para temas não relacionados).
-  - NÃO incluir menções a preço/valor unitário/estimado no objeto, salvo se o usuário tiver fornecido explicitamente esses valores no pedido.
-  - É EXPRESSAMENTE PROIBIDO devolver o objeto como expressão curta ou genérica ("materiais de limpeza", "material de escritório", "serviços de manutenção", "equipamentos" sozinhos). Sempre desenvolva em pelo menos uma frase completa com verbo e finalidade.
-  - OBJETO = DESCRIÇÃO PURA EM PROSA. NUNCA use "compreendendo os itens descritos abaixo", "conforme itens abaixo", "especificações a seguir", "conforme tabela", "conforme quantitativo" ou equivalentes.
-  - Faça autocontrole de estilo na própria geração: evite cliches genéricos, termos vazios e frases de enchimento desconectadas do objeto concreto.
-  - Antes de responder, revise mentalmente o objeto para remover contradições semânticas, repetições e construções artificiais.
-  - NÃO use reticências ("...") nem múltiplos pontos no final.
+- objeto: redigir como cláusula formal completa, declarativa e robusta (prosa contínua, sem lista solta).
+  - Estrutura argumentativa obrigatória do objeto:
+    * Núcleo material: declarar com precisão o que será adquirido/contratado (com substantivo técnico adequado ao item).
+    * Delimitação funcional: explicitar a finalidade pública e o contexto administrativo de uso.
+    * Fechamento normativo: concluir com referência a especificações técnicas, quantitativos e condições do Termo de Referência.
+  - Modelo de qualidade esperado (referência de estilo, não template rígido):
+    * "Aquisição de 300 (trezentas) unidades de pneus aro R16, destinados ao atendimento das necessidades da Administração Pública Municipal, conforme especificações técnicas, quantitativos e condições estabelecidas neste Termo de Referência."
+  - Regras fortes de redação:
+    * Produza texto original para o caso concreto; não faça parafraseamento mecânico do pedido do usuário.
+    * Evite frase curta telegráfica. O objeto deve soar como cláusula administrativa madura.
+    * Use construção declarativa, com encadeamento lógico e fluidez sintática.
+    * Prefira 1 período principal completo; aceite 2 períodos apenas se necessário para clareza técnica.
+  - Regras de conteúdo:
+    * Se houver quantidade e unidade explícitas, incorpore obrigatoriamente no objeto.
+    * Sempre que natural, use "número + (extenso)" para reforçar precisão formal.
+    * Não mencionar preço/valor unitário/estimado, salvo se o usuário tiver informado explicitamente.
+    * Não remeter a "itens abaixo", "tabela", "anexo" ou equivalentes.
+  - Consistência semântica obrigatória:
+    * "aquisição" = compra de bens/produtos/materiais/insumos/equipamentos.
+    * "contratação" = serviços/obras/locação/manutenção/execução continuada.
+    * Não misturar termos de forma incoerente ("contratação de aquisição", "aquisição de serviços").
+    * Em cenário híbrido (fornecimento + instalação), declarar natureza principal e complemento sem contradição.
+  - Proibições explícitas:
+    * Não devolver objeto genérico ("Aquisição de pneus.", "Serviços de manutenção.", "Material de escritório.").
+    * Não usar bordões vazios ("de forma eficiente", "de modo adequado") sem vínculo técnico com o objeto.
+    * Não usar reticências, linguagem coloquial, metacomentários ou autoexplicações.
+  - Checklist obrigatório antes de finalizar o campo objeto:
+    * O texto identifica claramente o item/serviço principal?
+    * O texto explicita finalidade administrativa concreta?
+    * Há coerência plena entre aquisição x contratação?
+    * Há completude técnica mínima (sem ficar curto/telegráfico)?
+    * A redação final parece cláusula de TR assinável por órgão público?
 - objeto_escopo: texto complementar (1 a 2 frases) com delimitação do escopo técnico/operacional do objeto.
 - objeto_entregas: texto complementar (1 a 2 frases) com principais entregas/resultados verificáveis esperados da contratação.
 - objeto_resultados: texto complementar (1 a 2 frases) com impactos/resultados esperados para a Administração e usuários do serviço.
@@ -114,18 +117,41 @@ REGRAS:
 - Use Lei 14.133/2021. Não invente dados que não possam ser inferidos do pedido (ex.: fiscal deixe vazio se não informado; dotação sempre deixe vazia, pois não é responsabilidade da IA preencher).
 """
 
-OBJETO_REWRITE_SYSTEM_PROMPT = """Você é um redator técnico-jurídico especializado em Termo de Referência.
+OBJETO_REWRITE_SYSTEM_PROMPT = """Você é redator público especializado em cláusulas de OBJETO para Termo de Referência (Lei 14.133/2021).
 
-Sua tarefa é reescrever APENAS a cláusula de objeto, com linguagem administrativa formal, fluida e objetiva.
+OBJETIVO:
+Reescrever exclusivamente a cláusula de objeto com padrão técnico-jurídico elevado, redação declarativa robusta, fluidez e precisão.
 
-Regras:
-- Saída: APENAS texto corrido (sem JSON, sem bullets, sem comentários).
-- Escreva 1 período principal bem construído (aceita até 2 períodos curtos se necessário).
-- Preserve a natureza correta: "aquisição" para bens e "contratação" para serviços/obras.
-- Se houver quantidade/unidade explícitas nos dados, incorpore no texto de forma natural.
-- Não use "conforme itens abaixo", "conforme tabela", "etc." ou frases vagas.
-- Não invente preço, prazo, marca, órgão ou dado não informado.
-- Evite redundância e frases infladas; priorize clareza e precisão.
+SAÍDA:
+- Entregar APENAS o texto final do objeto (sem JSON, sem bullets, sem observações).
+
+PADRÃO OBRIGATÓRIO DE COMPOSIÇÃO:
+1) Abertura material: declarar com exatidão o que será adquirido/contratado.
+2) Delimitação funcional: explicitar a finalidade administrativa e o interesse público atendido.
+3) Fechamento técnico: vincular o objeto às especificações técnicas, quantitativos e condições do Termo de Referência.
+
+REGRAS DE QUALIDADE:
+- O texto deve parecer cláusula pronta para documento oficial; não pode soar rascunho.
+- Evitar frase telegráfica. Se necessário, ampliar com informação substantiva e útil.
+- Preferir 1 período principal denso e bem articulado; admitir 2 períodos apenas quando indispensável.
+- Manter coesão, regência e concordância corretas; evitar repetição de palavras e vícios de linguagem.
+
+REGRAS DE CONTEÚDO:
+- Preservar natureza semântica:
+  * aquisição = bens/produtos/materiais/insumos/equipamentos;
+  * contratação = serviços/obras/locação/manutenção.
+- Se houver quantidade/unidade explícitas, incorporar obrigatoriamente.
+- Quando for natural no contexto formal, usar número seguido do extenso entre parênteses.
+- Não inventar preço, prazo, marca, secretaria, localidade ou qualquer dado ausente.
+
+PROIBIÇÕES:
+- Não usar "conforme itens abaixo", "conforme tabela", "etc.", "entre outros", "de forma adequada" sem conteúdo técnico.
+- Não devolver objeto curto genérico (ex.: "Aquisição de pneus r16.").
+- Não usar metacomentário, justificativa do modelo ou explicação do processo.
+
+CRITÉRIO DE ACEITAÇÃO:
+- O texto final deve responder, em uma leitura única:
+  "o que", "em que extensão mínima", "para qual finalidade administrativa" e "sob quais balizas técnicas".
 """
 
 
@@ -329,6 +355,112 @@ async def _rewrite_objeto_clause(
         return draft_objeto
     rewritten = rewritten.strip().strip('"').strip("'")
     return rewritten or draft_objeto
+
+
+def _is_objeto_redacao_fraca(text: str) -> bool:
+    t = (text or "").strip()
+    if not t:
+        return True
+    words = re.findall(r"\w+", t, flags=re.UNICODE)
+    if len(words) < 12:
+        return True
+    low = t.lower()
+    has_finalidade = any(k in low for k in ("finalidad", "destinad", "atendimento", "necessidades"))
+    return not has_finalidade
+
+
+def _numero_extenso_pt_br_ate_9999(n: int, feminino: bool = False) -> str:
+    if n < 0 or n > 9999:
+        return str(n)
+
+    unidades_m = {
+        0: "zero", 1: "um", 2: "dois", 3: "tres", 4: "quatro", 5: "cinco", 6: "seis", 7: "sete", 8: "oito", 9: "nove",
+        10: "dez", 11: "onze", 12: "doze", 13: "treze", 14: "quatorze", 15: "quinze", 16: "dezesseis", 17: "dezessete", 18: "dezoito", 19: "dezenove",
+    }
+    unidades_f = dict(unidades_m)
+    unidades_f[1] = "uma"
+    unidades_f[2] = "duas"
+
+    dezenas = {20: "vinte", 30: "trinta", 40: "quarenta", 50: "cinquenta", 60: "sessenta", 70: "setenta", 80: "oitenta", 90: "noventa"}
+    centenas_m = {100: "cem", 200: "duzentos", 300: "trezentos", 400: "quatrocentos", 500: "quinhentos", 600: "seiscentos", 700: "setecentos", 800: "oitocentos", 900: "novecentos"}
+    centenas_f = {100: "cem", 200: "duzentas", 300: "trezentas", 400: "quatrocentas", 500: "quinhentas", 600: "seiscentas", 700: "setecentas", 800: "oitocentas", 900: "novecentas"}
+
+    u = unidades_f if feminino else unidades_m
+    c_map = centenas_f if feminino else centenas_m
+
+    if n in u:
+        return u[n]
+    if n in dezenas:
+        return dezenas[n]
+    if n in c_map:
+        return c_map[n]
+    if n < 100:
+        d = (n // 10) * 10
+        return f"{dezenas[d]} e {u[n - d]}"
+    if n < 1000:
+        c = (n // 100) * 100
+        c_txt = "cento" if c == 100 else c_map[c]
+        return f"{c_txt} e {_numero_extenso_pt_br_ate_9999(n - c, feminino=feminino)}"
+    milhar = n // 1000
+    resto = n % 1000
+    mil_txt = "mil" if milhar == 1 else f"{_numero_extenso_pt_br_ate_9999(milhar)} mil"
+    if resto == 0:
+        return mil_txt
+    conector = " e " if resto < 100 else " "
+    return f"{mil_txt}{conector}{_numero_extenso_pt_br_ate_9999(resto, feminino=feminino)}"
+
+
+def _extrair_int_positivo(value: Any) -> Optional[int]:
+    if value is None:
+        return None
+    m = re.search(r"\d+", str(value))
+    if not m:
+        return None
+    try:
+        val = int(m.group(0))
+    except Exception:
+        return None
+    return val if val > 0 else None
+
+
+def _polish_objeto_with_itens(objeto: str, itens: List[ItemSlot]) -> str:
+    """
+    Melhora o objeto para padrão técnico quando houver aquisição com itens/quantidade.
+    Não substitui indiscriminadamente: atua como lapidação de qualidade.
+    """
+    t = (objeto or "").strip()
+    if not t or not itens:
+        return t
+
+    first = itens[0]
+    desc = str(getattr(first, "descricao", "") or "").strip()
+    qtd = _extrair_int_positivo(getattr(first, "quantidade", None))
+    unidade = str(getattr(first, "unidade", "") or "").strip().lower()
+    if not desc or not qtd:
+        return t
+
+    is_aquisicao = bool(re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", t))
+    if not is_aquisicao:
+        return t
+
+    feminino = unidade in {"un", "unid", "unidade", "unidades"}
+    extenso = _numero_extenso_pt_br_ate_9999(qtd, feminino=feminino)
+    unidade_txt = "unidades" if not unidade else (unidade if unidade != "un" else "unidades")
+    bloco_qtd = f"{qtd} ({extenso}) {unidade_txt}"
+
+    # Se não houver bloco numérico + extenso, reconstrói o início em padrão formal.
+    if not re.search(r"\b\d{1,6}\s*\([^)]{2,}\)", t):
+        t = (
+            f"Aquisição de {bloco_qtd} de {desc}, destinados ao atendimento das necessidades "
+            "da Administração Pública Municipal, conforme especificações técnicas, quantitativos "
+            "e condições estabelecidas neste Termo de Referência."
+        )
+        return t
+
+    # Se já houver número por extenso, apenas garante fechamento institucional.
+    if not re.search(r"(?i)administra[cç][aã]o p[úu]blica", t):
+        t = t.rstrip(".;:, ") + ", destinados ao atendimento das necessidades da Administração Pública Municipal."
+    return t
 
 def _normalize_objeto(text: str) -> str:
     """
@@ -1160,6 +1292,18 @@ async def fill_tr_slots_with_llm(
         draft_objeto=llm_slots.objeto,
         itens=llm_slots.itens,
     )
+    if _is_objeto_redacao_fraca(llm_slots.objeto):
+        llm_slots.objeto = await _rewrite_objeto_clause(
+            user_prompt=(
+                f"{user_prompt}\n\n"
+                "Reescreva o objeto com redação mais completa e elegante, evitando forma telegráfica. "
+                "Inclua finalidade administrativa explícita e mantenha o texto em 1 período bem construído."
+            ),
+            draft_objeto=llm_slots.objeto,
+            itens=llm_slots.itens,
+        )
+    # Lapidação final para cenários de aquisição com quantidade explícita nos itens.
+    llm_slots.objeto = _polish_objeto_with_itens(llm_slots.objeto, llm_slots.itens)
     # Sanidade mínima pós-LLM (sem engessar estilo).
     llm_slots.objeto = _enforce_objeto_semantic_consistency(_normalize_objeto(llm_slots.objeto))
 

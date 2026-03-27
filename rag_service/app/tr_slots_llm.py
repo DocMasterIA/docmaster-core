@@ -157,7 +157,7 @@ PROIBIÇÕES:
 CRITÉRIO DE ACEITAÇÃO:
 - O texto final deve responder, em uma leitura única:
   "o que", "em que extensão mínima", "para qual finalidade administrativa" e "sob quais balizas técnicas".
-- Se houver lista extensa de itens de aquisição, o objeto deve ser MUITO sintético: no máximo 3 a 5 macrogrupos (ex.: pneus, peças, insumos, acessórios automotivos), sem listar nominalmente cada insumo, deixando o detalhe na tabela. Proibido: "incluindo ... 300 unidades ...", enumeração de modelos (R16, R15) e fechamento que re-lista quantitativos.
+- Se houver lista extensa de itens de aquisição, o núcleo material deve ter no máximo 3 a 5 macrogrupos (ex.: pneus, peças, insumos e acessórios automotivos), sem listar cada insumo nominalmente, deixando o detalhe na tabela. Porém a cláusula NÃO pode ser telegráfica: inclua obrigatoriamente uma oração clara de finalidade administrativa (ex.: atendimento à manutenção da frota, continuidade operacional, suporte ao funcionamento dos veículos da Administração), antes do fechamento normativo. Proibido: "incluindo ... 300 unidades ...", enumeração de modelos e fechamento que re-lista quantitativos.
 """
 
 
@@ -424,12 +424,78 @@ async def _ultra_compress_objeto_macro_groups(
     return await _rewrite_objeto_clause(
         user_prompt=(
             f"{user_prompt}\n\n"
-            "O objeto a seguir ainda traz lista nominal longa após 'Aquisição de'. "
-            "Comprima o núcleo para NO MÁXIMO 3 a 5 MACROGRUPOS (ex.: pneus, peças, insumos e acessórios automotivos). "
-            "Proibido citar itens específicos (válvulas, pastilhas, óleo, filtro, contrapeso, amortecedor etc.). "
-            "Sem algarismos. Inclua finalidade administrativa breve e feche com "
-            "\"conforme quantidades e demais condições estabelecidas neste Termo de Referência\" ou "
-            "\"em quantidade conforme estipulado neste Termo de Referência\".\n\n"
+            "O objeto abaixo ainda traz lista nominal longa após 'Aquisição de'. "
+            "Redija UMA ou DUAS frases completas, com linguagem administrativa madura:\n"
+            "(1) Núcleo: NO MÁXIMO 3 a 5 MACROGRUPOS (ex.: pneus, peças, insumos e acessórios automotivos). "
+            "Não cite itens específicos (válvulas, pastilhas, óleo, filtro, etc.). Sem algarismos.\n"
+            "(2) Finalidade: uma oração clara vinculando ao interesse público (manutenção/suporte da frota, continuidade operacional, "
+            "atendimento às necessidades de manutenção da frota e de suporte operacional — ajuste ao contexto do pedido sem inventar órgão ou quantidade).\n"
+            "(3) Fechamento: \"conforme quantidades e demais condições estabelecidas neste Termo de Referência\" ou equivalente formal.\n"
+            "Não entregue só macrogrupos colados ao fechamento; evite texto de etiqueta.\n\n"
+            f"Texto atual:\n{texto.strip()}"
+        ),
+        draft_objeto=texto,
+        itens=itens,
+        max_items=12,
+    )
+
+
+def _macro_objeto_telegrafico_demais(text: str) -> bool:
+    """Detecta resumo só com macrogrupos + fechamento normativo, sem oração de finalidade administrativa."""
+    t = (text or "").strip()
+    if not t:
+        return False
+    low = t.lower()
+    if not re.search(r"(?i)\baquisi(?:c|ç)[aã]o\s+de\s+", low):
+        return False
+    words = re.findall(r"\w+", t, flags=re.UNICODE)
+    forte_finalidade = any(
+        k in low
+        for k in (
+            "destinad",
+            "finalidade",
+            "necessidades",
+            "atendimento",
+            "manutenção",
+            "manutencao",
+            "frota",
+            "operacional",
+            "viatur",
+            "veículos",
+            "veiculos",
+            "continuidade",
+            "funcionamento",
+        )
+    )
+    conector_finalidade = bool(
+        re.search(
+            r"(?i)\b(destinad[oa]s?|com\s+(?:o\s+)?(?:objetivo|intuito|vistas)|para\s+atender|"
+            r"garantindo\s+a|visando\s+a|assegurando)\b",
+            low,
+        )
+    )
+    if len(words) < 28 and not forte_finalidade:
+        return True
+    if len(words) < 40 and forte_finalidade and not conector_finalidade:
+        return True
+    return False
+
+
+async def _enrich_macro_objeto_add_finalidade(
+    texto: str,
+    itens: List[ItemSlot],
+    user_prompt: str,
+) -> str:
+    """Amplia cláusula quando ficou curta demais após compressão por macrogrupos."""
+    return await _rewrite_objeto_clause(
+        user_prompt=(
+            f"{user_prompt}\n\n"
+            "O objeto abaixo está simples demais (macrogrupos colados ao fechamento normativo). "
+            "Mantenha NO MÁXIMO 3 a 5 macrogrupos após 'Aquisição de', sem listar itens nem números. "
+            "Insira ENTRE o núcleo e o fechamento uma oração de finalidade administrativa bem redigida "
+            "(frota, manutenção veicular, continuidade operacional ou equivalente coerente com o pedido). "
+            "Pode usar 2 frases curtas se fluir melhor. Preserve fechamento com "
+            "\"conforme quantidades e demais condições estabelecidas neste Termo de Referência\".\n\n"
             f"Texto atual:\n{texto.strip()}"
         ),
         draft_objeto=texto,
@@ -475,11 +541,12 @@ async def _summarize_objeto_many_aquisicao_items(
     summarized = await _rewrite_objeto_clause(
         user_prompt=(
             f"{user_prompt}\n\n"
-            "Há muitos itens na aquisição. O OBJETO deve ser MUITO curto no núcleo material: "
-            "no máximo 3 a 5 MACROGRUPOS (ex.: pneus, peças, insumos e acessórios automotivos), "
-            "sem listar cada tipo nominalmente (nada de válvulas, pastilhas, óleo 5W30, etc. no texto). "
-            "Detalhe fica só na tabela de itens. Linguagem formal, finalidade administrativa e fechamento: "
-            "\"conforme quantidades e demais condições estabelecidas neste Termo de Referência\" "
+            "Há muitos itens na aquisição. Redija cláusula com redação madura (não telegráfica):\n"
+            "- Núcleo: no máximo 3 a 5 MACROGRUPOS (ex.: pneus, peças, insumos e acessórios automotivos), "
+            "sem listar cada tipo nominalmente (nada de válvulas, pastilhas, óleo 5W30, etc.). "
+            "Detalhe só na tabela de itens.\n"
+            "- Inclua explicitamente finalidade administrativa (manutenção da frota, continuidade operacional ou suporte às necessidades de manutenção da Administração — conforme o pedido).\n"
+            "- Feche com \"conforme quantidades e demais condições estabelecidas neste Termo de Referência\" "
             "ou \"em quantidade conforme estipulado neste Termo de Referência\"."
         ),
         draft_objeto=t,
@@ -506,6 +573,8 @@ async def _summarize_objeto_many_aquisicao_items(
         )
     if _needs_ultra_macro_objeto_summary(summarized):
         summarized = await _ultra_compress_objeto_macro_groups(summarized, itens, user_prompt)
+    if _macro_objeto_telegrafico_demais(summarized):
+        summarized = await _enrich_macro_objeto_add_finalidade(summarized, itens, user_prompt)
     return summarized
 
 
@@ -531,7 +600,8 @@ async def _strip_enumeration_from_summarized_objeto_if_needed(
             f"Corrija o objeto abaixo: ainda há listagem detalhada ou quantidades/modelos ou 'incluindo ...'. "
             f"Detalhe só na tabela.\n{t}\n\n"
             "Use NO MÁXIMO 3 a 5 macrogrupos após 'Aquisição de' (ex.: pneus, peças, insumos e acessórios automotivos). "
-            "Sem dígitos, sem finalidade prolixa. Feche com \"conforme quantidades e demais condições estabelecidas neste Termo de Referência\" "
+            "Sem dígitos. Inclua uma oração de finalidade administrativa (não basta colar macrogrupos ao fechamento). "
+            "Feche com \"conforme quantidades e demais condições estabelecidas neste Termo de Referência\" "
             "ou \"em quantidade conforme estipulado neste Termo de Referência\"."
         ),
         draft_objeto=t,
@@ -1567,6 +1637,17 @@ async def fill_tr_slots_with_llm(
         and _needs_ultra_macro_objeto_summary(llm_slots.objeto)
     ):
         llm_slots.objeto = await _ultra_compress_objeto_macro_groups(
+            llm_slots.objeto, llm_slots.itens, user_prompt
+        )
+    if (
+        len(llm_slots.itens) >= 6
+        and (
+            re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", (user_prompt or "").lower())
+            or re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", (llm_slots.objeto or "").lower())
+        )
+        and _macro_objeto_telegrafico_demais(llm_slots.objeto)
+    ):
+        llm_slots.objeto = await _enrich_macro_objeto_add_finalidade(
             llm_slots.objeto, llm_slots.itens, user_prompt
         )
     # Sanidade mínima pós-LLM (sem engessar estilo).

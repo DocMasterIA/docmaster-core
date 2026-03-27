@@ -325,10 +325,11 @@ async def _rewrite_objeto_clause(
     user_prompt: str,
     draft_objeto: str,
     itens: List[ItemSlot],
+    max_items: int = 5,
 ) -> str:
     """Reescreve a cláusula de objeto em chamada dedicada, curta e focada."""
     itens_lines: List[str] = []
-    for it in itens[:5]:
+    for it in itens[: max(1, max_items)]:
         desc = (getattr(it, "descricao", "") or "").strip()
         un = (getattr(it, "unidade", "") or "").strip()
         qtd = getattr(it, "quantidade", None)
@@ -361,6 +362,22 @@ async def _rewrite_objeto_clause(
         return draft_objeto
     rewritten = rewritten.strip().strip('"').strip("'")
     return rewritten or draft_objeto
+
+
+def _looks_like_item_by_item_enumeration(text: str) -> bool:
+    t = (text or "").strip().lower()
+    if not t:
+        return False
+    enum_markers = 0
+    if len(re.findall(r"\b\d{1,6}\b", t)) >= 3:
+        enum_markers += 1
+    if len(re.findall(r"\bmodelo\s*[a-z0-9.-]*", t)) >= 2:
+        enum_markers += 1
+    if len(re.findall(r"\br\d{1,2}(?:[.,]\d)?\b", t)) >= 2:
+        enum_markers += 1
+    if t.count(",") >= 4:
+        enum_markers += 1
+    return enum_markers >= 2
 
 
 def _is_objeto_redacao_fraca(text: str) -> bool:
@@ -397,7 +414,7 @@ async def _summarize_objeto_many_aquisicao_items(
     if not is_aquisicao:
         return t
 
-    return await _rewrite_objeto_clause(
+    summarized = await _rewrite_objeto_clause(
         user_prompt=(
             f"{user_prompt}\n\n"
             "Há muitos itens na aquisição. Resuma o OBJETO por macrogrupos (sem listar item por item), "
@@ -407,7 +424,24 @@ async def _summarize_objeto_many_aquisicao_items(
         ),
         draft_objeto=t,
         itens=itens,
+        max_items=12,
     )
+
+    if _looks_like_item_by_item_enumeration(summarized):
+        summarized = await _rewrite_objeto_clause(
+            user_prompt=(
+                f"{user_prompt}\n\n"
+                f"O texto abaixo ainda está enumerando itens e modelos, o que é proibido para o campo objeto:\n"
+                f"{summarized}\n\n"
+                "Reescreva em alto nível por categorias/macrogrupos, sem citar item por item, "
+                "sem listar modelos ou quantidades específicas, mantendo finalidade administrativa e "
+                "fechamento \"conforme quantidades e demais condições estabelecidas neste Termo de Referência\"."
+            ),
+            draft_objeto=summarized,
+            itens=itens,
+            max_items=12,
+        )
+    return summarized
 
 
 def _numero_extenso_pt_br_ate_9999(n: int, feminino: bool = False) -> str:

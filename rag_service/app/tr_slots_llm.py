@@ -86,7 +86,7 @@ REGRAS:
     * Sempre que natural, use "número + (extenso)" para reforçar precisão formal.
     * Em aquisição, prefira fechamento com "conforme quantidades e demais condições estabelecidas neste Termo de Referência".
     * Em contratação (qualquer natureza), prefira fechamento com "conforme requisitos técnicos e demais condições estabelecidas neste Termo de Referência".
-    * Quando houver muitos itens de aquisição (lista extensa), NÃO enumerar item por item no objeto; resumir por macrogrupos e manter o detalhamento no array "itens" (tabela).
+    * Quando houver muitos itens de aquisição (lista extensa), NÃO enumerar item por item no objeto; resumir por macrogrupos e manter o detalhamento no array "itens" (tabela). NÃO use "incluindo" seguido de quantidades/modelos; NÃO recoloque algarismos ou medidas (kg, litros, unidades) no objeto — isso fica na tabela.
     * Não mencionar preço/valor unitário/estimado, salvo se o usuário tiver informado explicitamente.
     * Não remeter a "itens abaixo", "tabela", "anexo" ou equivalentes.
   - Consistência semântica obrigatória:
@@ -143,9 +143,9 @@ REGRAS DE CONTEÚDO:
 - Preservar natureza semântica:
   * aquisição = bens/produtos/materiais/insumos/equipamentos;
   * contratação = serviços/obras/locação/manutenção.
-- Se houver quantidade/unidade explícitas, incorporar obrigatoriamente.
-- Se o usuário informar números em algarismo, preserve os algarismos no texto final (podendo complementar com extenso entre parênteses).
-- Quando for natural no contexto formal, usar número seguido do extenso entre parênteses.
+- Se houver quantidade/unidade explícitas, incorporar obrigatoriamente quando o objeto for unitário ou a lista de itens for curta.
+- Se o usuário informar números em algarismo, preserve os algarismos no texto final (podendo complementar com extenso entre parênteses), EXCETO quando a mensagem do usuário pedir resumo por macrogrupos ou houver lista extensa de aquisição: aí não inclua algarismos, modelos nem medidas no objeto.
+- Quando for natural no contexto formal (e não for lista extensa resumida), usar número seguido do extenso entre parênteses.
 - Não inventar preço, prazo, marca, secretaria, localidade ou qualquer dado ausente.
 
 PROIBIÇÕES:
@@ -157,7 +157,7 @@ PROIBIÇÕES:
 CRITÉRIO DE ACEITAÇÃO:
 - O texto final deve responder, em uma leitura única:
   "o que", "em que extensão mínima", "para qual finalidade administrativa" e "sob quais balizas técnicas".
-- Se houver lista extensa de itens de aquisição, o objeto deve ser sintético por macrogrupos (sem enumeração integral), deixando os itens detalhados para a tabela.
+- Se houver lista extensa de itens de aquisição, o objeto deve ser sintético por macrogrupos (sem enumeração integral), deixando os itens detalhados para a tabela. Proibido: "incluindo ... 300 unidades ...", enumeração de modelos (R16, R15) e fechamento que re-lista quantitativos.
 """
 
 
@@ -365,17 +365,33 @@ async def _rewrite_objeto_clause(
 
 
 def _looks_like_item_by_item_enumeration(text: str) -> bool:
+    """Detecta objeto que ainda enumera quantidades/modelos (detalhe que deve ir só na tabela)."""
     t = (text or "").strip().lower()
     if not t:
         return False
+    # "incluindo 300 unidades..." ou similar
+    if re.search(r"\bincluindo\b", t) and re.search(r"\b\d{2,6}\b", t):
+        return True
+    # Várias ocorrências de quantidade + unidade de medida
+    qty_unit_hits = len(
+        re.findall(
+            r"\b\d{1,6}\s*(?:unidades?|kg|litros?|m[lL]\b|gal[õo]es?|cx|caixas?)\b",
+            t,
+        )
+    )
+    if qty_unit_hits >= 2:
+        return True
+    # Muitos algarismos isolados = lista de quantitativos no texto
+    if len(re.findall(r"\b\d{2,6}\b", t)) >= 4:
+        return True
     enum_markers = 0
     if len(re.findall(r"\b\d{1,6}\b", t)) >= 3:
         enum_markers += 1
-    if len(re.findall(r"\bmodelo\s*[a-z0-9.-]*", t)) >= 2:
+    if len(re.findall(r"\bmodelo\s*[a-z0-9.-]+", t)) >= 2:
         enum_markers += 1
-    if len(re.findall(r"\br\d{1,2}(?:[.,]\d)?\b", t)) >= 2:
+    if len(re.findall(r"(?:^|[^\w])(?:aro\s*)?r\d{1,2}(?:[.,]\d)?\b", t)) >= 2:
         enum_markers += 1
-    if t.count(",") >= 4:
+    if t.count(",") >= 4 and re.search(r"\b\d{2,6}\b", t):
         enum_markers += 1
     return enum_markers >= 2
 
@@ -427,21 +443,55 @@ async def _summarize_objeto_many_aquisicao_items(
         max_items=12,
     )
 
-    if _looks_like_item_by_item_enumeration(summarized):
+    for _ in range(2):
+        if not _looks_like_item_by_item_enumeration(summarized):
+            break
         summarized = await _rewrite_objeto_clause(
             user_prompt=(
                 f"{user_prompt}\n\n"
-                f"O texto abaixo ainda está enumerando itens e modelos, o que é proibido para o campo objeto:\n"
+                f"O texto abaixo ainda traz quantidades, modelos ou lista \"incluindo ...\", proibido no objeto:\n"
                 f"{summarized}\n\n"
-                "Reescreva em alto nível por categorias/macrogrupos, sem citar item por item, "
-                "sem listar modelos ou quantidades específicas, mantendo finalidade administrativa e "
-                "fechamento \"conforme quantidades e demais condições estabelecidas neste Termo de Referência\"."
+                "Reescreva SOMENTE com nomes genéricos de categorias (ex.: pneus, válvulas, peças de freio, "
+                "lubrificantes), sem algarismos, sem 'incluindo', sem unidades (kg, litros, unidades). "
+                "Use fechamento: \"conforme quantidades e demais condições estabelecidas neste Termo de Referência\" "
+                "ou \"em quantidade conforme estipulado neste Termo de Referência\"."
             ),
             draft_objeto=summarized,
             itens=itens,
             max_items=12,
         )
     return summarized
+
+
+async def _strip_enumeration_from_summarized_objeto_if_needed(
+    objeto: str,
+    itens: List[ItemSlot],
+    user_prompt: str,
+) -> str:
+    """Após outras etapas, garante que listas longas de aquisição não voltem com quantidades no texto."""
+    t = (objeto or "").strip()
+    if not t or len(itens) < 6:
+        return t
+    low_p = (user_prompt or "").lower()
+    if not (
+        re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", low_p) or re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", t.lower())
+    ):
+        return t
+    if not _looks_like_item_by_item_enumeration(t):
+        return t
+    return await _rewrite_objeto_clause(
+        user_prompt=(
+            f"{user_prompt}\n\n"
+            f"Corrija o objeto abaixo: ele ainda lista quantidades, modelos ou usa 'incluindo ...'. "
+            f"Isso é proibido — o detalhamento está na tabela de itens.\n{t}\n\n"
+            "Reescreva só com categorias (tipos de bem/material) e finalidade administrativa, sem dígitos, "
+            "fechando com \"conforme quantidades e demais condições estabelecidas neste Termo de Referência\" "
+            "ou \"em quantidade conforme estipulado neste Termo de Referência\"."
+        ),
+        draft_objeto=t,
+        itens=itens,
+        max_items=12,
+    )
 
 
 def _numero_extenso_pt_br_ate_9999(n: int, feminino: bool = False) -> str:
@@ -507,6 +557,20 @@ def _polish_objeto_with_itens(objeto: str, itens: List[ItemSlot], user_prompt: s
     if not t or not itens:
         return t
 
+    low_prompt = (user_prompt or "").lower()
+    is_aquisicao_early = bool(
+        re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", t) or re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", low_prompt)
+    )
+    # Listas longas: objeto deve permanecer resumido; não recompor com quantidades item a item.
+    if is_aquisicao_early and len(itens) >= 6:
+        finalidade = r"destinad[oa]s?\s+ao\s+atendimento\s+das\s+necessidades\s+da\s+administra[cç][aã]o\s+p[úu]blica\s+municipal"
+        t = re.sub(
+            rf"(?i)\b({finalidade})\b\s*[.,;:]+\s*,?\s*\b\1\b",
+            r"\1",
+            t,
+        )
+        return re.sub(r"\s{2,}", " ", t).strip()
+
     first = itens[0]
     desc = str(getattr(first, "descricao", "") or "").strip()
     qtd = _extrair_int_positivo(getattr(first, "quantidade", None))
@@ -514,7 +578,6 @@ def _polish_objeto_with_itens(objeto: str, itens: List[ItemSlot], user_prompt: s
     if not desc or not qtd:
         return t
 
-    low_prompt = (user_prompt or "").lower()
     low_obj = t.lower()
 
     # Nunca força polimento de aquisição para pedidos de contratação/serviço.
@@ -534,7 +597,7 @@ def _polish_objeto_with_itens(objeto: str, itens: List[ItemSlot], user_prompt: s
     # recompõe aquisição com base nos itens para preservar fidelidade numérica.
     prompt_has_digits = bool(re.search(r"\b\d{1,6}\b", low_prompt))
     text_has_digits = bool(re.search(r"\b\d{1,6}\b", t))
-    if prompt_has_digits and not text_has_digits and len(itens) >= 1:
+    if prompt_has_digits and not text_has_digits and len(itens) >= 1 and len(itens) < 6:
         parts: List[str] = []
         for it in itens[:6]:
             qtd_i = _extrair_int_positivo(getattr(it, "quantidade", None))
@@ -1445,6 +1508,9 @@ async def fill_tr_slots_with_llm(
     )
     # Lapidação final para cenários de aquisição com quantidade explícita nos itens.
     llm_slots.objeto = _polish_objeto_with_itens(llm_slots.objeto, llm_slots.itens, user_prompt)
+    llm_slots.objeto = await _strip_enumeration_from_summarized_objeto_if_needed(
+        llm_slots.objeto, llm_slots.itens, user_prompt
+    )
     # Sanidade mínima pós-LLM (sem engessar estilo).
     llm_slots.objeto = _enforce_objeto_semantic_consistency(_normalize_objeto(llm_slots.objeto))
 

@@ -84,6 +84,8 @@ REGRAS:
   - Regras de conteúdo:
     * Se houver quantidade e unidade explícitas, incorpore obrigatoriamente no objeto.
     * Sempre que natural, use "número + (extenso)" para reforçar precisão formal.
+    * Em aquisição, prefira fechamento com "conforme quantidades e demais condições estabelecidas neste Termo de Referência".
+    * Em contratação (qualquer natureza), prefira fechamento com "conforme requisitos técnicos e demais condições estabelecidas neste Termo de Referência".
     * Não mencionar preço/valor unitário/estimado, salvo se o usuário tiver informado explicitamente.
     * Não remeter a "itens abaixo", "tabela", "anexo" ou equivalentes.
   - Consistência semântica obrigatória:
@@ -685,6 +687,26 @@ def _enforce_objeto_semantic_consistency(text: str) -> str:
             t = re.sub(r"(?i)\baquisi(?:ç|c)[aã]o\s+de\s+", "contratação de ", t)
         elif has_goods_nature and not has_service_nature:
             t = re.sub(r"(?i)\bcontrata(?:ç|c)[aã]o\s+de\s+", "aquisição de ", t)
+
+    # Fechamento por natureza (aquisição x contratação).
+    is_aquisicao = bool(re.search(r"(?i)\b(aquisi(?:ç|c)[aã]o|fornecimento)\b", t)) and not has_service_nature
+    if is_aquisicao:
+        t = re.sub(
+            r"(?i),?\s*(visando|com\s+o\s+intuito\s+de)\s+atender\s+aos?\s+requisitos?\s+t[ée]cnicos?,?\s+quantitativos?\s+e\s+(demais\s+)?condi[çc][õo]es?\s+(delineadas|estabelecidas)\s+neste\s+termo\s+de\s+refer[êe]ncia\.?",
+            ", conforme quantidades e demais condições estabelecidas neste Termo de Referência",
+            t,
+        )
+        t = re.sub(
+            r"(?i),?\s*conforme\s+especifica(?:ç|c)[õo]es?\s+t[ée]cnicas?,?\s+quantitativos?\s+e\s+condi[çc][õo]es?\s+estabelecidas\s+neste\s+termo\s+de\s+refer[êe]ncia\.?",
+            ", conforme quantidades e demais condições estabelecidas neste Termo de Referência",
+            t,
+        )
+    else:
+        t = re.sub(
+            r"(?i),?\s*conforme\s+quantidades?\s+e\s+demais\s+condi[çc][õo]es?\s+estabelecidas\s+neste\s+termo\s+de\s+refer[êe]ncia\.?",
+            ", conforme requisitos técnicos e demais condições estabelecidas neste Termo de Referência",
+            t,
+        )
 
     # Mantém liberdade de redação da IA: aqui só sanidade mínima.
     t = re.sub(r"\s{2,}", " ", t).strip()

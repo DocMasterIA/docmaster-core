@@ -460,6 +460,14 @@ def _polish_objeto_with_itens(objeto: str, itens: List[ItemSlot]) -> str:
     # Se já houver número por extenso, apenas garante fechamento institucional.
     if not re.search(r"(?i)administra[cç][aã]o p[úu]blica", t):
         t = t.rstrip(".;:, ") + ", destinados ao atendimento das necessidades da Administração Pública Municipal."
+
+    # Remove duplicação acidental da oração de finalidade quando o texto já a contém.
+    finalidade = r"destinad[oa]s?\s+ao\s+atendimento\s+das\s+necessidades\s+da\s+administra[cç][aã]o\s+p[úu]blica\s+municipal"
+    t = re.sub(
+        rf"(?i)\b({finalidade})\b\s*[.,;:]+\s*,?\s*\b\1\b",
+        r"\1",
+        t,
+    )
     return t
 
 def _normalize_objeto(text: str) -> str:

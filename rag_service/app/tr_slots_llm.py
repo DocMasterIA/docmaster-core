@@ -114,6 +114,20 @@ REGRAS:
 - Use Lei 14.133/2021. Não invente dados que não possam ser inferidos do pedido (ex.: fiscal deixe vazio se não informado; dotação sempre deixe vazia, pois não é responsabilidade da IA preencher).
 """
 
+OBJETO_REWRITE_SYSTEM_PROMPT = """Você é um redator técnico-jurídico especializado em Termo de Referência.
+
+Sua tarefa é reescrever APENAS a cláusula de objeto, com linguagem administrativa formal, fluida e objetiva.
+
+Regras:
+- Saída: APENAS texto corrido (sem JSON, sem bullets, sem comentários).
+- Escreva 1 período principal bem construído (aceita até 2 períodos curtos se necessário).
+- Preserve a natureza correta: "aquisição" para bens e "contratação" para serviços/obras.
+- Se houver quantidade/unidade explícitas nos dados, incorpore no texto de forma natural.
+- Não use "conforme itens abaixo", "conforme tabela", "etc." ou frases vagas.
+- Não invente preço, prazo, marca, órgão ou dado não informado.
+- Evite redundância e frases infladas; priorize clareza e precisão.
+"""
+
 
 def _format_user_context_for_tr_prompt(user_context: Optional[Dict[str, Any]]) -> str:
     """Formata contexto do usuário logado (Django) para inclusão no prompt do TR."""
@@ -273,6 +287,48 @@ REGRAS DE SAÍDA:
         "XV",
     }
     return inciso_val if inciso_val in valid_incisos else ""
+
+
+async def _rewrite_objeto_clause(
+    user_prompt: str,
+    draft_objeto: str,
+    itens: List[ItemSlot],
+) -> str:
+    """Reescreve a cláusula de objeto em chamada dedicada, curta e focada."""
+    itens_lines: List[str] = []
+    for it in itens[:5]:
+        desc = (getattr(it, "descricao", "") or "").strip()
+        un = (getattr(it, "unidade", "") or "").strip()
+        qtd = getattr(it, "quantidade", None)
+        if desc:
+            itens_lines.append(f"- descricao={desc}; unidade={un or '-'}; quantidade={qtd if qtd is not None else '-'}")
+
+    user_parts = [
+        f"Pedido do usuário: {user_prompt.strip()}",
+        f"Rascunho atual do objeto: {draft_objeto.strip() or '[vazio]'}",
+    ]
+    if itens_lines:
+        user_parts.append("Itens estruturados:\n" + "\n".join(itens_lines))
+
+    full_prompt = f"<<SYSTEM>>\n{OBJETO_REWRITE_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n" + "\n".join(user_parts)
+    url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
+    payload = {"prompt": full_prompt, "stream": False}
+
+    try:
+        async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            body = resp.json()
+    except Exception:
+        return draft_objeto
+
+    data = body.get("data", body) if isinstance(body, dict) else {}
+    text = data.get("response", data.get("text", "")) if isinstance(data, dict) else str(data)
+    rewritten = (text or "").strip()
+    if not rewritten:
+        return draft_objeto
+    rewritten = rewritten.strip().strip('"').strip("'")
+    return rewritten or draft_objeto
 
 def _normalize_objeto(text: str) -> str:
     """
@@ -1098,11 +1154,14 @@ async def fill_tr_slots_with_llm(
                 f"O objeto do presente Termo de Referência é {objeto_fallback.strip().rstrip('.;')}."
             ) or objeto_fallback
 
-    # Reforço final: evita objeto curto/simples e corrige semântica de aquisição x contratação.
-    llm_slots.objeto = _enforce_objeto_semantic_consistency(
-        _expand_objeto_if_too_short(_normalize_objeto(llm_slots.objeto))
+    # Etapa dedicada para o objeto: prompt curto e separado do JSON de slots.
+    llm_slots.objeto = await _rewrite_objeto_clause(
+        user_prompt=user_prompt,
+        draft_objeto=llm_slots.objeto,
+        itens=llm_slots.itens,
     )
-    llm_slots.objeto = _enrich_objeto_with_quantidade(llm_slots.objeto, llm_slots.itens)
+    # Sanidade mínima pós-LLM (sem engessar estilo).
+    llm_slots.objeto = _enforce_objeto_semantic_consistency(_normalize_objeto(llm_slots.objeto))
 
     # Complementos de objeto: se vierem vazios, derivar automaticamente do objeto final.
     if not (llm_slots.objeto_escopo or "").strip():

@@ -75,7 +75,7 @@ REGRAS:
     * Delimitação funcional: explicitar a finalidade pública e o contexto administrativo de uso.
     * Fechamento normativo: concluir com referência a especificações técnicas, quantitativos e condições do Termo de Referência.
   - Modelo de qualidade esperado (referência de estilo, não template rígido):
-    * "Aquisição de 300 (trezentas) unidades de pneus aro R16, destinados ao atendimento das necessidades da Administração Pública Municipal, conforme especificações técnicas, quantitativos e condições estabelecidas neste Termo de Referência."
+    * "Aquisição/contratação do objeto demandado, com delimitação da finalidade administrativa e referência às especificações técnicas, quantitativos e condições estabelecidas neste Termo de Referência."
   - Regras fortes de redação:
     * Produza texto original para o caso concreto; não faça parafraseamento mecânico do pedido do usuário.
     * Evite frase curta telegráfica. O objeto deve soar como cláusula administrativa madura.
@@ -148,6 +148,7 @@ PROIBIÇÕES:
 - Não usar "conforme itens abaixo", "conforme tabela", "etc.", "entre outros", "de forma adequada" sem conteúdo técnico.
 - Não devolver objeto curto genérico (ex.: "Aquisição de pneus r16.").
 - Não usar metacomentário, justificativa do modelo ou explicação do processo.
+- Não inserir marcas, modelos, quantidades, unidades ou características técnicas que não estejam no pedido do usuário, no rascunho ou nos itens estruturados.
 
 CRITÉRIO DE ACEITAÇÃO:
 - O texto final deve responder, em uma leitura única:
@@ -423,7 +424,7 @@ def _extrair_int_positivo(value: Any) -> Optional[int]:
     return val if val > 0 else None
 
 
-def _polish_objeto_with_itens(objeto: str, itens: List[ItemSlot]) -> str:
+def _polish_objeto_with_itens(objeto: str, itens: List[ItemSlot], user_prompt: str) -> str:
     """
     Melhora o objeto para padrão técnico quando houver aquisição com itens/quantidade.
     Não substitui indiscriminadamente: atua como lapidação de qualidade.
@@ -439,7 +440,14 @@ def _polish_objeto_with_itens(objeto: str, itens: List[ItemSlot]) -> str:
     if not desc or not qtd:
         return t
 
-    is_aquisicao = bool(re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", t))
+    low_prompt = (user_prompt or "").lower()
+    low_obj = t.lower()
+
+    # Nunca força polimento de aquisição para pedidos de contratação/serviço.
+    if any(k in low_prompt for k in ("contratação", "contratacao", "serviço", "servicos", "manutenção", "manutencao")):
+        return t
+
+    is_aquisicao = bool(re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", t) or re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", low_prompt))
     if not is_aquisicao:
         return t
 
@@ -447,6 +455,11 @@ def _polish_objeto_with_itens(objeto: str, itens: List[ItemSlot]) -> str:
     extenso = _numero_extenso_pt_br_ate_9999(qtd, feminino=feminino)
     unidade_txt = "unidades" if not unidade else (unidade if unidade != "un" else "unidades")
     bloco_qtd = f"{qtd} ({extenso}) {unidade_txt}"
+
+    # Só lapida se o texto já guardar aderência mínima ao item (evita injetar tema errado).
+    desc_tokens = [tok for tok in re.findall(r"[a-z0-9]{4,}", desc.lower())[:4]]
+    if desc_tokens and not any(tok in low_obj for tok in desc_tokens):
+        return t
 
     # Se não houver bloco numérico + extenso, reconstrói o início em padrão formal.
     if not re.search(r"\b\d{1,6}\s*\([^)]{2,}\)", t):
@@ -1311,7 +1324,7 @@ async def fill_tr_slots_with_llm(
             itens=llm_slots.itens,
         )
     # Lapidação final para cenários de aquisição com quantidade explícita nos itens.
-    llm_slots.objeto = _polish_objeto_with_itens(llm_slots.objeto, llm_slots.itens)
+    llm_slots.objeto = _polish_objeto_with_itens(llm_slots.objeto, llm_slots.itens, user_prompt)
     # Sanidade mínima pós-LLM (sem engessar estilo).
     llm_slots.objeto = _enforce_objeto_semantic_consistency(_normalize_objeto(llm_slots.objeto))
 

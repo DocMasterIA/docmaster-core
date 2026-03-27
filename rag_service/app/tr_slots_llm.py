@@ -98,11 +98,13 @@ REGRAS:
     * Não devolver objeto genérico ("Aquisição de pneus.", "Serviços de manutenção.", "Material de escritório.").
     * Não usar bordões vazios ("de forma eficiente", "de modo adequado") sem vínculo técnico com o objeto.
     * Não usar reticências, linguagem coloquial, metacomentários ou autoexplicações.
+    * NÃO usar "Inclui:", "Compreende:", "Engloba:", "Abrangendo os seguintes itens" nem listas com traços (-), asteriscos ou numeração no campo objeto; o detalhamento nominal fica exclusivamente no array "itens".
   - Checklist obrigatório antes de finalizar o campo objeto:
     * O texto identifica claramente o item/serviço principal?
     * O texto explicita finalidade administrativa concreta?
     * Há coerência plena entre aquisição x contratação?
     * Há completude técnica mínima (sem ficar curto/telegráfico)?
+    * Não há lista com marcadores (-, *, •), "Inclui:" nem itens numerados após a prosa?
     * A redação final parece cláusula de TR assinável por órgão público?
 - objeto_escopo: texto complementar (1 a 2 frases) com delimitação do escopo técnico/operacional do objeto.
 - objeto_entregas: texto complementar (1 a 2 frases) com principais entregas/resultados verificáveis esperados da contratação.
@@ -126,7 +128,7 @@ OBJETIVO:
 Reescrever exclusivamente a cláusula de objeto com padrão técnico-jurídico elevado, redação declarativa robusta, fluidez e precisão.
 
 SAÍDA:
-- Entregar APENAS o texto final do objeto (sem JSON, sem bullets, sem observações).
+- Entregar APENAS o texto final do objeto (sem JSON, sem bullets, sem observações, sem "Inclui:" ou enumeração após o parágrafo).
 
 PADRÃO OBRIGATÓRIO DE COMPOSIÇÃO:
 1) Abertura material: declarar o que será adquirido/contratado (em listas extensas de aquisição, use só macrogrupos; não detalhe cada SKU/tipo).
@@ -149,6 +151,7 @@ REGRAS DE CONTEÚDO:
 - Não inventar preço, prazo, marca, secretaria, localidade ou qualquer dado ausente.
 
 PROIBIÇÕES:
+- Não usar listas com traço (-), asterisco, numeração, "Inclui:", "Compreende:", "Engloba:" nem "Abrangendo os seguintes itens"; todo item nominal vai na tabela, não no objeto.
 - Não usar "conforme itens abaixo", "conforme tabela", "etc.", "entre outros", "de forma adequada" sem conteúdo técnico.
 - Não devolver objeto curto vazio de conteúdo (ex.: só "Aquisição de materiais."); em lista extensa, macrogrupos como "pneus, peças, insumos e acessórios automotivos" são válidos.
 - Não usar metacomentário, justificativa do modelo ou explicação do processo.
@@ -157,7 +160,7 @@ PROIBIÇÕES:
 CRITÉRIO DE ACEITAÇÃO:
 - O texto final deve responder, em uma leitura única:
   "o que", "em que extensão mínima", "para qual finalidade administrativa" e "sob quais balizas técnicas".
-- Se houver lista extensa de itens de aquisição, o núcleo material deve ter no máximo 3 a 5 macrogrupos (ex.: pneus, peças, insumos e acessórios automotivos), sem listar cada insumo nominalmente, deixando o detalhe na tabela. Porém a cláusula NÃO pode ser telegráfica: inclua obrigatoriamente uma oração clara de finalidade administrativa (ex.: atendimento à manutenção da frota, continuidade operacional, suporte ao funcionamento dos veículos da Administração), antes do fechamento normativo. Proibido: "incluindo ... 300 unidades ...", enumeração de modelos e fechamento que re-lista quantitativos.
+- Se houver lista extensa de itens de aquisição, o núcleo material deve ter no máximo 3 a 5 macrogrupos (ex.: pneus, peças, insumos e acessórios automotivos), sem listar cada insumo nominalmente, deixando o detalhe na tabela. Porém a cláusula NÃO pode ser telegráfica: inclua obrigatoriamente uma oração clara de finalidade administrativa (ex.: atendimento à manutenção da frota, continuidade operacional, suporte ao funcionamento dos veículos da Administração), antes do fechamento normativo. Proibido: "incluindo ... 300 unidades ...", enumeração de modelos, blocos "Inclui:" com traços e fechamento que re-lista quantitativos.
 """
 
 
@@ -366,9 +369,19 @@ async def _rewrite_objeto_clause(
 
 def _looks_like_item_by_item_enumeration(text: str) -> bool:
     """Detecta objeto que ainda enumera quantidades/modelos (detalhe que deve ir só na tabela)."""
-    t = (text or "").strip().lower()
-    if not t:
+    raw = (text or "").strip()
+    if not raw:
         return False
+    t = raw.lower()
+    # Introduz colagem típica do modelo: "Inclui:" + bullets (detalhe só na tabela)
+    if re.search(r"(?i)\b(?:inclui|compreende|engloba)\s*:", raw):
+        return True
+    if re.search(r"(?i)\babrangendo\s+os\s+seguintes(?:\s+itens)?\b", raw):
+        return True
+    if re.search(r"(?m)^\s*[-*•]\s+\S", raw):
+        return True
+    if re.search(r"(?m)^\s*\d+[\.)]\s+\S", raw):
+        return True
     # "incluindo 300 unidades..." ou similar
     if re.search(r"\bincluindo\b", t) and re.search(r"\b\d{2,6}\b", t):
         return True
@@ -544,7 +557,7 @@ async def _summarize_objeto_many_aquisicao_items(
             "Há muitos itens na aquisição. Redija cláusula com redação madura (não telegráfica):\n"
             "- Núcleo: no máximo 3 a 5 MACROGRUPOS (ex.: pneus, peças, insumos e acessórios automotivos), "
             "sem listar cada tipo nominalmente (nada de válvulas, pastilhas, óleo 5W30, etc.). "
-            "Detalhe só na tabela de itens.\n"
+            "Detalhe só na tabela de itens. Proibido 'Inclui:', listas com traço (-) ou numeração.\n"
             "- Inclua explicitamente finalidade administrativa (manutenção da frota, continuidade operacional ou suporte às necessidades de manutenção da Administração — conforme o pedido).\n"
             "- Feche com \"conforme quantidades e demais condições estabelecidas neste Termo de Referência\" "
             "ou \"em quantidade conforme estipulado neste Termo de Referência\"."
@@ -560,10 +573,10 @@ async def _summarize_objeto_many_aquisicao_items(
         summarized = await _rewrite_objeto_clause(
             user_prompt=(
                 f"{user_prompt}\n\n"
-                f"O texto abaixo ainda traz quantidades, modelos ou lista \"incluindo ...\", proibido no objeto:\n"
+                f"O texto abaixo ainda traz quantidades, modelos, lista \"incluindo ...\", 'Inclui:' ou bullets (-), proibido no objeto:\n"
                 f"{summarized}\n\n"
                 "Reescreva com NO MÁXIMO 3 a 5 MACROGRUPOS agregados (ex.: pneus, peças, insumos e acessórios automotivos), "
-                "sem citar itens específicos nominalmente, sem algarismos, sem 'incluindo', sem unidades (kg, litros). "
+                "sem citar itens específicos nominalmente, sem algarismos, sem 'incluindo', sem 'Inclui:', sem traços de lista, sem unidades (kg, litros). "
                 "Use fechamento: \"conforme quantidades e demais condições estabelecidas neste Termo de Referência\" "
                 "ou \"em quantidade conforme estipulado neste Termo de Referência\"."
             ),
@@ -597,7 +610,7 @@ async def _strip_enumeration_from_summarized_objeto_if_needed(
     return await _rewrite_objeto_clause(
         user_prompt=(
             f"{user_prompt}\n\n"
-            f"Corrija o objeto abaixo: ainda há listagem detalhada ou quantidades/modelos ou 'incluindo ...'. "
+            f"Corrija o objeto abaixo: ainda há listagem detalhada, quantidades/modelos, 'incluindo ...', 'Inclui:' ou bullets. "
             f"Detalhe só na tabela.\n{t}\n\n"
             "Use NO MÁXIMO 3 a 5 macrogrupos após 'Aquisição de' (ex.: pneus, peças, insumos e acessórios automotivos). "
             "Sem dígitos. Inclua uma oração de finalidade administrativa (não basta colar macrogrupos ao fechamento). "
@@ -756,6 +769,38 @@ def _polish_objeto_with_itens(objeto: str, itens: List[ItemSlot], user_prompt: s
     )
     return t
 
+
+def _strip_item_lists_from_objeto_text(text: str) -> str:
+    """
+    Remove enumerações que o modelo às vezes cola na cláusula (ex.: "Inclui:" + itens com traço).
+    O detalhamento deve permanecer apenas no array itens.
+    """
+    text = (text or "").strip()
+    if not text:
+        return ""
+
+    m_intro = re.search(
+        r"(?i)\b(?:inclui|compreende|engloba|abrangendo\s+os\s+seguintes(?:\s+itens)?)\s*:",
+        text,
+    )
+    if m_intro:
+        text = text[: m_intro.start()].rstrip()
+
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        s = line.strip()
+        if re.match(r"^[-*•]\s+\S", s) or re.match(r"^\d+[\.)]\s+\S", s):
+            text = "\n".join(lines[:i]).rstrip()
+            break
+
+    m_inline = re.search(r"(?<=[.!?])\s+[-*•]\s+\S", text)
+    if m_inline:
+        text = text[: m_inline.start()].rstrip()
+
+    text = re.sub(r"(?i)\s*(?:inclui|compreende|engloba)\s*:\s*$", "", text).rstrip()
+    return text.rstrip(",;: ")
+
+
 def _normalize_objeto(text: str) -> str:
     """
     Normaliza o campo objeto para ficar mais formal e sem pontuação estranha no final.
@@ -764,6 +809,9 @@ def _normalize_objeto(text: str) -> str:
     - Remove citações que remetem a itens/tabela abaixo (descrição pura apenas).
     """
     text = (text or "").strip()
+    if not text:
+        return ""
+    text = _strip_item_lists_from_objeto_text(text)
     if not text:
         return ""
 

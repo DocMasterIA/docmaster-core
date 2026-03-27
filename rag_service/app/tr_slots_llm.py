@@ -74,6 +74,8 @@ REGRAS:
   - O texto deve descrever o que será contratado, para quem e com qual finalidade administrativa, com extensão adequada e objetiva (preferencialmente 1 a 2 frases, em torno de 2 a 3 linhas).
   - Priorize fluidez textual e precisão técnica, sem verborragia.
   - Evite simplificação excessiva, mas também evite redação longa e repetitiva.
+  - A redação deve ser ORIGINAL para cada caso concreto; não reutilize molde fixo com mera troca de variáveis.
+  - Use o exemplo de estilo apenas como referência de qualidade textual (clareza, técnica, concisão), e não como template obrigatório.
   - NÃO faça isto no campo objeto:
     * Copiar ou colar o texto do pedido do usuário (ex.: se o usuário escrever "Aquisição de 10 pneus 1000R20, 10 câmaras...", o objeto NÃO pode ser esse texto repetido; você DEVE reformular em cláusula contínua).
     * Devolver uma única palavra ou duas palavras (ex.: "pneus", "material de construção", "equipamentos", "material de escritório"). Qualquer resposta com menos de 4 palavras ou menos de 40 caracteres no objeto é INVÁLIDA.
@@ -88,8 +90,11 @@ REGRAS:
   - CONTEXTO ESPECÍFICO:
     * Evite observações genéricas desconectadas do item (ex.: compliance amplo, menções abstratas sem relação com o objeto concreto).
     * Cada frase deve estar ligada ao objeto pedido (ex.: se o pedido é seringa, o texto deve tratar de insumo médico correlato, uso e finalidade assistencial, sem deriva para temas não relacionados).
+  - NÃO incluir menções a preço/valor unitário/estimado no objeto, salvo se o usuário tiver fornecido explicitamente esses valores no pedido.
   - É EXPRESSAMENTE PROIBIDO devolver o objeto como expressão curta ou genérica ("materiais de limpeza", "material de escritório", "serviços de manutenção", "equipamentos" sozinhos). Sempre desenvolva em pelo menos uma frase completa com verbo e finalidade.
   - OBJETO = DESCRIÇÃO PURA EM PROSA. NUNCA use "compreendendo os itens descritos abaixo", "conforme itens abaixo", "especificações a seguir", "conforme tabela", "conforme quantitativo" ou equivalentes.
+  - Faça autocontrole de estilo na própria geração: evite cliches genéricos, termos vazios e frases de enchimento desconectadas do objeto concreto.
+  - Antes de responder, revise mentalmente o objeto para remover contradições semânticas, repetições e construções artificiais.
   - NÃO use reticências ("...") nem múltiplos pontos no final.
 - objeto_escopo: texto complementar (1 a 2 frases) com delimitação do escopo técnico/operacional do objeto.
 - objeto_entregas: texto complementar (1 a 2 frases) com principais entregas/resultados verificáveis esperados da contratação.
@@ -290,14 +295,16 @@ def _normalize_objeto(text: str) -> str:
         r",?\s*conforme\s+o\s+quantitativo\s+descrito\s+abaixo\.?",
         r",?\s*detalhados\s+(na\s+tabela|nos\s+itens)\s+abaixo\.?",
         r",?\s*especificados\s+(na\s+tabela|nos\s+itens)\s+abaixo\.?",
+        r",?\s*no\s+valor\s+unit[áa]rio\s+compat[íi]vel\s+com\s+o\s+mercado\.?",
+        r",?\s*com\s+valor\s+unit[áa]rio\s+compat[íi]vel\s+com\s+o\s+mercado\.?",
+        r",?\s*com\s+pre[çc]o\s+compat[íi]vel\s+com\s+o\s+mercado\.?",
     ]
     for pat in objeto_remover:
         text = re.sub(pat, "", text, flags=re.IGNORECASE)
     text = re.sub(r"\s{2,}", " ", text).strip()
 
-    # Heurística extra: evitar objetos extremamente genéricos de 1–3 palavras,
-    # como "materiais de limpeza" ou "material de escritório". Nestes casos,
-    # expande para uma frase completa padrão, mais adequada ao TR.
+    # Heurística extra: evitar objetos extremamente genéricos de 1–3 palavras.
+    # Nestes casos, aplica uma base mínima de redação formal (sem engessar template).
     base = re.sub(r"[.。…;:,]+$", "", text).strip()
     if base:
         lower = base.lower()
@@ -357,10 +364,12 @@ def _normalize_objeto(text: str) -> str:
             use_template = True
 
         if use_template and base_for_clause:
+            natureza = "aquisição"
+            if re.search(r"(?i)\b(servi[çc]o|manuten[çc][aã]o|loca[çc][aã]o|obra|engenharia)\b", base_for_clause):
+                natureza = "contratação"
             text = (
-                f"O objeto do presente Termo de Referência é a contratação de {base_for_clause} "
-                "para atender às necessidades da Administração Pública, garantindo a adequada "
-                "prestação dos serviços e o atendimento ao interesse público."
+                f"O objeto do presente Termo de Referência é a {natureza} de {base_for_clause}, "
+                "para atendimento de necessidade administrativa do órgão requisitante."
             )
 
     # Remove reticências/múltiplos pontos e outros sinais fortes no final
@@ -380,7 +389,8 @@ def _expand_objeto_if_too_short(text: str) -> str:
         return t
 
     words = t.split()
-    if len(words) >= 14 and len(t) >= 120:
+    # Fallback apenas para casos realmente inválidos (quase vazio/telegráfico).
+    if len(words) >= 6 or len(t) >= 45:
         return t
 
     base = re.sub(r"^[Oo]\s+objeto\s+do\s+presente\s+Termo\s+de\s+Refer[êe]ncia\s+[ée]\s+", "", t).strip()
@@ -388,24 +398,8 @@ def _expand_objeto_if_too_short(text: str) -> str:
     if not base:
         base = t
 
-    lower = base.lower()
-    base = re.sub(r"(?i)^\s*(a\s+)?aquisi(?:ç|c)[aã]o\s+de\s+", "", base).strip()
-    base = re.sub(r"(?i)^\s*(a\s+)?contrata(?:ç|c)[aã]o\s+de\s+", "", base).strip()
-    if not base:
-        base = t
-
-    if any(k in lower for k in ("aquisição", "aquisicao", "pneu", "material", "insumo", "produto", "equipamento")):
-        return (
-            f"O objeto do presente Termo de Referência é a aquisição de {base}, "
-            "destinada ao atendimento das necessidades da Administração Pública, "
-            "conforme especificações técnicas, quantitativos e condições estabelecidas neste Termo de Referência."
-        )
-
-    return (
-        f"O objeto do presente Termo de Referência é a contratação de {base}, "
-        "destinada ao atendimento das necessidades da Administração Pública, "
-        "conforme requisitos técnicos, níveis de desempenho e condições estabelecidas neste Termo de Referência."
-    )
+    # Reescrita mínima para evitar objeto "quebrado", sem impor template rígido.
+    return f"O objeto do presente Termo de Referência é {base}."
 
 
 def _enforce_objeto_semantic_consistency(text: str) -> str:
@@ -481,13 +475,11 @@ def _enforce_objeto_semantic_consistency(text: str) -> str:
         elif has_goods_nature and not has_service_nature:
             t = re.sub(r"(?i)\bcontrata(?:ç|c)[aã]o\s+de\s+", "aquisição de ", t)
 
-    # Remove frase genérica comum que descola do contexto do item.
-    t = re.sub(
-        r"(?i),?\s*com\s+observ[âa]ncia\s+dos\s+requisitos\s+t[ée]cnicos\s+e\s+operacionais\s+aplic[áa]veis",
-        "",
-        t,
-    )
+    # Mantém liberdade de redação da IA: aqui só sanidade mínima.
     t = re.sub(r"\s{2,}", " ", t).strip()
+    t = re.sub(r"[;:,]+\s*$", "", t).strip()
+    if t and not t.endswith("."):
+        t = f"{t}."
     return t
 
 

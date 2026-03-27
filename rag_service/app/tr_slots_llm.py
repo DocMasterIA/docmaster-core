@@ -86,7 +86,7 @@ REGRAS:
     * Sempre que natural, use "número + (extenso)" para reforçar precisão formal.
     * Em aquisição, prefira fechamento com "conforme quantidades e demais condições estabelecidas neste Termo de Referência".
     * Em contratação (qualquer natureza), prefira fechamento com "conforme requisitos técnicos e demais condições estabelecidas neste Termo de Referência".
-    * Quando houver muitos itens de aquisição (lista extensa), NÃO enumerar item por item no objeto; resumir por macrogrupos e manter o detalhamento no array "itens" (tabela). NÃO use "incluindo" seguido de quantidades/modelos; NÃO recoloque algarismos ou medidas (kg, litros, unidades) no objeto — isso fica na tabela.
+    * Quando houver muitos itens de aquisição (lista extensa), NÃO enumerar item por item no objeto; resumir em poucos MACROGRUPOS (idealmente 3 a 5 termos), p.ex. "Aquisição de pneus, peças, insumos e acessórios automotivos", e manter o detalhamento no array "itens" (tabela). NÃO liste nominalmente cada tipo (válvulas, pastilhas, óleo 5W30 etc.). NÃO use "incluindo" seguido de quantidades/modelos; NÃO recoloque algarismos ou medidas (kg, litros, unidades) no objeto — isso fica na tabela.
     * Não mencionar preço/valor unitário/estimado, salvo se o usuário tiver informado explicitamente.
     * Não remeter a "itens abaixo", "tabela", "anexo" ou equivalentes.
   - Consistência semântica obrigatória:
@@ -129,7 +129,7 @@ SAÍDA:
 - Entregar APENAS o texto final do objeto (sem JSON, sem bullets, sem observações).
 
 PADRÃO OBRIGATÓRIO DE COMPOSIÇÃO:
-1) Abertura material: declarar com exatidão o que será adquirido/contratado.
+1) Abertura material: declarar o que será adquirido/contratado (em listas extensas de aquisição, use só macrogrupos; não detalhe cada SKU/tipo).
 2) Delimitação funcional: explicitar a finalidade administrativa e o interesse público atendido.
 3) Fechamento técnico: vincular o objeto às especificações técnicas, quantitativos e condições do Termo de Referência.
 
@@ -150,14 +150,14 @@ REGRAS DE CONTEÚDO:
 
 PROIBIÇÕES:
 - Não usar "conforme itens abaixo", "conforme tabela", "etc.", "entre outros", "de forma adequada" sem conteúdo técnico.
-- Não devolver objeto curto genérico (ex.: "Aquisição de pneus r16.").
+- Não devolver objeto curto vazio de conteúdo (ex.: só "Aquisição de materiais."); em lista extensa, macrogrupos como "pneus, peças, insumos e acessórios automotivos" são válidos.
 - Não usar metacomentário, justificativa do modelo ou explicação do processo.
 - Não inserir marcas, modelos, quantidades, unidades ou características técnicas que não estejam no pedido do usuário, no rascunho ou nos itens estruturados.
 
 CRITÉRIO DE ACEITAÇÃO:
 - O texto final deve responder, em uma leitura única:
   "o que", "em que extensão mínima", "para qual finalidade administrativa" e "sob quais balizas técnicas".
-- Se houver lista extensa de itens de aquisição, o objeto deve ser sintético por macrogrupos (sem enumeração integral), deixando os itens detalhados para a tabela. Proibido: "incluindo ... 300 unidades ...", enumeração de modelos (R16, R15) e fechamento que re-lista quantitativos.
+- Se houver lista extensa de itens de aquisição, o objeto deve ser MUITO sintético: no máximo 3 a 5 macrogrupos (ex.: pneus, peças, insumos, acessórios automotivos), sem listar nominalmente cada insumo, deixando o detalhe na tabela. Proibido: "incluindo ... 300 unidades ...", enumeração de modelos (R16, R15) e fechamento que re-lista quantitativos.
 """
 
 
@@ -396,6 +396,48 @@ def _looks_like_item_by_item_enumeration(text: str) -> bool:
     return enum_markers >= 2
 
 
+def _needs_ultra_macro_objeto_summary(text: str) -> bool:
+    """Núcleo após 'Aquisição de' ainda lista dezenas de tipos; pedir compressão para macrogrupos."""
+    t = (text or "").strip()
+    if not t:
+        return False
+    first = re.split(r"(?<=[.!?])\s+", t, maxsplit=1)[0]
+    m = re.search(r"(?i)^aquisi(?:c|ç)[aã]o\s+de\s+(.+)$", first.strip())
+    if not m:
+        return False
+    nucleus = m.group(1).strip()
+    if nucleus.count(",") >= 3:
+        return True
+    if nucleus.lower().count(" e ") >= 3:
+        return True
+    if len(nucleus.split()) > 35:
+        return True
+    return False
+
+
+async def _ultra_compress_objeto_macro_groups(
+    texto: str,
+    itens: List[ItemSlot],
+    user_prompt: str,
+) -> str:
+    """Força núcleo 'Aquisição de …' com poucos macrogrupos (poucas vírgulas, sem itens nominalmente)."""
+    return await _rewrite_objeto_clause(
+        user_prompt=(
+            f"{user_prompt}\n\n"
+            "O objeto a seguir ainda traz lista nominal longa após 'Aquisição de'. "
+            "Comprima o núcleo para NO MÁXIMO 3 a 5 MACROGRUPOS (ex.: pneus, peças, insumos e acessórios automotivos). "
+            "Proibido citar itens específicos (válvulas, pastilhas, óleo, filtro, contrapeso, amortecedor etc.). "
+            "Sem algarismos. Inclua finalidade administrativa breve e feche com "
+            "\"conforme quantidades e demais condições estabelecidas neste Termo de Referência\" ou "
+            "\"em quantidade conforme estipulado neste Termo de Referência\".\n\n"
+            f"Texto atual:\n{texto.strip()}"
+        ),
+        draft_objeto=texto,
+        itens=itens,
+        max_items=12,
+    )
+
+
 def _is_objeto_redacao_fraca(text: str) -> bool:
     t = (text or "").strip()
     if not t:
@@ -433,10 +475,12 @@ async def _summarize_objeto_many_aquisicao_items(
     summarized = await _rewrite_objeto_clause(
         user_prompt=(
             f"{user_prompt}\n\n"
-            "Há muitos itens na aquisição. Resuma o OBJETO por macrogrupos (sem listar item por item), "
-            "deixando o detalhamento para a tabela de itens. "
-            "Mantenha linguagem formal, finalidade administrativa e fechamento: "
-            "\"conforme quantidades e demais condições estabelecidas neste Termo de Referência\"."
+            "Há muitos itens na aquisição. O OBJETO deve ser MUITO curto no núcleo material: "
+            "no máximo 3 a 5 MACROGRUPOS (ex.: pneus, peças, insumos e acessórios automotivos), "
+            "sem listar cada tipo nominalmente (nada de válvulas, pastilhas, óleo 5W30, etc. no texto). "
+            "Detalhe fica só na tabela de itens. Linguagem formal, finalidade administrativa e fechamento: "
+            "\"conforme quantidades e demais condições estabelecidas neste Termo de Referência\" "
+            "ou \"em quantidade conforme estipulado neste Termo de Referência\"."
         ),
         draft_objeto=t,
         itens=itens,
@@ -451,8 +495,8 @@ async def _summarize_objeto_many_aquisicao_items(
                 f"{user_prompt}\n\n"
                 f"O texto abaixo ainda traz quantidades, modelos ou lista \"incluindo ...\", proibido no objeto:\n"
                 f"{summarized}\n\n"
-                "Reescreva SOMENTE com nomes genéricos de categorias (ex.: pneus, válvulas, peças de freio, "
-                "lubrificantes), sem algarismos, sem 'incluindo', sem unidades (kg, litros, unidades). "
+                "Reescreva com NO MÁXIMO 3 a 5 MACROGRUPOS agregados (ex.: pneus, peças, insumos e acessórios automotivos), "
+                "sem citar itens específicos nominalmente, sem algarismos, sem 'incluindo', sem unidades (kg, litros). "
                 "Use fechamento: \"conforme quantidades e demais condições estabelecidas neste Termo de Referência\" "
                 "ou \"em quantidade conforme estipulado neste Termo de Referência\"."
             ),
@@ -460,6 +504,8 @@ async def _summarize_objeto_many_aquisicao_items(
             itens=itens,
             max_items=12,
         )
+    if _needs_ultra_macro_objeto_summary(summarized):
+        summarized = await _ultra_compress_objeto_macro_groups(summarized, itens, user_prompt)
     return summarized
 
 
@@ -482,10 +528,10 @@ async def _strip_enumeration_from_summarized_objeto_if_needed(
     return await _rewrite_objeto_clause(
         user_prompt=(
             f"{user_prompt}\n\n"
-            f"Corrija o objeto abaixo: ele ainda lista quantidades, modelos ou usa 'incluindo ...'. "
-            f"Isso é proibido — o detalhamento está na tabela de itens.\n{t}\n\n"
-            "Reescreva só com categorias (tipos de bem/material) e finalidade administrativa, sem dígitos, "
-            "fechando com \"conforme quantidades e demais condições estabelecidas neste Termo de Referência\" "
+            f"Corrija o objeto abaixo: ainda há listagem detalhada ou quantidades/modelos ou 'incluindo ...'. "
+            f"Detalhe só na tabela.\n{t}\n\n"
+            "Use NO MÁXIMO 3 a 5 macrogrupos após 'Aquisição de' (ex.: pneus, peças, insumos e acessórios automotivos). "
+            "Sem dígitos, sem finalidade prolixa. Feche com \"conforme quantidades e demais condições estabelecidas neste Termo de Referência\" "
             "ou \"em quantidade conforme estipulado neste Termo de Referência\"."
         ),
         draft_objeto=t,
@@ -1511,6 +1557,18 @@ async def fill_tr_slots_with_llm(
     llm_slots.objeto = await _strip_enumeration_from_summarized_objeto_if_needed(
         llm_slots.objeto, llm_slots.itens, user_prompt
     )
+    low_p = (user_prompt or "").lower()
+    if (
+        len(llm_slots.itens) >= 6
+        and (
+            re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", low_p)
+            or re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", (llm_slots.objeto or "").lower())
+        )
+        and _needs_ultra_macro_objeto_summary(llm_slots.objeto)
+    ):
+        llm_slots.objeto = await _ultra_compress_objeto_macro_groups(
+            llm_slots.objeto, llm_slots.itens, user_prompt
+        )
     # Sanidade mínima pós-LLM (sem engessar estilo).
     llm_slots.objeto = _enforce_objeto_semantic_consistency(_normalize_objeto(llm_slots.objeto))
 

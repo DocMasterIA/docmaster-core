@@ -82,6 +82,8 @@ REGRAS:
     * Devolver uma lista solta (ex.: "10 pneus, 10 câmaras, 50 válvulas"). O objeto deve ser redação em prosa, não enumeração.
   - A partir do pedido do usuário, interprete o que foi solicitado e redija uma cláusula de objeto em terceira pessoa, em prosa e com linguagem formal.
   - Deve incluir: (a) o que será contratado (bens/serviços), em linguagem de cláusula; (b) a finalidade ou o setor/órgão beneficiado quando informado no pedido.
+  - Se o pedido trouxer quantitativo/unidade explícitos, incorpore esses dados no objeto com precisão (ex.: "300 unidades de ..."), sem remeter a "itens abaixo" ou "tabela".
+  - Quando houver quantidade numérica explícita e o contexto permitir, prefira o padrão "número + (número por extenso)" para reforçar clareza formal.
   - CONSISTÊNCIA SEMÂNTICA OBRIGATÓRIA:
     * "aquisição" = compra de bens/materiais/produtos;
     * "contratação" = prestação de serviços, locação, manutenção, execução de obra ou solução continuada.
@@ -480,6 +482,69 @@ def _enforce_objeto_semantic_consistency(text: str) -> str:
     t = re.sub(r"[;:,]+\s*$", "", t).strip()
     if t and not t.endswith("."):
         t = f"{t}."
+    return t
+
+
+def _num_pt_br_ate_9999(n: int) -> str:
+    if n < 0 or n > 9999:
+        return str(n)
+    base = {
+        0: "zero", 1: "um", 2: "dois", 3: "tres", 4: "quatro", 5: "cinco", 6: "seis", 7: "sete", 8: "oito", 9: "nove",
+        10: "dez", 11: "onze", 12: "doze", 13: "treze", 14: "quatorze", 15: "quinze", 16: "dezesseis", 17: "dezessete", 18: "dezoito", 19: "dezenove",
+        20: "vinte", 30: "trinta", 40: "quarenta", 50: "cinquenta", 60: "sessenta", 70: "setenta", 80: "oitenta", 90: "noventa",
+        100: "cem", 200: "duzentos", 300: "trezentos", 400: "quatrocentos", 500: "quinhentos", 600: "seiscentos", 700: "setecentos", 800: "oitocentos", 900: "novecentos",
+    }
+    if n in base:
+        return base[n]
+    if n < 100:
+        d = (n // 10) * 10
+        return f"{base[d]} e {base[n - d]}"
+    if n < 1000:
+        c = (n // 100) * 100
+        c_text = "cento" if c == 100 else base[c]
+        return f"{c_text} e {_num_pt_br_ate_9999(n - c)}"
+    m = n // 1000
+    r = n % 1000
+    mil = "mil" if m == 1 else f"{_num_pt_br_ate_9999(m)} mil"
+    if r == 0:
+        return mil
+    return f"{mil}{' e ' if r < 100 else ' '}{_num_pt_br_ate_9999(r)}"
+
+
+def _extract_positive_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    m = re.search(r"\d+", str(value))
+    if not m:
+        return None
+    try:
+        n = int(m.group(0))
+    except Exception:
+        return None
+    return n if n > 0 else None
+
+
+def _enrich_objeto_with_quantidade(text: str, itens: List[ItemSlot]) -> str:
+    """Complementa o objeto apenas quando a IA omite quantidade explícita dos itens."""
+    t = (text or "").strip()
+    if not t or not itens:
+        return t
+    if re.search(r"\b\d{1,6}\b", t):
+        return t
+    it = itens[0]
+    qtd = _extract_positive_int(getattr(it, "quantidade", None))
+    desc = str(getattr(it, "descricao", "") or "").strip()
+    if not qtd or not desc:
+        return t
+    extenso = _num_pt_br_ate_9999(qtd)
+    bloco_qtd = f"{qtd} ({extenso}) unidades"
+    # Ajuste localizado: só injeta quantitativo no trecho inicial de aquisição.
+    t = re.sub(
+        r"(?i)\baquisi(?:ç|c)[aã]o\s+de\s+",
+        f"aquisição de {bloco_qtd} de ",
+        t,
+        count=1,
+    )
     return t
 
 
@@ -1037,6 +1102,7 @@ async def fill_tr_slots_with_llm(
     llm_slots.objeto = _enforce_objeto_semantic_consistency(
         _expand_objeto_if_too_short(_normalize_objeto(llm_slots.objeto))
     )
+    llm_slots.objeto = _enrich_objeto_with_quantidade(llm_slots.objeto, llm_slots.itens)
 
     # Complementos de objeto: se vierem vazios, derivar automaticamente do objeto final.
     if not (llm_slots.objeto_escopo or "").strip():

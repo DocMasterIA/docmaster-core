@@ -143,6 +143,7 @@ REGRAS DE CONTEÚDO:
   * aquisição = bens/produtos/materiais/insumos/equipamentos;
   * contratação = serviços/obras/locação/manutenção.
 - Se houver quantidade/unidade explícitas, incorporar obrigatoriamente.
+- Se o usuário informar números em algarismo, preserve os algarismos no texto final (podendo complementar com extenso entre parênteses).
 - Quando for natural no contexto formal, usar número seguido do extenso entre parênteses.
 - Não inventar preço, prazo, marca, secretaria, localidade ou qualquer dado ausente.
 
@@ -457,6 +458,26 @@ def _polish_objeto_with_itens(objeto: str, itens: List[ItemSlot], user_prompt: s
     extenso = _numero_extenso_pt_br_ate_9999(qtd, feminino=feminino)
     unidade_txt = "unidades" if not unidade else (unidade if unidade != "un" else "unidades")
     bloco_qtd = f"{qtd} ({extenso}) {unidade_txt}"
+
+    # Se pedido veio com algarismos e o objeto saiu sem algarismos,
+    # recompõe aquisição com base nos itens para preservar fidelidade numérica.
+    prompt_has_digits = bool(re.search(r"\b\d{1,6}\b", low_prompt))
+    text_has_digits = bool(re.search(r"\b\d{1,6}\b", t))
+    if prompt_has_digits and not text_has_digits and len(itens) >= 1:
+        parts: List[str] = []
+        for it in itens[:6]:
+            qtd_i = _extrair_int_positivo(getattr(it, "quantidade", None))
+            desc_i = str(getattr(it, "descricao", "") or "").strip()
+            if not qtd_i or not desc_i:
+                continue
+            ext_i = _numero_extenso_pt_br_ate_9999(qtd_i, feminino=False)
+            parts.append(f"{qtd_i} ({ext_i}) {desc_i}")
+        if parts:
+            lista = ", ".join(parts[:-1]) + (" e " + parts[-1] if len(parts) > 1 else parts[0])
+            return (
+                f"Aquisição de {lista}, destinados ao atendimento das necessidades da Administração Pública Municipal, "
+                "conforme quantidades e demais condições estabelecidas neste Termo de Referência."
+            )
 
     # Só lapida se o texto já guardar aderência mínima ao item (evita injetar tema errado).
     desc_tokens = [tok for tok in re.findall(r"[a-z0-9]{4,}", desc.lower())[:4]]

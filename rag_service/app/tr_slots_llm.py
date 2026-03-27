@@ -71,14 +71,23 @@ REGRAS:
 - dotacao: sempre deve ser retornado como string vazia \"\". A IA NÃO deve sugerir, inferir ou inventar dotação orçamentária; esse campo será preenchido posteriormente pelo sistema ou por outro fluxo.
 - objeto: redigir como cláusula formal completa (em prosa, sem lista solta, sem palavra isolada).
   - Preferencialmente iniciar com fórmula formal, como: "O objeto do presente Termo de Referência é ", "O presente Termo de Referência tem por objeto " ou "O objeto deste Termo de Referência consiste em ".
-  - O texto deve descrever o que será contratado, para quem e com qual finalidade administrativa, com extensão adequada ao caso (em geral 2 a 5 frases).
-  - Evite respostas curtas demais; priorize redação objetiva, técnica e suficientemente detalhada.
+  - O texto deve descrever o que será contratado, para quem e com qual finalidade administrativa, com extensão adequada ao caso (em geral 3 a 6 frases).
+  - Priorize fluidez textual entre as frases (encadeamento lógico), evitando blocos telegráficos ou frases artificiais isoladas.
+  - Evite simplificação excessiva: respostas curtas, genéricas ou com baixa densidade técnica são inválidas.
   - NÃO faça isto no campo objeto:
     * Copiar ou colar o texto do pedido do usuário (ex.: se o usuário escrever "Aquisição de 10 pneus 1000R20, 10 câmaras...", o objeto NÃO pode ser esse texto repetido; você DEVE reformular em cláusula contínua).
     * Devolver uma única palavra ou duas palavras (ex.: "pneus", "material de construção", "equipamentos", "material de escritório"). Qualquer resposta com menos de 4 palavras ou menos de 40 caracteres no objeto é INVÁLIDA.
     * Devolver uma lista solta (ex.: "10 pneus, 10 câmaras, 50 válvulas"). O objeto deve ser redação em prosa, não enumeração.
   - A partir do pedido do usuário, interprete o que foi solicitado e redija uma cláusula de objeto em terceira pessoa, em prosa e com linguagem formal.
   - Deve incluir: (a) o que será contratado (bens/serviços), em linguagem de cláusula; (b) a finalidade ou o setor/órgão beneficiado quando informado no pedido.
+  - CONSISTÊNCIA SEMÂNTICA OBRIGATÓRIA:
+    * "aquisição" = compra de bens/materiais/produtos;
+    * "contratação" = prestação de serviços, locação, manutenção, execução de obra ou solução continuada.
+    * NÃO misture os dois termos de forma incoerente no mesmo objeto (ex.: "aquisição de serviço", "contratação de material" sem justificar modelo híbrido).
+    * Se o caso for híbrido (ex.: fornecimento com instalação), explicite a principal natureza e o complemento, com fluidez e sem contradição.
+  - CONTEXTO ESPECÍFICO:
+    * Evite observações genéricas desconectadas do item (ex.: compliance amplo, menções abstratas sem relação com o objeto concreto).
+    * Cada frase deve estar ligada ao objeto pedido (ex.: se o pedido é seringa, o texto deve tratar de insumo médico correlato, uso e finalidade assistencial, sem deriva para temas não relacionados).
   - É EXPRESSAMENTE PROIBIDO devolver o objeto como expressão curta ou genérica ("materiais de limpeza", "material de escritório", "serviços de manutenção", "equipamentos" sozinhos). Sempre desenvolva em pelo menos uma frase completa com verbo e finalidade.
   - OBJETO = DESCRIÇÃO PURA EM PROSA. NUNCA use "compreendendo os itens descritos abaixo", "conforme itens abaixo", "especificações a seguir", "conforme tabela", "conforme quantitativo" ou equivalentes.
   - NÃO use reticências ("...") nem múltiplos pontos no final.
@@ -372,7 +381,7 @@ def _expand_objeto_if_too_short(text: str) -> str:
 
     words = t.split()
     paragraph_count = len([p for p in re.split(r"\n\s*\n", t) if p.strip()])
-    if len(words) >= 20 and len(t) >= 150 and paragraph_count >= 2:
+    if len(words) >= 28 and len(t) >= 220 and paragraph_count >= 2:
         return t
 
     base = re.sub(r"^[Oo]\s+objeto\s+do\s+presente\s+Termo\s+de\s+Refer[êe]ncia\s+[ée]\s+", "", t).strip()
@@ -382,12 +391,85 @@ def _expand_objeto_if_too_short(text: str) -> str:
 
     return (
         f"O objeto do presente Termo de Referência é a contratação de {base}, "
-        "com definição clara do escopo técnico e operacional, em conformidade com os requisitos normativos aplicáveis.\n\n"
-        "A execução deverá contemplar todas as atividades, insumos, rotinas e controles necessários à entrega adequada do objeto, "
-        "incluindo padrões mínimos de desempenho, qualidade e continuidade da prestação.\n\n"
-        "Como resultado esperado, busca-se assegurar maior eficiência administrativa, mitigação de riscos operacionais e melhoria "
-        "do atendimento ao interesse público, com regularidade e efetividade."
+        "com delimitação do escopo técnico e operacional necessário ao atendimento da demanda administrativa que motivou o processo.\n\n"
+        "Para a adequada execução, deverão ser observadas as etapas de planejamento, fornecimento e/ou prestação correlata, "
+        "com padrões mínimos de qualidade, critérios de desempenho e mecanismos de controle compatíveis com a natureza do objeto, "
+        "de modo a assegurar regularidade, rastreabilidade e conformidade técnica.\n\n"
+        "As entregas esperadas deverão ocorrer de forma tempestiva e consistente com as necessidades institucionais, "
+        "contribuindo para a continuidade dos serviços públicos, redução de riscos operacionais e incremento da eficiência administrativa, "
+        "com foco em resultado útil à Administração e aos usuários finais."
     )
+
+
+def _enforce_objeto_semantic_consistency(text: str) -> str:
+    """
+    Corrige incoerências comuns no objeto:
+    - mistura indevida de aquisição x contratação;
+    - construções genéricas pouco conectadas ao objeto.
+    """
+    t = (text or "").strip()
+    if not t:
+        return t
+
+    low = t.lower()
+    service_hints = (
+        "serviço",
+        "servicos",
+        "prestação",
+        "prestacao",
+        "manutenção",
+        "manutencao",
+        "execução",
+        "execucao",
+        "obra",
+        "engenharia",
+        "locação",
+        "locacao",
+    )
+    goods_hints = (
+        "aquisição",
+        "aquisicao",
+        "fornecimento",
+        "insumo",
+        "material",
+        "produto",
+        "equipamento",
+        "medicamento",
+        "seringa",
+    )
+
+    has_service_nature = any(h in low for h in service_hints)
+    has_goods_nature = any(h in low for h in goods_hints)
+
+    # Evita "aquisição de serviços" e afins.
+    t = re.sub(
+        r"(?i)\baquisi(?:ç|c)[aã]o\s+de\s+servi[çc]os?\b",
+        "contratação de serviços",
+        t,
+    )
+    # Evita "contratação de materiais/produtos" quando a natureza é compra.
+    t = re.sub(
+        r"(?i)\bcontrata(?:ç|c)[aã]o\s+de\s+(materiais?|produtos?|insumos?|equipamentos?|medicamentos?)\b",
+        r"aquisição de \1",
+        t,
+    )
+
+    # Se texto mantém ambiguidade, força forma principal por heurística.
+    low_after = t.lower()
+    if "aquisição" in low_after and "contratação" in low_after:
+        if has_service_nature and not has_goods_nature:
+            t = re.sub(r"(?i)\baquisi(?:ç|c)[aã]o\s+de\s+", "contratação de ", t)
+        elif has_goods_nature and not has_service_nature:
+            t = re.sub(r"(?i)\bcontrata(?:ç|c)[aã]o\s+de\s+", "aquisição de ", t)
+
+    # Remove frase genérica comum que descola do contexto do item.
+    t = re.sub(
+        r"(?i),?\s*com\s+observ[âa]ncia\s+dos\s+requisitos\s+t[ée]cnicos\s+e\s+operacionais\s+aplic[áa]veis",
+        "",
+        t,
+    )
+    t = re.sub(r"\s{2,}", " ", t).strip()
+    return t
 
 
 def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
@@ -940,21 +1022,23 @@ async def fill_tr_slots_with_llm(
                 f"O objeto do presente Termo de Referência é {objeto_fallback.strip().rstrip('.;')}."
             ) or objeto_fallback
 
-    # Reforço final: evita objeto curto/simples mesmo quando não é "trivial"
-    llm_slots.objeto = _expand_objeto_if_too_short(_normalize_objeto(llm_slots.objeto))
+    # Reforço final: evita objeto curto/simples e corrige semântica de aquisição x contratação.
+    llm_slots.objeto = _enforce_objeto_semantic_consistency(
+        _expand_objeto_if_too_short(_normalize_objeto(llm_slots.objeto))
+    )
 
     # Complementos de objeto: se vierem vazios, derivar automaticamente do objeto final.
     if not (llm_slots.objeto_escopo or "").strip():
         llm_slots.objeto_escopo = (
-            "O escopo compreende o planejamento, execução, controle e validação técnica das atividades necessárias ao atendimento da demanda administrativa."
+            "O escopo compreende as atividades técnicas e operacionais indispensáveis à execução do objeto, incluindo planejamento, implementação, controle e validação dos resultados pactuados."
         )
     if not (llm_slots.objeto_entregas or "").strip():
         llm_slots.objeto_entregas = (
-            "As entregas deverão observar critérios objetivos de qualidade, conformidade e desempenho, com documentação comprobatória das etapas executadas."
+            "As entregas deverão ser definidas com critérios objetivos de qualidade, conformidade e desempenho, acompanhadas da documentação comprobatória das etapas efetivamente realizadas."
         )
     if not (llm_slots.objeto_resultados or "").strip():
         llm_slots.objeto_resultados = (
-            "Espera-se como resultado a melhoria da eficiência operacional, a continuidade do serviço público e a redução de riscos de desatendimento ao interesse coletivo."
+            "Como resultados esperados, projeta-se a melhoria da eficiência operacional, o fortalecimento da continuidade do serviço público e a mitigação de riscos de desatendimento ao interesse coletivo."
         )
 
     # Campos adicionais do TR: se a LLM não retornar textos dedicados,

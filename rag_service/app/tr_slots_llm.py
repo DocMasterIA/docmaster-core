@@ -71,9 +71,9 @@ REGRAS:
 - dotacao: sempre deve ser retornado como string vazia \"\". A IA NÃO deve sugerir, inferir ou inventar dotação orçamentária; esse campo será preenchido posteriormente pelo sistema ou por outro fluxo.
 - objeto: redigir como cláusula formal completa (em prosa, sem lista solta, sem palavra isolada).
   - Preferencialmente iniciar com fórmula formal, como: "O objeto do presente Termo de Referência é ", "O presente Termo de Referência tem por objeto " ou "O objeto deste Termo de Referência consiste em ".
-  - O texto deve descrever o que será contratado, para quem e com qual finalidade administrativa, com extensão adequada ao caso (em geral 3 a 6 frases).
-  - Priorize fluidez textual entre as frases (encadeamento lógico), evitando blocos telegráficos ou frases artificiais isoladas.
-  - Evite simplificação excessiva: respostas curtas, genéricas ou com baixa densidade técnica são inválidas.
+  - O texto deve descrever o que será contratado, para quem e com qual finalidade administrativa, com extensão adequada e objetiva (preferencialmente 1 a 2 frases, em torno de 2 a 3 linhas).
+  - Priorize fluidez textual e precisão técnica, sem verborragia.
+  - Evite simplificação excessiva, mas também evite redação longa e repetitiva.
   - NÃO faça isto no campo objeto:
     * Copiar ou colar o texto do pedido do usuário (ex.: se o usuário escrever "Aquisição de 10 pneus 1000R20, 10 câmaras...", o objeto NÃO pode ser esse texto repetido; você DEVE reformular em cláusula contínua).
     * Devolver uma única palavra ou duas palavras (ex.: "pneus", "material de construção", "equipamentos", "material de escritório"). Qualquer resposta com menos de 4 palavras ou menos de 40 caracteres no objeto é INVÁLIDA.
@@ -380,8 +380,7 @@ def _expand_objeto_if_too_short(text: str) -> str:
         return t
 
     words = t.split()
-    paragraph_count = len([p for p in re.split(r"\n\s*\n", t) if p.strip()])
-    if len(words) >= 28 and len(t) >= 220 and paragraph_count >= 2:
+    if len(words) >= 14 and len(t) >= 120:
         return t
 
     base = re.sub(r"^[Oo]\s+objeto\s+do\s+presente\s+Termo\s+de\s+Refer[êe]ncia\s+[ée]\s+", "", t).strip()
@@ -389,15 +388,23 @@ def _expand_objeto_if_too_short(text: str) -> str:
     if not base:
         base = t
 
+    lower = base.lower()
+    base = re.sub(r"(?i)^\s*(a\s+)?aquisi(?:ç|c)[aã]o\s+de\s+", "", base).strip()
+    base = re.sub(r"(?i)^\s*(a\s+)?contrata(?:ç|c)[aã]o\s+de\s+", "", base).strip()
+    if not base:
+        base = t
+
+    if any(k in lower for k in ("aquisição", "aquisicao", "pneu", "material", "insumo", "produto", "equipamento")):
+        return (
+            f"O objeto do presente Termo de Referência é a aquisição de {base}, "
+            "destinada ao atendimento das necessidades da Administração Pública, "
+            "conforme especificações técnicas, quantitativos e condições estabelecidas neste Termo de Referência."
+        )
+
     return (
         f"O objeto do presente Termo de Referência é a contratação de {base}, "
-        "com delimitação do escopo técnico e operacional necessário ao atendimento da demanda administrativa que motivou o processo.\n\n"
-        "Para a adequada execução, deverão ser observadas as etapas de planejamento, fornecimento e/ou prestação correlata, "
-        "com padrões mínimos de qualidade, critérios de desempenho e mecanismos de controle compatíveis com a natureza do objeto, "
-        "de modo a assegurar regularidade, rastreabilidade e conformidade técnica.\n\n"
-        "As entregas esperadas deverão ocorrer de forma tempestiva e consistente com as necessidades institucionais, "
-        "contribuindo para a continuidade dos serviços públicos, redução de riscos operacionais e incremento da eficiência administrativa, "
-        "com foco em resultado útil à Administração e aos usuários finais."
+        "destinada ao atendimento das necessidades da Administração Pública, "
+        "conforme requisitos técnicos, níveis de desempenho e condições estabelecidas neste Termo de Referência."
     )
 
 
@@ -441,6 +448,18 @@ def _enforce_objeto_semantic_consistency(text: str) -> str:
     has_service_nature = any(h in low for h in service_hints)
     has_goods_nature = any(h in low for h in goods_hints)
 
+    # Evita "contratação de aquisição de ..." (duplicidade semântica).
+    t = re.sub(
+        r"(?i)\bcontrata(?:ç|c)[aã]o\s+de\s+aquisi(?:ç|c)[aã]o\s+de\s+",
+        "aquisição de ",
+        t,
+    )
+    # Evita "aquisição de contratação de ..." (duplicidade semântica).
+    t = re.sub(
+        r"(?i)\baquisi(?:ç|c)[aã]o\s+de\s+contrata(?:ç|c)[aã]o\s+de\s+",
+        "contratação de ",
+        t,
+    )
     # Evita "aquisição de serviços" e afins.
     t = re.sub(
         r"(?i)\baquisi(?:ç|c)[aã]o\s+de\s+servi[çc]os?\b",

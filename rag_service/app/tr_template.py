@@ -17,11 +17,7 @@ from typing import List, Dict, Any, Optional
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-<<<<<<< HEAD
 from docx.shared import Cm, Pt
-=======
-from docx.shared import Cm
->>>>>>> 36d4074 (...)
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
@@ -156,40 +152,22 @@ def _style_items_table(table) -> None:
 
 def _configure_items_table_columns(table, doc: Document) -> None:
     """
-<<<<<<< HEAD
-    Ajusta largura das colunas para priorizar descrição:
-    - Item, Unidade e Quantidade ficam com largura compacta.
-    - Descrição recebe a maior parte da largura útil da página.
-=======
     Mantém colunas curtas compactas, mas largas o suficiente
     para não quebrar títulos como "Item" e "Quantidade".
->>>>>>> 36d4074 (...)
     """
     if not table.columns:
         return
 
-<<<<<<< HEAD
-    # Colunas compactas (aprox. largura mínima para título/conteúdo curto)
-    item_w = Cm(1.2)
-    unidade_w = Cm(2.0)
-    quantidade_w = Cm(2.2)
-
-    # Largura útil da seção para distribuir a tabela.
-=======
     # Ajuste fino: continua priorizando "Descrição", sem esmagar cabeçalhos.
-    item_w = Cm(1.8)
-    unidade_w = Cm(2.6)
-    quantidade_w = Cm(3.2)
+    item_w = Cm(2.2)
+    unidade_w = Cm(2.8)
+    quantidade_w = Cm(3.9)
 
->>>>>>> 36d4074 (...)
     section = doc.sections[0] if doc.sections else None
     if section is not None:
         content_w = section.page_width - section.left_margin - section.right_margin
     else:
-<<<<<<< HEAD
         # fallback seguro caso não haja metadados de seção
-=======
->>>>>>> 36d4074 (...)
         content_w = Cm(16.0)
 
     descricao_w = content_w - (item_w + unidade_w + quantidade_w)
@@ -197,15 +175,6 @@ def _configure_items_table_columns(table, doc: Document) -> None:
         descricao_w = Cm(6.0)
 
     table.autofit = False
-<<<<<<< HEAD
-    col_widths = [item_w, descricao_w, unidade_w, quantidade_w]
-    for idx, w in enumerate(col_widths):
-        if idx < len(table.columns):
-            table.columns[idx].width = w
-        for row in table.rows:
-            if idx < len(row.cells):
-                row.cells[idx].width = w
-=======
     widths = [item_w, descricao_w, unidade_w, quantidade_w]
     for idx, width in enumerate(widths):
         if idx < len(table.columns):
@@ -213,7 +182,6 @@ def _configure_items_table_columns(table, doc: Document) -> None:
         for row in table.rows:
             if idx < len(row.cells):
                 row.cells[idx].width = width
->>>>>>> 36d4074 (...)
 
 
 def _replace_placeholders_in_paragraphs(doc: Document, mapping: Dict[str, str]) -> None:

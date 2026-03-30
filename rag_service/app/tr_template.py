@@ -159,9 +159,9 @@ def _configure_items_table_columns(table, doc: Document) -> None:
         return
 
     # Ajuste fino: continua priorizando "Descrição", sem esmagar cabeçalhos.
-    item_w = Cm(1.8)
-    unidade_w = Cm(2.6)
-    quantidade_w = Cm(3.2)
+    item_w = Cm(1.3)
+    unidade_w = Cm(1.9)
+    quantidade_w = Cm(2.5)
 
     section = doc.sections[0] if doc.sections else None
     if section is not None:
@@ -175,6 +175,13 @@ def _configure_items_table_columns(table, doc: Document) -> None:
         descricao_w = Cm(6.0)
 
     table.autofit = False
+    # Força layout fixo no Word para respeitar larguras definidas.
+    tbl_pr = table._tbl.tblPr
+    tbl_layout = tbl_pr.find(qn("w:tblLayout")) if tbl_pr is not None else None
+    if tbl_layout is None:
+        tbl_layout = OxmlElement("w:tblLayout")
+        tbl_pr.append(tbl_layout)
+    tbl_layout.set(qn("w:type"), "fixed")
     widths = [item_w, descricao_w, unidade_w, quantidade_w]
     for idx, width in enumerate(widths):
         if idx < len(table.columns):

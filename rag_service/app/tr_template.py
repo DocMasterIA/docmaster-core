@@ -159,9 +159,9 @@ def _configure_items_table_columns(table, doc: Document) -> None:
         return
 
     # Ajuste fino: continua priorizando "Descrição", sem esmagar cabeçalhos.
-    item_w = Cm(2.4)
-    unidade_w = Cm(3.0)
-    quantidade_w = Cm(4.2)
+    item_w = Cm(1.8)
+    unidade_w = Cm(2.6)
+    quantidade_w = Cm(3.2)
 
     section = doc.sections[0] if doc.sections else None
     if section is not None:
@@ -332,7 +332,6 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
         # Coluna 0: número do item (01, 02, 03...)
         if len(cells) > 0:
             _set_cell(cells[0], f"{i+1:02d}")
-            _set_cell_no_wrap(cells[0])
             if cells[0].paragraphs:
                 cells[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
         # Coluna 1: descrição (sempre escreve o valor do slot, ignorando texto anterior)
@@ -341,13 +340,11 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
         # Coluna 2: unidade
         if len(cells) > 2:
             _set_cell(cells[2], str(item.unidade) or "")
-            _set_cell_no_wrap(cells[2])
             if cells[2].paragraphs:
                 cells[2].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
         # Coluna 3: quantidade
         if len(cells) > 3:
             _set_cell(cells[3], str(item.quantidade) or "")
-            _set_cell_no_wrap(cells[3])
             if cells[3].paragraphs:
                 cells[3].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
 

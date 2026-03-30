@@ -236,6 +236,34 @@ def _parse_llm_json_response(text: str) -> Dict[str, Any]:
     return json.loads(raw)
 
 
+def _parse_llm_json_response_resilient(text: str) -> Dict[str, Any]:
+    """
+    Parse resiliente para respostas quase-JSON da LLM.
+    Tenta parse normal e, se falhar, aplica correções sintáticas comuns.
+    """
+    try:
+        return _parse_llm_json_response(text)
+    except json.JSONDecodeError:
+        pass
+
+    t = (text or "").strip()
+    m = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", t)
+    if m:
+        raw = m.group(1).strip()
+    else:
+        start = t.find("{")
+        end = t.rfind("}") + 1
+        raw = t[start:end] if start >= 0 and end > start else t
+
+    # Correções frequentes em saídas de LLM
+    fixed = raw
+    fixed = fixed.replace("“", '"').replace("”", '"').replace("’", "'")
+    fixed = re.sub(r",\s*([}\]])", r"\1", fixed)  # vírgula sobrando antes de fechar objeto/lista
+    fixed = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", fixed)  # controles inválidos
+
+    return json.loads(fixed)
+
+
 async def _choose_art75_inciso(objeto: str, itens: List[ItemSlot]) -> str:
     """
     Chama a LLM especificamente para escolher o inciso do art. 75
@@ -1607,7 +1635,13 @@ async def fill_tr_slots_with_llm(
     if not raw:
         raise ValueError("Resposta da LLM vazia para preenchimento dos slots do TR.")
 
-    parsed = _parse_llm_json_response(raw)
+    try:
+        parsed = _parse_llm_json_response_resilient(raw)
+    except json.JSONDecodeError as e:
+        raise ValueError(
+            "Falha ao interpretar JSON retornado pela LLM durante a geração do TR. "
+            f"Detalhe do parser: {e.msg} (linha {e.lineno}, coluna {e.colno})."
+        ) from e
     llm_slots = _dict_to_tr_slots(parsed)
 
     # Se o objeto vier vazio ou praticamente sem conteúdo (ex.: só um "."),

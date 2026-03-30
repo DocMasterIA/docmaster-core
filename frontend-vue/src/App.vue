@@ -167,7 +167,7 @@ const router = useRouter();
 const route = useRoute();
 
 const user = ref(null);
-const generationMenuOpen = ref(true);
+const generationMenuOpen = ref(false);
 const groupOpenState = ref({
   DispensaArt75I: false,
   DispensaArt75II: false,
@@ -333,15 +333,6 @@ async function logout() {
 
 onMounted(() => {
   fetchMe();
-  if (isGenerationSectionActive.value) {
-    generationMenuOpen.value = true;
-    const activeGroup = generationPages.find((page) =>
-      page.children?.some((child) => child.name === route.name),
-    );
-    if (activeGroup) {
-      groupOpenState.value[activeGroup.name] = true;
-    }
-  }
 });
 </script>
 

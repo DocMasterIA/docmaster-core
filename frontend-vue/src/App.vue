@@ -126,6 +126,17 @@
               </li>
               <li class="gov-nav__item">
                 <router-link
+                  to="/pesquisador-pncp"
+                  class="gov-nav__link"
+                  :class="{ 'gov-nav__link--active': $route.name === 'PncpResearcher' }"
+                  active-class="gov-nav__link--active"
+                >
+                  <i class="gov-nav__link-icon fa-solid fa-database" aria-hidden="true"></i>
+                  Pesquisador de Dados PNCP
+                </router-link>
+              </li>
+              <li class="gov-nav__item">
+                <router-link
                   to="/area-do-usuario"
                   class="gov-nav__link"
                   :class="{ 'gov-nav__link--active': $route.name === 'AreaDoUsuario' }"
@@ -158,7 +169,7 @@ const route = useRoute();
 const user = ref(null);
 const generationMenuOpen = ref(true);
 const groupOpenState = ref({
-  DispensaArt75I: true,
+  DispensaArt75I: false,
   DispensaArt75II: false,
   InexigibilidadeArt74I: false,
   EtpLivreGroup: false,

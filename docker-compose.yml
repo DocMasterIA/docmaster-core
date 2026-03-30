@@ -120,6 +120,21 @@ services:
       - text_corrector_service
     restart: unless-stopped
 
+  pncp_researcher_service:
+    build:
+      context: .
+      dockerfile: pncp_researcher_service/Dockerfile
+    image: docmaster-pncp_researcher_service
+    container_name: pncp_researcher_service
+    ports:
+      - "8012:8012"
+    environment:
+      - PORT=8012
+      - PNCP_BASE_URL=https://pncp.gov.br/api/consulta
+      - PNCP_TIMEOUT=60
+      - PNCP_DEFAULT_LOOKBACK_DAYS=180
+    restart: unless-stopped
+
   backend:
     build:
       context: .

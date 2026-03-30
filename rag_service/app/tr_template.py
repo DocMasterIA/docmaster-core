@@ -17,15 +17,31 @@ from typing import List, Dict, Any, Optional
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Cm, Pt
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
 TR_ITEMS_TABLE_ANCHOR = "(TR_TABELA_ITENS)"
+SLOT_TEXT_FONT_FAMILY = "Times New Roman"
 TR_ITEMS_LEGACY_CELL_PLACEHOLDERS = {
     "(Descrever o item de acordo com o solicitado)",
     "(Inserir unidade de medida ex: caixa, litro, unidade etc)",
     "(Inserir quantidade solicitada)",
 }
+
+
+def _apply_times_new_roman(paragraph) -> None:
+    for run in paragraph.runs:
+        run.font.name = SLOT_TEXT_FONT_FAMILY
+        r_pr = run._element.get_or_add_rPr()
+        r_fonts = r_pr.find(qn("w:rFonts"))
+        if r_fonts is None:
+            r_fonts = OxmlElement("w:rFonts")
+            r_pr.append(r_fonts)
+        r_fonts.set(qn("w:ascii"), SLOT_TEXT_FONT_FAMILY)
+        r_fonts.set(qn("w:hAnsi"), SLOT_TEXT_FONT_FAMILY)
+        r_fonts.set(qn("w:cs"), SLOT_TEXT_FONT_FAMILY)
+        r_fonts.set(qn("w:eastAsia"), SLOT_TEXT_FONT_FAMILY)
 
 
 # Template base legado: template_packages/tr_base/TR_modelo_base.docx (raiz do projeto)
@@ -55,6 +71,9 @@ class ItemSlot:
 @dataclass
 class TRTemplateSlots:
     objeto: str = ""
+    objeto_escopo: str = ""
+    objeto_entregas: str = ""
+    objeto_resultados: str = ""
     dispensa: DispensaSlots = field(default_factory=DispensaSlots)
     itens: List[ItemSlot] = field(default_factory=list)
     justificativa: str = ""
@@ -131,6 +150,42 @@ def _style_items_table(table) -> None:
     tblPr.append(tblBorders)
 
 
+def _configure_items_table_columns(table, doc: Document) -> None:
+    """
+    Ajusta largura das colunas para priorizar descrição:
+    - Item, Unidade e Quantidade ficam com largura compacta.
+    - Descrição recebe a maior parte da largura útil da página.
+    """
+    if not table.columns:
+        return
+
+    # Colunas compactas (aprox. largura mínima para título/conteúdo curto)
+    item_w = Cm(1.2)
+    unidade_w = Cm(2.0)
+    quantidade_w = Cm(2.2)
+
+    # Largura útil da seção para distribuir a tabela.
+    section = doc.sections[0] if doc.sections else None
+    if section is not None:
+        content_w = section.page_width - section.left_margin - section.right_margin
+    else:
+        # fallback seguro caso não haja metadados de seção
+        content_w = Cm(16.0)
+
+    descricao_w = content_w - (item_w + unidade_w + quantidade_w)
+    if descricao_w < Cm(6.0):
+        descricao_w = Cm(6.0)
+
+    table.autofit = False
+    col_widths = [item_w, descricao_w, unidade_w, quantidade_w]
+    for idx, w in enumerate(col_widths):
+        if idx < len(table.columns):
+            table.columns[idx].width = w
+        for row in table.rows:
+            if idx < len(row.cells):
+                row.cells[idx].width = w
+
+
 def _replace_placeholders_in_paragraphs(doc: Document, mapping: Dict[str, str]) -> None:
     """
     Substitui textos exatos dos placeholders em todos os parágrafos do documento.
@@ -149,6 +204,7 @@ def _replace_placeholders_in_paragraphs(doc: Document, mapping: Dict[str, str]) 
                 changed = True
         if changed:
             p.text = text
+            _apply_times_new_roman(p)
 
 
 def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
@@ -235,6 +291,7 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
 
     # Aplica estilo e bordas fixas à tabela
     _style_items_table(target_table)
+    _configure_items_table_columns(target_table, doc)
 
     # Cria cabeçalho padronizado
     header_row = target_table.add_row()
@@ -245,11 +302,19 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
             cell = header_cells[idx]
             cell.text = label
             for para in cell.paragraphs:
+                para.paragraph_format.space_before = Pt(0)
+                para.paragraph_format.space_after = Pt(0)
+                para.paragraph_format.line_spacing = 1.0
                 for run in para.runs:
                     run.bold = True
 
     def _set_cell(cell, text: str) -> None:
         cell.text = str(text) if text is not None else ""
+        for para in cell.paragraphs:
+            para.paragraph_format.space_before = Pt(0)
+            para.paragraph_format.space_after = Pt(0)
+            para.paragraph_format.line_spacing = 1.0
+            _apply_times_new_roman(para)
 
     for i, item in enumerate(itens):
         row = target_table.add_row()
@@ -335,6 +400,9 @@ def render_tr_from_slots(
     mapping = {
         # Placeholders padronizados (preferenciais)
         "(TR_OBJETO)": slots.objeto or "",
+        "(TR_OBJETO_ESCOPO)": slots.objeto_escopo or slots.objeto or "",
+        "(TR_OBJETO_ENTREGAS)": slots.objeto_entregas or slots.objeto or "",
+        "(TR_OBJETO_RESULTADOS_ESPERADOS)": slots.objeto_resultados or slots.objeto or "",
         "(TR_DISPENSA_INCISO)": slots.dispensa.inciso or "",
         "(TR_JUSTIFICATIVA)": justificativa_text,
         "(TR_FISCAL_NOME)": slots.fiscal.nome or "",
@@ -392,6 +460,8 @@ def render_tr_from_slots(
                         changed = True
                 if changed:
                     cell.text = text
+                    for para in cell.paragraphs:
+                        _apply_times_new_roman(para)
 
     _fill_items_table(doc, slots.itens)
 

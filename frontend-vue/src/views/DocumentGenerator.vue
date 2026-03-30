@@ -541,6 +541,24 @@ const FLOW_CONFIG = {
             fullWidth: true,
           },
           {
+            id: 'tr_objeto_escopo',
+            label: 'Objeto - escopo técnico/operacional',
+            input: 'textarea',
+            fullWidth: true,
+          },
+          {
+            id: 'tr_objeto_entregas',
+            label: 'Objeto - entregas principais',
+            input: 'textarea',
+            fullWidth: true,
+          },
+          {
+            id: 'tr_objeto_resultados',
+            label: 'Objeto - resultados esperados',
+            input: 'textarea',
+            fullWidth: true,
+          },
+          {
             id: 'tr_endereco_propostas',
             label: 'Endereço presencial para envio ou entrega de propostas',
             input: 'text',
@@ -985,6 +1003,9 @@ function buildTrSlotsOverride() {
   if (cargoAss) o.cargo_assinante_termo = cargoAss;
 
   const objetoManualTR = (f.tr_objeto_manual || '').trim();
+  const objetoEscopo = (f.tr_objeto_escopo || '').trim();
+  const objetoEntregas = (f.tr_objeto_entregas || '').trim();
+  const objetoResultados = (f.tr_objeto_resultados || '').trim();
   if (route.name === 'DispensaArt75IObrasEngenharia') {
     // Nesta rota o objeto é sempre manual (sem geração por IA).
     if (objetoManualTR) o.objeto = objetoManualTR;
@@ -992,6 +1013,9 @@ function buildTrSlotsOverride() {
     const objeto = (f.objeto || f.objeto_obra || '').trim();
     if (objeto) o.objeto = objeto;
   }
+  if (objetoEscopo) o.objeto_escopo = objetoEscopo;
+  if (objetoEntregas) o.objeto_entregas = objetoEntregas;
+  if (objetoResultados) o.objeto_resultados = objetoResultados;
 
   const justificativa = (f.justificativa || f.justificativa_inviabilidade || '').trim();
   if (justificativa) o.justificativa = justificativa;

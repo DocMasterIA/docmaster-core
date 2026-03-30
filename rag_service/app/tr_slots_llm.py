@@ -33,7 +33,7 @@ TR_SLOTS_SYSTEM_PROMPT = """Você preenche os campos (slots) de um Termo de Refe
 
 REGRAS:
 - Responda APENAS com um JSON válido, sem texto antes ou depois.
-- O JSON deve ter pelo menos estas chaves: objeto, dispensa, itens, justificativa, problema_administrativo, beneficio_esperado, fiscal, dotacao.
+- O JSON deve ter pelo menos estas chaves: objeto, objeto_escopo, objeto_entregas, objeto_resultados, dispensa, itens, justificativa, problema_administrativo, beneficio_esperado, fiscal, dotacao.
 - Use linguagem técnica, formal e objetiva, adequada a documentos administrativos. NÃO use gírias, comentários informais ou meta-observações (ex.: "simples até demais", "ficou meio esquisito", "feito direto pelo usuário").
 
 - dispensa: objeto com "artigo" e "inciso".
@@ -69,19 +69,46 @@ REGRAS:
   - Se o usuário já tiver informado descrição/unidade/quantidade, preserve essas informações e apenas complemente de forma técnica quando fizer sentido.
 - fiscal: objeto com "nome" (nome completo do fiscal do contrato). Se não houver nome de fiscal claramente informado pelo usuário ou contexto, use "" (não invente nomes).
 - dotacao: sempre deve ser retornado como string vazia \"\". A IA NÃO deve sugerir, inferir ou inventar dotação orçamentária; esse campo será preenchido posteriormente pelo sistema ou por outro fluxo.
-- objeto: redigir como cláusula formal completa (em prosa, sem lista solta, sem palavra isolada).
-  - Preferencialmente iniciar com fórmula formal, como: "O objeto do presente Termo de Referência é ", "O presente Termo de Referência tem por objeto " ou "O objeto deste Termo de Referência consiste em ".
-  - O texto deve descrever o que será contratado, para quem e com qual finalidade administrativa, com extensão adequada ao caso (em geral 2 a 5 frases).
-  - Evite respostas curtas demais; priorize redação objetiva, técnica e suficientemente detalhada.
-  - NÃO faça isto no campo objeto:
-    * Copiar ou colar o texto do pedido do usuário (ex.: se o usuário escrever "Aquisição de 10 pneus 1000R20, 10 câmaras...", o objeto NÃO pode ser esse texto repetido; você DEVE reformular em cláusula contínua).
-    * Devolver uma única palavra ou duas palavras (ex.: "pneus", "material de construção", "equipamentos", "material de escritório"). Qualquer resposta com menos de 4 palavras ou menos de 40 caracteres no objeto é INVÁLIDA.
-    * Devolver uma lista solta (ex.: "10 pneus, 10 câmaras, 50 válvulas"). O objeto deve ser redação em prosa, não enumeração.
-  - A partir do pedido do usuário, interprete o que foi solicitado e redija uma cláusula de objeto em terceira pessoa, em prosa e com linguagem formal.
-  - Deve incluir: (a) o que será contratado (bens/serviços), em linguagem de cláusula; (b) a finalidade ou o setor/órgão beneficiado quando informado no pedido.
-  - É EXPRESSAMENTE PROIBIDO devolver o objeto como expressão curta ou genérica ("materiais de limpeza", "material de escritório", "serviços de manutenção", "equipamentos" sozinhos). Sempre desenvolva em pelo menos uma frase completa com verbo e finalidade.
-  - OBJETO = DESCRIÇÃO PURA EM PROSA. NUNCA use "compreendendo os itens descritos abaixo", "conforme itens abaixo", "especificações a seguir", "conforme tabela", "conforme quantitativo" ou equivalentes.
-  - NÃO use reticências ("...") nem múltiplos pontos no final.
+- objeto: redigir como cláusula formal completa, declarativa e robusta (prosa contínua, sem lista solta).
+  - Estrutura argumentativa obrigatória do objeto:
+    * Núcleo material: declarar com precisão o que será adquirido/contratado (com substantivo técnico adequado ao item).
+    * Delimitação funcional: explicitar a finalidade pública e o contexto administrativo de uso.
+    * Fechamento normativo: concluir com referência a especificações técnicas, quantitativos e condições do Termo de Referência.
+  - Modelo de qualidade esperado (referência de estilo, não template rígido):
+    * "Aquisição/contratação do objeto demandado, com delimitação da finalidade administrativa e referência às especificações técnicas, quantitativos e condições estabelecidas neste Termo de Referência."
+  - Regras fortes de redação:
+    * Produza texto original para o caso concreto; não faça parafraseamento mecânico do pedido do usuário.
+    * Evite frase curta telegráfica. O objeto deve soar como cláusula administrativa madura.
+    * Use construção declarativa, com encadeamento lógico e fluidez sintática.
+    * Prefira 1 período principal completo; aceite 2 períodos apenas se necessário para clareza técnica.
+  - Regras de conteúdo:
+    * Se houver quantidade e unidade explícitas, incorpore obrigatoriamente no objeto.
+    * Sempre que natural, use "número + (extenso)" para reforçar precisão formal.
+    * Em aquisição, prefira fechamento com "conforme quantidades e demais condições estabelecidas neste Termo de Referência".
+    * Em contratação (qualquer natureza), prefira fechamento com "conforme requisitos técnicos e demais condições estabelecidas neste Termo de Referência".
+    * Quando houver muitos itens de aquisição (lista extensa), NÃO enumerar item por item no objeto; resumir em poucos MACROGRUPOS (idealmente 3 a 5 termos), p.ex. "Aquisição de pneus, peças, insumos e acessórios automotivos", e manter o detalhamento no array "itens" (tabela). NÃO liste nominalmente cada tipo (válvulas, pastilhas, óleo 5W30 etc.). NÃO use "incluindo" seguido de quantidades/modelos; NÃO recoloque algarismos ou medidas (kg, litros, unidades) no objeto — isso fica na tabela.
+    * Não mencionar preço/valor unitário/estimado, salvo se o usuário tiver informado explicitamente.
+    * Não remeter a "itens abaixo", "tabela", "anexo" ou equivalentes.
+  - Consistência semântica obrigatória:
+    * "aquisição" = compra de bens/produtos/materiais/insumos/equipamentos.
+    * "contratação" = serviços/obras/locação/manutenção/execução continuada.
+    * Não misturar termos de forma incoerente ("contratação de aquisição", "aquisição de serviços").
+    * Em cenário híbrido (fornecimento + instalação), declarar natureza principal e complemento sem contradição.
+  - Proibições explícitas:
+    * Não devolver objeto genérico ("Aquisição de pneus.", "Serviços de manutenção.", "Material de escritório.").
+    * Não usar bordões vazios ("de forma eficiente", "de modo adequado") sem vínculo técnico com o objeto.
+    * Não usar reticências, linguagem coloquial, metacomentários ou autoexplicações.
+    * NÃO usar "Inclui:", "Compreende:", "Engloba:", "Abrangendo os seguintes itens" nem listas com traços (-), asteriscos ou numeração no campo objeto; o detalhamento nominal fica exclusivamente no array "itens".
+  - Checklist obrigatório antes de finalizar o campo objeto:
+    * O texto identifica claramente o item/serviço principal?
+    * O texto explicita finalidade administrativa concreta?
+    * Há coerência plena entre aquisição x contratação?
+    * Há completude técnica mínima (sem ficar curto/telegráfico)?
+    * Não há lista com marcadores (-, *, •), "Inclui:" nem itens numerados após a prosa?
+    * A redação final parece cláusula de TR assinável por órgão público?
+- objeto_escopo: texto complementar (1 a 2 frases) com delimitação do escopo técnico/operacional do objeto.
+- objeto_entregas: texto complementar (1 a 2 frases) com principais entregas/resultados verificáveis esperados da contratação.
+- objeto_resultados: texto complementar (1 a 2 frases) com impactos/resultados esperados para a Administração e usuários do serviço.
 - justificativa: parágrafo de justificativa técnica/administrativa para a contratação, em linguagem formal. - Deve ser um texto dissertativo-argumentativo extenso, completo e técnico. Não deve ser uma frase curta e simplificada.
   - Deve ser um parágrafo de justificativa técnica/administrativa mais rico (idealmente 3 a 6 frases), em linguagem formal, explicando:
     * por que a contratação é necessária para a Administração,
@@ -93,6 +120,47 @@ REGRAS:
 - Se o usuário informar itens (descrição, unidade, quantidade), use-os no array itens; senão sugira itens coerentes com o objeto.
 - Cada produto ou serviço diferente mencionado pelo usuário deve virar um item separado no array "itens" (não agrupe vários produtos na mesma "descricao").
 - Use Lei 14.133/2021. Não invente dados que não possam ser inferidos do pedido (ex.: fiscal deixe vazio se não informado; dotação sempre deixe vazia, pois não é responsabilidade da IA preencher).
+"""
+
+OBJETO_REWRITE_SYSTEM_PROMPT = """Você é redator público especializado em cláusulas de OBJETO para Termo de Referência (Lei 14.133/2021).
+
+OBJETIVO:
+Reescrever exclusivamente a cláusula de objeto com padrão técnico-jurídico elevado, redação declarativa robusta, fluidez e precisão.
+
+SAÍDA:
+- Entregar APENAS o texto final do objeto (sem JSON, sem bullets, sem observações, sem "Inclui:" ou enumeração após o parágrafo).
+
+PADRÃO OBRIGATÓRIO DE COMPOSIÇÃO:
+1) Abertura material: declarar o que será adquirido/contratado (em listas extensas de aquisição, use só macrogrupos; não detalhe cada SKU/tipo).
+2) Delimitação funcional: explicitar a finalidade administrativa e o interesse público atendido.
+3) Fechamento técnico: vincular o objeto às especificações técnicas, quantitativos e condições do Termo de Referência.
+
+REGRAS DE QUALIDADE:
+- O texto deve parecer cláusula pronta para documento oficial; não pode soar rascunho.
+- Evitar frase telegráfica. Se necessário, ampliar com informação substantiva e útil.
+- Preferir 1 período principal denso e bem articulado; admitir 2 períodos apenas quando indispensável.
+- Manter coesão, regência e concordância corretas; evitar repetição de palavras e vícios de linguagem.
+
+REGRAS DE CONTEÚDO:
+- Preservar natureza semântica:
+  * aquisição = bens/produtos/materiais/insumos/equipamentos;
+  * contratação = serviços/obras/locação/manutenção.
+- Se houver quantidade/unidade explícitas, incorporar obrigatoriamente quando o objeto for unitário ou a lista de itens for curta.
+- Se o usuário informar números em algarismo, preserve os algarismos no texto final (podendo complementar com extenso entre parênteses), EXCETO quando a mensagem do usuário pedir resumo por macrogrupos ou houver lista extensa de aquisição: aí não inclua algarismos, modelos nem medidas no objeto.
+- Quando for natural no contexto formal (e não for lista extensa resumida), usar número seguido do extenso entre parênteses.
+- Não inventar preço, prazo, marca, secretaria, localidade ou qualquer dado ausente.
+
+PROIBIÇÕES:
+- Não usar listas com traço (-), asterisco, numeração, "Inclui:", "Compreende:", "Engloba:" nem "Abrangendo os seguintes itens"; todo item nominal vai na tabela, não no objeto.
+- Não usar "conforme itens abaixo", "conforme tabela", "etc.", "entre outros", "de forma adequada" sem conteúdo técnico.
+- Não devolver objeto curto vazio de conteúdo (ex.: só "Aquisição de materiais."); em lista extensa, macrogrupos como "pneus, peças, insumos e acessórios automotivos" são válidos.
+- Não usar metacomentário, justificativa do modelo ou explicação do processo.
+- Não inserir marcas, modelos, quantidades, unidades ou características técnicas que não estejam no pedido do usuário, no rascunho ou nos itens estruturados.
+
+CRITÉRIO DE ACEITAÇÃO:
+- O texto final deve responder, em uma leitura única:
+  "o que", "em que extensão mínima", "para qual finalidade administrativa" e "sob quais balizas técnicas".
+- Se houver lista extensa de itens de aquisição, o núcleo material deve ter no máximo 3 a 5 macrogrupos (ex.: pneus, peças, insumos e acessórios automotivos), sem listar cada insumo nominalmente, deixando o detalhe na tabela. Porém a cláusula NÃO pode ser telegráfica: inclua obrigatoriamente uma oração clara de finalidade administrativa (ex.: atendimento à manutenção da frota, continuidade operacional, suporte ao funcionamento dos veículos da Administração), antes do fechamento normativo. Proibido: "incluindo ... 300 unidades ...", enumeração de modelos, blocos "Inclui:" com traços e fechamento que re-lista quantitativos.
 """
 
 
@@ -147,7 +215,7 @@ def _build_tr_slots_user_prompt(
             "NÃO resuma o objeto em uma frase curta ou genérica; desenvolva em cláusula contínua completa."
         )
     parts.append(
-        "\nPreencha o JSON de slots do Termo de Referência (objeto, dispensa, itens, justificativa, problema_administrativo, beneficio_esperado, fiscal, dotacao). Saída: apenas o JSON."
+        "\nPreencha o JSON de slots do Termo de Referência (objeto, objeto_escopo, objeto_entregas, objeto_resultados, dispensa, itens, justificativa, problema_administrativo, beneficio_esperado, fiscal, dotacao). Saída: apenas o JSON."
     )
     return "\n".join(parts)
 
@@ -255,6 +323,484 @@ REGRAS DE SAÍDA:
     }
     return inciso_val if inciso_val in valid_incisos else ""
 
+
+async def _rewrite_objeto_clause(
+    user_prompt: str,
+    draft_objeto: str,
+    itens: List[ItemSlot],
+    max_items: int = 5,
+) -> str:
+    """Reescreve a cláusula de objeto em chamada dedicada, curta e focada."""
+    itens_lines: List[str] = []
+    for it in itens[: max(1, max_items)]:
+        desc = (getattr(it, "descricao", "") or "").strip()
+        un = (getattr(it, "unidade", "") or "").strip()
+        qtd = getattr(it, "quantidade", None)
+        if desc:
+            itens_lines.append(f"- descricao={desc}; unidade={un or '-'}; quantidade={qtd if qtd is not None else '-'}")
+
+    user_parts = [
+        f"Pedido do usuário: {user_prompt.strip()}",
+        f"Rascunho atual do objeto: {draft_objeto.strip() or '[vazio]'}",
+    ]
+    if itens_lines:
+        user_parts.append("Itens estruturados:\n" + "\n".join(itens_lines))
+
+    full_prompt = f"<<SYSTEM>>\n{OBJETO_REWRITE_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n" + "\n".join(user_parts)
+    url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
+    payload = {"prompt": full_prompt, "stream": False}
+
+    try:
+        async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            body = resp.json()
+    except Exception:
+        return draft_objeto
+
+    data = body.get("data", body) if isinstance(body, dict) else {}
+    text = data.get("response", data.get("text", "")) if isinstance(data, dict) else str(data)
+    rewritten = (text or "").strip()
+    if not rewritten:
+        return draft_objeto
+    rewritten = rewritten.strip().strip('"').strip("'")
+    return rewritten or draft_objeto
+
+
+def _looks_like_item_by_item_enumeration(text: str) -> bool:
+    """Detecta objeto que ainda enumera quantidades/modelos (detalhe que deve ir só na tabela)."""
+    raw = (text or "").strip()
+    if not raw:
+        return False
+    t = raw.lower()
+    # Introduz colagem típica do modelo: "Inclui:" + bullets (detalhe só na tabela)
+    if re.search(r"(?i)\b(?:inclui|compreende|engloba)\s*:", raw):
+        return True
+    if re.search(r"(?i)\babrangendo\s+os\s+seguintes(?:\s+itens)?\b", raw):
+        return True
+    if re.search(r"(?m)^\s*[-*•]\s+\S", raw):
+        return True
+    if re.search(r"(?m)^\s*\d+[\.)]\s+\S", raw):
+        return True
+    # "incluindo 300 unidades..." ou similar
+    if re.search(r"\bincluindo\b", t) and re.search(r"\b\d{2,6}\b", t):
+        return True
+    # Várias ocorrências de quantidade + unidade de medida
+    qty_unit_hits = len(
+        re.findall(
+            r"\b\d{1,6}\s*(?:unidades?|kg|litros?|m[lL]\b|gal[õo]es?|cx|caixas?)\b",
+            t,
+        )
+    )
+    if qty_unit_hits >= 2:
+        return True
+    # Muitos algarismos isolados = lista de quantitativos no texto
+    if len(re.findall(r"\b\d{2,6}\b", t)) >= 4:
+        return True
+    enum_markers = 0
+    if len(re.findall(r"\b\d{1,6}\b", t)) >= 3:
+        enum_markers += 1
+    if len(re.findall(r"\bmodelo\s*[a-z0-9.-]+", t)) >= 2:
+        enum_markers += 1
+    if len(re.findall(r"(?:^|[^\w])(?:aro\s*)?r\d{1,2}(?:[.,]\d)?\b", t)) >= 2:
+        enum_markers += 1
+    if t.count(",") >= 4 and re.search(r"\b\d{2,6}\b", t):
+        enum_markers += 1
+    return enum_markers >= 2
+
+
+def _needs_ultra_macro_objeto_summary(text: str) -> bool:
+    """Núcleo após 'Aquisição de' ainda lista dezenas de tipos; pedir compressão para macrogrupos."""
+    t = (text or "").strip()
+    if not t:
+        return False
+    first = re.split(r"(?<=[.!?])\s+", t, maxsplit=1)[0]
+    m = re.search(r"(?i)^aquisi(?:c|ç)[aã]o\s+de\s+(.+)$", first.strip())
+    if not m:
+        return False
+    nucleus = m.group(1).strip()
+    if nucleus.count(",") >= 3:
+        return True
+    if nucleus.lower().count(" e ") >= 3:
+        return True
+    if len(nucleus.split()) > 35:
+        return True
+    return False
+
+
+async def _ultra_compress_objeto_macro_groups(
+    texto: str,
+    itens: List[ItemSlot],
+    user_prompt: str,
+) -> str:
+    """Força núcleo 'Aquisição de …' com poucos macrogrupos (poucas vírgulas, sem itens nominalmente)."""
+    return await _rewrite_objeto_clause(
+        user_prompt=(
+            f"{user_prompt}\n\n"
+            "O objeto abaixo ainda traz lista nominal longa após 'Aquisição de'. "
+            "Redija UMA ou DUAS frases completas, com linguagem administrativa madura:\n"
+            "(1) Núcleo: NO MÁXIMO 3 a 5 MACROGRUPOS (ex.: pneus, peças, insumos e acessórios automotivos). "
+            "Não cite itens específicos (válvulas, pastilhas, óleo, filtro, etc.). Sem algarismos.\n"
+            "(2) Finalidade: uma oração clara vinculando ao interesse público (manutenção/suporte da frota, continuidade operacional, "
+            "atendimento às necessidades de manutenção da frota e de suporte operacional — ajuste ao contexto do pedido sem inventar órgão ou quantidade).\n"
+            "(3) Fechamento: \"conforme quantidades e demais condições estabelecidas neste Termo de Referência\" ou equivalente formal.\n"
+            "Não entregue só macrogrupos colados ao fechamento; evite texto de etiqueta.\n\n"
+            f"Texto atual:\n{texto.strip()}"
+        ),
+        draft_objeto=texto,
+        itens=itens,
+        max_items=12,
+    )
+
+
+def _macro_objeto_telegrafico_demais(text: str) -> bool:
+    """Detecta resumo só com macrogrupos + fechamento normativo, sem oração de finalidade administrativa."""
+    t = (text or "").strip()
+    if not t:
+        return False
+    low = t.lower()
+    if not re.search(r"(?i)\baquisi(?:c|ç)[aã]o\s+de\s+", low):
+        return False
+    words = re.findall(r"\w+", t, flags=re.UNICODE)
+    forte_finalidade = any(
+        k in low
+        for k in (
+            "destinad",
+            "finalidade",
+            "necessidades",
+            "atendimento",
+            "manutenção",
+            "manutencao",
+            "frota",
+            "operacional",
+            "viatur",
+            "veículos",
+            "veiculos",
+            "continuidade",
+            "funcionamento",
+        )
+    )
+    conector_finalidade = bool(
+        re.search(
+            r"(?i)\b(destinad[oa]s?|com\s+(?:o\s+)?(?:objetivo|intuito|vistas)|para\s+atender|"
+            r"garantindo\s+a|visando\s+a|assegurando)\b",
+            low,
+        )
+    )
+    if len(words) < 28 and not forte_finalidade:
+        return True
+    if len(words) < 40 and forte_finalidade and not conector_finalidade:
+        return True
+    return False
+
+
+async def _enrich_macro_objeto_add_finalidade(
+    texto: str,
+    itens: List[ItemSlot],
+    user_prompt: str,
+) -> str:
+    """Amplia cláusula quando ficou curta demais após compressão por macrogrupos."""
+    return await _rewrite_objeto_clause(
+        user_prompt=(
+            f"{user_prompt}\n\n"
+            "O objeto abaixo está simples demais (macrogrupos colados ao fechamento normativo). "
+            "Mantenha NO MÁXIMO 3 a 5 macrogrupos após 'Aquisição de', sem listar itens nem números. "
+            "Insira ENTRE o núcleo e o fechamento uma oração de finalidade administrativa bem redigida "
+            "(frota, manutenção veicular, continuidade operacional ou equivalente coerente com o pedido). "
+            "Pode usar 2 frases curtas se fluir melhor. Preserve fechamento com "
+            "\"conforme quantidades e demais condições estabelecidas neste Termo de Referência\".\n\n"
+            f"Texto atual:\n{texto.strip()}"
+        ),
+        draft_objeto=texto,
+        itens=itens,
+        max_items=12,
+    )
+
+
+def _is_objeto_redacao_fraca(text: str) -> bool:
+    t = (text or "").strip()
+    if not t:
+        return True
+    words = re.findall(r"\w+", t, flags=re.UNICODE)
+    if len(words) < 12:
+        return True
+    low = t.lower()
+    has_finalidade = any(k in low for k in ("finalidad", "destinad", "atendimento", "necessidades"))
+    return not has_finalidade
+
+
+async def _summarize_objeto_many_aquisicao_items(
+    objeto: str,
+    itens: List[ItemSlot],
+    user_prompt: str,
+) -> str:
+    """
+    Em aquisições com lista extensa, pede à própria IA para resumir o objeto
+    por macrogrupos (sem enumeração item a item), mantendo detalhes na tabela.
+    """
+    t = (objeto or "").strip()
+    if not t or len(itens) < 6:
+        return t
+
+    low_prompt = (user_prompt or "").lower()
+    low_obj = t.lower()
+    is_aquisicao = bool(
+        re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", low_prompt)
+        or re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", low_obj)
+    )
+    if not is_aquisicao:
+        return t
+
+    summarized = await _rewrite_objeto_clause(
+        user_prompt=(
+            f"{user_prompt}\n\n"
+            "Há muitos itens na aquisição. Redija cláusula com redação madura (não telegráfica):\n"
+            "- Núcleo: no máximo 3 a 5 MACROGRUPOS (ex.: pneus, peças, insumos e acessórios automotivos), "
+            "sem listar cada tipo nominalmente (nada de válvulas, pastilhas, óleo 5W30, etc.). "
+            "Detalhe só na tabela de itens. Proibido 'Inclui:', listas com traço (-) ou numeração.\n"
+            "- Inclua explicitamente finalidade administrativa (manutenção da frota, continuidade operacional ou suporte às necessidades de manutenção da Administração — conforme o pedido).\n"
+            "- Feche com \"conforme quantidades e demais condições estabelecidas neste Termo de Referência\" "
+            "ou \"em quantidade conforme estipulado neste Termo de Referência\"."
+        ),
+        draft_objeto=t,
+        itens=itens,
+        max_items=12,
+    )
+
+    for _ in range(2):
+        if not _looks_like_item_by_item_enumeration(summarized):
+            break
+        summarized = await _rewrite_objeto_clause(
+            user_prompt=(
+                f"{user_prompt}\n\n"
+                f"O texto abaixo ainda traz quantidades, modelos, lista \"incluindo ...\", 'Inclui:' ou bullets (-), proibido no objeto:\n"
+                f"{summarized}\n\n"
+                "Reescreva com NO MÁXIMO 3 a 5 MACROGRUPOS agregados (ex.: pneus, peças, insumos e acessórios automotivos), "
+                "sem citar itens específicos nominalmente, sem algarismos, sem 'incluindo', sem 'Inclui:', sem traços de lista, sem unidades (kg, litros). "
+                "Use fechamento: \"conforme quantidades e demais condições estabelecidas neste Termo de Referência\" "
+                "ou \"em quantidade conforme estipulado neste Termo de Referência\"."
+            ),
+            draft_objeto=summarized,
+            itens=itens,
+            max_items=12,
+        )
+    if _needs_ultra_macro_objeto_summary(summarized):
+        summarized = await _ultra_compress_objeto_macro_groups(summarized, itens, user_prompt)
+    if _macro_objeto_telegrafico_demais(summarized):
+        summarized = await _enrich_macro_objeto_add_finalidade(summarized, itens, user_prompt)
+    return summarized
+
+
+async def _strip_enumeration_from_summarized_objeto_if_needed(
+    objeto: str,
+    itens: List[ItemSlot],
+    user_prompt: str,
+) -> str:
+    """Após outras etapas, garante que listas longas de aquisição não voltem com quantidades no texto."""
+    t = (objeto or "").strip()
+    if not t or len(itens) < 6:
+        return t
+    low_p = (user_prompt or "").lower()
+    if not (
+        re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", low_p) or re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", t.lower())
+    ):
+        return t
+    if not _looks_like_item_by_item_enumeration(t):
+        return t
+    return await _rewrite_objeto_clause(
+        user_prompt=(
+            f"{user_prompt}\n\n"
+            f"Corrija o objeto abaixo: ainda há listagem detalhada, quantidades/modelos, 'incluindo ...', 'Inclui:' ou bullets. "
+            f"Detalhe só na tabela.\n{t}\n\n"
+            "Use NO MÁXIMO 3 a 5 macrogrupos após 'Aquisição de' (ex.: pneus, peças, insumos e acessórios automotivos). "
+            "Sem dígitos. Inclua uma oração de finalidade administrativa (não basta colar macrogrupos ao fechamento). "
+            "Feche com \"conforme quantidades e demais condições estabelecidas neste Termo de Referência\" "
+            "ou \"em quantidade conforme estipulado neste Termo de Referência\"."
+        ),
+        draft_objeto=t,
+        itens=itens,
+        max_items=12,
+    )
+
+
+def _numero_extenso_pt_br_ate_9999(n: int, feminino: bool = False) -> str:
+    if n < 0 or n > 9999:
+        return str(n)
+
+    unidades_m = {
+        0: "zero", 1: "um", 2: "dois", 3: "tres", 4: "quatro", 5: "cinco", 6: "seis", 7: "sete", 8: "oito", 9: "nove",
+        10: "dez", 11: "onze", 12: "doze", 13: "treze", 14: "quatorze", 15: "quinze", 16: "dezesseis", 17: "dezessete", 18: "dezoito", 19: "dezenove",
+    }
+    unidades_f = dict(unidades_m)
+    unidades_f[1] = "uma"
+    unidades_f[2] = "duas"
+
+    dezenas = {20: "vinte", 30: "trinta", 40: "quarenta", 50: "cinquenta", 60: "sessenta", 70: "setenta", 80: "oitenta", 90: "noventa"}
+    centenas_m = {100: "cem", 200: "duzentos", 300: "trezentos", 400: "quatrocentos", 500: "quinhentos", 600: "seiscentos", 700: "setecentos", 800: "oitocentos", 900: "novecentos"}
+    centenas_f = {100: "cem", 200: "duzentas", 300: "trezentas", 400: "quatrocentas", 500: "quinhentas", 600: "seiscentas", 700: "setecentas", 800: "oitocentas", 900: "novecentas"}
+
+    u = unidades_f if feminino else unidades_m
+    c_map = centenas_f if feminino else centenas_m
+
+    if n in u:
+        return u[n]
+    if n in dezenas:
+        return dezenas[n]
+    if n in c_map:
+        return c_map[n]
+    if n < 100:
+        d = (n // 10) * 10
+        return f"{dezenas[d]} e {u[n - d]}"
+    if n < 1000:
+        c = (n // 100) * 100
+        c_txt = "cento" if c == 100 else c_map[c]
+        return f"{c_txt} e {_numero_extenso_pt_br_ate_9999(n - c, feminino=feminino)}"
+    milhar = n // 1000
+    resto = n % 1000
+    mil_txt = "mil" if milhar == 1 else f"{_numero_extenso_pt_br_ate_9999(milhar)} mil"
+    if resto == 0:
+        return mil_txt
+    conector = " e " if resto < 100 else " "
+    return f"{mil_txt}{conector}{_numero_extenso_pt_br_ate_9999(resto, feminino=feminino)}"
+
+
+def _extrair_int_positivo(value: Any) -> Optional[int]:
+    if value is None:
+        return None
+    m = re.search(r"\d+", str(value))
+    if not m:
+        return None
+    try:
+        val = int(m.group(0))
+    except Exception:
+        return None
+    return val if val > 0 else None
+
+
+def _polish_objeto_with_itens(objeto: str, itens: List[ItemSlot], user_prompt: str) -> str:
+    """
+    Melhora o objeto para padrão técnico quando houver aquisição com itens/quantidade.
+    Não substitui indiscriminadamente: atua como lapidação de qualidade.
+    """
+    t = (objeto or "").strip()
+    if not t or not itens:
+        return t
+
+    low_prompt = (user_prompt or "").lower()
+    is_aquisicao_early = bool(
+        re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", t) or re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", low_prompt)
+    )
+    # Listas longas: objeto deve permanecer resumido; não recompor com quantidades item a item.
+    if is_aquisicao_early and len(itens) >= 6:
+        finalidade = r"destinad[oa]s?\s+ao\s+atendimento\s+das\s+necessidades\s+da\s+administra[cç][aã]o\s+p[úu]blica\s+municipal"
+        t = re.sub(
+            rf"(?i)\b({finalidade})\b\s*[.,;:]+\s*,?\s*\b\1\b",
+            r"\1",
+            t,
+        )
+        return re.sub(r"\s{2,}", " ", t).strip()
+
+    first = itens[0]
+    desc = str(getattr(first, "descricao", "") or "").strip()
+    qtd = _extrair_int_positivo(getattr(first, "quantidade", None))
+    unidade = str(getattr(first, "unidade", "") or "").strip().lower()
+    if not desc or not qtd:
+        return t
+
+    low_obj = t.lower()
+
+    # Nunca força polimento de aquisição para pedidos de contratação/serviço.
+    if any(k in low_prompt for k in ("contratação", "contratacao", "serviço", "servicos", "manutenção", "manutencao")):
+        return t
+
+    is_aquisicao = bool(re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", t) or re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", low_prompt))
+    if not is_aquisicao:
+        return t
+
+    feminino = unidade in {"un", "unid", "unidade", "unidades"}
+    extenso = _numero_extenso_pt_br_ate_9999(qtd, feminino=feminino)
+    unidade_txt = "unidades" if not unidade else (unidade if unidade != "un" else "unidades")
+    bloco_qtd = f"{qtd} ({extenso}) {unidade_txt}"
+
+    # Se pedido veio com algarismos e o objeto saiu sem algarismos,
+    # recompõe aquisição com base nos itens para preservar fidelidade numérica.
+    prompt_has_digits = bool(re.search(r"\b\d{1,6}\b", low_prompt))
+    text_has_digits = bool(re.search(r"\b\d{1,6}\b", t))
+    if prompt_has_digits and not text_has_digits and len(itens) >= 1 and len(itens) < 6:
+        parts: List[str] = []
+        for it in itens[:6]:
+            qtd_i = _extrair_int_positivo(getattr(it, "quantidade", None))
+            desc_i = str(getattr(it, "descricao", "") or "").strip()
+            if not qtd_i or not desc_i:
+                continue
+            ext_i = _numero_extenso_pt_br_ate_9999(qtd_i, feminino=False)
+            parts.append(f"{qtd_i} ({ext_i}) {desc_i}")
+        if parts:
+            lista = ", ".join(parts[:-1]) + (" e " + parts[-1] if len(parts) > 1 else parts[0])
+            return (
+                f"Aquisição de {lista}, destinados ao atendimento das necessidades da Administração Pública Municipal, "
+                "conforme quantidades e demais condições estabelecidas neste Termo de Referência."
+            )
+
+    # Só lapida se o texto já guardar aderência mínima ao item (evita injetar tema errado).
+    desc_tokens = [tok for tok in re.findall(r"[a-z0-9]{4,}", desc.lower())[:4]]
+    if desc_tokens and not any(tok in low_obj for tok in desc_tokens):
+        return t
+
+    # Se não houver bloco numérico + extenso, reconstrói o início em padrão formal.
+    if not re.search(r"\b\d{1,6}\s*\([^)]{2,}\)", t):
+        t = (
+            f"Aquisição de {bloco_qtd} de {desc}, destinados ao atendimento das necessidades "
+            "da Administração Pública Municipal, conforme especificações técnicas, quantitativos "
+            "e condições estabelecidas neste Termo de Referência."
+        )
+        return t
+
+    # Se já houver número por extenso, apenas garante fechamento institucional.
+    if not re.search(r"(?i)administra[cç][aã]o p[úu]blica", t):
+        t = t.rstrip(".;:, ") + ", destinados ao atendimento das necessidades da Administração Pública Municipal."
+
+    # Remove duplicação acidental da oração de finalidade quando o texto já a contém.
+    finalidade = r"destinad[oa]s?\s+ao\s+atendimento\s+das\s+necessidades\s+da\s+administra[cç][aã]o\s+p[úu]blica\s+municipal"
+    t = re.sub(
+        rf"(?i)\b({finalidade})\b\s*[.,;:]+\s*,?\s*\b\1\b",
+        r"\1",
+        t,
+    )
+    return t
+
+
+def _strip_item_lists_from_objeto_text(text: str) -> str:
+    """
+    Remove enumerações que o modelo às vezes cola na cláusula (ex.: "Inclui:" + itens com traço).
+    O detalhamento deve permanecer apenas no array itens.
+    """
+    text = (text or "").strip()
+    if not text:
+        return ""
+
+    m_intro = re.search(
+        r"(?i)\b(?:inclui|compreende|engloba|abrangendo\s+os\s+seguintes(?:\s+itens)?)\s*:",
+        text,
+    )
+    if m_intro:
+        text = text[: m_intro.start()].rstrip()
+
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        s = line.strip()
+        if re.match(r"^[-*•]\s+\S", s) or re.match(r"^\d+[\.)]\s+\S", s):
+            text = "\n".join(lines[:i]).rstrip()
+            break
+
+    m_inline = re.search(r"(?<=[.!?])\s+[-*•]\s+\S", text)
+    if m_inline:
+        text = text[: m_inline.start()].rstrip()
+
+    text = re.sub(r"(?i)\s*(?:inclui|compreende|engloba)\s*:\s*$", "", text).rstrip()
+    return text.rstrip(",;: ")
+
+
 def _normalize_objeto(text: str) -> str:
     """
     Normaliza o campo objeto para ficar mais formal e sem pontuação estranha no final.
@@ -263,6 +809,9 @@ def _normalize_objeto(text: str) -> str:
     - Remove citações que remetem a itens/tabela abaixo (descrição pura apenas).
     """
     text = (text or "").strip()
+    if not text:
+        return ""
+    text = _strip_item_lists_from_objeto_text(text)
     if not text:
         return ""
 
@@ -278,14 +827,16 @@ def _normalize_objeto(text: str) -> str:
         r",?\s*conforme\s+o\s+quantitativo\s+descrito\s+abaixo\.?",
         r",?\s*detalhados\s+(na\s+tabela|nos\s+itens)\s+abaixo\.?",
         r",?\s*especificados\s+(na\s+tabela|nos\s+itens)\s+abaixo\.?",
+        r",?\s*no\s+valor\s+unit[áa]rio\s+compat[íi]vel\s+com\s+o\s+mercado\.?",
+        r",?\s*com\s+valor\s+unit[áa]rio\s+compat[íi]vel\s+com\s+o\s+mercado\.?",
+        r",?\s*com\s+pre[çc]o\s+compat[íi]vel\s+com\s+o\s+mercado\.?",
     ]
     for pat in objeto_remover:
         text = re.sub(pat, "", text, flags=re.IGNORECASE)
     text = re.sub(r"\s{2,}", " ", text).strip()
 
-    # Heurística extra: evitar objetos extremamente genéricos de 1–3 palavras,
-    # como "materiais de limpeza" ou "material de escritório". Nestes casos,
-    # expande para uma frase completa padrão, mais adequada ao TR.
+    # Heurística extra: evitar objetos extremamente genéricos de 1–3 palavras.
+    # Nestes casos, aplica uma base mínima de redação formal (sem engessar template).
     base = re.sub(r"[.。…;:,]+$", "", text).strip()
     if base:
         lower = base.lower()
@@ -345,10 +896,12 @@ def _normalize_objeto(text: str) -> str:
             use_template = True
 
         if use_template and base_for_clause:
+            natureza = "aquisição"
+            if re.search(r"(?i)\b(servi[çc]o|manuten[çc][aã]o|loca[çc][aã]o|obra|engenharia)\b", base_for_clause):
+                natureza = "contratação"
             text = (
-                f"O objeto do presente Termo de Referência é a contratação de {base_for_clause} "
-                "para atender às necessidades da Administração Pública, garantindo a adequada "
-                "prestação dos serviços e o atendimento ao interesse público."
+                f"O objeto do presente Termo de Referência é a {natureza} de {base_for_clause}, "
+                "para atendimento de necessidade administrativa do órgão requisitante."
             )
 
     # Remove reticências/múltiplos pontos e outros sinais fortes no final
@@ -368,7 +921,8 @@ def _expand_objeto_if_too_short(text: str) -> str:
         return t
 
     words = t.split()
-    if len(words) >= 16 and len(t) >= 120:
+    # Fallback apenas para casos realmente inválidos (quase vazio/telegráfico).
+    if len(words) >= 6 or len(t) >= 45:
         return t
 
     base = re.sub(r"^[Oo]\s+objeto\s+do\s+presente\s+Termo\s+de\s+Refer[êe]ncia\s+[ée]\s+", "", t).strip()
@@ -376,11 +930,172 @@ def _expand_objeto_if_too_short(text: str) -> str:
     if not base:
         base = t
 
-    return (
-        f"O objeto do presente Termo de Referência é a contratação de {base}, "
-        "com observância dos requisitos técnicos e operacionais aplicáveis, "
-        "de modo a atender às necessidades da Administração Pública com regularidade e eficiência."
+    # Reescrita mínima para evitar objeto "quebrado", sem impor template rígido.
+    return f"O objeto do presente Termo de Referência é {base}."
+
+
+def _enforce_objeto_semantic_consistency(text: str) -> str:
+    """
+    Corrige incoerências comuns no objeto:
+    - mistura indevida de aquisição x contratação;
+    - construções genéricas pouco conectadas ao objeto.
+    """
+    t = (text or "").strip()
+    if not t:
+        return t
+
+    low = t.lower()
+    service_hints = (
+        "serviço",
+        "servicos",
+        "prestação",
+        "prestacao",
+        "manutenção",
+        "manutencao",
+        "execução",
+        "execucao",
+        "obra",
+        "engenharia",
+        "locação",
+        "locacao",
     )
+    goods_hints = (
+        "aquisição",
+        "aquisicao",
+        "fornecimento",
+        "insumo",
+        "material",
+        "produto",
+        "equipamento",
+        "medicamento",
+        "seringa",
+    )
+
+    has_service_nature = any(h in low for h in service_hints)
+    has_goods_nature = any(h in low for h in goods_hints)
+
+    # Evita "contratação de aquisição de ..." (duplicidade semântica).
+    t = re.sub(
+        r"(?i)\bcontrata(?:ç|c)[aã]o\s+de\s+aquisi(?:ç|c)[aã]o\s+de\s+",
+        "aquisição de ",
+        t,
+    )
+    # Evita "aquisição de contratação de ..." (duplicidade semântica).
+    t = re.sub(
+        r"(?i)\baquisi(?:ç|c)[aã]o\s+de\s+contrata(?:ç|c)[aã]o\s+de\s+",
+        "contratação de ",
+        t,
+    )
+    # Evita "aquisição de serviços" e afins.
+    t = re.sub(
+        r"(?i)\baquisi(?:ç|c)[aã]o\s+de\s+servi[çc]os?\b",
+        "contratação de serviços",
+        t,
+    )
+    # Evita "contratação de materiais/produtos" quando a natureza é compra.
+    t = re.sub(
+        r"(?i)\bcontrata(?:ç|c)[aã]o\s+de\s+(materiais?|produtos?|insumos?|equipamentos?|medicamentos?)\b",
+        r"aquisição de \1",
+        t,
+    )
+
+    # Se texto mantém ambiguidade, força forma principal por heurística.
+    low_after = t.lower()
+    if "aquisição" in low_after and "contratação" in low_after:
+        if has_service_nature and not has_goods_nature:
+            t = re.sub(r"(?i)\baquisi(?:ç|c)[aã]o\s+de\s+", "contratação de ", t)
+        elif has_goods_nature and not has_service_nature:
+            t = re.sub(r"(?i)\bcontrata(?:ç|c)[aã]o\s+de\s+", "aquisição de ", t)
+
+    # Fechamento por natureza (aquisição x contratação).
+    is_aquisicao = bool(re.search(r"(?i)\b(aquisi(?:ç|c)[aã]o|fornecimento)\b", t)) and not has_service_nature
+    if is_aquisicao:
+        t = re.sub(
+            r"(?i),?\s*(visando|com\s+o\s+intuito\s+de)\s+atender\s+aos?\s+requisitos?\s+t[ée]cnicos?,?\s+quantitativos?\s+e\s+(demais\s+)?condi[çc][õo]es?\s+(delineadas|estabelecidas)\s+neste\s+termo\s+de\s+refer[êe]ncia\.?",
+            ", conforme quantidades e demais condições estabelecidas neste Termo de Referência",
+            t,
+        )
+        t = re.sub(
+            r"(?i),?\s*conforme\s+especifica(?:ç|c)[õo]es?\s+t[ée]cnicas?,?\s+quantitativos?\s+e\s+condi[çc][õo]es?\s+estabelecidas\s+neste\s+termo\s+de\s+refer[êe]ncia\.?",
+            ", conforme quantidades e demais condições estabelecidas neste Termo de Referência",
+            t,
+        )
+    else:
+        t = re.sub(
+            r"(?i),?\s*conforme\s+quantidades?\s+e\s+demais\s+condi[çc][õo]es?\s+estabelecidas\s+neste\s+termo\s+de\s+refer[êe]ncia\.?",
+            ", conforme requisitos técnicos e demais condições estabelecidas neste Termo de Referência",
+            t,
+        )
+
+    # Mantém liberdade de redação da IA: aqui só sanidade mínima.
+    t = re.sub(r"\s{2,}", " ", t).strip()
+    t = re.sub(r"[;:,]+\s*$", "", t).strip()
+    if t and not t.endswith("."):
+        t = f"{t}."
+    return t
+
+
+def _num_pt_br_ate_9999(n: int) -> str:
+    if n < 0 or n > 9999:
+        return str(n)
+    base = {
+        0: "zero", 1: "um", 2: "dois", 3: "tres", 4: "quatro", 5: "cinco", 6: "seis", 7: "sete", 8: "oito", 9: "nove",
+        10: "dez", 11: "onze", 12: "doze", 13: "treze", 14: "quatorze", 15: "quinze", 16: "dezesseis", 17: "dezessete", 18: "dezoito", 19: "dezenove",
+        20: "vinte", 30: "trinta", 40: "quarenta", 50: "cinquenta", 60: "sessenta", 70: "setenta", 80: "oitenta", 90: "noventa",
+        100: "cem", 200: "duzentos", 300: "trezentos", 400: "quatrocentos", 500: "quinhentos", 600: "seiscentos", 700: "setecentos", 800: "oitocentos", 900: "novecentos",
+    }
+    if n in base:
+        return base[n]
+    if n < 100:
+        d = (n // 10) * 10
+        return f"{base[d]} e {base[n - d]}"
+    if n < 1000:
+        c = (n // 100) * 100
+        c_text = "cento" if c == 100 else base[c]
+        return f"{c_text} e {_num_pt_br_ate_9999(n - c)}"
+    m = n // 1000
+    r = n % 1000
+    mil = "mil" if m == 1 else f"{_num_pt_br_ate_9999(m)} mil"
+    if r == 0:
+        return mil
+    return f"{mil}{' e ' if r < 100 else ' '}{_num_pt_br_ate_9999(r)}"
+
+
+def _extract_positive_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    m = re.search(r"\d+", str(value))
+    if not m:
+        return None
+    try:
+        n = int(m.group(0))
+    except Exception:
+        return None
+    return n if n > 0 else None
+
+
+def _enrich_objeto_with_quantidade(text: str, itens: List[ItemSlot]) -> str:
+    """Complementa o objeto apenas quando a IA omite quantidade explícita dos itens."""
+    t = (text or "").strip()
+    if not t or not itens:
+        return t
+    if re.search(r"\b\d{1,6}\b", t):
+        return t
+    it = itens[0]
+    qtd = _extract_positive_int(getattr(it, "quantidade", None))
+    desc = str(getattr(it, "descricao", "") or "").strip()
+    if not qtd or not desc:
+        return t
+    extenso = _num_pt_br_ate_9999(qtd)
+    bloco_qtd = f"{qtd} ({extenso}) unidades"
+    # Ajuste localizado: só injeta quantitativo no trecho inicial de aquisição.
+    t = re.sub(
+        r"(?i)\baquisi(?:ç|c)[aã]o\s+de\s+",
+        f"aquisição de {bloco_qtd} de ",
+        t,
+        count=1,
+    )
+    return t
 
 
 def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
@@ -426,6 +1141,9 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
     # Campo dotacao NÃO deve ser preenchido pela IA: sempre vem vazio aqui.
     return TRTemplateSlots(
         objeto=_normalize_objeto(str(data.get("objeto", "")).strip()),
+        objeto_escopo=str(data.get("objeto_escopo", "")).strip(),
+        objeto_entregas=str(data.get("objeto_entregas", "")).strip(),
+        objeto_resultados=str(data.get("objeto_resultados", "")).strip(),
         dispensa=dispensa,
         itens=itens,
         justificativa=str(data.get("justificativa", "")).strip(),
@@ -480,6 +1198,21 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         return llm_slots
 
     objeto = (override.get("objeto") or llm_slots.objeto) if override.get("objeto") is not None else llm_slots.objeto
+    objeto_escopo = (
+        (override.get("objeto_escopo") or llm_slots.objeto_escopo)
+        if override.get("objeto_escopo") is not None
+        else llm_slots.objeto_escopo
+    )
+    objeto_entregas = (
+        (override.get("objeto_entregas") or llm_slots.objeto_entregas)
+        if override.get("objeto_entregas") is not None
+        else llm_slots.objeto_entregas
+    )
+    objeto_resultados = (
+        (override.get("objeto_resultados") or llm_slots.objeto_resultados)
+        if override.get("objeto_resultados") is not None
+        else llm_slots.objeto_resultados
+    )
     justificativa = (override.get("justificativa") or llm_slots.justificativa) if override.get("justificativa") is not None else llm_slots.justificativa
     problema_administrativo = (
         (override.get("problema_administrativo") or llm_slots.problema_administrativo)
@@ -680,6 +1413,9 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         if itens:
             return TRTemplateSlots(
                 objeto=objeto,
+                objeto_escopo=objeto_escopo,
+                objeto_entregas=objeto_entregas,
+                objeto_resultados=objeto_resultados,
                 dispensa=dispensa,
                 itens=itens,
                 justificativa=justificativa,
@@ -723,6 +1459,9 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
 
     return TRTemplateSlots(
         objeto=objeto,
+        objeto_escopo=objeto_escopo,
+        objeto_entregas=objeto_entregas,
+        objeto_resultados=objeto_resultados,
         dispensa=dispensa,
         itens=itens,
         justificativa=justificativa,
@@ -909,8 +1648,72 @@ async def fill_tr_slots_with_llm(
                 f"O objeto do presente Termo de Referência é {objeto_fallback.strip().rstrip('.;')}."
             ) or objeto_fallback
 
-    # Reforço final: evita objeto curto/simples mesmo quando não é "trivial"
-    llm_slots.objeto = _expand_objeto_if_too_short(_normalize_objeto(llm_slots.objeto))
+    # Etapa dedicada para o objeto: prompt curto e separado do JSON de slots.
+    llm_slots.objeto = await _rewrite_objeto_clause(
+        user_prompt=user_prompt,
+        draft_objeto=llm_slots.objeto,
+        itens=llm_slots.itens,
+    )
+    if _is_objeto_redacao_fraca(llm_slots.objeto):
+        llm_slots.objeto = await _rewrite_objeto_clause(
+            user_prompt=(
+                f"{user_prompt}\n\n"
+                "Reescreva o objeto com redação mais completa e elegante, evitando forma telegráfica. "
+                "Inclua finalidade administrativa explícita e mantenha o texto em 1 período bem construído."
+            ),
+            draft_objeto=llm_slots.objeto,
+            itens=llm_slots.itens,
+        )
+    # Em aquisições com muitos itens, resume objeto por macrogrupos.
+    llm_slots.objeto = await _summarize_objeto_many_aquisicao_items(
+        llm_slots.objeto,
+        llm_slots.itens,
+        user_prompt,
+    )
+    # Lapidação final para cenários de aquisição com quantidade explícita nos itens.
+    llm_slots.objeto = _polish_objeto_with_itens(llm_slots.objeto, llm_slots.itens, user_prompt)
+    llm_slots.objeto = await _strip_enumeration_from_summarized_objeto_if_needed(
+        llm_slots.objeto, llm_slots.itens, user_prompt
+    )
+    low_p = (user_prompt or "").lower()
+    if (
+        len(llm_slots.itens) >= 6
+        and (
+            re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", low_p)
+            or re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", (llm_slots.objeto or "").lower())
+        )
+        and _needs_ultra_macro_objeto_summary(llm_slots.objeto)
+    ):
+        llm_slots.objeto = await _ultra_compress_objeto_macro_groups(
+            llm_slots.objeto, llm_slots.itens, user_prompt
+        )
+    if (
+        len(llm_slots.itens) >= 6
+        and (
+            re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", (user_prompt or "").lower())
+            or re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", (llm_slots.objeto or "").lower())
+        )
+        and _macro_objeto_telegrafico_demais(llm_slots.objeto)
+    ):
+        llm_slots.objeto = await _enrich_macro_objeto_add_finalidade(
+            llm_slots.objeto, llm_slots.itens, user_prompt
+        )
+    # Sanidade mínima pós-LLM (sem engessar estilo).
+    llm_slots.objeto = _enforce_objeto_semantic_consistency(_normalize_objeto(llm_slots.objeto))
+
+    # Complementos de objeto: se vierem vazios, derivar automaticamente do objeto final.
+    if not (llm_slots.objeto_escopo or "").strip():
+        llm_slots.objeto_escopo = (
+            "O escopo compreende as atividades técnicas e operacionais indispensáveis à execução do objeto, incluindo planejamento, implementação, controle e validação dos resultados pactuados."
+        )
+    if not (llm_slots.objeto_entregas or "").strip():
+        llm_slots.objeto_entregas = (
+            "As entregas deverão ser definidas com critérios objetivos de qualidade, conformidade e desempenho, acompanhadas da documentação comprobatória das etapas efetivamente realizadas."
+        )
+    if not (llm_slots.objeto_resultados or "").strip():
+        llm_slots.objeto_resultados = (
+            "Como resultados esperados, projeta-se a melhoria da eficiência operacional, o fortalecimento da continuidade do serviço público e a mitigação de riscos de desatendimento ao interesse coletivo."
+        )
 
     # Campos adicionais do TR: se a LLM não retornar textos dedicados,
     # usa a justificativa como fallback para não deixar placeholder vazio.

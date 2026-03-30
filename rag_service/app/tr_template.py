@@ -17,6 +17,7 @@ from typing import List, Dict, Any, Optional
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Cm, Pt
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
@@ -149,6 +150,42 @@ def _style_items_table(table) -> None:
     tblPr.append(tblBorders)
 
 
+def _configure_items_table_columns(table, doc: Document) -> None:
+    """
+    Ajusta largura das colunas para priorizar descrição:
+    - Item, Unidade e Quantidade ficam com largura compacta.
+    - Descrição recebe a maior parte da largura útil da página.
+    """
+    if not table.columns:
+        return
+
+    # Colunas compactas (aprox. largura mínima para título/conteúdo curto)
+    item_w = Cm(1.2)
+    unidade_w = Cm(2.0)
+    quantidade_w = Cm(2.2)
+
+    # Largura útil da seção para distribuir a tabela.
+    section = doc.sections[0] if doc.sections else None
+    if section is not None:
+        content_w = section.page_width - section.left_margin - section.right_margin
+    else:
+        # fallback seguro caso não haja metadados de seção
+        content_w = Cm(16.0)
+
+    descricao_w = content_w - (item_w + unidade_w + quantidade_w)
+    if descricao_w < Cm(6.0):
+        descricao_w = Cm(6.0)
+
+    table.autofit = False
+    col_widths = [item_w, descricao_w, unidade_w, quantidade_w]
+    for idx, w in enumerate(col_widths):
+        if idx < len(table.columns):
+            table.columns[idx].width = w
+        for row in table.rows:
+            if idx < len(row.cells):
+                row.cells[idx].width = w
+
+
 def _replace_placeholders_in_paragraphs(doc: Document, mapping: Dict[str, str]) -> None:
     """
     Substitui textos exatos dos placeholders em todos os parágrafos do documento.
@@ -254,6 +291,7 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
 
     # Aplica estilo e bordas fixas à tabela
     _style_items_table(target_table)
+    _configure_items_table_columns(target_table, doc)
 
     # Cria cabeçalho padronizado
     header_row = target_table.add_row()
@@ -264,12 +302,18 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
             cell = header_cells[idx]
             cell.text = label
             for para in cell.paragraphs:
+                para.paragraph_format.space_before = Pt(0)
+                para.paragraph_format.space_after = Pt(0)
+                para.paragraph_format.line_spacing = 1.0
                 for run in para.runs:
                     run.bold = True
 
     def _set_cell(cell, text: str) -> None:
         cell.text = str(text) if text is not None else ""
         for para in cell.paragraphs:
+            para.paragraph_format.space_before = Pt(0)
+            para.paragraph_format.space_after = Pt(0)
+            para.paragraph_format.line_spacing = 1.0
             _apply_times_new_roman(para)
 
     for i, item in enumerate(itens):

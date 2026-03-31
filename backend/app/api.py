@@ -953,10 +953,12 @@ def api_me(request):
         pref = getattr(user, "prefeitura", None)
         if pref:
             data["prefeitura"] = str(pref)
+            data["prefeitura_id"] = str(pref.id)
             data["prefeitura_uf"] = pref.estado or ""
             data["prefeitura_nome"] = pref.nome_municipio
         else:
             data["prefeitura"] = None
+            data["prefeitura_id"] = None
             data["prefeitura_uf"] = ""
             data["prefeitura_nome"] = ""
         return JsonResponse(data)

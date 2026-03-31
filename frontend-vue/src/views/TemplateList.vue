@@ -160,6 +160,21 @@ const estados = ref([]);
 const prefeituras = ref([]);
 const subtopicos = ref([]);
 
+const userPrefeituraId = ref(null);
+const userIsStaff = ref(false);
+
+async function fetchCurrentUser() {
+  try {
+    const res = await fetch(`${API_BASE}/api/me/`, { credentials: 'include' });
+    if (!res.ok) return;
+    const data = await res.json();
+    userPrefeituraId.value = data.prefeitura_id || null;
+    userIsStaff.value = !!data.is_staff;
+  } catch (e) {
+    console.warn('fetchCurrentUser', e);
+  }
+}
+
 const pdfModalOpen = ref(false);
 const pdfModalTitle = ref('Preview');
 const pdfModalMeta = ref('');
@@ -218,7 +233,12 @@ const estadoFlagUrl = computed(() => {
 
 const filteredTemplates = computed(() => {
   const q = searchQuery.value.toLowerCase().trim();
-  const list = templates.value;
+  const list = templates.value.filter((t) => {
+    if (userIsStaff.value) return true;
+    // Templates sem prefeitura são globais (visíveis para todos)
+    if (!t.prefeitura) return true;
+    return t.prefeitura.id === userPrefeituraId.value;
+  });
   const filtered = q ? list.filter((t) => (t.name || '').toLowerCase().includes(q)) : list;
   const mockMatches = !q || MOCK_TEMPLATE.name.toLowerCase().includes(q);
   return mockMatches ? [MOCK_TEMPLATE, ...filtered] : filtered;
@@ -336,6 +356,7 @@ async function loadTemplatePreviewPdf(templateId) {
 
 let pdfjsLib = null;
 onMounted(() => {
+  fetchCurrentUser();
   loadTemplates();
   loadFilterOptions();
   if (window.pdfjsLib) {

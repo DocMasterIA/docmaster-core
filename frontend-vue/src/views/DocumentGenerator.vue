@@ -437,6 +437,26 @@ const selectedTemplate = ref(null);
 const focusedIndex = ref(-1);
 const searchDebounce = ref(null);
 
+const userPrefeituraId = ref(null);
+const userIsStaff = ref(false);
+
+async function fetchCurrentUser() {
+  try {
+    const res = await fetch(`${API_BASE}/api/me/`, { credentials: 'include' });
+    if (!res.ok) return;
+    const data = await res.json();
+    userPrefeituraId.value = data.prefeitura_id || null;
+    userIsStaff.value = !!data.is_staff;
+  } catch (e) {
+    console.warn('fetchCurrentUser', e);
+  }
+}
+
+function filterTemplatesByPrefeitura(list) {
+  if (userIsStaff.value) return list;
+  return list.filter((t) => !t.prefeitura || t.prefeitura.id === userPrefeituraId.value);
+}
+
 const iaPrompt = ref('');
 const docTypeMode = ref('auto'); // 'auto' (generate-document), 'tr_modelo' (TR modelo fixo)
 const sourceMode = ref('llm'); // modo único: criar do zero com IA
@@ -1067,7 +1087,7 @@ async function fetchTemplates(q) {
     const res = await fetch(url, { credentials: 'include' });
     if (!res.ok) return;
     const data = await res.json();
-    templateList.value = data.templates || [];
+    templateList.value = filterTemplatesByPrefeitura(data.templates || []);
     focusedIndex.value = -1;
   } catch (e) {
     console.warn('fetchTemplates', e);
@@ -1445,6 +1465,7 @@ async function loadTemplatePreviewPdf(templateId) {
 
 let pdfjsLib = null;
 onMounted(async () => {
+  fetchCurrentUser();
   document.addEventListener('click', clickOutside);
   docTypeMode.value = isEtpLivreRoute.value ? 'auto' : 'tr_modelo';
   if (window.pdfjsLib) {

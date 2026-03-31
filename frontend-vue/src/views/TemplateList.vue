@@ -175,6 +175,13 @@ async function fetchCurrentUser() {
   }
 }
 
+function canUseTemplateByPrefeitura(template) {
+  if (!template) return false;
+  if (userIsStaff.value) return true;
+  if (!template.prefeitura) return true; // template global
+  return String(template.prefeitura.id) === String(userPrefeituraId.value || '');
+}
+
 const pdfModalOpen = ref(false);
 const pdfModalTitle = ref('Preview');
 const pdfModalMeta = ref('');
@@ -289,6 +296,7 @@ async function loadFilterOptions() {
 }
 
 function openPdfModal(tpl) {
+  if (!canUseTemplateByPrefeitura(tpl)) return;
   currentTemplateId.value = tpl.id;
   currentTemplateName.value = tpl.name || 'Preview';
   pdfModalTitle.value = tpl.name || 'Preview';
@@ -317,6 +325,8 @@ function closePdfModal() {
 
 function usarComoBase() {
   if (!currentTemplateId.value || currentTemplateId.value === MOCK_TEMPLATE.id) return;
+  const tpl = templates.value.find((x) => String(x.id) === String(currentTemplateId.value));
+  if (tpl && !canUseTemplateByPrefeitura(tpl)) return;
   closePdfModal();
   router.push({ path: '/', query: { template_id: currentTemplateId.value } });
 }

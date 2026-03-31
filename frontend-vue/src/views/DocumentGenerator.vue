@@ -457,6 +457,13 @@ function filterTemplatesByPrefeitura(list) {
   return list.filter((t) => !t.prefeitura || t.prefeitura.id === userPrefeituraId.value);
 }
 
+function canUseTemplateByPrefeitura(template) {
+  if (!template) return false;
+  if (userIsStaff.value) return true;
+  if (!template.prefeitura) return true; // template global
+  return String(template.prefeitura.id) === String(userPrefeituraId.value || '');
+}
+
 const iaPrompt = ref('');
 const docTypeMode = ref('auto'); // 'auto' (generate-document), 'tr_modelo' (TR modelo fixo)
 const sourceMode = ref('llm'); // modo único: criar do zero com IA
@@ -1103,6 +1110,10 @@ function onSearchInput() {
 }
 
 function selectTemplate(t) {
+  if (!canUseTemplateByPrefeitura(t)) {
+    generateError.value = 'Este template pertence a outra prefeitura e não pode ser utilizado.';
+    return;
+  }
   selectedTemplate.value = t;
   searchQuery.value = t.name;
   showTemplateDropdown.value = false;
@@ -1115,7 +1126,19 @@ async function fetchTemplateDetails(id) {
     if (!res.ok) return;
     const data = await res.json();
     const t = data.template || data.templates?.[0];
-    if (t) selectedTemplate.value = { id: t.id, name: t.name, preview_image: t.preview_image };
+    if (!t) return;
+    if (!canUseTemplateByPrefeitura(t)) {
+      selectedTemplate.value = null;
+      searchQuery.value = '';
+      generateError.value = 'Template bloqueado: ele não pertence à sua prefeitura.';
+      return;
+    }
+    selectedTemplate.value = {
+      id: t.id,
+      name: t.name,
+      preview_image: t.preview_image,
+      prefeitura: t.prefeitura || null,
+    };
   } catch (e) {
     console.debug('fetchTemplateDetails', e);
   }
@@ -1246,6 +1269,10 @@ async function submitViaLLM() {
         slot_package_key: slotPackageKey.value,
       };
   if (selectedTemplate.value?.id) {
+    if (!canUseTemplateByPrefeitura(selectedTemplate.value)) {
+      generateError.value = 'Template bloqueado: ele não pertence à sua prefeitura.';
+      return;
+    }
     payload.template_id = selectedTemplate.value.id;
   }
 

@@ -78,6 +78,32 @@ LIBRARY_TEMPLATE_ID_KEY = "__library_template_id__"
 LIBRARY_TEMPLATE_NAME_KEY = "__library_template_name__"
 
 
+def _can_user_access_template(user, template: Template) -> bool:
+    """Regra de acesso por prefeitura para templates."""
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if user.is_staff or user.is_superuser:
+        return True
+    user_pref_id = getattr(user, "prefeitura_id", None)
+    tpl_pref_id = getattr(template, "prefeitura_id", None)
+    # Template sem prefeitura continua global (compatibilidade legada).
+    if tpl_pref_id is None:
+        return True
+    return user_pref_id is not None and str(user_pref_id) == str(tpl_pref_id)
+
+
+def _templates_queryset_for_user(user):
+    qs = Template.objects.all()
+    if not user.is_staff and not user.is_superuser:
+        user_pref_id = getattr(user, "prefeitura_id", None)
+        if user_pref_id is None:
+            # Sem prefeitura: apenas templates globais
+            qs = qs.filter(prefeitura__isnull=True)
+        else:
+            qs = qs.filter(prefeitura_id=user_pref_id) | qs.filter(prefeitura__isnull=True)
+    return qs.distinct()
+
+
 def _resolve_merge_template_id(request, payload):
     """
     `template_id` no JSON tem prioridade. Caso contrário, usa o template da
@@ -86,7 +112,8 @@ def _resolve_merge_template_id(request, payload):
     raw = payload.get("template_id")
     if raw not in (None, ""):
         tid = str(raw).strip()
-        if Template.objects.filter(id=tid).exists():
+        tpl = Template.objects.filter(id=tid).first()
+        if tpl and _can_user_access_template(request.user, tpl):
             return tid
         # ID inválido no payload: tenta preset salvo (ex.: template removido do banco)
 
@@ -104,7 +131,8 @@ def _resolve_merge_template_id(request, payload):
         if not lib:
             return None
         tid = str(lib).strip()
-        if tid and Template.objects.filter(id=tid).exists():
+        tpl = Template.objects.filter(id=tid).first() if tid else None
+        if tpl and _can_user_access_template(request.user, tpl):
             return tid
     except Exception:
         pass
@@ -126,7 +154,7 @@ def upload_template_and_request_mapping_api(request):
     mapping_instructions = request.POST.get("mapping_instructions", "")
 
     # Salva Template e gera preview (imagem) imediatamente
-    tpl = Template.objects.create(name=name, file=uploaded)
+    tpl = Template.objects.create(name=name, file=uploaded, prefeitura=getattr(request.user, "prefeitura", None))
     
     preview_rel_path = generate_docx_preview(tpl)
     tpl.preview_image = preview_rel_path
@@ -176,6 +204,8 @@ def get_template_list_api(request):
     if template_id:
         try:
             t = Template.objects.get(id=template_id)
+            if not _can_user_access_template(request.user, t):
+                return JsonResponse({"error": "Acesso negado ao template desta prefeitura."}, status=403)
             item = _serialize_template_for_list(t)
             return JsonResponse({"template": item})
         except Template.DoesNotExist:
@@ -186,7 +216,7 @@ def get_template_list_api(request):
     prefeitura_id = request.GET.get("prefeitura_id", "").strip()
     subtopico_id = request.GET.get("subtopico_id", "").strip()
 
-    qs = Template.objects.all().order_by("-created_at")
+    qs = _templates_queryset_for_user(request.user).order_by("-created_at")
 
     if estado:
         qs = qs.filter(prefeitura__estado=estado)
@@ -207,7 +237,8 @@ def template_filters_api(request):
     para popular os filtros da Biblioteca de Templates.
     """
     # Estados e prefeituras apenas onde existem templates associados
-    pref_qs = Prefeitura.objects.filter(template__isnull=False).distinct().order_by("estado", "nome_municipio")
+    tpl_qs = _templates_queryset_for_user(request.user)
+    pref_qs = Prefeitura.objects.filter(template__in=tpl_qs).distinct().order_by("estado", "nome_municipio")
     estados = sorted({p.estado for p in pref_qs if p.estado})
     prefeituras = [
         {
@@ -218,7 +249,7 @@ def template_filters_api(request):
         for p in pref_qs
     ]
 
-    sub_qs = SubtopicoSecretaria.objects.filter(template__isnull=False).distinct().order_by("nome")
+    sub_qs = SubtopicoSecretaria.objects.filter(template__in=tpl_qs).distinct().order_by("nome")
     subtopicos = [
         {
             "id": str(s.id),
@@ -252,6 +283,8 @@ def generate_document_with_values_api(request):
         return JsonResponse({"ok": False, "error": "template_id obrigatório"}, status=400)
 
     tpl = get_object_or_404(Template, pk=template_id)
+    if not _can_user_access_template(request.user, tpl):
+        return JsonResponse({"ok": False, "error": "Acesso negado ao template desta prefeitura."}, status=403)
     schema = getattr(tpl, "schema", None)
     tmpdir = tempfile.gettempdir()
     out_docx = os.path.join(tmpdir, f"doc_{tpl.id}.docx")
@@ -289,6 +322,14 @@ def gerar_via_llm_api(request):
         payload = json.loads(request.body)
     except (json.JSONDecodeError, TypeError):
         return JsonResponse({"ok": False, "error": "Corpo JSON inválido"}, status=400)
+
+    raw_template_id = payload.get("template_id")
+    if raw_template_id not in (None, ""):
+        tpl = Template.objects.filter(id=str(raw_template_id).strip()).first()
+        if not tpl:
+            return JsonResponse({"ok": False, "error": "template_id inválido."}, status=400)
+        if not _can_user_access_template(request.user, tpl):
+            return JsonResponse({"ok": False, "error": "Acesso negado ao template desta prefeitura."}, status=403)
 
     user_prompt = (payload.get("user_prompt") or "").strip()
     template_id = _resolve_merge_template_id(request, payload)
@@ -454,6 +495,14 @@ def gerar_tr_modelo_api(request):
     except (json.JSONDecodeError, TypeError):
         return JsonResponse({"ok": False, "error": "Corpo JSON inválido"}, status=400)
 
+    raw_template_id = payload.get("template_id")
+    if raw_template_id not in (None, ""):
+        tpl = Template.objects.filter(id=str(raw_template_id).strip()).first()
+        if not tpl:
+            return JsonResponse({"ok": False, "error": "template_id inválido."}, status=400)
+        if not _can_user_access_template(request.user, tpl):
+            return JsonResponse({"ok": False, "error": "Acesso negado ao template desta prefeitura."}, status=403)
+
     user_prompt = (payload.get("user_prompt") or "").strip()
     slots_override = payload.get("slots_override")  # opcional
     template_id = _resolve_merge_template_id(request, payload)
@@ -582,6 +631,14 @@ def gerar_tr_e_dfd_api(request):
         payload = json.loads(request.body)
     except (json.JSONDecodeError, TypeError):
         return JsonResponse({"ok": False, "error": "Corpo JSON inválido"}, status=400)
+
+    raw_template_id = payload.get("template_id")
+    if raw_template_id not in (None, ""):
+        tpl = Template.objects.filter(id=str(raw_template_id).strip()).first()
+        if not tpl:
+            return JsonResponse({"ok": False, "error": "template_id inválido."}, status=400)
+        if not _can_user_access_template(request.user, tpl):
+            return JsonResponse({"ok": False, "error": "Acesso negado ao template desta prefeitura."}, status=403)
 
     user_prompt = (payload.get("user_prompt") or "").strip()
     slots_override = payload.get("slots_override")  # opcional
@@ -795,7 +852,7 @@ def template_list_api(request):
     """
     q = request.GET.get("q", "").strip()
     # Se quiser limitar a templates do usuário: use owner=request.user
-    base_qs = Template.objects.all().order_by("-created_at")
+    base_qs = _templates_queryset_for_user(request.user).order_by("-created_at")
 
     if q:
         qs = base_qs.filter(name__icontains=q)[:10]
@@ -818,6 +875,8 @@ def template_list_api(request):
 @api_login_required
 def template_preview_pdf_api(request, template_id):
     tpl = get_object_or_404(Template, id=template_id)
+    if not _can_user_access_template(request.user, tpl):
+        return JsonResponse({"ok": False, "error": "Acesso negado ao template desta prefeitura."}, status=403)
     if tpl.preview_pdf and tpl.preview_pdf.name:
         # Se o arquivo sumiu do MEDIA (ex.: container recriado sem volume),
         # regenerar em vez de retornar URL quebrada.

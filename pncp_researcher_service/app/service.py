@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from statistics import mean, median
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import re
 import unicodedata
 import math
 import asyncio
+
+import httpx
 
 from .config import (
     PNCP_DEFAULT_LOOKBACK_DAYS,
@@ -21,7 +23,7 @@ from .config import (
     PNCP_ITEM_AMOSTRA_LINHAS,
     PNCP_REQUIRE_TABLE_MATCH_WHEN_ITENS_EXIST,
 )
-from .pncp_client import search_contracts, get_contract_items
+from .pncp_client import create_pncp_http_client, search_contracts, get_contract_items
 from .schemas import MarketSearchRequest
 
 
@@ -318,6 +320,7 @@ def _table_supports_query(rows: List[Dict[str, Any]], query_groups: List[List[st
 async def _extract_matching_items_with_table_lookup(
     raw_items: List[Dict[str, Any]],
     query_groups: List[List[str]],
+    http_client: Optional[httpx.AsyncClient] = None,
 ) -> List[Dict[str, Any]]:
     """
     Faz match por objeto + tabela de itens da contratação (quando disponível).
@@ -341,7 +344,7 @@ async def _extract_matching_items_with_table_lookup(
             should_fetch = cnpj and ano is not None and seq is not None
             if should_fetch and (PNCP_FETCH_ITEMS_ALWAYS or score_obj_bruto <= 0):
                 async with sem:
-                    lookup_coro = get_contract_items(cnpj, ano, seq)
+                    lookup_coro = get_contract_items(cnpj, ano, seq, client=http_client)
                     if PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS > 0:
                         rows = await asyncio.wait_for(lookup_coro, timeout=PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS)
                     else:
@@ -467,42 +470,46 @@ async def market_search_stream(payload: MarketSearchRequest):
     total_page_budget = max(1, payload.max_paginas)
     pages_per_modalidade = max(1, math.ceil(total_page_budget / max(1, len(modalidades))))
 
-    for modalidade in modalidades:
-        page = payload.pagina
-        pages_used_this_modalidade = 0
-        while pages_used_this_modalidade < pages_per_modalidade and pages_processed < total_page_budget:
-            batch = await search_contracts(
-                data_inicial=data_inicial,
-                data_final=data_final,
-                codigo_modalidade=modalidade,
-                uf=payload.uf,
-                codigo_municipio_ibge=payload.codigo_municipio_ibge,
-                pagina=page,
-                tamanho_pagina=payload.tamanho_pagina,
-            )
-            pages_used_this_modalidade += 1
-            pages_processed += 1
+    async with create_pncp_http_client() as http:
+        for modalidade in modalidades:
+            page = payload.pagina
+            pages_used_this_modalidade = 0
+            while pages_used_this_modalidade < pages_per_modalidade and pages_processed < total_page_budget:
+                batch = await search_contracts(
+                    data_inicial=data_inicial,
+                    data_final=data_final,
+                    codigo_modalidade=modalidade,
+                    uf=payload.uf,
+                    codigo_municipio_ibge=payload.codigo_municipio_ibge,
+                    pagina=page,
+                    tamanho_pagina=payload.tamanho_pagina,
+                    client=http,
+                )
+                pages_used_this_modalidade += 1
+                pages_processed += 1
 
-            if PNCP_ENABLE_ITEM_TABLE_LOOKUP:
-                page_items = await _extract_matching_items_with_table_lookup(batch or [], query_groups)
-            else:
-                page_items = _extract_matching_items(batch or [], query_groups)
-            all_items.extend(page_items)
+                if PNCP_ENABLE_ITEM_TABLE_LOOKUP:
+                    page_items = await _extract_matching_items_with_table_lookup(
+                        batch or [], query_groups, http_client=http
+                    )
+                else:
+                    page_items = _extract_matching_items(batch or [], query_groups)
+                all_items.extend(page_items)
 
-            yield {
-                "type": "page",
-                "modalidade": modalidade,
-                "page": page,
-                "raw_count": len(batch or []),
-                "matched_count": len(page_items),
-                "items": page_items,
-            }
+                yield {
+                    "type": "page",
+                    "modalidade": modalidade,
+                    "page": page,
+                    "raw_count": len(batch or []),
+                    "matched_count": len(page_items),
+                    "items": page_items,
+                }
 
-            if not batch or len(batch) < max(10, min(payload.tamanho_pagina, 50)):
+                if not batch or len(batch) < max(10, min(payload.tamanho_pagina, 50)):
+                    break
+                page += 1
+            if pages_processed >= total_page_budget:
                 break
-            page += 1
-        if pages_processed >= total_page_budget:
-            break
 
     all_items = _dedupe_items(all_items)
     all_items.sort(key=lambda x: x.get("score_relevancia") or 0, reverse=True)

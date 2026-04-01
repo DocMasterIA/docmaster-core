@@ -13,6 +13,9 @@ from .config import (
     PNCP_MAX_RETRIES,
     PNCP_RETRY_BACKOFF_SECONDS,
     PNCP_MIN_REQUEST_INTERVAL_SECONDS,
+    PNCP_THROTTLE_MODE,
+    PNCP_BUCKET_CAPACITY,
+    PNCP_BUCKET_REFILL_PER_SEC,
     PNCP_RATE_LIMIT_EXTRA_ATTEMPTS,
     PNCP_RATE_LIMIT_BACKOFF_CAP_SECONDS,
 )
@@ -25,9 +28,12 @@ class PNCPClientError(Exception):
 _pace_lock = asyncio.Lock()
 _last_request_monotonic: float = 0.0
 
+_bucket_lock = asyncio.Lock()
+_bucket_tokens: float = 0.0
+_bucket_last: Optional[float] = None
 
-async def _throttle_pace() -> None:
-    """Evita rajadas de requisições que disparam 429 no PNCP."""
+
+async def _throttle_interval() -> None:
     global _last_request_monotonic
     interval = max(0.0, float(PNCP_MIN_REQUEST_INTERVAL_SECONDS or 0))
     if interval <= 0:
@@ -38,6 +44,49 @@ async def _throttle_pace() -> None:
         if delta < interval:
             await asyncio.sleep(interval - delta)
         _last_request_monotonic = time.monotonic()
+
+
+async def _throttle_bucket() -> None:
+    """Token bucket: permite vários GETs em paralelo com teto médio (menos lento que interval global)."""
+    global _bucket_tokens, _bucket_last
+    cap = max(1.0, float(PNCP_BUCKET_CAPACITY))
+    rate = max(0.05, float(PNCP_BUCKET_REFILL_PER_SEC))
+    while True:
+        wait = 0.0
+        async with _bucket_lock:
+            now = time.monotonic()
+            if _bucket_last is None:
+                _bucket_last = now
+                _bucket_tokens = cap
+            else:
+                _bucket_tokens = min(cap, _bucket_tokens + (now - _bucket_last) * rate)
+                _bucket_last = now
+            if _bucket_tokens >= 1.0:
+                _bucket_tokens -= 1.0
+                return
+            need = 1.0 - _bucket_tokens
+            wait = need / rate
+        await asyncio.sleep(wait)
+
+
+async def _throttle_pace() -> None:
+    """Controle de taxa configurável (ver PNCP_THROTTLE_MODE)."""
+    mode = (PNCP_THROTTLE_MODE or "bucket").strip().lower()
+    if mode in ("off", "none", "0", "false"):
+        return
+    if mode == "interval":
+        await _throttle_interval()
+        return
+    # default: bucket
+    await _throttle_bucket()
+
+
+def _pncp_client_limits() -> httpx.Limits:
+    return httpx.Limits(max_connections=40, max_keepalive_connections=20)
+
+
+def create_pncp_http_client() -> httpx.AsyncClient:
+    return httpx.AsyncClient(timeout=PNCP_TIMEOUT, limits=_pncp_client_limits())
 
 
 def _retry_after_seconds(resp: httpx.Response) -> float:
@@ -95,6 +144,8 @@ async def search_contracts(
     codigo_municipio_ibge: Optional[str] = None,
     pagina: int = 1,
     tamanho_pagina: int = 50,
+    *,
+    client: Optional[httpx.AsyncClient] = None,
 ) -> List[Dict[str, Any]]:
     endpoint = f"{PNCP_BASE_URL}/v1/contratacoes/publicacao"
     req_params: Dict[str, Any] = {
@@ -110,8 +161,15 @@ async def search_contracts(
     if codigo_municipio_ibge:
         req_params["codigoMunicipioIbge"] = codigo_municipio_ibge
 
-    async with httpx.AsyncClient(timeout=PNCP_TIMEOUT) as client:
+    close_client = False
+    if client is None:
+        client = create_pncp_http_client()
+        close_client = True
+    try:
         resp = await _get_pncp(client, endpoint, params=req_params, tolerate_rate_limit=True)
+    finally:
+        if close_client:
+            await client.aclose()
 
     if resp is None:
         return []
@@ -138,6 +196,8 @@ async def get_contract_items(
     cnpj_orgao: str,
     ano_compra: Any,
     sequencial_compra: Any,
+    *,
+    client: Optional[httpx.AsyncClient] = None,
 ) -> List[Dict[str, Any]]:
     """
     Busca tabela de itens de uma contratação no PNCP.
@@ -154,8 +214,15 @@ async def get_contract_items(
 
     endpoint = f"{PNCP_PNCP_API_BASE_URL}/v1/orgaos/{cnpj}/compras/{ano}/{seq}/itens"
 
-    async with httpx.AsyncClient(timeout=PNCP_TIMEOUT) as client:
+    close_client = False
+    if client is None:
+        client = create_pncp_http_client()
+        close_client = True
+    try:
         resp = await _get_pncp(client, endpoint, params=None, tolerate_rate_limit=True)
+    finally:
+        if close_client:
+            await client.aclose()
 
     if resp is None:
         return []

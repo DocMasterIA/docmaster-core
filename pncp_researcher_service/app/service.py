@@ -5,6 +5,7 @@ from statistics import mean, median
 from typing import Any, Dict, List
 import re
 import unicodedata
+import math
 
 from .config import PNCP_DEFAULT_LOOKBACK_DAYS, PNCP_MODALIDADES_DEFAULT
 from .pncp_client import search_contracts
@@ -156,11 +157,13 @@ async def market_search_stream(payload: MarketSearchRequest):
 
     all_items: List[Dict[str, Any]] = []
     pages_processed = 0
-    remaining_pages = max(1, payload.max_paginas)
+    total_page_budget = max(1, payload.max_paginas)
+    pages_per_modalidade = max(1, math.ceil(total_page_budget / max(1, len(modalidades))))
 
     for modalidade in modalidades:
         page = payload.pagina
-        while remaining_pages > 0:
+        pages_used_this_modalidade = 0
+        while pages_used_this_modalidade < pages_per_modalidade and pages_processed < total_page_budget:
             batch = await search_contracts(
                 data_inicial=data_inicial,
                 data_final=data_final,
@@ -170,7 +173,7 @@ async def market_search_stream(payload: MarketSearchRequest):
                 pagina=page,
                 tamanho_pagina=payload.tamanho_pagina,
             )
-            remaining_pages -= 1
+            pages_used_this_modalidade += 1
             pages_processed += 1
 
             page_items = _extract_matching_items(batch or [], query_groups)
@@ -188,7 +191,7 @@ async def market_search_stream(payload: MarketSearchRequest):
             if not batch or len(batch) < max(10, min(payload.tamanho_pagina, 50)):
                 break
             page += 1
-        if remaining_pages <= 0:
+        if pages_processed >= total_page_budget:
             break
 
     all_items = _dedupe_items(all_items)

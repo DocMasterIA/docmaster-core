@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from statistics import mean, median
 from typing import Any, Dict, List, Optional
 import re
@@ -31,6 +31,29 @@ def _default_dates() -> tuple[str, str]:
     today = datetime.utcnow()
     start = today - timedelta(days=PNCP_DEFAULT_LOOKBACK_DAYS)
     return start.strftime("%Y%m%d"), today.strftime("%Y%m%d")
+
+
+def _parse_pn_date(s: str) -> date:
+    return datetime.strptime(s.strip(), "%Y%m%d").date()
+
+
+def _pn_date_windows(di_s: str, df_s: str) -> List[tuple[str, str]]:
+    """
+    O PNCP retorna 422 se (dataFinal - dataInicial) ultrapassar 365 dias.
+    Gera janelas consecutivas com folga (delta máximo 364 dias entre início e fim).
+    """
+    d0 = _parse_pn_date(di_s)
+    d1 = _parse_pn_date(df_s)
+    if d1 < d0:
+        d0, d1 = d1, d0
+    max_step = timedelta(days=364)
+    out: List[tuple[str, str]] = []
+    cur = d0
+    while cur <= d1:
+        chunk_end = min(cur + max_step, d1)
+        out.append((cur.strftime("%Y%m%d"), chunk_end.strftime("%Y%m%d")))
+        cur = chunk_end + timedelta(days=1)
+    return out
 
 
 def _contains_tokens(text: str, tokens: List[str]) -> bool:
@@ -462,6 +485,7 @@ async def market_search_stream(payload: MarketSearchRequest):
     di, df = _default_dates()
     data_inicial = payload.data_inicial or di
     data_final = payload.data_final or df
+    periodo_janelas = _pn_date_windows(data_inicial, data_final)
     query_groups = _build_query_groups(payload.termo_busca)
     modalidades = [payload.codigo_modalidade] if payload.codigo_modalidade is not None else PNCP_MODALIDADES_DEFAULT
 
@@ -471,70 +495,77 @@ async def market_search_stream(payload: MarketSearchRequest):
     pages_per_modalidade = max(1, math.ceil(total_page_budget / max(1, len(modalidades))))
     min_batch_full = max(10, min(payload.tamanho_pagina, 50))
 
-    mod_state: Dict[int, Dict[str, Any]] = {
-        int(m): {"page": payload.pagina, "exhausted": False, "fetched": 0} for m in modalidades
-    }
-
     async with create_pncp_http_client() as http:
-        while pages_processed < total_page_budget:
-            remaining = max(0, total_page_budget - pages_processed)
-            to_fetch: List[int] = []
-            for m in modalidades:
-                if len(to_fetch) >= remaining:
-                    break
-                mi = int(m)
-                st = mod_state[mi]
-                if st["exhausted"] or st["fetched"] >= pages_per_modalidade:
-                    continue
-                to_fetch.append(mi)
-
-            if not to_fetch:
+        for janela_idx, (w_di, w_df) in enumerate(periodo_janelas):
+            if pages_processed >= total_page_budget:
                 break
+            mod_state: Dict[int, Dict[str, Any]] = {
+                int(m): {"page": payload.pagina, "exhausted": False, "fetched": 0} for m in modalidades
+            }
+            while pages_processed < total_page_budget:
+                remaining = max(0, total_page_budget - pages_processed)
+                to_fetch: List[int] = []
+                for m in modalidades:
+                    if len(to_fetch) >= remaining:
+                        break
+                    mi = int(m)
+                    st = mod_state[mi]
+                    if st["exhausted"] or st["fetched"] >= pages_per_modalidade:
+                        continue
+                    to_fetch.append(mi)
 
-            search_tasks = [
-                search_contracts(
-                    data_inicial=data_inicial,
-                    data_final=data_final,
-                    codigo_modalidade=mi,
-                    uf=payload.uf,
-                    codigo_municipio_ibge=payload.codigo_municipio_ibge,
-                    pagina=mod_state[mi]["page"],
-                    tamanho_pagina=payload.tamanho_pagina,
-                    client=http,
-                )
-                for mi in to_fetch
-            ]
-            batches: List[List[Dict[str, Any]]] = await asyncio.gather(*search_tasks)
+                if not to_fetch:
+                    break
 
-            if PNCP_ENABLE_ITEM_TABLE_LOOKUP:
-                item_tasks = [
-                    _extract_matching_items_with_table_lookup(b or [], query_groups, http_client=http)
-                    for b in batches
+                search_tasks = [
+                    search_contracts(
+                        data_inicial=w_di,
+                        data_final=w_df,
+                        codigo_modalidade=mi,
+                        uf=payload.uf,
+                        codigo_municipio_ibge=payload.codigo_municipio_ibge,
+                        pagina=mod_state[mi]["page"],
+                        tamanho_pagina=payload.tamanho_pagina,
+                        client=http,
+                    )
+                    for mi in to_fetch
                 ]
-                page_items_list: List[List[Dict[str, Any]]] = await asyncio.gather(*item_tasks)
-            else:
-                page_items_list = [_extract_matching_items(b or [], query_groups) for b in batches]
+                batches: List[List[Dict[str, Any]]] = await asyncio.gather(*search_tasks)
 
-            for mi, batch, page_items in zip(to_fetch, batches, page_items_list):
-                st = mod_state[mi]
-                page_num = st["page"]
-                st["page"] = page_num + 1
-                st["fetched"] += 1
-                pages_processed += 1
+                if PNCP_ENABLE_ITEM_TABLE_LOOKUP:
+                    item_tasks = [
+                        _extract_matching_items_with_table_lookup(b or [], query_groups, http_client=http)
+                        for b in batches
+                    ]
+                    page_items_list: List[List[Dict[str, Any]]] = await asyncio.gather(*item_tasks)
+                else:
+                    page_items_list = [_extract_matching_items(b or [], query_groups) for b in batches]
 
-                all_items.extend(page_items)
+                for mi, batch, page_items in zip(to_fetch, batches, page_items_list):
+                    st = mod_state[mi]
+                    page_num = st["page"]
+                    st["page"] = page_num + 1
+                    st["fetched"] += 1
+                    pages_processed += 1
 
-                yield {
-                    "type": "page",
-                    "modalidade": mi,
-                    "page": page_num,
-                    "raw_count": len(batch or []),
-                    "matched_count": len(page_items),
-                    "items": page_items,
-                }
+                    all_items.extend(page_items)
 
-                if not batch or len(batch) < min_batch_full:
-                    st["exhausted"] = True
+                    ev: Dict[str, Any] = {
+                        "type": "page",
+                        "modalidade": mi,
+                        "page": page_num,
+                        "raw_count": len(batch or []),
+                        "matched_count": len(page_items),
+                        "items": page_items,
+                    }
+                    if len(periodo_janelas) > 1:
+                        ev["periodo_janela"] = janela_idx + 1
+                        ev["data_inicial_janela"] = w_di
+                        ev["data_final_janela"] = w_df
+                    yield ev
+
+                    if not batch or len(batch) < min_batch_full:
+                        st["exhausted"] = True
 
     all_items = _dedupe_items(all_items)
     all_items.sort(key=lambda x: x.get("score_relevancia") or 0, reverse=True)
@@ -559,6 +590,8 @@ async def market_search_stream(payload: MarketSearchRequest):
             "codigo_municipio_ibge": payload.codigo_municipio_ibge,
             "data_inicial": data_inicial,
             "data_final": data_final,
+            "periodo_particionado_pncp_365d": len(periodo_janelas) > 1,
+            "periodo_janelas": [{"inicio": a, "fim": b} for a, b in periodo_janelas],
             "codigo_modalidade": payload.codigo_modalidade,
             "modalidades_consideradas": modalidades,
             "pagina_inicial": payload.pagina,

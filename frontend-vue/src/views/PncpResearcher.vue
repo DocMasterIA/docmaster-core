@@ -3,46 +3,82 @@
     <header class="gov-page__header">
       <h1 class="gov-page__title">Pesquisador de Dados PNCP</h1>
       <p class="gov-page__subtitle">
-        Pesquise itens e visualize referências de preços e contratações públicas.
+        Pesquise termos nas publicações e nos itens das contratações (via PNCP). É necessário estar logado.
       </p>
     </header>
 
     <div class="gov-surface gov-page__content">
-      <form class="pncp-search" @submit.prevent>
-        <label class="gov-label" for="pncp-query">Pesquisar item no PNCP</label>
+      <form class="pncp-search" @submit.prevent="runSearch">
+        <label class="gov-label" for="pncp-query">Termo de busca</label>
         <div class="pncp-search__row">
           <input
             id="pncp-query"
             v-model.trim="query"
             type="text"
             class="gov-input pncp-search__input"
-            placeholder="Ex.: pavimentação asfáltica, pneus aro 16, medicamentos..."
+            placeholder="Ex.: pneu, material esportivo, bambolê..."
+            required
+            :disabled="loading"
           />
-          <button type="button" class="gov-btn gov-btn--primary" @click="query = query">
+          <button type="submit" class="gov-btn gov-btn--primary" :disabled="loading || !query">
             <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-            Pesquisar
+            {{ loading ? 'Pesquisando…' : 'Pesquisar' }}
           </button>
         </div>
+
+        <details class="pncp-advanced">
+          <summary>Filtros opcionais</summary>
+          <div class="pncp-advanced__grid">
+            <label class="gov-label">
+              UF
+              <input v-model.trim="ufFilter" type="text" maxlength="2" class="gov-input" placeholder="Ex.: SP" :disabled="loading" />
+            </label>
+            <label class="gov-label">
+              Máx. páginas (total)
+              <input v-model.number="maxPaginas" type="number" min="1" max="60" class="gov-input" :disabled="loading" />
+            </label>
+            <label class="gov-label">
+              Data inicial
+              <input v-model="dataInicial" type="date" class="gov-input" :disabled="loading" />
+            </label>
+            <label class="gov-label">
+              Data final
+              <input v-model="dataFinal" type="date" class="gov-input" :disabled="loading" />
+            </label>
+          </div>
+        </details>
       </form>
 
+      <p v-if="errorMsg" class="pncp-error" role="alert">{{ errorMsg }}</p>
+      <p v-if="loading && progressHint" class="pncp-progress">{{ progressHint }}</p>
+
       <div class="pncp-summary">
-        <span class="pncp-summary__badge">{{ filteredItems.length }} itens encontrados</span>
-        <span class="pncp-summary__hint">Mockup inicial - integração em tempo real em desenvolvimento.</span>
+        <span class="pncp-summary__badge">{{ displayItems.length }} resultado(s)</span>
+        <span v-if="finalStats" class="pncp-summary__hint">
+          Páginas processadas: {{ finalStats.pages_processed ?? '—' }}
+          <template v-if="finalStats.valor_medio != null">
+            · Preço médio (amostra): {{ formatCurrency(finalStats.valor_medio) }}
+          </template>
+        </span>
       </div>
 
       <div class="pncp-grid">
-        <article v-for="item in filteredItems" :key="item.id" class="pncp-card">
+        <article v-for="item in displayItems" :key="item.id" class="pncp-card">
           <h3 class="pncp-card__title">{{ item.title }}</h3>
           <p class="pncp-card__price">{{ formatCurrency(item.price) }}</p>
 
           <dl class="pncp-card__meta">
+            <div class="pncp-card__meta-row">
+              <dt>PNCP:</dt>
+              <dd>{{ item.id }}</dd>
+            </div>
             <div class="pncp-card__meta-row">
               <dt>Órgão:</dt>
               <dd>{{ item.orgao }}</dd>
             </div>
             <div class="pncp-card__meta-row">
               <dt>UF/Município:</dt>
-              <dd>{{ item.uf }} - {{ item.municipio }}</dd>
+              <dd>{{ item.uf }} — {{ item.municipio }}</dd>
             </div>
             <div class="pncp-card__meta-row">
               <dt>Modalidade:</dt>
@@ -54,15 +90,33 @@
             </div>
           </dl>
 
+          <details v-if="item.itensPncp?.length" class="pncp-card__itens">
+            <summary>Itens da contratação ({{ item.itensPncp.length }})</summary>
+            <ul>
+              <li v-for="(li, idx) in item.itensPncp" :key="idx">
+                <strong>{{ li.numeroItem != null ? `#${li.numeroItem} ` : '' }}</strong>
+                {{ li.descricao || '—' }}
+                <span v-if="li.quantidade != null" class="pncp-li-qty">
+                  · Qtd: {{ li.quantidade }} {{ (li.unidadeMedida || '').trim() }}
+                </span>
+                <span v-if="li.valorUnitarioEstimado != null" class="pncp-li-val">
+                  · Unit. {{ formatCurrency(li.valorUnitarioEstimado) }}
+                </span>
+              </li>
+            </ul>
+          </details>
+
           <footer class="pncp-card__footer">
-            <span class="pncp-card__chip">{{ item.tema }}</span>
-            <span class="pncp-card__date">{{ item.dataRef }}</span>
+            <span class="pncp-card__chip">{{ item.matchOrigem || '—' }}</span>
+            <span class="pncp-card__date" :title="'Score: ' + item.score">
+              {{ item.confirmadoItens === true ? 'Confirmado nos itens' : item.confirmadoItens === false ? 'Só objeto' : 'Sem tabela' }}
+            </span>
           </footer>
         </article>
       </div>
 
-      <p v-if="!filteredItems.length" class="pncp-empty">
-        Nenhum item encontrado para "{{ query }}".
+      <p v-if="!loading && lastSearched && !displayItems.length && !errorMsg" class="pncp-empty">
+        Nenhum resultado para "{{ lastSearched }}" com os filtros atuais.
       </p>
     </div>
   </section>
@@ -71,77 +125,48 @@
 <script setup>
 import { computed, ref } from 'vue';
 
+const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || '');
+
 const query = ref('');
+const ufFilter = ref('');
+const maxPaginas = ref(15);
+const dataInicial = ref('');
+const dataFinal = ref('');
 
-const mockItems = ref([
-  {
-    id: 'pncp-001',
-    title: 'Pavimentação asfáltica CBUQ em vias urbanas',
-    price: 1845200.5,
-    orgao: 'Prefeitura Municipal de Itajaí',
-    uf: 'SC',
-    municipio: 'Itajaí',
-    modalidade: 'Dispensa',
-    situacao: 'Homologada',
-    tema: 'obras_engenharia',
-    dataRef: '22/03/2026',
-  },
-  {
-    id: 'pncp-002',
-    title: 'Aquisição de pneus e serviços de balanceamento',
-    price: 326780.0,
-    orgao: 'Prefeitura Municipal de Joinville',
-    uf: 'SC',
-    municipio: 'Joinville',
-    modalidade: 'Pregão',
-    situacao: 'Em disputa',
-    tema: 'frota_pneus',
-    dataRef: '21/03/2026',
-  },
-  {
-    id: 'pncp-003',
-    title: 'Fornecimento de medicamentos da atenção básica',
-    price: 912450.9,
-    orgao: 'Prefeitura Municipal de Blumenau',
-    uf: 'SC',
-    municipio: 'Blumenau',
-    modalidade: 'Pregão',
-    situacao: 'Adjudicada',
-    tema: 'saude_medicamentos_insumos',
-    dataRef: '19/03/2026',
-  },
-  {
-    id: 'pncp-004',
-    title: 'Serviços de limpeza predial continuada',
-    price: 1274300.0,
-    orgao: 'Prefeitura Municipal de Florianópolis',
-    uf: 'SC',
-    municipio: 'Florianópolis',
-    modalidade: 'Dispensa',
-    situacao: 'Publicada',
-    tema: 'servicos_limpeza',
-    dataRef: '18/03/2026',
-  },
-]);
+const loading = ref(false);
+const errorMsg = ref(null);
+const progressHint = ref('');
+const lastSearched = ref('');
 
-const filteredItems = computed(() => {
-  const q = query.value.toLowerCase().trim();
-  if (!q) return mockItems.value;
-  return mockItems.value.filter((item) => {
-    const haystack = [
-      item.title,
-      item.orgao,
-      item.uf,
-      item.municipio,
-      item.modalidade,
-      item.situacao,
-      item.tema,
-    ]
-      .join(' ')
-      .toLowerCase();
-    return haystack.includes(q);
-  });
-});
+/** @type {import('vue').Ref<Array<ReturnType<typeof mapApiItem>>>} */
+const items = ref([]);
+const finalStats = ref(null);
+
+const displayItems = computed(() =>
+  [...items.value].sort((a, b) => (b.score || 0) - (a.score || 0)),
+);
+
+function toPnDate(htmlDate) {
+  if (!htmlDate) return null;
+  return String(htmlDate).replaceAll('-', '');
+}
+
+function mapApiItem(raw) {
+  return {
+    id: raw.numero_pncp || '',
+    title: raw.objeto_resumido || '—',
+    price: raw.valor_global ?? 0,
+    orgao: raw.orgao || '—',
+    uf: raw.uf || '—',
+    municipio: raw.municipio || '—',
+    modalidade: raw.modalidade || '—',
+    situacao: raw.situacao || '—',
+    matchOrigem: raw.match_origem || '',
+    confirmadoItens: raw.confirmado_nos_itens,
+    itensPncp: Array.isArray(raw.itens_pncp) ? raw.itens_pncp : [],
+    score: raw.score_relevancia ?? 0,
+  };
+}
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('pt-BR', {
@@ -149,6 +174,116 @@ function formatCurrency(value) {
     currency: 'BRL',
     maximumFractionDigits: 2,
   }).format(Number(value || 0));
+}
+
+async function runSearch() {
+  const termo = query.value.trim();
+  if (!termo || loading.value) return;
+
+  errorMsg.value = null;
+  finalStats.value = null;
+  items.value = [];
+  lastSearched.value = termo;
+  loading.value = true;
+  progressHint.value = 'Enviando pesquisa…';
+
+  const body = {
+    termo_busca: termo,
+    pagina: 1,
+    tamanho_pagina: 50,
+    max_paginas: Math.min(60, Math.max(1, Number(maxPaginas.value) || 15)),
+  };
+  const di = toPnDate(dataInicial.value);
+  const df = toPnDate(dataFinal.value);
+  if (di) body.data_inicial = di;
+  if (df) body.data_final = df;
+  const u = ufFilter.value.trim().toUpperCase();
+  if (u.length === 2) body.uf = u;
+
+  const byKey = new Map();
+  let pageEvents = 0;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/pncp-research/market-search/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson, application/json' },
+      credentials: 'include',
+      body: JSON.stringify(body),
+    });
+
+    if (res.status === 401) {
+      errorMsg.value = 'Faça login para usar o pesquisador PNCP.';
+      return;
+    }
+
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const j = await res.json();
+        detail = j.error || j.detail || detail;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(detail || `Erro HTTP ${res.status}`);
+    }
+
+    const ct = res.headers.get('Content-Type') || '';
+    if (!ct.includes('ndjson') && ct.includes('json')) {
+      const data = await res.json();
+      if (data.detail && !data.ok) throw new Error(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail));
+      const list = data.itens || [];
+      items.value = list.map(mapApiItem);
+      finalStats.value = data.stats || null;
+      return;
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error('Stream não suportado pelo navegador.');
+
+    const dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+      for (const line of lines) {
+        const s = line.trim();
+        if (!s) continue;
+        let ev;
+        try {
+          ev = JSON.parse(s);
+        } catch {
+          continue;
+        }
+        if (ev.type === 'page') {
+          pageEvents += 1;
+          progressHint.value = `Processando publicações… (${pageEvents} lote(s) recebido(s))`;
+          for (const it of ev.items || []) {
+            const m = mapApiItem(it);
+            if (m.id) byKey.set(m.id, m);
+          }
+          items.value = Array.from(byKey.values());
+        } else if (ev.type === 'final') {
+          finalStats.value = ev.stats || null;
+          const list = ev.itens || [];
+          for (const it of list) {
+            const m = mapApiItem(it);
+            if (m.id) byKey.set(m.id, m);
+          }
+          items.value = Array.from(byKey.values());
+        } else if (ev.type === 'error') {
+          throw new Error(ev.detail || 'Erro na pesquisa PNCP.');
+        }
+      }
+    }
+  } catch (e) {
+    errorMsg.value = e instanceof Error ? e.message : String(e);
+  } finally {
+    loading.value = false;
+    progressHint.value = '';
+  }
 }
 </script>
 
@@ -185,10 +320,44 @@ function formatCurrency(value) {
 .pncp-search__row {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .pncp-search__input {
   flex: 1;
+  min-width: 200px;
+}
+
+.pncp-advanced {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.pncp-advanced summary {
+  cursor: pointer;
+  color: var(--color-text-soft);
+}
+
+.pncp-advanced__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.pncp-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: #fde8e8;
+  border: 1px solid #e8a4a4;
+  color: #8a1f1f;
+}
+
+.pncp-progress {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-soft);
 }
 
 .pncp-summary {
@@ -262,11 +431,31 @@ function formatCurrency(value) {
   margin: 0;
 }
 
+.pncp-card__itens {
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.pncp-card__itens ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.pncp-card__itens li {
+  margin-bottom: 6px;
+}
+
+.pncp-li-qty,
+.pncp-li-val {
+  color: var(--color-text-soft);
+}
+
 .pncp-card__footer {
   margin-top: 10px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
 }
 
 .pncp-card__chip {
@@ -278,8 +467,9 @@ function formatCurrency(value) {
 }
 
 .pncp-card__date {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-text-soft);
+  text-align: right;
 }
 
 .pncp-empty {

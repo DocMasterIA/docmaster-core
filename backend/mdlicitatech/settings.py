@@ -420,6 +420,9 @@ LOGIN_URL = '/login'
 # Proxy para o serviço FastAPI de orquestração LLM (usa sessão Django para autorização)
 LLM_API_BASE_URL = os.environ.get("LLM_API_BASE_URL", "http://127.0.0.1:8002").rstrip("/")
 
+# Pesquisador PNCP (FastAPI em pncp_researcher_service)
+PNCP_RESEARCHER_BASE_URL = os.environ.get("PNCP_RESEARCHER_BASE_URL", "http://127.0.0.1:8012").rstrip("/")
+
 # Serviço RAG (geração de documentos com IA)
 RAG_SERVICE_URL = os.environ.get("RAG_SERVICE_URL", "http://127.0.0.1:8004").rstrip("/")
 

@@ -144,9 +144,11 @@ services:
     environment:
       - LLM_API_BASE_URL=http://llm_api:8002
       - RAG_SERVICE_URL=http://rag_service:8004
+      - PNCP_RESEARCHER_BASE_URL=http://pncp_researcher_service:8012
     depends_on:
       - llm_api
       - rag_service
+      - pncp_researcher_service
     ports:
       - "8001:8000"  # Django na 8001 no host (8000 já é ChromaDB)
     volumes:

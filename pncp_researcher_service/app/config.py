@@ -28,6 +28,8 @@ def _env_timeout(key: str, default: float) -> float | None:
 
 
 PNCP_BASE_URL: str = os.getenv("PNCP_BASE_URL", "https://pncp.gov.br/api/consulta").rstrip("/")
+# API de compras/itens/arquivos (diferente da API de consulta por publicação).
+PNCP_PNCP_API_BASE_URL: str = os.getenv("PNCP_PNCP_API_BASE_URL", "https://pncp.gov.br/pncp-api").rstrip("/")
 PNCP_TIMEOUT: float | None = _env_timeout("PNCP_TIMEOUT", 120.0)
 PNCP_DEFAULT_LOOKBACK_DAYS: int = _env_int("PNCP_DEFAULT_LOOKBACK_DAYS", 180)
 PNCP_MAX_RETRIES: int = _env_int("PNCP_MAX_RETRIES", 4)

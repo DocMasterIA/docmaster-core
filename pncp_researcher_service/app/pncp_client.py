@@ -8,6 +8,7 @@ import httpx
 
 from .config import (
     PNCP_BASE_URL,
+    PNCP_PNCP_API_BASE_URL,
     PNCP_TIMEOUT,
     PNCP_MAX_RETRIES,
     PNCP_RETRY_BACKOFF_SECONDS,
@@ -140,7 +141,10 @@ async def get_contract_items(
 ) -> List[Dict[str, Any]]:
     """
     Busca tabela de itens de uma contratação no PNCP.
-    Endpoint público usual: /v1/orgaos/{cnpj}/compras/{ano}/{sequencial}/itens
+
+    A API de **consulta** (`/api/consulta`) não expõe este recurso; os itens ficam na
+    base **pncp-api** (mesma árvore usada em arquivos), por exemplo:
+    `{PNCP_PNCP_API}/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}/itens`
     """
     cnpj = str(cnpj_orgao or "").strip()
     ano = str(ano_compra or "").strip()
@@ -148,7 +152,7 @@ async def get_contract_items(
     if not cnpj or not ano or not seq:
         return []
 
-    endpoint = f"{PNCP_BASE_URL}/v1/orgaos/{cnpj}/compras/{ano}/{seq}/itens"
+    endpoint = f"{PNCP_PNCP_API_BASE_URL}/v1/orgaos/{cnpj}/compras/{ano}/{seq}/itens"
 
     async with httpx.AsyncClient(timeout=PNCP_TIMEOUT) as client:
         resp = await _get_pncp(client, endpoint, params=None, tolerate_rate_limit=True)
@@ -168,6 +172,7 @@ async def get_contract_items(
 
     if isinstance(data, dict) and isinstance(data.get("data"), list):
         return data["data"]
+    # pncp-api devolve o array de itens direto no corpo.
     if isinstance(data, list):
         return data
     return []

@@ -1,15 +1,89 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Any, Dict, List, Optional
 
 import httpx
 
-from .config import PNCP_BASE_URL, PNCP_TIMEOUT, PNCP_MAX_RETRIES, PNCP_RETRY_BACKOFF_SECONDS
+from .config import (
+    PNCP_BASE_URL,
+    PNCP_TIMEOUT,
+    PNCP_MAX_RETRIES,
+    PNCP_RETRY_BACKOFF_SECONDS,
+    PNCP_MIN_REQUEST_INTERVAL_SECONDS,
+    PNCP_RATE_LIMIT_EXTRA_ATTEMPTS,
+    PNCP_RATE_LIMIT_BACKOFF_CAP_SECONDS,
+)
 
 
 class PNCPClientError(Exception):
     pass
+
+
+_pace_lock = asyncio.Lock()
+_last_request_monotonic: float = 0.0
+
+
+async def _throttle_pace() -> None:
+    """Evita rajadas de requisições que disparam 429 no PNCP."""
+    global _last_request_monotonic
+    interval = max(0.0, float(PNCP_MIN_REQUEST_INTERVAL_SECONDS or 0))
+    if interval <= 0:
+        return
+    async with _pace_lock:
+        now = time.monotonic()
+        delta = now - _last_request_monotonic
+        if delta < interval:
+            await asyncio.sleep(interval - delta)
+        _last_request_monotonic = time.monotonic()
+
+
+def _retry_after_seconds(resp: httpx.Response) -> float:
+    raw = (resp.headers.get("Retry-After") or "").strip()
+    if not raw:
+        return 0.0
+    try:
+        return float(raw)
+    except ValueError:
+        return 0.0
+
+
+async def _get_pncp(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    params: Optional[Dict[str, Any]] = None,
+    tolerate_rate_limit: bool,
+) -> Optional[httpx.Response]:
+    """
+    GET com pacing + retries em 429/503.
+    Se tolerate_rate_limit=True e ainda assim 429/503, retorna None (tratar como vazio).
+    """
+    total_attempts = max(1, PNCP_MAX_RETRIES + max(0, PNCP_RATE_LIMIT_EXTRA_ATTEMPTS))
+    resp: Optional[httpx.Response] = None
+    for attempt in range(total_attempts):
+        await _throttle_pace()
+        try:
+            resp = await client.get(url, params=params)
+        except httpx.RequestError:
+            if attempt < total_attempts - 1:
+                await asyncio.sleep(PNCP_RETRY_BACKOFF_SECONDS * (2 ** min(attempt, 6)))
+                continue
+            return None
+
+        if resp.status_code in (429, 503):
+            ra = _retry_after_seconds(resp)
+            backoff = PNCP_RETRY_BACKOFF_SECONDS * (2 ** min(attempt, 10))
+            wait = min(PNCP_RATE_LIMIT_BACKOFF_CAP_SECONDS, max(ra, backoff, 1.0))
+            if attempt < total_attempts - 1:
+                await asyncio.sleep(wait)
+                continue
+            return None if tolerate_rate_limit else resp
+
+        return resp
+
+    return None
 
 
 async def search_contracts(
@@ -22,44 +96,29 @@ async def search_contracts(
     tamanho_pagina: int = 50,
 ) -> List[Dict[str, Any]]:
     endpoint = f"{PNCP_BASE_URL}/v1/contratacoes/publicacao"
-    params: Dict[str, Any] = {
+    req_params: Dict[str, Any] = {
         "dataInicial": data_inicial,
         "dataFinal": data_final,
         "pagina": max(1, int(pagina)),
         "tamanhoPagina": max(10, min(int(tamanho_pagina), 50)),
     }
     if codigo_modalidade is not None:
-        params["codigoModalidadeContratacao"] = int(codigo_modalidade)
+        req_params["codigoModalidadeContratacao"] = int(codigo_modalidade)
     if uf:
-        params["uf"] = uf
+        req_params["uf"] = uf
     if codigo_municipio_ibge:
-        params["codigoMunicipioIbge"] = codigo_municipio_ibge
+        req_params["codigoMunicipioIbge"] = codigo_municipio_ibge
 
-    # Retry com backoff para reduzir falhas transitórias/timeout.
-    last_request_error: Optional[Exception] = None
-    resp: Optional[httpx.Response] = None
-    for attempt in range(max(1, PNCP_MAX_RETRIES)):
-        try:
-            async with httpx.AsyncClient(timeout=PNCP_TIMEOUT) as client:
-                resp = await client.get(endpoint, params=params)
-            break
-        except httpx.RequestError as e:
-            last_request_error = e
-            if attempt < max(1, PNCP_MAX_RETRIES) - 1:
-                wait_s = PNCP_RETRY_BACKOFF_SECONDS * (2 ** attempt)
-                await asyncio.sleep(wait_s)
-                continue
-            # Não derruba o fluxo por timeout/conexão: trata como página vazia.
-            return []
+    async with httpx.AsyncClient(timeout=PNCP_TIMEOUT) as client:
+        resp = await _get_pncp(client, endpoint, params=req_params, tolerate_rate_limit=True)
 
     if resp is None:
-        if last_request_error is not None:
-            raise PNCPClientError(f"Falha inesperada sem resposta do PNCP: {type(last_request_error).__name__}")
-        raise PNCPClientError("Falha inesperada sem resposta do PNCP.")
-
+        return []
     if resp.status_code == 204:
         return []
     if resp.status_code >= 400:
+        # Erros "normais" do PNCP (ex.: 422 período inválido) ainda sobem para debug;
+        # 429/503 já foram absorvidos acima como None.
         raise PNCPClientError(f"PNCP retornou {resp.status_code}: {resp.text[:300]}")
 
     try:
@@ -91,35 +150,21 @@ async def get_contract_items(
 
     endpoint = f"{PNCP_BASE_URL}/v1/orgaos/{cnpj}/compras/{ano}/{seq}/itens"
 
-    last_request_error: Optional[Exception] = None
-    resp: Optional[httpx.Response] = None
-    for attempt in range(max(1, PNCP_MAX_RETRIES)):
-        try:
-            async with httpx.AsyncClient(timeout=PNCP_TIMEOUT) as client:
-                resp = await client.get(endpoint)
-            break
-        except httpx.RequestError as e:
-            last_request_error = e
-            if attempt < max(1, PNCP_MAX_RETRIES) - 1:
-                wait_s = PNCP_RETRY_BACKOFF_SECONDS * (2 ** attempt)
-                await asyncio.sleep(wait_s)
-                continue
-            return []
+    async with httpx.AsyncClient(timeout=PNCP_TIMEOUT) as client:
+        resp = await _get_pncp(client, endpoint, params=None, tolerate_rate_limit=True)
 
     if resp is None:
-        if last_request_error is not None:
-            raise PNCPClientError(f"Falha sem resposta ao buscar itens PNCP: {type(last_request_error).__name__}")
-        raise PNCPClientError("Falha sem resposta ao buscar itens PNCP.")
-
+        return []
     if resp.status_code in (204, 404):
         return []
     if resp.status_code >= 400:
-        raise PNCPClientError(f"PNCP itens retornou {resp.status_code}: {resp.text[:300]}")
+        # Erro pontual em itens: não derruba busca principal
+        return []
 
     try:
         data = resp.json()
-    except ValueError as e:
-        raise PNCPClientError("PNCP itens retornou JSON inválido.") from e
+    except ValueError:
+        return []
 
     if isinstance(data, dict) and isinstance(data.get("data"), list):
         return data["data"]

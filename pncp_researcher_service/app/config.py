@@ -60,3 +60,7 @@ PNCP_MODALIDADES_DEFAULT: list[int] = _env_int_list(
 PNCP_ENABLE_ITEM_TABLE_LOOKUP: bool = os.getenv("PNCP_ENABLE_ITEM_TABLE_LOOKUP", "true").strip().lower() in {"1", "true", "yes", "on"}
 PNCP_ITEM_LOOKUP_PER_PAGE: int = _env_int("PNCP_ITEM_LOOKUP_PER_PAGE", 30)
 PNCP_ITEM_LOOKUP_CONCURRENCY: int = _env_int("PNCP_ITEM_LOOKUP_CONCURRENCY", 8)
+# Timeout específico do lookup de itens (evita travar o stream quando PNCP está lento).
+PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS: float = float(os.getenv("PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS", "8"))
+# Orçamento máximo de tempo por página para lookup de itens.
+PNCP_ITEM_LOOKUP_MAX_SECONDS_PER_PAGE: float = float(os.getenv("PNCP_ITEM_LOOKUP_MAX_SECONDS_PER_PAGE", "6"))

@@ -14,6 +14,8 @@ from .config import (
     PNCP_ENABLE_ITEM_TABLE_LOOKUP,
     PNCP_ITEM_LOOKUP_PER_PAGE,
     PNCP_ITEM_LOOKUP_CONCURRENCY,
+    PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS,
+    PNCP_ITEM_LOOKUP_MAX_SECONDS_PER_PAGE,
 )
 from .pncp_client import search_contracts, get_contract_items
 from .schemas import MarketSearchRequest
@@ -108,9 +110,9 @@ def _compute_match_score(text: str, query_groups: List[List[str]]) -> float:
         if len(group) == 1:
             required_hits = 1
         elif len(group) <= 3:
-            required_hits = 2
+            required_hits = 1
         else:
-            required_hits = max(2, math.ceil(len(group) * 0.6))
+            required_hits = max(1, math.ceil(len(group) * 0.5))
 
         if hits < required_hits:
             return 0.0  # sem cobertura mínima de um grupo -> descarta
@@ -215,9 +217,13 @@ async def _extract_matching_items_with_table_lookup(
             cnpj = _extract_cnpj_from_raw(raw)
             ano = raw.get("anoCompra")
             seq = raw.get("sequencialCompra")
-            if cnpj and ano is not None and seq is not None:
+            if cnpj and ano is not None and seq is not None and score_obj <= 0:
                 async with sem:
-                    rows = await get_contract_items(cnpj, ano, seq)
+                    lookup_coro = get_contract_items(cnpj, ano, seq)
+                    if PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS > 0:
+                        rows = await asyncio.wait_for(lookup_coro, timeout=PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS)
+                    else:
+                        rows = await lookup_coro
                 item_table_text = _item_text_from_table_rows(rows)
                 score_table = _compute_match_score(item_table_text, query_groups) if item_table_text else 0.0
         except Exception:
@@ -252,8 +258,28 @@ async def _extract_matching_items_with_table_lookup(
         }
 
     selected = raw_items[: max(1, PNCP_ITEM_LOOKUP_PER_PAGE)]
-    results = await asyncio.gather(*(process_one(raw) for raw in selected))
-    matched = [r for r in results if r]
+    tasks = [asyncio.create_task(process_one(raw)) for raw in selected]
+    matched: List[Dict[str, Any]] = []
+    try:
+        if PNCP_ITEM_LOOKUP_MAX_SECONDS_PER_PAGE > 0:
+            done_iter = asyncio.as_completed(tasks, timeout=PNCP_ITEM_LOOKUP_MAX_SECONDS_PER_PAGE)
+        else:
+            done_iter = asyncio.as_completed(tasks)
+        for done in done_iter:
+            try:
+                result = await done
+            except Exception:
+                result = None
+            if result:
+                matched.append(result)
+    except TimeoutError:
+        # Estourou orçamento da página: devolve o que já conseguiu sem travar stream.
+        pass
+    finally:
+        for t in tasks:
+            if not t.done():
+                t.cancel()
+
     matched.sort(key=lambda x: x.get("score_relevancia") or 0, reverse=True)
     return matched
 

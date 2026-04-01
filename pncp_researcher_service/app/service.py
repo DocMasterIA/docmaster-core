@@ -100,9 +100,23 @@ def _compute_match_score(text: str, query_groups: List[List[str]]) -> float:
     if not normalized_text:
         return 0.0
 
+    words = set(normalized_text.split())
+
+    def token_hit(tok: str) -> bool:
+        if not tok:
+            return False
+        if tok in normalized_text:
+            return True
+        # Fallback por radical para plural/flexão simples (ex.: esportivo/esportiva/esportes)
+        stem = tok[: max(4, min(len(tok), 6))]
+        for w in words:
+            if w.startswith(stem) or stem.startswith(w[: max(3, min(len(w), 5))]):
+                return True
+        return False
+
     total_score = 0.0
     for group in query_groups:
-        hits = sum(1 for tok in group if tok in normalized_text)
+        hits = sum(1 for tok in group if token_hit(tok))
         # Regra de precisão por tamanho do grupo:
         # - 1 termo: precisa 1 hit
         # - 2-3 termos: precisa pelo menos 2 hits

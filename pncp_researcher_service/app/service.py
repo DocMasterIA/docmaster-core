@@ -6,9 +6,16 @@ from typing import Any, Dict, List
 import re
 import unicodedata
 import math
+import asyncio
 
-from .config import PNCP_DEFAULT_LOOKBACK_DAYS, PNCP_MODALIDADES_DEFAULT
-from .pncp_client import search_contracts
+from .config import (
+    PNCP_DEFAULT_LOOKBACK_DAYS,
+    PNCP_MODALIDADES_DEFAULT,
+    PNCP_ENABLE_ITEM_TABLE_LOOKUP,
+    PNCP_ITEM_LOOKUP_PER_PAGE,
+    PNCP_ITEM_LOOKUP_CONCURRENCY,
+)
+from .pncp_client import search_contracts, get_contract_items
 from .schemas import MarketSearchRequest
 
 
@@ -53,6 +60,12 @@ def _build_query_groups(termo_busca: str) -> List[List[str]]:
         "de", "da", "do", "das", "dos", "para", "com", "sem", "em", "no", "na", "nos", "nas",
         "por", "e", "ou", "a", "o", "as", "os", "um", "uma", "uns", "umas",
     }
+    generic_tokens = {
+        "material", "materiais", "consumo", "consumiveis", "consumivel",
+        "aquisicao", "aquisição", "contratacao", "contratação",
+        "servico", "servicos", "serviço", "serviços",
+        "equipamento", "equipamentos", "item", "itens",
+    }
 
     groups: List[List[str]] = []
     for raw in raw_groups:
@@ -60,7 +73,13 @@ def _build_query_groups(termo_busca: str) -> List[List[str]]:
         if not subgroups:
             subgroups = [raw]
         for sg in subgroups:
-            toks = [t for t in sg.split() if len(t) >= 3 and t not in stopwords]
+            toks = [
+                t for t in sg.split()
+                if len(t) >= 3 and t not in stopwords and t not in generic_tokens
+            ]
+            # Fallback: se sobrar vazio, mantém ao menos os termos não-stopword.
+            if not toks:
+                toks = [t for t in sg.split() if len(t) >= 3 and t not in stopwords]
             if toks:
                 groups.append(toks)
     return groups
@@ -82,7 +101,18 @@ def _compute_match_score(text: str, query_groups: List[List[str]]) -> float:
     total_score = 0.0
     for group in query_groups:
         hits = sum(1 for tok in group if tok in normalized_text)
-        if hits == 0:
+        # Regra de precisão por tamanho do grupo:
+        # - 1 termo: precisa 1 hit
+        # - 2-3 termos: precisa pelo menos 2 hits
+        # - 4+ termos: precisa ~60% dos termos
+        if len(group) == 1:
+            required_hits = 1
+        elif len(group) <= 3:
+            required_hits = 2
+        else:
+            required_hits = max(2, math.ceil(len(group) * 0.6))
+
+        if hits < required_hits:
             return 0.0  # sem cobertura mínima de um grupo -> descarta
 
         coverage = hits / max(1, len(group))
@@ -123,6 +153,107 @@ def _extract_matching_items(raw_items: List[Dict[str, Any]], query_groups: List[
                 "score_relevancia": score,
             }
         )
+    matched.sort(key=lambda x: x.get("score_relevancia") or 0, reverse=True)
+    return matched
+
+
+def _extract_cnpj_from_raw(raw: Dict[str, Any]) -> str:
+    """
+    Extrai CNPJ do órgão a partir de campos comuns do payload PNCP.
+    """
+    org = raw.get("orgaoEntidade") or {}
+    candidates = [
+        org.get("cnpj"),
+        org.get("cnpjOrgaoEntidade"),
+        raw.get("cnpjOrgaoEntidade"),
+    ]
+    numero_controle = str(raw.get("numeroControlePNCP") or "")
+    if numero_controle and "-" in numero_controle:
+        candidates.append(numero_controle.split("-")[0])
+    for c in candidates:
+        s = re.sub(r"\D+", "", str(c or ""))
+        if len(s) == 14:
+            return s
+    return ""
+
+
+def _item_text_from_table_rows(rows: List[Dict[str, Any]]) -> str:
+    """
+    Concatena os campos de descrição dos itens da tabela.
+    """
+    texts: List[str] = []
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        for key in ("descricao", "descricaoItem", "objeto", "item", "nomeItem"):
+            v = str(r.get(key) or "").strip()
+            if v:
+                texts.append(v)
+                break
+    return " | ".join(texts)
+
+
+async def _extract_matching_items_with_table_lookup(
+    raw_items: List[Dict[str, Any]],
+    query_groups: List[List[str]],
+) -> List[Dict[str, Any]]:
+    """
+    Faz match por objeto + tabela de itens da contratação (quando disponível).
+    """
+    if not raw_items:
+        return []
+
+    sem = asyncio.Semaphore(max(1, PNCP_ITEM_LOOKUP_CONCURRENCY))
+
+    async def process_one(raw: Dict[str, Any]) -> Dict[str, Any] | None:
+        obj = str(raw.get("objetoCompra") or "")
+        score_obj = _compute_match_score(obj, query_groups)
+
+        item_table_text = ""
+        score_table = 0.0
+        try:
+            cnpj = _extract_cnpj_from_raw(raw)
+            ano = raw.get("anoCompra")
+            seq = raw.get("sequencialCompra")
+            if cnpj and ano is not None and seq is not None:
+                async with sem:
+                    rows = await get_contract_items(cnpj, ano, seq)
+                item_table_text = _item_text_from_table_rows(rows)
+                score_table = _compute_match_score(item_table_text, query_groups) if item_table_text else 0.0
+        except Exception:
+            # Não derruba busca por falha pontual na consulta de itens
+            score_table = 0.0
+
+        score = max(score_obj, score_table)
+        if score <= 0:
+            return None
+
+        org = raw.get("orgaoEntidade") or {}
+        unid = raw.get("unidadeOrgao") or {}
+        valor = raw.get("valorTotalEstimado")
+        try:
+            valor_f = float(valor) if valor is not None else None
+        except Exception:
+            valor_f = None
+
+        return {
+            "numero_pncp": raw.get("numeroControlePNCP"),
+            "objeto_resumido": obj,
+            "orgao": org.get("razaoSocial") or org.get("razaosocial"),
+            "municipio": unid.get("municipioNome"),
+            "uf": unid.get("ufSigla"),
+            "modalidade": raw.get("modalidadeNome"),
+            "valor_global": valor_f,
+            "situacao": raw.get("situacaoCompraNome"),
+            "ano_compra": raw.get("anoCompra"),
+            "sequencial_compra": raw.get("sequencialCompra"),
+            "score_relevancia": score,
+            "match_origem": "tabela_itens" if score_table >= score_obj and score_table > 0 else "objeto",
+        }
+
+    selected = raw_items[: max(1, PNCP_ITEM_LOOKUP_PER_PAGE)]
+    results = await asyncio.gather(*(process_one(raw) for raw in selected))
+    matched = [r for r in results if r]
     matched.sort(key=lambda x: x.get("score_relevancia") or 0, reverse=True)
     return matched
 
@@ -176,7 +307,10 @@ async def market_search_stream(payload: MarketSearchRequest):
             pages_used_this_modalidade += 1
             pages_processed += 1
 
-            page_items = _extract_matching_items(batch or [], query_groups)
+            if PNCP_ENABLE_ITEM_TABLE_LOOKUP:
+                page_items = await _extract_matching_items_with_table_lookup(batch or [], query_groups)
+            else:
+                page_items = _extract_matching_items(batch or [], query_groups)
             all_items.extend(page_items)
 
             yield {

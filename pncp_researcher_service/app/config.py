@@ -55,3 +55,8 @@ PNCP_MODALIDADES_DEFAULT: list[int] = _env_int_list(
     "PNCP_MODALIDADES_DEFAULT",
     [8, 6, 7, 9, 10],
 )
+
+# Busca em tabela de itens (detalhamento) para aumentar precisão de termo.
+PNCP_ENABLE_ITEM_TABLE_LOOKUP: bool = os.getenv("PNCP_ENABLE_ITEM_TABLE_LOOKUP", "true").strip().lower() in {"1", "true", "yes", "on"}
+PNCP_ITEM_LOOKUP_PER_PAGE: int = _env_int("PNCP_ITEM_LOOKUP_PER_PAGE", 30)
+PNCP_ITEM_LOOKUP_CONCURRENCY: int = _env_int("PNCP_ITEM_LOOKUP_CONCURRENCY", 8)

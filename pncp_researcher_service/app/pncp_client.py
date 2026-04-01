@@ -72,3 +72,57 @@ async def search_contracts(
     if isinstance(data, list):
         return data
     return []
+
+
+async def get_contract_items(
+    cnpj_orgao: str,
+    ano_compra: Any,
+    sequencial_compra: Any,
+) -> List[Dict[str, Any]]:
+    """
+    Busca tabela de itens de uma contratação no PNCP.
+    Endpoint público usual: /v1/orgaos/{cnpj}/compras/{ano}/{sequencial}/itens
+    """
+    cnpj = str(cnpj_orgao or "").strip()
+    ano = str(ano_compra or "").strip()
+    seq = str(sequencial_compra or "").strip()
+    if not cnpj or not ano or not seq:
+        return []
+
+    endpoint = f"{PNCP_BASE_URL}/v1/orgaos/{cnpj}/compras/{ano}/{seq}/itens"
+
+    last_request_error: Optional[Exception] = None
+    resp: Optional[httpx.Response] = None
+    for attempt in range(max(1, PNCP_MAX_RETRIES)):
+        try:
+            async with httpx.AsyncClient(timeout=PNCP_TIMEOUT) as client:
+                resp = await client.get(endpoint)
+            break
+        except httpx.RequestError as e:
+            last_request_error = e
+            if attempt < max(1, PNCP_MAX_RETRIES) - 1:
+                wait_s = PNCP_RETRY_BACKOFF_SECONDS * (2 ** attempt)
+                await asyncio.sleep(wait_s)
+                continue
+            return []
+
+    if resp is None:
+        if last_request_error is not None:
+            raise PNCPClientError(f"Falha sem resposta ao buscar itens PNCP: {type(last_request_error).__name__}")
+        raise PNCPClientError("Falha sem resposta ao buscar itens PNCP.")
+
+    if resp.status_code in (204, 404):
+        return []
+    if resp.status_code >= 400:
+        raise PNCPClientError(f"PNCP itens retornou {resp.status_code}: {resp.text[:300]}")
+
+    try:
+        data = resp.json()
+    except ValueError as e:
+        raise PNCPClientError("PNCP itens retornou JSON inválido.") from e
+
+    if isinstance(data, dict) and isinstance(data.get("data"), list):
+        return data["data"]
+    if isinstance(data, list):
+        return data
+    return []

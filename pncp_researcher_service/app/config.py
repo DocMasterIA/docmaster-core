@@ -37,8 +37,8 @@ PNCP_RETRY_BACKOFF_SECONDS: float = float(os.getenv("PNCP_RETRY_BACKOFF_SECONDS"
 # Limite de taxa: bucket (rajadas paralelas) | interval (1 GET por intervalo) | off (sem pace; mais 429).
 PNCP_THROTTLE_MODE: str = (os.getenv("PNCP_THROTTLE_MODE", "bucket") or "bucket").strip().lower()
 # Modo bucket: burst inicial + recarga contínua (melhor que interval fixo com async paralelo).
-PNCP_BUCKET_CAPACITY: float = float(os.getenv("PNCP_BUCKET_CAPACITY", "12"))
-PNCP_BUCKET_REFILL_PER_SEC: float = float(os.getenv("PNCP_BUCKET_REFILL_PER_SEC", "18"))
+PNCP_BUCKET_CAPACITY: float = float(os.getenv("PNCP_BUCKET_CAPACITY", "16"))
+PNCP_BUCKET_REFILL_PER_SEC: float = float(os.getenv("PNCP_BUCKET_REFILL_PER_SEC", "24"))
 # Modo interval: espaço mínimo entre cada GET (legado; serializa demais com muitas tasks).
 PNCP_MIN_REQUEST_INTERVAL_SECONDS: float = float(os.getenv("PNCP_MIN_REQUEST_INTERVAL_SECONDS", "0.12"))
 # Tentativas extras além de PNCP_MAX_RETRIES quando resposta for 429/503.
@@ -72,7 +72,7 @@ PNCP_MODALIDADES_DEFAULT: list[int] = _env_int_list(
 # Busca em tabela de itens (detalhamento) para aumentar precisão de termo.
 PNCP_ENABLE_ITEM_TABLE_LOOKUP: bool = os.getenv("PNCP_ENABLE_ITEM_TABLE_LOOKUP", "true").strip().lower() in {"1", "true", "yes", "on"}
 PNCP_ITEM_LOOKUP_PER_PAGE: int = _env_int("PNCP_ITEM_LOOKUP_PER_PAGE", 30)
-PNCP_ITEM_LOOKUP_CONCURRENCY: int = _env_int("PNCP_ITEM_LOOKUP_CONCURRENCY", 8)
+PNCP_ITEM_LOOKUP_CONCURRENCY: int = _env_int("PNCP_ITEM_LOOKUP_CONCURRENCY", 12)
 # Timeout específico do lookup de itens (evita travar o stream quando PNCP está lento).
 PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS: float = float(os.getenv("PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS", "8"))
 # Orçamento máximo de tempo por página para lookup de itens.

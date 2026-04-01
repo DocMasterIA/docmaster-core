@@ -469,47 +469,72 @@ async def market_search_stream(payload: MarketSearchRequest):
     pages_processed = 0
     total_page_budget = max(1, payload.max_paginas)
     pages_per_modalidade = max(1, math.ceil(total_page_budget / max(1, len(modalidades))))
+    min_batch_full = max(10, min(payload.tamanho_pagina, 50))
+
+    mod_state: Dict[int, Dict[str, Any]] = {
+        int(m): {"page": payload.pagina, "exhausted": False, "fetched": 0} for m in modalidades
+    }
 
     async with create_pncp_http_client() as http:
-        for modalidade in modalidades:
-            page = payload.pagina
-            pages_used_this_modalidade = 0
-            while pages_used_this_modalidade < pages_per_modalidade and pages_processed < total_page_budget:
-                batch = await search_contracts(
+        while pages_processed < total_page_budget:
+            remaining = max(0, total_page_budget - pages_processed)
+            to_fetch: List[int] = []
+            for m in modalidades:
+                if len(to_fetch) >= remaining:
+                    break
+                mi = int(m)
+                st = mod_state[mi]
+                if st["exhausted"] or st["fetched"] >= pages_per_modalidade:
+                    continue
+                to_fetch.append(mi)
+
+            if not to_fetch:
+                break
+
+            search_tasks = [
+                search_contracts(
                     data_inicial=data_inicial,
                     data_final=data_final,
-                    codigo_modalidade=modalidade,
+                    codigo_modalidade=mi,
                     uf=payload.uf,
                     codigo_municipio_ibge=payload.codigo_municipio_ibge,
-                    pagina=page,
+                    pagina=mod_state[mi]["page"],
                     tamanho_pagina=payload.tamanho_pagina,
                     client=http,
                 )
-                pages_used_this_modalidade += 1
+                for mi in to_fetch
+            ]
+            batches: List[List[Dict[str, Any]]] = await asyncio.gather(*search_tasks)
+
+            if PNCP_ENABLE_ITEM_TABLE_LOOKUP:
+                item_tasks = [
+                    _extract_matching_items_with_table_lookup(b or [], query_groups, http_client=http)
+                    for b in batches
+                ]
+                page_items_list: List[List[Dict[str, Any]]] = await asyncio.gather(*item_tasks)
+            else:
+                page_items_list = [_extract_matching_items(b or [], query_groups) for b in batches]
+
+            for mi, batch, page_items in zip(to_fetch, batches, page_items_list):
+                st = mod_state[mi]
+                page_num = st["page"]
+                st["page"] = page_num + 1
+                st["fetched"] += 1
                 pages_processed += 1
 
-                if PNCP_ENABLE_ITEM_TABLE_LOOKUP:
-                    page_items = await _extract_matching_items_with_table_lookup(
-                        batch or [], query_groups, http_client=http
-                    )
-                else:
-                    page_items = _extract_matching_items(batch or [], query_groups)
                 all_items.extend(page_items)
 
                 yield {
                     "type": "page",
-                    "modalidade": modalidade,
-                    "page": page,
+                    "modalidade": mi,
+                    "page": page_num,
                     "raw_count": len(batch or []),
                     "matched_count": len(page_items),
                     "items": page_items,
                 }
 
-                if not batch or len(batch) < max(10, min(payload.tamanho_pagina, 50)):
-                    break
-                page += 1
-            if pages_processed >= total_page_budget:
-                break
+                if not batch or len(batch) < min_batch_full:
+                    st["exhausted"] = True
 
     all_items = _dedupe_items(all_items)
     all_items.sort(key=lambda x: x.get("score_relevancia") or 0, reverse=True)

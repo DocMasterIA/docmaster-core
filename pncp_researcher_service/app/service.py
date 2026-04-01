@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 import re
 import unicodedata
 
-from .config import PNCP_DEFAULT_LOOKBACK_DAYS
+from .config import PNCP_DEFAULT_LOOKBACK_DAYS, PNCP_MODALIDADES_DEFAULT
 from .pncp_client import search_contracts
 from .schemas import MarketSearchRequest
 
@@ -92,90 +92,6 @@ def _compute_match_score(text: str, query_groups: List[List[str]]) -> float:
     return round(total_score, 4)
 
 
-async def market_search(payload: MarketSearchRequest) -> Dict[str, Any]:
-    di, df = _default_dates()
-    data_inicial = payload.data_inicial or di
-    data_final = payload.data_final or df
-    query_groups = _build_query_groups(payload.termo_busca)
-
-    raw_items: List[Dict[str, Any]] = []
-    page = payload.pagina
-    for _ in range(max(1, payload.max_paginas)):
-        batch = await search_contracts(
-            data_inicial=data_inicial,
-            data_final=data_final,
-            codigo_modalidade=payload.codigo_modalidade,
-            uf=payload.uf,
-            codigo_municipio_ibge=payload.codigo_municipio_ibge,
-            pagina=page,
-            tamanho_pagina=payload.tamanho_pagina,
-        )
-        if not batch:
-            break
-        raw_items.extend(batch)
-        if len(batch) < max(10, min(payload.tamanho_pagina, 50)):
-            break
-        page += 1
-
-    items: List[Dict[str, Any]] = []
-    for raw in raw_items:
-        obj = str(raw.get("objetoCompra") or "")
-        score = _compute_match_score(obj, query_groups)
-        if score <= 0:
-            continue
-        org = raw.get("orgaoEntidade") or {}
-        unid = raw.get("unidadeOrgao") or {}
-        valor = raw.get("valorTotalEstimado")
-        try:
-            valor_f = float(valor) if valor is not None else None
-        except Exception:
-            valor_f = None
-        items.append(
-            {
-                "numero_pncp": raw.get("numeroControlePNCP"),
-                "objeto_resumido": obj,
-                "orgao": org.get("razaoSocial") or org.get("razaosocial"),
-                "municipio": unid.get("municipioNome"),
-                "uf": unid.get("ufSigla"),
-                "modalidade": raw.get("modalidadeNome"),
-                "valor_global": valor_f,
-                "situacao": raw.get("situacaoCompraNome"),
-                "ano_compra": raw.get("anoCompra"),
-                "sequencial_compra": raw.get("sequencialCompra"),
-                "score_relevancia": score,
-            }
-        )
-
-    # Ordena da maior relevância para menor
-    items.sort(key=lambda x: x.get("score_relevancia") or 0, reverse=True)
-
-    valores = [x["valor_global"] for x in items if isinstance(x.get("valor_global"), (int, float)) and x["valor_global"] > 0]
-    stats = {
-        "total_registros": len(items),
-        "com_valor": len(valores),
-        "valor_min": min(valores) if valores else None,
-        "valor_max": max(valores) if valores else None,
-        "valor_medio": round(mean(valores), 2) if valores else None,
-        "valor_mediano": round(median(valores), 2) if valores else None,
-    }
-
-    return {
-        "ok": True,
-        "filtros": {
-            "termo_busca": payload.termo_busca,
-            "uf": payload.uf,
-            "codigo_municipio_ibge": payload.codigo_municipio_ibge,
-            "data_inicial": data_inicial,
-            "data_final": data_final,
-            "codigo_modalidade": payload.codigo_modalidade,
-            "pagina_inicial": payload.pagina,
-            "max_paginas": payload.max_paginas,
-        },
-        "stats": stats,
-        "itens": items,
-    }
-
-
 def _extract_matching_items(raw_items: List[Dict[str, Any]], query_groups: List[List[str]]) -> List[Dict[str, Any]]:
     """Transforma payload bruto do PNCP em itens filtrados/rankeados."""
     matched: List[Dict[str, Any]] = []
@@ -210,6 +126,22 @@ def _extract_matching_items(raw_items: List[Dict[str, Any]], query_groups: List[
     return matched
 
 
+def _dedupe_items(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    seen = set()
+    out: List[Dict[str, Any]] = []
+    for it in items:
+        key = (
+            str(it.get("numero_pncp") or ""),
+            str(it.get("ano_compra") or ""),
+            str(it.get("sequencial_compra") or ""),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(it)
+    return out
+
+
 async def market_search_stream(payload: MarketSearchRequest):
     """
     Versão incremental da busca:
@@ -220,37 +152,47 @@ async def market_search_stream(payload: MarketSearchRequest):
     data_inicial = payload.data_inicial or di
     data_final = payload.data_final or df
     query_groups = _build_query_groups(payload.termo_busca)
+    modalidades = [payload.codigo_modalidade] if payload.codigo_modalidade is not None else PNCP_MODALIDADES_DEFAULT
 
     all_items: List[Dict[str, Any]] = []
-    page = payload.pagina
     pages_processed = 0
+    remaining_pages = max(1, payload.max_paginas)
 
-    for _ in range(max(1, payload.max_paginas)):
-        batch = await search_contracts(
-            data_inicial=data_inicial,
-            data_final=data_final,
-            codigo_modalidade=payload.codigo_modalidade,
-            uf=payload.uf,
-            codigo_municipio_ibge=payload.codigo_municipio_ibge,
-            pagina=page,
-            tamanho_pagina=payload.tamanho_pagina,
-        )
-        pages_processed += 1
+    for modalidade in modalidades:
+        page = payload.pagina
+        while remaining_pages > 0:
+            batch = await search_contracts(
+                data_inicial=data_inicial,
+                data_final=data_final,
+                codigo_modalidade=modalidade,
+                uf=payload.uf,
+                codigo_municipio_ibge=payload.codigo_municipio_ibge,
+                pagina=page,
+                tamanho_pagina=payload.tamanho_pagina,
+            )
+            remaining_pages -= 1
+            pages_processed += 1
 
-        page_items = _extract_matching_items(batch or [], query_groups)
-        all_items.extend(page_items)
+            page_items = _extract_matching_items(batch or [], query_groups)
+            all_items.extend(page_items)
 
-        yield {
-            "type": "page",
-            "page": page,
-            "raw_count": len(batch or []),
-            "matched_count": len(page_items),
-            "items": page_items,
-        }
+            yield {
+                "type": "page",
+                "modalidade": modalidade,
+                "page": page,
+                "raw_count": len(batch or []),
+                "matched_count": len(page_items),
+                "items": page_items,
+            }
 
-        if not batch or len(batch) < max(10, min(payload.tamanho_pagina, 50)):
+            if not batch or len(batch) < max(10, min(payload.tamanho_pagina, 50)):
+                break
+            page += 1
+        if remaining_pages <= 0:
             break
-        page += 1
+
+    all_items = _dedupe_items(all_items)
+    all_items.sort(key=lambda x: x.get("score_relevancia") or 0, reverse=True)
 
     valores = [x["valor_global"] for x in all_items if isinstance(x.get("valor_global"), (int, float)) and x["valor_global"] > 0]
     stats = {
@@ -273,9 +215,26 @@ async def market_search_stream(payload: MarketSearchRequest):
             "data_inicial": data_inicial,
             "data_final": data_final,
             "codigo_modalidade": payload.codigo_modalidade,
+            "modalidades_consideradas": modalidades,
             "pagina_inicial": payload.pagina,
             "max_paginas": payload.max_paginas,
         },
         "stats": stats,
         "itens": all_items,
+    }
+
+
+async def market_search(payload: MarketSearchRequest) -> Dict[str, Any]:
+    final_event: Dict[str, Any] | None = None
+    async for event in market_search_stream(payload):
+        if event.get("type") == "final":
+            final_event = event
+    if not final_event:
+        return {"ok": True, "filtros": {}, "stats": {"total_registros": 0}, "itens": []}
+    # Mantém contrato de resposta do endpoint síncrono
+    return {
+        "ok": bool(final_event.get("ok", True)),
+        "filtros": final_event.get("filtros", {}),
+        "stats": final_event.get("stats", {}),
+        "itens": final_event.get("itens", []),
     }

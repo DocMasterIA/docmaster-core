@@ -105,12 +105,20 @@ def _compute_match_score(text: str, query_groups: List[List[str]]) -> float:
     def token_hit(tok: str) -> bool:
         if not tok:
             return False
-        if tok in normalized_text:
+        if tok in words:
             return True
-        # Fallback por radical para plural/flexão simples (ex.: esportivo/esportiva/esportes)
-        stem = tok[: max(4, min(len(tok), 6))]
+        # Fallback por radical para plural/flexão simples (ex.: esportivo/esportiva/esportes),
+        # com prefixo mínimo forte para evitar falso positivo amplo.
+        if len(tok) < 5:
+            return False
+        stem = tok[: min(len(tok), 6)]
         for w in words:
-            if w.startswith(stem) or stem.startswith(w[: max(3, min(len(w), 5))]):
+            if len(w) < 5:
+                continue
+            if w.startswith(stem):
+                return True
+            # só aceita "tok começa com w" quando ambos têm prefixo robusto (>=5)
+            if tok.startswith(w[:5]):
                 return True
         return False
 

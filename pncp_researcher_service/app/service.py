@@ -109,17 +109,23 @@ def _compute_match_score(text: str, query_groups: List[List[str]]) -> float:
             return False
         if tok in words:
             return True
-        # Fallback por radical para plural/flexão simples (ex.: esportivo/esportiva/esportes),
-        # com prefixo mínimo forte para evitar falso positivo amplo.
-        if len(tok) < 5:
+        # Token muito curto: só casamento exato (evita "sol" em "solicitacao").
+        if len(tok) < 4:
             return False
+        # 4 letras (ex.: "pneu"): plural / flexão curta — sem isso "pneus" nunca casava.
+        if len(tok) == 4:
+            max_w = len(tok) + 2
+            for w in words:
+                if w.startswith(tok) and len(w) <= max_w:
+                    return True
+            return False
+        # >= 5: radical para flexões (ex.: esportivo/esportiva/esportes).
         stem = tok[: min(len(tok), 6)]
         for w in words:
             if len(w) < 5:
                 continue
             if w.startswith(stem):
                 return True
-            # só aceita "tok começa com w" quando ambos têm prefixo robusto (>=5)
             if tok.startswith(w[:5]):
                 return True
         return False

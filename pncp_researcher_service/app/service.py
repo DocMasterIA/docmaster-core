@@ -62,8 +62,10 @@ def _build_query_groups(termo_busca: str) -> List[List[str]]:
         "de", "da", "do", "das", "dos", "para", "com", "sem", "em", "no", "na", "nos", "nas",
         "por", "e", "ou", "a", "o", "as", "os", "um", "uma", "uns", "umas",
     }
+    # Não incluir "material"/"materiais" aqui: em buscas como "material esportivo"
+    # o usuário quer os dois termos; remover "material" gerava só "esportivo" e muito ruído.
     generic_tokens = {
-        "material", "materiais", "consumo", "consumiveis", "consumivel",
+        "consumo", "consumiveis", "consumivel",
         "aquisicao", "aquisição", "contratacao", "contratação",
         "servico", "servicos", "serviço", "serviços",
         "equipamento", "equipamentos", "item", "itens",
@@ -125,16 +127,16 @@ def _compute_match_score(text: str, query_groups: List[List[str]]) -> float:
     total_score = 0.0
     for group in query_groups:
         hits = sum(1 for tok in group if token_hit(tok))
-        # Regra de precisão por tamanho do grupo:
-        # - 1 termo: precisa 1 hit
-        # - 2-3 termos: precisa pelo menos 2 hits
-        # - 4+ termos: precisa ~60% dos termos
+        # Dentro do mesmo segmento (ex.: "material esportivo"), exige AND entre termos
+        # quando há 2 palavras: evita "só esporte/esportivas" sem material.
         if len(group) == 1:
             required_hits = 1
-        elif len(group) <= 3:
-            required_hits = 1
+        elif len(group) == 2:
+            required_hits = 2
+        elif len(group) == 3:
+            required_hits = 2
         else:
-            required_hits = max(1, math.ceil(len(group) * 0.5))
+            required_hits = max(2, math.ceil(len(group) * 0.5))
 
         if hits < required_hits:
             return 0.0  # sem cobertura mínima de um grupo -> descarta

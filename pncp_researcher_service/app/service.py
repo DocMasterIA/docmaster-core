@@ -16,6 +16,10 @@ from .config import (
     PNCP_ITEM_LOOKUP_CONCURRENCY,
     PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS,
     PNCP_ITEM_LOOKUP_MAX_SECONDS_PER_PAGE,
+    PNCP_FETCH_ITEMS_ALWAYS,
+    PNCP_ITEM_ROWS_MAX_DESTAQUE,
+    PNCP_ITEM_AMOSTRA_LINHAS,
+    PNCP_REQUIRE_TABLE_MATCH_WHEN_ITENS_EXIST,
 )
 from .pncp_client import search_contracts, get_contract_items
 from .schemas import MarketSearchRequest
@@ -209,20 +213,106 @@ def _extract_cnpj_from_raw(raw: Dict[str, Any]) -> str:
     return ""
 
 
+def _row_text_for_match(r: Dict[str, Any]) -> str:
+    """Texto de uma linha da tabela PNCP para pontuação."""
+    if not isinstance(r, dict):
+        return ""
+    parts: List[str] = []
+    for key in (
+        "descricao",
+        "descricaoItem",
+        "materialOuServicoNome",
+        "item",
+        "nomeItem",
+        "objeto",
+        "tipoItemNome",
+    ):
+        v = str(r.get(key) or "").strip()
+        if v:
+            parts.append(v)
+    return " ".join(parts)
+
+
+def _normalize_pncp_item_row(r: Dict[str, Any]) -> Dict[str, Any]:
+    """Campos úteis da linha de item retornados ao cliente."""
+    if not isinstance(r, dict):
+        return {}
+    out: Dict[str, Any] = {}
+    for k in (
+        "numeroItem",
+        "ordemItem",
+        "sequencialItem",
+        "descricao",
+        "descricaoItem",
+        "materialOuServicoNome",
+        "tipoItemNome",
+        "quantidade",
+        "unidadeMedida",
+        "unidadeFornecimentoNome",
+        "valorUnitarioEstimado",
+        "valorTotal",
+        "valorTotalEstimado",
+        "valorUnitarioHomologado",
+        "valorTotalHomologado",
+        "situacaoItemNome",
+    ):
+        if r.get(k) is not None:
+            out[k] = r[k]
+    return out
+
+
 def _item_text_from_table_rows(rows: List[Dict[str, Any]]) -> str:
-    """
-    Concatena os campos de descrição dos itens da tabela.
-    """
+    """Concatena textos das linhas para pontuação agregada na tabela."""
     texts: List[str] = []
     for r in rows or []:
-        if not isinstance(r, dict):
-            continue
-        for key in ("descricao", "descricaoItem", "objeto", "item", "nomeItem"):
-            v = str(r.get(key) or "").strip()
-            if v:
-                texts.append(v)
-                break
+        t = _row_text_for_match(r)
+        if t:
+            texts.append(t)
     return " | ".join(texts)
+
+
+def _itens_destaque_e_amostra(
+    rows: List[Dict[str, Any]],
+    query_groups: List[List[str]],
+    score_obj: float,
+) -> tuple[List[Dict[str, Any]], str, int]:
+    """
+    Monta lista para o JSON: linhas que batem na busca; se não houver, amostra quando objeto bate.
+    Retorna (lista_normalizada, modo, total_linhas).
+    """
+    total = len(rows or [])
+    cap = max(1, PNCP_ITEM_ROWS_MAX_DESTAQUE)
+    destaque: List[Dict[str, Any]] = []
+    for r in rows or []:
+        line = _row_text_for_match(r)
+        if line and _compute_match_score(line, query_groups) > 0:
+            destaque.append(_normalize_pncp_item_row(r))
+            if len(destaque) >= cap:
+                break
+    if destaque:
+        return destaque[:cap], "linhas_match", total
+    if score_obj > 0 and rows:
+        amostra_n = max(0, PNCP_ITEM_AMOSTRA_LINHAS)
+        sample = [_normalize_pncp_item_row(r) for r in rows[:amostra_n]]
+        return sample, "amostra_objeto", total
+    return [], "sem_linhas", total
+
+
+def _table_supports_query(rows: List[Dict[str, Any]], query_groups: List[List[str]]) -> bool:
+    """
+    True se alguma linha (ou o texto agregado) da tabela PNCP sustenta o termo de busca.
+    Lista vazia = não aplicável (chamador trata como "sem confirmação possível").
+    """
+    if not rows:
+        return False
+    for r in rows:
+        line = _row_text_for_match(r)
+        if line and _compute_match_score(line, query_groups) > 0:
+            return True
+    agg = _item_text_from_table_rows(rows)
+    if agg and _compute_match_score(agg, query_groups) > 0:
+        return True
+    return False
 
 
 async def _extract_matching_items_with_table_lookup(
@@ -239,15 +329,17 @@ async def _extract_matching_items_with_table_lookup(
 
     async def process_one(raw: Dict[str, Any]) -> Dict[str, Any] | None:
         obj = str(raw.get("objetoCompra") or "")
-        score_obj = _compute_match_score(obj, query_groups)
+        score_obj_bruto = _compute_match_score(obj, query_groups)
 
         item_table_text = ""
         score_table = 0.0
+        rows: List[Dict[str, Any]] = []
         try:
             cnpj = _extract_cnpj_from_raw(raw)
             ano = raw.get("anoCompra")
             seq = raw.get("sequencialCompra")
-            if cnpj and ano is not None and seq is not None and score_obj <= 0:
+            should_fetch = cnpj and ano is not None and seq is not None
+            if should_fetch and (PNCP_FETCH_ITEMS_ALWAYS or score_obj_bruto <= 0):
                 async with sem:
                     lookup_coro = get_contract_items(cnpj, ano, seq)
                     if PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS > 0:
@@ -259,6 +351,19 @@ async def _extract_matching_items_with_table_lookup(
         except Exception:
             # Não derruba busca por falha pontual na consulta de itens
             score_table = 0.0
+            rows = []
+
+        confirmado_itens: bool | None = None
+        if rows and PNCP_REQUIRE_TABLE_MATCH_WHEN_ITENS_EXIST:
+            confirmado_itens = _table_supports_query(rows, query_groups)
+            score_obj = score_obj_bruto if confirmado_itens else 0.0
+        elif rows:
+            confirmado_itens = _table_supports_query(rows, query_groups)
+            score_obj = score_obj_bruto
+        else:
+            # Sem linhas na API: não dá para confirmar pelos itens; mantém score do objeto.
+            confirmado_itens = None
+            score_obj = score_obj_bruto
 
         score = max(score_obj, score_table)
         if score <= 0:
@@ -272,6 +377,14 @@ async def _extract_matching_items_with_table_lookup(
         except Exception:
             valor_f = None
 
+        itens_json, itens_modo, qtd_itens = _itens_destaque_e_amostra(rows, query_groups, score_obj)
+        if score_obj > 0 and score_table > 0:
+            match_origem = "objeto_e_tabela"
+        elif score_table > 0 and score_obj <= 0:
+            match_origem = "tabela_itens"
+        else:
+            match_origem = "objeto"
+
         return {
             "numero_pncp": raw.get("numeroControlePNCP"),
             "objeto_resumido": obj,
@@ -284,7 +397,14 @@ async def _extract_matching_items_with_table_lookup(
             "ano_compra": raw.get("anoCompra"),
             "sequencial_compra": raw.get("sequencialCompra"),
             "score_relevancia": score,
-            "match_origem": "tabela_itens" if score_table >= score_obj and score_table > 0 else "objeto",
+            "score_objeto": round(score_obj, 4),
+            "score_objeto_texto": round(score_obj_bruto, 4),
+            "score_tabela_itens": round(score_table, 4),
+            "match_origem": match_origem,
+            "confirmado_nos_itens": confirmado_itens,
+            "qtd_itens_pncp": qtd_itens,
+            "itens_pncp_modo": itens_modo,
+            "itens_pncp": itens_json,
         }
 
     selected = raw_items[: max(1, PNCP_ITEM_LOOKUP_PER_PAGE)]

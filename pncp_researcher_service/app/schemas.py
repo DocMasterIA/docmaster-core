@@ -11,7 +11,10 @@ class HealthResponse(BaseModel):
 
 
 class MarketSearchRequest(BaseModel):
-    termo_busca: str = Field(..., description="Termo principal para busca no objeto da contratação.")
+    termo_busca: str = Field(
+        ...,
+        description="Termo para busca no objeto da contratação e, quando disponível, nas linhas da tabela de itens (API de itens do PNCP).",
+    )
     uf: Optional[str] = Field(None, description="UF para recorte geográfico.")
     codigo_municipio_ibge: Optional[str] = Field(None, description="Código IBGE do município.")
     data_inicial: Optional[str] = Field(None, description="AAAAMMDD.")

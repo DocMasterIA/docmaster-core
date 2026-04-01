@@ -70,3 +70,14 @@ PNCP_ITEM_LOOKUP_CONCURRENCY: int = _env_int("PNCP_ITEM_LOOKUP_CONCURRENCY", 3)
 PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS: float = float(os.getenv("PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS", "8"))
 # Orçamento máximo de tempo por página para lookup de itens.
 PNCP_ITEM_LOOKUP_MAX_SECONDS_PER_PAGE: float = float(os.getenv("PNCP_ITEM_LOOKUP_MAX_SECONDS_PER_PAGE", "6"))
+# Sempre chama GET itens (objeto + tabela); false = só quando objeto não casa (menos 429).
+PNCP_FETCH_ITEMS_ALWAYS: bool = os.getenv("PNCP_FETCH_ITEMS_ALWAYS", "true").strip().lower() in {"1", "true", "yes", "on"}
+# Máx. linhas devolvidas em itens_pncp_destaque (match por linha).
+PNCP_ITEM_ROWS_MAX_DESTAQUE: int = _env_int("PNCP_ITEM_ROWS_MAX_DESTAQUE", 25)
+# Quando só o objeto casa, quantas linhas da tabela enviar como amostra (valores/descrições).
+PNCP_ITEM_AMOSTRA_LINHAS: int = _env_int("PNCP_ITEM_AMOSTRA_LINHAS", 12)
+# Se a API de itens devolver linhas, exige que o termo apareça na tabela (não só no objeto).
+# Evita falso positivo (ex.: bicos "para encher pneus" quando se busca compra de pneus).
+PNCP_REQUIRE_TABLE_MATCH_WHEN_ITENS_EXIST: bool = os.getenv(
+    "PNCP_REQUIRE_TABLE_MATCH_WHEN_ITENS_EXIST", "true"
+).strip().lower() in {"1", "true", "yes", "on"}

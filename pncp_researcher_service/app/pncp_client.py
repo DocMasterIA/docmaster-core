@@ -15,7 +15,7 @@ class PNCPClientError(Exception):
 async def search_contracts(
     data_inicial: str,
     data_final: str,
-    codigo_modalidade: int,
+    codigo_modalidade: Optional[int] = None,
     uf: Optional[str] = None,
     codigo_municipio_ibge: Optional[str] = None,
     pagina: int = 1,
@@ -25,10 +25,11 @@ async def search_contracts(
     params: Dict[str, Any] = {
         "dataInicial": data_inicial,
         "dataFinal": data_final,
-        "codigoModalidadeContratacao": codigo_modalidade,
         "pagina": max(1, int(pagina)),
         "tamanhoPagina": max(10, min(int(tamanho_pagina), 50)),
     }
+    if codigo_modalidade is not None:
+        params["codigoModalidadeContratacao"] = int(codigo_modalidade)
     if uf:
         params["uf"] = uf
     if codigo_municipio_ibge:

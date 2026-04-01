@@ -16,7 +16,10 @@ class MarketSearchRequest(BaseModel):
     codigo_municipio_ibge: Optional[str] = Field(None, description="Código IBGE do município.")
     data_inicial: Optional[str] = Field(None, description="AAAAMMDD.")
     data_final: Optional[str] = Field(None, description="AAAAMMDD.")
-    codigo_modalidade: int = Field(8, description="Código da modalidade no PNCP (8=dispensa).")
+    codigo_modalidade: Optional[int] = Field(
+        None,
+        description="Código da modalidade no PNCP. Se omitido, pesquisa todas as modalidades.",
+    )
     pagina: int = Field(1, description="Página inicial.")
     tamanho_pagina: int = Field(50, description="Tamanho da página (10 a 50 no PNCP).")
     max_paginas: int = Field(2, description="Quantidade máxima de páginas para varrer.")

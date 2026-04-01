@@ -438,7 +438,7 @@ const focusedIndex = ref(-1);
 const searchDebounce = ref(null);
 
 const userPrefeituraId = ref(null);
-const userIsStaff = ref(false);
+const userIsSuperuser = ref(false);
 
 async function fetchCurrentUser() {
   try {
@@ -446,20 +446,20 @@ async function fetchCurrentUser() {
     if (!res.ok) return;
     const data = await res.json();
     userPrefeituraId.value = data.prefeitura_id || null;
-    userIsStaff.value = !!data.is_staff;
+    userIsSuperuser.value = !!data.is_superuser;
   } catch (e) {
     console.warn('fetchCurrentUser', e);
   }
 }
 
 function filterTemplatesByPrefeitura(list) {
-  if (userIsStaff.value) return list;
+  if (userIsSuperuser.value) return list;
   return list.filter((t) => !t.prefeitura || t.prefeitura.id === userPrefeituraId.value);
 }
 
 function canUseTemplateByPrefeitura(template) {
   if (!template) return false;
-  if (userIsStaff.value) return true;
+  if (userIsSuperuser.value) return true;
   if (!template.prefeitura) return true; // template global
   return String(template.prefeitura.id) === String(userPrefeituraId.value || '');
 }

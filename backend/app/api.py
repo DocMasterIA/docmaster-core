@@ -82,7 +82,7 @@ def _can_user_access_template(user, template: Template) -> bool:
     """Regra de acesso por prefeitura para templates."""
     if not user or not getattr(user, "is_authenticated", False):
         return False
-    if user.is_staff or user.is_superuser:
+    if user.is_superuser:
         return True
     user_pref_id = getattr(user, "prefeitura_id", None)
     tpl_pref_id = getattr(template, "prefeitura_id", None)
@@ -94,7 +94,7 @@ def _can_user_access_template(user, template: Template) -> bool:
 
 def _templates_queryset_for_user(user):
     qs = Template.objects.all()
-    if not user.is_staff and not user.is_superuser:
+    if not user.is_superuser:
         user_pref_id = getattr(user, "prefeitura_id", None)
         if user_pref_id is None:
             # Sem prefeitura: apenas templates globais
@@ -1000,6 +1000,7 @@ def api_me(request):
                 else ""
             ),
             "is_staff": user.is_staff,
+            "is_superuser": user.is_superuser,
         }
         if user.profile_photo and user.profile_photo.name:
             data["profile_photo"] = user.profile_photo.url

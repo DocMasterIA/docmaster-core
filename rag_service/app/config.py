@@ -23,11 +23,15 @@ CHROMA_HOST: str = os.getenv("CHROMA_HOST", "localhost")
 CHROMA_PORT: int = _env_int("CHROMA_PORT", 8000)
 CHROMA_COLLECTION: str = os.getenv("CHROMA_COLLECTION", "docmaster_docs")
 
-# Base URL da orquestração LLM (llm_api) para geração de respostas
+# Base URL da orquestração LLM para geração (POST /api/llm/generate) — padrão: llm_api + Ollama.
 LLM_ORCHESTRATION_BASE_URL: str = os.getenv(
     "LLM_ORCHESTRATION_BASE_URL",
     "http://localhost:8002",
 ).rstrip("/")
+
+# Só Estudo Técnico Preliminar (ETP): se definido, cláusulas/listas/tabelas desse tipo usam este
+# serviço (ex.: qwen_llm_service em 8015). Demais documentos continuam em LLM_ORCHESTRATION_BASE_URL.
+LLM_ETP_GENERATION_BASE_URL: str = os.getenv("LLM_ETP_GENERATION_BASE_URL", "").strip().rstrip("/")
 
 # Base URL do llm_agent (para gerar estrutura de documentos)
 LLM_AGENT_BASE_URL: str = os.getenv(
@@ -39,6 +43,19 @@ LLM_ORCHESTRATION_GENERATE_PATH: str = os.getenv(
     "LLM_ORCHESTRATION_GENERATE_PATH",
     "/api/llm/generate",
 )
+
+
+def _is_etp_document_type(document_type: str | None) -> bool:
+    d = (document_type or "").strip().lower()
+    return "etp" in d or "estudo" in d or d == "estudo_tecnico_preliminar"
+
+
+def llm_generation_base_url_for_document_type(document_type: str | None) -> str:
+    """URL do POST /api/llm/generate conforme o tipo de documento (ETP opcionalmente via Qwen/outro gateway)."""
+    if _is_etp_document_type(document_type) and LLM_ETP_GENERATION_BASE_URL:
+        return LLM_ETP_GENERATION_BASE_URL
+    return LLM_ORCHESTRATION_BASE_URL
+
 
 # Ollama (para embeddings, quando usar localmente)
 OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")

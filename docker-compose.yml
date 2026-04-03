@@ -2,6 +2,9 @@
 # Uso: docker compose up -d llm_api
 # Quando o Django rodar em outro serviço, defina LLM_API_BASE_URL=http://llm_api:8002
 # Para carregar variáveis do .env do host: env_file: - llm_api/.env
+#
+# Qwen só para ETP: docker compose --profile qwen up -d qwen_llm_service
+# No rag_service: LLM_ETP_GENERATION_BASE_URL=http://qwen_llm_service:8015 (Ollama/llm_api segue em LLM_ORCHESTRATION_BASE_URL).
 
 services:
   ollama:
@@ -41,6 +44,31 @@ services:
     volumes:
       # Logs de auditoria automáticos (llm_audit_YYYY-MM-DD.jsonl) em ./llm_audit no projeto
       - ./llm_audit:/app/logs
+    restart: unless-stopped
+
+  # Gateway Qwen (OpenAI-compatible). Mesmo contrato POST /api/llm/generate que o llm_api.
+  # Ative: docker compose --profile qwen up -d qwen_llm_service
+  # Requer QWEN_API_KEY (env host ou arquivo .env na raiz do compose).
+  qwen_llm_service:
+    profiles:
+      - qwen
+    build:
+      context: .
+      dockerfile: qwen_llm_service/Dockerfile
+    image: docmaster-qwen_llm_service
+    container_name: qwen_llm_service
+    ports:
+      - "8015:8015"
+    environment:
+      - PORT=8015
+      - QWEN_API_KEY=${QWEN_API_KEY:-}
+      - QWEN_MODEL=${QWEN_MODEL:-qwen-plus}
+      - QWEN_DAILY_TOKEN_BUDGET=${QWEN_DAILY_TOKEN_BUDGET:-0}
+      - QWEN_MAX_OUTPUT_TOKENS=${QWEN_MAX_OUTPUT_TOKENS:-4096}
+      - QWEN_MAX_PROMPT_CHARS=${QWEN_MAX_PROMPT_CHARS:-120000}
+      - QWEN_AUDIT_LOG_DIR=/app/logs
+    volumes:
+      - ./qwen_llm_audit:/app/logs
     restart: unless-stopped
 
   llm_agent:
@@ -105,6 +133,8 @@ services:
       - CHROMA_PORT=8000  # porta interna do container ChromaDB
       - OLLAMA_BASE_URL=http://ollama:11434
       - LLM_ORCHESTRATION_BASE_URL=http://llm_api:8002
+      # Geração de texto de ETP via gateway Qwen (mesmo contrato /api/llm/generate):
+      # - LLM_ETP_GENERATION_BASE_URL=http://qwen_llm_service:8015
       - LLM_AGENT_BASE_URL=http://llm_agent:8003
       - TEXT_CORRECTOR_ENABLED=1
       - TEXT_CORRECTOR_BASE_URL=http://text_corrector_service:8011

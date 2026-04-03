@@ -15,13 +15,13 @@ import httpx
 from .config import (
     CHROMA_COLLECTION,
     LLM_AGENT_BASE_URL,
-    LLM_ORCHESTRATION_BASE_URL,
     LLM_ORCHESTRATION_GENERATE_PATH,
     OLLAMA_BASE_URL,
     RAG_HTTP_TIMEOUT,
     RAG_LLM_SANITIZE,
     RAG_POSTPROCESS,
     RAG_TOP_K,
+    llm_generation_base_url_for_document_type,
 )
 from .retrieval import retrieve
 
@@ -113,10 +113,11 @@ Regras:
 """
 
 
-async def _llm_sanitize_meta_comments(text: str) -> str:
+async def _llm_sanitize_meta_comments(text: str, document_type: str | None = None) -> str:
     """
     Usa o LLM para remover meta-comentários. A IA interpreta o que deve ser removido.
     Retorna o texto original em caso de falha.
+    Para ETP, usa o mesmo backend de geração (ex.: Qwen) quando LLM_ETP_GENERATION_BASE_URL está definido.
     """
     if not text or not RAG_LLM_SANITIZE or not RAG_POSTPROCESS:
         return text
@@ -124,7 +125,8 @@ async def _llm_sanitize_meta_comments(text: str) -> str:
         return text
     try:
         full_prompt = LLM_SANITIZE_PROMPT + text
-        url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
+        base = llm_generation_base_url_for_document_type(document_type)
+        url = f"{base}{LLM_ORCHESTRATION_GENERATE_PATH}"
         payload = {"prompt": full_prompt, "stream": False}
         async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
             resp = await client.post(url, json=payload)
@@ -894,7 +896,8 @@ Instruções: O PRIMEIRO caractere da sua resposta deve ser o início do conteú
     async def _run_once(extra_instruction: str = "") -> str:
         q = query if not extra_instruction else f"{query}\n\n{extra_instruction}"
         full_prompt = f"<<SYSTEM>>\n{CLAUSE_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{q}"
-        url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
+        base = llm_generation_base_url_for_document_type(document_type)
+        url = f"{base}{LLM_ORCHESTRATION_GENERATE_PATH}"
         payload = {"prompt": full_prompt, "stream": False}
 
         async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
@@ -911,7 +914,7 @@ Instruções: O PRIMEIRO caractere da sua resposta deve ser o início do conteú
         data = body.get("data", body) if isinstance(body, dict) else {}
         text = data.get("response", data.get("text", ""))
         raw = (text or "").strip()
-        raw = await _llm_sanitize_meta_comments(raw)
+        raw = await _llm_sanitize_meta_comments(raw, document_type=document_type)
         return _postprocess_clause_text(raw, section_key=section_key)
 
     out = await _run_once()
@@ -992,7 +995,8 @@ ATENÇÃO: Não copie trechos de citação legal pura (transcrição de artigos)
     async def _run_once(extra_instruction: str = "") -> str:
         q = query if not extra_instruction else f"{query}\n\n{extra_instruction}"
         full_prompt = f"<<SYSTEM>>\n{LIST_COMPOSITION_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{q}"
-        url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
+        base = llm_generation_base_url_for_document_type(document_type)
+        url = f"{base}{LLM_ORCHESTRATION_GENERATE_PATH}"
         payload = {"prompt": full_prompt, "stream": False}
 
         async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
@@ -1008,7 +1012,7 @@ ATENÇÃO: Não copie trechos de citação legal pura (transcrição de artigos)
         data = body.get("data", body) if isinstance(body, dict) else {}
         text = data.get("response", data.get("text", ""))
         raw = (text or "").strip()
-        raw = await _llm_sanitize_meta_comments(raw)
+        raw = await _llm_sanitize_meta_comments(raw, document_type=document_type)
         return _postprocess_list_text(raw)
 
     out = await _run_once()
@@ -1109,7 +1113,8 @@ Exemplos de conteúdo similar (referência):
 Retorne APENAS um array JSON de objetos, cada um com as chaves das colunas. Exemplo: [{{"{col_labels[0]}": "val1", "{col_labels[1] if len(col_labels) > 1 else col_labels[0]}": "val2"}}, ...]"""
 
     full_prompt = f"<<SYSTEM>>\n{TABLE_ROWS_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{query}"
-    url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
+    base = llm_generation_base_url_for_document_type(document_type)
+    url = f"{base}{LLM_ORCHESTRATION_GENERATE_PATH}"
     payload = {"prompt": full_prompt, "stream": False}
 
     try:

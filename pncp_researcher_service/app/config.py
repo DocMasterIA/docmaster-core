@@ -32,6 +32,8 @@ PNCP_BASE_URL: str = os.getenv("PNCP_BASE_URL", "https://pncp.gov.br/api/consult
 PNCP_PNCP_API_BASE_URL: str = os.getenv("PNCP_PNCP_API_BASE_URL", "https://pncp.gov.br/pncp-api").rstrip("/")
 PNCP_TIMEOUT: float | None = _env_timeout("PNCP_TIMEOUT", 120.0)
 PNCP_DEFAULT_LOOKBACK_DAYS: int = _env_int("PNCP_DEFAULT_LOOKBACK_DAYS", 180)
+# Teto por requisição para max_paginas (varredura PNCP); aumentar eleva carga e risco de 429.
+PNCP_MAX_PAGINAS_PER_REQUEST: int = _env_int("PNCP_MAX_PAGINAS_PER_REQUEST", 120)
 PNCP_MAX_RETRIES: int = _env_int("PNCP_MAX_RETRIES", 4)
 PNCP_RETRY_BACKOFF_SECONDS: float = float(os.getenv("PNCP_RETRY_BACKOFF_SECONDS", "1.5"))
 # Limite de taxa: bucket (rajadas paralelas) | interval (1 GET por intervalo) | off (sem pace; mais 429).

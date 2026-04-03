@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from .config import PNCP_MAX_PAGINAS_PER_REQUEST
+
 
 class HealthResponse(BaseModel):
     ok: bool = True
@@ -25,7 +27,16 @@ class MarketSearchRequest(BaseModel):
     )
     pagina: int = Field(1, description="Página inicial.")
     tamanho_pagina: int = Field(50, description="Tamanho da página (10 a 50 no PNCP).")
-    max_paginas: int = Field(2, description="Quantidade máxima de páginas para varrer.")
+    max_paginas: int = Field(
+        15,
+        description=f"Quantidade máxima de páginas para varrer (1–{PNCP_MAX_PAGINAS_PER_REQUEST}, teto via PNCP_MAX_PAGINAS_PER_REQUEST).",
+    )
+
+    @field_validator("max_paginas")
+    @classmethod
+    def validate_max_paginas(cls, v: int) -> int:
+        cap = max(1, int(PNCP_MAX_PAGINAS_PER_REQUEST))
+        return max(1, min(int(v), cap))
 
     @field_validator("termo_busca")
     @classmethod

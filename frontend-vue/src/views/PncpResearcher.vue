@@ -35,7 +35,14 @@
             </label>
             <label class="gov-label">
               Máx. páginas (total)
-              <input v-model.number="maxPaginas" type="number" min="1" max="60" class="gov-input" :disabled="loading" />
+              <input
+                v-model.number="maxPaginas"
+                type="number"
+                min="1"
+                :max="MAX_PAGINAS_LIMIT"
+                class="gov-input"
+                :disabled="loading"
+              />
             </label>
             <label class="gov-label">
               Data inicial
@@ -113,6 +120,12 @@ import { computed, ref } from 'vue';
 
 const RAW_API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || '');
 const API_BASE = String(RAW_API_BASE).replace(/\/+$/, '');
+
+/** Teto de páginas no formulário (alinhar com PNCP_MAX_PAGINAS_PER_REQUEST no serviço). */
+const MAX_PAGINAS_LIMIT = Math.min(
+  500,
+  Math.max(1, Number.parseInt(String(import.meta.env.VITE_PNCP_MAX_PAGINAS || ''), 10) || 120),
+);
 
 const query = ref('');
 const ufFilter = ref('');
@@ -283,7 +296,7 @@ async function runSearch() {
     termo_busca: termo,
     pagina: 1,
     tamanho_pagina: 50,
-    max_paginas: Math.min(60, Math.max(1, Number(maxPaginas.value) || 15)),
+    max_paginas: Math.min(MAX_PAGINAS_LIMIT, Math.max(1, Number(maxPaginas.value) || 15)),
   };
   const di = diEarly;
   const df = dfEarly;

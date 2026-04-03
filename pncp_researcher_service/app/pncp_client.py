@@ -186,8 +186,7 @@ async def search_contracts(
         client = create_pncp_http_client()
         close_client = True
     try:
-        # false: após esgotar retries (429/502/503/504) ainda há resposta → erro claro; não confundir com “zero resultados”.
-        resp = await _get_pncp(client, endpoint, params=req_params, tolerate_rate_limit=False)
+        resp = await _get_pncp(client, endpoint, params=req_params, tolerate_rate_limit=True)
     finally:
         if close_client:
             await client.aclose()

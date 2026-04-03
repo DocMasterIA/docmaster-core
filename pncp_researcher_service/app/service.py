@@ -246,11 +246,14 @@ def _row_text_for_match(r: Dict[str, Any]) -> str:
     for key in (
         "descricao",
         "descricaoItem",
+        "descricaoResumida",
         "materialOuServicoNome",
         "item",
         "nomeItem",
         "objeto",
         "tipoItemNome",
+        "denominacao",
+        "nome",
     ):
         v = str(r.get(key) or "").strip()
         if v:
@@ -269,6 +272,7 @@ def _normalize_pncp_item_row(r: Dict[str, Any]) -> Dict[str, Any]:
         "sequencialItem",
         "descricao",
         "descricaoItem",
+        "descricaoResumida",
         "materialOuServicoNome",
         "tipoItemNome",
         "quantidade",
@@ -381,8 +385,15 @@ async def _extract_matching_items_with_table_lookup(
 
         confirmado_itens: bool | None = None
         if rows and PNCP_REQUIRE_TABLE_MATCH_WHEN_ITENS_EXIST:
-            confirmado_itens = _table_supports_query(rows, query_groups)
-            score_obj = score_obj_bruto if confirmado_itens else 0.0
+            tem_texto_linha = any(bool(_row_text_for_match(r).strip()) for r in rows)
+            if not tem_texto_linha:
+                # API devolveu linhas mas sem campos de descrição reconhecidos: não dá para
+                # confirmar nem contradizer o termo na tabela — mantém o match pelo objeto.
+                confirmado_itens = None
+                score_obj = score_obj_bruto
+            else:
+                confirmado_itens = _table_supports_query(rows, query_groups)
+                score_obj = score_obj_bruto if confirmado_itens else 0.0
         elif rows:
             confirmado_itens = _table_supports_query(rows, query_groups)
             score_obj = score_obj_bruto
@@ -403,7 +414,9 @@ async def _extract_matching_items_with_table_lookup(
         except Exception:
             valor_f = None
 
-        itens_json, itens_modo, qtd_itens = _itens_destaque_e_amostra(rows, query_groups, score_obj)
+        itens_json, itens_modo, qtd_itens = _itens_destaque_e_amostra(
+            rows, query_groups, score_obj_bruto
+        )
         if score_obj > 0 and score_table > 0:
             match_origem = "objeto_e_tabela"
         elif score_table > 0 and score_obj <= 0:

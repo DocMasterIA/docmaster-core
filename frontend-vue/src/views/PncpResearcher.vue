@@ -92,16 +92,19 @@
 
           <details v-if="item.itensPncp?.length" class="pncp-card__itens">
             <summary>Itens da contratação ({{ item.itensPncp.length }})</summary>
-            <ul>
-              <li v-for="(li, idx) in item.itensPncp" :key="idx">
-                <strong>{{ li.numeroItem != null ? `#${li.numeroItem} ` : '' }}</strong>
-                {{ li.descricao || '—' }}
-                <span v-if="li.quantidade != null" class="pncp-li-qty">
-                  · Qtd: {{ li.quantidade }} {{ (li.unidadeMedida || '').trim() }}
-                </span>
-                <span v-if="li.valorUnitarioEstimado != null" class="pncp-li-val">
-                  · Unit. {{ formatCurrency(li.valorUnitarioEstimado) }}
-                </span>
+            <ul class="pncp-item-lines">
+              <li v-for="(row, idx) in mapLineItems(item.itensPncp)" :key="idx" class="pncp-item-line">
+                <span v-if="row.badge" class="pncp-item-line__badge">{{ row.badge }}</span>
+                <div class="pncp-item-line__body">
+                  <p class="pncp-item-line__headline">{{ row.headline }}</p>
+                  <p v-if="row.complemento" class="pncp-item-line__complemento">{{ row.complemento }}</p>
+                  <div class="pncp-item-line__stats">
+                    <span v-if="row.qtdLine" class="pncp-item-line__stat">{{ row.qtdLine }}</span>
+                    <span v-if="row.unitLine" class="pncp-item-line__stat pncp-item-line__stat--money">
+                      {{ row.unitLine }}
+                    </span>
+                  </div>
+                </div>
               </li>
             </ul>
           </details>
@@ -175,6 +178,36 @@ function formatCurrency(value) {
     currency: 'BRL',
     maximumFractionDigits: 2,
   }).format(Number(value || 0));
+}
+
+/**
+ * Separa descrição típica PNCP: especificação do produto vs. trecho legal/serviços (após ", com ...").
+ */
+function splitItemDescricao(descricao) {
+  const s = String(descricao || '').trim();
+  if (!s) return { headline: '—', complemento: '' };
+  const m = s.match(/^(.+?),\s*(com\s+.+)$/is);
+  if (m) return { headline: m[1].trim(), complemento: m[2].trim() };
+  return { headline: s, complemento: '' };
+}
+
+/**
+ * @param {Record<string, unknown>} li
+ */
+function lineItemParts(li) {
+  const { headline, complemento } = splitItemDescricao(li.descricao);
+  const badge = li.numeroItem != null ? `#${li.numeroItem}` : '';
+  const unid = String(li.unidadeMedida || '').trim();
+  const qtdLine =
+    li.quantidade != null ? `Quantidade: ${li.quantidade}${unid ? ` ${unid}` : ''}` : '';
+  const unitLine =
+    li.valorUnitarioEstimado != null ? `Valor unitário: ${formatCurrency(li.valorUnitarioEstimado)}` : '';
+  return { badge, headline, complemento, qtdLine, unitLine };
+}
+
+function mapLineItems(list) {
+  if (!Array.isArray(list) || !list.length) return [];
+  return list.map((li) => lineItemParts(li));
 }
 
 /** Resposta de erro do proxy/Django/FastAPI (detail string ou lista Pydantic). */
@@ -475,18 +508,74 @@ async function runSearch() {
   font-size: 12px;
 }
 
-.pncp-card__itens ul {
-  margin: 6px 0 0;
-  padding-left: 18px;
+.pncp-item-lines {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
 }
 
-.pncp-card__itens li {
-  margin-bottom: 6px;
+.pncp-item-line {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid #e8edf4;
 }
 
-.pncp-li-qty,
-.pncp-li-val {
+.pncp-item-line:last-child {
+  border-bottom: none;
+}
+
+.pncp-item-line__badge {
+  flex: 0 0 auto;
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #1f4e79;
+  background: #e8f1fb;
+  padding: 3px 7px;
+  border-radius: 6px;
+  margin-top: 2px;
+}
+
+.pncp-item-line__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pncp-item-line__headline {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-text);
+}
+
+.pncp-item-line__complemento {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
   color: var(--color-text-soft);
+}
+
+.pncp-item-line__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-top: 2px;
+}
+
+.pncp-item-line__stat {
+  font-size: 12px;
+  color: var(--color-text-soft);
+}
+
+.pncp-item-line__stat--money {
+  font-weight: 600;
+  color: #0f5e3a;
 }
 
 .pncp-card__footer {

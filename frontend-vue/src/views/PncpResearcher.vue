@@ -352,6 +352,9 @@ async function runSearch() {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
 }
 
 .gov-page__title {
@@ -369,6 +372,9 @@ async function runSearch() {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
 }
 
 .pncp-search {
@@ -449,9 +455,11 @@ async function runSearch() {
   flex-direction: column;
   gap: 20px;
   width: 100%;
-  max-width: 760px;
+  max-width: none;
   margin: 0;
   padding: 0;
+  align-self: stretch;
+  box-sizing: border-box;
 }
 
 .pncp-card {
@@ -459,12 +467,16 @@ async function runSearch() {
   border-radius: var(--radius-md);
   background: #fff;
   padding: 12px;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
 }
 
 .pncp-card--somente-itens {
   display: flex;
   flex-direction: column;
   width: 100%;
+  align-self: stretch;
 }
 
 .pncp-card__items-heading {
@@ -565,6 +577,8 @@ async function runSearch() {
   padding: 0 0 0 1.35em;
   list-style: decimal;
   list-style-position: outside;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .pncp-item-line {
@@ -574,6 +588,8 @@ async function runSearch() {
   align-items: flex-start;
   padding: 12px 0 12px 0.25em;
   border-bottom: 1px solid #e8edf4;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .pncp-item-line:last-child {

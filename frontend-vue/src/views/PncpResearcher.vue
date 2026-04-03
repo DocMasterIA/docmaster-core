@@ -59,31 +59,39 @@
         </span>
       </div>
 
-      <div class="pncp-grid">
-        <template v-for="item in itemsComTabela" :key="item.id">
-          <article class="pncp-card pncp-card--somente-itens">
-            <h3 class="pncp-card__items-heading">
-              Itens da contratação
-              <span class="pncp-card__pncp-ref">{{ item.id }}</span>
-              <span class="pncp-card__items-count">({{ item.itensPncp.length }})</span>
-            </h3>
-            <ul class="pncp-item-lines">
-              <li v-for="(row, idx) in mapLineItems(item.itensPncp)" :key="idx" class="pncp-item-line">
-                <span v-if="row.badge" class="pncp-item-line__badge">{{ row.badge }}</span>
-                <div class="pncp-item-line__body">
-                  <p class="pncp-item-line__headline">{{ row.headline }}</p>
-                  <p v-if="row.complemento" class="pncp-item-line__complemento">{{ row.complemento }}</p>
-                  <div class="pncp-item-line__stats">
-                    <span v-if="row.qtdLine" class="pncp-item-line__stat">{{ row.qtdLine }}</span>
-                    <span v-if="row.unitLine" class="pncp-item-line__stat pncp-item-line__stat--money">
-                      {{ row.unitLine }}
-                    </span>
-                  </div>
+      <div class="pncp-list" role="list">
+        <article
+          v-for="(item, contrIdx) in itemsComTabela"
+          :key="item.id"
+          class="pncp-card pncp-card--somente-itens"
+          role="listitem"
+        >
+          <h3 class="pncp-card__items-heading">
+            <span class="pncp-card__block-num" aria-hidden="true">{{ contrIdx + 1 }}.</span>
+            <span class="pncp-card__items-heading-stack">
+              <span class="pncp-card__items-heading-label">Itens da contratação</span>
+              <span class="pncp-card__items-heading-meta">
+                <span class="pncp-card__pncp-ref">{{ item.id }}</span>
+                <span class="pncp-card__items-count">{{ item.itensPncp.length }} itens</span>
+              </span>
+            </span>
+          </h3>
+          <ol class="pncp-item-lines" role="list">
+            <li v-for="(row, idx) in mapLineItems(item.itensPncp)" :key="idx" class="pncp-item-line" role="listitem">
+              <span v-if="row.badge" class="pncp-item-line__badge">{{ row.badge }}</span>
+              <div class="pncp-item-line__body">
+                <p class="pncp-item-line__headline">{{ row.headline }}</p>
+                <p v-if="row.complemento" class="pncp-item-line__complemento">{{ row.complemento }}</p>
+                <div class="pncp-item-line__stats">
+                  <span v-if="row.qtdLine" class="pncp-item-line__stat">{{ row.qtdLine }}</span>
+                  <span v-if="row.unitLine" class="pncp-item-line__stat pncp-item-line__stat--money">
+                    {{ row.unitLine }}
+                  </span>
                 </div>
-              </li>
-            </ul>
-          </article>
-        </template>
+              </div>
+            </li>
+          </ol>
+        </article>
       </div>
 
       <p v-if="!loading && lastSearched && !displayItems.length && !errorMsg" class="pncp-empty">
@@ -436,10 +444,14 @@ async function runSearch() {
   font-size: 12px;
 }
 
-.pncp-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 10px;
+.pncp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 760px;
+  margin: 0;
+  padding: 0;
 }
 
 .pncp-card {
@@ -452,30 +464,61 @@ async function runSearch() {
 .pncp-card--somente-itens {
   display: flex;
   flex-direction: column;
+  width: 100%;
 }
 
 .pncp-card__items-heading {
-  margin: 0 0 8px;
+  margin: 0 0 12px;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
   font-size: 13px;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.45;
   color: var(--color-text);
 }
 
+.pncp-card__block-num {
+  flex: 0 0 auto;
+  min-width: 1.5em;
+  color: #1f4e79;
+  font-variant-numeric: tabular-nums;
+}
+
+.pncp-card__items-heading-stack {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pncp-card__items-heading-label {
+  display: block;
+}
+
+.pncp-card__items-heading-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+}
+
 .pncp-card__pncp-ref {
-  display: inline-block;
-  margin-left: 6px;
+  display: block;
   font-weight: 400;
   color: var(--color-text-soft);
   font-family: ui-monospace, monospace;
   font-size: 11px;
   word-break: break-all;
+  line-height: 1.35;
 }
 
 .pncp-card__items-count {
-  font-weight: 600;
+  font-weight: 500;
   color: var(--color-text-soft);
-  margin-left: 4px;
+  font-size: 12px;
 }
 
 .pncp-card__title {
@@ -519,15 +562,17 @@ async function runSearch() {
 
 .pncp-item-lines {
   margin: 0;
-  padding: 0;
-  list-style: none;
+  padding: 0 0 0 1.35em;
+  list-style: decimal;
+  list-style-position: outside;
 }
 
 .pncp-item-line {
   display: flex;
+  flex-direction: row;
   gap: 10px;
   align-items: flex-start;
-  padding: 10px 0;
+  padding: 12px 0 12px 0.25em;
   border-bottom: 1px solid #e8edf4;
 }
 

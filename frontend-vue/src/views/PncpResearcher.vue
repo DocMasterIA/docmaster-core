@@ -53,45 +53,20 @@
       <p v-if="loading && progressHint" class="pncp-progress">{{ progressHint }}</p>
 
       <div class="pncp-summary">
-        <span class="pncp-summary__badge">{{ displayItems.length }} resultado(s)</span>
+        <span class="pncp-summary__badge">{{ itemsComTabela.length }} contratação(ões) com itens</span>
         <span v-if="finalStats" class="pncp-summary__hint">
           Páginas processadas: {{ finalStats.pages_processed ?? '—' }}
-          <template v-if="finalStats.valor_medio != null">
-            · Preço médio (amostra): {{ formatCurrency(finalStats.valor_medio) }}
-          </template>
         </span>
       </div>
 
       <div class="pncp-grid">
-        <article v-for="item in displayItems" :key="item.id" class="pncp-card">
-          <h3 class="pncp-card__title">{{ item.title }}</h3>
-          <p class="pncp-card__price">{{ formatCurrency(item.price) }}</p>
-
-          <dl class="pncp-card__meta">
-            <div class="pncp-card__meta-row">
-              <dt>PNCP:</dt>
-              <dd>{{ item.id }}</dd>
-            </div>
-            <div class="pncp-card__meta-row">
-              <dt>Órgão:</dt>
-              <dd>{{ item.orgao }}</dd>
-            </div>
-            <div class="pncp-card__meta-row">
-              <dt>UF/Município:</dt>
-              <dd>{{ item.uf }} — {{ item.municipio }}</dd>
-            </div>
-            <div class="pncp-card__meta-row">
-              <dt>Modalidade:</dt>
-              <dd>{{ item.modalidade }}</dd>
-            </div>
-            <div class="pncp-card__meta-row">
-              <dt>Situação:</dt>
-              <dd>{{ item.situacao }}</dd>
-            </div>
-          </dl>
-
-          <details v-if="item.itensPncp?.length" class="pncp-card__itens">
-            <summary>Itens da contratação ({{ item.itensPncp.length }})</summary>
+        <template v-for="item in itemsComTabela" :key="item.id">
+          <article class="pncp-card pncp-card--somente-itens">
+            <h3 class="pncp-card__items-heading">
+              Itens da contratação
+              <span class="pncp-card__pncp-ref">{{ item.id }}</span>
+              <span class="pncp-card__items-count">({{ item.itensPncp.length }})</span>
+            </h3>
             <ul class="pncp-item-lines">
               <li v-for="(row, idx) in mapLineItems(item.itensPncp)" :key="idx" class="pncp-item-line">
                 <span v-if="row.badge" class="pncp-item-line__badge">{{ row.badge }}</span>
@@ -107,19 +82,19 @@
                 </div>
               </li>
             </ul>
-          </details>
-
-          <footer class="pncp-card__footer">
-            <span class="pncp-card__chip">{{ item.matchOrigem || '—' }}</span>
-            <span class="pncp-card__date" :title="'Score: ' + item.score">
-              {{ item.confirmadoItens === true ? 'Confirmado nos itens' : item.confirmadoItens === false ? 'Só objeto' : 'Sem tabela' }}
-            </span>
-          </footer>
-        </article>
+          </article>
+        </template>
       </div>
 
       <p v-if="!loading && lastSearched && !displayItems.length && !errorMsg" class="pncp-empty">
         Nenhum resultado para "{{ lastSearched }}" com os filtros atuais.
+      </p>
+      <p
+        v-else-if="!loading && lastSearched && displayItems.length && !itemsComTabela.length && !errorMsg"
+        class="pncp-empty"
+      >
+        Há {{ displayItems.length }} contratação(ões) no período, mas nenhuma com linhas de itens para exibir.
+        Tente outro termo ou aguarde o carregamento da tabela de itens no PNCP.
       </p>
     </div>
   </section>
@@ -148,6 +123,11 @@ const finalStats = ref(null);
 
 const displayItems = computed(() =>
   [...items.value].sort((a, b) => (b.score || 0) - (a.score || 0)),
+);
+
+/** Só contratações com linhas da tabela PNCP (exibição focada nos itens). */
+const itemsComTabela = computed(() =>
+  displayItems.value.filter((it) => Array.isArray(it.itensPncp) && it.itensPncp.length > 0),
 );
 
 function toPnDate(htmlDate) {
@@ -469,6 +449,35 @@ async function runSearch() {
   padding: 12px;
 }
 
+.pncp-card--somente-itens {
+  display: flex;
+  flex-direction: column;
+}
+
+.pncp-card__items-heading {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-text);
+}
+
+.pncp-card__pncp-ref {
+  display: inline-block;
+  margin-left: 6px;
+  font-weight: 400;
+  color: var(--color-text-soft);
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.pncp-card__items-count {
+  font-weight: 600;
+  color: var(--color-text-soft);
+  margin-left: 4px;
+}
+
 .pncp-card__title {
   margin: 0 0 4px;
   font-size: 15px;
@@ -509,7 +518,7 @@ async function runSearch() {
 }
 
 .pncp-item-lines {
-  margin: 8px 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }

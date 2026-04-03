@@ -58,6 +58,14 @@ def pncp_research_proxy(request, path: str):
                 stream=True,
                 timeout=(30, 900),
             )
+            # Erro antes do stream NDJSON: devolve JSON normal (422 validação, 502 PNCP, etc.)
+            if up.status_code >= 400:
+                try:
+                    payload = up.json()
+                except Exception:
+                    payload = {"detail": (up.text or up.reason or "")[:800]}
+                up.close()
+                return JsonResponse(payload, status=up.status_code, safe=False)
 
             def stream_iter():
                 try:

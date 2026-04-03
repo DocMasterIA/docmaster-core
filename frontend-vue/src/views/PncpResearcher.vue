@@ -125,7 +125,8 @@
 <script setup>
 import { computed, ref } from 'vue';
 
-const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || '');
+const RAW_API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || '');
+const API_BASE = String(RAW_API_BASE).replace(/\/+$/, '');
 
 const query = ref('');
 const ufFilter = ref('');
@@ -176,9 +177,79 @@ function formatCurrency(value) {
   }).format(Number(value || 0));
 }
 
+/** Resposta de erro do proxy/Django/FastAPI (detail string ou lista Pydantic). */
+async function readErrorMessage(res) {
+  const fallback = res.statusText || `HTTP ${res.status}`;
+  let text = '';
+  try {
+    text = await res.text();
+  } catch {
+    return fallback;
+  }
+  if (!text.trim()) return fallback;
+  try {
+    const j = JSON.parse(text);
+    const d = j.detail ?? j.error ?? j.message;
+    if (typeof d === 'string') return d;
+    if (Array.isArray(d)) {
+      const parts = d.map((x) => {
+        if (typeof x === 'string') return x;
+        if (x && typeof x.msg === 'string') return x.msg;
+        return JSON.stringify(x);
+      });
+      return parts.join('; ') || fallback;
+    }
+    if (d != null) return String(d);
+  } catch {
+    /* not JSON */
+  }
+  return text.trim().slice(0, 800) || fallback;
+}
+
+function applyStreamEvent(ev, byKey, pageEventsRef) {
+  if (ev.type === 'page') {
+    pageEventsRef.count += 1;
+    progressHint.value = `Processando publicações… (${pageEventsRef.count} lote(s) recebido(s))`;
+    for (const it of ev.items || []) {
+      const m = mapApiItem(it);
+      if (m.id) byKey.set(m.id, m);
+    }
+    items.value = Array.from(byKey.values());
+  } else if (ev.type === 'final') {
+    finalStats.value = ev.stats || null;
+    const list = ev.itens || [];
+    for (const it of list) {
+      const m = mapApiItem(it);
+      if (m.id) byKey.set(m.id, m);
+    }
+    items.value = Array.from(byKey.values());
+  } else if (ev.type === 'error') {
+    throw new Error(ev.detail || 'Erro na pesquisa PNCP.');
+  }
+}
+
+function tryApplyNdjsonLine(line, byKey, pageEventsRef) {
+  const s = line.trim();
+  if (!s) return;
+  let ev;
+  try {
+    ev = JSON.parse(s);
+  } catch {
+    return;
+  }
+  applyStreamEvent(ev, byKey, pageEventsRef);
+}
+
 async function runSearch() {
   const termo = query.value.trim();
   if (!termo || loading.value) return;
+
+  const diEarly = toPnDate(dataInicial.value);
+  const dfEarly = toPnDate(dataFinal.value);
+  if (diEarly && dfEarly && diEarly > dfEarly) {
+    errorMsg.value = 'Data inicial não pode ser posterior à data final.';
+    return;
+  }
 
   errorMsg.value = null;
   finalStats.value = null;
@@ -193,15 +264,15 @@ async function runSearch() {
     tamanho_pagina: 50,
     max_paginas: Math.min(60, Math.max(1, Number(maxPaginas.value) || 15)),
   };
-  const di = toPnDate(dataInicial.value);
-  const df = toPnDate(dataFinal.value);
+  const di = diEarly;
+  const df = dfEarly;
   if (di) body.data_inicial = di;
   if (df) body.data_final = df;
   const u = ufFilter.value.trim().toUpperCase();
   if (u.length === 2) body.uf = u;
 
   const byKey = new Map();
-  let pageEvents = 0;
+  const pageEventsRef = { count: 0 };
 
   try {
     const res = await fetch(`${API_BASE}/api/pncp-research/market-search/stream`, {
@@ -217,14 +288,7 @@ async function runSearch() {
     }
 
     if (!res.ok) {
-      let detail = res.statusText;
-      try {
-        const j = await res.json();
-        detail = j.error || j.detail || detail;
-      } catch {
-        /* ignore */
-      }
-      throw new Error(detail || `Erro HTTP ${res.status}`);
+      throw new Error(await readErrorMessage(res));
     }
 
     const ct = res.headers.get('Content-Type') || '';
@@ -249,35 +313,10 @@ async function runSearch() {
       const lines = buf.split('\n');
       buf = lines.pop() || '';
       for (const line of lines) {
-        const s = line.trim();
-        if (!s) continue;
-        let ev;
-        try {
-          ev = JSON.parse(s);
-        } catch {
-          continue;
-        }
-        if (ev.type === 'page') {
-          pageEvents += 1;
-          progressHint.value = `Processando publicações… (${pageEvents} lote(s) recebido(s))`;
-          for (const it of ev.items || []) {
-            const m = mapApiItem(it);
-            if (m.id) byKey.set(m.id, m);
-          }
-          items.value = Array.from(byKey.values());
-        } else if (ev.type === 'final') {
-          finalStats.value = ev.stats || null;
-          const list = ev.itens || [];
-          for (const it of list) {
-            const m = mapApiItem(it);
-            if (m.id) byKey.set(m.id, m);
-          }
-          items.value = Array.from(byKey.values());
-        } else if (ev.type === 'error') {
-          throw new Error(ev.detail || 'Erro na pesquisa PNCP.');
-        }
+        tryApplyNdjsonLine(line, byKey, pageEventsRef);
       }
     }
+    tryApplyNdjsonLine(buf, byKey, pageEventsRef);
   } catch (e) {
     errorMsg.value = e instanceof Error ? e.message : String(e);
   } finally {

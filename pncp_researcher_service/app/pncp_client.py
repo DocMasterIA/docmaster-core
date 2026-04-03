@@ -25,6 +25,26 @@ class PNCPClientError(Exception):
     pass
 
 
+# 429/503: limite ou indisponibilidade PNCP. 502/504: gateway/proxy (gera HTML; costuma ser transitório).
+_PNCP_RETRY_STATUS = frozenset({429, 502, 503, 504})
+
+
+def _http_error_snippet(resp: httpx.Response, max_len: int = 240) -> str:
+    """Extrai trecho legível; evita vazar HTML de Bad Gateway no detalhe para o usuário."""
+    ctype = (resp.headers.get("content-type") or "").lower()
+    text = (resp.text or "").strip()
+    head = (text[:400] or "").lower()
+    if "html" in ctype or text.startswith("<") or "<html" in head or "<body" in head:
+        return (
+            "serviço do PNCP ou gateway retornou página de erro (indisponível ou sobrecarga). "
+            "Tente novamente em alguns minutos."
+        )
+    snippet = " ".join(text.split())
+    if len(snippet) > max_len:
+        snippet = snippet[: max_len - 1].rstrip() + "…"
+    return snippet or "sem detalhe no corpo da resposta"
+
+
 _pace_lock = asyncio.Lock()
 _last_request_monotonic: float = 0.0
 
@@ -107,8 +127,8 @@ async def _get_pncp(
     tolerate_rate_limit: bool,
 ) -> Optional[httpx.Response]:
     """
-    GET com pacing + retries em 429/503.
-    Se tolerate_rate_limit=True e ainda assim 429/503, retorna None (tratar como vazio).
+    GET com pacing + retries em 429/502/503/504.
+    Se tolerate_rate_limit=True e ainda assim esgotar tentativas, retorna None (tratar como vazio).
     """
     total_attempts = max(1, PNCP_MAX_RETRIES + max(0, PNCP_RATE_LIMIT_EXTRA_ATTEMPTS))
     resp: Optional[httpx.Response] = None
@@ -122,7 +142,7 @@ async def _get_pncp(
                 continue
             return None
 
-        if resp.status_code in (429, 503):
+        if resp.status_code in _PNCP_RETRY_STATUS:
             ra = _retry_after_seconds(resp)
             backoff = PNCP_RETRY_BACKOFF_SECONDS * (2 ** min(attempt, 10))
             wait = min(PNCP_RATE_LIMIT_BACKOFF_CAP_SECONDS, max(ra, backoff, 1.0))
@@ -166,7 +186,8 @@ async def search_contracts(
         client = create_pncp_http_client()
         close_client = True
     try:
-        resp = await _get_pncp(client, endpoint, params=req_params, tolerate_rate_limit=True)
+        # false: após esgotar retries (429/502/503/504) ainda há resposta → erro claro; não confundir com “zero resultados”.
+        resp = await _get_pncp(client, endpoint, params=req_params, tolerate_rate_limit=False)
     finally:
         if close_client:
             await client.aclose()
@@ -176,9 +197,8 @@ async def search_contracts(
     if resp.status_code == 204:
         return []
     if resp.status_code >= 400:
-        # Erros "normais" do PNCP (ex.: 422 período inválido) ainda sobem para debug;
-        # 429/503 já foram absorvidos acima como None.
-        raise PNCPClientError(f"PNCP retornou {resp.status_code}: {resp.text[:300]}")
+        # 422 período inválido, etc.; códigos retryáveis esgotados também chegam aqui (detalhe sem HTML cru).
+        raise PNCPClientError(f"PNCP retornou {resp.status_code}: {_http_error_snippet(resp)}")
 
     try:
         data = resp.json()

@@ -41,7 +41,7 @@ PNCP_BUCKET_CAPACITY: float = float(os.getenv("PNCP_BUCKET_CAPACITY", "16"))
 PNCP_BUCKET_REFILL_PER_SEC: float = float(os.getenv("PNCP_BUCKET_REFILL_PER_SEC", "24"))
 # Modo interval: espaço mínimo entre cada GET (legado; serializa demais com muitas tasks).
 PNCP_MIN_REQUEST_INTERVAL_SECONDS: float = float(os.getenv("PNCP_MIN_REQUEST_INTERVAL_SECONDS", "0.12"))
-# Tentativas extras além de PNCP_MAX_RETRIES quando resposta for 429/503.
+# Tentativas extras além de PNCP_MAX_RETRIES quando resposta for 429/502/503/504.
 PNCP_RATE_LIMIT_EXTRA_ATTEMPTS: int = _env_int("PNCP_RATE_LIMIT_EXTRA_ATTEMPTS", 6)
 # Teto de espera por tentativa em caso de rate limit (segundos).
 PNCP_RATE_LIMIT_BACKOFF_CAP_SECONDS: float = float(os.getenv("PNCP_RATE_LIMIT_BACKOFF_CAP_SECONDS", "90"))

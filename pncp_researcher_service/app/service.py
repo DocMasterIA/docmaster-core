@@ -56,6 +56,15 @@ def _pn_date_windows(di_s: str, df_s: str) -> List[tuple[str, str]]:
     return out
 
 
+def _objeto_compra_text(raw: Dict[str, Any]) -> str:
+    """Texto do objeto nos campos usados pelo PNCP (nomemclatura varia entre versões)."""
+    for k in ("objetoCompra", "objeto", "descricaoObjeto", "titulo"):
+        v = raw.get(k)
+        if v is not None and str(v).strip():
+            return str(v).strip()
+    return ""
+
+
 def _contains_tokens(text: str, tokens: List[str]) -> bool:
     if not tokens:
         return True
@@ -115,6 +124,10 @@ def _build_query_groups(termo_busca: str) -> List[List[str]]:
                 toks = [t for t in sg.split() if len(t) >= 3 and t not in stopwords]
             if toks:
                 groups.append(toks)
+    if not groups and normalized:
+        toks = [t for t in normalized.split() if len(t) >= 2]
+        if toks:
+            groups.append(toks)
     return groups
 
 
@@ -188,7 +201,7 @@ def _extract_matching_items(raw_items: List[Dict[str, Any]], query_groups: List[
     """Transforma payload bruto do PNCP em itens filtrados/rankeados."""
     matched: List[Dict[str, Any]] = []
     for raw in raw_items:
-        obj = str(raw.get("objetoCompra") or "")
+        obj = _objeto_compra_text(raw)
         score = _compute_match_score(obj, query_groups)
         if score <= 0:
             continue
@@ -358,7 +371,7 @@ async def _extract_matching_items_with_table_lookup(
     sem = asyncio.Semaphore(max(1, PNCP_ITEM_LOOKUP_CONCURRENCY))
 
     async def process_one(raw: Dict[str, Any]) -> Dict[str, Any] | None:
-        obj = str(raw.get("objetoCompra") or "")
+        obj = _objeto_compra_text(raw)
         score_obj_bruto = _compute_match_score(obj, query_groups)
 
         item_table_text = ""
@@ -393,7 +406,9 @@ async def _extract_matching_items_with_table_lookup(
                 score_obj = score_obj_bruto
             else:
                 confirmado_itens = _table_supports_query(rows, query_groups)
-                score_obj = score_obj_bruto if confirmado_itens else 0.0
+                # Mantém sempre o score do objeto; confirmado_nos_itens só informa se a tabela
+                # reforça o termo (evita lista vazia quando o PNCP omite o token nas linhas).
+                score_obj = score_obj_bruto
         elif rows:
             confirmado_itens = _table_supports_query(rows, query_groups)
             score_obj = score_obj_bruto
@@ -417,9 +432,9 @@ async def _extract_matching_items_with_table_lookup(
         itens_json, itens_modo, qtd_itens = _itens_destaque_e_amostra(
             rows, query_groups, score_obj_bruto
         )
-        if score_obj > 0 and score_table > 0:
+        if score_obj_bruto > 0 and score_table > 0:
             match_origem = "objeto_e_tabela"
-        elif score_table > 0 and score_obj <= 0:
+        elif score_table > 0 and score_obj_bruto <= 0:
             match_origem = "tabela_itens"
         else:
             match_origem = "objeto"
@@ -446,7 +461,9 @@ async def _extract_matching_items_with_table_lookup(
             "itens_pncp": itens_json,
         }
 
-    selected = raw_items[: max(1, PNCP_ITEM_LOOKUP_PER_PAGE)]
+    # Até o teto da própria página PNCP (50); antes cortava em 30 e descartava resultado.
+    page_slice = min(50, max(1, PNCP_ITEM_LOOKUP_PER_PAGE), len(raw_items))
+    selected = raw_items[:page_slice]
     tasks = [asyncio.create_task(process_one(raw)) for raw in selected]
     matched: List[Dict[str, Any]] = []
     try:
@@ -543,7 +560,13 @@ async def market_search_stream(payload: MarketSearchRequest):
                     )
                     for mi in to_fetch
                 ]
-                batches: List[List[Dict[str, Any]]] = await asyncio.gather(*search_tasks)
+                raw_batches = await asyncio.gather(*search_tasks, return_exceptions=True)
+                batches: List[List[Dict[str, Any]]] = []
+                for mi, r in zip(to_fetch, raw_batches):
+                    if isinstance(r, Exception):
+                        batches.append([])
+                    else:
+                        batches.append(list(r) if r else [])
 
                 if PNCP_ENABLE_ITEM_TABLE_LOOKUP:
                     item_tasks = [

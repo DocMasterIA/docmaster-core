@@ -26,7 +26,7 @@ services:
 
   llm_api:
     build:
-      context: .
+      context: docmaster-core
       dockerfile: llm_api/Dockerfile
     image: docmaster-llm_api
     container_name: llm_api
@@ -53,7 +53,7 @@ services:
     profiles:
       - qwen
     build:
-      context: .
+      context: docmaster-core
       dockerfile: qwen_llm_service/Dockerfile
     image: docmaster-qwen_llm_service
     container_name: qwen_llm_service
@@ -73,7 +73,7 @@ services:
 
   llm_agent:
     build:
-      context: .
+      context: docmaster-core
       dockerfile: llm_agent/Dockerfile
     image: docmaster-llm_agent
     container_name: llm_agent
@@ -104,7 +104,7 @@ services:
 
   text_corrector_service:
     build:
-      context: .
+      context: docmaster-core
       dockerfile: text_corrector_service/Dockerfile
     image: docmaster-text_corrector_service
     container_name: text_corrector_service
@@ -121,7 +121,7 @@ services:
 
   rag_service:
     build:
-      context: .
+      context: docmaster-core
       dockerfile: rag_service/Dockerfile
     image: docmaster-rag_service
     container_name: rag_service
@@ -152,7 +152,7 @@ services:
 
   pncp_researcher_service:
     build:
-      context: .
+      context: docmaster-core
       dockerfile: pncp_researcher_service/Dockerfile
     image: docmaster-pncp_researcher_service
     container_name: pncp_researcher_service
@@ -168,14 +168,13 @@ services:
 
   backend:
     build:
-      context: .
+      context: docmaster-core
       dockerfile: Dockerfile  # Dockerfile do backend Django na raiz do projeto
     image: docmaster-backend
     container_name: backend
     environment:
       - LLM_API_BASE_URL=http://llm_api:8002
-      - RAG_SERVICE_URL=http://rag_service:8004Preços
-Governamentais
+      - RAG_SERVICE_URL=http://rag_service:8004
       - PNCP_RESEARCHER_BASE_URL=http://pncp_researcher_service:8012
     depends_on:
       - llm_api
@@ -191,21 +190,26 @@ Governamentais
       - backend_media:/app/backend/media
     restart: unless-stopped
 
-  # Expõe o Django (host:8001) na internet. Authtoken: use volume (arquivo no host) OU env NGROK_AUTHTOKEN.
-  # URL pública: docker compose logs --tail 80 ngrok
-  ngrok:
-    image: ngrok/ngrok:latest
-    container_name: ngrok
-    entrypoint: ["ngrok"]
-    command: ["http", "backend:8000", "--config", "/etc/ngrok/ngrok.yml", "--log=stdout"]
-    environment:
-      - NGROK_CONFIG=/etc/ngrok/ngrok.yml
-      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
-    volumes:
-      # Descomente e ajuste o caminho se o arquivo existir no host. Senão, use: export NGROK_AUTHTOKEN=seu_token
-      - /home/docmaster/.config/ngrok/ngrok.yml:/etc/ngrok/ngrok.yml:ro
+  # SPA Vue (estático) — mesmo hostname que o ingress do Cloudflare Tunnel (frontend-vue:80).
+  # Context só em frontend-vue/ (evita .dockerignore da raiz que exclui essa pasta nos outros builds).
+  frontend-vue:
+    build:
+      context: frontend-vue
+      dockerfile: Dockerfile
+    image: docmaster-frontend-vue
+    container_name: frontend-vue
+    restart: unless-stopped
+
+  # Exposição pública via Cloudflare Tunnel (substitui ngrok).
+  # Configure CLOUDFLARE_TUNNEL_TOKEN no ambiente do host antes do up.
+  # Logs: docker compose logs --tail 80 cloudflared-tunnel
+  cloudflared-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-tunnel
+    command: ["tunnel", "--no-autoupdate", "run", "--token", "${CLOUDFLARE_TUNNEL_TOKEN}"]
     depends_on:
       - backend
+      - frontend-vue
     restart: unless-stopped
 
 volumes:

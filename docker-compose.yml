@@ -62,7 +62,7 @@ services:
     environment:
       - PORT=8015
       - QWEN_API_KEY=${QWEN_API_KEY:-}
-      - QWEN_MODEL=${QWEN_MODEL:-qwen-plus}
+      - QWEN_MODEL=${QWEN_MODEL:-qwen3.6-plus}
       - QWEN_DAILY_TOKEN_BUDGET=${QWEN_DAILY_TOKEN_BUDGET:-0}
       - QWEN_MAX_OUTPUT_TOKENS=${QWEN_MAX_OUTPUT_TOKENS:-4096}
       - QWEN_MAX_PROMPT_CHARS=${QWEN_MAX_PROMPT_CHARS:-120000}
@@ -174,7 +174,8 @@ services:
     container_name: backend
     environment:
       - LLM_API_BASE_URL=http://llm_api:8002
-      - RAG_SERVICE_URL=http://rag_service:8004
+      - RAG_SERVICE_URL=http://rag_service:8004Preços
+Governamentais
       - PNCP_RESEARCHER_BASE_URL=http://pncp_researcher_service:8012
     depends_on:
       - llm_api

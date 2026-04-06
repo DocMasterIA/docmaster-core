@@ -38,7 +38,7 @@ class Settings:
         "https://dashscope.aliyuncs.com/compatible-mode/v1",
     ).rstrip("/")
     qwen_api_key: str = os.getenv("QWEN_API_KEY", "")
-    qwen_model_default: str = os.getenv("QWEN_MODEL", "qwen-plus")
+    qwen_model_default: str = os.getenv("QWEN_MODEL", "qwen3.6-plus")
     qwen_timeout_seconds: float = _env_float("QWEN_TIMEOUT", 120.0)
     qwen_max_output_tokens: int = _env_int("QWEN_MAX_OUTPUT_TOKENS", 4096)
     qwen_max_prompt_chars: int = _env_int("QWEN_MAX_PROMPT_CHARS", 120_000)

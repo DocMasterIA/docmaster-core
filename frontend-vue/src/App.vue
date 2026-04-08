@@ -162,7 +162,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br';
 const router = useRouter();
 const route = useRoute();
 

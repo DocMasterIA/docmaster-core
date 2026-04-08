@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br';
 
 const routes = [
   {
@@ -131,7 +131,17 @@ router.beforeEach(async (to) => {
 
 function checkAuth() {
   return fetch(`${API_BASE}/api/me/`, { method: 'GET', credentials: 'include' })
-    .then((res) => res.status === 200)
+    .then(async (res) => {
+      if (res.status !== 200) return false;
+      const ctype = (res.headers.get('content-type') || '').toLowerCase();
+      if (!ctype.includes('application/json')) return false;
+      try {
+        const data = await res.json();
+        return !!data && typeof data === 'object';
+      } catch (_) {
+        return false;
+      }
+    })
     .catch(() => false);
 }
 

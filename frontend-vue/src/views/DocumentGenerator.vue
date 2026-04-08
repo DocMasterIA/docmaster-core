@@ -423,7 +423,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 // Em dev: usar '' para que a requisição passe pelo proxy do Vite (evita 404 por chamar outro host/porta)
-const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || '');
+const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 const route = useRoute();
 
 const useOwnFile = ref(false);

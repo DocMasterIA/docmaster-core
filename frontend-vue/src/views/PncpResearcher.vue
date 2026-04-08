@@ -118,7 +118,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 
-const RAW_API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || '');
+const RAW_API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 const API_BASE = String(RAW_API_BASE).replace(/\/+$/, '');
 
 /** Teto de páginas no formulário (alinhar com PNCP_MAX_PAGINAS_PER_REQUEST no serviço). */

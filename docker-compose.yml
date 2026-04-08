@@ -198,8 +198,8 @@ services:
   # Mesmo prefixo que os outros builds: docmaster-core/... quando o compose roda de ~/ (pai do repo).
   frontend-vue:
     build:
-      context: docmaster-core/frontend-vue
-      dockerfile: Dockerfile
+      context: docmaster-core
+      dockerfile: frontend-vue/Dockerfile
     image: docmaster-frontend-vue
     container_name: frontend-vue
     restart: unless-stopped

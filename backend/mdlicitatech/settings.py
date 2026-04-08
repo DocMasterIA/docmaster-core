@@ -30,7 +30,7 @@ DEBUG = False
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
-    "docmasteria.com.br"
+    "docmasteria.com.br",
     "www.docmasteria.com.br",
     "api.docmasteria.com.br",
     "www.api.docmasteria.com.br",
@@ -56,16 +56,23 @@ CSRF_TRUSTED_ORIGINS = [
     "http://*.ngrok.io",
 ]
 
-# CORS: frontend Vue em origem diferente do Django (necessário para credentials: 'include')
-_cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "https://docmasteria.com.br",).strip()
+# CORS: frontend Vue em docmasteria.com.br ↔ API em api.docmasteria.com.br (credentials: 'include')
+_cors_origins = os.environ.get(
+    "CORS_ALLOWED_ORIGINS",
+    "https://docmasteria.com.br,https://www.docmasteria.com.br",
+).strip()
 if _cors_origins:
     CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(",") if o.strip()]
 elif DEBUG:
     CORS_ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
 else:
-    CORS_ALLOWED_ORIGINS = ["https://docmasteria.com.br"]
+    CORS_ALLOWED_ORIGINS = [
+        "https://docmasteria.com.br",
+        "https://www.docmasteria.com.br",
+    ]
 # Permite qualquer origem ngrok (URL muda a cada reinício) – uso em teste/produção com túnel
 CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://([a-zA-Z0-9-]+\.)?docmasteria\.com\.br$",
     r"^https?://[a-zA-Z0-9-]+\.ngrok-free\.app$",
     r"^https?://[a-zA-Z0-9-]+\.ngrok\.io$",
 ]
@@ -86,6 +93,10 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SAMESITE = "None"
 CSRF_COOKIE_SAMESITE = "None"
+# Mesmo cookie de sessão em docmasteria.com.br e api.docmasteria.com.br (SPA + API em subdomínios).
+# Em dev local, use: SESSION_COOKIE_DOMAIN= (vazio) no .env para não compartilhar entre hosts.
+_session_domain = os.environ.get("SESSION_COOKIE_DOMAIN", ".docmasteria.com.br").strip()
+SESSION_COOKIE_DOMAIN = _session_domain or None
 
 # Diz ao Django que as requisições vindas pelo proxy/ngrok são HTTPS
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

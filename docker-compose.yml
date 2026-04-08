@@ -3,6 +3,10 @@
 # Quando o Django rodar em outro serviço, defina LLM_API_BASE_URL=http://llm_api:8002
 # Para carregar variáveis do .env do host: env_file: - llm_api/.env
 #
+# Layout: este arquivo costuma ficar ao lado da pasta do repo (ex.: ~ com ~/docmaster-core/).
+# Se o compose estiver DENTRO da raiz do git (só docmaster-core/), troque "docmaster-core" por "."
+# em todos os build.context e ajuste volumes ./llm_audit → caminhos relativos ao repo.
+#
 # Qwen só para ETP: docker compose --profile qwen up -d qwen_llm_service
 # No rag_service: LLM_ETP_GENERATION_BASE_URL=http://qwen_llm_service:8015 (Ollama/llm_api segue em LLM_ORCHESTRATION_BASE_URL).
 
@@ -191,10 +195,10 @@ services:
     restart: unless-stopped
 
   # SPA Vue (estático) — mesmo hostname que o ingress do Cloudflare Tunnel (frontend-vue:80).
-  # Context só em frontend-vue/ (evita .dockerignore da raiz que exclui essa pasta nos outros builds).
+  # Mesmo prefixo que os outros builds: docmaster-core/... quando o compose roda de ~/ (pai do repo).
   frontend-vue:
     build:
-      context: frontend-vue
+      context: docmaster-core/frontend-vue
       dockerfile: Dockerfile
     image: docmaster-frontend-vue
     container_name: frontend-vue

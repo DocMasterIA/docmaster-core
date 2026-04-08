@@ -39,9 +39,9 @@ services:
     environment:
       - PORT=8002
       - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:latest}
-      - LLM_TIMEOUT=120
-      - LLM_MAX_RETRIES=3
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:7b}
+      - LLM_TIMEOUT=${LLM_TIMEOUT:-90}
+      - LLM_MAX_RETRIES=${LLM_MAX_RETRIES:-1}
       # LLM_AUDIT_LOG_DIR opcional; se vazio, o app usa /app/logs automaticamente
     depends_on:
       - ollama
@@ -138,7 +138,7 @@ services:
       - OLLAMA_BASE_URL=http://ollama:11434
       - LLM_ORCHESTRATION_BASE_URL=http://llm_api:8002
       # Geração de texto de ETP via gateway Qwen (mesmo contrato /api/llm/generate):
-      # - LLM_ETP_GENERATION_BASE_URL=http://qwen_llm_service:8015
+      - LLM_ETP_GENERATION_BASE_URL=http://qwen_llm_service:8015
       - LLM_AGENT_BASE_URL=http://llm_agent:8003
       - TEXT_CORRECTOR_ENABLED=1
       - TEXT_CORRECTOR_BASE_URL=http://text_corrector_service:8011
@@ -198,8 +198,8 @@ services:
   # Mesmo prefixo que os outros builds: docmaster-core/... quando o compose roda de ~/ (pai do repo).
   frontend-vue:
     build:
-      context: docmaster-core
-      dockerfile: frontend-vue/Dockerfile
+      context: docmaster-core/frontend-vue
+      dockerfile: Dockerfile
     image: docmaster-frontend-vue
     container_name: frontend-vue
     restart: unless-stopped
@@ -210,7 +210,7 @@ services:
   cloudflared-tunnel:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared-tunnel
-    command: ["tunnel", "--no-autoupdate", "run", "--token", "${CLOUDFLARE_TUNNEL_TOKEN}"]
+    command: ["tunnel", "--no-autoupdate", "--protocol", "http2", "run", "--token", "${CLOUDFLARE_TUNNEL_TOKEN}"]
     depends_on:
       - backend
       - frontend-vue

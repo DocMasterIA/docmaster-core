@@ -1,0 +1,463 @@
+from __future__ import annotations
+
+import json
+import sqlite3
+import zlib
+from contextlib import contextmanager
+from datetime import datetime, timedelta
+from typing import Any, Dict, Iterable, List, Optional
+
+from .config import (
+    PNCP_LOCAL_BACKFILL_MONTHS,
+    PNCP_LOCAL_DB_PATH,
+    PNCP_LOCAL_INCLUDE_ITEMS,
+    PNCP_MODALIDADES_DEFAULT,
+)
+from .pncp_client import create_pncp_http_client, get_contract_items, search_contracts
+
+
+@contextmanager
+def _conn():
+    conn = sqlite3.connect(PNCP_LOCAL_DB_PATH)
+    try:
+        conn.row_factory = sqlite3.Row
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def ensure_local_index() -> None:
+    with _conn() as c:
+        c.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pncp_contratos (
+                numero_pncp TEXT PRIMARY KEY,
+                ano_compra INTEGER,
+                sequencial_compra INTEGER,
+                objeto TEXT,
+                orgao TEXT,
+                municipio TEXT,
+                uf TEXT,
+                modalidade_codigo INTEGER,
+                modalidade_nome TEXT,
+                valor_global REAL,
+                situacao TEXT,
+                data_publicacao TEXT,
+                updated_at TEXT NOT NULL,
+                raw_json TEXT NOT NULL
+            )
+            """
+        )
+        c.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pncp_itens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                numero_pncp TEXT NOT NULL,
+                ano_compra INTEGER,
+                sequencial_compra INTEGER,
+                numero_item TEXT,
+                descricao TEXT,
+                material_servico TEXT,
+                quantidade REAL,
+                unidade_medida TEXT,
+                valor_unitario REAL,
+                valor_total REAL,
+                orgao TEXT,
+                municipio TEXT,
+                uf TEXT,
+                modalidade_nome TEXT,
+                data_publicacao TEXT,
+                item_fingerprint TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                raw_json_zlib BLOB,
+                UNIQUE(numero_pncp, item_fingerprint)
+            )
+            """
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pncp_objeto ON pncp_contratos(objeto)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pncp_uf_municipio ON pncp_contratos(uf, municipio)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pncp_modalidade ON pncp_contratos(modalidade_codigo)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pncp_data_pub ON pncp_contratos(data_publicacao)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pncp_itens_desc ON pncp_itens(descricao)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pncp_itens_pncp ON pncp_itens(numero_pncp)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pncp_itens_uf_municipio ON pncp_itens(uf, municipio)"
+        )
+
+
+def _objeto(raw: Dict[str, Any]) -> str:
+    for k in ("objetoCompra", "objeto", "descricaoObjeto", "titulo"):
+        v = raw.get(k)
+        if v is not None and str(v).strip():
+            return str(v).strip()
+    return ""
+
+
+def upsert_contracts(raw_items: Iterable[Dict[str, Any]]) -> int:
+    ensure_local_index()
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    count = 0
+    with _conn() as c:
+        for raw in raw_items:
+            if not isinstance(raw, dict):
+                continue
+            numero = str(raw.get("numeroControlePNCP") or "").strip()
+            if not numero:
+                continue
+            org = raw.get("orgaoEntidade") or {}
+            unid = raw.get("unidadeOrgao") or {}
+            valor = raw.get("valorTotalEstimado")
+            try:
+                valor_f = float(valor) if valor is not None else None
+            except Exception:
+                valor_f = None
+            c.execute(
+                """
+                INSERT INTO pncp_contratos (
+                    numero_pncp, ano_compra, sequencial_compra, objeto, orgao, municipio, uf,
+                    modalidade_codigo, modalidade_nome, valor_global, situacao, data_publicacao,
+                    updated_at, raw_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(numero_pncp) DO UPDATE SET
+                    ano_compra=excluded.ano_compra,
+                    sequencial_compra=excluded.sequencial_compra,
+                    objeto=excluded.objeto,
+                    orgao=excluded.orgao,
+                    municipio=excluded.municipio,
+                    uf=excluded.uf,
+                    modalidade_codigo=excluded.modalidade_codigo,
+                    modalidade_nome=excluded.modalidade_nome,
+                    valor_global=excluded.valor_global,
+                    situacao=excluded.situacao,
+                    data_publicacao=excluded.data_publicacao,
+                    updated_at=excluded.updated_at,
+                    raw_json=excluded.raw_json
+                """,
+                (
+                    numero,
+                    raw.get("anoCompra"),
+                    raw.get("sequencialCompra"),
+                    _objeto(raw),
+                    org.get("razaoSocial") or org.get("razaosocial"),
+                    unid.get("municipioNome"),
+                    unid.get("ufSigla"),
+                    raw.get("modalidadeId"),
+                    raw.get("modalidadeNome"),
+                    valor_f,
+                    raw.get("situacaoCompraNome"),
+                    raw.get("dataPublicacaoPncp") or raw.get("dataPublicacao"),
+                    now,
+                    json.dumps(raw, ensure_ascii=False),
+                ),
+            )
+            count += 1
+    return count
+
+
+def _safe_float(v: Any) -> Optional[float]:
+    try:
+        if v is None or v == "":
+            return None
+        return float(v)
+    except Exception:
+        return None
+
+
+def _item_desc(raw: Dict[str, Any]) -> str:
+    for k in ("descricao", "descricaoItem", "descricaoResumida", "item", "nomeItem"):
+        v = raw.get(k)
+        if v is not None and str(v).strip():
+            return str(v).strip()
+    return ""
+
+
+def upsert_contract_items(raw_contract: Dict[str, Any], item_rows: Iterable[Dict[str, Any]]) -> int:
+    numero = str(raw_contract.get("numeroControlePNCP") or "").strip()
+    if not numero:
+        return 0
+    org = raw_contract.get("orgaoEntidade") or {}
+    unid = raw_contract.get("unidadeOrgao") or {}
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    ano = raw_contract.get("anoCompra")
+    seq = raw_contract.get("sequencialCompra")
+    modalidade_nome = raw_contract.get("modalidadeNome")
+    data_pub = raw_contract.get("dataPublicacaoPncp") or raw_contract.get("dataPublicacao")
+    count = 0
+    with _conn() as c:
+        for r in item_rows:
+            if not isinstance(r, dict):
+                continue
+            desc = _item_desc(r)
+            if not desc:
+                continue
+            numero_item = str(
+                r.get("numeroItem") or r.get("ordemItem") or r.get("sequencialItem") or ""
+            ).strip()
+            qtd = _safe_float(r.get("quantidade"))
+            valor_unit = _safe_float(
+                r.get("valorUnitarioEstimado") or r.get("valorUnitarioHomologado")
+            )
+            valor_total = _safe_float(r.get("valorTotal") or r.get("valorTotalEstimado") or r.get("valorTotalHomologado"))
+            material_servico = str(r.get("materialOuServicoNome") or r.get("tipoItemNome") or "").strip()
+            unidade = str(r.get("unidadeMedida") or r.get("unidadeFornecimentoNome") or "").strip()
+            fingerprint = f"{numero_item}|{desc}|{qtd}|{unidade}|{valor_unit}|{valor_total}"
+            raw_blob = zlib.compress(json.dumps(r, ensure_ascii=False).encode("utf-8"), level=6)
+            c.execute(
+                """
+                INSERT INTO pncp_itens (
+                    numero_pncp, ano_compra, sequencial_compra, numero_item, descricao, material_servico,
+                    quantidade, unidade_medida, valor_unitario, valor_total, orgao, municipio, uf,
+                    modalidade_nome, data_publicacao, item_fingerprint, updated_at, raw_json_zlib
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(numero_pncp, item_fingerprint) DO UPDATE SET
+                    ano_compra=excluded.ano_compra,
+                    sequencial_compra=excluded.sequencial_compra,
+                    numero_item=excluded.numero_item,
+                    descricao=excluded.descricao,
+                    material_servico=excluded.material_servico,
+                    quantidade=excluded.quantidade,
+                    unidade_medida=excluded.unidade_medida,
+                    valor_unitario=excluded.valor_unitario,
+                    valor_total=excluded.valor_total,
+                    orgao=excluded.orgao,
+                    municipio=excluded.municipio,
+                    uf=excluded.uf,
+                    modalidade_nome=excluded.modalidade_nome,
+                    data_publicacao=excluded.data_publicacao,
+                    updated_at=excluded.updated_at,
+                    raw_json_zlib=excluded.raw_json_zlib
+                """,
+                (
+                    numero,
+                    ano,
+                    seq,
+                    numero_item,
+                    desc,
+                    material_servico,
+                    qtd,
+                    unidade,
+                    valor_unit,
+                    valor_total,
+                    org.get("razaoSocial") or org.get("razaosocial"),
+                    unid.get("municipioNome"),
+                    unid.get("ufSigla"),
+                    modalidade_nome,
+                    data_pub,
+                    fingerprint,
+                    now,
+                    raw_blob,
+                ),
+            )
+            count += 1
+    return count
+
+
+def local_index_stats() -> Dict[str, Any]:
+    ensure_local_index()
+    with _conn() as c:
+        total = c.execute("SELECT COUNT(*) AS n FROM pncp_contratos").fetchone()["n"]
+        total_itens = c.execute("SELECT COUNT(*) AS n FROM pncp_itens").fetchone()["n"]
+        by_uf_rows = c.execute(
+            "SELECT COALESCE(uf,'') AS uf, COUNT(*) AS n FROM pncp_contratos GROUP BY uf ORDER BY n DESC LIMIT 27"
+        ).fetchall()
+        by_modal_rows = c.execute(
+            "SELECT COALESCE(modalidade_nome,'') AS modalidade, COUNT(*) AS n FROM pncp_contratos GROUP BY modalidade_nome ORDER BY n DESC LIMIT 20"
+        ).fetchall()
+    return {
+        "ok": True,
+        "db_path": PNCP_LOCAL_DB_PATH,
+        "total_contratos": int(total or 0),
+        "total_itens": int(total_itens or 0),
+        "por_uf": [{"uf": r["uf"], "total": r["n"]} for r in by_uf_rows],
+        "por_modalidade": [{"modalidade": r["modalidade"], "total": r["n"]} for r in by_modal_rows],
+    }
+
+
+def local_search(
+    termo_busca: str,
+    *,
+    uf: Optional[str] = None,
+    codigo_modalidade: Optional[int] = None,
+    limit: int = 200,
+) -> Dict[str, Any]:
+    ensure_local_index()
+    term = (termo_busca or "").strip()
+    if not term:
+        return {"ok": True, "itens": [], "stats": {"total_registros": 0}}
+    where = ["objeto LIKE ?"]
+    params: List[Any] = [f"%{term}%"]
+    if uf:
+        where.append("uf = ?")
+        params.append(uf)
+    if codigo_modalidade is not None:
+        where.append("modalidade_codigo = ?")
+        params.append(int(codigo_modalidade))
+    sql = f"""
+        SELECT numero_pncp, objeto, orgao, municipio, uf, modalidade_nome, valor_global,
+               situacao, ano_compra, sequencial_compra
+        FROM pncp_contratos
+        WHERE {' AND '.join(where)}
+        ORDER BY updated_at DESC
+        LIMIT ?
+    """
+    params.append(max(1, min(int(limit), 2000)))
+    with _conn() as c:
+        rows = c.execute(sql, params).fetchall()
+    itens = [
+        {
+            "numero_pncp": r["numero_pncp"],
+            "objeto_resumido": r["objeto"],
+            "orgao": r["orgao"],
+            "municipio": r["municipio"],
+            "uf": r["uf"],
+            "modalidade": r["modalidade_nome"],
+            "valor_global": r["valor_global"],
+            "situacao": r["situacao"],
+            "ano_compra": r["ano_compra"],
+            "sequencial_compra": r["sequencial_compra"],
+            "origem": "base_local",
+        }
+        for r in rows
+    ]
+    return {"ok": True, "itens": itens, "stats": {"total_registros": len(itens)}}
+
+
+def local_item_search(
+    termo_busca: str,
+    *,
+    uf: Optional[str] = None,
+    codigo_modalidade: Optional[int] = None,
+    limit: int = 500,
+) -> Dict[str, Any]:
+    ensure_local_index()
+    term = (termo_busca or "").strip()
+    if not term:
+        return {"ok": True, "itens": [], "stats": {"total_registros": 0}}
+    where = ["descricao LIKE ?"]
+    params: List[Any] = [f"%{term}%"]
+    if uf:
+        where.append("uf = ?")
+        params.append(uf)
+    if codigo_modalidade is not None:
+        where.append("modalidade_nome IS NOT NULL")
+    sql = f"""
+        SELECT numero_pncp, ano_compra, sequencial_compra, numero_item, descricao, material_servico,
+               quantidade, unidade_medida, valor_unitario, valor_total, orgao, municipio, uf,
+               modalidade_nome, data_publicacao
+        FROM pncp_itens
+        WHERE {' AND '.join(where)}
+        ORDER BY updated_at DESC
+        LIMIT ?
+    """
+    params.append(max(1, min(int(limit), 5000)))
+    with _conn() as c:
+        rows = c.execute(sql, params).fetchall()
+    itens = [
+        {
+            "numero_pncp": r["numero_pncp"],
+            "ano_compra": r["ano_compra"],
+            "sequencial_compra": r["sequencial_compra"],
+            "numero_item": r["numero_item"],
+            "descricao_item": r["descricao"],
+            "material_servico": r["material_servico"],
+            "quantidade": r["quantidade"],
+            "unidade_medida": r["unidade_medida"],
+            "valor_unitario": r["valor_unitario"],
+            "valor_total": r["valor_total"],
+            "orgao": r["orgao"],
+            "municipio": r["municipio"],
+            "uf": r["uf"],
+            "modalidade": r["modalidade_nome"],
+            "data_publicacao": r["data_publicacao"],
+            "origem": "base_local_itens",
+        }
+        for r in rows
+    ]
+    return {"ok": True, "itens": itens, "stats": {"total_registros": len(itens)}}
+
+
+async def backfill_local_index(
+    *,
+    months: Optional[int] = None,
+    max_paginas: int = 120,
+    tamanho_pagina: int = 50,
+    uf: Optional[str] = None,
+    codigo_municipio_ibge: Optional[str] = None,
+    include_items: Optional[bool] = None,
+) -> Dict[str, Any]:
+    ensure_local_index()
+    m = max(1, int(months or PNCP_LOCAL_BACKFILL_MONTHS))
+    end = datetime.utcnow().date()
+    start = end - timedelta(days=30 * m)
+    data_inicial = start.strftime("%Y%m%d")
+    data_final = end.strftime("%Y%m%d")
+    modalidades = PNCP_MODALIDADES_DEFAULT
+    total_paginas = 0
+    total_upserts = 0
+    total_upserts_itens = 0
+    use_items = PNCP_LOCAL_INCLUDE_ITEMS if include_items is None else bool(include_items)
+    async with create_pncp_http_client() as http:
+        for modalidade in modalidades:
+            for pagina in range(1, max(1, max_paginas) + 1):
+                batch = await search_contracts(
+                    data_inicial=data_inicial,
+                    data_final=data_final,
+                    codigo_modalidade=modalidade,
+                    uf=uf,
+                    codigo_municipio_ibge=codigo_municipio_ibge,
+                    pagina=pagina,
+                    tamanho_pagina=tamanho_pagina,
+                    client=http,
+                )
+                total_paginas += 1
+                if not batch:
+                    break
+                total_upserts += upsert_contracts(batch)
+                if use_items:
+                    for raw in batch:
+                        cnpj = (
+                            (raw.get("orgaoEntidade") or {}).get("cnpj")
+                            or (raw.get("orgaoEntidade") or {}).get("cnpjOrgaoEntidade")
+                            or raw.get("cnpjOrgaoEntidade")
+                        )
+                        numero = str(raw.get("numeroControlePNCP") or "")
+                        if (not cnpj) and "-" in numero:
+                            cnpj = numero.split("-")[0]
+                        ano = raw.get("anoCompra")
+                        seq = raw.get("sequencialCompra")
+                        if not cnpj or ano is None or seq is None:
+                            continue
+                        try:
+                            rows = await get_contract_items(str(cnpj), ano, seq, client=http)
+                        except Exception:
+                            rows = []
+                        if rows:
+                            total_upserts_itens += upsert_contract_items(raw, rows)
+                if len(batch) < 10:
+                    break
+    stats = local_index_stats()
+    stats.update(
+        {
+            "data_inicial": data_inicial,
+            "data_final": data_final,
+            "meses_lookback": m,
+            "paginas_processadas": total_paginas,
+            "upserts_executados": total_upserts,
+            "upserts_itens_executados": total_upserts_itens,
+            "include_items": use_items,
+        }
+    )
+    return stats

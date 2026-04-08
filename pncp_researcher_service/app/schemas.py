@@ -52,3 +52,17 @@ class MarketSearchResponse(BaseModel):
     filtros: Dict[str, Any]
     stats: Dict[str, Any]
     itens: List[Dict[str, Any]]
+
+
+class LocalBackfillRequest(BaseModel):
+    months: int = Field(12, description="Janela histórica em meses para ingestão local.")
+    max_paginas: int = Field(120, description="Máximo de páginas por modalidade.")
+    tamanho_pagina: int = Field(50, description="Tamanho da página no PNCP (10-50).")
+    uf: Optional[str] = Field(None, description="Filtro opcional de UF para reduzir volume.")
+    codigo_municipio_ibge: Optional[str] = Field(
+        None, description="Filtro opcional de município (IBGE)."
+    )
+    include_items: bool = Field(
+        True,
+        description="Se true, busca também tabela de itens de cada contratação (sem baixar PDFs).",
+    )

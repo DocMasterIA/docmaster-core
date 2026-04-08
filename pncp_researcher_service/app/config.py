@@ -90,3 +90,16 @@ PNCP_ITEM_AMOSTRA_LINHAS: int = _env_int("PNCP_ITEM_AMOSTRA_LINHAS", 12)
 PNCP_REQUIRE_TABLE_MATCH_WHEN_ITENS_EXIST: bool = os.getenv(
     "PNCP_REQUIRE_TABLE_MATCH_WHEN_ITENS_EXIST", "true"
 ).strip().lower() in {"1", "true", "yes", "on"}
+
+# Índice local PNCP (SQLite) para reduzir dependência de chamadas externas.
+PNCP_LOCAL_DB_PATH: str = os.getenv(
+    "PNCP_LOCAL_DB_PATH",
+    "/tmp/pncp_researcher_local.db",
+).strip()
+PNCP_LOCAL_AUTO_INGEST: bool = os.getenv(
+    "PNCP_LOCAL_AUTO_INGEST", "true"
+).strip().lower() in {"1", "true", "yes", "on"}
+PNCP_LOCAL_BACKFILL_MONTHS: int = _env_int("PNCP_LOCAL_BACKFILL_MONTHS", 12)
+PNCP_LOCAL_INCLUDE_ITEMS: bool = os.getenv(
+    "PNCP_LOCAL_INCLUDE_ITEMS", "true"
+).strip().lower() in {"1", "true", "yes", "on"}

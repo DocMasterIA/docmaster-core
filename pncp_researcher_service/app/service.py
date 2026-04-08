@@ -22,8 +22,10 @@ from .config import (
     PNCP_ITEM_ROWS_MAX_DESTAQUE,
     PNCP_ITEM_AMOSTRA_LINHAS,
     PNCP_REQUIRE_TABLE_MATCH_WHEN_ITENS_EXIST,
+    PNCP_LOCAL_AUTO_INGEST,
 )
 from .pncp_client import create_pncp_http_client, search_contracts, get_contract_items
+from .local_index import upsert_contracts
 from .schemas import MarketSearchRequest
 
 
@@ -585,6 +587,12 @@ async def market_search_stream(payload: MarketSearchRequest):
                     pages_processed += 1
 
                     all_items.extend(page_items)
+                    if PNCP_LOCAL_AUTO_INGEST and batch:
+                        try:
+                            upsert_contracts(batch)
+                        except Exception:
+                            # Falha no cache local não deve interromper a busca online.
+                            pass
 
                     ev: Dict[str, Any] = {
                         "type": "page",

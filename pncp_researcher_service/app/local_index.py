@@ -13,7 +13,7 @@ from .config import (
     PNCP_LOCAL_INCLUDE_ITEMS,
     PNCP_MODALIDADES_DEFAULT,
 )
-from .pncp_client import create_pncp_http_client, get_contract_items, search_contracts
+from .pncp_client import PNCPClientError, create_pncp_http_client, get_contract_items, search_contracts
 
 
 @contextmanager
@@ -392,7 +392,7 @@ def local_item_search(
 async def backfill_local_index(
     *,
     months: Optional[int] = None,
-    max_paginas: int = 120,
+    max_paginas: Optional[int] = None,
     tamanho_pagina: int = 50,
     uf: Optional[str] = None,
     codigo_municipio_ibge: Optional[str] = None,
@@ -408,20 +408,35 @@ async def backfill_local_index(
     total_paginas = 0
     total_upserts = 0
     total_upserts_itens = 0
+    erros_modalidade: List[Dict[str, Any]] = []
     use_items = PNCP_LOCAL_INCLUDE_ITEMS if include_items is None else bool(include_items)
+    unlimited_pages = max_paginas is None or int(max_paginas) <= 0
+    paginas_limite = 0 if unlimited_pages else int(max_paginas)
     async with create_pncp_http_client() as http:
         for modalidade in modalidades:
-            for pagina in range(1, max(1, max_paginas) + 1):
-                batch = await search_contracts(
-                    data_inicial=data_inicial,
-                    data_final=data_final,
-                    codigo_modalidade=modalidade,
-                    uf=uf,
-                    codigo_municipio_ibge=codigo_municipio_ibge,
-                    pagina=pagina,
-                    tamanho_pagina=tamanho_pagina,
-                    client=http,
-                )
+            pagina = 1
+            while True:
+                try:
+                    batch = await search_contracts(
+                        data_inicial=data_inicial,
+                        data_final=data_final,
+                        codigo_modalidade=modalidade,
+                        uf=uf,
+                        codigo_municipio_ibge=codigo_municipio_ibge,
+                        pagina=pagina,
+                        tamanho_pagina=tamanho_pagina,
+                        client=http,
+                    )
+                except PNCPClientError as e:
+                    erros_modalidade.append(
+                        {
+                            "modalidade": modalidade,
+                            "pagina": pagina,
+                            "erro": str(e),
+                        }
+                    )
+                    # Em erro persistente de modalidade/página, segue para próxima modalidade.
+                    break
                 total_paginas += 1
                 if not batch:
                     break
@@ -448,6 +463,9 @@ async def backfill_local_index(
                             total_upserts_itens += upsert_contract_items(raw, rows)
                 if len(batch) < 10:
                     break
+                if (not unlimited_pages) and pagina >= paginas_limite:
+                    break
+                pagina += 1
     stats = local_index_stats()
     stats.update(
         {
@@ -458,6 +476,9 @@ async def backfill_local_index(
             "upserts_executados": total_upserts,
             "upserts_itens_executados": total_upserts_itens,
             "include_items": use_items,
+            "unbounded_paginas": unlimited_pages,
+            "max_paginas_efetivo": None if unlimited_pages else paginas_limite,
+            "erros_modalidade": erros_modalidade,
         }
     )
     return stats

@@ -56,7 +56,10 @@ class MarketSearchResponse(BaseModel):
 
 class LocalBackfillRequest(BaseModel):
     months: int = Field(12, description="Janela histórica em meses para ingestão local.")
-    max_paginas: int = Field(120, description="Máximo de páginas por modalidade.")
+    max_paginas: Optional[int] = Field(
+        None,
+        description="Máximo de páginas por modalidade. Use null para varrer sem teto (até o PNCP não retornar mais dados).",
+    )
     tamanho_pagina: int = Field(50, description="Tamanho da página no PNCP (10-50).")
     uf: Optional[str] = Field(None, description="Filtro opcional de UF para reduzir volume.")
     codigo_municipio_ibge: Optional[str] = Field(

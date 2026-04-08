@@ -25,8 +25,8 @@ class PNCPClientError(Exception):
     pass
 
 
-# 429/503: limite ou indisponibilidade PNCP. 502/504: gateway/proxy (gera HTML; costuma ser transitório).
-_PNCP_RETRY_STATUS = frozenset({429, 502, 503, 504})
+# 429/5xx: limite/instabilidade PNCP ou gateway/proxy (transitório).
+_PNCP_RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
 
 
 def _http_error_snippet(resp: httpx.Response, max_len: int = 240) -> str:
@@ -127,7 +127,7 @@ async def _get_pncp(
     tolerate_rate_limit: bool,
 ) -> Optional[httpx.Response]:
     """
-    GET com pacing + retries em 429/502/503/504.
+    GET com pacing + retries em 429/500/502/503/504.
     Se tolerate_rate_limit=True e ainda assim esgotar tentativas, retorna None (tratar como vazio).
     """
     total_attempts = max(1, PNCP_MAX_RETRIES + max(0, PNCP_RATE_LIMIT_EXTRA_ATTEMPTS))

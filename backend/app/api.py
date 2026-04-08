@@ -29,6 +29,15 @@ import re
 from functools import wraps
 from urllib.parse import urlparse
 
+def _rag_http_timeout_seconds() -> float:
+    """Timeout HTTP do backend -> rag_service (evita 524 do proxy externo)."""
+    raw = (os.environ.get("RAG_HTTP_TIMEOUT") or "95").strip()
+    try:
+        val = float(raw)
+    except Exception:
+        val = 95.0
+    return max(5.0, val)
+
 
 def api_login_required(view_func):
     """Decorator que retorna 401 JSON para APIs quando o usuário não está autenticado (em vez de redirect)."""
@@ -525,10 +534,11 @@ def gerar_tr_modelo_api(request):
     }
 
     try:
-        # Sem timeout explícito: deixa a chamada ao rag_service rodar até responder
-        resp = requests.post(url, json=body)
+        resp = requests.post(url, json=body, timeout=_rag_http_timeout_seconds())
     except requests.exceptions.ConnectionError:
         return JsonResponse({"ok": False, "error": "Serviço de geração de TR indisponível. Verifique se o rag_service está em execução."}, status=503)
+    except requests.exceptions.Timeout:
+        return JsonResponse({"ok": False, "error": "Tempo limite na geração de TR. O rag_service demorou para responder."}, status=504)
     except Exception as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=502)
 
@@ -676,9 +686,11 @@ def gerar_tr_e_dfd_api(request):
     }
 
     try:
-        resp = requests.post(url, json=body)
+        resp = requests.post(url, json=body, timeout=_rag_http_timeout_seconds())
     except requests.exceptions.ConnectionError:
         return JsonResponse({"ok": False, "error": "Serviço de geração de TR/DFD indisponível. Verifique se o rag_service está em execução."}, status=503)
+    except requests.exceptions.Timeout:
+        return JsonResponse({"ok": False, "error": "Tempo limite na geração de TR/DFD. O rag_service demorou para responder."}, status=504)
     except Exception as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=502)
 

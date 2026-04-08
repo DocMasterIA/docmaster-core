@@ -40,8 +40,8 @@ services:
       - PORT=8002
       - OLLAMA_BASE_URL=http://ollama:11434
       - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:7b}
-      - LLM_TIMEOUT=${LLM_TIMEOUT:-90}
-      - LLM_MAX_RETRIES=${LLM_MAX_RETRIES:-1}
+      - LLM_TIMEOUT=300
+      - LLM_MAX_RETRIES=1
       # LLM_AUDIT_LOG_DIR opcional; se vazio, o app usa /app/logs automaticamente
     depends_on:
       - ollama

@@ -135,6 +135,7 @@ services:
       - PORT=8004
       - CHROMA_HOST=chromadb
       - CHROMA_PORT=8000  # porta interna do container ChromaDB
+      - CHROMA_COLLECTION=docmaster_docs
       - OLLAMA_BASE_URL=http://ollama:11434
       - LLM_ORCHESTRATION_BASE_URL=http://llm_api:8002
       # Geração de texto de ETP via gateway Qwen (mesmo contrato /api/llm/generate):
@@ -143,7 +144,10 @@ services:
       - TEXT_CORRECTOR_ENABLED=1
       - TEXT_CORRECTOR_BASE_URL=http://text_corrector_service:8011
       - RAG_TOP_K=5
-      - RAG_TIMEOUT=0
+      - RAG_TIMEOUT=300
+      - TR_SLOTS_INCLUDE_RAG_EXAMPLES=0
+      - TR_SLOTS_ENABLE_OBJETO_REWRITE=0
+      - TR_SLOTS_ENABLE_INCISO_LLM=0
     volumes:
       # Monta pasta de treinamento para acesso aos documentos
       - ./treinamento:/data/treinamento:ro

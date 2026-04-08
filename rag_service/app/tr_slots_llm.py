@@ -8,6 +8,7 @@ Os valores enviados pelo usuário (slots_override) têm prioridade sobre a IA.
 from __future__ import annotations
 
 import json
+import os
 import re
 from typing import Any, Dict, List, Optional
 
@@ -27,6 +28,10 @@ from .tr_template import (
     FiscalSlots,
     ItemSlot,
 )
+
+TR_SLOTS_INCLUDE_RAG_EXAMPLES: bool = os.getenv("TR_SLOTS_INCLUDE_RAG_EXAMPLES", "0").strip() not in ("0", "false", "False", "no")
+TR_SLOTS_ENABLE_OBJETO_REWRITE: bool = os.getenv("TR_SLOTS_ENABLE_OBJETO_REWRITE", "0").strip() not in ("0", "false", "False", "no")
+TR_SLOTS_ENABLE_INCISO_LLM: bool = os.getenv("TR_SLOTS_ENABLE_INCISO_LLM", "0").strip() not in ("0", "false", "False", "no")
 
 
 TR_SLOTS_SYSTEM_PROMPT = """Você preenche os campos (slots) de um Termo de Referência com base no pedido do usuário e no contexto.
@@ -1566,39 +1571,40 @@ async def fill_tr_slots_with_llm(
     # Estratégia: priorizar exemplos oriundos do PNCP (fonte="pncp") e, se necessário,
     # complementar com outros TR já ingeridos.
     rag_objeto_examples = ""
-    try:
-        query_objeto = f"{user_prompt[:200]} cláusula objeto termo de referência"
-        # 1) PNCP primeiro
-        docs = retrieve(
-            query=query_objeto,
-            collection_name=CHROMA_COLLECTION,
-            top_k=3,
-            where={"document_type": "termo_referencia", "fonte": "pncp"},
-        )
-        # 2) Complementa com outros TR (sem restringir fonte) se necessário
-        if len(docs) < 3:
-            remaining = 3 - len(docs)
-            extra = retrieve(
-                query=query_objeto,
-                collection_name=CHROMA_COLLECTION,
-                top_k=remaining,
-                where={"document_type": "termo_referencia"},
-            )
-            if extra:
-                docs.extend(extra)
-        # 3) Fallback geral se absolutamente nada vier
-        if not docs:
+    if TR_SLOTS_INCLUDE_RAG_EXAMPLES:
+        try:
+            query_objeto = f"{user_prompt[:200]} cláusula objeto termo de referência"
+            # 1) PNCP primeiro
             docs = retrieve(
                 query=query_objeto,
                 collection_name=CHROMA_COLLECTION,
-                top_k=2,
+                top_k=3,
+                where={"document_type": "termo_referencia", "fonte": "pncp"},
             )
-        if docs:
-            rag_objeto_examples = "\n\n---\n\n".join(
-                (d.get("content", "") or "")[:1800] for d in docs
-            )
-    except Exception:
-        pass
+            # 2) Complementa com outros TR (sem restringir fonte) se necessário
+            if len(docs) < 3:
+                remaining = 3 - len(docs)
+                extra = retrieve(
+                    query=query_objeto,
+                    collection_name=CHROMA_COLLECTION,
+                    top_k=remaining,
+                    where={"document_type": "termo_referencia"},
+                )
+                if extra:
+                    docs.extend(extra)
+            # 3) Fallback geral se absolutamente nada vier
+            if not docs:
+                docs = retrieve(
+                    query=query_objeto,
+                    collection_name=CHROMA_COLLECTION,
+                    top_k=2,
+                )
+            if docs:
+                rag_objeto_examples = "\n\n---\n\n".join(
+                    (d.get("content", "") or "")[:1800] for d in docs
+                )
+        except Exception:
+            pass
 
     user_prompt_text = _build_tr_slots_user_prompt(
         user_prompt, context_from_agent, user_context, skip_context_in_prompt, rag_objeto_examples or None
@@ -1682,56 +1688,60 @@ async def fill_tr_slots_with_llm(
                 f"O objeto do presente Termo de Referência é {objeto_fallback.strip().rstrip('.;')}."
             ) or objeto_fallback
 
-    # Etapa dedicada para o objeto: prompt curto e separado do JSON de slots.
-    llm_slots.objeto = await _rewrite_objeto_clause(
-        user_prompt=user_prompt,
-        draft_objeto=llm_slots.objeto,
-        itens=llm_slots.itens,
-    )
-    if _is_objeto_redacao_fraca(llm_slots.objeto):
+    # Etapas de reescrita da cláusula de objeto podem custar múltiplas chamadas LLM;
+    # em modo rápido, desabilitamos para evitar timeouts em TR/DFD.
+    if TR_SLOTS_ENABLE_OBJETO_REWRITE:
         llm_slots.objeto = await _rewrite_objeto_clause(
-            user_prompt=(
-                f"{user_prompt}\n\n"
-                "Reescreva o objeto com redação mais completa e elegante, evitando forma telegráfica. "
-                "Inclua finalidade administrativa explícita e mantenha o texto em 1 período bem construído."
-            ),
+            user_prompt=user_prompt,
             draft_objeto=llm_slots.objeto,
             itens=llm_slots.itens,
         )
-    # Em aquisições com muitos itens, resume objeto por macrogrupos.
-    llm_slots.objeto = await _summarize_objeto_many_aquisicao_items(
-        llm_slots.objeto,
-        llm_slots.itens,
-        user_prompt,
-    )
+        if _is_objeto_redacao_fraca(llm_slots.objeto):
+            llm_slots.objeto = await _rewrite_objeto_clause(
+                user_prompt=(
+                    f"{user_prompt}\n\n"
+                    "Reescreva o objeto com redação mais completa e elegante, evitando forma telegráfica. "
+                    "Inclua finalidade administrativa explícita e mantenha o texto em 1 período bem construído."
+                ),
+                draft_objeto=llm_slots.objeto,
+                itens=llm_slots.itens,
+            )
+        # Em aquisições com muitos itens, resume objeto por macrogrupos.
+        llm_slots.objeto = await _summarize_objeto_many_aquisicao_items(
+            llm_slots.objeto,
+            llm_slots.itens,
+            user_prompt,
+        )
     # Lapidação final para cenários de aquisição com quantidade explícita nos itens.
     llm_slots.objeto = _polish_objeto_with_itens(llm_slots.objeto, llm_slots.itens, user_prompt)
-    llm_slots.objeto = await _strip_enumeration_from_summarized_objeto_if_needed(
-        llm_slots.objeto, llm_slots.itens, user_prompt
-    )
+    if TR_SLOTS_ENABLE_OBJETO_REWRITE:
+        llm_slots.objeto = await _strip_enumeration_from_summarized_objeto_if_needed(
+            llm_slots.objeto, llm_slots.itens, user_prompt
+        )
     low_p = (user_prompt or "").lower()
-    if (
-        len(llm_slots.itens) >= 6
-        and (
-            re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", low_p)
-            or re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", (llm_slots.objeto or "").lower())
-        )
-        and _needs_ultra_macro_objeto_summary(llm_slots.objeto)
-    ):
-        llm_slots.objeto = await _ultra_compress_objeto_macro_groups(
-            llm_slots.objeto, llm_slots.itens, user_prompt
-        )
-    if (
-        len(llm_slots.itens) >= 6
-        and (
-            re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", (user_prompt or "").lower())
-            or re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", (llm_slots.objeto or "").lower())
-        )
-        and _macro_objeto_telegrafico_demais(llm_slots.objeto)
-    ):
-        llm_slots.objeto = await _enrich_macro_objeto_add_finalidade(
-            llm_slots.objeto, llm_slots.itens, user_prompt
-        )
+    if TR_SLOTS_ENABLE_OBJETO_REWRITE:
+        if (
+            len(llm_slots.itens) >= 6
+            and (
+                re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", low_p)
+                or re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", (llm_slots.objeto or "").lower())
+            )
+            and _needs_ultra_macro_objeto_summary(llm_slots.objeto)
+        ):
+            llm_slots.objeto = await _ultra_compress_objeto_macro_groups(
+                llm_slots.objeto, llm_slots.itens, user_prompt
+            )
+        if (
+            len(llm_slots.itens) >= 6
+            and (
+                re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", (user_prompt or "").lower())
+                or re.search(r"(?i)\baquisi(?:c|ç)[aã]o\b", (llm_slots.objeto or "").lower())
+            )
+            and _macro_objeto_telegrafico_demais(llm_slots.objeto)
+        ):
+            llm_slots.objeto = await _enrich_macro_objeto_add_finalidade(
+                llm_slots.objeto, llm_slots.itens, user_prompt
+            )
     # Sanidade mínima pós-LLM (sem engessar estilo).
     llm_slots.objeto = _enforce_objeto_semantic_consistency(_normalize_objeto(llm_slots.objeto))
 
@@ -1760,10 +1770,12 @@ async def fill_tr_slots_with_llm(
     # - SEMPRE delegada à LLM especializada em _choose_art75_inciso,
     #   usando o texto de objeto (já normalizado/fallback) e os itens.
     # - O JSON de slots inicial NÃO define mais o inciso; ele é apenas artigo=75, inciso="" aqui.
-    try:
-        chosen_inciso = await _choose_art75_inciso(llm_slots.objeto, llm_slots.itens)
-    except Exception:
-        chosen_inciso = ""
+    chosen_inciso = ""
+    if TR_SLOTS_ENABLE_INCISO_LLM:
+        try:
+            chosen_inciso = await _choose_art75_inciso(llm_slots.objeto, llm_slots.itens)
+        except Exception:
+            chosen_inciso = ""
 
     if not chosen_inciso:
         # Se, mesmo após a etapa dedicada, a LLM não devolver um inciso válido,

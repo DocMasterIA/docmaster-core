@@ -1258,7 +1258,9 @@ async function onSubmit() {
 async function submitViaLLM() {
   const isTrDfd = docTypeMode.value === 'tr_modelo';
   const basePrompt = iaPrompt.value.trim();
-  const appendix = isTrDfd ? buildFormPromptAppendix() : '';
+  // TR/DFD já envia os dados estruturados em slots_override; anexar todo o formulário
+  // no user_prompt duplica contexto e aumenta muito latência/token no Ollama local.
+  const appendix = '';
   const userPromptFinal = appendix ? `${basePrompt}\n\n${appendix}` : basePrompt;
 
   const payload = isTrDfd

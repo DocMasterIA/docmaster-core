@@ -96,6 +96,49 @@ def ensure_local_index() -> None:
         c.execute(
             "CREATE INDEX IF NOT EXISTS idx_pncp_itens_uf_municipio ON pncp_itens(uf, municipio)"
         )
+        c.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pesquisador_sessoes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                titulo TEXT,
+                termo_busca TEXT NOT NULL,
+                filtros_json TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'aberta',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        c.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pesquisador_sessao_itens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sessao_id INTEGER NOT NULL,
+                numero_pncp TEXT,
+                ano_compra INTEGER,
+                sequencial_compra INTEGER,
+                numero_item TEXT,
+                descricao_item TEXT,
+                quantidade REAL,
+                unidade_medida TEXT,
+                valor_unitario REAL,
+                valor_total REAL,
+                orgao TEXT,
+                municipio TEXT,
+                uf TEXT,
+                modalidade TEXT,
+                source_json_zlib BLOB,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(sessao_id) REFERENCES pesquisador_sessoes(id)
+            )
+            """
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pesq_sess_created ON pesquisador_sessoes(created_at DESC)"
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pesq_sess_itens_sessao ON pesquisador_sessao_itens(sessao_id)"
+        )
 
 
 def _objeto(raw: Dict[str, Any]) -> str:
@@ -387,6 +430,173 @@ def local_item_search(
         for r in rows
     ]
     return {"ok": True, "itens": itens, "stats": {"total_registros": len(itens)}}
+
+
+def create_research_session(
+    termo_busca: str,
+    *,
+    titulo: Optional[str] = None,
+    filtros: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    ensure_local_index()
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    filtros_json = json.dumps(filtros or {}, ensure_ascii=False)
+    with _conn() as c:
+        cur = c.execute(
+            """
+            INSERT INTO pesquisador_sessoes (titulo, termo_busca, filtros_json, status, created_at, updated_at)
+            VALUES (?, ?, ?, 'aberta', ?, ?)
+            """,
+            (titulo or "", termo_busca.strip(), filtros_json, now, now),
+        )
+        sessao_id = int(cur.lastrowid)
+    return {
+        "ok": True,
+        "sessao_id": sessao_id,
+        "titulo": titulo or "",
+        "termo_busca": termo_busca.strip(),
+        "filtros": filtros or {},
+        "status": "aberta",
+        "created_at": now,
+    }
+
+
+def add_items_to_research_session(sessao_id: int, itens: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+    ensure_local_index()
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    inserted = 0
+    with _conn() as c:
+        row = c.execute(
+            "SELECT id FROM pesquisador_sessoes WHERE id = ?",
+            (int(sessao_id),),
+        ).fetchone()
+        if not row:
+            return {"ok": False, "error": "Sessão não encontrada.", "sessao_id": int(sessao_id)}
+        for it in itens or []:
+            if not isinstance(it, dict):
+                continue
+            source_blob = zlib.compress(json.dumps(it, ensure_ascii=False).encode("utf-8"), level=6)
+            c.execute(
+                """
+                INSERT INTO pesquisador_sessao_itens (
+                    sessao_id, numero_pncp, ano_compra, sequencial_compra, numero_item, descricao_item,
+                    quantidade, unidade_medida, valor_unitario, valor_total, orgao, municipio, uf, modalidade,
+                    source_json_zlib, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    int(sessao_id),
+                    it.get("numero_pncp"),
+                    it.get("ano_compra"),
+                    it.get("sequencial_compra"),
+                    it.get("numero_item"),
+                    it.get("descricao_item") or it.get("descricao") or it.get("objeto_resumido"),
+                    _safe_float(it.get("quantidade")),
+                    it.get("unidade_medida"),
+                    _safe_float(it.get("valor_unitario")),
+                    _safe_float(it.get("valor_total")) or _safe_float(it.get("valor_global")),
+                    it.get("orgao"),
+                    it.get("municipio"),
+                    it.get("uf"),
+                    it.get("modalidade"),
+                    source_blob,
+                    now,
+                ),
+            )
+            inserted += 1
+        c.execute(
+            "UPDATE pesquisador_sessoes SET updated_at = ? WHERE id = ?",
+            (now, int(sessao_id)),
+        )
+    return {"ok": True, "sessao_id": int(sessao_id), "itens_inseridos": inserted}
+
+
+def get_research_session(sessao_id: int) -> Dict[str, Any]:
+    ensure_local_index()
+    with _conn() as c:
+        s = c.execute(
+            """
+            SELECT id, titulo, termo_busca, filtros_json, status, created_at, updated_at
+            FROM pesquisador_sessoes
+            WHERE id = ?
+            """,
+            (int(sessao_id),),
+        ).fetchone()
+        if not s:
+            return {"ok": False, "error": "Sessão não encontrada.", "sessao_id": int(sessao_id)}
+        rows = c.execute(
+            """
+            SELECT id, numero_pncp, ano_compra, sequencial_compra, numero_item, descricao_item,
+                   quantidade, unidade_medida, valor_unitario, valor_total, orgao, municipio, uf, modalidade, created_at
+            FROM pesquisador_sessao_itens
+            WHERE sessao_id = ?
+            ORDER BY id DESC
+            """,
+            (int(sessao_id),),
+        ).fetchall()
+    return {
+        "ok": True,
+        "sessao": {
+            "id": s["id"],
+            "titulo": s["titulo"],
+            "termo_busca": s["termo_busca"],
+            "filtros": json.loads(s["filtros_json"] or "{}"),
+            "status": s["status"],
+            "created_at": s["created_at"],
+            "updated_at": s["updated_at"],
+        },
+        "itens": [
+            {
+                "id": r["id"],
+                "numero_pncp": r["numero_pncp"],
+                "ano_compra": r["ano_compra"],
+                "sequencial_compra": r["sequencial_compra"],
+                "numero_item": r["numero_item"],
+                "descricao_item": r["descricao_item"],
+                "quantidade": r["quantidade"],
+                "unidade_medida": r["unidade_medida"],
+                "valor_unitario": r["valor_unitario"],
+                "valor_total": r["valor_total"],
+                "orgao": r["orgao"],
+                "municipio": r["municipio"],
+                "uf": r["uf"],
+                "modalidade": r["modalidade"],
+                "created_at": r["created_at"],
+            }
+            for r in rows
+        ],
+        "stats": {"total_itens": len(rows)},
+    }
+
+
+def list_research_sessions(limit: int = 100) -> Dict[str, Any]:
+    ensure_local_index()
+    with _conn() as c:
+        rows = c.execute(
+            """
+            SELECT s.id, s.titulo, s.termo_busca, s.status, s.created_at, s.updated_at,
+                   (SELECT COUNT(*) FROM pesquisador_sessao_itens si WHERE si.sessao_id = s.id) AS total_itens
+            FROM pesquisador_sessoes s
+            ORDER BY s.id DESC
+            LIMIT ?
+            """,
+            (max(1, min(int(limit), 1000)),),
+        ).fetchall()
+    return {
+        "ok": True,
+        "sessoes": [
+            {
+                "id": r["id"],
+                "titulo": r["titulo"],
+                "termo_busca": r["termo_busca"],
+                "status": r["status"],
+                "created_at": r["created_at"],
+                "updated_at": r["updated_at"],
+                "total_itens": r["total_itens"],
+            }
+            for r in rows
+        ],
+    }
 
 
 async def backfill_local_index(

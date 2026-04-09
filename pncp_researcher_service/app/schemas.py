@@ -69,3 +69,13 @@ class LocalBackfillRequest(BaseModel):
         True,
         description="Se true, busca também tabela de itens de cada contratação (sem baixar PDFs).",
     )
+
+
+class ResearchSessionCreateRequest(BaseModel):
+    titulo: Optional[str] = Field(None, description="Título livre da pesquisa/cotação.")
+    termo_busca: str = Field(..., description="Termo principal da pesquisa.")
+    filtros: Dict[str, Any] = Field(default_factory=dict, description="Filtros aplicados.")
+
+
+class ResearchSessionAddItemsRequest(BaseModel):
+    itens: List[Dict[str, Any]] = Field(default_factory=list, description="Itens selecionados para registro na cotação.")

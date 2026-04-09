@@ -99,7 +99,49 @@ const routes = [
     path: '/pesquisador-pncp',
     name: 'PncpResearcher',
     component: () => import('../views/PncpResearcher.vue'),
-    meta: { title: 'Pesquisador de Dados PNCP' },
+    meta: { title: 'Pesquisador de Dados PNCP', public: true },
+  },
+  {
+    path: '/pesquisador-pncp/cotacoes/:cotacaoId',
+    name: 'CotacaoDetalhe',
+    component: () => import('../views/CotacaoDetalhe.vue'),
+    meta: { title: 'Detalhes da Cotação', public: true },
+  },
+  {
+    path: '/pesquisador-pncp/cotacoes/:cotacaoId/busca-inteligente',
+    name: 'BuscaInteligenteCotacoes',
+    component: () => import('../views/BuscaInteligenteCotacoes.vue'),
+    meta: { title: 'Busca Inteligente de Cotações', public: true },
+  },
+  {
+    path: '/pesquisador-pncp/cotacoes/:cotacaoId/busca-manual',
+    name: 'BuscaManualCotacoes',
+    component: () => import('../views/BuscaManualCotacoes.vue'),
+    meta: { title: 'Busca Manual de Cotações', public: true },
+  },
+  {
+    path: '/cotacoes/:cotacaoId',
+    redirect: (to) => `/pesquisador-pncp/cotacoes/${to.params.cotacaoId}`,
+  },
+  {
+    path: '/cotacoes/:cotacaoId/busca-inteligente',
+    redirect: (to) => `/pesquisador-pncp/cotacoes/${to.params.cotacaoId}/busca-inteligente`,
+  },
+  {
+    path: '/cotacoes/:cotacaoId/busca-manual',
+    redirect: (to) => `/pesquisador-pncp/cotacoes/${to.params.cotacaoId}/busca-manual`,
+  },
+  {
+    path: '/cotacao',
+    redirect: '/pesquisador-pncp/cotacoes/CT-2026-00421',
+  },
+  {
+    path: '/busca-item',
+    redirect: '/pesquisador-pncp/cotacoes/CT-2026-00421/busca-inteligente',
+  },
+  {
+    path: '/busca-manual',
+    redirect: '/pesquisador-pncp/cotacoes/CT-2026-00421/busca-manual',
   },
   {
     path: '/area-do-usuario',

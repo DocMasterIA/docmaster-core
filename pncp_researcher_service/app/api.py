@@ -8,11 +8,22 @@ from .pncp_client import PNCPClientError
 from .schemas import (
     HealthResponse,
     LocalBackfillRequest,
+    ResearchSessionAddItemsRequest,
+    ResearchSessionCreateRequest,
     MarketSearchRequest,
     MarketSearchResponse,
 )
 from .service import market_search, market_search_stream
-from .local_index import backfill_local_index, local_index_stats, local_item_search, local_search
+from .local_index import (
+    add_items_to_research_session,
+    backfill_local_index,
+    create_research_session,
+    get_research_session,
+    list_research_sessions,
+    local_index_stats,
+    local_item_search,
+    local_search,
+)
 
 router = APIRouter(prefix="/pncp-research", tags=["pncp-research"])
 
@@ -97,6 +108,52 @@ async def local_index_search_items_endpoint(body: MarketSearchRequest):
             codigo_modalidade=body.codigo_modalidade,
             limit=max(200, body.max_paginas * body.tamanho_pagina),
         )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/research/sessions")
+async def research_session_create_endpoint(body: ResearchSessionCreateRequest):
+    try:
+        return create_research_session(
+            body.termo_busca,
+            titulo=body.titulo,
+            filtros=body.filtros,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/research/sessions")
+async def research_session_list_endpoint(limit: int = 100):
+    try:
+        return list_research_sessions(limit=limit)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/research/sessions/{sessao_id}")
+async def research_session_get_endpoint(sessao_id: int):
+    try:
+        data = get_research_session(sessao_id)
+        if not data.get("ok"):
+            raise HTTPException(status_code=404, detail=data.get("error", "Sessão não encontrada."))
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/research/sessions/{sessao_id}/items")
+async def research_session_add_items_endpoint(sessao_id: int, body: ResearchSessionAddItemsRequest):
+    try:
+        data = add_items_to_research_session(sessao_id, body.itens)
+        if not data.get("ok"):
+            raise HTTPException(status_code=404, detail=data.get("error", "Sessão não encontrada."))
+        return data
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 

@@ -86,3 +86,24 @@ export function addItemsToResearchSession(sessaoId, itens, signal) {
 export function searchLocalItems(payload, signal) {
   return researchRequest('local-index/search-items', { method: 'POST', body: payload, signal });
 }
+
+/** PDF do relatório institucional da cotação (WeasyPrint no Django). */
+export async function downloadCotacaoRelatorioPdf(sessaoId, tituloRelatorio, signal) {
+  const res = await fetch(
+    `${API_BASE}/api/pncp/cotacoes/research/sessions/${encodeURIComponent(sessaoId)}/relatorio/pdf`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ titulo_relatorio: tituloRelatorio }),
+      signal,
+    },
+  );
+  const ctype = (res.headers.get('content-type') || '').toLowerCase();
+  if (!res.ok) {
+    const payload = ctype.includes('application/json') ? await res.json() : await res.text();
+    const msg = typeof payload === 'object' ? payload?.detail || payload?.error : payload;
+    throw new Error(msg || `Erro HTTP ${res.status}`);
+  }
+  return res.blob();
+}

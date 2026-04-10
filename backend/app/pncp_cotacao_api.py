@@ -22,6 +22,8 @@ from django.views.decorators.http import require_http_methods
 
 from backend.app.api import api_login_required
 from backend.app.models import PncpCotacao, PncpCotacaoItem
+from backend.app.services.pncp_relatorio_itens import agrupar_itens_relatorio_pesquisa_precos
+from backend.app.services.pncp_relatorio_pdf import extrair_cnpjs_dos_itens
 
 
 def _cfg_int(name: str, default: int) -> int:
@@ -399,13 +401,22 @@ def pncp_research_sessions_detail(request, sessao_id: int):
     if not c:
         return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
 
-    itens = list(c.itens.all().order_by("-id"))
+    itens_asc = list(c.itens.all().order_by("id"))
+    grupos_relatorio, total_linhas_cotacao = agrupar_itens_relatorio_pesquisa_precos(itens_asc)
+    itens_desc = list(reversed(itens_asc))
     return JsonResponse(
         {
             "ok": True,
-            "sessao": {**_sessao_dict(c, include_owner=True), "total_itens": len(itens)},
-            "itens": [_item_dict(x) for x in itens],
-            "stats": {"total_itens": len(itens)},
+            "sessao": {
+                **_sessao_dict(c, include_owner=True),
+                "total_itens": len(itens_asc),
+                "total_grupos_relatorio": len(grupos_relatorio),
+            },
+            "itens": [_item_dict(x) for x in itens_desc],
+            "grupos_relatorio": grupos_relatorio,
+            "total_linhas_cotacao": total_linhas_cotacao,
+            "cnpjs_fontes": extrair_cnpjs_dos_itens(itens_asc),
+            "stats": {"total_itens": len(itens_asc), "total_grupos": len(grupos_relatorio)},
         }
     )
 

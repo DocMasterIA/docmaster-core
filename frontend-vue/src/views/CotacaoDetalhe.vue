@@ -89,9 +89,9 @@
           <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
           Anexar Cotação do Fornecedor
         </button>
-        <button type="button" class="cot-btn">
+        <button type="button" class="cot-btn" @click="openRelatorioModal">
           <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
-          Gerar Relatório
+          Gerar relatório PDF
         </button>
       </section>
 
@@ -317,16 +317,76 @@
         </div>
       </div>
     </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="relatorioModalOpen"
+        class="pncp-modal-backdrop"
+        role="presentation"
+        @click.self="closeRelatorioModal"
+      >
+        <div
+          class="pncp-modal pncp-modal--relatorio"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cot-relatorio-title"
+          @click.stop
+        >
+          <h2 id="cot-relatorio-title" class="pncp-modal__title">Relatório PDF da cotação</h2>
+          <p class="pncp-modal__text">
+            Documento estruturado para uso institucional: título personalizado, data da pesquisa, itens agrupados
+            por fontes, CNPJs quando existirem, marca d’água e QR que abre esta cotação no sistema
+            (é preciso estar na mesma conta / sessão iniciada no site).
+          </p>
+          <label class="cot-relatorio-field">
+            <span>Título do relatório <abbr title="obrigatório">*</abbr></span>
+            <input
+              v-model.trim="relatorioTitulo"
+              type="text"
+              class="gov-input"
+              placeholder="Ex.: Relatório de pesquisa de preços — material de expediente"
+              autocomplete="off"
+            />
+          </label>
+          <p v-if="relatorioError" class="pncp-modal__error">{{ relatorioError }}</p>
+          <div class="pncp-modal__actions">
+            <button type="button" class="pncp-modal__btn pncp-modal__btn--ghost" @click="closeRelatorioModal">
+              Cancelar
+            </button>
+            <RouterLink
+              v-if="sessionBackendId != null"
+              class="pncp-modal__btn pncp-modal__btn--ghost pncp-modal__link-btn"
+              :to="relatorioPreviewTo"
+            >
+              Pré-visualizar layout
+            </RouterLink>
+            <button
+              type="button"
+              class="pncp-modal__btn pncp-modal__btn--primary"
+              :disabled="relatorioLoading"
+              @click="submitRelatorioPdf"
+            >
+              {{ relatorioLoading ? 'Gerando…' : 'Baixar PDF' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </section>
 </template>
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { getResearchSession, updateResearchSession } from '../services/pncpResearch';
+import { downloadCotacaoRelatorioPdf, getResearchSession, updateResearchSession } from '../services/pncpResearch';
 
 const route = useRoute();
 const cotacaoId = computed(() => route.params.cotacaoId || 'CT-2026-00421');
+
+const sessionBackendId = computed(() => {
+  const n = Number(route.params.cotacaoId);
+  return Number.isFinite(n) ? n : null;
+});
 
 const MODELO_COTACAO_LABELS = {
   pesquisa_precos_padrao: 'Pesquisa de preços (padrão)',
@@ -346,6 +406,22 @@ const valorTotalItensFmt = ref('R$ —');
 const tituloSalvo = ref(false);
 const isLoading = ref(false);
 const loadError = ref('');
+const relatorioModalOpen = ref(false);
+const relatorioTitulo = ref('');
+const relatorioError = ref('');
+const relatorioLoading = ref(false);
+
+const relatorioPreviewTo = computed(() => ({
+  name: 'RelatorioPesquisaPrecos',
+  query: {
+    cotacaoId: sessionBackendId.value != null ? String(sessionBackendId.value) : '',
+    titulo:
+      (relatorioTitulo.value || '').trim() ||
+      (tituloCotacao.value || '').trim() ||
+      (sessionBackendId.value != null ? `Relatório — cotação ${sessionBackendId.value}` : ''),
+  },
+}));
+
 const faixaRegionalBase = 'R$ 15,00';
 const faixaRegionalVariacao = '20%';
 
@@ -435,6 +511,47 @@ function confirmDelete() {
   pendingDelete.value = null;
 }
 
+function openRelatorioModal() {
+  relatorioError.value = '';
+  relatorioTitulo.value =
+    (tituloCotacao.value || '').trim() || `Relatório — cotação ${cotacaoId.value}`;
+  relatorioModalOpen.value = true;
+}
+
+function closeRelatorioModal() {
+  if (relatorioLoading.value) return;
+  relatorioModalOpen.value = false;
+}
+
+async function submitRelatorioPdf() {
+  const sessionId = Number(cotacaoId.value);
+  const t = (relatorioTitulo.value || '').trim();
+  if (Number.isNaN(sessionId)) {
+    relatorioError.value = 'Cotação inválida.';
+    return;
+  }
+  if (!t) {
+    relatorioError.value = 'Informe o título do relatório.';
+    return;
+  }
+  relatorioError.value = '';
+  relatorioLoading.value = true;
+  try {
+    const blob = await downloadCotacaoRelatorioPdf(sessionId, t);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `relatorio-cotacao-${sessionId}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+    relatorioModalOpen.value = false;
+  } catch (e) {
+    relatorioError.value = e?.message || 'Falha ao gerar o PDF.';
+  } finally {
+    relatorioLoading.value = false;
+  }
+}
+
 let escHandler = null;
 watch(pendingDelete, (open) => {
   if (escHandler) {
@@ -448,8 +565,24 @@ watch(pendingDelete, (open) => {
     window.addEventListener('keydown', escHandler);
   }
 });
+
+let escRelatorio = null;
+watch(relatorioModalOpen, (open) => {
+  if (escRelatorio) {
+    window.removeEventListener('keydown', escRelatorio);
+    escRelatorio = null;
+  }
+  if (open) {
+    escRelatorio = (e) => {
+      if (e.key === 'Escape') closeRelatorioModal();
+    };
+    window.addEventListener('keydown', escRelatorio);
+  }
+});
+
 onUnmounted(() => {
   if (escHandler) window.removeEventListener('keydown', escHandler);
+  if (escRelatorio) window.removeEventListener('keydown', escRelatorio);
 });
 
 onMounted(() => {
@@ -1007,6 +1140,14 @@ async function saveTituloNoBackend() {
   background: #f6f9fc;
 }
 
+a.pncp-modal__link-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
 .pncp-modal__btn--danger {
   background: #b91c1c;
   border-color: #b91c1c;
@@ -1015,5 +1156,44 @@ async function saveTituloNoBackend() {
 
 .pncp-modal__btn--danger:hover {
   filter: brightness(0.95);
+}
+
+.pncp-modal--relatorio {
+  max-width: 560px;
+}
+
+.pncp-modal__error {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #b91c1c;
+}
+
+.pncp-modal__btn--primary {
+  background: #1f4e79;
+  border-color: #1f4e79;
+  color: #fff;
+}
+
+.pncp-modal__btn--primary:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+.pncp-modal__btn--primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.cot-relatorio-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0 16px;
+  font-size: 12px;
+  color: var(--color-text-soft);
+}
+
+.cot-relatorio-field span abbr {
+  text-decoration: none;
+  color: #b91c1c;
 }
 </style>

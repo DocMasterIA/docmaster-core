@@ -29,6 +29,7 @@ from .pncp_cotacao_api import (
     pncp_research_sessions_list_create,
     pncp_research_sessions_update,
 )
+from .pncp_relatorio_api import pncp_cotacao_relatorio_pdf, pncp_cotacao_relatorio_verificar
 from .ajax import area_do_usuario_ajax
 from django.conf import settings
 from django.conf.urls.static import static
@@ -79,6 +80,16 @@ urlpatterns = [
         'api/pncp/cotacoes/research/sessions/<int:sessao_id>/items',
         pncp_research_sessions_add_items,
         name='api_pncp_cotacoes_session_items',
+    ),
+    path(
+        'api/pncp/cotacoes/research/sessions/<int:sessao_id>/relatorio/pdf',
+        pncp_cotacao_relatorio_pdf,
+        name='api_pncp_cotacao_relatorio_pdf',
+    ),
+    path(
+        'api/pncp/cotacoes/research/sessions/<int:sessao_id>/relatorio/verificar',
+        pncp_cotacao_relatorio_verificar,
+        name='api_pncp_cotacao_relatorio_verificar',
     ),
     # Proxy pesquisador PNCP (sessão Django → pncp_researcher_service)
     path('api/pncp-research/<path:path>', pncp_research_proxy, name='api_pncp_research_proxy'),

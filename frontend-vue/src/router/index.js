@@ -120,6 +120,12 @@ const routes = [
     meta: { title: 'Busca Manual de Cotações', public: true },
   },
   {
+    path: '/pesquisador-pncp/relatorio-pesquisa-precos',
+    name: 'RelatorioPesquisaPrecos',
+    component: () => import('../views/RelatorioPesquisaPrecos.vue'),
+    meta: { title: 'Relatório de pesquisa de preços', public: true },
+  },
+  {
     path: '/cotacoes/:cotacaoId',
     redirect: (to) => `/pesquisador-pncp/cotacoes/${to.params.cotacaoId}`,
   },

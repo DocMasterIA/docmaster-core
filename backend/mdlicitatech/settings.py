@@ -441,6 +441,17 @@ PNCP_COTACAO_BULK_CREATE_BATCH = int(os.environ.get("PNCP_COTACAO_BULK_CREATE_BA
 PNCP_COTACAO_MAX_FILTROS_JSON_BYTES = int(os.environ.get("PNCP_COTACAO_MAX_FILTROS_JSON_BYTES", str(32 * 1024)))
 PNCP_COTACAO_MAX_SOURCE_JSON_BYTES = int(os.environ.get("PNCP_COTACAO_MAX_SOURCE_JSON_BYTES", str(120 * 1024)))
 
+# Relatório PDF de cotações PNCP (marca d’água / rodapé)
+PNCP_RELATORIO_SISTEMA_NOME = os.environ.get(
+    "PNCP_RELATORIO_SISTEMA_NOME",
+    "DocMaster — Pesquisador PNCP",
+)
+# Base do SPA (sem barra final). QR do PDF: {base}/pesquisador-pncp/cotacoes/<id> (acesso logado).
+PNCP_RELATORIO_QR_FRONTEND_BASE_URL = os.environ.get(
+    "PNCP_RELATORIO_QR_FRONTEND_BASE_URL",
+    "https://docmasteria.com.br",
+).strip().rstrip("/") or "https://docmasteria.com.br"
+
 # Serviço RAG (geração de documentos com IA)
 RAG_SERVICE_URL = os.environ.get("RAG_SERVICE_URL", "http://127.0.0.1:8004").rstrip("/")
 

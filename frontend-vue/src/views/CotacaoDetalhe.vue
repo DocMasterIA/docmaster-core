@@ -18,6 +18,8 @@
           Voltar para lista
         </RouterLink>
       </div>
+      <p v-if="loadError" class="cot-meta cot-meta--error">{{ loadError }}</p>
+      <p v-else-if="isLoading" class="cot-meta">Carregando itens da cotação no backend...</p>
     </header>
 
     <div class="gov-surface gov-page__content">
@@ -39,16 +41,25 @@
       <section class="cot-head">
         <div class="cot-head__summary">
           <div class="cot-card">
+            <span class="cot-card__label">Modelo</span>
+            <strong>{{ sessaoModeloLabel }}</strong>
+          </div>
+          <div class="cot-card">
+            <span class="cot-card__label">Termo PNCP</span>
+            <strong class="cot-card__truncate" :title="sessaoTermoBusca">{{ sessaoTermoBusca }}</strong>
+          </div>
+          <div class="cot-card">
             <span class="cot-card__label">Criado por</span>
-            <strong>Diniz Luiz Martins Neto</strong>
+            <strong>{{ sessaoCriadoPor }}</strong>
+            <span v-if="sessaoCriadoPorEmail" class="cot-card__email">{{ sessaoCriadoPorEmail }}</span>
           </div>
           <div class="cot-card">
             <span class="cot-card__label">Criado em</span>
-            <strong>1 de Abril de 2026 às 14:49</strong>
+            <strong>{{ sessaoCreatedAt }}</strong>
           </div>
           <div class="cot-card cot-card--highlight">
-            <span class="cot-card__label">Valor Total da Cotação</span>
-            <strong>R$ 1.849,72</strong>
+            <span class="cot-card__label">Soma dos itens (estimado)</span>
+            <strong>{{ valorTotalItensFmt }}</strong>
           </div>
         </div>
       </section>
@@ -247,7 +258,15 @@
                 <td class="cot-sheet-center">{{ linha.qtd }}</td>
                 <td class="cot-sheet-center">{{ linha.und }}</td>
                 <td class="cot-sheet-center">{{ linha.precoTotal }}</td>
-                <td>{{ linha.faixaRegional }}</td>
+                <td>
+                  <div class="cot-faixa-block">
+                    <span class="cot-faixa-block__label">BASE</span>
+                    <strong class="cot-faixa-block__value">{{ faixaRegionalBase }}</strong>
+                    <span class="cot-faixa-block__dot" aria-hidden="true">·</span>
+                    <span class="cot-faixa-block__label">VAR</span>
+                    <strong class="cot-faixa-block__value">{{ faixaRegionalVariacao }}</strong>
+                  </div>
+                </td>
                 <td class="cot-sheet-center">
                   <span class="cot-sheet-status">{{ linha.status }}</span>
                 </td>
@@ -302,118 +321,33 @@
 </template>
 
 <script setup>
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { getResearchSession, updateResearchSession } from '../services/pncpResearch';
 
 const route = useRoute();
 const cotacaoId = computed(() => route.params.cotacaoId || 'CT-2026-00421');
 
-const linhasMock = ref([
-  {
-    id: 1,
-    nomeItem: 'Servico de manutencao preventiva de ar-condicionado',
-    fontes: { governamentais: 3, entesPublicos: 2, dominioAmplo: 1, cotacaoDireta: 2, notasFiscais: 0 },
-    qtd: 3,
-    und: 'Serv.',
-    precoTotal: 'R$ 1.240,00',
-    faixaRegional: 'R$ 380,00 - R$ 460,00',
-    status: 'Completo',
-  },
-  {
-    id: 2,
-    nomeItem: 'Aquisicao de material de escritorio',
-    fontes: { governamentais: 2, entesPublicos: 1, dominioAmplo: 3, cotacaoDireta: 1, notasFiscais: 1 },
-    qtd: 120,
-    und: 'Unid.',
-    precoTotal: 'R$ 2.980,50',
-    faixaRegional: 'R$ 22,00 - R$ 28,00',
-    status: 'Em analise',
-  },
-  {
-    id: 3,
-    nomeItem: 'Contratacao de suporte tecnico de TI',
-    fontes: { governamentais: 1, entesPublicos: 2, dominioAmplo: 2, cotacaoDireta: 2, notasFiscais: 0 },
-    qtd: 1,
-    und: 'Serv.',
-    precoTotal: 'R$ 4.500,00',
-    faixaRegional: 'R$ 4.100,00 - R$ 4.900,00',
-    status: 'Completo',
-  },
-  {
-    id: 4,
-    nomeItem: 'Locacao de impressoras multifuncionais',
-    fontes: { governamentais: 2, entesPublicos: 2, dominioAmplo: 1, cotacaoDireta: 1, notasFiscais: 1 },
-    qtd: 6,
-    und: 'Unid.',
-    precoTotal: 'R$ 3.120,00',
-    faixaRegional: 'R$ 480,00 - R$ 560,00',
-    status: 'Pendente',
-  },
-  {
-    id: 5,
-    nomeItem: 'Servico de limpeza e higienizacao predial',
-    fontes: { governamentais: 3, entesPublicos: 1, dominioAmplo: 1, cotacaoDireta: 2, notasFiscais: 2 },
-    qtd: 1,
-    und: 'Serv.',
-    precoTotal: 'R$ 7.800,00',
-    faixaRegional: 'R$ 7.200,00 - R$ 8.050,00',
-    status: 'Completo',
-  },
-  {
-    id: 6,
-    nomeItem: 'Compra de pneus para frota municipal',
-    fontes: { governamentais: 4, entesPublicos: 3, dominioAmplo: 2, cotacaoDireta: 1, notasFiscais: 1 },
-    qtd: 40,
-    und: 'Unid.',
-    precoTotal: 'R$ 18.600,00',
-    faixaRegional: 'R$ 430,00 - R$ 510,00',
-    status: 'Em analise',
-  },
-  {
-    id: 7,
-    nomeItem: 'Aquisicao de computadores desktop',
-    fontes: { governamentais: 2, entesPublicos: 2, dominioAmplo: 4, cotacaoDireta: 1, notasFiscais: 1 },
-    qtd: 25,
-    und: 'Unid.',
-    precoTotal: 'R$ 96.250,00',
-    faixaRegional: 'R$ 3.650,00 - R$ 4.100,00',
-    status: 'Pendente',
-  },
-  {
-    id: 8,
-    nomeItem: 'Servico de dedetizacao trimestral',
-    fontes: { governamentais: 1, entesPublicos: 2, dominioAmplo: 1, cotacaoDireta: 2, notasFiscais: 0 },
-    qtd: 4,
-    und: 'Serv.',
-    precoTotal: 'R$ 2.200,00',
-    faixaRegional: 'R$ 500,00 - R$ 620,00',
-    status: 'Completo',
-  },
-  {
-    id: 9,
-    nomeItem: 'Recarga de extintores de incendio',
-    fontes: { governamentais: 2, entesPublicos: 1, dominioAmplo: 1, cotacaoDireta: 2, notasFiscais: 1 },
-    qtd: 30,
-    und: 'Unid.',
-    precoTotal: 'R$ 3.450,00',
-    faixaRegional: 'R$ 98,00 - R$ 120,00',
-    status: 'Em analise',
-  },
-  {
-    id: 10,
-    nomeItem: 'Aquisicao de cadeiras ergonomicas',
-    fontes: { governamentais: 1, entesPublicos: 2, dominioAmplo: 3, cotacaoDireta: 1, notasFiscais: 0 },
-    qtd: 60,
-    und: 'Unid.',
-    precoTotal: 'R$ 27.900,00',
-    faixaRegional: 'R$ 430,00 - R$ 510,00',
-    status: 'Pendente',
-  },
-]);
+const MODELO_COTACAO_LABELS = {
+  pesquisa_precos_padrao: 'Pesquisa de preços (padrão)',
+  referencia_mercado: 'Referência de mercado',
+};
+
+const linhasMock = ref([]);
 
 const selectedIds = ref(new Set());
-const tituloCotacao = ref('Cotação CT-2026-00421');
+const tituloCotacao = ref('');
+const sessaoModeloLabel = ref('—');
+const sessaoTermoBusca = ref('—');
+const sessaoCreatedAt = ref('—');
+const sessaoCriadoPor = ref('—');
+const sessaoCriadoPorEmail = ref('');
+const valorTotalItensFmt = ref('R$ —');
 const tituloSalvo = ref(false);
+const isLoading = ref(false);
+const loadError = ref('');
+const faixaRegionalBase = 'R$ 15,00';
+const faixaRegionalVariacao = '20%';
 
 const allSelected = computed(() => {
   const rows = linhasMock.value;
@@ -518,11 +452,107 @@ onUnmounted(() => {
   if (escHandler) window.removeEventListener('keydown', escHandler);
 });
 
+onMounted(() => {
+  loadSessionFromBackend();
+});
+
+async function loadSessionFromBackend() {
+  const sessionId = Number(cotacaoId.value);
+  if (Number.isNaN(sessionId)) {
+    loadError.value = 'ID de cotação inválido para backend PNCP.';
+    return;
+  }
+  isLoading.value = true;
+  loadError.value = '';
+  try {
+    const data = await getResearchSession(sessionId);
+    if (data?.ok && data.sessao) {
+      const s = data.sessao;
+      tituloCotacao.value = s.titulo || `Cotação ${cotacaoId.value}`;
+      const mk = s.modelo_cotacao || 'pesquisa_precos_padrao';
+      sessaoModeloLabel.value = MODELO_COTACAO_LABELS[mk] || mk;
+      sessaoTermoBusca.value = s.termo_busca || '—';
+      sessaoCreatedAt.value = formatDateTimePt(s.created_at);
+      sessaoCriadoPor.value = s.criado_por || '—';
+      sessaoCriadoPorEmail.value = (s.criado_por_email || '').trim();
+    }
+    if (data?.ok && Array.isArray(data.itens)) {
+      let soma = 0;
+      let temValor = false;
+      linhasMock.value = data.itens.map((it, idx) => {
+        const vt = Number(it.valor_total ?? it.valor_unitario);
+        if (!Number.isNaN(vt) && vt > 0) {
+          soma += vt;
+          temValor = true;
+        }
+        return {
+          id: it.id || idx + 1,
+          nomeItem: it.descricao_item || `Item ${idx + 1}`,
+          fontes: { governamentais: 1, entesPublicos: 0, dominioAmplo: 0, cotacaoDireta: 0, notasFiscais: 0 },
+          qtd: it.quantidade ?? '-',
+          und: it.unidade_medida || '-',
+          precoTotal: formatCurrency(it.valor_total ?? it.valor_unitario ?? 0),
+          faixaRegional: '',
+          status: 'Importado',
+        };
+      });
+      valorTotalItensFmt.value = temValor ? formatCurrency(soma) : 'R$ —';
+    } else if (data?.ok) {
+      linhasMock.value = [];
+      valorTotalItensFmt.value = 'R$ —';
+    }
+  } catch (err) {
+    loadError.value = `Não foi possível carregar a sessão no backend (${err.message || 'erro desconhecido'}).`;
+    linhasMock.value = [];
+    valorTotalItensFmt.value = 'R$ —';
+    sessaoCriadoPor.value = '—';
+    sessaoCriadoPorEmail.value = '';
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+function formatCurrency(v) {
+  const n = Number(v);
+  if (Number.isNaN(n)) return 'R$ -';
+  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function formatDateTimePt(iso) {
+  if (!iso) return '—';
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return String(iso);
+  return dt.toLocaleString('pt-BR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function salvarTituloCotacao() {
-  tituloSalvo.value = true;
-  setTimeout(() => {
-    tituloSalvo.value = false;
-  }, 1500);
+  saveTituloNoBackend();
+}
+
+async function saveTituloNoBackend() {
+  const sessionId = Number(cotacaoId.value);
+  if (Number.isNaN(sessionId)) {
+    loadError.value = 'Não foi possível salvar: cotação sem ID numérico.';
+    return;
+  }
+  loadError.value = '';
+  try {
+    await updateResearchSession(sessionId, {
+      titulo: tituloCotacao.value || `Cotação ${sessionId}`,
+    });
+    tituloSalvo.value = true;
+    setTimeout(() => {
+      tituloSalvo.value = false;
+    }, 1500);
+  } catch (err) {
+    loadError.value = `Falha ao salvar título (${err.message || 'erro desconhecido'}).`;
+  }
 }
 </script>
 
@@ -530,6 +560,8 @@ function salvarTituloCotacao() {
 .gov-page { display: flex; flex-direction: column; gap: 16px; width: 100%; min-width: 0; }
 .gov-page__title { margin: 0; font-size: 24px; }
 .gov-page__subtitle { margin: 6px 0 0; color: var(--color-text-soft); }
+.cot-meta { margin: 8px 0 0; font-size: 12px; color: #64748b; }
+.cot-meta--error { color: #b91c1c; }
 .gov-page__content { padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .cot-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .cot-back-btn { border: 1px solid #cfd8e3; border-radius: 10px; background: #fff; color: #1f2937; padding: 7px 12px; font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 7px; }
@@ -538,6 +570,22 @@ function salvarTituloCotacao() {
 .cot-card { border: 1px solid #d6dde8; border-radius: 10px; background: #fff; padding: 10px; display: flex; flex-direction: column; gap: 2px; }
 .cot-card--highlight strong { color: #1f4e79; }
 .cot-card__label { font-size: 11px; text-transform: uppercase; color: var(--color-text-soft); }
+.cot-card__email {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--color-text-soft);
+  word-break: break-all;
+}
+.cot-card__truncate {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  font-weight: 600;
+}
 
 .cot-title-editor {
   border: 1px solid #d6dde8;
@@ -837,6 +885,32 @@ function salvarTituloCotacao() {
   padding: 2px 8px;
   font-size: 10px;
   white-space: nowrap;
+}
+
+.cot-faixa-block {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #d6dde8;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 4px 6px;
+  white-space: nowrap;
+}
+
+.cot-faixa-block__label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.cot-faixa-block__value {
+  font-size: 11px;
+  color: #1f2937;
+}
+
+.cot-faixa-block__dot {
+  color: #64748b;
 }
 
 .cot-sheet-actions {

@@ -10,6 +10,7 @@ from .schemas import (
     LocalBackfillRequest,
     ResearchSessionAddItemsRequest,
     ResearchSessionCreateRequest,
+    ResearchSessionUpdateRequest,
     MarketSearchRequest,
     MarketSearchResponse,
 )
@@ -20,6 +21,7 @@ from .local_index import (
     create_research_session,
     get_research_session,
     list_research_sessions,
+    update_research_session,
     local_index_stats,
     local_item_search,
     local_search,
@@ -114,14 +116,22 @@ async def local_index_search_items_endpoint(body: MarketSearchRequest):
 
 @router.post("/research/sessions")
 async def research_session_create_endpoint(body: ResearchSessionCreateRequest):
+    """Cria cotação (ordem de pesquisa) persistida em `pesquisador_sessoes` (SQLite do serviço)."""
     try:
         return create_research_session(
-            body.termo_busca,
             titulo=body.titulo,
+            termo_busca=body.termo_busca,
+            modelo_cotacao=body.modelo_cotacao,
             filtros=body.filtros,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/research/cotacoes")
+async def cotacao_create_endpoint(body: ResearchSessionCreateRequest):
+    """Alias semântico de `POST /research/sessions` para o domínio «cotação»."""
+    return await research_session_create_endpoint(body)
 
 
 @router.get("/research/sessions")
@@ -149,6 +159,25 @@ async def research_session_get_endpoint(sessao_id: int):
 async def research_session_add_items_endpoint(sessao_id: int, body: ResearchSessionAddItemsRequest):
     try:
         data = add_items_to_research_session(sessao_id, body.itens)
+        if not data.get("ok"):
+            raise HTTPException(status_code=404, detail=data.get("error", "Sessão não encontrada."))
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/research/sessions/{sessao_id}/update")
+async def research_session_update_endpoint(sessao_id: int, body: ResearchSessionUpdateRequest):
+    try:
+        data = update_research_session(
+            sessao_id,
+            titulo=body.titulo,
+            status=body.status,
+            termo_busca=body.termo_busca,
+            modelo_cotacao=body.modelo_cotacao,
+        )
         if not data.get("ok"):
             raise HTTPException(status_code=404, detail=data.get("error", "Sessão não encontrada."))
         return data

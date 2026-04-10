@@ -434,6 +434,13 @@ LLM_API_BASE_URL = os.environ.get("LLM_API_BASE_URL", "http://127.0.0.1:8002").r
 # Pesquisador PNCP (FastAPI em pncp_researcher_service)
 PNCP_RESEARCHER_BASE_URL = os.environ.get("PNCP_RESEARCHER_BASE_URL", "http://127.0.0.1:8012").rstrip("/")
 
+# Cotações PNCP (Django ORM — limites de payload e gravação em lote)
+PNCP_COTACAO_MAX_JSON_BYTES = int(os.environ.get("PNCP_COTACAO_MAX_JSON_BYTES", str(8 * 1024 * 1024)))
+PNCP_COTACAO_MAX_ITEMS_PER_REQUEST = int(os.environ.get("PNCP_COTACAO_MAX_ITEMS_PER_REQUEST", "2000"))
+PNCP_COTACAO_BULK_CREATE_BATCH = int(os.environ.get("PNCP_COTACAO_BULK_CREATE_BATCH", "250"))
+PNCP_COTACAO_MAX_FILTROS_JSON_BYTES = int(os.environ.get("PNCP_COTACAO_MAX_FILTROS_JSON_BYTES", str(32 * 1024)))
+PNCP_COTACAO_MAX_SOURCE_JSON_BYTES = int(os.environ.get("PNCP_COTACAO_MAX_SOURCE_JSON_BYTES", str(120 * 1024)))
+
 # Serviço RAG (geração de documentos com IA)
 RAG_SERVICE_URL = os.environ.get("RAG_SERVICE_URL", "http://127.0.0.1:8004").rstrip("/")
 

@@ -104,11 +104,13 @@ def ensure_local_index() -> None:
                 termo_busca TEXT NOT NULL,
                 filtros_json TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'aberta',
+                modelo_cotacao TEXT NOT NULL DEFAULT 'pesquisa_precos_padrao',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
             """
         )
+        _migrate_pesquisador_sessoes_columns(c)
         c.execute(
             """
             CREATE TABLE IF NOT EXISTS pesquisador_sessao_itens (
@@ -138,6 +140,18 @@ def ensure_local_index() -> None:
         )
         c.execute(
             "CREATE INDEX IF NOT EXISTS idx_pesq_sess_itens_sessao ON pesquisador_sessao_itens(sessao_id)"
+        )
+
+
+def _migrate_pesquisador_sessoes_columns(c: sqlite3.Cursor) -> None:
+    """Compatibiliza bases antigas sem modelo_cotacao."""
+    cols = {row[1] for row in c.execute("PRAGMA table_info(pesquisador_sessoes)")}
+    if "modelo_cotacao" not in cols:
+        c.execute(
+            """
+            ALTER TABLE pesquisador_sessoes
+            ADD COLUMN modelo_cotacao TEXT DEFAULT 'pesquisa_precos_padrao'
+            """
         )
 
 
@@ -433,31 +447,49 @@ def local_item_search(
 
 
 def create_research_session(
-    termo_busca: str,
     *,
-    titulo: Optional[str] = None,
+    titulo: str,
+    termo_busca: str,
+    modelo_cotacao: str = "pesquisa_precos_padrao",
     filtros: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     ensure_local_index()
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     filtros_json = json.dumps(filtros or {}, ensure_ascii=False)
+    titulo_s = (titulo or "").strip()
+    termo_s = (termo_busca or "").strip()
+    modelo_s = (modelo_cotacao or "").strip() or "pesquisa_precos_padrao"
     with _conn() as c:
         cur = c.execute(
             """
-            INSERT INTO pesquisador_sessoes (titulo, termo_busca, filtros_json, status, created_at, updated_at)
-            VALUES (?, ?, ?, 'aberta', ?, ?)
+            INSERT INTO pesquisador_sessoes (
+                titulo, termo_busca, filtros_json, status, modelo_cotacao, created_at, updated_at
+            )
+            VALUES (?, ?, ?, 'aberta', ?, ?, ?)
             """,
-            (titulo or "", termo_busca.strip(), filtros_json, now, now),
+            (titulo_s, termo_s, filtros_json, modelo_s, now, now),
         )
         sessao_id = int(cur.lastrowid)
-    return {
-        "ok": True,
-        "sessao_id": sessao_id,
-        "titulo": titulo or "",
-        "termo_busca": termo_busca.strip(),
+    cotacao = {
+        "id": sessao_id,
+        "titulo": titulo_s,
+        "termo_busca": termo_s,
+        "modelo_cotacao": modelo_s,
         "filtros": filtros or {},
         "status": "aberta",
         "created_at": now,
+    }
+    return {
+        "ok": True,
+        "sessao_id": sessao_id,
+        "cotacao_id": sessao_id,
+        "titulo": titulo_s,
+        "termo_busca": termo_s,
+        "modelo_cotacao": modelo_s,
+        "filtros": filtros or {},
+        "status": "aberta",
+        "created_at": now,
+        "cotacao": cotacao,
     }
 
 
@@ -516,7 +548,7 @@ def get_research_session(sessao_id: int) -> Dict[str, Any]:
     with _conn() as c:
         s = c.execute(
             """
-            SELECT id, titulo, termo_busca, filtros_json, status, created_at, updated_at
+            SELECT id, titulo, termo_busca, filtros_json, status, modelo_cotacao, created_at, updated_at
             FROM pesquisador_sessoes
             WHERE id = ?
             """,
@@ -540,6 +572,7 @@ def get_research_session(sessao_id: int) -> Dict[str, Any]:
             "id": s["id"],
             "titulo": s["titulo"],
             "termo_busca": s["termo_busca"],
+            "modelo_cotacao": s["modelo_cotacao"] or "pesquisa_precos_padrao",
             "filtros": json.loads(s["filtros_json"] or "{}"),
             "status": s["status"],
             "created_at": s["created_at"],
@@ -574,7 +607,7 @@ def list_research_sessions(limit: int = 100) -> Dict[str, Any]:
     with _conn() as c:
         rows = c.execute(
             """
-            SELECT s.id, s.titulo, s.termo_busca, s.status, s.created_at, s.updated_at,
+            SELECT s.id, s.titulo, s.termo_busca, s.status, s.modelo_cotacao, s.created_at, s.updated_at,
                    (SELECT COUNT(*) FROM pesquisador_sessao_itens si WHERE si.sessao_id = s.id) AS total_itens
             FROM pesquisador_sessoes s
             ORDER BY s.id DESC
@@ -589,6 +622,7 @@ def list_research_sessions(limit: int = 100) -> Dict[str, Any]:
                 "id": r["id"],
                 "titulo": r["titulo"],
                 "termo_busca": r["termo_busca"],
+                "modelo_cotacao": r["modelo_cotacao"] or "pesquisa_precos_padrao",
                 "status": r["status"],
                 "created_at": r["created_at"],
                 "updated_at": r["updated_at"],
@@ -596,6 +630,58 @@ def list_research_sessions(limit: int = 100) -> Dict[str, Any]:
             }
             for r in rows
         ],
+    }
+
+
+def update_research_session(
+    sessao_id: int,
+    *,
+    titulo: Optional[str] = None,
+    status: Optional[str] = None,
+    termo_busca: Optional[str] = None,
+    modelo_cotacao: Optional[str] = None,
+) -> Dict[str, Any]:
+    ensure_local_index()
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    with _conn() as c:
+        row = c.execute(
+            "SELECT id, titulo, status, termo_busca, modelo_cotacao FROM pesquisador_sessoes WHERE id = ?",
+            (int(sessao_id),),
+        ).fetchone()
+        if not row:
+            return {"ok": False, "error": "Sessão não encontrada.", "sessao_id": int(sessao_id)}
+
+        next_titulo = row["titulo"] if titulo is None else str(titulo).strip()
+        next_status = row["status"] if status is None else str(status).strip() or row["status"]
+        next_termo = row["termo_busca"]
+        if termo_busca is not None:
+            t = str(termo_busca).strip()
+            if t:
+                next_termo = t
+        base_modelo = row["modelo_cotacao"] or "pesquisa_precos_padrao"
+        next_modelo = base_modelo
+        if modelo_cotacao is not None:
+            m = str(modelo_cotacao).strip()
+            if m:
+                next_modelo = m
+
+        c.execute(
+            """
+            UPDATE pesquisador_sessoes
+            SET titulo = ?, status = ?, termo_busca = ?, modelo_cotacao = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (next_titulo, next_status, next_termo, next_modelo, now, int(sessao_id)),
+        )
+
+    return {
+        "ok": True,
+        "sessao_id": int(sessao_id),
+        "titulo": next_titulo,
+        "status": next_status,
+        "termo_busca": next_termo,
+        "modelo_cotacao": next_modelo,
+        "updated_at": now,
     }
 
 

@@ -19,16 +19,16 @@
     <div class="gov-surface gov-page__content">
       <section class="bia-summary">
         <div class="bia-summary-card">
-          <span>Validas</span>
-          <strong>3</strong>
+          <span>Resultados</span>
+          <strong>{{ filteredRows.length }}</strong>
         </div>
         <div class="bia-summary-card">
           <span>Media</span>
-          <strong>R$ 13,00</strong>
+          <strong>{{ mediaValor }}</strong>
         </div>
         <div class="bia-summary-card bia-summary-card--highlight">
-          <span>Risco</span>
-          <strong>Baixo</strong>
+          <span>Selecionados</span>
+          <strong>{{ totalSelecionados }}</strong>
         </div>
       </section>
 
@@ -98,13 +98,13 @@
         </div>
         <button type="button" class="bia-search-btn" @click="applyFilters">Buscar</button>
       </section>
+      <p v-if="searchError" class="bia-meta bia-meta--error">{{ searchError }}</p>
+      <p v-else-if="isSearching" class="bia-meta">Consultando backend PNCP...</p>
 
       <section class="bia-table-shell">
         <div class="bia-table-head">
           <div class="bia-table-head__pills">
-            <span class="bia-pill bia-pill--ok">3 aptas para media</span>
-            <span class="bia-pill bia-pill--warn">1 alerta</span>
-            <span class="bia-pill">2 duplicidades agrupadas</span>
+            <span class="bia-pill bia-pill--ok">{{ displayedRows.length }} resultados</span>
           </div>
           <RouterLink
             :to="`/pesquisador-pncp/cotacoes/${cotacaoId}`"
@@ -113,7 +113,11 @@
             <i class="fa-solid fa-plus" aria-hidden="true"></i>
             Adicionar itens na cotação {{ cotacaoId }}
           </RouterLink>
+          <button type="button" class="bia-add-cotacao-btn" @click="adicionarSelecionadosNaCotacao">
+            Salvar selecionados
+          </button>
         </div>
+        <p v-if="saveMessage" class="bia-meta">{{ saveMessage }}</p>
 
         <div class="bia-table-scroll">
           <table class="bia-table">
@@ -134,7 +138,7 @@
             </thead>
             <tbody>
               <tr v-for="row in displayedRows" :key="row.id">
-                <td><input type="checkbox" :checked="row.status === 'Selecionado'" /></td>
+                <td><input type="checkbox" :checked="row.selecionado" @change="toggleSelecionado(row.id)" /></td>
                 <td>
                   <div class="bia-cotacao-line">
                     <div class="bia-main">{{ row.titulo }}</div>
@@ -192,8 +196,9 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
+import { addItemsToResearchSession, searchLocalItems } from '../services/pncpResearch';
 
 const route = useRoute();
 const cotacaoId = computed(() => route.params.cotacaoId || 'CT-2026-00421');
@@ -294,79 +299,19 @@ function toggleAllUfs(event) {
   filtros.ufs = [];
 }
 
-const rows = [
-  {
-    id: 1,
-    titulo: 'Chamada Publica - Hortifrutigranjeiros para Alimentacao Escolar',
-    item: 'Abacate',
-    normalizado: 'Abacate in natura',
-    orgao: 'Prefeitura de Itaja',
-    cidade: 'Itaja/GO',
-    modalidade: 'Chamada Publica',
-    processo: 'CP 002/2028',
-    data: '08/04/2028',
-    qtd: '200 KG',
-    valor: 'R$ 13,00',
-    score: '96%',
-    confiabilidade: 'Alta',
-    risco: 'Baixo',
-    status: 'Selecionado',
-  },
-  {
-    id: 2,
-    titulo: 'Pregao Eletronico - Aquisicao de Hortifrutigranjeiros',
-    item: 'Abacate em kg',
-    normalizado: 'Abacate in natura',
-    orgao: 'Prefeitura de Cassilandia',
-    cidade: 'Cassilandia/MS',
-    modalidade: 'Pregao Eletronico',
-    processo: 'PE 014/2028',
-    data: '11/04/2028',
-    qtd: '180 KG',
-    valor: 'R$ 12,80',
-    score: '91%',
-    confiabilidade: 'Alta',
-    risco: 'Baixo',
-    status: 'Selecionado',
-  },
-  {
-    id: 3,
-    titulo: 'Registro de Precos - Frutas e Verduras',
-    item: 'Abacate 1 kg',
-    normalizado: 'Abacate in natura',
-    orgao: 'Fundo Municipal de Educacao',
-    cidade: 'Jatai/GO',
-    modalidade: 'Pregao Eletronico SRP',
-    processo: 'PE-SRP 021/2028',
-    data: '02/04/2028',
-    qtd: '250 KG',
-    valor: 'R$ 13,20',
-    score: '87%',
-    confiabilidade: 'Media',
-    risco: 'Medio',
-    status: 'Selecionado',
-  },
-  {
-    id: 4,
-    titulo: 'Dispensa Eletronica - Generos Alimenticios',
-    item: 'Abacate unidade',
-    normalizado: 'Divergencia de unidade',
-    orgao: 'Secretaria Municipal de Educacao',
-    cidade: 'Rio Verde/GO',
-    modalidade: 'Dispensa Eletronica',
-    processo: 'DE 008/2028',
-    data: '09/04/2028',
-    qtd: '300 UN',
-    valor: 'R$ 9,90',
-    score: '52%',
-    confiabilidade: 'Baixa',
-    risco: 'Alto',
-    status: 'Selecionado',
-  },
-];
-
-const filteredRows = ref([...rows]);
-const displayedRows = computed(() => filteredRows.value.slice(0, 3));
+const rows = ref([]);
+const filteredRows = ref([]);
+const displayedRows = computed(() => filteredRows.value);
+const isSearching = ref(false);
+const searchError = ref('');
+const saveMessage = ref('');
+const totalSelecionados = computed(() => filteredRows.value.filter((x) => x.selecionado).length);
+const mediaValor = computed(() => {
+  const nums = filteredRows.value.map((x) => parseMoeda(x.valor)).filter((x) => typeof x === 'number');
+  if (!nums.length) return 'R$ -';
+  const media = nums.reduce((a, b) => a + b, 0) / nums.length;
+  return formatCurrency(media);
+});
 
 function confiabilidadeClass(value) {
   if (value === 'Alta') return 'bia-badge--ok';
@@ -382,22 +327,100 @@ function riscoClass(value) {
   return '';
 }
 
-function applyFilters() {
-  const descricao = filtros.descricao.trim().toLowerCase();
-  const modalidade = filtros.modalidade.trim().toLowerCase();
-  const selectedUfs = new Set(filtros.ufs);
-
-  filteredRows.value = rows.filter((row) => {
-    const cidade = row.cidade || '';
-    const rowUf = cidade.includes('/') ? cidade.split('/').pop().toUpperCase() : '';
-
-    const matchesDescricao = !descricao || row.titulo.toLowerCase().includes(descricao) || row.item.toLowerCase().includes(descricao);
-    const matchesModalidade = filtros.modalidade === 'Todas' || row.modalidade.toLowerCase() === modalidade;
-    const matchesUf = selectedUfs.size === 0 || selectedUfs.has(rowUf);
-
-    return matchesDescricao && matchesModalidade && matchesUf;
-  });
+async function applyFilters() {
+  if (!filtros.descricao.trim()) return;
+  isSearching.value = true;
+  searchError.value = '';
+  try {
+    const backend = await searchLocalItems({
+      termo_busca: filtros.descricao.trim(),
+      uf: filtros.ufs.length === 1 ? filtros.ufs[0] : null,
+      codigo_modalidade: null,
+      max_paginas: 1,
+      tamanho_pagina: 50,
+    });
+    if (backend?.ok && Array.isArray(backend.itens)) {
+      const mapped = backend.itens.map((it, idx) => ({
+        id: `backend-${idx}-${it.numero_pncp || ''}`,
+        numeroPncp: it.numero_pncp || null,
+        titulo: it.descricao_item || it.objeto_resumido || 'Item sem descrição',
+        item: it.descricao_item || '-',
+        normalizado: it.material_servico || '-',
+        orgao: it.orgao || '-',
+        cidade: `${it.municipio || '-'}${it.uf ? `/${it.uf}` : ''}`,
+        modalidade: it.modalidade || '-',
+        processo: it.numero_pncp || '-',
+        data: it.data_publicacao || '-',
+        qtd: it.quantidade || '-',
+        valor: formatCurrency(it.valor_unitario ?? it.valor_total ?? 0),
+        score: '-',
+        confiabilidade: 'Média',
+        risco: 'Médio',
+        status: 'Disponível',
+        selecionado: false,
+      }));
+      rows.value = mapped;
+      filteredRows.value = mapped;
+    }
+  } catch (err) {
+    searchError.value = `Não foi possível consultar o backend (${err.message || 'erro desconhecido'}).`;
+  } finally {
+    isSearching.value = false;
+  }
 }
+
+function formatCurrency(v) {
+  const n = Number(v);
+  if (Number.isNaN(n)) return 'R$ -';
+  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function toggleSelecionado(id) {
+  filteredRows.value = filteredRows.value.map((r) => (r.id === id ? { ...r, selecionado: !r.selecionado } : r));
+}
+
+async function adicionarSelecionadosNaCotacao() {
+  const sessionId = Number(cotacaoId.value);
+  if (Number.isNaN(sessionId)) {
+    saveMessage.value = 'Cotação inválida para salvar no backend.';
+    return;
+  }
+  const itens = filteredRows.value
+    .filter((r) => r.selecionado)
+    .map((r) => ({
+      numero_pncp: r.numeroPncp,
+      descricao_item: r.item,
+      orgao: r.orgao,
+      municipio: r.cidade,
+      modalidade: r.modalidade,
+      valor_unitario: parseMoeda(r.valor),
+    }));
+  if (!itens.length) {
+    saveMessage.value = 'Selecione ao menos um item.';
+    return;
+  }
+  const MAX_ITENS_POR_ENVIO = 2000;
+  let enviar = itens;
+  if (itens.length > MAX_ITENS_POR_ENVIO) {
+    enviar = itens.slice(0, MAX_ITENS_POR_ENVIO);
+    saveMessage.value = `Limite de ${MAX_ITENS_POR_ENVIO} itens por envio; gravando os primeiros ${MAX_ITENS_POR_ENVIO}.`;
+  }
+  try {
+    const res = await addItemsToResearchSession(sessionId, enviar);
+    saveMessage.value = `${res.itens_inseridos ?? enviar.length} item(ns) adicionados à cotação.`;
+  } catch (err) {
+    saveMessage.value = `Falha ao salvar: ${err.message || 'erro desconhecido'}`;
+  }
+}
+
+function parseMoeda(v) {
+  const n = Number(String(v || '').replace(/[^\d,.-]/g, '').replace(',', '.'));
+  return Number.isNaN(n) ? null : n;
+}
+
+onMounted(() => {
+  applyFilters();
+});
 </script>
 
 <style scoped>
@@ -419,6 +442,8 @@ function applyFilters() {
 .bia-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 6px; align-items: stretch; }
 .bia-filter { border: 1px solid #d6dde8; border-radius: 10px; background: #f8fafc; padding: 7px 8px; display: flex; flex-direction: column; gap: 4px; }
 .bia-filter > span { font-size: 9px; color: #64748b; text-transform: uppercase; line-height: 1.1; }
+.bia-meta { margin: 2px 0 0; font-size: 12px; color: #64748b; }
+.bia-meta--error { color: #b91c1c; }
 .bia-filter input,
 .bia-filter select {
   border: 1px solid #cfd8e3;

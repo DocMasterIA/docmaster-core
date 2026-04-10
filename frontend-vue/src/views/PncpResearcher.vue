@@ -2,9 +2,10 @@
   <section class="gov-page">
     <header class="gov-page__header">
       <h1 class="gov-page__title">Pesquisador de Dados PNCP</h1>
-      <p class="gov-page__subtitle">
-        Base estrutural inicial da lista de cotações (mock no frontend-vue).
-      </p>
+      <p class="gov-page__subtitle">Pesquisas/cotações PNCP salvas no backend.</p>
+      <p v-if="loadError" class="gov-page__meta gov-page__meta--error">{{ loadError }}</p>
+      <p v-else-if="isLoading" class="gov-page__meta">Carregando cotações do backend...</p>
+      <p v-else class="gov-page__meta gov-page__meta--ok">Conectado ao backend PNCP.</p>
     </header>
 
     <div class="gov-surface gov-page__content">
@@ -12,9 +13,11 @@
         <div class="pncp-mock__head">
           <div>
             <h2 class="pncp-mock__title">Pesquisa de Preços Inteligente</h2>
-            <p class="pncp-mock__subtitle">Dados iniciais mockados da página de cotações.</p>
+            <p class="pncp-mock__subtitle">Cotações salvas no backend; nova cotação só precisa de um título.</p>
           </div>
-          <RouterLink to="/pesquisador-pncp/cotacoes/CT-2026-00421" class="pncp-new-btn">+ Fazer nova cotação</RouterLink>
+          <button type="button" class="pncp-new-btn" :disabled="isCreating" @click="openCreateModal">
+            + Fazer nova cotação
+          </button>
         </div>
 
         <div class="pncp-mock__filters">
@@ -37,7 +40,7 @@
           <table class="pncp-mock__table">
             <thead>
               <tr>
-                <th>Data</th>
+                <th>Criada em</th>
                 <th>Descrição</th>
                 <th>Itens</th>
                 <th>Responsável</th>
@@ -45,15 +48,17 @@
                 <th>Ações</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody v-if="filteredMockRows.length">
               <tr v-for="row in filteredMockRows" :key="row.id">
                 <td>{{ row.data }}</td>
                 <td>
                   <div class="pncp-mock__desc">{{ row.descricao }}</div>
-                  <div class="pncp-mock__desc-sub">Gerenciado pela IA DocMaster</div>
                 </td>
                 <td>{{ row.itens }}</td>
-                <td>{{ row.usuario }}</td>
+                <td>
+                  <div class="pncp-mock__usuario">{{ row.usuario }}</div>
+                  <div v-if="row.usuarioEmail" class="pncp-mock__desc-sub">{{ row.usuarioEmail }}</div>
+                </td>
                 <td>
                   <span class="pncp-status" :class="row.status === 'Finalizada' ? 'pncp-status--ok' : 'pncp-status--run'">{{ row.status }}</span>
                 </td>
@@ -63,6 +68,11 @@
                     <button type="button" class="pncp-action-btn" @click="openDeleteModal(row)">Excluir</button>
                   </div>
                 </td>
+              </tr>
+            </tbody>
+            <tbody v-else>
+              <tr>
+                <td colspan="6" class="pncp-empty">Nenhuma cotação encontrada no backend.</td>
               </tr>
             </tbody>
           </table>
@@ -99,43 +109,158 @@
         </div>
       </div>
     </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="showCreateModal"
+        class="pncp-modal-backdrop"
+        role="presentation"
+        @click.self="closeCreateModal"
+      >
+        <div
+          class="pncp-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pncp-create-title"
+          @click.stop
+        >
+          <h2 id="pncp-create-title" class="pncp-modal__title">Nova cotação</h2>
+          <p class="pncp-modal__text">
+            O título sugerido inclui seu nome cadastrado e a data/hora. Ao criar, o sistema grava também seu e-mail e o vínculo com seu usuário; o termo inicial de busca no PNCP será o mesmo título.
+          </p>
+          <div class="pncp-modal__form">
+            <label class="pncp-modal__field">
+              <span>Título <abbr title="obrigatório">*</abbr></span>
+              <input
+                v-model.trim="createForm.titulo"
+                type="text"
+                class="gov-input"
+                placeholder="Ex.: Cotação de material de expediente — abril/2026"
+                autocomplete="off"
+              />
+            </label>
+          </div>
+          <p v-if="createFormError" class="pncp-modal__error">{{ createFormError }}</p>
+          <div class="pncp-modal__actions">
+            <button type="button" class="pncp-modal__btn pncp-modal__btn--ghost" @click="closeCreateModal">
+              Cancelar
+            </button>
+            <button
+              type="button"
+              class="pncp-modal__btn pncp-modal__btn--primary"
+              :disabled="isCreating"
+              @click="submitCreateCotacao"
+            >
+              {{ isCreating ? 'Criando...' : 'Criar cotação' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </section>
 </template>
 
 <script setup>
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
+import { createResearchSession, fetchCurrentUser, listResearchSessions } from '../services/pncpResearch';
 
+const router = useRouter();
 const mockQuery = ref('');
 const mockStatusFilter = ref('todos');
-const mockRows = ref([
-  {
-    id: 1,
-    cotacaoId: 'CT-2026-00421',
-    data: '01/04/2026 14:49',
-    descricao: 'Contratação de empresa para manutenção de ar-condicionado',
-    itens: 4,
-    usuario: 'Diniz Luiz Martins Neto',
-    status: 'Em andamento',
-  },
-  {
-    id: 2,
-    cotacaoId: 'CT-2026-00422',
-    data: '01/04/2026 13:40',
-    descricao: 'Aquisição de gêneros alimentícios',
-    itens: 4,
-    usuario: 'Diniz Luiz Martins Neto',
-    status: 'Finalizada',
-  },
-  {
-    id: 3,
-    cotacaoId: 'CT-2026-00423',
-    data: '01/04/2026 03:50',
-    descricao: 'Aquisição de medicamentos',
-    itens: 10,
-    usuario: 'Edislene Ferreira da Silva',
-    status: 'Finalizada',
-  },
-]);
+const isLoading = ref(false);
+const isCreating = ref(false);
+const loadError = ref('');
+const mockRows = ref([]);
+
+const showCreateModal = ref(false);
+const createFormError = ref('');
+const createForm = ref({
+  titulo: '',
+});
+
+async function openCreateModal() {
+  createFormError.value = '';
+  const now = new Date();
+  let titulo = `Cotação ${now.toLocaleDateString('pt-BR')} ${now.toLocaleTimeString('pt-BR')}`;
+  try {
+    const me = await fetchCurrentUser();
+    if (me?.full_name) {
+      const dataLonga = now.toLocaleDateString('pt-BR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+      const hora = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      titulo = `Cotação — ${me.full_name} — ${dataLonga} · ${hora}`;
+    }
+  } catch {
+    /* mantém titulo com data simples */
+  }
+  createForm.value = { titulo };
+  showCreateModal.value = true;
+}
+
+function closeCreateModal() {
+  if (isCreating.value) return;
+  showCreateModal.value = false;
+}
+
+async function loadSessionsFromBackend() {
+  isLoading.value = true;
+  loadError.value = '';
+  try {
+    const data = await listResearchSessions(100);
+    if (data?.ok && Array.isArray(data.sessoes)) {
+      mockRows.value = data.sessoes.map((s) => ({
+        id: s.id,
+        cotacaoId: String(s.id),
+        data: formatDateTime(s.created_at || s.updated_at),
+        descricao: s.titulo || s.termo_busca || `Cotação ${s.id}`,
+        itens: Number(s.total_itens || 0),
+        usuario: s.criado_por || '—',
+        usuarioEmail: (s.criado_por_email || '').trim(),
+        status: s.status === 'aberta' ? 'Em andamento' : 'Finalizada',
+      }));
+    }
+  } catch (err) {
+    loadError.value = `Backend PNCP indisponível (${err.message || 'erro desconhecido'}).`;
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+async function submitCreateCotacao() {
+  const titulo = (createForm.value.titulo || '').trim();
+  if (!titulo) {
+    createFormError.value = 'Informe um título para a cotação.';
+    return;
+  }
+  createFormError.value = '';
+  isCreating.value = true;
+  loadError.value = '';
+  try {
+    const payload = { titulo, filtros: {} };
+    const data = await createResearchSession(payload);
+    const newId = data?.sessao_id ?? data?.cotacao_id;
+    if (data?.ok && newId != null) {
+      showCreateModal.value = false;
+      router.push(`/pesquisador-pncp/cotacoes/${newId}`);
+    }
+  } catch (err) {
+    createFormError.value = err.message || 'Erro desconhecido ao criar cotação.';
+  } finally {
+    isCreating.value = false;
+  }
+}
+
+function formatDateTime(iso) {
+  if (!iso) return '--';
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return String(iso);
+  return dt.toLocaleString('pt-BR');
+}
 
 const mockInProgressCount = computed(
   () => mockRows.value.filter((x) => x.status === 'Em andamento').length,
@@ -154,6 +279,7 @@ const filteredMockRows = computed(() => {
     return (
       row.descricao.toLowerCase().includes(q) ||
       row.usuario.toLowerCase().includes(q) ||
+      (row.usuarioEmail && row.usuarioEmail.toLowerCase().includes(q)) ||
       row.status.toLowerCase().includes(q)
     );
   });
@@ -190,8 +316,27 @@ watch(pendingDelete, (row) => {
     window.addEventListener('keydown', escHandler);
   }
 });
+
+let escCreateHandler = null;
+watch(showCreateModal, (open) => {
+  if (escCreateHandler) {
+    window.removeEventListener('keydown', escCreateHandler);
+    escCreateHandler = null;
+  }
+  if (open) {
+    escCreateHandler = (e) => {
+      if (e.key === 'Escape') closeCreateModal();
+    };
+    window.addEventListener('keydown', escCreateHandler);
+  }
+});
+
 onUnmounted(() => {
   if (escHandler) window.removeEventListener('keydown', escHandler);
+  if (escCreateHandler) window.removeEventListener('keydown', escCreateHandler);
+});
+onMounted(() => {
+  loadSessionsFromBackend();
 });
 </script>
 
@@ -211,6 +356,20 @@ onUnmounted(() => {
 .gov-page__subtitle {
   margin: 6px 0 0;
   color: var(--color-text-soft);
+}
+
+.gov-page__meta {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.gov-page__meta--error {
+  color: #b91c1c;
+}
+
+.gov-page__meta--ok {
+  color: #0f5e3a;
 }
 
 .gov-page__content {
@@ -337,6 +496,11 @@ onUnmounted(() => {
   text-align: left;
 }
 
+.pncp-empty {
+  text-align: center !important;
+  color: #64748b;
+}
+
 .pncp-mock__table th {
   color: var(--color-text-soft);
   font-size: 11px;
@@ -345,6 +509,11 @@ onUnmounted(() => {
 
 .pncp-mock__desc {
   font-weight: 600;
+}
+
+.pncp-mock__usuario {
+  font-weight: 600;
+  font-size: 12px;
 }
 
 .pncp-mock__desc-sub {
@@ -471,5 +640,46 @@ onUnmounted(() => {
 
 .pncp-modal__btn--danger:hover {
   filter: brightness(0.95);
+}
+
+.pncp-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+
+.pncp-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-soft);
+}
+
+.pncp-modal__field span abbr {
+  text-decoration: none;
+  color: #b91c1c;
+}
+
+.pncp-modal__error {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #b91c1c;
+}
+
+.pncp-modal__btn--primary {
+  background: #1f4e79;
+  border-color: #1f4e79;
+  color: #fff;
+}
+
+.pncp-modal__btn--primary:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+.pncp-modal__btn--primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 </style>

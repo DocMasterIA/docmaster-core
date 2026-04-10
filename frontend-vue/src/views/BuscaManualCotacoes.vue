@@ -47,9 +47,11 @@
               <option>Chamada Pública</option>
             </select>
           </label>
-          <button type="button" class="manual-btn-search">Buscar</button>
+          <button type="button" class="manual-btn-search" @click="buscarNoBackend">Buscar</button>
         </div>
       </section>
+      <p v-if="searchError" class="manual-meta manual-meta--error">{{ searchError }}</p>
+      <p v-else-if="isSearching" class="manual-meta">Consultando backend PNCP...</p>
 
       <section class="manual-controls">
         <div class="manual-controls__left">
@@ -95,10 +97,10 @@
       </section>
 
       <section class="manual-summary">
-        <div class="manual-summary-card"><span>Alta Confiabilidade</span><strong>1</strong></div>
-        <div class="manual-summary-card"><span>Média Confiabilidade</span><strong>1</strong></div>
-        <div class="manual-summary-card"><span>Baixa Confiabilidade</span><strong>2</strong></div>
-        <div class="manual-summary-card"><span>Selecionadas pela IA</span><strong>1</strong></div>
+        <div class="manual-summary-card"><span>Resultados</span><strong>{{ resultados.length }}</strong></div>
+        <div class="manual-summary-card"><span>Selecionados</span><strong>{{ totalSelecionados }}</strong></div>
+        <div class="manual-summary-card"><span>Valor médio</span><strong>{{ mediaValor }}</strong></div>
+        <div class="manual-summary-card"><span>UFs distintas</span><strong>{{ totalUfs }}</strong></div>
       </section>
 
       <section class="manual-results-table-shell">
@@ -110,7 +112,11 @@
             <i class="fa-solid fa-plus" aria-hidden="true"></i>
             Adicionar itens na cotação {{ cotacaoId }}
           </RouterLink>
+          <button type="button" class="manual-add-cotacao-btn" @click="adicionarSelecionadosNaCotacao">
+            Salvar selecionados
+          </button>
         </div>
+        <p v-if="saveMessage" class="manual-meta">{{ saveMessage }}</p>
         <div class="manual-results-table-scroll">
           <table class="manual-results-table">
             <thead>
@@ -128,7 +134,7 @@
             <tbody>
               <tr v-for="item in resultados" :key="item.id">
                 <td class="manual-cell-center">
-                  <input type="checkbox" :checked="item.selecionado" />
+                  <input type="checkbox" :checked="item.selecionado" @change="toggleSelecionado(item.id)" />
                 </td>
                 <td>
                   <div class="manual-cot-main">{{ item.titulo }}</div>
@@ -152,8 +158,9 @@
 </template>
 
 <script setup>
-import { computed, reactive } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
+import { addItemsToResearchSession, searchLocalItems } from '../services/pncpResearch';
 
 const route = useRoute();
 const cotacaoId = computed(() => route.params.cotacaoId || 'CT-2026-00421');
@@ -182,158 +189,109 @@ function onVariacaoInput(event) {
   event.target.value = normalized;
 }
 
-const resultados = [
-  {
-    id: 1,
-    titulo: 'Registro de Preços para futura e eventual aquisição de medicamentos e alimentação especial',
-    descricao: 'SILYBUM MARIANUM (SILIMARINA) EXTRATO 100 MG (FORFIG)',
-    quantidade: '8000 Comprimidos',
-    uf: 'SP',
-    data: '10/03/2026',
-    valor: 'R$ 0,66',
-    statusIa: 'Alta',
-    observacao: 'Correspondência altamente compatível',
-    selecionado: true,
-  },
-  {
-    id: 2,
-    titulo: 'Registro de Preços para futura e eventual aquisição de medicamentos e alimentação especial',
-    descricao: 'SILYBUM MARIANUM (SILIMARINA) EXTRATO 200 MG (FORFIG)',
-    quantidade: '8000 Comprimidos',
-    uf: 'SP',
-    data: '10/03/2026',
-    valor: 'R$ 0,75',
-    statusIa: 'Média',
-    observacao: 'Descrição próxima, requer conferência de dosagem',
-    selecionado: false,
-  },
-  {
-    id: 3,
-    titulo: 'Aquisição de medicamentos manipulados',
-    descricao: 'CARDUS MARIANUS 100 MG (FORFIG)',
-    quantidade: '6000 Cápsulas',
-    uf: 'SP',
-    data: '09/03/2026',
-    valor: 'R$ 0,20',
-    statusIa: 'Baixa',
-    observacao: 'Similaridade parcial identificada',
-    selecionado: false,
-  },
-  {
-    id: 4,
-    titulo: 'Registro de Preços para aquisição de antibióticos',
-    descricao: 'AMOXICILINA 500 MG CÁPSULA',
-    quantidade: '12000 Cápsulas',
-    uf: 'GO',
-    data: '11/03/2026',
-    valor: 'R$ 0,42',
-    statusIa: 'Alta',
-    observacao: 'Descrição aderente ao item de referência',
-    selecionado: true,
-  },
-  {
-    id: 5,
-    titulo: 'Pregão eletrônico para fornecimento de analgésicos',
-    descricao: 'DIPIRONA SÓDICA 500 MG COMPRIMIDO',
-    quantidade: '15000 Comprimidos',
-    uf: 'MS',
-    data: '12/03/2026',
-    valor: 'R$ 0,18',
-    statusIa: 'Média',
-    observacao: 'Unidade compatível, marca divergente',
-    selecionado: false,
-  },
-  {
-    id: 6,
-    titulo: 'Compra direta de medicamentos para atenção básica',
-    descricao: 'LOSARTANA POTÁSSICA 50 MG COMPRIMIDO',
-    quantidade: '20000 Comprimidos',
-    uf: 'SP',
-    data: '14/03/2026',
-    valor: 'R$ 0,11',
-    statusIa: 'Alta',
-    observacao: 'Alta similaridade com histórico recente',
-    selecionado: true,
-  },
-  {
-    id: 7,
-    titulo: 'Registro de preços para insumos hospitalares',
-    descricao: 'SORO FISIOLÓGICO 0,9% 500 ML',
-    quantidade: '5000 Frascos',
-    uf: 'MG',
-    data: '15/03/2026',
-    valor: 'R$ 4,90',
-    statusIa: 'Média',
-    observacao: 'Compatível com pequena variação de embalagem',
-    selecionado: false,
-  },
-  {
-    id: 8,
-    titulo: 'Aquisição de medicamentos para farmácia municipal',
-    descricao: 'METFORMINA 850 MG COMPRIMIDO',
-    quantidade: '18000 Comprimidos',
-    uf: 'PR',
-    data: '16/03/2026',
-    valor: 'R$ 0,14',
-    statusIa: 'Alta',
-    observacao: 'Parâmetros equivalentes ao item pesquisado',
-    selecionado: true,
-  },
-  {
-    id: 9,
-    titulo: 'Chamada pública para aquisição de medicamentos essenciais',
-    descricao: 'OMEPRAZOL 20 MG CÁPSULA',
-    quantidade: '13000 Cápsulas',
-    uf: 'BA',
-    data: '18/03/2026',
-    valor: 'R$ 0,23',
-    statusIa: 'Baixa',
-    observacao: 'Diferença de lote e apresentação secundária',
-    selecionado: false,
-  },
-  {
-    id: 10,
-    titulo: 'Pregão eletrônico para medicamentos cardiovasculares',
-    descricao: 'ATENOLOL 25 MG COMPRIMIDO',
-    quantidade: '9000 Comprimidos',
-    uf: 'SC',
-    data: '19/03/2026',
-    valor: 'R$ 0,19',
-    statusIa: 'Média',
-    observacao: 'Semelhança parcial; validar equivalência terapêutica',
-    selecionado: false,
-  },
-  {
-    id: 11,
-    titulo: 'Registro de preços para medicamentos de uso contínuo',
-    descricao: 'LEVOTIROXINA SÓDICA 50 MCG COMPRIMIDO',
-    quantidade: '7000 Comprimidos',
-    uf: 'RS',
-    data: '20/03/2026',
-    valor: 'R$ 0,27',
-    statusIa: 'Alta',
-    observacao: 'Dados consistentes com histórico de aquisição',
-    selecionado: true,
-  },
-  {
-    id: 12,
-    titulo: 'Aquisição emergencial de medicamentos',
-    descricao: 'PREDNISONA 20 MG COMPRIMIDO',
-    quantidade: '6000 Comprimidos',
-    uf: 'RJ',
-    data: '21/03/2026',
-    valor: 'R$ 0,31',
-    statusIa: 'Baixa',
-    observacao: 'Contexto da compra diferente da demanda principal',
-    selecionado: false,
-  },
-];
+const resultados = ref([]);
+const isSearching = ref(false);
+const searchError = ref('');
+const saveMessage = ref('');
+const totalSelecionados = computed(() => resultados.value.filter((x) => x.selecionado).length);
+const totalUfs = computed(() => new Set(resultados.value.map((x) => x.uf).filter(Boolean)).size);
+const mediaValor = computed(() => {
+  const nums = resultados.value.map((x) => parseMoeda(x.valor)).filter((x) => typeof x === 'number');
+  if (!nums.length) return 'R$ -';
+  return formatCurrency(nums.reduce((a, b) => a + b, 0) / nums.length);
+});
 
 function statusClass(status) {
   if (status === 'Alta') return 'manual-ia-dot--high';
   if (status === 'Média') return 'manual-ia-dot--mid';
   return 'manual-ia-dot--low';
 }
+
+async function buscarNoBackend() {
+  if (!filtros.descricao.trim()) return;
+  isSearching.value = true;
+  searchError.value = '';
+  try {
+    const data = await searchLocalItems({
+      termo_busca: filtros.descricao.trim(),
+      uf: null,
+      codigo_modalidade: null,
+      max_paginas: 1,
+      tamanho_pagina: 50,
+    });
+    if (data?.ok && Array.isArray(data.itens)) {
+      resultados.value = data.itens.map((it, idx) => ({
+        id: `backend-${idx}-${it.numero_pncp || ''}`,
+        numeroPncp: it.numero_pncp || null,
+        titulo: it.orgao || 'Órgão não informado',
+        descricao: it.descricao_item || it.objeto_resumido || 'Descrição indisponível',
+        quantidade: `${it.quantidade || '-'} ${it.unidade_medida || ''}`.trim(),
+        uf: it.uf || '-',
+        data: it.data_publicacao || '-',
+        valor: formatCurrency(it.valor_unitario ?? it.valor_total ?? 0),
+        statusIa: 'Média',
+        observacao: it.modalidade || 'Importado do backend PNCP',
+        selecionado: false,
+      }));
+    }
+  } catch (err) {
+    searchError.value = `Não foi possível consultar o backend (${err.message || 'erro desconhecido'}).`;
+  } finally {
+    isSearching.value = false;
+  }
+}
+
+function formatCurrency(v) {
+  const n = Number(v);
+  if (Number.isNaN(n)) return 'R$ -';
+  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function toggleSelecionado(id) {
+  resultados.value = resultados.value.map((r) => (r.id === id ? { ...r, selecionado: !r.selecionado } : r));
+}
+
+async function adicionarSelecionadosNaCotacao() {
+  const sessionId = Number(cotacaoId.value);
+  if (Number.isNaN(sessionId)) {
+    saveMessage.value = 'Cotação inválida para salvar no backend.';
+    return;
+  }
+  const itens = resultados.value
+    .filter((r) => r.selecionado)
+    .map((r) => ({
+      numero_pncp: r.numeroPncp,
+      descricao_item: r.descricao,
+      uf: r.uf,
+      modalidade: r.observacao,
+      valor_unitario: parseMoeda(r.valor),
+    }));
+  if (!itens.length) {
+    saveMessage.value = 'Selecione ao menos um item.';
+    return;
+  }
+  const MAX_ITENS_POR_ENVIO = 2000;
+  let enviar = itens;
+  if (itens.length > MAX_ITENS_POR_ENVIO) {
+    enviar = itens.slice(0, MAX_ITENS_POR_ENVIO);
+    saveMessage.value = `Limite de ${MAX_ITENS_POR_ENVIO} itens por envio; gravando os primeiros ${MAX_ITENS_POR_ENVIO}.`;
+  }
+  try {
+    const res = await addItemsToResearchSession(sessionId, enviar);
+    saveMessage.value = `${res.itens_inseridos ?? enviar.length} item(ns) adicionados à cotação.`;
+  } catch (err) {
+    saveMessage.value = `Falha ao salvar: ${err.message || 'erro desconhecido'}`;
+  }
+}
+
+function parseMoeda(v) {
+  const n = Number(String(v || '').replace(/[^\d,.-]/g, '').replace(',', '.'));
+  return Number.isNaN(n) ? null : n;
+}
+
+onMounted(() => {
+  buscarNoBackend();
+});
 </script>
 
 <style scoped>
@@ -360,6 +318,8 @@ function statusClass(status) {
 .manual-field { border: 1px solid #d6dde8; border-radius: 10px; background: #f8fafc; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; min-width: 170px; }
 .manual-field--grow { flex: 1 1 320px; }
 .manual-field span { font-size: 10px; text-transform: uppercase; color: #64748b; }
+.manual-meta { margin: 0; font-size: 12px; color: #64748b; }
+.manual-meta--error { color: #b91c1c; }
 .manual-field input,
 .manual-field select { border: 1px solid #cfd8e3; border-radius: 8px; background: #fff; font-size: 13px; padding: 7px 9px; outline: none; }
 

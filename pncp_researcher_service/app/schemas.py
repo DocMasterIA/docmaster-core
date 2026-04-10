@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .config import PNCP_MAX_PAGINAS_PER_REQUEST
 
@@ -72,10 +72,48 @@ class LocalBackfillRequest(BaseModel):
 
 
 class ResearchSessionCreateRequest(BaseModel):
-    titulo: Optional[str] = Field(None, description="Título livre da pesquisa/cotação.")
-    termo_busca: str = Field(..., description="Termo principal da pesquisa.")
-    filtros: Dict[str, Any] = Field(default_factory=dict, description="Filtros aplicados.")
+    """Corpo para criar uma ordem de pesquisa (cotação) persistida no serviço PNCP."""
+
+    titulo: str = Field(
+        ...,
+        min_length=1,
+        max_length=500,
+        description="Título da cotação / ordem de pesquisa.",
+    )
+    modelo_cotacao: str = Field(
+        default="pesquisa_precos_padrao",
+        min_length=1,
+        max_length=120,
+        description="Chave do modelo de cotação (ex.: pesquisa_precos_padrao). Persistida em pesquisador_sessoes.modelo_cotacao.",
+    )
+    termo_busca: Optional[str] = Field(
+        None,
+        max_length=2000,
+        description="Termo inicial de busca no PNCP; se omitido, usa o título.",
+    )
+    filtros: Dict[str, Any] = Field(default_factory=dict, description="Filtros adicionais (UF, período, etc.).")
+
+    @field_validator("titulo", "modelo_cotacao")
+    @classmethod
+    def strip_required_strings(cls, v: str) -> str:
+        s = (v or "").strip()
+        if not s:
+            raise ValueError("Campo não pode ser vazio.")
+        return s
+
+    @model_validator(mode="after")
+    def default_termo_busca(self) -> ResearchSessionCreateRequest:
+        tb = (self.termo_busca or "").strip()
+        self.termo_busca = tb if tb else self.titulo.strip()
+        return self
 
 
 class ResearchSessionAddItemsRequest(BaseModel):
     itens: List[Dict[str, Any]] = Field(default_factory=list, description="Itens selecionados para registro na cotação.")
+
+
+class ResearchSessionUpdateRequest(BaseModel):
+    titulo: Optional[str] = Field(None, description="Novo título da cotação.")
+    status: Optional[str] = Field(None, description="Status da cotação (ex.: aberta/finalizada).")
+    termo_busca: Optional[str] = Field(None, description="Novo termo de pesquisa PNCP associado à cotação.")
+    modelo_cotacao: Optional[str] = Field(None, description="Novo modelo de cotação (chave persistida).")

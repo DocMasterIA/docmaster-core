@@ -23,6 +23,12 @@ from .api import (
 )
 from .llm_proxy import llm_proxy
 from .pncp_research_proxy import pncp_research_proxy
+from .pncp_cotacao_api import (
+    pncp_research_sessions_add_items,
+    pncp_research_sessions_detail,
+    pncp_research_sessions_list_create,
+    pncp_research_sessions_update,
+)
 from .ajax import area_do_usuario_ajax
 from django.conf import settings
 from django.conf.urls.static import static
@@ -53,6 +59,27 @@ urlpatterns = [
     path("api/slots/form-state/save", slot_form_state_save_api, name="slots_form_state_save_api"),
     # Proxy LLM: sessão Django obrigatória; repassa para FastAPI (LLM_API_BASE_URL)
     path('api/llm/<path:path>', llm_proxy, name='api_llm_proxy'),
+    # Cotações PNCP persistidas no Django (ORM)
+    path(
+        'api/pncp/cotacoes/research/sessions',
+        pncp_research_sessions_list_create,
+        name='api_pncp_cotacoes_sessions',
+    ),
+    path(
+        'api/pncp/cotacoes/research/sessions/<int:sessao_id>',
+        pncp_research_sessions_detail,
+        name='api_pncp_cotacoes_session_detail',
+    ),
+    path(
+        'api/pncp/cotacoes/research/sessions/<int:sessao_id>/update',
+        pncp_research_sessions_update,
+        name='api_pncp_cotacoes_session_update',
+    ),
+    path(
+        'api/pncp/cotacoes/research/sessions/<int:sessao_id>/items',
+        pncp_research_sessions_add_items,
+        name='api_pncp_cotacoes_session_items',
+    ),
     # Proxy pesquisador PNCP (sessão Django → pncp_researcher_service)
     path('api/pncp-research/<path:path>', pncp_research_proxy, name='api_pncp_research_proxy'),
     path('secretaria-autocomplete/ajax/', SecretariaAutocomplete.as_view(), name='secretaria-autocomplete'),

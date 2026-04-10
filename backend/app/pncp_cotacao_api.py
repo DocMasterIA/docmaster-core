@@ -1,0 +1,535 @@
+"""
+CRUD de cotações PNCP no Django (ORM). O proxy `/api/pncp-research/` continua
+servindo busca no índice local, market-search e streams no FastAPI.
+
+Validação, limites de payload e transações com select_for_update ao gravar itens.
+"""
+from __future__ import annotations
+
+import json
+import math
+import re
+from datetime import timezone as dt_timezone
+from typing import Any, Dict, List, Optional, Tuple
+
+from django.conf import settings
+from django.db import transaction
+from django.db.models import Count
+from django.http import JsonResponse, HttpRequest
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+
+from backend.app.api import api_login_required
+from backend.app.models import PncpCotacao, PncpCotacaoItem
+
+
+def _cfg_int(name: str, default: int) -> int:
+    v = getattr(settings, name, default)
+    try:
+        return max(1, int(v))
+    except (TypeError, ValueError):
+        return default
+
+
+MAX_JSON_BODY_BYTES = _cfg_int("PNCP_COTACAO_MAX_JSON_BYTES", 8 * 1024 * 1024)
+MAX_ITEMS_PER_REQUEST = _cfg_int("PNCP_COTACAO_MAX_ITEMS_PER_REQUEST", 2000)
+BULK_CREATE_BATCH = _cfg_int("PNCP_COTACAO_BULK_CREATE_BATCH", 250)
+MAX_FILTROS_JSON_BYTES = _cfg_int("PNCP_COTACAO_MAX_FILTROS_JSON_BYTES", 32 * 1024)
+MAX_SOURCE_JSON_BYTES = _cfg_int("PNCP_COTACAO_MAX_SOURCE_JSON_BYTES", 120 * 1024)
+
+ALLOWED_MODELOS = frozenset({"pesquisa_precos_padrao", "referencia_mercado"})
+ALLOWED_STATUS = frozenset({"aberta", "finalizada", "cancelada"})
+CLOSED_FOR_ITEMS = frozenset({"finalizada", "cancelada"})
+
+_UF_RE = re.compile(r"^[A-Z]{2}$")
+
+# Chaves típicas PNCP / front para preservar se o payload bruto for grande
+_SOURCE_KEEP_KEYS = frozenset(
+    {
+        "numero_pncp",
+        "numeroControlePNCP",
+        "ano_compra",
+        "sequencial_compra",
+        "numero_item",
+        "numeroItem",
+        "descricao_item",
+        "descricao",
+        "objeto_resumido",
+        "objetoCompra",
+        "unidade_medida",
+        "unidadeMedida",
+        "quantidade",
+        "valor_unitario",
+        "valor_total",
+        "valor_global",
+        "valorUnitario",
+        "valorTotal",
+        "orgao",
+        "municipio",
+        "uf",
+        "modalidade",
+        "data_publicacao",
+    }
+)
+
+
+def _iso_z(dt) -> Optional[str]:
+    if dt is None:
+        return None
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.get_default_timezone())
+    return dt.astimezone(dt_timezone.utc).replace(tzinfo=None).isoformat(timespec="seconds") + "Z"
+
+
+def _parse_json_body(request: HttpRequest) -> Tuple[Optional[Dict[str, Any]], Optional[JsonResponse]]:
+    raw = request.body or b""
+    if len(raw) > MAX_JSON_BODY_BYTES:
+        return None, JsonResponse(
+            {"detail": f"Corpo JSON excede {MAX_JSON_BODY_BYTES} bytes."},
+            status=413,
+        )
+    if not raw.strip():
+        return {}, None
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except json.JSONDecodeError:
+        return None, JsonResponse({"detail": "Corpo da requisição não é JSON válido."}, status=400)
+    if not isinstance(data, dict):
+        return None, JsonResponse({"detail": "JSON raiz deve ser um objeto."}, status=422)
+    return data, None
+
+
+def _safe_float(v: Any) -> Optional[float]:
+    if v is None or v == "":
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(f) or math.isinf(f):
+        return None
+    return f
+
+
+def _safe_int_field(v: Any, *, min_v: int, max_v: int) -> Optional[int]:
+    if v is None or v == "":
+        return None
+    try:
+        i = int(v)
+    except (TypeError, ValueError):
+        return None
+    if i < min_v or i > max_v:
+        return None
+    return i
+
+
+def _normalize_uf(uf: Any) -> str:
+    if uf is None:
+        return ""
+    s = str(uf).strip().upper()[:8]
+    if _UF_RE.match(s):
+        return s
+    return str(uf).strip()[:8]
+
+
+def _sanitize_filtros(obj: Any) -> Dict[str, Any]:
+    """JSON seguro e limitado para o campo filtros (sem estruturas arbitrárias profundas)."""
+
+    def coerce(v: Any, depth: int) -> Any:
+        if depth <= 0:
+            return None
+        if v is None or isinstance(v, bool):
+            return v
+        if isinstance(v, int):
+            return v if -(2**31) <= v < 2**31 else None
+        if isinstance(v, float):
+            if math.isnan(v) or math.isinf(v):
+                return None
+            return v
+        if isinstance(v, str):
+            return v[:4000]
+        if isinstance(v, list):
+            return [coerce(x, depth - 1) for x in v[:100]]
+        if isinstance(v, dict):
+            out: Dict[str, Any] = {}
+            for i, (k, val) in enumerate(v.items()):
+                if i >= 80:
+                    break
+                if isinstance(k, str) and 0 < len(k) <= 120:
+                    out[k] = coerce(val, depth - 1)
+            return out
+        return str(v)[:500]
+
+    if not isinstance(obj, dict):
+        return {}
+    coerced = coerce(obj, depth=5)
+    assert isinstance(coerced, dict)
+    try:
+        raw = json.dumps(coerced, ensure_ascii=False, default=str)
+    except Exception:
+        return {}
+    if len(raw.encode("utf-8")) > MAX_FILTROS_JSON_BYTES:
+        return {}
+    return coerced
+
+
+def _compact_item_source(it: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(it, dict):
+        return {}
+    try:
+        raw = json.dumps(it, ensure_ascii=False, default=str)
+    except Exception:
+        slim = {k: it[k] for k in _SOURCE_KEEP_KEYS if k in it}
+        return slim
+    if len(raw.encode("utf-8")) <= MAX_SOURCE_JSON_BYTES:
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return {k: it[k] for k in _SOURCE_KEEP_KEYS if k in it}
+    slim = {k: it[k] for k in _SOURCE_KEEP_KEYS if k in it}
+    try:
+        raw2 = json.dumps(slim, ensure_ascii=False, default=str)
+        if len(raw2.encode("utf-8")) > MAX_SOURCE_JSON_BYTES:
+            return {"_truncado": True, "numero_pncp": str(it.get("numero_pncp") or it.get("numeroControlePNCP") or "")[:256]}
+    except Exception:
+        pass
+    return slim
+
+
+def _usuario_criacao_snapshot(user) -> tuple[str, str]:
+    """Nome e e-mail exibidos na cotação (snapshot no create)."""
+    nome = (user.get_full_name() or "").strip()
+    email = (getattr(user, "email", None) or "").strip()
+    if not nome:
+        nome = email or str(user.pk)
+    return nome[:240], email[:254]
+
+
+def _cotacao_qs_for_user(user):
+    qs = PncpCotacao.objects.all()
+    if user.is_superuser:
+        return qs
+    return qs.filter(usuario_id=user.id)
+
+
+def _sessao_dict(c: PncpCotacao, *, include_owner: bool = False) -> Dict[str, Any]:
+    out: Dict[str, Any] = {
+        "id": c.id,
+        "titulo": c.titulo,
+        "termo_busca": c.termo_busca,
+        "modelo_cotacao": c.modelo_cotacao or "pesquisa_precos_padrao",
+        "filtros": c.filtros or {},
+        "status": c.status,
+        "created_at": _iso_z(c.created_at),
+        "updated_at": _iso_z(c.updated_at),
+    }
+    if include_owner:
+        u = c.usuario
+        snap_nome = (getattr(c, "criado_por_nome", None) or "").strip()
+        snap_email = (getattr(c, "criado_por_email", None) or "").strip()
+        out["criado_por"] = snap_nome or (u.get_full_name() or "").strip() or getattr(u, "email", "") or str(u.pk)
+        out["criado_por_email"] = snap_email or (getattr(u, "email", None) or "").strip()
+    return out
+
+
+def _item_dict(row: PncpCotacaoItem) -> Dict[str, Any]:
+    return {
+        "id": row.id,
+        "numero_pncp": row.numero_pncp or None,
+        "ano_compra": row.ano_compra,
+        "sequencial_compra": row.sequencial_compra,
+        "numero_item": row.numero_item or None,
+        "descricao_item": row.descricao_item or None,
+        "quantidade": row.quantidade,
+        "unidade_medida": row.unidade_medida or None,
+        "valor_unitario": row.valor_unitario,
+        "valor_total": row.valor_total,
+        "orgao": row.orgao or None,
+        "municipio": row.municipio or None,
+        "uf": row.uf or None,
+        "modalidade": row.modalidade or None,
+        "created_at": _iso_z(row.created_at),
+    }
+
+
+def _item_identity_error(it: Dict[str, Any]) -> Optional[str]:
+    """Exige âncora mínima para precisão: PNCP, par compra ou descrição não vazia."""
+    np = str(it.get("numero_pncp") or it.get("numeroControlePNCP") or "").strip()
+    if np:
+        return None
+    desc = (
+        it.get("descricao_item")
+        or it.get("descricao")
+        or it.get("objeto_resumido")
+        or it.get("objetoCompra")
+        or ""
+    )
+    desc_s = str(desc).strip()
+    if desc_s:
+        return None
+    ano = _safe_int_field(it.get("ano_compra"), min_v=1990, max_v=2100)
+    seq = _safe_int_field(it.get("sequencial_compra"), min_v=1, max_v=2_147_483_647)
+    if ano is not None and seq is not None:
+        return None
+    return (
+        "cada item precisa de numero_pncp, ou (ano_compra + sequencial_compra), "
+        "ou descrição/objeto não vazio"
+    )
+
+
+def _item_from_payload(it: Dict[str, Any], cotacao: PncpCotacao) -> PncpCotacaoItem:
+    desc = (
+        it.get("descricao_item")
+        or it.get("descricao")
+        or it.get("objeto_resumido")
+        or it.get("objetoCompra")
+        or ""
+    )
+    vt = _safe_float(it.get("valor_total")) or _safe_float(it.get("valor_global"))
+    np = str(it.get("numero_pncp") or it.get("numeroControlePNCP") or "")[:256]
+    return PncpCotacaoItem(
+        cotacao=cotacao,
+        numero_pncp=np,
+        ano_compra=_safe_int_field(it.get("ano_compra"), min_v=1990, max_v=2100),
+        sequencial_compra=_safe_int_field(it.get("sequencial_compra"), min_v=1, max_v=2_147_483_647),
+        numero_item=str(it.get("numero_item") or it.get("numeroItem") or "")[:64],
+        descricao_item=str(desc)[:10000] if desc else "",
+        quantidade=_safe_float(it.get("quantidade")),
+        unidade_medida=str(it.get("unidade_medida") or it.get("unidadeMedida") or "")[:64],
+        valor_unitario=_safe_float(it.get("valor_unitario")) or _safe_float(it.get("valorUnitario")),
+        valor_total=vt,
+        orgao=str(it.get("orgao") or "")[:512],
+        municipio=str(it.get("municipio") or "")[:256],
+        uf=_normalize_uf(it.get("uf")),
+        modalidade=str(it.get("modalidade") or "")[:256],
+        source=_compact_item_source(it),
+    )
+
+
+@api_login_required
+@csrf_exempt
+@require_http_methods(["GET", "POST", "OPTIONS"])
+def pncp_research_sessions_list_create(request):
+    if request.method == "OPTIONS":
+        return JsonResponse({}, status=204)
+
+    if request.method == "GET":
+        try:
+            limit = int(request.GET.get("limit") or "100")
+        except ValueError:
+            limit = 100
+        limit = max(1, min(limit, 1000))
+        rows = (
+            _cotacao_qs_for_user(request.user)
+            .select_related("usuario")
+            .annotate(total_itens=Count("itens"))
+            .order_by("-id")[:limit]
+        )
+        sessoes: List[Dict[str, Any]] = []
+        for r in rows:
+            d = _sessao_dict(r, include_owner=True)
+            d["total_itens"] = r.total_itens
+            sessoes.append(d)
+        return JsonResponse({"ok": True, "sessoes": sessoes})
+
+    body, err = _parse_json_body(request)
+    if err:
+        return err
+
+    titulo = str(body.get("titulo") or "").strip()
+    if not titulo:
+        return JsonResponse({"detail": "titulo é obrigatório."}, status=422)
+    if len(titulo) > 500:
+        return JsonResponse({"detail": "titulo excede 500 caracteres."}, status=422)
+
+    modelo = str(body.get("modelo_cotacao") or "pesquisa_precos_padrao").strip()
+    if modelo not in ALLOWED_MODELOS:
+        return JsonResponse(
+            {"detail": "modelo_cotacao inválido.", "allowed": sorted(ALLOWED_MODELOS)},
+            status=422,
+        )
+
+    termo_raw = body.get("termo_busca")
+    termo = str(termo_raw).strip() if termo_raw is not None else ""
+    if not termo:
+        termo = titulo
+    if len(termo) > 2000:
+        return JsonResponse({"detail": "termo_busca excede 2000 caracteres."}, status=422)
+
+    filtros = _sanitize_filtros(body.get("filtros"))
+    prefeitura_id = getattr(request.user, "prefeitura_id", None)
+    nome_snap, email_snap = _usuario_criacao_snapshot(request.user)
+
+    with transaction.atomic():
+        c = PncpCotacao.objects.create(
+            usuario=request.user,
+            prefeitura_id=prefeitura_id,
+            titulo=titulo,
+            termo_busca=termo,
+            modelo_cotacao=modelo,
+            filtros=filtros,
+            status="aberta",
+            criado_por_nome=nome_snap,
+            criado_por_email=email_snap,
+        )
+
+    cotacao_payload = _sessao_dict(c, include_owner=True)
+    cotacao_payload["total_itens"] = 0
+    return JsonResponse(
+        {
+            "ok": True,
+            "sessao_id": c.id,
+            "cotacao_id": c.id,
+            **cotacao_payload,
+            "cotacao": cotacao_payload,
+        },
+        status=201,
+    )
+
+
+@api_login_required
+@csrf_exempt
+@require_http_methods(["GET", "OPTIONS"])
+def pncp_research_sessions_detail(request, sessao_id: int):
+    if request.method == "OPTIONS":
+        return JsonResponse({}, status=204)
+
+    c = _cotacao_qs_for_user(request.user).select_related("usuario").filter(pk=sessao_id).first()
+    if not c:
+        return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
+
+    itens = list(c.itens.all().order_by("-id"))
+    return JsonResponse(
+        {
+            "ok": True,
+            "sessao": {**_sessao_dict(c, include_owner=True), "total_itens": len(itens)},
+            "itens": [_item_dict(x) for x in itens],
+            "stats": {"total_itens": len(itens)},
+        }
+    )
+
+
+@api_login_required
+@csrf_exempt
+@require_http_methods(["POST", "OPTIONS"])
+def pncp_research_sessions_update(request, sessao_id: int):
+    if request.method == "OPTIONS":
+        return JsonResponse({}, status=204)
+
+    body, err = _parse_json_body(request)
+    if err:
+        return err
+
+    with transaction.atomic():
+        c = _cotacao_qs_for_user(request.user).select_for_update().filter(pk=sessao_id).first()
+        if not c:
+            return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
+
+        if "titulo" in body and body["titulo"] is not None:
+            t = str(body["titulo"]).strip()
+            if not t:
+                return JsonResponse({"detail": "titulo não pode ser vazio."}, status=422)
+            if len(t) > 500:
+                return JsonResponse({"detail": "titulo excede 500 caracteres."}, status=422)
+            c.titulo = t
+
+        if "status" in body and body["status"] is not None:
+            st = str(body["status"]).strip()
+            if st not in ALLOWED_STATUS:
+                return JsonResponse(
+                    {"detail": "status inválido.", "allowed": sorted(ALLOWED_STATUS)},
+                    status=422,
+                )
+            c.status = st
+
+        if "termo_busca" in body and body["termo_busca"] is not None:
+            t = str(body["termo_busca"]).strip()
+            if t:
+                if len(t) > 2000:
+                    return JsonResponse({"detail": "termo_busca excede 2000 caracteres."}, status=422)
+                c.termo_busca = t
+
+        if "modelo_cotacao" in body and body["modelo_cotacao"] is not None:
+            m = str(body["modelo_cotacao"]).strip()
+            if m and m not in ALLOWED_MODELOS:
+                return JsonResponse(
+                    {"detail": "modelo_cotacao inválido.", "allowed": sorted(ALLOWED_MODELOS)},
+                    status=422,
+                )
+            if m:
+                c.modelo_cotacao = m
+
+        c.save()
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "sessao_id": c.id,
+            "titulo": c.titulo,
+            "status": c.status,
+            "termo_busca": c.termo_busca,
+            "modelo_cotacao": c.modelo_cotacao,
+            "updated_at": _iso_z(c.updated_at),
+        }
+    )
+
+
+@api_login_required
+@csrf_exempt
+@require_http_methods(["POST", "OPTIONS"])
+def pncp_research_sessions_add_items(request, sessao_id: int):
+    if request.method == "OPTIONS":
+        return JsonResponse({}, status=204)
+
+    body, err = _parse_json_body(request)
+    if err:
+        return err
+
+    raw_itens = body.get("itens")
+    if not isinstance(raw_itens, list):
+        return JsonResponse({"detail": "Campo itens deve ser uma lista."}, status=422)
+
+    if len(raw_itens) > MAX_ITEMS_PER_REQUEST:
+        return JsonResponse(
+            {
+                "detail": f"No máximo {MAX_ITEMS_PER_REQUEST} itens por requisição.",
+                "received": len(raw_itens),
+            },
+            status=422,
+        )
+
+    if not raw_itens:
+        c0 = _cotacao_qs_for_user(request.user).filter(pk=sessao_id).first()
+        if not c0:
+            return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
+        return JsonResponse({"ok": True, "sessao_id": c0.id, "itens_inseridos": 0})
+
+    for idx, it in enumerate(raw_itens):
+        if not isinstance(it, dict):
+            return JsonResponse(
+                {"detail": "Cada item deve ser um objeto JSON.", "index": idx},
+                status=422,
+            )
+        id_err = _item_identity_error(it)
+        if id_err:
+            return JsonResponse({"detail": id_err, "index": idx}, status=422)
+
+    inserted = 0
+    with transaction.atomic():
+        c = _cotacao_qs_for_user(request.user).select_for_update().filter(pk=sessao_id).first()
+        if not c:
+            return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
+        if c.status in CLOSED_FOR_ITEMS:
+            return JsonResponse(
+                {"detail": "Cotação encerrada; não é permitido adicionar itens."},
+                status=409,
+            )
+        built = [_item_from_payload(it, c) for it in raw_itens]
+        for i in range(0, len(built), BULK_CREATE_BATCH):
+            chunk = built[i : i + BULK_CREATE_BATCH]
+            PncpCotacaoItem.objects.bulk_create(chunk, batch_size=BULK_CREATE_BATCH)
+        inserted = len(built)
+        c.save(update_fields=["updated_at"])
+
+    return JsonResponse({"ok": True, "sessao_id": c.id, "itens_inseridos": inserted})

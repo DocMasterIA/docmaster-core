@@ -1,8 +1,9 @@
 """
 Proxy para o serviço FastAPI pncp_researcher_service.
 
-O frontend chama /api/pncp-research/... no Django (sessão). O Django repassa
-ao serviço PNCP (localhost / rede Docker), inclusive NDJSON em market-search/stream.
+Cotações (CRUD) ficam no Django em `/api/pncp/cotacoes/research/sessions...`.
+Este proxy repassa apenas operações do microserviço: índice local, market-search
+e streams NDJSON.
 """
 from __future__ import annotations
 

@@ -89,8 +89,8 @@
           <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
           Anexar Cotação do Fornecedor
         </button>
-        <button type="button" class="cot-btn" @click="openRelatorioModal">
-          <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
+        <button type="button" class="cot-btn cot-btn--primary" @click="openRelatorioModal">
+          <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
           Gerar relatório PDF
         </button>
       </section>
@@ -332,11 +332,12 @@
           aria-labelledby="cot-relatorio-title"
           @click.stop
         >
-          <h2 id="cot-relatorio-title" class="pncp-modal__title">Relatório PDF da cotação</h2>
+          <h2 id="cot-relatorio-title" class="pncp-modal__title">Relatório PDF desta cotação</h2>
           <p class="pncp-modal__text">
-            Documento estruturado para uso institucional: título personalizado, data da pesquisa, itens agrupados
-            por fontes, CNPJs quando existirem, marca d’água e QR que abre esta cotação no sistema
-            (é preciso estar na mesma conta / sessão iniciada no site).
+            O PDF é <strong>gerado a partir desta cotação</strong> (itens e dados guardados no sistema). Ao confirmar,
+            o ficheiro é produzido no servidor e o <strong>download começa automaticamente</strong>. Inclui título
+            personalizado, resumo, detalhamento por fontes, CNPJs quando existirem, marca d’água e QR para abrir esta
+            mesma cotação no site (com sessão iniciada).
           </p>
           <label class="cot-relatorio-field">
             <span>Título do relatório <abbr title="obrigatório">*</abbr></span>
@@ -366,7 +367,7 @@
               :disabled="relatorioLoading"
               @click="submitRelatorioPdf"
             >
-              {{ relatorioLoading ? 'Gerando…' : 'Baixar PDF' }}
+              {{ relatorioLoading ? 'A gerar…' : 'Gerar e baixar PDF' }}
             </button>
           </div>
         </div>

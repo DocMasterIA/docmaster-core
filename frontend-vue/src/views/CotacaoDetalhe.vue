@@ -349,6 +349,9 @@
               autocomplete="off"
             />
           </label>
+          <p class="cot-relatorio-info">
+            Itens reais vinculados a esta cotação: <strong>{{ totalItensSessao }}</strong>
+          </p>
           <p v-if="relatorioError" class="pncp-modal__error">{{ relatorioError }}</p>
           <div class="pncp-modal__actions">
             <button type="button" class="pncp-modal__btn pncp-modal__btn--ghost" @click="closeRelatorioModal">
@@ -364,7 +367,7 @@
             <button
               type="button"
               class="pncp-modal__btn pncp-modal__btn--primary"
-              :disabled="relatorioLoading"
+              :disabled="relatorioLoading || totalItensSessao === 0"
               @click="submitRelatorioPdf"
             >
               {{ relatorioLoading ? 'A gerar…' : 'Gerar e baixar PDF' }}
@@ -411,6 +414,7 @@ const relatorioModalOpen = ref(false);
 const relatorioTitulo = ref('');
 const relatorioError = ref('');
 const relatorioLoading = ref(false);
+const totalItensSessao = ref(0);
 
 const relatorioPreviewTo = computed(() => ({
   name: 'RelatorioPesquisaPrecos',
@@ -514,6 +518,9 @@ function confirmDelete() {
 
 function openRelatorioModal() {
   relatorioError.value = '';
+  if (totalItensSessao.value === 0) {
+    relatorioError.value = 'Adicione ao menos 1 item real na cotação para gerar o PDF.';
+  }
   relatorioTitulo.value =
     (tituloCotacao.value || '').trim() || `Relatório — cotação ${cotacaoId.value}`;
   relatorioModalOpen.value = true;
@@ -533,6 +540,10 @@ async function submitRelatorioPdf() {
   }
   if (!t) {
     relatorioError.value = 'Informe o título do relatório.';
+    return;
+  }
+  if (totalItensSessao.value === 0) {
+    relatorioError.value = 'Esta cotação ainda não possui itens para gerar o relatório.';
     return;
   }
   relatorioError.value = '';
@@ -609,6 +620,7 @@ async function loadSessionFromBackend() {
       sessaoCreatedAt.value = formatDateTimePt(s.created_at);
       sessaoCriadoPor.value = s.criado_por || '—';
       sessaoCriadoPorEmail.value = (s.criado_por_email || '').trim();
+      totalItensSessao.value = Number(s.total_itens) || 0;
     }
     if (data?.ok && Array.isArray(data.itens)) {
       let soma = 0;
@@ -634,6 +646,7 @@ async function loadSessionFromBackend() {
     } else if (data?.ok) {
       linhasMock.value = [];
       valorTotalItensFmt.value = 'R$ —';
+      totalItensSessao.value = 0;
     }
   } catch (err) {
     loadError.value = `Não foi possível carregar a sessão no backend (${err.message || 'erro desconhecido'}).`;
@@ -641,6 +654,7 @@ async function loadSessionFromBackend() {
     valorTotalItensFmt.value = 'R$ —';
     sessaoCriadoPor.value = '—';
     sessaoCriadoPorEmail.value = '';
+    totalItensSessao.value = 0;
   } finally {
     isLoading.value = false;
   }
@@ -1196,5 +1210,11 @@ a.pncp-modal__link-btn {
 .cot-relatorio-field span abbr {
   text-decoration: none;
   color: #b91c1c;
+}
+
+.cot-relatorio-info {
+  margin: -4px 0 12px;
+  font-size: 12px;
+  color: #475569;
 }
 </style>

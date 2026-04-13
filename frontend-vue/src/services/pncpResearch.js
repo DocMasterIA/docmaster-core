@@ -87,6 +87,14 @@ export function searchLocalItems(payload, signal) {
   return researchRequest('local-index/search-items', { method: 'POST', body: payload, signal });
 }
 
+export function getLocalIndexStats(signal) {
+  return researchRequest('local-index/stats', { signal });
+}
+
+export function backfillLocalIndex(payload, signal) {
+  return researchRequest('local-index/backfill', { method: 'POST', body: payload, signal });
+}
+
 /** PDF do relatório institucional da cotação (WeasyPrint no Django). */
 export async function downloadCotacaoRelatorioPdf(sessaoId, tituloRelatorio, signal) {
   const res = await fetch(

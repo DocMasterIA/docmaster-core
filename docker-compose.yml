@@ -172,6 +172,10 @@ services:
       - PNCP_TIMEOUT=60
       - PNCP_DEFAULT_LOOKBACK_DAYS=180
       - PNCP_MAX_PAGINAS_PER_REQUEST=${PNCP_MAX_PAGINAS_PER_REQUEST:-120}
+      - PNCP_LOCAL_DB_PATH=/data/pncp/pncp_researcher_local.db
+    volumes:
+      # SQLite local do pncp_researcher_service (persiste entre up/rebuild)
+      - pncp_researcher_data:/data/pncp
     restart: unless-stopped
 
   backend:
@@ -225,3 +229,4 @@ volumes:
   ollama_data:
   backend_data:   # SQLite do Django (persiste entre build/up)
   backend_media:  # MEDIA_ROOT do Django (templates/docx, previews, etc.)
+  pncp_researcher_data:  # SQLite do pncp_researcher_service

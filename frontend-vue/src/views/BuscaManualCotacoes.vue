@@ -49,6 +49,14 @@
           </label>
           <button type="button" class="manual-btn-search" @click="buscarNoBackend">Buscar</button>
         </div>
+        <div class="manual-local-db-row">
+          <p class="manual-meta">
+            Base local PNCP (`pncp_researcher_service`): <strong>{{ totalItensBaseLocal }}</strong> itens indexados.
+          </p>
+          <button type="button" class="manual-btn-backfill" :disabled="isBackfilling" @click="atualizarBaseLocalAgora">
+            {{ isBackfilling ? 'Atualizando base...' : 'Atualizar base local (.db)' }}
+          </button>
+        </div>
       </section>
       <p v-if="searchError" class="manual-meta manual-meta--error">{{ searchError }}</p>
       <p v-else-if="isSearching" class="manual-meta">Consultando backend PNCP...</p>
@@ -160,7 +168,12 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { addItemsToResearchSession, searchLocalItems } from '../services/pncpResearch';
+import {
+  addItemsToResearchSession,
+  backfillLocalIndex,
+  getLocalIndexStats,
+  searchLocalItems,
+} from '../services/pncpResearch';
 
 const route = useRoute();
 const cotacaoId = computed(() => route.params.cotacaoId || 'CT-2026-00421');
@@ -193,6 +206,8 @@ const resultados = ref([]);
 const isSearching = ref(false);
 const searchError = ref('');
 const saveMessage = ref('');
+const localStats = ref(null);
+const isBackfilling = ref(false);
 const totalSelecionados = computed(() => resultados.value.filter((x) => x.selecionado).length);
 const totalUfs = computed(() => new Set(resultados.value.map((x) => x.uf).filter(Boolean)).size);
 const mediaValor = computed(() => {
@@ -200,6 +215,15 @@ const mediaValor = computed(() => {
   if (!nums.length) return 'R$ -';
   return formatCurrency(nums.reduce((a, b) => a + b, 0) / nums.length);
 });
+const totalItensBaseLocal = computed(() => Number(localStats.value?.total_itens || 0));
+
+async function carregarStatusBaseLocal() {
+  try {
+    localStats.value = await getLocalIndexStats();
+  } catch (_err) {
+    localStats.value = null;
+  }
+}
 
 function statusClass(status) {
   if (status === 'Alta') return 'manual-ia-dot--high';
@@ -222,13 +246,22 @@ async function buscarNoBackend() {
     if (data?.ok && Array.isArray(data.itens)) {
       resultados.value = data.itens.map((it, idx) => ({
         id: `backend-${idx}-${it.numero_pncp || ''}`,
+        sourceRaw: it,
         numeroPncp: it.numero_pncp || null,
+        anoCompra: it.ano_compra ?? null,
+        sequencialCompra: it.sequencial_compra ?? null,
+        numeroItem: it.numero_item ?? null,
         titulo: it.orgao || 'Órgão não informado',
         descricao: it.descricao_item || it.objeto_resumido || 'Descrição indisponível',
         quantidade: `${it.quantidade || '-'} ${it.unidade_medida || ''}`.trim(),
+        quantidadeNum: it.quantidade ?? null,
+        unidadeMedida: it.unidade_medida || null,
         uf: it.uf || '-',
+        municipio: it.municipio || null,
         data: it.data_publicacao || '-',
         valor: formatCurrency(it.valor_unitario ?? it.valor_total ?? 0),
+        valorUnitario: it.valor_unitario ?? null,
+        valorTotal: it.valor_total ?? null,
         statusIa: 'Média',
         observacao: it.modalidade || 'Importado do backend PNCP',
         selecionado: false,
@@ -238,6 +271,28 @@ async function buscarNoBackend() {
     searchError.value = `Não foi possível consultar o backend (${err.message || 'erro desconhecido'}).`;
   } finally {
     isSearching.value = false;
+  }
+}
+
+async function atualizarBaseLocalAgora() {
+  if (isBackfilling.value) return;
+  isBackfilling.value = true;
+  searchError.value = '';
+  saveMessage.value = '';
+  try {
+    const res = await backfillLocalIndex({
+      months: 12,
+      max_paginas: 2,
+      tamanho_pagina: 50,
+      include_items: true,
+    });
+    localStats.value = res;
+    saveMessage.value = `Base local atualizada. Itens no índice: ${Number(res?.total_itens || 0)}.`;
+    await buscarNoBackend();
+  } catch (err) {
+    searchError.value = `Falha ao atualizar a base local (${err.message || 'erro desconhecido'}).`;
+  } finally {
+    isBackfilling.value = false;
   }
 }
 
@@ -260,11 +315,20 @@ async function adicionarSelecionadosNaCotacao() {
   const itens = resultados.value
     .filter((r) => r.selecionado)
     .map((r) => ({
+      ...(r.sourceRaw || {}),
       numero_pncp: r.numeroPncp,
+      ano_compra: r.anoCompra,
+      sequencial_compra: r.sequencialCompra,
+      numero_item: r.numeroItem,
       descricao_item: r.descricao,
+      quantidade: r.quantidadeNum,
+      unidade_medida: r.unidadeMedida,
+      valor_unitario: r.valorUnitario ?? parseMoeda(r.valor),
+      valor_total: r.valorTotal,
+      orgao: r.titulo,
+      municipio: r.municipio,
       uf: r.uf,
       modalidade: r.observacao,
-      valor_unitario: parseMoeda(r.valor),
     }));
   if (!itens.length) {
     saveMessage.value = 'Selecione ao menos um item.';
@@ -290,6 +354,7 @@ function parseMoeda(v) {
 }
 
 onMounted(() => {
+  carregarStatusBaseLocal();
   buscarNoBackend();
 });
 </script>
@@ -313,6 +378,17 @@ onMounted(() => {
 
 .manual-filters__row {
   justify-content: flex-start;
+}
+
+.manual-local-db-row {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #d6dde8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .manual-field { border: 1px solid #d6dde8; border-radius: 10px; background: #f8fafc; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; min-width: 170px; }
@@ -369,6 +445,20 @@ onMounted(() => {
 .manual-btn-search {
   flex: 0 0 auto;
   margin-left: auto;
+}
+
+.manual-btn-backfill {
+  height: 34px;
+  border: 1px solid #b7d2ef;
+  border-radius: 10px;
+  background: #e8f1fb;
+  color: #1f4e79;
+  font-weight: 600;
+  padding: 0 12px;
+}
+
+.manual-btn-backfill:disabled {
+  opacity: 0.7;
 }
 /* Mantem o bloco de ordenacao/valor em linha (cards lado a lado) */
 .manual-controls {

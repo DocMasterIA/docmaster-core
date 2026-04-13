@@ -235,6 +235,54 @@ _HTML_TEMPLATE = _ENV.from_string(
     </div>
 
     <section class="rpp-block">
+      <h2 class="rpp-section-title">Metodologia Aplicada</h2>
+      <p class="rpp-section-lead">Base legal, método matemático e critérios de seleção das cotações</p>
+      <div class="rpp-metodologia">
+        <h3 class="rpp-metodologia__title">IN 65/2021 · Lei 14.133</h3>
+        <p>
+          A presente pesquisa de preços foi materializada com base na Lei nº 14.133/2021 e na Instrução Normativa nº 65/2021,
+          adotando como método matemático a média aritmética dos preços obtidos, em conformidade com o art. 3º da referida instrução.
+        </p>
+        <p>
+          Para composição do valor estimado, foram consideradas cotações provenientes de contratação direta, PNCP, CMED,
+          ComprasGov e plataformas eletrônicas, observando compatibilidade do objeto, unidade de medida, recência da contratação,
+          identificação do fornecedor e consistência dos dados.
+        </p>
+        <table class="rpp-table rpp-table--metodologia">
+          <thead>
+            <tr>
+              <th>Critério de seleção</th>
+              <th>Parâmetro aplicado</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Compatibilidade do objeto</td>
+              <td>Descrição, unidade e quantidade equivalentes ao item pesquisado.</td>
+            </tr>
+            <tr>
+              <td>Recência observada</td>
+              <td>Até 12 meses.</td>
+            </tr>
+            <tr>
+              <td>Rastreabilidade</td>
+              <td>CNPJ, fonte e data.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="rpp-block">
+      <h2 class="rpp-section-title">Conclusão Técnica</h2>
+      <p class="rpp-conclusao">
+        Com base nas cotações obtidas, na metodologia aplicada e na análise técnica dos dados, conclui-se que os valores
+        estimados refletem adequadamente os preços praticados no mercado, estando aptos a subsidiar a contratação pública
+        pretendida, com observância aos princípios da economicidade, razoabilidade e eficiência.
+      </p>
+    </section>
+
+    <section class="rpp-block">
       <h2 class="rpp-section-title">Resultado consolidado</h2>
       <p class="rpp-section-lead">Resumo dos itens com média das cotações e situação da pesquisa (mínimo de 3 fontes por item para «Válido»).</p>
       <div class="rpp-table-wrap">

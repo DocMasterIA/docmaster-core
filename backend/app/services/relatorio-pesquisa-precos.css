@@ -377,6 +377,44 @@
   margin-bottom: 3mm;
 }
 
+.rpp-metodologia__title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1f4e79;
+}
+
+.rpp--pdf .rpp-metodologia__title {
+  font-size: 9pt;
+}
+
+.rpp-metodologia p {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: #334155;
+  line-height: 1.5;
+}
+
+.rpp--pdf .rpp-metodologia p {
+  font-size: 8.5pt;
+}
+
+.rpp-table--metodologia th:first-child,
+.rpp-table--metodologia td:first-child {
+  width: 38%;
+}
+
+.rpp-conclusao {
+  margin: 0;
+  font-size: 12px;
+  color: #334155;
+  line-height: 1.55;
+}
+
+.rpp--pdf .rpp-conclusao {
+  font-size: 8.5pt;
+}
+
 /* Bloco por item no detalhamento */
 .rpp-detalhe-item {
   border: 1px solid #d6dde8;

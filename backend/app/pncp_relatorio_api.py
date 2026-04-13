@@ -74,12 +74,19 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
     if not c:
         return JsonResponse({"ok": False, "error": "Cotação não encontrada."}, status=404)
 
+    itens_qs = c.itens.all()
+    if not itens_qs.exists():
+        return JsonResponse(
+            {"detail": "Esta cotação ainda não possui itens. Adicione ao menos 1 item para gerar o PDF."},
+            status=422,
+        )
+
     url_qr = _url_qr_acesso_cotacao_no_sistema(sessao_id)
 
     try:
         pdf_bytes = gerar_pdf_relatorio_cotacao(
             cotacao=c,
-            itens_qs=c.itens.all(),
+            itens_qs=itens_qs,
             titulo_relatorio=titulo_rel,
             url_verificacao=url_qr,
         )

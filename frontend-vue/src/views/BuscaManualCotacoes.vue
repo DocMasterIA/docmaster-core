@@ -586,7 +586,6 @@ async function adicionarSelecionadosNaCotacao() {
   const itens = resultados.value
     .filter((r) => r.selecionado)
     .map((r) => ({
-      ...(r.sourceRaw || {}),
       numero_pncp: toNullableText(r.numeroPncp),
       ano_compra: r.anoCompra,
       sequencial_compra: r.sequencialCompra,
@@ -600,22 +599,31 @@ async function adicionarSelecionadosNaCotacao() {
       municipio: toNullableText(r.municipio),
       uf: toNullableText(r.uf),
       modalidade: toNullableText(r.observacao),
+      // Mantém metadados úteis sem inflar demais o JSON.
+      origem: 'busca_manual',
+      data_publicacao: toNullableText(r.data),
+      material_servico: toNullableText(r.sourceRaw?.material_servico),
     }))
     .filter((it) => !!it.descricao_item || !!it.numero_pncp || (it.ano_compra != null && it.sequencial_compra != null));
   if (!itens.length) {
     saveMessage.value = 'Selecione ao menos um item.';
     return;
   }
-  const MAX_ITENS_POR_ENVIO = 2000;
+  const MAX_ITENS_TOTAL = 2000;
+  const BATCH_SIZE = 250;
   let enviar = itens;
-  if (itens.length > MAX_ITENS_POR_ENVIO) {
-    enviar = itens.slice(0, MAX_ITENS_POR_ENVIO);
-    saveMessage.value = `Limite de ${MAX_ITENS_POR_ENVIO} itens por envio; gravando os primeiros ${MAX_ITENS_POR_ENVIO}.`;
+  if (itens.length > MAX_ITENS_TOTAL) {
+    enviar = itens.slice(0, MAX_ITENS_TOTAL);
+    saveMessage.value = `Limite de ${MAX_ITENS_TOTAL} itens por operação; gravando os primeiros ${MAX_ITENS_TOTAL}.`;
   }
   isSavingSelecionados.value = true;
   try {
-    const res = await addItemsToResearchSession(sessionId, enviar);
-    const totalInseridos = Number(res.itens_inseridos ?? enviar.length);
+    let totalInseridos = 0;
+    for (let i = 0; i < enviar.length; i += BATCH_SIZE) {
+      const lote = enviar.slice(i, i + BATCH_SIZE);
+      const res = await addItemsToResearchSession(sessionId, lote);
+      totalInseridos += Number(res.itens_inseridos ?? lote.length);
+    }
     saveMessage.value = `${totalInseridos} item(ns) adicionados à cotação ${sessionId}.`;
     if (totalInseridos > 0) {
       resultados.value = resultados.value.map((r) => (r.selecionado ? { ...r, selecionado: false } : r));

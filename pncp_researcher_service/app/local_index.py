@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
+import unicodedata
 import zlib
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -392,6 +394,52 @@ def local_search(
     return {"ok": True, "itens": itens, "stats": {"total_registros": len(itens)}}
 
 
+def _normalize_search_text(text: str) -> str:
+    s = (text or "").strip().lower()
+    if not s:
+        return ""
+    s = "".join(ch for ch in unicodedata.normalize("NFD", s) if unicodedata.category(ch) != "Mn")
+    s = re.sub(r"[^a-z0-9\s]", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def _token_variants(token: str) -> List[str]:
+    t = _normalize_search_text(token)
+    if not t:
+        return []
+    variants = {t}
+    # plural/singular simples para aumentar recall (pneu <-> pneus)
+    if t.endswith("s") and len(t) > 3:
+        variants.add(t[:-1])
+    else:
+        variants.add(f"{t}s")
+    return sorted(v for v in variants if v)
+
+
+def _build_search_tokens(termo_busca: str) -> List[List[str]]:
+    norm = _normalize_search_text(termo_busca)
+    if not norm:
+        return []
+    raw_tokens = [tok for tok in norm.split(" ") if len(tok) >= 2]
+    return [_token_variants(tok) for tok in raw_tokens if _token_variants(tok)]
+
+
+def _row_matches_search_tokens(text: str, tokens: List[List[str]]) -> bool:
+    if not tokens:
+        return False
+    normalized_text = _normalize_search_text(text)
+    if not normalized_text:
+        return False
+    words = set(normalized_text.split())
+    for options in tokens:
+        # cada token de busca deve casar ao menos uma variante (AND entre tokens)
+        matched = any((opt in words) or (opt in normalized_text) for opt in options)
+        if not matched:
+            return False
+    return True
+
+
 def local_item_search(
     termo_busca: str,
     *,
@@ -400,11 +448,13 @@ def local_item_search(
     limit: int = 500,
 ) -> Dict[str, Any]:
     ensure_local_index()
-    term = (termo_busca or "").strip()
-    if not term:
+    token_groups = _build_search_tokens(termo_busca)
+    if not token_groups:
         return {"ok": True, "itens": [], "stats": {"total_registros": 0}}
+    # Anchor no SQL para reduzir leitura; match final é feito em Python com variações de token.
+    anchor = token_groups[0][0]
     where = ["descricao LIKE ?"]
-    params: List[Any] = [f"%{term}%"]
+    params: List[Any] = [f"%{anchor}%"]
     if uf:
         where.append("uf = ?")
         params.append(uf)
@@ -419,30 +469,39 @@ def local_item_search(
         ORDER BY updated_at DESC
         LIMIT ?
     """
-    params.append(max(1, min(int(limit), 5000)))
+    sql_limit = max(1, min(int(limit) * 8, 20000))
+    params.append(sql_limit)
     with _conn() as c:
         rows = c.execute(sql, params).fetchall()
-    itens = [
-        {
-            "numero_pncp": r["numero_pncp"],
-            "ano_compra": r["ano_compra"],
-            "sequencial_compra": r["sequencial_compra"],
-            "numero_item": r["numero_item"],
-            "descricao_item": r["descricao"],
-            "material_servico": r["material_servico"],
-            "quantidade": r["quantidade"],
-            "unidade_medida": r["unidade_medida"],
-            "valor_unitario": r["valor_unitario"],
-            "valor_total": r["valor_total"],
-            "orgao": r["orgao"],
-            "municipio": r["municipio"],
-            "uf": r["uf"],
-            "modalidade": r["modalidade_nome"],
-            "data_publicacao": r["data_publicacao"],
-            "origem": "base_local_itens",
-        }
-        for r in rows
-    ]
+    itens = []
+    for r in rows:
+        desc = r["descricao"] or ""
+        mat = r["material_servico"] or ""
+        texto_item = f"{desc} {mat}".strip()
+        if not _row_matches_search_tokens(texto_item, token_groups):
+            continue
+        itens.append(
+            {
+                "numero_pncp": r["numero_pncp"],
+                "ano_compra": r["ano_compra"],
+                "sequencial_compra": r["sequencial_compra"],
+                "numero_item": r["numero_item"],
+                "descricao_item": r["descricao"],
+                "material_servico": r["material_servico"],
+                "quantidade": r["quantidade"],
+                "unidade_medida": r["unidade_medida"],
+                "valor_unitario": r["valor_unitario"],
+                "valor_total": r["valor_total"],
+                "orgao": r["orgao"],
+                "municipio": r["municipio"],
+                "uf": r["uf"],
+                "modalidade": r["modalidade_nome"],
+                "data_publicacao": r["data_publicacao"],
+                "origem": "base_local_itens",
+            }
+        )
+        if len(itens) >= max(1, min(int(limit), 5000)):
+            break
     return {"ok": True, "itens": itens, "stats": {"total_registros": len(itens)}}
 
 

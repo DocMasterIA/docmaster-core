@@ -21,7 +21,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from backend.app.api import api_login_required
-from backend.app.models import PncpCotacao, PncpCotacaoItem
+from backend.app.models import PncpCotacao, PncpCotacaoItem, Prefeitura
 from backend.app.services.pncp_relatorio_itens import agrupar_itens_relatorio_pesquisa_precos
 from backend.app.services.pncp_relatorio_pdf import extrair_cnpjs_dos_itens
 
@@ -251,6 +251,20 @@ def _cotacao_qs_for_user(user):
     return qs.filter(usuario_id=user.id)
 
 
+def _safe_prefeitura_id_for_user(user) -> Optional[int]:
+    """
+    Evita 500 em create quando user.prefeitura_id aponta para registro inexistente.
+    """
+    pref_id = getattr(user, "prefeitura_id", None)
+    if not pref_id:
+        return None
+    try:
+        pid = int(pref_id)
+    except (TypeError, ValueError):
+        return None
+    return pid if Prefeitura.objects.filter(id=pid).exists() else None
+
+
 def _sessao_dict(c: PncpCotacao, *, include_owner: bool = False) -> Dict[str, Any]:
     out: Dict[str, Any] = {
         "id": c.id,
@@ -396,7 +410,7 @@ def pncp_research_sessions_list_create(request):
         return JsonResponse({"detail": "termo_busca excede 2000 caracteres."}, status=422)
 
     filtros = _sanitize_filtros(body.get("filtros"))
-    prefeitura_id = getattr(request.user, "prefeitura_id", None)
+    prefeitura_id = _safe_prefeitura_id_for_user(request.user)
     nome_snap, email_snap = _usuario_criacao_snapshot(request.user)
 
     with transaction.atomic():

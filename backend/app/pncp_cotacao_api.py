@@ -13,7 +13,7 @@ from datetime import timezone as dt_timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from django.conf import settings
-from django.db import transaction
+from django.db import DatabaseError, transaction
 from django.db.models import Count
 from django.http import JsonResponse, HttpRequest
 from django.utils import timezone
@@ -208,6 +208,42 @@ def _usuario_criacao_snapshot(user) -> tuple[str, str]:
     return nome[:240], email[:254]
 
 
+def _create_cotacao_with_snapshot_fallback(
+    *,
+    usuario,
+    prefeitura_id,
+    titulo: str,
+    termo: str,
+    modelo: str,
+    filtros: Dict[str, Any],
+    nome_snap: str,
+    email_snap: str,
+) -> PncpCotacao:
+    """
+    Evita 500 quando o banco ainda não possui colunas de snapshot do criador.
+    """
+    base_kwargs = {
+        "usuario": usuario,
+        "prefeitura_id": prefeitura_id,
+        "titulo": titulo,
+        "termo_busca": termo,
+        "modelo_cotacao": modelo,
+        "filtros": filtros,
+        "status": "aberta",
+    }
+    try:
+        return PncpCotacao.objects.create(
+            **base_kwargs,
+            criado_por_nome=nome_snap,
+            criado_por_email=email_snap,
+        )
+    except DatabaseError as e:
+        msg = str(e).lower()
+        if ("criado_por_nome" not in msg) and ("criado_por_email" not in msg):
+            raise
+        return PncpCotacao.objects.create(**base_kwargs)
+
+
 def _cotacao_qs_for_user(user):
     qs = PncpCotacao.objects.all()
     if user.is_superuser:
@@ -364,16 +400,15 @@ def pncp_research_sessions_list_create(request):
     nome_snap, email_snap = _usuario_criacao_snapshot(request.user)
 
     with transaction.atomic():
-        c = PncpCotacao.objects.create(
+        c = _create_cotacao_with_snapshot_fallback(
             usuario=request.user,
             prefeitura_id=prefeitura_id,
             titulo=titulo,
-            termo_busca=termo,
-            modelo_cotacao=modelo,
+            termo=termo,
+            modelo=modelo,
             filtros=filtros,
-            status="aberta",
-            criado_por_nome=nome_snap,
-            criado_por_email=email_snap,
+            nome_snap=nome_snap,
+            email_snap=email_snap,
         )
 
     cotacao_payload = _sessao_dict(c, include_owner=True)

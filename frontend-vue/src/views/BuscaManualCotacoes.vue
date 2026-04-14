@@ -152,21 +152,20 @@
 
       <section class="manual-results-table-shell">
         <div class="manual-results-head">
-          <RouterLink
-            :to="`/pesquisador-pncp/cotacoes/${cotacaoId}`"
-            class="manual-add-cotacao-btn"
-          >
-            <i class="fa-solid fa-plus" aria-hidden="true"></i>
-            Adicionar itens na cotação {{ cotacaoId }}
-          </RouterLink>
           <button
             type="button"
             class="manual-add-cotacao-btn"
             :disabled="isSavingSelecionados || totalSelecionados === 0"
-            @click="adicionarSelecionadosNaCotacao"
+            @click="adicionarSelecionadosNaCotacao(true)"
           >
-            {{ isSavingSelecionados ? 'Salvando...' : 'Salvar selecionados' }}
+            {{ isSavingSelecionados ? 'Salvando...' : `Salvar e abrir cotação ${cotacaoId}` }}
           </button>
+          <RouterLink
+            :to="`/pesquisador-pncp/cotacoes/${cotacaoId}`"
+            class="manual-add-cotacao-btn manual-add-cotacao-btn--ghost"
+          >
+            Ir para cotação
+          </RouterLink>
         </div>
         <p v-if="saveMessage" class="manual-meta">{{ saveMessage }}</p>
         <div class="manual-results-table-scroll">
@@ -215,7 +214,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import {
   addItemsToResearchSession,
   backfillLocalIndex,
@@ -224,6 +223,7 @@ import {
 } from '../services/pncpResearch';
 
 const route = useRoute();
+const router = useRouter();
 const cotacaoId = computed(() => route.params.cotacaoId || 'CT-2026-00421');
 
 const filtros = reactive({
@@ -575,7 +575,7 @@ function toggleSelecionado(id) {
   resultados.value = resultados.value.map((r) => (r.id === id ? { ...r, selecionado: !r.selecionado } : r));
 }
 
-async function adicionarSelecionadosNaCotacao() {
+async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
   if (isSavingSelecionados.value) return;
   const sessionId = Number(cotacaoId.value);
   if (Number.isNaN(sessionId)) {
@@ -627,6 +627,9 @@ async function adicionarSelecionadosNaCotacao() {
     saveMessage.value = `${totalInseridos} item(ns) adicionados à cotação ${sessionId}.`;
     if (totalInseridos > 0) {
       resultados.value = resultados.value.map((r) => (r.selecionado ? { ...r, selecionado: false } : r));
+      if (goToCotacao) {
+        await router.push(`/pesquisador-pncp/cotacoes/${sessionId}`);
+      }
     }
   } catch (err) {
     saveMessage.value = `Falha ao salvar: ${err.message || 'erro desconhecido'}`;
@@ -889,6 +892,11 @@ onMounted(() => {
 
 .manual-add-cotacao-btn:hover {
   filter: brightness(0.95);
+}
+
+.manual-add-cotacao-btn--ghost {
+  background: #fff;
+  color: #1f4e79;
 }
 
 .manual-results-table-scroll {

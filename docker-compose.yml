@@ -5,7 +5,7 @@
 #
 # Layout: este arquivo costuma ficar ao lado da pasta do repo (ex.: ~ com ~/docmaster-core/).
 # Se o compose estiver DENTRO da raiz do git (só docmaster-core/), troque "docmaster-core" por "."
-# em todos os build.context e ajuste volumes ./llm_audit → caminhos relativos ao repo..
+# em todos os build.context e ajuste volumes ./llm_audit → caminhos relativos ao repo...
 #
 # Qwen só para ETP: docker compose --profile qwen up -d qwen_llm_service
 # No rag_service: LLM_ETP_GENERATION_BASE_URL=http://qwen_llm_service:8015 (Ollama/llm_api segue em LLM_ORCHESTRATION_BASE_URL).

@@ -76,6 +76,7 @@
                     :checked="filtros.ufs.includes(uf.code)"
                     @change="toggleUf(uf.code)"
                   />
+                  <img :src="uf.flag" :alt="`Bandeira ${uf.code}`" class="manual-uf-option__flag" />
                   <span>{{ uf.code }} - {{ uf.name }}</span>
                 </label>
               </div>
@@ -233,6 +234,36 @@ const filtros = reactive({
   variacao: '20',
 });
 
+const UF_FLAGS = {
+  AC: new URL('../assets/estados/02-acre-full.svg', import.meta.url).href,
+  AL: new URL('../assets/estados/03-alagoas-full.svg', import.meta.url).href,
+  AP: new URL('../assets/estados/04-amapa-full.svg', import.meta.url).href,
+  AM: new URL('../assets/estados/05-amazonas-full.svg', import.meta.url).href,
+  BA: new URL('../assets/estados/06-bahia-full.svg', import.meta.url).href,
+  CE: new URL('../assets/estados/07-ceara-full.svg', import.meta.url).href,
+  DF: new URL('../assets/estados/08-distrito-federal-full.svg', import.meta.url).href,
+  ES: new URL('../assets/estados/09-espirito-santo-full.svg', import.meta.url).href,
+  GO: new URL('../assets/estados/10-goias-full.svg', import.meta.url).href,
+  MA: new URL('../assets/estados/11-maranhao-full.svg', import.meta.url).href,
+  MT: new URL('../assets/estados/12-mato-grosso-full.svg', import.meta.url).href,
+  MS: new URL('../assets/estados/13-mato-grosso-do-sul-full.svg', import.meta.url).href,
+  MG: new URL('../assets/estados/14-minas-gerais-full.svg', import.meta.url).href,
+  PA: new URL('../assets/estados/15-para-full.svg', import.meta.url).href,
+  PB: new URL('../assets/estados/16-paraiba-full.svg', import.meta.url).href,
+  PR: new URL('../assets/estados/17-parana-full.svg', import.meta.url).href,
+  PE: new URL('../assets/estados/18-pernambuco-full.svg', import.meta.url).href,
+  PI: new URL('../assets/estados/19-piaui-full.svg', import.meta.url).href,
+  RJ: new URL('../assets/estados/20-rio-de-janeiro-full.svg', import.meta.url).href,
+  RN: new URL('../assets/estados/21-rio-grande-do-norte-full.svg', import.meta.url).href,
+  RS: new URL('../assets/estados/22-rio-grande-do-sul-full.svg', import.meta.url).href,
+  RO: new URL('../assets/estados/23-rondonia-full.svg', import.meta.url).href,
+  RR: new URL('../assets/estados/24-roraima-full.svg', import.meta.url).href,
+  SC: new URL('../assets/estados/25-santa-catarina-full.svg', import.meta.url).href,
+  SP: new URL('../assets/estados/26-sao-paulo-full.svg', import.meta.url).href,
+  SE: new URL('../assets/estados/27-sergipe-full.svg', import.meta.url).href,
+  TO: new URL('../assets/estados/28-tocantins-full.svg', import.meta.url).href,
+};
+
 const ufOptions = [
   { code: 'AC', name: 'Acre' }, { code: 'AL', name: 'Alagoas' }, { code: 'AP', name: 'Amapá' },
   { code: 'AM', name: 'Amazonas' }, { code: 'BA', name: 'Bahia' }, { code: 'CE', name: 'Ceará' },
@@ -243,7 +274,7 @@ const ufOptions = [
   { code: 'RJ', name: 'Rio de Janeiro' }, { code: 'RN', name: 'Rio Grande do Norte' }, { code: 'RS', name: 'Rio Grande do Sul' },
   { code: 'RO', name: 'Rondônia' }, { code: 'RR', name: 'Roraima' }, { code: 'SC', name: 'Santa Catarina' },
   { code: 'SP', name: 'São Paulo' }, { code: 'SE', name: 'Sergipe' }, { code: 'TO', name: 'Tocantins' },
-];
+].map((uf) => ({ ...uf, flag: UF_FLAGS[uf.code] }));
 
 const MODALIDADE_TO_CODIGO = {
   Pregão: 8,
@@ -746,6 +777,14 @@ onMounted(() => {
   font-size: 12px;
   color: #334155;
   padding: 4px;
+}
+
+.manual-uf-option__flag {
+  width: 22px;
+  height: 15px;
+  object-fit: cover;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 
 .manual-uf-dropdown__item--all {

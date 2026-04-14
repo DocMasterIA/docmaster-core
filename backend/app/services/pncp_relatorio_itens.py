@@ -222,9 +222,10 @@ def agrupar_itens_relatorio_pesquisa_precos(itens: List[Any]) -> Tuple[List[Dict
         und = (getattr(first, "unidade_medida", None) or "—")[:64]
 
         vals = [v for v in (_valor_numerico_item(x) for x in members) if v is not None]
+        media_valor: Optional[float] = None
         if vals:
-            media = sum(vals) / len(vals)
-            media_fmt = f"R$ {_formatar_moeda_br(media)}"
+            media_valor = sum(vals) / len(vals)
+            media_fmt = f"R$ {_formatar_moeda_br(media_valor)}"
         else:
             media_fmt = "—"
 
@@ -243,6 +244,7 @@ def agrupar_itens_relatorio_pesquisa_precos(itens: List[Any]) -> Tuple[List[Dict
                 "quantidade_fmt": q_fmt,
                 "unidade": und,
                 "n_cotacoes": n_cot,
+                "media_valor": media_valor,
                 "media_fmt": media_fmt,
                 "situacao": situacao,
                 "fontes": fontes,
@@ -250,3 +252,35 @@ def agrupar_itens_relatorio_pesquisa_precos(itens: List[Any]) -> Tuple[List[Dict
         )
 
     return grupos, total_linhas
+
+
+def resumo_calculo_media_aritmetica(grupos: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Resumo do cálculo institucional:
+    - fórmula aplicada;
+    - média das médias por item;
+    - faixa (mín/max) das médias por item.
+    """
+    medias = []
+    for g in grupos or []:
+        mv = g.get("media_valor")
+        try:
+            f = float(mv)
+        except (TypeError, ValueError):
+            continue
+        if math.isnan(f) or math.isinf(f):
+            continue
+        medias.append(f)
+
+    media_geral = (sum(medias) / len(medias)) if medias else None
+    return {
+        "formula_id": "media_aritmetica_precos_obtidos",
+        "formula_label": "Média aritmética dos preços obtidos",
+        "itens_com_media": len(medias),
+        "media_das_medias": media_geral,
+        "media_das_medias_fmt": f"R$ {_formatar_moeda_br(media_geral)}" if media_geral is not None else "—",
+        "menor_media_item": min(medias) if medias else None,
+        "menor_media_item_fmt": f"R$ {_formatar_moeda_br(min(medias))}" if medias else "—",
+        "maior_media_item": max(medias) if medias else None,
+        "maior_media_item_fmt": f"R$ {_formatar_moeda_br(max(medias))}" if medias else "—",
+    }

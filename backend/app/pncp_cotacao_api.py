@@ -22,7 +22,10 @@ from django.views.decorators.http import require_http_methods
 
 from backend.app.api import api_login_required
 from backend.app.models import PncpCotacao, PncpCotacaoItem, Prefeitura
-from backend.app.services.pncp_relatorio_itens import agrupar_itens_relatorio_pesquisa_precos
+from backend.app.services.pncp_relatorio_itens import (
+    agrupar_itens_relatorio_pesquisa_precos,
+    resumo_calculo_media_aritmetica,
+)
 from backend.app.services.pncp_relatorio_pdf import extrair_cnpjs_dos_itens
 
 
@@ -488,9 +491,11 @@ def pncp_research_sessions_detail(request, sessao_id: int):
                 **_sessao_dict(c, include_owner=True),
                 "total_itens": len(itens_asc),
                 "total_grupos_relatorio": len(grupos_relatorio),
+                "formula_calculo": "Média aritmética dos preços obtidos",
             },
             "itens": [_item_dict(x) for x in itens_desc],
             "grupos_relatorio": grupos_relatorio,
+            "calculo_precos": resumo_calculo_media_aritmetica(grupos_relatorio),
             "total_linhas_cotacao": total_linhas_cotacao,
             "cnpjs_fontes": extrair_cnpjs_dos_itens(itens_asc),
             "stats": {"total_itens": len(itens_asc), "total_grupos": len(grupos_relatorio)},

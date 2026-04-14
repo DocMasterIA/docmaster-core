@@ -145,8 +145,12 @@
                   <input type="checkbox" :checked="item.selecionado" @change="toggleSelecionado(item.id)" />
                 </td>
                 <td>
-                  <div class="manual-cot-main">{{ item.titulo }}</div>
-                  <div class="manual-cot-sub">{{ item.descricao }}</div>
+                  <div class="manual-cot-main">{{ item.descricao }}</div>
+                  <div class="manual-cot-sub">
+                    <span class="manual-cot-meta">{{ item.titulo }}</span>
+                    <span v-if="item.municipioUfCompacto && item.municipioUfCompacto !== '-'" class="manual-cot-meta-sep">·</span>
+                    <span v-if="item.municipioUfCompacto && item.municipioUfCompacto !== '-'">{{ item.municipioUfCompacto }}</span>
+                  </div>
                 </td>
                 <td>{{ item.quantidade }}</td>
                 <td class="manual-cell-center">{{ item.uf }}</td>
@@ -240,8 +244,9 @@ async function buscarNoBackend() {
       termo_busca: filtros.descricao.trim(),
       uf: null,
       codigo_modalidade: null,
-      max_paginas: 1,
-      tamanho_pagina: 50,
+      // Busca agressiva para varrer o máximo possível (backend limita teto de segurança).
+      max_paginas: 500,
+      tamanho_pagina: 200,
     });
     if (data?.ok && Array.isArray(data.itens)) {
       resultados.value = data.itens.map((it, idx) => ({
@@ -253,6 +258,7 @@ async function buscarNoBackend() {
         numeroItem: it.numero_item ?? null,
         titulo: it.orgao || 'Órgão não informado',
         descricao: it.descricao_item || it.objeto_resumido || 'Descrição indisponível',
+        municipioUfCompacto: [it.municipio, it.uf].filter(Boolean).join('/') || '-',
         quantidade: `${it.quantidade || '-'} ${it.unidade_medida || ''}`.trim(),
         quantidadeNum: it.quantidade ?? null,
         unidadeMedida: it.unidade_medida || null,
@@ -568,6 +574,15 @@ onMounted(() => {
 .manual-cell-money { white-space: nowrap; font-weight: 700; }
 .manual-cot-main { font-weight: 600; color: #1f4e79; line-height: 1.25; }
 .manual-cot-sub { margin-top: 3px; color: #475569; line-height: 1.3; }
+.manual-cot-meta {
+  display: inline-block;
+  max-width: 560px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+.manual-cot-meta-sep { margin: 0 6px; color: #94a3b8; }
 
 .manual-status {
   display: inline-flex;

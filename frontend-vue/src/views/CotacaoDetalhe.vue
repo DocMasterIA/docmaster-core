@@ -71,7 +71,7 @@
           <div class="cot-formula__subtitle">Aplicada para consolidação</div>
         </div>
         <button type="button" class="cot-formula__select">
-          Média aritmética dos preços obtidos
+          {{ formulaCalculoLabel }}
           <span aria-hidden="true">▾</span>
         </button>
       </section>
@@ -415,6 +415,7 @@ const relatorioTitulo = ref('');
 const relatorioError = ref('');
 const relatorioLoading = ref(false);
 const totalItensSessao = ref(0);
+const formulaCalculoLabel = ref('Média aritmética dos preços obtidos');
 
 const relatorioPreviewTo = computed(() => ({
   name: 'RelatorioPesquisaPrecos',
@@ -621,6 +622,10 @@ async function loadSessionFromBackend() {
       sessaoCriadoPor.value = s.criado_por || '—';
       sessaoCriadoPorEmail.value = (s.criado_por_email || '').trim();
       totalItensSessao.value = Number(s.total_itens) || 0;
+      formulaCalculoLabel.value =
+        s.formula_calculo ||
+        data?.calculo_precos?.formula_label ||
+        'Média aritmética dos preços obtidos';
     }
     if (data?.ok && Array.isArray(data.itens)) {
       let soma = 0;
@@ -655,6 +660,7 @@ async function loadSessionFromBackend() {
     sessaoCriadoPor.value = '—';
     sessaoCriadoPorEmail.value = '';
     totalItensSessao.value = 0;
+    formulaCalculoLabel.value = 'Média aritmética dos preços obtidos';
   } finally {
     isLoading.value = false;
   }

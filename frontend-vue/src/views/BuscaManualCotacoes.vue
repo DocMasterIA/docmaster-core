@@ -30,6 +30,7 @@
           <label class="manual-field">
             <span>Tipo</span>
             <select v-model="filtros.tipo">
+              <option>Todos</option>
               <option>Material</option>
               <option>Serviço</option>
             </select>
@@ -225,7 +226,7 @@ const cotacaoId = computed(() => route.params.cotacaoId || 'CT-2026-00421');
 const filtros = reactive({
   descricao: 'FORFIG',
   periodo: 'Último Ano',
-  tipo: 'Material',
+  tipo: 'Todos',
   modalidade: 'Todas',
   ufs: [],
   ordenarPor: 'Produto',
@@ -369,7 +370,7 @@ const resultadosFiltradosOrdenados = computed(() => {
   if (filtros.periodo) {
     filtrados = filtrados.filter((item) => isWithinPeriodo(item.data, filtros.periodo));
   }
-  if (filtros.tipo) {
+  if (filtros.tipo && filtros.tipo !== 'Todos') {
     const tipoSelecionado = normalizeText(filtros.tipo);
     filtrados = filtrados.filter((item) => normalizeText(resolveTipoItem(item)) === tipoSelecionado);
   }

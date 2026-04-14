@@ -37,14 +37,20 @@
           <label class="manual-field">
             <span>Modalidade</span>
             <select v-model="filtros.modalidade">
+              <option>Todas</option>
               <option>Pregão</option>
               <option>Pregão Eletrônico</option>
+              <option>Pregão Eletrônico SRP</option>
               <option>Compra direta</option>
+              <option>Dispensa Eletrônica</option>
               <option>Concorrência</option>
               <option>Concorrência eletrônica</option>
               <option>Inexigibilidade</option>
               <option>Dispensa</option>
               <option>Chamada Pública</option>
+              <option>Leilão</option>
+              <option>Concurso</option>
+              <option>Diálogo Competitivo</option>
             </select>
           </label>
           <div class="manual-field manual-field--uf">
@@ -219,7 +225,7 @@ const filtros = reactive({
   descricao: 'FORFIG',
   periodo: 'Último Ano',
   tipo: 'Material',
-  modalidade: 'Pregão',
+  modalidade: 'Todas',
   ufs: [],
   ordenarPor: 'Produto',
   ordem: 'Decrescente',
@@ -242,12 +248,17 @@ const ufOptions = [
 const MODALIDADE_TO_CODIGO = {
   Pregão: 8,
   'Pregão Eletrônico': 8,
+  'Pregão Eletrônico SRP': 8,
   Concorrência: 6,
   'Concorrência eletrônica': 6,
   'Chamada Pública': 7,
   Dispensa: 9,
   'Compra direta': 9,
+  'Dispensa Eletrônica': 9,
   Inexigibilidade: 10,
+  Leilão: 11,
+  Concurso: 12,
+  'Diálogo Competitivo': 13,
 };
 
 function toggleUf(code) {
@@ -331,7 +342,7 @@ const resultadosFiltradosOrdenados = computed(() => {
     const tipoSelecionado = normalizeText(filtros.tipo);
     filtrados = filtrados.filter((item) => normalizeText(resolveTipoItem(item)) === tipoSelecionado);
   }
-  if (filtros.modalidade) {
+  if (filtros.modalidade && filtros.modalidade !== 'Todas') {
     const modalidadeSelecionada = normalizeText(filtros.modalidade);
     filtrados = filtrados.filter((item) =>
       normalizeText(item.observacao || '').includes(modalidadeSelecionada)
@@ -385,7 +396,10 @@ async function buscarNoBackend() {
   isSearching.value = true;
   searchError.value = '';
   try {
-    const codigoModalidade = MODALIDADE_TO_CODIGO[filtros.modalidade] ?? null;
+    const codigoModalidade =
+      filtros.modalidade && filtros.modalidade !== 'Todas'
+        ? (MODALIDADE_TO_CODIGO[filtros.modalidade] ?? null)
+        : null;
     const data = await searchLocalItems({
       termo_busca: filtros.descricao.trim(),
       uf: filtros.ufs.length === 1 ? filtros.ufs[0] : null,

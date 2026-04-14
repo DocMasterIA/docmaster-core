@@ -77,9 +77,9 @@
       </section>
 
       <section class="cot-actions">
-        <button type="button" class="cot-btn">
+        <button type="button" class="cot-btn" :disabled="importLoading" @click="openImportSpreadsheet">
           <i class="fa-solid fa-file-arrow-up" aria-hidden="true"></i>
-          Importar Planilha Preenchida
+          {{ importLoading ? 'Importando planilha...' : 'Importar Planilha Preenchida' }}
         </button>
         <button type="button" class="cot-btn">
           <i class="fa-solid fa-file-excel" aria-hidden="true"></i>
@@ -94,6 +94,13 @@
           Gerar relatório PDF
         </button>
       </section>
+      <input
+        ref="importSpreadsheetInput"
+        type="file"
+        accept=".csv,.xlsx"
+        class="cot-hidden-file-input"
+        @change="onImportSpreadsheetSelected"
+      />
 
       <section class="cot-new-item-block">
         <div class="cot-new-item-block__text">
@@ -382,7 +389,13 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { downloadCotacaoRelatorioPdf, getResearchSession, updateResearchSession } from '../services/pncpResearch';
+import {
+  deleteItemsFromResearchSession,
+  downloadCotacaoRelatorioPdf,
+  getResearchSession,
+  importItemsSpreadsheetToResearchSession,
+  updateResearchSession,
+} from '../services/pncpResearch';
 
 const route = useRoute();
 const cotacaoId = computed(() => route.params.cotacaoId || 'CT-2026-00421');
@@ -416,6 +429,8 @@ const relatorioError = ref('');
 const relatorioLoading = ref(false);
 const totalItensSessao = ref(0);
 const formulaCalculoLabel = ref('Média aritmética dos preços obtidos');
+const importLoading = ref(false);
+const importSpreadsheetInput = ref(null);
 
 const relatorioPreviewTo = computed(() => ({
   name: 'RelatorioPesquisaPrecos',
@@ -500,21 +515,35 @@ function cancelDelete() {
   pendingDelete.value = null;
 }
 
-function confirmDelete() {
+async function confirmDelete() {
   const p = pendingDelete.value;
   if (!p) return;
-  if (p.kind === 'bulk') {
-    const remover = new Set(p.ids);
-    linhasMock.value = linhasMock.value.filter((linha) => !remover.has(linha.id));
-    selectedIds.value = new Set();
-  } else {
-    const id = p.row.id;
-    linhasMock.value = linhasMock.value.filter((linha) => linha.id !== id);
-    const next = new Set(selectedIds.value);
-    next.delete(id);
-    selectedIds.value = next;
+  const sessionId = Number(cotacaoId.value);
+  if (Number.isNaN(sessionId)) {
+    loadError.value = 'Cotação inválida para excluir itens.';
+    return;
   }
-  pendingDelete.value = null;
+  const ids = p.kind === 'bulk' ? p.ids : [p.row.id];
+  const itemIds = ids
+    .map((x) => Number(x))
+    .filter((x) => Number.isFinite(x) && x > 0);
+  if (!itemIds.length) {
+    pendingDelete.value = null;
+    return;
+  }
+  loadError.value = '';
+  try {
+    await deleteItemsFromResearchSession(sessionId, itemIds);
+    const remover = new Set(itemIds);
+    linhasMock.value = linhasMock.value.filter((linha) => !remover.has(Number(linha.id)));
+    const next = new Set(selectedIds.value);
+    for (const id of itemIds) next.delete(id);
+    selectedIds.value = next;
+    pendingDelete.value = null;
+    totalItensSessao.value = Math.max(0, totalItensSessao.value - itemIds.length);
+  } catch (err) {
+    loadError.value = `Falha ao excluir item(ns): ${err?.message || 'erro desconhecido'}.`;
+  }
 }
 
 function openRelatorioModal() {
@@ -525,6 +554,50 @@ function openRelatorioModal() {
   relatorioTitulo.value =
     (tituloCotacao.value || '').trim() || `Relatório — cotação ${cotacaoId.value}`;
   relatorioModalOpen.value = true;
+}
+
+function openImportSpreadsheet() {
+  if (importLoading.value) return;
+  importSpreadsheetInput.value?.click();
+}
+
+async function onImportSpreadsheetSelected(event) {
+  const sessionId = Number(cotacaoId.value);
+  const file = event?.target?.files?.[0];
+  event.target.value = '';
+  if (Number.isNaN(sessionId)) {
+    loadError.value = 'Cotação inválida para importação.';
+    return;
+  }
+  if (!file) return;
+  importLoading.value = true;
+  loadError.value = '';
+  try {
+    const res = await importItemsSpreadsheetToResearchSession(sessionId, file, {
+      descricao_item: 'descricao_item',
+      quantidade: 'quantidade',
+      unidade_medida: 'unidade_medida',
+      valor_unitario: 'valor_unitario',
+      numero_item: 'numero_item',
+      numero_pncp: 'numero_pncp',
+      ano_compra: 'ano_compra',
+      sequencial_compra: 'sequencial_compra',
+      orgao: 'orgao',
+      municipio: 'municipio',
+      uf: 'uf',
+      modalidade: 'modalidade',
+    });
+    await loadSessionFromBackend();
+    const invalid = Number(res?.linhas_invalidas || 0);
+    loadError.value =
+      invalid > 0
+        ? `Planilha importada com sucesso: ${res?.itens_inseridos || 0} itens. ${invalid} linha(s) inválida(s).`
+        : '';
+  } catch (err) {
+    loadError.value = `Falha ao importar planilha: ${err?.message || 'erro desconhecido'}. Colunas obrigatórias: descricao_item, quantidade, unidade_medida, valor_unitario.`;
+  } finally {
+    importLoading.value = false;
+  }
 }
 
 function closeRelatorioModal() {
@@ -834,6 +907,7 @@ async function saveTituloNoBackend() {
 .cot-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .cot-btn { border: 1px solid #cfd8e3; border-radius: 10px; background: #fff; color: #1f2937; padding: 7px 12px; font-size: 12px; text-decoration: none; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
 .cot-btn--primary { background: #1f4e79; color: #fff; border-color: #1f4e79; }
+.cot-hidden-file-input { display: none; }
 
 .cot-new-item-block {
   border: 1px solid #d6dde8;

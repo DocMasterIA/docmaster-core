@@ -99,6 +99,35 @@ export function addItemsToResearchSession(sessaoId, itens, signal) {
   });
 }
 
+export function deleteItemsFromResearchSession(sessaoId, itemIds, signal) {
+  return cotacaoRequest(`research/sessions/${encodeURIComponent(sessaoId)}/items/delete`, {
+    method: 'POST',
+    body: { item_ids: itemIds },
+    signal,
+  });
+}
+
+export async function importItemsSpreadsheetToResearchSession(sessaoId, file, columnMap = {}, signal) {
+  const form = new FormData();
+  form.append('arquivo', file);
+  form.append('column_map', JSON.stringify(columnMap || {}));
+
+  const res = await fetch(
+    `${API_BASE}/api/pncp/cotacoes/research/sessions/${encodeURIComponent(sessaoId)}/items/import`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      body: form,
+      signal,
+    },
+  );
+
+  const ctype = (res.headers.get('content-type') || '').toLowerCase();
+  const payload = ctype.includes('application/json') ? await res.json() : await res.text();
+  if (!res.ok) throw new Error(extractErrorMessage(payload, res.status));
+  return payload;
+}
+
 export function searchLocalItems(payload, signal) {
   return researchRequest('local-index/search-items', { method: 'POST', body: payload, signal });
 }

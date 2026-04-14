@@ -25,7 +25,9 @@ from .llm_proxy import llm_proxy
 from .pncp_research_proxy import pncp_research_proxy
 from .pncp_cotacao_api import (
     pncp_research_sessions_add_items,
+    pncp_research_sessions_delete_items,
     pncp_research_sessions_detail,
+    pncp_research_sessions_import_items,
     pncp_research_sessions_list_create,
     pncp_research_sessions_update,
 )
@@ -80,6 +82,16 @@ urlpatterns = [
         'api/pncp/cotacoes/research/sessions/<int:sessao_id>/items',
         pncp_research_sessions_add_items,
         name='api_pncp_cotacoes_session_items',
+    ),
+    path(
+        'api/pncp/cotacoes/research/sessions/<int:sessao_id>/items/import',
+        pncp_research_sessions_import_items,
+        name='api_pncp_cotacoes_session_items_import',
+    ),
+    path(
+        'api/pncp/cotacoes/research/sessions/<int:sessao_id>/items/delete',
+        pncp_research_sessions_delete_items,
+        name='api_pncp_cotacoes_session_items_delete',
     ),
     path(
         'api/pncp/cotacoes/research/sessions/<int:sessao_id>/relatorio/pdf',

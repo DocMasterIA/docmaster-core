@@ -457,7 +457,15 @@ async function buscarNoBackend() {
       tamanho_pagina: 200,
     });
     if (data?.ok && Array.isArray(data.itens)) {
-      resultados.value = data.itens.map((it, idx) => ({
+      resultados.value = data.itens
+        .filter((it) => {
+          const vu = Number(it?.valor_unitario);
+          const vt = Number(it?.valor_total);
+          const v = Number.isFinite(vu) ? vu : (Number.isFinite(vt) ? vt : null);
+          // Não exibe itens zerados (R$ 0,00) na busca manual.
+          return v == null || v > 0;
+        })
+        .map((it, idx) => ({
         id: `backend-${idx}-${it.numero_pncp || ''}`,
         sourceRaw: it,
         numeroPncp: it.numero_pncp || null,

@@ -9,6 +9,9 @@ from __future__ import annotations
 import json
 import math
 import re
+import csv
+import io
+import unicodedata
 from datetime import timezone as dt_timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -78,6 +81,35 @@ _SOURCE_KEEP_KEYS = frozenset(
     }
 )
 
+IMPORT_REQUIRED_COLUMN_IDS = ("descricao_item", "quantidade", "unidade_medida", "valor_unitario")
+IMPORT_OPTIONAL_COLUMN_IDS = (
+    "numero_item",
+    "numero_pncp",
+    "ano_compra",
+    "sequencial_compra",
+    "orgao",
+    "municipio",
+    "uf",
+    "modalidade",
+)
+_IMPORT_ALLOWED_IDS = frozenset(IMPORT_REQUIRED_COLUMN_IDS + IMPORT_OPTIONAL_COLUMN_IDS)
+_IMPORT_ALIASES = {
+    "id_item": "numero_item",
+    "item_id": "numero_item",
+    "item": "numero_item",
+    "descricao": "descricao_item",
+    "descricaoitem": "descricao_item",
+    "qtd": "quantidade",
+    "unidade": "unidade_medida",
+    "unidade_medida": "unidade_medida",
+    "valor": "valor_unitario",
+    "valor_unitario": "valor_unitario",
+    "valorunitario": "valor_unitario",
+    "numeropncp": "numero_pncp",
+    "ano": "ano_compra",
+    "sequencial": "sequencial_compra",
+}
+
 
 def _iso_z(dt) -> Optional[str]:
     if dt is None:
@@ -103,6 +135,106 @@ def _parse_json_body(request: HttpRequest) -> Tuple[Optional[Dict[str, Any]], Op
     if not isinstance(data, dict):
         return None, JsonResponse({"detail": "JSON raiz deve ser um objeto."}, status=422)
     return data, None
+
+
+def _normalize_column_id(v: Any) -> str:
+    s = str(v or "").strip().lower()
+    if not s:
+        return ""
+    s = "".join(ch for ch in unicodedata.normalize("NFD", s) if unicodedata.category(ch) != "Mn")
+    s = re.sub(r"[^a-z0-9]+", "_", s).strip("_")
+    s = _IMPORT_ALIASES.get(s, s)
+    return s
+
+
+def _parse_column_map_raw(raw: str) -> Dict[str, str]:
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    out: Dict[str, str] = {}
+    for key, value in data.items():
+        k = _normalize_column_id(key)
+        v = _normalize_column_id(value)
+        if k in _IMPORT_ALLOWED_IDS and v:
+            out[k] = v
+    return out
+
+
+def _read_rows_from_upload(upload) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+    name = str(getattr(upload, "name", "")).lower()
+    if name.endswith(".csv"):
+        content = upload.read()
+        text = content.decode("utf-8-sig", errors="replace")
+        reader = csv.DictReader(io.StringIO(text))
+        return [dict(r) for r in reader], None
+
+    if name.endswith(".xlsx"):
+        try:
+            from openpyxl import load_workbook
+        except Exception:
+            return [], "Leitura XLSX indisponível. Instale 'openpyxl' no backend ou envie CSV do Google Sheets."
+        wb = load_workbook(filename=upload, read_only=True, data_only=True)
+        ws = wb.active
+        rows_iter = ws.iter_rows(values_only=True)
+        try:
+            header = next(rows_iter)
+        except StopIteration:
+            return [], None
+        header_vals = [str(c or "").strip() for c in header]
+        out_rows: List[Dict[str, Any]] = []
+        for row in rows_iter:
+            d: Dict[str, Any] = {}
+            for i, h in enumerate(header_vals):
+                if not h:
+                    continue
+                d[h] = row[i] if i < len(row) else None
+            out_rows.append(d)
+        return out_rows, None
+
+    return [], "Formato inválido. Envie arquivo .csv ou .xlsx."
+
+
+def _build_items_from_import_rows(rows: List[Dict[str, Any]], column_map: Dict[str, str]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    items: List[Dict[str, Any]] = []
+    errors: List[Dict[str, Any]] = []
+    for idx, row in enumerate(rows, start=2):
+        src = row if isinstance(row, dict) else {}
+        normalized_row = {_normalize_column_id(k): v for k, v in src.items()}
+        it: Dict[str, Any] = {}
+        for cid in IMPORT_REQUIRED_COLUMN_IDS + IMPORT_OPTIONAL_COLUMN_IDS:
+            source_key = column_map.get(cid) or cid
+            source_key = _normalize_column_id(source_key)
+            val = normalized_row.get(source_key)
+            if val is None and source_key != cid:
+                val = normalized_row.get(cid)
+            it[cid] = val
+
+        desc = str(it.get("descricao_item") or "").strip()
+        if not desc:
+            errors.append({"row": idx, "error": "descricao_item obrigatório"})
+            continue
+        item_payload = {
+            "numero_item": str(it.get("numero_item") or "").strip(),
+            "descricao_item": desc,
+            "quantidade": _safe_float(it.get("quantidade")),
+            "unidade_medida": str(it.get("unidade_medida") or "").strip(),
+            "valor_unitario": _safe_float(it.get("valor_unitario")),
+            "numero_pncp": str(it.get("numero_pncp") or "").strip(),
+            "ano_compra": _safe_int_field(it.get("ano_compra"), min_v=1990, max_v=2100),
+            "sequencial_compra": _safe_int_field(it.get("sequencial_compra"), min_v=1, max_v=2_147_483_647),
+            "orgao": str(it.get("orgao") or "").strip(),
+            "municipio": str(it.get("municipio") or "").strip(),
+            "uf": _normalize_uf(it.get("uf")),
+            "modalidade": str(it.get("modalidade") or "").strip(),
+            "origem": "planilha_manual",
+        }
+        items.append(item_payload)
+    return items, errors
 
 
 def _safe_float(v: Any) -> Optional[float]:
@@ -626,3 +758,104 @@ def pncp_research_sessions_add_items(request, sessao_id: int):
         c.save(update_fields=["updated_at"])
 
     return JsonResponse({"ok": True, "sessao_id": c.id, "itens_inseridos": inserted})
+
+
+@api_login_required
+@csrf_exempt
+@require_http_methods(["POST", "OPTIONS"])
+def pncp_research_sessions_import_items(request, sessao_id: int):
+    if request.method == "OPTIONS":
+        return JsonResponse({}, status=204)
+
+    upload = request.FILES.get("arquivo")
+    if not upload:
+        return JsonResponse({"detail": "Envie o arquivo em 'arquivo'."}, status=422)
+
+    column_map = _parse_column_map_raw(request.POST.get("column_map", ""))
+    rows, read_err = _read_rows_from_upload(upload)
+    if read_err:
+        return JsonResponse({"detail": read_err}, status=422)
+    if not rows:
+        return JsonResponse({"detail": "Arquivo sem linhas de dados."}, status=422)
+
+    items_payload, parse_errors = _build_items_from_import_rows(rows, column_map)
+    if not items_payload:
+        return JsonResponse(
+            {"detail": "Nenhuma linha válida encontrada para importar.", "errors": parse_errors[:20]},
+            status=422,
+        )
+
+    inserted = 0
+    with transaction.atomic():
+        c = _cotacao_qs_for_user(request.user).select_for_update().filter(pk=sessao_id).first()
+        if not c:
+            return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
+        if c.status in CLOSED_FOR_ITEMS:
+            return JsonResponse(
+                {"detail": "Cotação encerrada; não é permitido importar itens."},
+                status=409,
+            )
+
+        built = [_item_from_payload(it, c) for it in items_payload]
+        for i in range(0, len(built), BULK_CREATE_BATCH):
+            chunk = built[i : i + BULK_CREATE_BATCH]
+            PncpCotacaoItem.objects.bulk_create(chunk, batch_size=BULK_CREATE_BATCH)
+        inserted = len(built)
+        c.save(update_fields=["updated_at"])
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "sessao_id": c.id,
+            "itens_inseridos": inserted,
+            "linhas_arquivo": len(rows),
+            "linhas_invalidas": len(parse_errors),
+            "errors": parse_errors[:20],
+            "required_column_ids": list(IMPORT_REQUIRED_COLUMN_IDS),
+        }
+    )
+
+
+@api_login_required
+@csrf_exempt
+@require_http_methods(["POST", "OPTIONS"])
+def pncp_research_sessions_delete_items(request, sessao_id: int):
+    if request.method == "OPTIONS":
+        return JsonResponse({}, status=204)
+
+    body, err = _parse_json_body(request)
+    if err:
+        return err
+
+    raw_ids = body.get("item_ids")
+    if not isinstance(raw_ids, list) or not raw_ids:
+        return JsonResponse({"detail": "Campo item_ids deve ser uma lista não vazia."}, status=422)
+
+    ids: List[int] = []
+    for v in raw_ids[:MAX_ITEMS_PER_REQUEST]:
+        try:
+            i = int(v)
+        except (TypeError, ValueError):
+            continue
+        if i > 0:
+            ids.append(i)
+    if not ids:
+        return JsonResponse({"detail": "Nenhum item_id válido informado."}, status=422)
+
+    with transaction.atomic():
+        c = _cotacao_qs_for_user(request.user).select_for_update().filter(pk=sessao_id).first()
+        if not c:
+            return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
+        if c.status in CLOSED_FOR_ITEMS:
+            return JsonResponse(
+                {"detail": "Cotação encerrada; não é permitido excluir itens."},
+                status=409,
+            )
+
+        qs = c.itens.filter(id__in=ids)
+        deleted_count, _ = qs.delete()
+        c.save(update_fields=["updated_at"])
+
+    return JsonResponse(
+        {"ok": True, "sessao_id": c.id, "itens_excluidos": int(deleted_count), "item_ids": ids}
+    )

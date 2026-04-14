@@ -201,13 +201,18 @@ def _compact_item_source(it: Dict[str, Any]) -> Dict[str, Any]:
 
 def _usuario_criacao_snapshot(user) -> tuple[str, str]:
     """Nome e e-mail exibidos na cotação (snapshot no create)."""
-    get_full_name = getattr(user, "get_full_name", None)
     nome = ""
-    if callable(get_full_name):
-        try:
-            nome = (get_full_name() or "").strip()
-        except Exception:
-            nome = ""
+    first = (getattr(user, "first_name", None) or "").strip()
+    last = (getattr(user, "last_name", None) or "").strip()
+    if first or last:
+        nome = f"{first} {last}".strip()
+    if not nome:
+        get_full_name = getattr(user, "get_full_name", None)
+        if callable(get_full_name):
+            try:
+                nome = (get_full_name() or "").strip()
+            except Exception:
+                nome = ""
     email = (getattr(user, "email", None) or "").strip()
     if not nome:
         nome = email or str(user.pk)
@@ -251,10 +256,7 @@ def _create_cotacao_with_snapshot_fallback(
 
 
 def _cotacao_qs_for_user(user):
-    qs = PncpCotacao.objects.all()
-    if user.is_superuser:
-        return qs
-    return qs.filter(usuario_id=user.id)
+    return PncpCotacao.objects.filter(usuario_id=user.id)
 
 
 def _safe_prefeitura_id_for_user(user) -> Optional[int]:
@@ -286,13 +288,18 @@ def _sessao_dict(c: PncpCotacao, *, include_owner: bool = False) -> Dict[str, An
         u = c.usuario
         snap_nome = (getattr(c, "criado_por_nome", None) or "").strip()
         snap_email = (getattr(c, "criado_por_email", None) or "").strip()
-        get_full_name = getattr(u, "get_full_name", None)
         full_name = ""
-        if callable(get_full_name):
-            try:
-                full_name = (get_full_name() or "").strip()
-            except Exception:
-                full_name = ""
+        first = (getattr(u, "first_name", None) or "").strip()
+        last = (getattr(u, "last_name", None) or "").strip()
+        if first or last:
+            full_name = f"{first} {last}".strip()
+        if not full_name:
+            get_full_name = getattr(u, "get_full_name", None)
+            if callable(get_full_name):
+                try:
+                    full_name = (get_full_name() or "").strip()
+                except Exception:
+                    full_name = ""
         out["criado_por"] = snap_nome or full_name or getattr(u, "email", "") or str(u.pk)
         out["criado_por_email"] = snap_email or (getattr(u, "email", None) or "").strip()
     return out
@@ -454,10 +461,18 @@ def pncp_research_sessions_list_create(request):
 
 @api_login_required
 @csrf_exempt
-@require_http_methods(["GET", "OPTIONS"])
+@require_http_methods(["GET", "DELETE", "OPTIONS"])
 def pncp_research_sessions_detail(request, sessao_id: int):
     if request.method == "OPTIONS":
         return JsonResponse({}, status=204)
+
+    if request.method == "DELETE":
+        with transaction.atomic():
+            c = _cotacao_qs_for_user(request.user).select_for_update().filter(pk=sessao_id).first()
+            if not c:
+                return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
+            c.delete()
+        return JsonResponse({"ok": True, "sessao_id": sessao_id, "deleted": True})
 
     c = _cotacao_qs_for_user(request.user).select_related("usuario").filter(pk=sessao_id).first()
     if not c:

@@ -84,6 +84,13 @@ export function updateResearchSession(sessaoId, payload, signal) {
   });
 }
 
+export function deleteResearchSession(sessaoId, signal) {
+  return cotacaoRequest(`research/sessions/${encodeURIComponent(sessaoId)}`, {
+    method: 'DELETE',
+    signal,
+  });
+}
+
 export function addItemsToResearchSession(sessaoId, itens, signal) {
   return cotacaoRequest(`research/sessions/${encodeURIComponent(sessaoId)}/items`, {
     method: 'POST',

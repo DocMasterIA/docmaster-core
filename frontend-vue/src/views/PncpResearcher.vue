@@ -102,8 +102,8 @@
             <button type="button" class="pncp-modal__btn pncp-modal__btn--ghost" @click="cancelDelete">
               Cancelar
             </button>
-            <button type="button" class="pncp-modal__btn pncp-modal__btn--danger" @click="confirmDelete">
-              Excluir
+            <button type="button" class="pncp-modal__btn pncp-modal__btn--danger" :disabled="isDeleting" @click="confirmDelete">
+              {{ isDeleting ? 'Excluindo...' : 'Excluir' }}
             </button>
           </div>
         </div>
@@ -163,13 +163,19 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { createResearchSession, fetchCurrentUser, listResearchSessions } from '../services/pncpResearch';
+import {
+  createResearchSession,
+  deleteResearchSession,
+  fetchCurrentUser,
+  listResearchSessions,
+} from '../services/pncpResearch';
 
 const router = useRouter();
 const mockQuery = ref('');
 const mockStatusFilter = ref('todos');
 const isLoading = ref(false);
 const isCreating = ref(false);
+const isDeleting = ref(false);
 const loadError = ref('');
 const mockRows = ref([]);
 
@@ -296,11 +302,20 @@ function cancelDelete() {
   pendingDelete.value = null;
 }
 
-function confirmDelete() {
+async function confirmDelete() {
   if (!pendingDelete.value) return;
-  const id = pendingDelete.value.id;
-  mockRows.value = mockRows.value.filter((r) => r.id !== id);
-  pendingDelete.value = null;
+  const row = pendingDelete.value;
+  isDeleting.value = true;
+  loadError.value = '';
+  try {
+    await deleteResearchSession(row.id);
+    mockRows.value = mockRows.value.filter((r) => r.id !== row.id);
+    pendingDelete.value = null;
+  } catch (err) {
+    loadError.value = `Falha ao excluir cotação (${err.message || 'erro desconhecido'}).`;
+  } finally {
+    isDeleting.value = false;
+  }
 }
 
 let escHandler = null;

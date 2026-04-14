@@ -47,6 +47,34 @@
               <option>Chamada Pública</option>
             </select>
           </label>
+          <div class="manual-field manual-field--uf">
+            <span>UF</span>
+            <details class="manual-uf-dropdown">
+              <summary class="manual-uf-dropdown__summary">
+                <span>{{ selectedUfLabel }}</span>
+                <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+              </summary>
+              <div class="manual-uf-dropdown__menu" role="group" aria-label="Selecionar UFs">
+                <label class="manual-uf-dropdown__item manual-uf-dropdown__item--all">
+                  <input
+                    type="checkbox"
+                    :checked="allUfsSelected"
+                    :indeterminate.prop="isPartiallySelectedUf"
+                    @change="toggleAllUfs"
+                  />
+                  <span>Todos os estados</span>
+                </label>
+                <label v-for="uf in ufOptions" :key="uf.code" class="manual-uf-dropdown__item">
+                  <input
+                    type="checkbox"
+                    :checked="filtros.ufs.includes(uf.code)"
+                    @change="toggleUf(uf.code)"
+                  />
+                  <span>{{ uf.code }} - {{ uf.name }}</span>
+                </label>
+              </div>
+            </details>
+          </div>
           <button type="button" class="manual-btn-search" @click="buscarNoBackend">Buscar</button>
         </div>
         <div class="manual-local-db-row">
@@ -105,7 +133,7 @@
       </section>
 
       <section class="manual-summary">
-        <div class="manual-summary-card"><span>Resultados</span><strong>{{ resultados.length }}</strong></div>
+        <div class="manual-summary-card"><span>Resultados</span><strong>{{ resultadosFiltradosOrdenados.length }}</strong></div>
         <div class="manual-summary-card"><span>Selecionados</span><strong>{{ totalSelecionados }}</strong></div>
         <div class="manual-summary-card"><span>Valor médio</span><strong>{{ mediaValor }}</strong></div>
         <div class="manual-summary-card"><span>UFs distintas</span><strong>{{ totalUfs }}</strong></div>
@@ -120,8 +148,13 @@
             <i class="fa-solid fa-plus" aria-hidden="true"></i>
             Adicionar itens na cotação {{ cotacaoId }}
           </RouterLink>
-          <button type="button" class="manual-add-cotacao-btn" @click="adicionarSelecionadosNaCotacao">
-            Salvar selecionados
+          <button
+            type="button"
+            class="manual-add-cotacao-btn"
+            :disabled="isSavingSelecionados || totalSelecionados === 0"
+            @click="adicionarSelecionadosNaCotacao"
+          >
+            {{ isSavingSelecionados ? 'Salvando...' : 'Salvar selecionados' }}
           </button>
         </div>
         <p v-if="saveMessage" class="manual-meta">{{ saveMessage }}</p>
@@ -140,7 +173,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in resultados" :key="item.id">
+              <tr v-for="item in resultadosFiltradosOrdenados" :key="item.id">
                 <td class="manual-cell-center">
                   <input type="checkbox" :checked="item.selecionado" @change="toggleSelecionado(item.id)" />
                 </td>
@@ -187,11 +220,51 @@ const filtros = reactive({
   periodo: 'Último Ano',
   tipo: 'Material',
   modalidade: 'Pregão',
+  ufs: [],
   ordenarPor: 'Produto',
   ordem: 'Decrescente',
   valorBase: '15,00',
   variacao: '20',
 });
+
+const ufOptions = [
+  { code: 'AC', name: 'Acre' }, { code: 'AL', name: 'Alagoas' }, { code: 'AP', name: 'Amapá' },
+  { code: 'AM', name: 'Amazonas' }, { code: 'BA', name: 'Bahia' }, { code: 'CE', name: 'Ceará' },
+  { code: 'DF', name: 'Distrito Federal' }, { code: 'ES', name: 'Espírito Santo' }, { code: 'GO', name: 'Goiás' },
+  { code: 'MA', name: 'Maranhão' }, { code: 'MT', name: 'Mato Grosso' }, { code: 'MS', name: 'Mato Grosso do Sul' },
+  { code: 'MG', name: 'Minas Gerais' }, { code: 'PA', name: 'Pará' }, { code: 'PB', name: 'Paraíba' },
+  { code: 'PR', name: 'Paraná' }, { code: 'PE', name: 'Pernambuco' }, { code: 'PI', name: 'Piauí' },
+  { code: 'RJ', name: 'Rio de Janeiro' }, { code: 'RN', name: 'Rio Grande do Norte' }, { code: 'RS', name: 'Rio Grande do Sul' },
+  { code: 'RO', name: 'Rondônia' }, { code: 'RR', name: 'Roraima' }, { code: 'SC', name: 'Santa Catarina' },
+  { code: 'SP', name: 'São Paulo' }, { code: 'SE', name: 'Sergipe' }, { code: 'TO', name: 'Tocantins' },
+];
+
+const MODALIDADE_TO_CODIGO = {
+  Pregão: 8,
+  'Pregão Eletrônico': 8,
+  Concorrência: 6,
+  'Concorrência eletrônica': 6,
+  'Chamada Pública': 7,
+  Dispensa: 9,
+  'Compra direta': 9,
+  Inexigibilidade: 10,
+};
+
+function toggleUf(code) {
+  if (filtros.ufs.includes(code)) {
+    filtros.ufs = filtros.ufs.filter((uf) => uf !== code);
+    return;
+  }
+  filtros.ufs = [...filtros.ufs, code];
+}
+
+function toggleAllUfs(event) {
+  if (event.target.checked) {
+    filtros.ufs = ufOptions.map((uf) => uf.code);
+    return;
+  }
+  filtros.ufs = [];
+}
 
 function onVariacaoInput(event) {
   const raw = String(event.target.value || '');
@@ -212,14 +285,86 @@ const searchError = ref('');
 const saveMessage = ref('');
 const localStats = ref(null);
 const isBackfilling = ref(false);
+const isSavingSelecionados = ref(false);
 const totalSelecionados = computed(() => resultados.value.filter((x) => x.selecionado).length);
-const totalUfs = computed(() => new Set(resultados.value.map((x) => x.uf).filter(Boolean)).size);
+const totalUfs = computed(() => new Set(resultadosFiltradosOrdenados.value.map((x) => x.uf).filter(Boolean)).size);
 const mediaValor = computed(() => {
-  const nums = resultados.value.map((x) => parseMoeda(x.valor)).filter((x) => typeof x === 'number');
+  const nums = resultadosFiltradosOrdenados.value.map((x) => parseMoeda(x.valor)).filter((x) => typeof x === 'number');
   if (!nums.length) return 'R$ -';
   return formatCurrency(nums.reduce((a, b) => a + b, 0) / nums.length);
 });
 const totalItensBaseLocal = computed(() => Number(localStats.value?.total_itens || 0));
+const selectedUfLabel = computed(() => {
+  if (!filtros.ufs.length) return 'Selecionar UFs';
+  if (filtros.ufs.length <= 3) return filtros.ufs.join(', ');
+  return `${filtros.ufs.length} UFs selecionadas`;
+});
+const allUfsSelected = computed(() => filtros.ufs.length === ufOptions.length);
+const isPartiallySelectedUf = computed(
+  () => filtros.ufs.length > 0 && filtros.ufs.length < ufOptions.length,
+);
+
+const resultadosFiltradosOrdenados = computed(() => {
+  const base = [...resultados.value];
+  const valorBase = parseMoeda(filtros.valorBase);
+  const variacao = Number.parseFloat(String(filtros.variacao || '0'));
+  const variacaoValida = Number.isFinite(variacao) ? Math.max(0, variacao) : 0;
+
+  let filtrados = base;
+  if (valorBase != null && valorBase > 0) {
+    const min = valorBase * (1 - variacaoValida / 100);
+    const max = valorBase * (1 + variacaoValida / 100);
+    filtrados = base.filter((item) => {
+      const v = parseMoeda(item.valor);
+      if (v == null) return false;
+      return v >= min && v <= max;
+    });
+  }
+  if (filtros.ufs.length > 0 && filtros.ufs.length < ufOptions.length) {
+    const selected = new Set(filtros.ufs);
+    filtrados = filtrados.filter((item) => selected.has(String(item.uf || '').toUpperCase()));
+  }
+  if (filtros.periodo) {
+    filtrados = filtrados.filter((item) => isWithinPeriodo(item.data, filtros.periodo));
+  }
+  if (filtros.tipo) {
+    const tipoSelecionado = normalizeText(filtros.tipo);
+    filtrados = filtrados.filter((item) => normalizeText(resolveTipoItem(item)) === tipoSelecionado);
+  }
+  if (filtros.modalidade) {
+    const modalidadeSelecionada = normalizeText(filtros.modalidade);
+    filtrados = filtrados.filter((item) =>
+      normalizeText(item.observacao || '').includes(modalidadeSelecionada)
+    );
+  }
+
+  const ordem = filtros.ordem === 'Crescente' ? 1 : -1;
+  const byText = (a, b, pick) => String(pick(a) || '').localeCompare(String(pick(b) || ''), 'pt-BR');
+  const byNumber = (a, b, pick) => {
+    const av = Number(pick(a));
+    const bv = Number(pick(b));
+    const ax = Number.isFinite(av) ? av : Number.POSITIVE_INFINITY;
+    const bx = Number.isFinite(bv) ? bv : Number.POSITIVE_INFINITY;
+    return ax - bx;
+  };
+
+  filtrados.sort((a, b) => {
+    let cmp = 0;
+    if (filtros.ordenarPor === 'Quantidade') {
+      cmp = byNumber(a, b, (x) => x.quantidadeNum);
+    } else if (filtros.ordenarPor === 'Valor') {
+      cmp = byNumber(a, b, (x) => parseMoeda(x.valor));
+    } else if (filtros.ordenarPor === 'UF') {
+      cmp = byText(a, b, (x) => x.uf);
+    } else {
+      cmp = byText(a, b, (x) => x.descricao);
+    }
+    if (cmp === 0) cmp = byText(a, b, (x) => x.descricao);
+    return cmp * ordem;
+  });
+
+  return filtrados;
+});
 
 async function carregarStatusBaseLocal() {
   try {
@@ -240,10 +385,11 @@ async function buscarNoBackend() {
   isSearching.value = true;
   searchError.value = '';
   try {
+    const codigoModalidade = MODALIDADE_TO_CODIGO[filtros.modalidade] ?? null;
     const data = await searchLocalItems({
       termo_busca: filtros.descricao.trim(),
-      uf: null,
-      codigo_modalidade: null,
+      uf: filtros.ufs.length === 1 ? filtros.ufs[0] : null,
+      codigo_modalidade: codigoModalidade,
       // Busca agressiva para varrer o máximo possível (backend limita teto de segurança).
       max_paginas: 500,
       tamanho_pagina: 200,
@@ -308,34 +454,92 @@ function formatCurrency(v) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+function toNullableText(v) {
+  const s = String(v ?? '').trim();
+  if (!s || s === '-' || s === '—') return null;
+  return s;
+}
+
+function normalizeText(v) {
+  return String(v ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function parseDateFlexible(v) {
+  const s = String(v ?? '').trim();
+  if (!s) return null;
+  const br = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (br) {
+    const d = new Date(Number(br[3]), Number(br[2]) - 1, Number(br[1]));
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function isWithinPeriodo(itemDate, periodoLabel) {
+  const dt = parseDateFlexible(itemDate);
+  if (!dt) return true;
+  const now = new Date();
+  const label = normalizeText(periodoLabel);
+  let months = 12;
+  if (label.includes('mes') && label.includes('ultimo') && !label.includes('3') && !label.includes('6')) {
+    months = 1;
+  } else if (label.includes('3')) {
+    months = 3;
+  } else if (label.includes('6')) {
+    months = 6;
+  } else if (label.includes('ano') || label.includes('12')) {
+    months = 12;
+  }
+  const cutoff = new Date(now);
+  cutoff.setMonth(cutoff.getMonth() - months);
+  return dt >= cutoff;
+}
+
+function resolveTipoItem(item) {
+  const materialServico = normalizeText(item?.sourceRaw?.material_servico || '');
+  if (materialServico.includes('servico') || materialServico.includes('serviço')) return 'Servico';
+  if (materialServico.includes('material')) return 'Material';
+  const desc = normalizeText(item?.descricao || '');
+  if (desc.includes('servico') || desc.includes('serviço')) return 'Servico';
+  return 'Material';
+}
+
 function toggleSelecionado(id) {
   resultados.value = resultados.value.map((r) => (r.id === id ? { ...r, selecionado: !r.selecionado } : r));
 }
 
 async function adicionarSelecionadosNaCotacao() {
+  if (isSavingSelecionados.value) return;
   const sessionId = Number(cotacaoId.value);
   if (Number.isNaN(sessionId)) {
     saveMessage.value = 'Cotação inválida para salvar no backend.';
     return;
   }
+  saveMessage.value = '';
   const itens = resultados.value
     .filter((r) => r.selecionado)
     .map((r) => ({
       ...(r.sourceRaw || {}),
-      numero_pncp: r.numeroPncp,
+      numero_pncp: toNullableText(r.numeroPncp),
       ano_compra: r.anoCompra,
       sequencial_compra: r.sequencialCompra,
-      numero_item: r.numeroItem,
-      descricao_item: r.descricao,
+      numero_item: toNullableText(r.numeroItem),
+      descricao_item: toNullableText(r.descricao),
       quantidade: r.quantidadeNum,
-      unidade_medida: r.unidadeMedida,
+      unidade_medida: toNullableText(r.unidadeMedida),
       valor_unitario: r.valorUnitario ?? parseMoeda(r.valor),
       valor_total: r.valorTotal,
-      orgao: r.titulo,
-      municipio: r.municipio,
-      uf: r.uf,
-      modalidade: r.observacao,
-    }));
+      orgao: toNullableText(r.titulo),
+      municipio: toNullableText(r.municipio),
+      uf: toNullableText(r.uf),
+      modalidade: toNullableText(r.observacao),
+    }))
+    .filter((it) => !!it.descricao_item || !!it.numero_pncp || (it.ano_compra != null && it.sequencial_compra != null));
   if (!itens.length) {
     saveMessage.value = 'Selecione ao menos um item.';
     return;
@@ -346,16 +550,29 @@ async function adicionarSelecionadosNaCotacao() {
     enviar = itens.slice(0, MAX_ITENS_POR_ENVIO);
     saveMessage.value = `Limite de ${MAX_ITENS_POR_ENVIO} itens por envio; gravando os primeiros ${MAX_ITENS_POR_ENVIO}.`;
   }
+  isSavingSelecionados.value = true;
   try {
     const res = await addItemsToResearchSession(sessionId, enviar);
-    saveMessage.value = `${res.itens_inseridos ?? enviar.length} item(ns) adicionados à cotação.`;
+    const totalInseridos = Number(res.itens_inseridos ?? enviar.length);
+    saveMessage.value = `${totalInseridos} item(ns) adicionados à cotação ${sessionId}.`;
+    if (totalInseridos > 0) {
+      resultados.value = resultados.value.map((r) => (r.selecionado ? { ...r, selecionado: false } : r));
+    }
   } catch (err) {
     saveMessage.value = `Falha ao salvar: ${err.message || 'erro desconhecido'}`;
+  } finally {
+    isSavingSelecionados.value = false;
   }
 }
 
 function parseMoeda(v) {
-  const n = Number(String(v || '').replace(/[^\d,.-]/g, '').replace(',', '.'));
+  const raw = String(v ?? '').trim();
+  if (!raw) return null;
+  const normalized = raw
+    .replace(/[^\d,.-]/g, '')
+    .replace(/\./g, '')
+    .replace(',', '.');
+  const n = Number(normalized);
   return Number.isNaN(n) ? null : n;
 }
 
@@ -399,6 +616,7 @@ onMounted(() => {
 
 .manual-field { border: 1px solid #d6dde8; border-radius: 10px; background: #f8fafc; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; min-width: 170px; }
 .manual-field--grow { flex: 1 1 320px; }
+.manual-field--uf { min-width: 220px; }
 .manual-field span { font-size: 10px; text-transform: uppercase; color: #64748b; }
 .manual-meta { margin: 0; font-size: 12px; color: #64748b; }
 .manual-meta--error { color: #b91c1c; }
@@ -465,6 +683,61 @@ onMounted(() => {
 
 .manual-btn-backfill:disabled {
   opacity: 0.7;
+}
+
+.manual-uf-dropdown {
+  position: relative;
+}
+
+.manual-uf-dropdown__summary {
+  list-style: none;
+  border: 1px solid #cfd8e3;
+  border-radius: 8px;
+  background: #fff;
+  padding: 7px 9px;
+  font-size: 13px;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.manual-uf-dropdown__summary::-webkit-details-marker {
+  display: none;
+}
+
+.manual-uf-dropdown__menu {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 320px;
+  max-height: 280px;
+  overflow: auto;
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+  padding: 8px;
+  display: grid;
+  gap: 4px;
+}
+
+.manual-uf-dropdown__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #334155;
+  padding: 4px;
+}
+
+.manual-uf-dropdown__item--all {
+  border-bottom: 1px solid #e8edf4;
+  margin-bottom: 4px;
+  padding-bottom: 8px;
 }
 /* Mantem o bloco de ordenacao/valor em linha (cards lado a lado) */
 .manual-controls {

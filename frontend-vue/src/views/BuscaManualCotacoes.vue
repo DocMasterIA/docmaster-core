@@ -146,6 +146,9 @@
         <div class="manual-summary-card"><span>Valor médio</span><strong>{{ mediaValor }}</strong></div>
         <div class="manual-summary-card"><span>UFs distintas</span><strong>{{ totalUfs }}</strong></div>
       </section>
+      <p v-if="faixaValorAtiva" class="manual-meta">
+        Faixa ativa por Valor Base + Variação: <strong>{{ faixaValorAtiva }}</strong>
+      </p>
 
       <section class="manual-results-table-shell">
         <div class="manual-results-head">
@@ -337,6 +340,15 @@ const mediaValor = computed(() => {
   return formatCurrency(nums.reduce((a, b) => a + b, 0) / nums.length);
 });
 const totalItensBaseLocal = computed(() => Number(localStats.value?.total_itens || 0));
+const faixaValorAtiva = computed(() => {
+  const base = parseMoeda(filtros.valorBase);
+  if (base == null || base <= 0) return '';
+  const p = Number.parseFloat(String(filtros.variacao || '0'));
+  const perc = Number.isFinite(p) ? Math.max(0, p) : 0;
+  const min = base * (1 - perc / 100);
+  const max = base * (1 + perc / 100);
+  return `${formatCurrency(min)} até ${formatCurrency(max)} (${perc}% para baixo/cima)`;
+});
 const selectedUfLabel = computed(() => {
   if (!filtros.ufs.length) return 'Selecionar UFs';
   if (filtros.ufs.length <= 3) return filtros.ufs.join(', ');
@@ -355,11 +367,15 @@ const resultadosFiltradosOrdenados = computed(() => {
 
   let filtrados = base;
   if (valorBase != null && valorBase > 0) {
-    const min = valorBase * (1 - variacaoValida / 100);
-    const max = valorBase * (1 + variacaoValida / 100);
+    const fator = variacaoValida / 100;
+    const min = valorBase * (1 - fator);
+    const max = valorBase * (1 + fator);
     filtrados = base.filter((item) => {
-      const v = parseMoeda(item.valor);
+      // Usa valor numérico bruto do item para evitar ruído de formatação.
+      const vBruto = item.valorUnitario ?? item.valorTotal ?? parseMoeda(item.valor);
+      const v = Number(vBruto);
       if (v == null) return false;
+      if (!Number.isFinite(v)) return false;
       return v >= min && v <= max;
     });
   }

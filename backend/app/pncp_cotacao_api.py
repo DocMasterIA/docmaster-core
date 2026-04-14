@@ -201,7 +201,13 @@ def _compact_item_source(it: Dict[str, Any]) -> Dict[str, Any]:
 
 def _usuario_criacao_snapshot(user) -> tuple[str, str]:
     """Nome e e-mail exibidos na cotação (snapshot no create)."""
-    nome = (user.get_full_name() or "").strip()
+    get_full_name = getattr(user, "get_full_name", None)
+    nome = ""
+    if callable(get_full_name):
+        try:
+            nome = (get_full_name() or "").strip()
+        except Exception:
+            nome = ""
     email = (getattr(user, "email", None) or "").strip()
     if not nome:
         nome = email or str(user.pk)
@@ -280,7 +286,14 @@ def _sessao_dict(c: PncpCotacao, *, include_owner: bool = False) -> Dict[str, An
         u = c.usuario
         snap_nome = (getattr(c, "criado_por_nome", None) or "").strip()
         snap_email = (getattr(c, "criado_por_email", None) or "").strip()
-        out["criado_por"] = snap_nome or (u.get_full_name() or "").strip() or getattr(u, "email", "") or str(u.pk)
+        get_full_name = getattr(u, "get_full_name", None)
+        full_name = ""
+        if callable(get_full_name):
+            try:
+                full_name = (get_full_name() or "").strip()
+            except Exception:
+                full_name = ""
+        out["criado_por"] = snap_nome or full_name or getattr(u, "email", "") or str(u.pk)
         out["criado_por_email"] = snap_email or (getattr(u, "email", None) or "").strip()
     return out
 

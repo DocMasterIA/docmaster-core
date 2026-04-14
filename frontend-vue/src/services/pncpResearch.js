@@ -1,5 +1,16 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br';
 
+function extractErrorMessage(payload, status) {
+  const raw = typeof payload === 'object' ? payload?.detail || payload?.error : payload;
+  const msg = String(raw || '').trim();
+  // Django 500 default HTML should not leak to UI.
+  if (msg.startsWith('<!doctype html') || msg.startsWith('<html')) {
+    if (status >= 500) return 'Erro interno no backend PNCP. Tente novamente em instantes.';
+    return `Erro HTTP ${status}`;
+  }
+  return msg || `Erro HTTP ${status}`;
+}
+
 /** Proxy FastAPI: índice local, market-search, streams. */
 async function researchRequest(path, { method = 'GET', body, signal } = {}) {
   const res = await fetch(`${API_BASE}/api/pncp-research/${path}`, {
@@ -16,8 +27,7 @@ async function researchRequest(path, { method = 'GET', body, signal } = {}) {
   const payload = ctype.includes('application/json') ? await res.json() : await res.text();
 
   if (!res.ok) {
-    const msg = typeof payload === 'object' ? payload?.detail || payload?.error : payload;
-    throw new Error(msg || `Erro HTTP ${res.status}`);
+    throw new Error(extractErrorMessage(payload, res.status));
   }
   return payload;
 }
@@ -38,8 +48,7 @@ async function cotacaoRequest(path, { method = 'GET', body, signal } = {}) {
   const payload = ctype.includes('application/json') ? await res.json() : await res.text();
 
   if (!res.ok) {
-    const msg = typeof payload === 'object' ? payload?.detail || payload?.error : payload;
-    throw new Error(msg || `Erro HTTP ${res.status}`);
+    throw new Error(extractErrorMessage(payload, res.status));
   }
   return payload;
 }
@@ -110,8 +119,7 @@ export async function downloadCotacaoRelatorioPdf(sessaoId, tituloRelatorio, sig
   const ctype = (res.headers.get('content-type') || '').toLowerCase();
   if (!res.ok) {
     const payload = ctype.includes('application/json') ? await res.json() : await res.text();
-    const msg = typeof payload === 'object' ? payload?.detail || payload?.error : payload;
-    throw new Error(msg || `Erro HTTP ${res.status}`);
+    throw new Error(extractErrorMessage(payload, res.status));
   }
   return res.blob();
 }

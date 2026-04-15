@@ -21,6 +21,7 @@ services:
     environment:
       - OLLAMA_FLASH_ATTENTION=true
       - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_KEEP_ALIVE=24h
     restart: unless-stopped
     # GPU: descomente se tiver NVIDIA
     deploy:

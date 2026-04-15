@@ -253,6 +253,7 @@ def agrupar_itens_relatorio_pesquisa_precos(itens: List[Any]) -> Tuple[List[Dict
                 "quantidade_fmt": q_fmt,
                 "unidade": und,
                 "n_cotacoes": n_cot,
+                "valores_fontes": vals,
                 "media_valor": media_valor,
                 "media_fmt": media_fmt,
                 "situacao": situacao,
@@ -333,18 +334,62 @@ def _resumo_from_values(
     }
 
 
+def _valor_formula_em_lista(values: List[float], formula_id: str) -> Optional[float]:
+    if not values:
+        return None
+    s = sorted(values)
+    if formula_id == "mediana_precos_obtidos":
+        n = len(s)
+        if n % 2 == 1:
+            return s[n // 2]
+        return (s[n // 2 - 1] + s[n // 2]) / 2
+    if formula_id == "menor_preco":
+        return min(s)
+    if formula_id == "media_saneada":
+        cut = int(len(s) * 0.2)
+        saneados = s[cut : len(s) - cut] if len(s) - (2 * cut) >= 1 else s
+        return sum(saneados) / len(saneados)
+    if formula_id == "media_relativa_25_50":
+        p25 = _percentile(s, 0.25)
+        p50 = _percentile(s, 0.50)
+        if p25 is None or p50 is None:
+            return None
+        faixa = [x for x in s if p25 <= x <= p50]
+        if not faixa:
+            faixa = [p25, p50]
+        return sum(faixa) / len(faixa)
+    # media_aritmetica_precos_obtidos e media_ponderada (peso uniforme por fonte)
+    return sum(s) / len(s)
+
+
 def resumo_calculo_precos(grupos: List[Dict[str, Any]], formula_id: str) -> Dict[str, Any]:
     medias: List[float] = []
     pesos: List[float] = []
     for g in grupos or []:
-        mv = g.get("media_valor")
-        try:
-            f = float(mv)
-        except (TypeError, ValueError):
+        valores_fontes: List[float] = []
+        raw_vals = g.get("valores_fontes")
+        if isinstance(raw_vals, list):
+            for rv in raw_vals:
+                try:
+                    fv = float(rv)
+                except (TypeError, ValueError):
+                    continue
+                if math.isnan(fv) or math.isinf(fv):
+                    continue
+                valores_fontes.append(fv)
+        if not valores_fontes:
+            mv = g.get("media_valor")
+            try:
+                f = float(mv)
+            except (TypeError, ValueError):
+                continue
+            if math.isnan(f) or math.isinf(f):
+                continue
+            valores_fontes = [f]
+        valor_item = _valor_formula_em_lista(valores_fontes, formula_id)
+        if valor_item is None:
             continue
-        if math.isnan(f) or math.isinf(f):
-            continue
-        medias.append(f)
+        medias.append(valor_item)
         nc = g.get("n_cotacoes")
         try:
             p = float(nc)

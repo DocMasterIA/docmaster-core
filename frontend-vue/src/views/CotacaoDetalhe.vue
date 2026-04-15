@@ -120,6 +120,16 @@
           <i class="fa-solid fa-lock" aria-hidden="true"></i>
           {{ isClosingCotacao ? 'Fechando cotação...' : 'Finalizar/Fechar Cotação' }}
         </button>
+        <button
+          v-if="isSessaoFechada"
+          type="button"
+          class="cot-btn cot-btn--success"
+          :disabled="isReopeningCotacao"
+          @click="reabrirCotacao"
+        >
+          <i class="fa-solid fa-lock-open" aria-hidden="true"></i>
+          {{ isReopeningCotacao ? 'Reabrindo cotação...' : 'Reabrir Cotação' }}
+        </button>
       </section>
       <input
         ref="importSpreadsheetInput"
@@ -485,6 +495,7 @@ const importLoading = ref(false);
 const importSpreadsheetInput = ref(null);
 const sessaoStatus = ref('aberta');
 const isClosingCotacao = ref(false);
+const isReopeningCotacao = ref(false);
 
 const isSessaoFechada = computed(() => ['finalizada', 'cancelada'].includes(String(sessaoStatus.value || '')));
 const sessaoStatusLabel = computed(() => {
@@ -695,6 +706,29 @@ async function finalizarCotacao() {
     loadError.value = `Falha ao finalizar cotação (${err?.message || 'erro desconhecido'}).`;
   } finally {
     isClosingCotacao.value = false;
+  }
+}
+
+async function reabrirCotacao() {
+  const sessionId = Number(cotacaoId.value);
+  if (Number.isNaN(sessionId)) {
+    loadError.value = 'Cotação inválida para reabrir.';
+    return;
+  }
+  if (!isSessaoFechada.value || isReopeningCotacao.value) return;
+  const ok = window.confirm(
+    'Deseja reabrir esta cotação? Após reabrir, será possível importar, adicionar e excluir itens novamente.',
+  );
+  if (!ok) return;
+  isReopeningCotacao.value = true;
+  loadError.value = '';
+  try {
+    await updateResearchSession(sessionId, { status: 'aberta' });
+    sessaoStatus.value = 'aberta';
+  } catch (err) {
+    loadError.value = `Falha ao reabrir cotação (${err?.message || 'erro desconhecido'}).`;
+  } finally {
+    isReopeningCotacao.value = false;
   }
 }
 
@@ -1092,6 +1126,7 @@ async function saveTituloNoBackend() {
 .cot-btn { border: 1px solid #cfd8e3; border-radius: 10px; background: #fff; color: #1f2937; padding: 7px 12px; font-size: 12px; text-decoration: none; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
 .cot-btn--primary { background: #1f4e79; color: #fff; border-color: #1f4e79; }
 .cot-btn--danger { background: #b91c1c; color: #fff; border-color: #b91c1c; }
+.cot-btn--success { background: #166534; color: #fff; border-color: #166534; }
 .cot-btn--disabled { pointer-events: none; opacity: 0.55; }
 .cot-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .cot-hidden-file-input { display: none; }

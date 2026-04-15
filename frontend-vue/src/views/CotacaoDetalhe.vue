@@ -876,12 +876,22 @@ async function loadSessionFromBackend() {
     if (data?.ok && Array.isArray(data.itens)) {
       let soma = 0;
       let temValor = false;
+      const fontesPorGrupo = new Map();
+      if (Array.isArray(data?.grupos_relatorio)) {
+        for (const g of data.grupos_relatorio) {
+          const key = buildGrupoStatusKey(g?.nome, g?.unidade, g?.quantidade_fmt);
+          const nCot = Number(g?.n_cotacoes);
+          fontesPorGrupo.set(key, Number.isFinite(nCot) ? nCot : 0);
+        }
+      }
       linhasMock.value = data.itens.map((it, idx) => {
         const vt = Number(it.valor_total ?? it.valor_unitario);
         if (!Number.isNaN(vt) && vt > 0) {
           soma += vt;
           temValor = true;
         }
+        const statusKey = buildGrupoStatusKey(it?.descricao_item, it?.unidade_medida, it?.quantidade);
+        const totalFontes = Number(fontesPorGrupo.get(statusKey) ?? 1);
         return {
           id: it.id || idx + 1,
           nomeItem: it.descricao_item || `Item ${idx + 1}`,
@@ -891,7 +901,7 @@ async function loadSessionFromBackend() {
           precoTotal: formatCurrency(it.valor_total ?? it.valor_unitario ?? 0),
           faixaRegionalBase: formatFaixaRegionalBase(it),
           faixaRegionalVariacao: formatFaixaRegionalVariacao(it),
-          status: 'Importado',
+          status: totalFontes >= 3 ? 'Completo' : 'Incompleto',
         };
       });
       valorTotalItensFmt.value = temValor ? formatCurrency(soma) : 'R$ —';
@@ -913,6 +923,23 @@ async function loadSessionFromBackend() {
   } finally {
     isLoading.value = false;
   }
+}
+
+function buildGrupoStatusKey(nome, unidade, quantidade) {
+  const n = String(nome || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+  const u = String(unidade || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+  const qRaw = String(quantidade ?? '').trim().replace(',', '.');
+  const qNum = Number(qRaw);
+  const q = Number.isFinite(qNum) ? String(qNum) : qRaw;
+  return `${n}|${u}|${q}`;
 }
 
 function pickNumeric(...vals) {

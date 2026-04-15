@@ -20,6 +20,15 @@ MIN_FONTES_SITUACAO_VALIDA = 3
 
 _CNPJ_LOOSE = re.compile(r"\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}")
 
+FORMULA_LABELS: Dict[str, str] = {
+    "media_aritmetica_precos_obtidos": "Média aritmética dos preços obtidos",
+    "mediana_precos_obtidos": "Mediana dos preços obtidos",
+    "menor_preco": "Menor preço",
+    "media_saneada": "Média saneada",
+    "media_ponderada": "Média ponderada",
+    "media_relativa_25_50": "Média relativa 25% - 50%",
+}
+
 
 def _normalize_cnpj(raw: str) -> str:
     d = re.sub(r"\D", "", raw)
@@ -284,3 +293,122 @@ def resumo_calculo_media_aritmetica(grupos: List[Dict[str, Any]]) -> Dict[str, A
         "maior_media_item": max(medias) if medias else None,
         "maior_media_item_fmt": f"R$ {_formatar_moeda_br(max(medias))}" if medias else "—",
     }
+
+
+def _percentile(sorted_vals: List[float], p: float) -> Optional[float]:
+    if not sorted_vals:
+        return None
+    if p <= 0:
+        return sorted_vals[0]
+    if p >= 1:
+        return sorted_vals[-1]
+    idx = (len(sorted_vals) - 1) * p
+    lo = int(math.floor(idx))
+    hi = int(math.ceil(idx))
+    if lo == hi:
+        return sorted_vals[lo]
+    frac = idx - lo
+    return sorted_vals[lo] * (1 - frac) + sorted_vals[hi] * frac
+
+
+def _resumo_from_values(
+    values: List[float],
+    *,
+    formula_id: str,
+    valor_calculado: Optional[float],
+    extra: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    extra = extra or {}
+    return {
+        "formula_id": formula_id,
+        "formula_label": FORMULA_LABELS.get(formula_id, FORMULA_LABELS["media_aritmetica_precos_obtidos"]),
+        "itens_com_media": len(values),
+        "media_das_medias": valor_calculado,
+        "media_das_medias_fmt": f"R$ {_formatar_moeda_br(valor_calculado)}" if valor_calculado is not None else "—",
+        "menor_media_item": min(values) if values else None,
+        "menor_media_item_fmt": f"R$ {_formatar_moeda_br(min(values))}" if values else "—",
+        "maior_media_item": max(values) if values else None,
+        "maior_media_item_fmt": f"R$ {_formatar_moeda_br(max(values))}" if values else "—",
+        **extra,
+    }
+
+
+def resumo_calculo_precos(grupos: List[Dict[str, Any]], formula_id: str) -> Dict[str, Any]:
+    medias: List[float] = []
+    pesos: List[float] = []
+    for g in grupos or []:
+        mv = g.get("media_valor")
+        try:
+            f = float(mv)
+        except (TypeError, ValueError):
+            continue
+        if math.isnan(f) or math.isinf(f):
+            continue
+        medias.append(f)
+        nc = g.get("n_cotacoes")
+        try:
+            p = float(nc)
+        except (TypeError, ValueError):
+            p = 1.0
+        if math.isnan(p) or math.isinf(p) or p <= 0:
+            p = 1.0
+        pesos.append(p)
+
+    if not medias:
+        return _resumo_from_values([], formula_id=formula_id, valor_calculado=None)
+
+    if formula_id == "mediana_precos_obtidos":
+        s = sorted(medias)
+        n = len(s)
+        if n % 2 == 1:
+            val = s[n // 2]
+        else:
+            val = (s[n // 2 - 1] + s[n // 2]) / 2
+        return _resumo_from_values(medias, formula_id=formula_id, valor_calculado=val)
+
+    if formula_id == "menor_preco":
+        val = min(medias)
+        return _resumo_from_values(medias, formula_id=formula_id, valor_calculado=val)
+
+    if formula_id == "media_saneada":
+        s = sorted(medias)
+        cut = int(len(s) * 0.2)
+        saneados = s[cut : len(s) - cut] if len(s) - (2 * cut) >= 1 else s
+        val = sum(saneados) / len(saneados)
+        return _resumo_from_values(
+            medias,
+            formula_id=formula_id,
+            valor_calculado=val,
+            extra={"itens_saneados_utilizados": len(saneados)},
+        )
+
+    if formula_id == "media_ponderada":
+        total_peso = sum(pesos) or 1.0
+        val = sum(v * w for v, w in zip(medias, pesos)) / total_peso
+        return _resumo_from_values(medias, formula_id=formula_id, valor_calculado=val)
+
+    if formula_id == "media_relativa_25_50":
+        s = sorted(medias)
+        p25 = _percentile(s, 0.25)
+        p50 = _percentile(s, 0.50)
+        if p25 is None or p50 is None:
+            val = None
+            faixa = []
+        else:
+            faixa = [x for x in s if p25 <= x <= p50]
+            if not faixa:
+                faixa = [p25, p50]
+            val = sum(faixa) / len(faixa)
+        return _resumo_from_values(
+            medias,
+            formula_id=formula_id,
+            valor_calculado=val,
+            extra={
+                "p25_fmt": f"R$ {_formatar_moeda_br(p25)}" if p25 is not None else "—",
+                "p50_fmt": f"R$ {_formatar_moeda_br(p50)}" if p50 is not None else "—",
+                "itens_faixa_25_50": len(faixa),
+            },
+        )
+
+    val = sum(medias) / len(medias)
+    return _resumo_from_values(medias, formula_id="media_aritmetica_precos_obtidos", valor_calculado=val)

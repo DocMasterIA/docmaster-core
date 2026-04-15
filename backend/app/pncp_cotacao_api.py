@@ -27,7 +27,7 @@ from backend.app.api import api_login_required
 from backend.app.models import PncpCotacao, PncpCotacaoItem, Prefeitura
 from backend.app.services.pncp_relatorio_itens import (
     agrupar_itens_relatorio_pesquisa_precos,
-    resumo_calculo_media_aritmetica,
+    resumo_calculo_precos,
 )
 from backend.app.services.pncp_relatorio_pdf import extrair_cnpjs_dos_itens
 
@@ -49,6 +49,25 @@ MAX_SOURCE_JSON_BYTES = _cfg_int("PNCP_COTACAO_MAX_SOURCE_JSON_BYTES", 120 * 102
 ALLOWED_MODELOS = frozenset({"pesquisa_precos_padrao", "referencia_mercado"})
 ALLOWED_STATUS = frozenset({"aberta", "finalizada", "cancelada"})
 CLOSED_FOR_ITEMS = frozenset({"finalizada", "cancelada"})
+ALLOWED_FORMULA_CALCULO = frozenset(
+    {
+        "media_aritmetica_precos_obtidos",
+        "mediana_precos_obtidos",
+        "menor_preco",
+        "media_saneada",
+        "media_ponderada",
+        "media_relativa_25_50",
+    }
+)
+DEFAULT_FORMULA_CALCULO = "media_aritmetica_precos_obtidos"
+FORMULA_LABELS = {
+    "media_aritmetica_precos_obtidos": "Média aritmética dos preços obtidos",
+    "mediana_precos_obtidos": "Mediana dos preços obtidos",
+    "menor_preco": "Menor preço",
+    "media_saneada": "Média saneada",
+    "media_ponderada": "Média ponderada",
+    "media_relativa_25_50": "Média relativa 25% - 50%",
+}
 
 _UF_RE = re.compile(r"^[A-Z]{2}$")
 
@@ -311,6 +330,18 @@ def _sanitize_filtros(obj: Any) -> Dict[str, Any]:
     return coerced
 
 
+def _resolve_formula_calculo_id(filtros: Any) -> str:
+    if not isinstance(filtros, dict):
+        return DEFAULT_FORMULA_CALCULO
+    raw = filtros.get("formula_calculo") or filtros.get("formula_calculo_id")
+    if raw is None:
+        return DEFAULT_FORMULA_CALCULO
+    fid = str(raw).strip()
+    if fid in ALLOWED_FORMULA_CALCULO:
+        return fid
+    return DEFAULT_FORMULA_CALCULO
+
+
 def _compact_item_source(it: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(it, dict):
         return {}
@@ -456,6 +487,7 @@ def _item_dict(row: PncpCotacaoItem) -> Dict[str, Any]:
         "municipio": row.municipio or None,
         "uf": row.uf or None,
         "modalidade": row.modalidade or None,
+        "source": row.source or {},
         "created_at": _iso_z(row.created_at),
     }
 
@@ -615,6 +647,8 @@ def pncp_research_sessions_detail(request, sessao_id: int):
 
     itens_asc = list(c.itens.all().order_by("id"))
     grupos_relatorio, total_linhas_cotacao = agrupar_itens_relatorio_pesquisa_precos(itens_asc)
+    formula_id = _resolve_formula_calculo_id(c.filtros or {})
+    formula_label = FORMULA_LABELS.get(formula_id, FORMULA_LABELS[DEFAULT_FORMULA_CALCULO])
     itens_desc = list(reversed(itens_asc))
     return JsonResponse(
         {
@@ -623,11 +657,12 @@ def pncp_research_sessions_detail(request, sessao_id: int):
                 **_sessao_dict(c, include_owner=True),
                 "total_itens": len(itens_asc),
                 "total_grupos_relatorio": len(grupos_relatorio),
-                "formula_calculo": "Média aritmética dos preços obtidos",
+                "formula_calculo": formula_label,
+                "formula_calculo_id": formula_id,
             },
             "itens": [_item_dict(x) for x in itens_desc],
             "grupos_relatorio": grupos_relatorio,
-            "calculo_precos": resumo_calculo_media_aritmetica(grupos_relatorio),
+            "calculo_precos": resumo_calculo_precos(grupos_relatorio, formula_id),
             "total_linhas_cotacao": total_linhas_cotacao,
             "cnpjs_fontes": extrair_cnpjs_dos_itens(itens_asc),
             "stats": {"total_itens": len(itens_asc), "total_grupos": len(grupos_relatorio)},
@@ -685,8 +720,20 @@ def pncp_research_sessions_update(request, sessao_id: int):
             if m:
                 c.modelo_cotacao = m
 
+        if "formula_calculo_id" in body and body["formula_calculo_id"] is not None:
+            fid = str(body["formula_calculo_id"]).strip()
+            if fid not in ALLOWED_FORMULA_CALCULO:
+                return JsonResponse(
+                    {"detail": "formula_calculo_id inválida.", "allowed": sorted(ALLOWED_FORMULA_CALCULO)},
+                    status=422,
+                )
+            filtros = dict(c.filtros or {})
+            filtros["formula_calculo"] = fid
+            c.filtros = _sanitize_filtros(filtros)
+
         c.save()
 
+    formula_id = _resolve_formula_calculo_id(c.filtros or {})
     return JsonResponse(
         {
             "ok": True,
@@ -695,6 +742,8 @@ def pncp_research_sessions_update(request, sessao_id: int):
             "status": c.status,
             "termo_busca": c.termo_busca,
             "modelo_cotacao": c.modelo_cotacao,
+            "formula_calculo_id": formula_id,
+            "formula_calculo": FORMULA_LABELS.get(formula_id, FORMULA_LABELS[DEFAULT_FORMULA_CALCULO]),
             "updated_at": _iso_z(c.updated_at),
         }
     )

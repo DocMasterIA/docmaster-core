@@ -32,7 +32,7 @@
             placeholder="Ex.: Cotação de medicamentos - abril/2026"
           />
         </label>
-        <button type="button" class="cot-btn cot-btn--primary" @click="salvarTituloCotacao">
+        <button type="button" class="cot-btn cot-btn--primary" :disabled="isSessaoFechada" @click="salvarTituloCotacao">
           <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
           Salvar título
         </button>
@@ -61,6 +61,10 @@
             <span class="cot-card__label">Soma dos itens (estimado)</span>
             <strong>{{ valorTotalItensFmt }}</strong>
           </div>
+          <div class="cot-card">
+            <span class="cot-card__label">Status</span>
+            <strong>{{ sessaoStatusLabel }}</strong>
+          </div>
         </div>
       </section>
 
@@ -70,20 +74,34 @@
           <div class="cot-formula__title">Fórmula de Cálculo</div>
           <div class="cot-formula__subtitle">Aplicada para consolidação</div>
         </div>
-        <button type="button" class="cot-formula__select">
-          {{ formulaCalculoLabel }}
-          <span aria-hidden="true">▾</span>
-        </button>
+        <select
+          class="cot-formula__select"
+          :disabled="isSessaoFechada || isSavingFormula"
+          :value="formulaCalculoId"
+          @change="onChangeFormulaCalculo"
+        >
+          <option
+            v-for="opt in formulaCalculoOptions"
+            :key="opt.id"
+            :value="opt.id"
+          >
+            {{ opt.label }}
+          </option>
+        </select>
       </section>
 
       <section class="cot-actions">
-        <button type="button" class="cot-btn" :disabled="importLoading" @click="openImportSpreadsheet">
+        <button type="button" class="cot-btn" :disabled="importLoading || isSessaoFechada" @click="openImportSpreadsheet">
           <i class="fa-solid fa-file-arrow-up" aria-hidden="true"></i>
           {{ importLoading ? 'Importando planilha...' : 'Importar Planilha Preenchida' }}
         </button>
-        <button type="button" class="cot-btn">
+        <button type="button" class="cot-btn" @click="downloadModeloExcel">
           <i class="fa-solid fa-file-excel" aria-hidden="true"></i>
-          Baixar Planilha Modelo
+          Baixar Planilha Modelo (Excel)
+        </button>
+        <button type="button" class="cot-btn" @click="downloadModeloSheetsCsv">
+          <i class="fa-solid fa-table" aria-hidden="true"></i>
+          Baixar Modelo (Google Sheets CSV)
         </button>
         <button type="button" class="cot-btn">
           <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
@@ -92,6 +110,15 @@
         <button type="button" class="cot-btn cot-btn--primary" @click="openRelatorioModal">
           <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
           Gerar relatório PDF
+        </button>
+        <button
+          type="button"
+          class="cot-btn cot-btn--danger"
+          :disabled="isClosingCotacao || isSessaoFechada"
+          @click="finalizarCotacao"
+        >
+          <i class="fa-solid fa-lock" aria-hidden="true"></i>
+          {{ isClosingCotacao ? 'Fechando cotação...' : 'Finalizar/Fechar Cotação' }}
         </button>
       </section>
       <input
@@ -108,11 +135,23 @@
           <p>Escolha como deseja iniciar a pesquisa para adicionar novos itens à cotação.</p>
         </div>
         <div class="cot-new-item-block__actions">
-          <RouterLink :to="`/pesquisador-pncp/cotacoes/${cotacaoId}/busca-inteligente`" class="cot-btn cot-btn--primary">
+          <RouterLink
+            :to="`/pesquisador-pncp/cotacoes/${cotacaoId}/busca-inteligente`"
+            class="cot-btn cot-btn--primary"
+            :class="{ 'cot-btn--disabled': isSessaoFechada }"
+            :aria-disabled="isSessaoFechada ? 'true' : 'false'"
+            @click="onStartSearchClick"
+          >
             <i class="fa-solid fa-robot" aria-hidden="true"></i>
             Iniciar busca com I.A
           </RouterLink>
-          <RouterLink :to="`/pesquisador-pncp/cotacoes/${cotacaoId}/busca-manual`" class="cot-btn">
+          <RouterLink
+            :to="`/pesquisador-pncp/cotacoes/${cotacaoId}/busca-manual`"
+            class="cot-btn"
+            :class="{ 'cot-btn--disabled': isSessaoFechada }"
+            :aria-disabled="isSessaoFechada ? 'true' : 'false'"
+            @click="onStartSearchClick"
+          >
             <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
             Iniciar busca manual
           </RouterLink>
@@ -132,7 +171,7 @@
           <button
             type="button"
             class="cot-sheet-bulk-delete"
-            :disabled="selectedIds.size === 0"
+            :disabled="selectedIds.size === 0 || isSessaoFechada"
             @click="openBulkDeleteModal"
           >
             <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
@@ -163,6 +202,7 @@
                     type="checkbox"
                     class="cot-sheet-checkbox"
                     :checked="allSelected"
+                    :disabled="isSessaoFechada"
                     :indeterminate.prop="isPartiallySelected"
                     @change="toggleSelectAll"
                     aria-label="Selecionar todos os itens"
@@ -212,6 +252,7 @@
                     type="checkbox"
                     class="cot-sheet-checkbox"
                     :checked="selectedIds.has(linha.id)"
+                    :disabled="isSessaoFechada"
                     @change="toggleSelectRow(linha.id)"
                     :aria-label="`Selecionar item ${linha.id}`"
                   />
@@ -268,10 +309,10 @@
                 <td>
                   <div class="cot-faixa-block">
                     <span class="cot-faixa-block__label">BASE</span>
-                    <strong class="cot-faixa-block__value">{{ faixaRegionalBase }}</strong>
+                    <strong class="cot-faixa-block__value">{{ linha.faixaRegionalBase }}</strong>
                     <span class="cot-faixa-block__dot" aria-hidden="true">·</span>
                     <span class="cot-faixa-block__label">VAR</span>
-                    <strong class="cot-faixa-block__value">{{ faixaRegionalVariacao }}</strong>
+                    <strong class="cot-faixa-block__value">{{ linha.faixaRegionalVariacao }}</strong>
                   </div>
                 </td>
                 <td class="cot-sheet-center">
@@ -284,6 +325,7 @@
                     <button
                       type="button"
                       class="cot-sheet-action-btn cot-sheet-action-btn--danger"
+                      :disabled="isSessaoFechada"
                       @click="openRowDeleteModal(linha)"
                     >
                       Excluir
@@ -429,8 +471,29 @@ const relatorioError = ref('');
 const relatorioLoading = ref(false);
 const totalItensSessao = ref(0);
 const formulaCalculoLabel = ref('Média aritmética dos preços obtidos');
+const formulaCalculoId = ref('media_aritmetica_precos_obtidos');
+const formulaCalculoOptions = [
+  { id: 'media_aritmetica_precos_obtidos', label: 'Média Aritmética dos preços obtidos' },
+  { id: 'mediana_precos_obtidos', label: 'Mediana dos preços obtidos' },
+  { id: 'menor_preco', label: 'Menor preço' },
+  { id: 'media_saneada', label: 'Média Saneada' },
+  { id: 'media_ponderada', label: 'Média ponderada' },
+  { id: 'media_relativa_25_50', label: 'Média relativa 25% - 50%' },
+];
+const isSavingFormula = ref(false);
 const importLoading = ref(false);
 const importSpreadsheetInput = ref(null);
+const sessaoStatus = ref('aberta');
+const isClosingCotacao = ref(false);
+
+const isSessaoFechada = computed(() => ['finalizada', 'cancelada'].includes(String(sessaoStatus.value || '')));
+const sessaoStatusLabel = computed(() => {
+  const s = String(sessaoStatus.value || '').toLowerCase();
+  if (s === 'finalizada') return 'Fechada';
+  if (s === 'cancelada') return 'Cancelada';
+  if (s === 'aberta') return 'Aberta';
+  return s || '—';
+});
 
 const relatorioPreviewTo = computed(() => ({
   name: 'RelatorioPesquisaPrecos',
@@ -443,8 +506,8 @@ const relatorioPreviewTo = computed(() => ({
   },
 }));
 
-const faixaRegionalBase = 'R$ 15,00';
-const faixaRegionalVariacao = '20%';
+const faixaRegionalBaseSessao = ref(null);
+const faixaRegionalVariacaoSessao = ref(null);
 
 const allSelected = computed(() => {
   const rows = linhasMock.value;
@@ -503,11 +566,13 @@ const deleteModalQuote = computed(() => {
 });
 
 function openBulkDeleteModal() {
+  if (isSessaoFechada.value) return;
   if (selectedIds.value.size === 0) return;
   pendingDelete.value = { kind: 'bulk', ids: [...selectedIds.value] };
 }
 
 function openRowDeleteModal(row) {
+  if (isSessaoFechada.value) return;
   pendingDelete.value = { kind: 'row', row };
 }
 
@@ -557,8 +622,82 @@ function openRelatorioModal() {
 }
 
 function openImportSpreadsheet() {
+  if (isSessaoFechada.value) return;
   if (importLoading.value) return;
   importSpreadsheetInput.value?.click();
+}
+
+function onStartSearchClick(event) {
+  if (!isSessaoFechada.value) return;
+  event?.preventDefault?.();
+  loadError.value = 'Cotação fechada: não é permitido iniciar novas buscas.';
+}
+
+function triggerTemplateDownload(url, filename) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function downloadModeloExcel() {
+  triggerTemplateDownload(
+    '/modelos/cotacao-manual-modelo-docmasteria.xlsx',
+    'cotacao-manual-modelo-docmasteria.xlsx',
+  );
+}
+
+function downloadModeloSheetsCsv() {
+  triggerTemplateDownload('/modelos/cotacao-manual-modelo.csv', 'cotacao-manual-modelo.csv');
+}
+
+async function onChangeFormulaCalculo(event) {
+  const nextId = String(event?.target?.value || '').trim();
+  if (!nextId || nextId === formulaCalculoId.value) return;
+  const sessionId = Number(cotacaoId.value);
+  if (Number.isNaN(sessionId)) {
+    loadError.value = 'Cotação inválida para alterar fórmula.';
+    return;
+  }
+  isSavingFormula.value = true;
+  loadError.value = '';
+  try {
+    await updateResearchSession(sessionId, { formula_calculo_id: nextId });
+    formulaCalculoId.value = nextId;
+    formulaCalculoLabel.value =
+      formulaCalculoOptions.find((x) => x.id === nextId)?.label || formulaCalculoLabel.value;
+    await loadSessionFromBackend();
+  } catch (err) {
+    loadError.value = `Falha ao atualizar fórmula de cálculo (${err?.message || 'erro desconhecido'}).`;
+  } finally {
+    isSavingFormula.value = false;
+  }
+}
+
+async function finalizarCotacao() {
+  const sessionId = Number(cotacaoId.value);
+  if (Number.isNaN(sessionId)) {
+    loadError.value = 'Cotação inválida para finalizar.';
+    return;
+  }
+  if (isSessaoFechada.value || isClosingCotacao.value) return;
+  const ok = window.confirm(
+    'Deseja finalizar/fechar esta cotação? Após fechar, não será possível importar, adicionar ou excluir itens.',
+  );
+  if (!ok) return;
+  isClosingCotacao.value = true;
+  loadError.value = '';
+  try {
+    await updateResearchSession(sessionId, { status: 'finalizada' });
+    sessaoStatus.value = 'finalizada';
+  } catch (err) {
+    loadError.value = `Falha ao finalizar cotação (${err?.message || 'erro desconhecido'}).`;
+  } finally {
+    isClosingCotacao.value = false;
+  }
 }
 
 async function onImportSpreadsheetSelected(event) {
@@ -694,11 +833,24 @@ async function loadSessionFromBackend() {
       sessaoCreatedAt.value = formatDateTimePt(s.created_at);
       sessaoCriadoPor.value = s.criado_por || '—';
       sessaoCriadoPorEmail.value = (s.criado_por_email || '').trim();
+      sessaoStatus.value = String(s.status || 'aberta').toLowerCase();
       totalItensSessao.value = Number(s.total_itens) || 0;
+      formulaCalculoId.value = s.formula_calculo_id || 'media_aritmetica_precos_obtidos';
       formulaCalculoLabel.value =
         s.formula_calculo ||
         data?.calculo_precos?.formula_label ||
         'Média aritmética dos preços obtidos';
+      faixaRegionalBaseSessao.value = pickNumeric(
+        s?.filtros?.valor_base,
+        s?.filtros?.valorBase,
+        s?.filtros?.preco_base,
+        s?.filtros?.precoBase,
+      );
+      faixaRegionalVariacaoSessao.value = pickNumeric(
+        s?.filtros?.variacao,
+        s?.filtros?.variacao_percentual,
+        s?.filtros?.variacaoPercentual,
+      );
     }
     if (data?.ok && Array.isArray(data.itens)) {
       let soma = 0;
@@ -716,7 +868,8 @@ async function loadSessionFromBackend() {
           qtd: it.quantidade ?? '-',
           und: it.unidade_medida || '-',
           precoTotal: formatCurrency(it.valor_total ?? it.valor_unitario ?? 0),
-          faixaRegional: '',
+          faixaRegionalBase: formatFaixaRegionalBase(it),
+          faixaRegionalVariacao: formatFaixaRegionalVariacao(it),
           status: 'Importado',
         };
       });
@@ -732,11 +885,52 @@ async function loadSessionFromBackend() {
     valorTotalItensFmt.value = 'R$ —';
     sessaoCriadoPor.value = '—';
     sessaoCriadoPorEmail.value = '';
+    sessaoStatus.value = 'aberta';
     totalItensSessao.value = 0;
+    formulaCalculoId.value = 'media_aritmetica_precos_obtidos';
     formulaCalculoLabel.value = 'Média aritmética dos preços obtidos';
+    faixaRegionalBaseSessao.value = null;
+    faixaRegionalVariacaoSessao.value = null;
   } finally {
     isLoading.value = false;
   }
+}
+
+function pickNumeric(...vals) {
+  for (const v of vals) {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return null;
+}
+
+function extractItemSourceNumber(item, ...keys) {
+  const src = item?.sourceRaw || item?.source;
+  if (!src || typeof src !== 'object') return null;
+  for (const k of keys) {
+    const n = Number(src[k]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return null;
+}
+
+function formatFaixaRegionalBase(item) {
+  const byItem = pickNumeric(
+    extractItemSourceNumber(item, 'valor_base', 'valorBase', 'preco_base', 'precoBase'),
+  );
+  const bySession = pickNumeric(faixaRegionalBaseSessao.value);
+  const byValue = pickNumeric(item?.valor_unitario, item?.valor_total);
+  const base = byItem ?? bySession ?? byValue;
+  return base ? formatCurrency(base) : 'R$ —';
+}
+
+function formatFaixaRegionalVariacao(item) {
+  const byItem = pickNumeric(
+    extractItemSourceNumber(item, 'variacao', 'variacao_percentual', 'variacaoPercentual'),
+  );
+  const bySession = pickNumeric(faixaRegionalVariacaoSessao.value);
+  const v = byItem ?? bySession;
+  return v ? `${Number(v).toLocaleString('pt-BR')}%` : '—';
 }
 
 function formatCurrency(v) {
@@ -907,6 +1101,9 @@ async function saveTituloNoBackend() {
 .cot-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .cot-btn { border: 1px solid #cfd8e3; border-radius: 10px; background: #fff; color: #1f2937; padding: 7px 12px; font-size: 12px; text-decoration: none; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
 .cot-btn--primary { background: #1f4e79; color: #fff; border-color: #1f4e79; }
+.cot-btn--danger { background: #b91c1c; color: #fff; border-color: #b91c1c; }
+.cot-btn--disabled { pointer-events: none; opacity: 0.55; }
+.cot-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .cot-hidden-file-input { display: none; }
 
 .cot-new-item-block {

@@ -591,6 +591,11 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
     return;
   }
   saveMessage.value = '';
+  const faixaBaseSelecionada = parseMoeda(filtros.valorBase);
+  const variacaoSelecionada = Number.parseFloat(String(filtros.variacao || '0'));
+  const variacaoPercentual = Number.isFinite(variacaoSelecionada) && variacaoSelecionada >= 0
+    ? variacaoSelecionada
+    : null;
   const itens = resultados.value
     .filter((r) => r.selecionado)
     .map((r) => ({
@@ -611,6 +616,12 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
       origem: 'busca_manual',
       data_publicacao: toNullableText(r.data),
       material_servico: toNullableText(r.sourceRaw?.material_servico),
+      valor_base: faixaBaseSelecionada,
+      variacao_percentual: variacaoPercentual,
+      faixa_regional: {
+        valor_base: faixaBaseSelecionada,
+        variacao_percentual: variacaoPercentual,
+      },
     }))
     .filter((it) => !!it.descricao_item || !!it.numero_pncp || (it.ano_compra != null && it.sequencial_compra != null));
   if (!itens.length) {

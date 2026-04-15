@@ -506,8 +506,6 @@ const relatorioPreviewTo = computed(() => ({
   },
 }));
 
-const faixaRegionalBaseSessao = ref(null);
-const faixaRegionalVariacaoSessao = ref(null);
 
 const allSelected = computed(() => {
   const rows = linhasMock.value;
@@ -840,17 +838,6 @@ async function loadSessionFromBackend() {
         s.formula_calculo ||
         data?.calculo_precos?.formula_label ||
         'Média aritmética dos preços obtidos';
-      faixaRegionalBaseSessao.value = pickNumeric(
-        s?.filtros?.valor_base,
-        s?.filtros?.valorBase,
-        s?.filtros?.preco_base,
-        s?.filtros?.precoBase,
-      );
-      faixaRegionalVariacaoSessao.value = pickNumeric(
-        s?.filtros?.variacao,
-        s?.filtros?.variacao_percentual,
-        s?.filtros?.variacaoPercentual,
-      );
     }
     if (data?.ok && Array.isArray(data.itens)) {
       let soma = 0;
@@ -889,8 +876,6 @@ async function loadSessionFromBackend() {
     totalItensSessao.value = 0;
     formulaCalculoId.value = 'media_aritmetica_precos_obtidos';
     formulaCalculoLabel.value = 'Média aritmética dos preços obtidos';
-    faixaRegionalBaseSessao.value = null;
-    faixaRegionalVariacaoSessao.value = null;
   } finally {
     isLoading.value = false;
   }
@@ -911,6 +896,13 @@ function extractItemSourceNumber(item, ...keys) {
     const n = Number(src[k]);
     if (Number.isFinite(n) && n > 0) return n;
   }
+  const faixa = src?.faixa_regional || src?.faixaRegional;
+  if (faixa && typeof faixa === 'object') {
+    for (const k of keys) {
+      const n = Number(faixa[k]);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+  }
   return null;
 }
 
@@ -918,9 +910,8 @@ function formatFaixaRegionalBase(item) {
   const byItem = pickNumeric(
     extractItemSourceNumber(item, 'valor_base', 'valorBase', 'preco_base', 'precoBase'),
   );
-  const bySession = pickNumeric(faixaRegionalBaseSessao.value);
   const byValue = pickNumeric(item?.valor_unitario, item?.valor_total);
-  const base = byItem ?? bySession ?? byValue;
+  const base = byItem ?? byValue;
   return base ? formatCurrency(base) : 'R$ —';
 }
 
@@ -928,8 +919,7 @@ function formatFaixaRegionalVariacao(item) {
   const byItem = pickNumeric(
     extractItemSourceNumber(item, 'variacao', 'variacao_percentual', 'variacaoPercentual'),
   );
-  const bySession = pickNumeric(faixaRegionalVariacaoSessao.value);
-  const v = byItem ?? bySession;
+  const v = byItem;
   return v ? `${Number(v).toLocaleString('pt-BR')}%` : '—';
 }
 

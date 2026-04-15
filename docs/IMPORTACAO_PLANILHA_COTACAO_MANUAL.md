@@ -45,6 +45,8 @@ As colunas abaixo devem existir (diretamente ou via alias/mapeamento):
 - `municipio`
 - `uf`
 - `modalidade`
+- `valor_base`
+- `variacao_percentual`
 
 Ordem usada no modelo padrao:
 
@@ -60,6 +62,8 @@ Ordem usada no modelo padrao:
 10. `municipio`
 11. `uf`
 12. `modalidade`
+13. `valor_base`
+14. `variacao_percentual`
 
 ## Aliases aceitos (normalizacao automatica)
 

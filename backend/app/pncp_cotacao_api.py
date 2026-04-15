@@ -68,6 +68,7 @@ FORMULA_LABELS = {
     "media_ponderada": "Média ponderada",
     "media_relativa_25_50": "Média relativa 25% - 50%",
 }
+FORMULA_LABELS_TO_ID = {v.lower(): k for k, v in FORMULA_LABELS.items()}
 
 _UF_RE = re.compile(r"^[A-Z]{2}$")
 
@@ -97,6 +98,15 @@ _SOURCE_KEEP_KEYS = frozenset(
         "uf",
         "modalidade",
         "data_publicacao",
+        "valor_base",
+        "valorBase",
+        "preco_base",
+        "precoBase",
+        "variacao",
+        "variacao_percentual",
+        "variacaoPercentual",
+        "faixa_regional",
+        "faixaRegional",
     }
 )
 
@@ -110,6 +120,8 @@ IMPORT_OPTIONAL_COLUMN_IDS = (
     "municipio",
     "uf",
     "modalidade",
+    "valor_base",
+    "variacao_percentual",
 )
 _IMPORT_ALLOWED_IDS = frozenset(IMPORT_REQUIRED_COLUMN_IDS + IMPORT_OPTIONAL_COLUMN_IDS)
 _IMPORT_ALIASES = {
@@ -127,6 +139,9 @@ _IMPORT_ALIASES = {
     "numeropncp": "numero_pncp",
     "ano": "ano_compra",
     "sequencial": "sequencial_compra",
+    "variacao": "variacao_percentual",
+    "variacao_percentual": "variacao_percentual",
+    "valor_base": "valor_base",
 }
 
 
@@ -250,6 +265,12 @@ def _build_items_from_import_rows(rows: List[Dict[str, Any]], column_map: Dict[s
             "municipio": str(it.get("municipio") or "").strip(),
             "uf": _normalize_uf(it.get("uf")),
             "modalidade": str(it.get("modalidade") or "").strip(),
+            "valor_base": _safe_float(it.get("valor_base")),
+            "variacao_percentual": _safe_float(it.get("variacao_percentual")),
+            "faixa_regional": {
+                "valor_base": _safe_float(it.get("valor_base")),
+                "variacao_percentual": _safe_float(it.get("variacao_percentual")),
+            },
             "origem": "planilha_manual",
         }
         items.append(item_payload)
@@ -331,15 +352,23 @@ def _sanitize_filtros(obj: Any) -> Dict[str, Any]:
 
 
 def _resolve_formula_calculo_id(filtros: Any) -> str:
+    def _coerce_formula_id(raw_value: Any) -> str:
+        if raw_value is None:
+            return DEFAULT_FORMULA_CALCULO
+        fid = str(raw_value).strip()
+        if fid in ALLOWED_FORMULA_CALCULO:
+            return fid
+        by_label = FORMULA_LABELS_TO_ID.get(fid.lower())
+        if by_label:
+            return by_label
+        return DEFAULT_FORMULA_CALCULO
+
     if not isinstance(filtros, dict):
         return DEFAULT_FORMULA_CALCULO
     raw = filtros.get("formula_calculo") or filtros.get("formula_calculo_id")
     if raw is None:
         return DEFAULT_FORMULA_CALCULO
-    fid = str(raw).strip()
-    if fid in ALLOWED_FORMULA_CALCULO:
-        return fid
-    return DEFAULT_FORMULA_CALCULO
+    return _coerce_formula_id(raw)
 
 
 def _compact_item_source(it: Dict[str, Any]) -> Dict[str, Any]:
@@ -720,8 +749,12 @@ def pncp_research_sessions_update(request, sessao_id: int):
             if m:
                 c.modelo_cotacao = m
 
-        if "formula_calculo_id" in body and body["formula_calculo_id"] is not None:
-            fid = str(body["formula_calculo_id"]).strip()
+        incoming_formula = body.get("formula_calculo_id")
+        if incoming_formula is None and body.get("formula_calculo") is not None:
+            incoming_formula = body.get("formula_calculo")
+        if incoming_formula is not None:
+            fid = str(incoming_formula).strip()
+            fid = FORMULA_LABELS_TO_ID.get(fid.lower(), fid)
             if fid not in ALLOWED_FORMULA_CALCULO:
                 return JsonResponse(
                     {"detail": "formula_calculo_id inválida.", "allowed": sorted(ALLOWED_FORMULA_CALCULO)},

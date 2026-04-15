@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from django.conf import settings
 from django.db import DatabaseError, transaction
 from django.db.models import Count
+from django.core.files.base import ContentFile
 from django.http import JsonResponse, HttpRequest
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -70,6 +71,10 @@ FORMULA_LABELS = {
     "media_relativa_25_50": "Média relativa 25% - 50%",
 }
 FORMULA_LABELS_TO_ID = {v.lower(): k for k, v in FORMULA_LABELS.items()}
+
+
+def _nome_padrao_anexo_fornecedor(sessao_id: int) -> str:
+    return f"cotacao-fornecedor-sessao-{int(sessao_id)}.pdf"
 
 _UF_RE = re.compile(r"^[A-Z]{2}$")
 
@@ -679,6 +684,7 @@ def pncp_research_sessions_detail(request, sessao_id: int):
     grupos_relatorio, total_linhas_cotacao = agrupar_itens_relatorio_pesquisa_precos(itens_asc)
     formula_id = _resolve_formula_calculo_id(c.filtros or {})
     formula_label = FORMULA_LABELS.get(formula_id, FORMULA_LABELS[DEFAULT_FORMULA_CALCULO])
+    anexo = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
     itens_desc = list(reversed(itens_asc))
     return JsonResponse(
         {
@@ -689,7 +695,8 @@ def pncp_research_sessions_detail(request, sessao_id: int):
                 "total_grupos_relatorio": len(grupos_relatorio),
                 "formula_calculo": formula_label,
                 "formula_calculo_id": formula_id,
-                "anexo_fornecedor_pdf": PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).exists(),
+                "anexo_fornecedor_pdf": bool(anexo and anexo.arquivo_pdf),
+                "anexo_fornecedor_nome": (anexo.nome_original if anexo else "") or "",
             },
             "itens": [_item_dict(x) for x in itens_desc],
             "grupos_relatorio": grupos_relatorio,
@@ -881,8 +888,10 @@ def pncp_research_sessions_upload_supplier_pdf(request, sessao_id: int):
                 anexo.arquivo_pdf.delete(save=False)
         else:
             anexo = PncpCotacaoAnexo(cotacao=c)
-        anexo.arquivo_pdf = upload
-        anexo.nome_original = name[:255]
+        std_name = _nome_padrao_anexo_fornecedor(c.id)
+        file_bytes = upload.read()
+        anexo.arquivo_pdf.save(std_name, ContentFile(file_bytes), save=False)
+        anexo.nome_original = std_name[:255]
         anexo.tamanho_bytes = size
         anexo.content_type = ctype or "application/pdf"
         anexo.save()

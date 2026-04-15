@@ -140,6 +140,12 @@
           {{ isReopeningCotacao ? 'Reabrindo cotação...' : 'Reabrir Cotação' }}
         </button>
       </section>
+      <section class="cot-fornecedor-field">
+        <span class="cot-fornecedor-field__label">Cotação do Fornecedor</span>
+        <strong class="cot-fornecedor-field__value">
+          {{ supplierPdfFilename || 'Nenhum PDF anexado' }}
+        </strong>
+      </section>
       <input
         ref="importSpreadsheetInput"
         type="file"
@@ -414,9 +420,6 @@
             personalizado, resumo, detalhamento por fontes, CNPJs quando existirem, marca d’água e QR para abrir esta
             mesma cotação no site (com sessão iniciada).
           </p>
-          <p v-if="hasSupplierPdfAttachment" class="cot-relatorio-info">
-            O PDF anexado do fornecedor será acrescentado ao final deste relatório.
-          </p>
           <label class="cot-relatorio-field">
             <span>Título do relatório <abbr title="obrigatório">*</abbr></span>
             <input
@@ -516,6 +519,7 @@ const importSpreadsheetInput = ref(null);
 const supplierPdfInput = ref(null);
 const supplierPdfLoading = ref(false);
 const hasSupplierPdfAttachment = ref(false);
+const supplierPdfFilename = ref('');
 const sessaoStatus = ref('aberta');
 const isClosingCotacao = ref(false);
 const isReopeningCotacao = ref(false);
@@ -812,8 +816,9 @@ async function onSupplierPdfSelected(event) {
   supplierPdfLoading.value = true;
   loadError.value = '';
   try {
-    await uploadSupplierPdfToResearchSession(sessionId, file);
+    const res = await uploadSupplierPdfToResearchSession(sessionId, file);
     hasSupplierPdfAttachment.value = true;
+    supplierPdfFilename.value = String(res?.arquivo?.nome || '').trim() || 'cotacao-fornecedor.pdf';
   } catch (err) {
     loadError.value = `Falha ao anexar PDF do fornecedor: ${err?.message || 'erro desconhecido'}.`;
   } finally {
@@ -917,6 +922,7 @@ async function loadSessionFromBackend() {
       sessaoCriadoPorEmail.value = (s.criado_por_email || '').trim();
       sessaoStatus.value = String(s.status || 'aberta').toLowerCase();
       hasSupplierPdfAttachment.value = !!s.anexo_fornecedor_pdf;
+      supplierPdfFilename.value = String(s.anexo_fornecedor_nome || '').trim();
       totalItensSessao.value = Number(s.total_itens) || 0;
       formulaCalculoId.value = s.formula_calculo_id || 'media_aritmetica_precos_obtidos';
       formulaCalculoLabel.value =
@@ -969,6 +975,7 @@ async function loadSessionFromBackend() {
     sessaoCriadoPorEmail.value = '';
     sessaoStatus.value = 'aberta';
     hasSupplierPdfAttachment.value = false;
+    supplierPdfFilename.value = '';
     totalItensSessao.value = 0;
     formulaCalculoId.value = 'media_aritmetica_precos_obtidos';
     formulaCalculoLabel.value = 'Média aritmética dos preços obtidos';
@@ -1208,6 +1215,25 @@ async function saveTituloNoBackend() {
 .cot-btn--success { background: #166534; color: #fff; border-color: #166534; }
 .cot-btn--disabled { pointer-events: none; opacity: 0.55; }
 .cot-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.cot-fornecedor-field {
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cot-fornecedor-field__label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--color-text-soft);
+}
+.cot-fornecedor-field__value {
+  font-size: 13px;
+  color: #111827;
+  word-break: break-word;
+}
 .cot-hidden-file-input { display: none; }
 
 .cot-new-item-block {

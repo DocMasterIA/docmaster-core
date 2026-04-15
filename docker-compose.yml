@@ -20,13 +20,13 @@ services:
       - ollama_data:/root/.ollama
     restart: unless-stopped
     # GPU: descomente se tiver NVIDIA
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
   llm_api:
     build:

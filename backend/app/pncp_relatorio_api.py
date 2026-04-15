@@ -20,7 +20,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
 
 from backend.app.api import api_login_required
-from backend.app.models import PncpCotacao, PncpCotacaoAnexo
+from backend.app.models import PncpCotacao
 from backend.app.services.pncp_relatorio_pdf import (
     gerar_pdf_relatorio_cotacao,
     nome_arquivo_relatorio,
@@ -49,24 +49,6 @@ def _url_qr_acesso_cotacao_no_sistema(sessao_id: int) -> str:
     base = getattr(settings, "PNCP_RELATORIO_QR_FRONTEND_BASE_URL", "https://docmasteria.com.br")
     base = str(base).strip().rstrip("/") or "https://docmasteria.com.br"
     return f"{base}/pesquisador-pncp/cotacoes/{int(sessao_id)}"
-
-
-def _mesclar_pdf_relatorio_com_anexo(base_pdf_bytes: bytes, anexo_pdf_bytes: bytes) -> bytes:
-    try:
-        from pypdf import PdfReader, PdfWriter
-    except Exception:
-        return base_pdf_bytes
-
-    out = PdfWriter()
-    base_reader = PdfReader(io.BytesIO(base_pdf_bytes))
-    for p in base_reader.pages:
-        out.add_page(p)
-    anexo_reader = PdfReader(io.BytesIO(anexo_pdf_bytes))
-    for p in anexo_reader.pages:
-        out.add_page(p)
-    buf = io.BytesIO()
-    out.write(buf)
-    return buf.getvalue()
 
 
 @api_login_required
@@ -108,18 +90,6 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
             titulo_relatorio=titulo_rel,
             url_verificacao=url_qr,
         )
-        anexo = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
-        if anexo and anexo.arquivo_pdf:
-            try:
-                anexo.arquivo_pdf.open("rb")
-                anexo_bytes = anexo.arquivo_pdf.read()
-            finally:
-                try:
-                    anexo.arquivo_pdf.close()
-                except Exception:
-                    pass
-            if anexo_bytes:
-                pdf_bytes = _mesclar_pdf_relatorio_com_anexo(pdf_bytes, anexo_bytes)
     except Exception as e:
         return JsonResponse(
             {"detail": f"Falha ao gerar PDF ({e}). Verifique se WeasyPrint e dependências estão instaladas."},

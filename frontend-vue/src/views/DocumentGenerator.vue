@@ -694,6 +694,7 @@ const previewImageUrl = computed(() => {
 });
 
 const isEtpLivreRoute = computed(() => route.name === 'EtpLivre');
+const documentTypeHint = computed(() => (isEtpLivreRoute.value ? 'etp' : null));
 const showSlotsCard = computed(() => !isEtpLivreRoute.value);
 
 const selectedFlow = computed(() => TR_DFD_SLOTS_FLOW);
@@ -1269,6 +1270,7 @@ async function submitViaLLM() {
         user_prompt: basePrompt,
         output: 'docx',
         slot_package_key: slotPackageKey.value,
+        ...(documentTypeHint.value ? { document_type_hint: documentTypeHint.value } : {}),
       };
   if (selectedTemplate.value?.id) {
     if (!canUseTemplateByPrefeitura(selectedTemplate.value)) {

@@ -375,9 +375,11 @@ def gerar_via_llm_api(request):
     }
 
     try:
-        resp = requests.post(url, json=body, params=params)
+        resp = requests.post(url, json=body, params=params, timeout=_rag_http_timeout_seconds())
     except requests.exceptions.ConnectionError:
         return JsonResponse({"ok": False, "error": "Serviço de geração indisponível. Verifique se o rag_service está em execução."}, status=503)
+    except requests.exceptions.Timeout:
+        return JsonResponse({"ok": False, "error": "Tempo limite na geração. O rag_service demorou para responder."}, status=504)
     except Exception as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=502)
 

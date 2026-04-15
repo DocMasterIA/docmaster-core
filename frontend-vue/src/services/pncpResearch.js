@@ -128,6 +128,24 @@ export async function importItemsSpreadsheetToResearchSession(sessaoId, file, co
   return payload;
 }
 
+export async function uploadSupplierPdfToResearchSession(sessaoId, file, signal) {
+  const form = new FormData();
+  form.append('arquivo', file);
+  const res = await fetch(
+    `${API_BASE}/api/pncp/cotacoes/research/sessions/${encodeURIComponent(sessaoId)}/attachments/supplier-pdf`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      body: form,
+      signal,
+    },
+  );
+  const ctype = (res.headers.get('content-type') || '').toLowerCase();
+  const payload = ctype.includes('application/json') ? await res.json() : await res.text();
+  if (!res.ok) throw new Error(extractErrorMessage(payload, res.status));
+  return payload;
+}
+
 export function searchLocalItems(payload, signal) {
   return researchRequest('local-index/search-items', { method: 'POST', body: payload, signal });
 }

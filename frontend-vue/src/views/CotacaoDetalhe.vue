@@ -103,9 +103,18 @@
           <i class="fa-solid fa-table" aria-hidden="true"></i>
           Baixar Modelo (Google Sheets CSV)
         </button>
-        <button type="button" class="cot-btn">
+        <button
+          type="button"
+          class="cot-btn"
+          :disabled="supplierPdfLoading || isSessaoFechada"
+          @click="openSupplierPdfPicker"
+        >
           <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
-          Anexar Cotação do Fornecedor
+          {{
+            supplierPdfLoading
+              ? 'Anexando PDF...'
+              : (hasSupplierPdfAttachment ? 'Trocar PDF do Fornecedor' : 'Anexar Cotação do Fornecedor')
+          }}
         </button>
         <button type="button" class="cot-btn cot-btn--primary" @click="openRelatorioModal">
           <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
@@ -137,6 +146,13 @@
         accept=".csv,.xlsx"
         class="cot-hidden-file-input"
         @change="onImportSpreadsheetSelected"
+      />
+      <input
+        ref="supplierPdfInput"
+        type="file"
+        accept="application/pdf,.pdf"
+        class="cot-hidden-file-input"
+        @change="onSupplierPdfSelected"
       />
 
       <section class="cot-new-item-block">
@@ -398,6 +414,9 @@
             personalizado, resumo, detalhamento por fontes, CNPJs quando existirem, marca d’água e QR para abrir esta
             mesma cotação no site (com sessão iniciada).
           </p>
+          <p v-if="hasSupplierPdfAttachment" class="cot-relatorio-info">
+            O PDF anexado do fornecedor será acrescentado ao final deste relatório.
+          </p>
           <label class="cot-relatorio-field">
             <span>Título do relatório <abbr title="obrigatório">*</abbr></span>
             <input
@@ -446,6 +465,7 @@ import {
   downloadCotacaoRelatorioPdf,
   getResearchSession,
   importItemsSpreadsheetToResearchSession,
+  uploadSupplierPdfToResearchSession,
   updateResearchSession,
 } from '../services/pncpResearch';
 
@@ -493,6 +513,9 @@ const formulaCalculoOptions = [
 const isSavingFormula = ref(false);
 const importLoading = ref(false);
 const importSpreadsheetInput = ref(null);
+const supplierPdfInput = ref(null);
+const supplierPdfLoading = ref(false);
+const hasSupplierPdfAttachment = ref(false);
 const sessaoStatus = ref('aberta');
 const isClosingCotacao = ref(false);
 const isReopeningCotacao = ref(false);
@@ -636,6 +659,12 @@ function openImportSpreadsheet() {
   importSpreadsheetInput.value?.click();
 }
 
+function openSupplierPdfPicker() {
+  if (isSessaoFechada.value) return;
+  if (supplierPdfLoading.value) return;
+  supplierPdfInput.value?.click();
+}
+
 function onStartSearchClick(event) {
   if (!isSessaoFechada.value) return;
   event?.preventDefault?.();
@@ -771,6 +800,27 @@ async function onImportSpreadsheetSelected(event) {
   }
 }
 
+async function onSupplierPdfSelected(event) {
+  const sessionId = Number(cotacaoId.value);
+  const file = event?.target?.files?.[0];
+  event.target.value = '';
+  if (Number.isNaN(sessionId)) {
+    loadError.value = 'Cotação inválida para anexar PDF.';
+    return;
+  }
+  if (!file) return;
+  supplierPdfLoading.value = true;
+  loadError.value = '';
+  try {
+    await uploadSupplierPdfToResearchSession(sessionId, file);
+    hasSupplierPdfAttachment.value = true;
+  } catch (err) {
+    loadError.value = `Falha ao anexar PDF do fornecedor: ${err?.message || 'erro desconhecido'}.`;
+  } finally {
+    supplierPdfLoading.value = false;
+  }
+}
+
 function closeRelatorioModal() {
   if (relatorioLoading.value) return;
   relatorioModalOpen.value = false;
@@ -866,6 +916,7 @@ async function loadSessionFromBackend() {
       sessaoCriadoPor.value = s.criado_por || '—';
       sessaoCriadoPorEmail.value = (s.criado_por_email || '').trim();
       sessaoStatus.value = String(s.status || 'aberta').toLowerCase();
+      hasSupplierPdfAttachment.value = !!s.anexo_fornecedor_pdf;
       totalItensSessao.value = Number(s.total_itens) || 0;
       formulaCalculoId.value = s.formula_calculo_id || 'media_aritmetica_precos_obtidos';
       formulaCalculoLabel.value =
@@ -917,6 +968,7 @@ async function loadSessionFromBackend() {
     sessaoCriadoPor.value = '—';
     sessaoCriadoPorEmail.value = '';
     sessaoStatus.value = 'aberta';
+    hasSupplierPdfAttachment.value = false;
     totalItensSessao.value = 0;
     formulaCalculoId.value = 'media_aritmetica_precos_obtidos';
     formulaCalculoLabel.value = 'Média aritmética dos preços obtidos';

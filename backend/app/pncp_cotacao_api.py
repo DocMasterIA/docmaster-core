@@ -24,7 +24,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from backend.app.api import api_login_required
-from backend.app.models import PncpCotacao, PncpCotacaoItem, Prefeitura
+from backend.app.models import PncpCotacao, PncpCotacaoAnexo, PncpCotacaoItem, Prefeitura
 from backend.app.services.pncp_relatorio_itens import (
     agrupar_itens_relatorio_pesquisa_precos,
     resumo_calculo_precos,
@@ -45,6 +45,7 @@ MAX_ITEMS_PER_REQUEST = _cfg_int("PNCP_COTACAO_MAX_ITEMS_PER_REQUEST", 2000)
 BULK_CREATE_BATCH = _cfg_int("PNCP_COTACAO_BULK_CREATE_BATCH", 250)
 MAX_FILTROS_JSON_BYTES = _cfg_int("PNCP_COTACAO_MAX_FILTROS_JSON_BYTES", 32 * 1024)
 MAX_SOURCE_JSON_BYTES = _cfg_int("PNCP_COTACAO_MAX_SOURCE_JSON_BYTES", 120 * 1024)
+MAX_ANEXO_PDF_BYTES = _cfg_int("PNCP_COTACAO_MAX_ANEXO_PDF_BYTES", 30 * 1024 * 1024)
 
 ALLOWED_MODELOS = frozenset({"pesquisa_precos_padrao", "referencia_mercado"})
 ALLOWED_STATUS = frozenset({"aberta", "finalizada", "cancelada"})
@@ -688,6 +689,7 @@ def pncp_research_sessions_detail(request, sessao_id: int):
                 "total_grupos_relatorio": len(grupos_relatorio),
                 "formula_calculo": formula_label,
                 "formula_calculo_id": formula_id,
+                "anexo_fornecedor_pdf": PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).exists(),
             },
             "itens": [_item_dict(x) for x in itens_desc],
             "grupos_relatorio": grupos_relatorio,
@@ -840,6 +842,64 @@ def pncp_research_sessions_add_items(request, sessao_id: int):
         c.save(update_fields=["updated_at"])
 
     return JsonResponse({"ok": True, "sessao_id": c.id, "itens_inseridos": inserted})
+
+
+@api_login_required
+@csrf_exempt
+@require_http_methods(["POST", "OPTIONS"])
+def pncp_research_sessions_upload_supplier_pdf(request, sessao_id: int):
+    if request.method == "OPTIONS":
+        return JsonResponse({}, status=204)
+
+    upload = request.FILES.get("arquivo")
+    if not upload:
+        return JsonResponse({"detail": "Envie o arquivo em 'arquivo'."}, status=422)
+
+    name = str(getattr(upload, "name", "")).strip()
+    ctype = str(getattr(upload, "content_type", "")).lower().strip()
+    if not name.lower().endswith(".pdf"):
+        return JsonResponse({"detail": "Apenas arquivo PDF é aceito."}, status=422)
+    if ctype and ctype not in {"application/pdf", "application/x-pdf"}:
+        return JsonResponse({"detail": "Tipo de arquivo inválido. Envie PDF."}, status=422)
+    size = int(getattr(upload, "size", 0) or 0)
+    if size <= 0:
+        return JsonResponse({"detail": "Arquivo vazio."}, status=422)
+    if size > MAX_ANEXO_PDF_BYTES:
+        return JsonResponse(
+            {"detail": f"Arquivo excede limite de {MAX_ANEXO_PDF_BYTES} bytes."},
+            status=422,
+        )
+
+    with transaction.atomic():
+        c = _cotacao_qs_for_user(request.user).select_for_update().filter(pk=sessao_id).first()
+        if not c:
+            return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
+
+        anexo = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
+        if anexo:
+            if anexo.arquivo_pdf:
+                anexo.arquivo_pdf.delete(save=False)
+        else:
+            anexo = PncpCotacaoAnexo(cotacao=c)
+        anexo.arquivo_pdf = upload
+        anexo.nome_original = name[:255]
+        anexo.tamanho_bytes = size
+        anexo.content_type = ctype or "application/pdf"
+        anexo.save()
+        c.save(update_fields=["updated_at"])
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "sessao_id": c.id,
+            "anexo_fornecedor_pdf": True,
+            "arquivo": {
+                "nome": anexo.nome_original,
+                "tamanho_bytes": anexo.tamanho_bytes,
+                "content_type": anexo.content_type,
+            },
+        }
+    )
 
 
 @api_login_required

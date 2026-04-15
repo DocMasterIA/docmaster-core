@@ -67,3 +67,22 @@ class PncpCotacaoItem(models.Model):
         indexes = [
             models.Index(fields=["cotacao", "-id"]),
         ]
+
+
+class PncpCotacaoAnexo(models.Model):
+    """Anexo PDF do fornecedor para composição do relatório final."""
+
+    cotacao = models.OneToOneField(
+        PncpCotacao,
+        on_delete=models.CASCADE,
+        related_name="anexo_fornecedor",
+    )
+    arquivo_pdf = models.FileField(upload_to="pncp/cotacoes/anexos_fornecedor/")
+    nome_original = models.CharField(max_length=255, blank=True, default="")
+    tamanho_bytes = models.BigIntegerField(default=0)
+    content_type = models.CharField(max_length=120, blank=True, default="application/pdf")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-id"]

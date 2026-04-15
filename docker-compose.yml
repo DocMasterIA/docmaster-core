@@ -18,6 +18,9 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_FLASH_ATTENTION=true
+      - OLLAMA_MAX_LOADED_MODELS=1
     restart: unless-stopped
     # GPU: descomente se tiver NVIDIA
     deploy:
@@ -27,6 +30,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+              
 
   llm_api:
     build:

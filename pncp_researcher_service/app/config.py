@@ -27,6 +27,13 @@ def _env_timeout(key: str, default: float) -> float | None:
     return v
 
 
+def _env_bool(key: str, default: bool) -> bool:
+    raw = os.getenv(key)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
 PNCP_BASE_URL: str = os.getenv("PNCP_BASE_URL", "https://pncp.gov.br/api/consulta").rstrip("/")
 # API de compras/itens/arquivos (diferente da API de consulta por publicação).
 PNCP_PNCP_API_BASE_URL: str = os.getenv("PNCP_PNCP_API_BASE_URL", "https://pncp.gov.br/pncp-api").rstrip("/")
@@ -103,3 +110,11 @@ PNCP_LOCAL_BACKFILL_MONTHS: int = _env_int("PNCP_LOCAL_BACKFILL_MONTHS", 12)
 PNCP_LOCAL_INCLUDE_ITEMS: bool = os.getenv(
     "PNCP_LOCAL_INCLUDE_ITEMS", "true"
 ).strip().lower() in {"1", "true", "yes", "on"}
+
+# Re-ranking leve com LLM para escolher os 3 melhores itens.
+PNCP_IA_RERANK_ENABLED: bool = _env_bool("PNCP_IA_RERANK_ENABLED", False)
+PNCP_IA_BASE_URL: str = os.getenv("PNCP_IA_BASE_URL", "http://qwen_llm_service:8015").rstrip("/")
+PNCP_IA_GENERATE_PATH: str = os.getenv("PNCP_IA_GENERATE_PATH", "/api/llm/generate")
+PNCP_IA_MODEL: str = os.getenv("PNCP_IA_MODEL", "").strip()
+PNCP_IA_TIMEOUT_SECONDS: float = float(os.getenv("PNCP_IA_TIMEOUT_SECONDS", "4.5"))
+PNCP_IA_MAX_CANDIDATES: int = _env_int("PNCP_IA_MAX_CANDIDATES", 36)

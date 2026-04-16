@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from statistics import mean, median
 from typing import Any, Dict, List, Optional
+import json
 import re
 import unicodedata
 import math
@@ -23,6 +24,12 @@ from .config import (
     PNCP_ITEM_AMOSTRA_LINHAS,
     PNCP_REQUIRE_TABLE_MATCH_WHEN_ITENS_EXIST,
     PNCP_LOCAL_AUTO_INGEST,
+    PNCP_IA_RERANK_ENABLED,
+    PNCP_IA_BASE_URL,
+    PNCP_IA_GENERATE_PATH,
+    PNCP_IA_MODEL,
+    PNCP_IA_TIMEOUT_SECONDS,
+    PNCP_IA_MAX_CANDIDATES,
 )
 from .pncp_client import create_pncp_http_client, search_contracts, get_contract_items
 from .local_index import upsert_contracts, local_item_search
@@ -845,6 +852,95 @@ def _select_top3_with_diversity(items: List[Dict[str, Any]]) -> List[Dict[str, A
     return selected[:3]
 
 
+def _safe_float(value: Any) -> float:
+    try:
+        out = float(value)
+    except Exception:
+        return 0.0
+    if math.isnan(out) or math.isinf(out):
+        return 0.0
+    return out
+
+
+def _build_ia_rerank_prompt(termo_busca: str, candidatos: List[Dict[str, Any]]) -> str:
+    linhas: List[str] = []
+    for c in candidatos:
+        linhas.append(
+            f"- id={c.get('_ia_id')} | desc={c.get('descricao_item') or ''} | mat={c.get('material_servico') or ''} "
+            f"| qtd={c.get('quantidade') or ''} {c.get('unidade_medida') or ''} | valor={c.get('valor_unitario') or c.get('valor_total') or ''} "
+            f"| orgao={c.get('orgao') or ''} | uf={c.get('uf') or ''}"
+        )
+    itens_txt = "\n".join(linhas)
+    return (
+        "Você é um avaliador de cotações PNCP.\n"
+        f"Termo de busca: {termo_busca}\n\n"
+        "Escolha EXATAMENTE 3 IDs mais aderentes ao termo, com boa leitura de descrição e preço saudável.\n"
+        "Priorize item principal no texto (não detalhe secundário de outro produto).\n"
+        "Quando o termo NÃO for médico, evite itens médicos/hospitalares.\n"
+        "Considere unidade/quantidade e descarte outliers de preço muito fora da faixa.\n\n"
+        "Responda APENAS JSON válido neste formato:\n"
+        '{"selected":[{"id":"...","score_aprovacao":0,"confiabilidade":"Alta|Média|Baixa","risco":"Baixo|Médio|Alto","justificativa":"..."}]}\n\n'
+        f"Candidatos:\n{itens_txt}\n"
+    )
+
+
+def _parse_ia_rerank_response(raw_text: str) -> List[Dict[str, Any]]:
+    txt = (raw_text or "").strip()
+    if not txt:
+        return []
+    start = txt.find("{")
+    end = txt.rfind("}")
+    if start >= 0 and end > start:
+        txt = txt[start : end + 1]
+    try:
+        data = json.loads(txt)
+    except Exception:
+        return []
+    selected = data.get("selected")
+    if not isinstance(selected, list):
+        return []
+    out: List[Dict[str, Any]] = []
+    for entry in selected:
+        if not isinstance(entry, dict):
+            continue
+        item_id = str(entry.get("id") or "").strip()
+        if not item_id:
+            continue
+        out.append(
+            {
+                "id": item_id,
+                "score_aprovacao": int(max(0, min(100, _safe_float(entry.get("score_aprovacao"))))),
+                "confiabilidade": str(entry.get("confiabilidade") or "").strip() or None,
+                "risco": str(entry.get("risco") or "").strip() or None,
+                "justificativa": str(entry.get("justificativa") or "").strip() or None,
+            }
+        )
+    return out
+
+
+async def _rerank_top3_with_ia(
+    termo_busca: str,
+    candidatos: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    if not PNCP_IA_RERANK_ENABLED or not candidatos:
+        return []
+    prompt = _build_ia_rerank_prompt(termo_busca, candidatos)
+    payload: Dict[str, Any] = {"prompt": prompt, "stream": False}
+    if PNCP_IA_MODEL:
+        payload["model"] = PNCP_IA_MODEL
+    url = f"{PNCP_IA_BASE_URL}{PNCP_IA_GENERATE_PATH}"
+    timeout = httpx.Timeout(PNCP_IA_TIMEOUT_SECONDS)
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            body = resp.json()
+    except Exception:
+        return []
+    text = str(((body or {}).get("data") or {}).get("response") or "")
+    return _parse_ia_rerank_response(text)
+
+
 async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, Any]:
     """
     Versão inteligente da busca manual:
@@ -915,12 +1011,51 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         ),
         reverse=True,
     )
-    top3 = _select_top3_with_diversity(scored)[:3]
+
+    top3: List[Dict[str, Any]] = []
+    ia_used = False
+    if PNCP_IA_RERANK_ENABLED and scored:
+        limite_candidatos = max(6, min(PNCP_IA_MAX_CANDIDATES, len(scored)))
+        candidatos_ia: List[Dict[str, Any]] = []
+        for idx, base_item in enumerate(scored[:limite_candidatos]):
+            row = dict(base_item)
+            row["_ia_id"] = f"cand-{idx}"
+            candidatos_ia.append(row)
+        ia_selected = await _rerank_top3_with_ia(payload.termo_busca, candidatos_ia)
+        if ia_selected:
+            by_id = {str(c.get("_ia_id")): c for c in candidatos_ia}
+            chosen: List[Dict[str, Any]] = []
+            for picked in ia_selected:
+                cid = str(picked.get("id") or "")
+                row = by_id.get(cid)
+                if not row:
+                    continue
+                out = dict(row)
+                out.pop("_ia_id", None)
+                if picked.get("score_aprovacao") is not None:
+                    out["score_aprovacao"] = int(picked["score_aprovacao"])
+                if picked.get("confiabilidade"):
+                    out["confiabilidade"] = picked["confiabilidade"]
+                if picked.get("risco"):
+                    out["risco"] = picked["risco"]
+                if picked.get("justificativa"):
+                    out["ia_justificativa"] = picked["justificativa"]
+                chosen.append(out)
+                if len(chosen) >= 3:
+                    break
+            if chosen:
+                top3 = _select_top3_with_diversity(chosen)[:3]
+                ia_used = True
+
+    if not top3:
+        top3 = _select_top3_with_diversity(scored)[:3]
 
     out_stats = dict(base_items.get("stats") or {})
     out_stats["total_registros_ia"] = len(scored)
     out_stats["total_selecionados_ia"] = len(top3)
     out_stats["regra_selecao"] = "top3_com_diversidade_orgao"
+    out_stats["ia_rerank_ativo"] = bool(PNCP_IA_RERANK_ENABLED)
+    out_stats["ia_rerank_usado"] = ia_used
 
     return {
         "ok": bool(base_items.get("ok", True)),

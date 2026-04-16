@@ -20,7 +20,7 @@
       <section class="bia-summary">
         <div class="bia-summary-card">
           <span>Resultados</span>
-          <strong>{{ filteredRows.length }}</strong>
+          <strong>{{ displayedRows.length }}</strong>
         </div>
         <div class="bia-summary-card">
           <span>Media</span>
@@ -49,6 +49,7 @@
         <label class="bia-filter">
           <span>Tipo</span>
           <select v-model="filtros.tipo">
+            <option>Todos</option>
             <option>Material</option>
             <option>Servico</option>
           </select>
@@ -98,23 +99,68 @@
         </div>
         <button type="button" class="bia-search-btn" @click="applyFilters">Buscar</button>
       </section>
+      <section class="bia-controls">
+        <div class="bia-controls__left">
+          <label class="bia-filter">
+            <span>Ordenar por</span>
+            <select v-model="filtros.ordenarPor">
+              <option>Produto</option>
+              <option>Quantidade</option>
+              <option>Valor</option>
+              <option>UF</option>
+              <option>Score</option>
+            </select>
+          </label>
+          <label class="bia-filter">
+            <span>Ordem</span>
+            <select v-model="filtros.ordem">
+              <option>Decrescente</option>
+              <option>Crescente</option>
+            </select>
+          </label>
+        </div>
+        <div class="bia-controls__right">
+          <label class="bia-filter">
+            <span>Valor Base</span>
+            <input v-model="filtros.valorBase" type="text" inputmode="decimal" placeholder="Ex.: 1500,00" />
+          </label>
+          <label class="bia-filter">
+            <span>Variação %</span>
+            <input
+              :value="filtros.variacao"
+              type="text"
+              inputmode="numeric"
+              maxlength="3"
+              @input="onVariacaoInput"
+            />
+          </label>
+        </div>
+      </section>
       <p v-if="searchError" class="bia-meta bia-meta--error">{{ searchError }}</p>
       <p v-else-if="isSearching" class="bia-meta">Consultando backend PNCP...</p>
+      <p v-if="faixaValorAtiva" class="bia-meta">
+        Faixa ativa por Valor Base + Variação: <strong>{{ faixaValorAtiva }}</strong>
+      </p>
 
       <section class="bia-table-shell">
         <div class="bia-table-head">
           <div class="bia-table-head__pills">
             <span class="bia-pill bia-pill--ok">{{ displayedRows.length }} resultados</span>
+            <span class="bia-pill">{{ totalUfs }} UFs</span>
           </div>
           <RouterLink
             :to="`/pesquisador-pncp/cotacoes/${cotacaoId}`"
-            class="bia-add-cotacao-btn"
+            class="bia-add-cotacao-btn bia-add-cotacao-btn--ghost"
           >
-            <i class="fa-solid fa-plus" aria-hidden="true"></i>
-            Adicionar itens na cotação {{ cotacaoId }}
+            Ir para cotação
           </RouterLink>
-          <button type="button" class="bia-add-cotacao-btn" @click="adicionarSelecionadosNaCotacao">
-            Salvar selecionados
+          <button
+            type="button"
+            class="bia-add-cotacao-btn"
+            :disabled="isSavingSelecionados || totalSelecionados === 0"
+            @click="adicionarSelecionadosNaCotacao"
+          >
+            {{ isSavingSelecionados ? 'Salvando...' : 'Salvar selecionados' }}
           </button>
         </div>
         <p v-if="saveMessage" class="bia-meta">{{ saveMessage }}</p>
@@ -123,41 +169,39 @@
           <table class="bia-table">
             <thead>
               <tr>
-                <th>Selecao</th>
-                <th>Cotacao</th>
-                <th>Orgao / Local</th>
-                <th>Processo</th>
-                <th>Qtd.</th>
-                <th>Valor</th>
-                <th>Score</th>
-                <th>Confiabilidade</th>
+                <th>Seleção</th>
+                <th>Cotação</th>
+                <th>Quantidade</th>
+                <th>UF</th>
+                <th>Data</th>
+                <th>Valor Unit.</th>
+                <th>Confiabilidade IA</th>
                 <th>Risco</th>
-                <th>Status</th>
-                <th>Acoes</th>
+                <th>Score</th>
+                <th>Observação</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="row in displayedRows" :key="row.id">
-                <td><input type="checkbox" :checked="row.selecionado" @change="toggleSelecionado(row.id)" /></td>
+                <td class="bia-cell-center">
+                  <input type="checkbox" :checked="row.selecionado" @change="toggleSelecionado(row.id)" />
+                </td>
                 <td>
-                  <div class="bia-cotacao-line">
-                    <div class="bia-main">{{ row.titulo }}</div>
-                    <div class="bia-meta-inline">
-                      <span>Item: <strong>{{ row.item }}</strong></span>
-                      <span>IA: <strong>{{ row.normalizado }}</strong></span>
-                      <span>Modalidade: {{ row.modalidade }} • Data: {{ row.data }}</span>
-                    </div>
+                  <div class="bia-main">{{ row.titulo }}</div>
+                  <div class="bia-sub">
+                    <span class="bia-meta-token">{{ row.orgao }}</span>
+                    <span v-if="row.cidade && row.cidade !== '-'" class="bia-meta-sep">·</span>
+                    <span v-if="row.cidade && row.cidade !== '-'">{{ row.cidade }}</span>
+                  </div>
+                  <div class="bia-sub">
+                    {{ row.modalidade }} • {{ row.status }} • {{ row.normalizado }}
                   </div>
                 </td>
-                <td>
-                  <div class="bia-main">{{ row.orgao }}</div>
-                  <div class="bia-sub">{{ row.cidade }}</div>
-                </td>
-                <td>{{ row.processo }}</td>
                 <td>{{ row.qtd }}</td>
+                <td class="bia-cell-center">{{ row.uf }}</td>
+                <td class="bia-cell-center">{{ row.data }}</td>
                 <td class="bia-bold">{{ row.valor }}</td>
-                <td>{{ row.score }}</td>
-                <td>
+                <td class="bia-cell-center">
                   <span
                     class="bia-badge"
                     :class="confiabilidadeClass(row.confiabilidade)"
@@ -165,7 +209,7 @@
                     {{ row.confiabilidade }}
                   </span>
                 </td>
-                <td>
+                <td class="bia-cell-center">
                   <span
                     class="bia-badge"
                     :class="riscoClass(row.risco)"
@@ -173,19 +217,8 @@
                     {{ row.risco }}
                   </span>
                 </td>
-                <td><span class="bia-badge">{{ row.status }}</span></td>
-                <td>
-                  <div class="bia-actions">
-                    <button type="button" class="bia-action-btn bia-action-btn--primary">
-                      <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
-                      Docs
-                    </button>
-                    <button type="button" class="bia-action-btn">
-                      <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
-                      IA
-                    </button>
-                  </div>
-                </td>
+                <td class="bia-cell-center">{{ row.score }}</td>
+                <td>{{ row.processo }}</td>
               </tr>
             </tbody>
           </table>
@@ -196,7 +229,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { addItemsToResearchSession, intelligentMarketSearch } from '../services/pncpResearch';
 
@@ -208,8 +241,32 @@ const filtros = reactive({
   periodo: 'Ultimos 12 meses',
   tipo: 'Material',
   modalidade: 'Todas',
+  ordenarPor: 'Produto',
+  ordem: 'Decrescente',
+  valorBase: '',
+  variacao: '0',
   ufs: ['GO', 'MS'],
 });
+
+const MODALIDADE_TO_CODIGO = {
+  Pregao: 8,
+  'Pregão Eletrônico': 8,
+  'Pregão Eletrônico SRP': 8,
+  Concorrencia: 6,
+  Concorrência: 6,
+  'Concorrência eletrônica': 6,
+  'Chamada Publica': 7,
+  'Chamada Pública': 7,
+  Dispensa: 9,
+  'Compra direta': 9,
+  'Dispensa Eletrônica': 9,
+  Inexigibilidade: 10,
+  Leilao: 11,
+  Leilão: 11,
+  Concurso: 12,
+  'Dialogo Competitivo': 13,
+  'Diálogo Competitivo': 13,
+};
 
 const UF_FLAGS = {
   AC: new URL('../assets/estados/02-acre-full.svg', import.meta.url).href,
@@ -300,17 +357,26 @@ function toggleAllUfs(event) {
 }
 
 const rows = ref([]);
-const filteredRows = ref([]);
-const displayedRows = computed(() => filteredRows.value);
 const isSearching = ref(false);
 const searchError = ref('');
 const saveMessage = ref('');
-const totalSelecionados = computed(() => filteredRows.value.filter((x) => x.selecionado).length);
+const isSavingSelecionados = ref(false);
+const totalSelecionados = computed(() => displayedRows.value.filter((x) => x.selecionado).length);
+const totalUfs = computed(() => new Set(displayedRows.value.map((x) => x.uf).filter(Boolean)).size);
 const mediaValor = computed(() => {
-  const nums = filteredRows.value.map((x) => parseMoeda(x.valor)).filter((x) => typeof x === 'number');
+  const nums = displayedRows.value.map((x) => parseMoeda(x.valor)).filter((x) => typeof x === 'number');
   if (!nums.length) return 'R$ -';
   const media = nums.reduce((a, b) => a + b, 0) / nums.length;
   return formatCurrency(media);
+});
+const faixaValorAtiva = computed(() => {
+  const base = parseMoeda(filtros.valorBase);
+  if (base == null || base <= 0) return '';
+  const p = Number.parseFloat(String(filtros.variacao || '0'));
+  const perc = Number.isFinite(p) ? Math.max(0, p) : 0;
+  const min = base * (1 - perc / 100);
+  const max = base * (1 + perc / 100);
+  return `${formatCurrency(min)} até ${formatCurrency(max)} (${perc}% para baixo/cima)`;
 });
 
 function confiabilidadeClass(value) {
@@ -327,32 +393,111 @@ function riscoClass(value) {
   return '';
 }
 
+const displayedRows = computed(() => {
+  const base = [...rows.value];
+  const valorBase = parseMoeda(filtros.valorBase);
+  const variacao = Number.parseFloat(String(filtros.variacao || '0'));
+  const variacaoValida = Number.isFinite(variacao) ? Math.max(0, variacao) : 0;
+
+  let filtrados = base;
+  if (valorBase != null && valorBase > 0) {
+    const fator = variacaoValida / 100;
+    const min = valorBase * (1 - fator);
+    const max = valorBase * (1 + fator);
+    filtrados = filtrados.filter((item) => {
+      const vBruto = item.valorUnitario ?? item.valorTotal ?? parseMoeda(item.valor);
+      const v = Number(vBruto);
+      return Number.isFinite(v) && v >= min && v <= max;
+    });
+  }
+  if (filtros.ufs.length > 0 && filtros.ufs.length < ufOptions.length) {
+    const selected = new Set(filtros.ufs);
+    filtrados = filtrados.filter((item) => selected.has(String(item.uf || '').toUpperCase()));
+  }
+  if (filtros.periodo) {
+    filtrados = filtrados.filter((item) => isWithinPeriodo(item.data, filtros.periodo));
+  }
+  if (filtros.tipo && filtros.tipo !== 'Todos') {
+    const tipoSelecionado = normalizeText(filtros.tipo);
+    filtrados = filtrados.filter((item) => normalizeText(resolveTipoItem(item)) === tipoSelecionado);
+  }
+  if (filtros.modalidade && filtros.modalidade !== 'Todas') {
+    const modalidadeSelecionada = normalizeText(filtros.modalidade);
+    filtrados = filtrados.filter((item) =>
+      normalizeText(item.modalidade || '').includes(modalidadeSelecionada)
+    );
+  }
+
+  const ordem = filtros.ordem === 'Crescente' ? 1 : -1;
+  const byText = (a, b, pick) => String(pick(a) || '').localeCompare(String(pick(b) || ''), 'pt-BR');
+  const byNumber = (a, b, pick) => {
+    const av = Number(pick(a));
+    const bv = Number(pick(b));
+    const ax = Number.isFinite(av) ? av : Number.POSITIVE_INFINITY;
+    const bx = Number.isFinite(bv) ? bv : Number.POSITIVE_INFINITY;
+    return ax - bx;
+  };
+
+  filtrados.sort((a, b) => {
+    let cmp = 0;
+    if (filtros.ordenarPor === 'Quantidade') {
+      cmp = byNumber(a, b, (x) => x.quantidadeNum);
+    } else if (filtros.ordenarPor === 'Valor') {
+      cmp = byNumber(a, b, (x) => x.valorUnitario ?? x.valorTotal ?? parseMoeda(x.valor));
+    } else if (filtros.ordenarPor === 'UF') {
+      cmp = byText(a, b, (x) => x.uf);
+    } else if (filtros.ordenarPor === 'Score') {
+      cmp = byNumber(a, b, (x) => x.score);
+    } else {
+      cmp = byText(a, b, (x) => x.titulo);
+    }
+    if (cmp === 0) cmp = byText(a, b, (x) => x.titulo);
+    return cmp * ordem;
+  });
+
+  return filtrados;
+});
+
 async function applyFilters() {
   if (!filtros.descricao.trim()) return;
   isSearching.value = true;
   searchError.value = '';
   try {
+    const codigoModalidade =
+      filtros.modalidade && filtros.modalidade !== 'Todas'
+        ? (MODALIDADE_TO_CODIGO[filtros.modalidade] ?? null)
+        : null;
     const backend = await intelligentMarketSearch({
       termo_busca: filtros.descricao.trim(),
       uf: filtros.ufs.length === 1 ? filtros.ufs[0] : null,
-      codigo_modalidade: null,
-      max_paginas: 8,
-      tamanho_pagina: 50,
+      codigo_modalidade: codigoModalidade,
+      max_paginas: 500,
+      tamanho_pagina: 200,
     });
     if (backend?.ok && Array.isArray(backend.itens)) {
       const mapped = backend.itens.map((it, idx) => ({
         id: `backend-${idx}-${it.numero_pncp || ''}`,
+        sourceRaw: it,
         numeroPncp: it.numero_pncp || null,
-        titulo: it.descricao_item || it.objeto_resumido || 'Item sem descrição',
-        item: it.descricao_item || '-',
-        normalizado: it.material_servico || '-',
+        anoCompra: it.ano_compra ?? null,
+        sequencialCompra: it.sequencial_compra ?? null,
+        numeroItem: it.numero_item ?? null,
+        titulo: it.descricao_item || it.objeto_resumido || 'Descrição indisponível',
+        item: it.descricao_item || it.objeto_resumido || '-',
+        normalizado: it.material_servico || resolveTipoItem(it) || '-',
         orgao: it.orgao || '-',
         cidade: `${it.municipio || '-'}${it.uf ? `/${it.uf}` : ''}`,
+        uf: it.uf || '-',
+        municipio: it.municipio || null,
         modalidade: it.modalidade || '-',
         processo: it.numero_pncp || '-',
         data: it.data_publicacao || '-',
-        qtd: it.quantidade || '-',
-        valor: formatCurrency(it.valor_global ?? it.valor_unitario ?? it.valor_total ?? 0),
+        qtd: `${it.quantidade || '-'} ${it.unidade_medida || ''}`.trim(),
+        quantidadeNum: it.quantidade ?? null,
+        unidadeMedida: it.unidade_medida || null,
+        valor: formatCurrency(it.valor_unitario ?? it.valor_total ?? 0),
+        valorUnitario: it.valor_unitario ?? null,
+        valorTotal: it.valor_total ?? null,
         score: Number.isFinite(Number(it.score_aprovacao)) ? Number(it.score_aprovacao) : 0,
         confiabilidade: it.confiabilidade || 'Média',
         risco: it.risco || 'Médio',
@@ -360,7 +505,6 @@ async function applyFilters() {
         selecionado: false,
       }));
       rows.value = mapped;
-      filteredRows.value = mapped;
       if (!mapped.length) {
         searchError.value = 'A IA não encontrou 3 cotações aderentes para este termo no recorte atual.';
       }
@@ -379,24 +523,33 @@ function formatCurrency(v) {
 }
 
 function toggleSelecionado(id) {
-  filteredRows.value = filteredRows.value.map((r) => (r.id === id ? { ...r, selecionado: !r.selecionado } : r));
+  rows.value = rows.value.map((r) => (r.id === id ? { ...r, selecionado: !r.selecionado } : r));
 }
 
 async function adicionarSelecionadosNaCotacao() {
+  if (isSavingSelecionados.value) return;
   const sessionId = Number(cotacaoId.value);
   if (Number.isNaN(sessionId)) {
     saveMessage.value = 'Cotação inválida para salvar no backend.';
     return;
   }
-  const itens = filteredRows.value
+  const itens = displayedRows.value
     .filter((r) => r.selecionado)
     .map((r) => ({
       numero_pncp: r.numeroPncp,
+      ano_compra: r.anoCompra,
+      sequencial_compra: r.sequencialCompra,
+      numero_item: r.numeroItem,
       descricao_item: r.item,
       orgao: r.orgao,
-      municipio: r.cidade,
+      municipio: r.municipio,
+      uf: r.uf,
+      quantidade: r.quantidadeNum,
+      unidade_medida: r.unidadeMedida,
       modalidade: r.modalidade,
-      valor_unitario: parseMoeda(r.valor),
+      valor_unitario: r.valorUnitario ?? parseMoeda(r.valor),
+      valor_total: r.valorTotal,
+      material_servico: r.normalizado,
     }));
   if (!itens.length) {
     saveMessage.value = 'Selecione ao menos um item.';
@@ -409,10 +562,13 @@ async function adicionarSelecionadosNaCotacao() {
     saveMessage.value = `Limite de ${MAX_ITENS_POR_ENVIO} itens por envio; gravando os primeiros ${MAX_ITENS_POR_ENVIO}.`;
   }
   try {
+    isSavingSelecionados.value = true;
     const res = await addItemsToResearchSession(sessionId, enviar);
     saveMessage.value = `${res.itens_inseridos ?? enviar.length} item(ns) adicionados à cotação.`;
   } catch (err) {
     saveMessage.value = `Falha ao salvar: ${err.message || 'erro desconhecido'}`;
+  } finally {
+    isSavingSelecionados.value = false;
   }
 }
 
@@ -421,9 +577,67 @@ function parseMoeda(v) {
   return Number.isNaN(n) ? null : n;
 }
 
-onMounted(() => {
-  // Inicia vazio para forçar intenção de busca do usuário.
-});
+function normalizeText(v) {
+  return String(v ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function parseDateFlexible(v) {
+  const s = String(v ?? '').trim();
+  if (!s) return null;
+  const br = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (br) {
+    const d = new Date(Number(br[3]), Number(br[2]) - 1, Number(br[1]));
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function isWithinPeriodo(itemDate, periodoLabel) {
+  const dt = parseDateFlexible(itemDate);
+  if (!dt) return true;
+  const now = new Date();
+  const label = normalizeText(periodoLabel);
+  let months = 12;
+  if (label.includes('3')) {
+    months = 3;
+  } else if (label.includes('6')) {
+    months = 6;
+  } else if (label.includes('24')) {
+    months = 24;
+  } else if (label.includes('12') || label.includes('ano')) {
+    months = 12;
+  }
+  const cutoff = new Date(now);
+  cutoff.setMonth(cutoff.getMonth() - months);
+  return dt >= cutoff;
+}
+
+function resolveTipoItem(item) {
+  const materialServico = normalizeText(item?.sourceRaw?.material_servico || item?.material_servico || item?.normalizado || '');
+  if (materialServico.includes('servico') || materialServico.includes('serviço')) return 'Servico';
+  if (materialServico.includes('material')) return 'Material';
+  const desc = normalizeText(item?.descricao || item?.item || item?.titulo || '');
+  if (desc.includes('servico') || desc.includes('serviço')) return 'Servico';
+  return 'Material';
+}
+
+function onVariacaoInput(event) {
+  const raw = String(event.target.value || '');
+  const onlyDigits = raw.replace(/\D/g, '');
+  if (!onlyDigits) {
+    filtros.variacao = '0';
+    event.target.value = '0';
+    return;
+  }
+  const normalized = String(Math.min(100, Math.max(0, Number.parseInt(onlyDigits, 10))));
+  filtros.variacao = normalized;
+  event.target.value = normalized;
+}
 </script>
 
 <style scoped>
@@ -443,6 +657,9 @@ onMounted(() => {
 .bia-summary-card--highlight strong { color: #0f4c81; }
 
 .bia-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 6px; align-items: stretch; }
+.bia-controls { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.bia-controls__left,
+.bia-controls__right { display: flex; flex-wrap: wrap; gap: 8px; }
 .bia-filter { border: 1px solid #d6dde8; border-radius: 10px; background: #f8fafc; padding: 7px 8px; display: flex; flex-direction: column; gap: 4px; }
 .bia-filter > span { font-size: 9px; color: #64748b; text-transform: uppercase; line-height: 1.1; }
 .bia-meta { margin: 2px 0 0; font-size: 12px; color: #64748b; }
@@ -581,6 +798,14 @@ onMounted(() => {
 .bia-add-cotacao-btn:hover {
   filter: brightness(0.95);
 }
+.bia-add-cotacao-btn--ghost {
+  background: #fff;
+  color: #1f4e79;
+}
+.bia-add-cotacao-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
 .bia-pill { border: 1px solid #d5dde9; background: #eef2f7; color: #475569; border-radius: 999px; padding: 3px 10px; font-size: 12px; }
 .bia-pill--ok { border-color: #b7d2ef; background: #e8f1fb; color: #1f4e79; }
 .bia-pill--warn { border-color: #f2dfb7; background: #fff7e6; color: #9a6a10; }
@@ -595,45 +820,12 @@ onMounted(() => {
 }
 .bia-main { font-weight: 600; color: #0f172a; line-height: 1.3; }
 .bia-sub { color: #64748b; margin-top: 4px; line-height: 1.4; }
-.bia-cotacao-line { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.bia-meta-inline { display: inline-flex; gap: 10px; flex-wrap: wrap; color: #64748b; font-size: 11px; line-height: 1.3; }
-.bia-meta-inline span { white-space: nowrap; }
+.bia-cell-center { text-align: center; }
+.bia-meta-token { white-space: nowrap; }
+.bia-meta-sep { margin: 0 6px; color: #94a3b8; }
 .bia-bold { font-weight: 700; white-space: nowrap; }
 .bia-badge { display: inline-flex; border: 1px solid #d5dde9; border-radius: 999px; padding: 2px 8px; font-size: 10px; white-space: nowrap; }
 .bia-badge--ok { border-color: #b7d2ef; background: #e8f1fb; color: #1f4e79; }
 .bia-badge--warn { border-color: #f2dfb7; background: #fff7e6; color: #9a6a10; }
 .bia-badge--danger { border-color: #f0c8c8; background: #fff0f0; color: #a63f3f; }
-.bia-actions { display: flex; flex-direction: row; gap: 4px; min-width: 94px; }
-.bia-action-btn {
-  border: 1px solid #cfd8e3;
-  border-radius: 8px;
-  background: #fff;
-  color: #1f2937;
-  padding: 5px 6px;
-  font-size: 10px;
-  text-align: center;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-width: 44px;
-  transition: background-color .15s ease, border-color .15s ease, color .15s ease;
-}
-
-.bia-action-btn:hover {
-  background: #f6f9fc;
-}
-
-.bia-action-btn:focus-visible {
-  outline: none;
-  border-color: #1f4e79;
-  box-shadow: 0 0 0 2px rgba(31, 78, 121, 0.12);
-}
-
-.bia-action-btn--primary {
-  border-color: #1f4e79;
-  background: #e8f1fb;
-  color: #1f4e79;
-}
 </style>

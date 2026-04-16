@@ -25,7 +25,7 @@ from .config import (
     PNCP_LOCAL_AUTO_INGEST,
 )
 from .pncp_client import create_pncp_http_client, search_contracts, get_contract_items
-from .local_index import upsert_contracts
+from .local_index import upsert_contracts, local_item_search
 from .schemas import MarketSearchRequest
 
 
@@ -768,22 +768,48 @@ def _select_top3_with_diversity(items: List[Dict[str, Any]]) -> List[Dict[str, A
 
 async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, Any]:
     """
-    Busca PNCP + seleção inteligente de exatamente 3 cotações.
-    Score final (0-100) combina:
-    - aderência semântica
-    - confirmação em tabela de itens
-    - recência
-    - coerência de valor
+    Versão inteligente da busca manual:
+    - usa o mesmo índice local de itens PNCP (local_item_search);
+    - aplica score 0-100 por item;
+    - retorna exatamente 3 cotações com diversidade de órgão.
     """
-    base = await market_search(payload)
-    itens = list(base.get("itens") or [])
-    valores = [x.get("valor_global") for x in itens if isinstance(x.get("valor_global"), (int, float)) and x.get("valor_global", 0) > 0]
+    # Reutiliza a mesma fonte da busca manual (itens PNCP normalizados)
+    limit = max(50, payload.max_paginas * payload.tamanho_pagina)
+    base_items = local_item_search(
+        payload.termo_busca,
+        uf=payload.uf,
+        codigo_modalidade=payload.codigo_modalidade,
+        limit=limit,
+    )
+    itens = list(base_items.get("itens") or [])
+    if not itens:
+        return {
+            "ok": True,
+            "filtros": {
+                "termo_busca": payload.termo_busca,
+                "uf": payload.uf,
+                "codigo_municipio_ibge": payload.codigo_municipio_ibge,
+                "codigo_modalidade": payload.codigo_modalidade,
+                "pagina_inicial": payload.pagina,
+                "max_paginas": payload.max_paginas,
+                "tamanho_pagina": payload.tamanho_pagina,
+                "fonte": "local_item_search",
+            },
+            "stats": base_items.get("stats", {}),
+            "itens": [],
+        }
+
+    query_groups = _build_query_groups(payload.termo_busca)
+    valores = [x.get("valor_unitario") or x.get("valor_total") for x in itens if isinstance((x.get("valor_unitario") or x.get("valor_total")), (int, float)) and (x.get("valor_unitario") or x.get("valor_total") or 0) > 0]
     median_val = median(valores) if valores else None
 
     scored: List[Dict[str, Any]] = []
     for it in itens:
-        sem = _score_semantic(it)
-        tbl = _score_table_confirmation(it)
+        texto_item = f"{it.get('descricao_item') or ''} {it.get('material_servico') or ''}".strip()
+        sem_raw = _compute_match_score(texto_item, query_groups) if query_groups else 0.0
+        sem = min(55.0, (min(sem_raw, 3.0) / 3.0) * 55.0) if sem_raw > 0 else 0.0
+        # Sem tabela de itens aqui: usa valor neutro intermediário.
+        tbl = 8.0
         rec = _score_recency(it)
         coh = _score_value_coherence(it, median_val)
         score_0_100 = max(0, min(100, round(sem + tbl + rec + coh)))
@@ -797,20 +823,29 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     scored.sort(
         key=lambda x: (
             float(x.get("score_aprovacao") or 0),
-            float(x.get("score_relevancia") or 0),
+            float(x.get("valor_unitario") or x.get("valor_total") or 0),
         ),
         reverse=True,
     )
     top3 = _select_top3_with_diversity(scored)[:3]
 
-    out_stats = dict(base.get("stats") or {})
+    out_stats = dict(base_items.get("stats") or {})
     out_stats["total_registros_ia"] = len(scored)
     out_stats["total_selecionados_ia"] = len(top3)
     out_stats["regra_selecao"] = "top3_com_diversidade_orgao"
 
     return {
-        "ok": bool(base.get("ok", True)),
-        "filtros": base.get("filtros", {}),
+        "ok": bool(base_items.get("ok", True)),
+        "filtros": {
+            "termo_busca": payload.termo_busca,
+            "uf": payload.uf,
+            "codigo_municipio_ibge": payload.codigo_municipio_ibge,
+            "codigo_modalidade": payload.codigo_modalidade,
+            "pagina_inicial": payload.pagina,
+            "max_paginas": payload.max_paginas,
+            "tamanho_pagina": payload.tamanho_pagina,
+            "fonte": "local_item_search",
+        },
         "stats": out_stats,
         "itens": top3,
     }

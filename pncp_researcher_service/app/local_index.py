@@ -459,7 +459,21 @@ def local_item_search(
         where.append("uf = ?")
         params.append(uf)
     if codigo_modalidade is not None:
-        where.append("modalidade_nome IS NOT NULL")
+        modalidade_patterns = {
+            6: ["concorr"],
+            7: ["chamada publica", "chamada pública"],
+            8: ["pregao", "pregão"],
+            9: ["dispensa", "compra direta"],
+            10: ["inexigibilidade"],
+            11: ["leilao", "leilão"],
+            12: ["concurso"],
+            13: ["dialogo competitivo", "diálogo competitivo"],
+        }.get(int(codigo_modalidade), [])
+        if modalidade_patterns:
+            where.append(
+                "(" + " OR ".join(["LOWER(COALESCE(modalidade_nome, '')) LIKE ?" for _ in modalidade_patterns]) + ")"
+            )
+            params.extend([f"%{pattern}%" for pattern in modalidade_patterns])
     sql = f"""
         SELECT numero_pncp, ano_compra, sequencial_compra, numero_item, descricao, material_servico,
                quantidade, unidade_medida, valor_unitario, valor_total, orgao, municipio, uf,

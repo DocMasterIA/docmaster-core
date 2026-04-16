@@ -806,6 +806,57 @@ def _query_tokens(query_groups: List[List[str]]) -> set[str]:
     return out
 
 
+def _is_strict_candidate_match(item: Dict[str, Any], query_groups: List[List[str]]) -> bool:
+    """
+    Purificação pesada para evitar falso positivo por menção lateral do termo.
+    Ex.: "locação de tenda ... parafusos, conexões em aço" não deve passar para "parafuso de aço".
+    """
+    q_tokens = list(_query_tokens(query_groups))
+    if len(q_tokens) < 2:
+        # Para consulta curta (1 token), mantém filtro semântico padrão.
+        return True
+
+    desc = _normalize_text(str(item.get("descricao_item") or ""))
+    mat = _normalize_text(str(item.get("material_servico") or ""))
+    if not desc and not mat:
+        return False
+    full = f"{desc} {mat}".strip()
+    words = full.split()
+    if not words:
+        return False
+
+    token_positions: Dict[str, List[int]] = {t: [] for t in q_tokens}
+    for idx, w in enumerate(words):
+        for t in q_tokens:
+            if w == t or w.startswith(t) or t.startswith(w[: max(1, min(4, len(w))) ]):
+                token_positions[t].append(idx)
+
+    # Todos os tokens-chave devem aparecer.
+    if any(len(token_positions[t]) == 0 for t in q_tokens):
+        return False
+
+    # Tokens-chave devem aparecer perto entre si (janela curta).
+    min_pos = min(min(v) for v in token_positions.values())
+    max_pos = max(min(v) for v in token_positions.values())
+    if (max_pos - min_pos) > 10:
+        return False
+
+    # O núcleo do termo deve surgir cedo no texto, não no fim de uma descrição gigante.
+    if min_pos > 20:
+        return False
+
+    # Bloqueia contextos típicos onde o termo aparece só como componente secundário.
+    secondary_context = (
+        "locacao", "tenda", "cadeira", "longarina", "placa", "manutencao", "servico",
+        "instalacao", "montagem", "desmontagem", "estrutura", "lona", "evento",
+    )
+    secondary_hits = sum(1 for s in secondary_context if s in full)
+    if secondary_hits >= 2 and min_pos > 6:
+        return False
+
+    return True
+
+
 def _context_penalty(item: Dict[str, Any], query_groups: List[List[str]]) -> float:
     """
     Penaliza forte contexto incompatível com o termo.
@@ -1053,6 +1104,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     scored: List[Dict[str, Any]] = []
     # Primeiro passa: filtra obviamente ruins (sem texto/valor) e calcula scores.
     for it in itens:
+        if not _is_strict_candidate_match(it, query_groups):
+            continue
         texto_item = f"{it.get('descricao_item') or ''} {it.get('material_servico') or ''}".strip()
         sem_raw = _compute_match_score(texto_item, query_groups) if query_groups else 0.0
         sem = min(55.0, (min(sem_raw, 3.0) / 3.0) * 55.0) if sem_raw > 0 else 0.0

@@ -111,7 +111,7 @@
                 <th>Confiabilidade IA</th>
                 <th>Risco</th>
                 <th>Score</th>
-                <th>Observação</th>
+                <th>Cotação usada</th>
               </tr>
             </thead>
             <tbody>

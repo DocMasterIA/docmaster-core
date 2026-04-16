@@ -112,8 +112,8 @@ PNCP_LOCAL_INCLUDE_ITEMS: bool = os.getenv(
 ).strip().lower() in {"1", "true", "yes", "on"}
 
 # Re-ranking leve com LLM para escolher os 3 melhores itens.
-PNCP_IA_RERANK_ENABLED: bool = _env_bool("PNCP_IA_RERANK_ENABLED", False)
-PNCP_IA_BASE_URL: str = os.getenv("PNCP_IA_BASE_URL", "http://qwen_llm_service:8015").rstrip("/")
+PNCP_IA_RERANK_ENABLED: bool = _env_bool("PNCP_IA_RERANK_ENABLED", True)
+PNCP_IA_BASE_URL: str = os.getenv("PNCP_IA_BASE_URL", "http://llm_api:8002").rstrip("/")
 PNCP_IA_GENERATE_PATH: str = os.getenv("PNCP_IA_GENERATE_PATH", "/api/llm/generate")
 PNCP_IA_MODEL: str = os.getenv("PNCP_IA_MODEL", "").strip()
 PNCP_IA_TIMEOUT_SECONDS: float = float(os.getenv("PNCP_IA_TIMEOUT_SECONDS", "4.5"))

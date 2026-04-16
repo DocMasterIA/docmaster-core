@@ -151,7 +151,14 @@ export function searchLocalItems(payload, signal) {
 }
 
 export function intelligentMarketSearch(payload, signal) {
-  return researchRequest('market-search/intelligent', { method: 'POST', body: payload, signal });
+  return researchRequest('market-search/intelligent', { method: 'POST', body: payload, signal }).catch(async (err) => {
+    const msg = String(err?.message || '');
+    // Fallback de compatibilidade: ambiente antigo sem endpoint inteligente ainda publicado.
+    if (msg.includes('Not Found') || msg.includes('404')) {
+      return researchRequest('market-search', { method: 'POST', body: payload, signal });
+    }
+    throw err;
+  });
 }
 
 export function getLocalIndexStats(signal) {

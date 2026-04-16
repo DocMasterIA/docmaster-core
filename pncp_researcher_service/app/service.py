@@ -796,6 +796,73 @@ def _score_clarity_and_unit(item: Dict[str, Any], query_groups: List[List[str]])
     return max(0.0, min(15.0, score))
 
 
+def _query_tokens(query_groups: List[List[str]]) -> set[str]:
+    out: set[str] = set()
+    for group in query_groups:
+        for tok in group:
+            t = _normalize_text(tok)
+            if t:
+                out.add(t)
+    return out
+
+
+def _context_penalty(item: Dict[str, Any], query_groups: List[List[str]]) -> float:
+    """
+    Penaliza forte contexto incompatível com o termo.
+    Ex.: termo genérico "parafuso de aço" trazendo implante ortopédico.
+    """
+    desc = _normalize_text(str(item.get("descricao_item") or ""))
+    mat = _normalize_text(str(item.get("material_servico") or ""))
+    full = f"{desc} {mat}".strip()
+    if not full:
+        return -8.0
+
+    q_tokens = _query_tokens(query_groups)
+    query_is_medical = any(
+        t in q_tokens
+        for t in {
+            "hospitalar",
+            "medico",
+            "medica",
+            "medic",
+            "ortopedico",
+            "ortopedica",
+            "implante",
+            "protese",
+            "anvisa",
+            "canulado",
+            "osseo",
+        }
+    )
+    if not query_is_medical:
+        medical_hits = 0
+        for tok in (
+            "osseo",
+            "ortoped",
+            "anvisa",
+            "titani",
+            "implante",
+            "protese",
+            "hospital",
+            "canulad",
+            "mao",
+            "pe",
+        ):
+            if tok in full:
+                medical_hits += 1
+        if medical_hits >= 2:
+            return -24.0
+        if medical_hits == 1:
+            return -10.0
+
+    # Penaliza descrições muito longas e pouco objetivas.
+    if len(full.split()) > 70:
+        return -8.0
+    if len(full.split()) > 45:
+        return -4.0
+    return 0.0
+
+
 def _score_semantic(item: Dict[str, Any]) -> float:
     raw = item.get("score_relevancia")
     try:
@@ -818,17 +885,17 @@ def _score_table_confirmation(item: Dict[str, Any]) -> float:
 
 
 def _classify_confiabilidade(score: float) -> str:
-    if score >= 75:
+    if score >= 80:
         return "Alta"
-    if score >= 55:
+    if score >= 60:
         return "Média"
     return "Baixa"
 
 
 def _classify_risco(score: float) -> str:
-    if score >= 75:
+    if score >= 80:
         return "Baixo"
-    if score >= 55:
+    if score >= 60:
         return "Médio"
     return "Alto"
 
@@ -996,13 +1063,34 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         rec = _score_recency(it)
         coh = _score_value_coherence(it, median_val)
         clar = _score_clarity_and_unit(it, query_groups)
-        score_0_100 = max(0, min(100, round(sem + tbl + rec + coh + clar)))
+        pen = _context_penalty(it, query_groups)
+        raw_score = sem + tbl + rec + coh + clar + pen
+        score_0_100 = max(0, min(100, round(raw_score)))
         it2 = dict(it)
+        it2["score_bruto"] = round(raw_score, 3)
         it2["score_aprovacao"] = score_0_100
         it2["confiabilidade"] = _classify_confiabilidade(score_0_100)
         it2["risco"] = _classify_risco(score_0_100)
         it2["status"] = "Aprovado" if score_0_100 >= 55 else "Revisar"
         scored.append(it2)
+
+    # Reescala para ampliar separação entre bons e ruins no conjunto atual.
+    if scored:
+        raw_values = [_safe_float(x.get("score_bruto")) for x in scored]
+        lo = min(raw_values)
+        hi = max(raw_values)
+        span = hi - lo
+        for row in scored:
+            raw = _safe_float(row.get("score_bruto"))
+            if span <= 1e-9:
+                norm = 65.0
+            else:
+                norm = 35.0 + 65.0 * ((raw - lo) / span)
+            score_adj = int(max(0, min(100, round(norm))))
+            row["score_aprovacao"] = score_adj
+            row["confiabilidade"] = _classify_confiabilidade(score_adj)
+            row["risco"] = _classify_risco(score_adj)
+            row["status"] = "Aprovado" if score_adj >= 60 else "Revisar"
 
     scored.sort(
         key=lambda x: (

@@ -806,6 +806,17 @@ def _query_tokens(query_groups: List[List[str]]) -> set[str]:
     return out
 
 
+def _query_phrase_tokens(query_groups: List[List[str]]) -> List[str]:
+    """
+    Retorna os tokens do primeiro grupo da consulta (núcleo da frase).
+    Ex.: "parafuso de aço sextavado" -> ["parafuso", "aco", "sextavado"].
+    """
+    if not query_groups:
+        return []
+    first = [_normalize_text(t) for t in query_groups[0]]
+    return [t for t in first if t]
+
+
 def _is_strict_candidate_match(item: Dict[str, Any], query_groups: List[List[str]]) -> bool:
     """
     Purificação pesada para evitar falso positivo por menção lateral do termo.
@@ -845,10 +856,23 @@ def _is_strict_candidate_match(item: Dict[str, Any], query_groups: List[List[str
     if min_pos > 20:
         return False
 
+    # Regra genérica: os tokens do núcleo da frase devem aparecer cedo e próximos.
+    phrase_tokens = _query_phrase_tokens(query_groups)
+    if len(phrase_tokens) >= 2:
+        lead_window = words[:20]
+        lead_hits = sum(
+            1
+            for tok in phrase_tokens
+            if any((w == tok) or w.startswith(tok) or tok.startswith(w[: max(1, min(4, len(w)))]) for w in lead_window)
+        )
+        if lead_hits < max(2, math.ceil(len(phrase_tokens) * 0.7)):
+            return False
+
     # Bloqueia contextos típicos onde o termo aparece só como componente secundário.
     secondary_context = (
         "locacao", "tenda", "cadeira", "longarina", "placa", "manutencao", "servico",
         "instalacao", "montagem", "desmontagem", "estrutura", "lona", "evento",
+        "cinta", "abracadeira", "poste", "suporte",
     )
     secondary_hits = sum(1 for s in secondary_context if s in full)
     if secondary_hits >= 2 and min_pos > 6:
@@ -859,8 +883,8 @@ def _is_strict_candidate_match(item: Dict[str, Any], query_groups: List[List[str
 
 def _context_penalty(item: Dict[str, Any], query_groups: List[List[str]]) -> float:
     """
-    Penaliza forte contexto incompatível com o termo.
-    Ex.: termo genérico "parafuso de aço" trazendo implante ortopédico.
+    Penaliza contexto incompatível com o termo pesquisado.
+    Exemplo genérico: consulta de item de ferragem retornando item de implante médico.
     """
     desc = _normalize_text(str(item.get("descricao_item") or ""))
     mat = _normalize_text(str(item.get("material_servico") or ""))
@@ -905,6 +929,29 @@ def _context_penalty(item: Dict[str, Any], query_groups: List[List[str]]) -> flo
             return -24.0
         if medical_hits == 1:
             return -10.0
+
+    # Penalidade genérica de contexto acessório quando o núcleo da consulta
+    # não aparece cedo na descrição.
+    phrase_tokens = _query_phrase_tokens(query_groups)
+    if phrase_tokens:
+        words = full.split()
+        lead_window = words[:20]
+        lead_hits = sum(
+            1
+            for tok in phrase_tokens
+            if any((w == tok) or w.startswith(tok) or tok.startswith(w[: max(1, min(4, len(w)))]) for w in lead_window)
+        )
+        if lead_hits < max(1, math.ceil(len(phrase_tokens) * 0.5)):
+            return -14.0
+
+    accessory_hits = 0
+    for tok in ("cinta", "abracadeira", "poste", "suporte", "tenda", "lona", "longarina", "cadeira"):
+        if tok in full:
+            accessory_hits += 1
+    if accessory_hits >= 3:
+        return -16.0
+    if accessory_hits == 2:
+        return -8.0
 
     # Penaliza descrições muito longas e pouco objetivas.
     if len(full.split()) > 70:

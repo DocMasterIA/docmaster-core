@@ -1017,6 +1017,39 @@ def _select_top3_with_diversity(items: List[Dict[str, Any]]) -> List[Dict[str, A
     return selected[:3]
 
 
+def _select_top3_quality_first(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Prioriza qualidade: Alta -> Média -> Baixa.
+    Itens de baixa qualidade só entram se não houver itens melhores suficientes.
+    """
+    if not items:
+        return []
+
+    def score_of(it: Dict[str, Any]) -> int:
+        return int(max(0, min(100, _safe_float(it.get("score_aprovacao")))))
+
+    high = [it for it in items if score_of(it) >= 80]
+    medium = [it for it in items if 60 <= score_of(it) < 80]
+    low = [it for it in items if score_of(it) < 60]
+
+    selected: List[Dict[str, Any]] = []
+    for bucket in (high, medium, low):
+        if len(selected) >= 3:
+            break
+        if not bucket:
+            continue
+        already = {id(x) for x in selected}
+        rest = [x for x in bucket if id(x) not in already]
+        picks = _select_top3_with_diversity(rest)
+        for p in picks:
+            if len(selected) >= 3:
+                break
+            if any(p is s for s in selected):
+                continue
+            selected.append(p)
+    return selected[:3]
+
+
 def _safe_float(value: Any) -> float:
     try:
         out = float(value)
@@ -1234,16 +1267,16 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                 if len(chosen) >= 3:
                     break
             if chosen:
-                top3 = _select_top3_with_diversity(chosen)[:3]
+                top3 = _select_top3_quality_first(chosen)[:3]
                 ia_used = True
 
     if not top3:
-        top3 = _select_top3_with_diversity(scored)[:3]
+        top3 = _select_top3_quality_first(scored)[:3]
 
     out_stats = dict(base_items.get("stats") or {})
     out_stats["total_registros_ia"] = len(scored)
     out_stats["total_selecionados_ia"] = len(top3)
-    out_stats["regra_selecao"] = "top3_com_diversidade_orgao"
+    out_stats["regra_selecao"] = "top3_quality_first_com_diversidade_orgao"
     out_stats["ia_rerank_ativo"] = bool(PNCP_IA_RERANK_ENABLED)
     out_stats["ia_rerank_usado"] = ia_used
 

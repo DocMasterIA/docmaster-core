@@ -1104,10 +1104,14 @@ def _parse_ia_rerank_response(raw_text: str) -> List[Dict[str, Any]]:
         item_id = str(entry.get("id") or "").strip()
         if not item_id:
             continue
+        score_raw = entry.get("score_aprovacao")
+        score_val: Optional[int] = None
+        if score_raw is not None and str(score_raw).strip() != "":
+            score_val = int(max(0, min(100, _safe_float(score_raw))))
         out.append(
             {
                 "id": item_id,
-                "score_aprovacao": int(max(0, min(100, _safe_float(entry.get("score_aprovacao"))))),
+                "score_aprovacao": score_val,
                 "confiabilidade": str(entry.get("confiabilidade") or "").strip() or None,
                 "risco": str(entry.get("risco") or "").strip() or None,
                 "justificativa": str(entry.get("justificativa") or "").strip() or None,

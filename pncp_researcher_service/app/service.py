@@ -724,25 +724,52 @@ def _score_clarity_and_unit(item: Dict[str, Any], query_groups: List[List[str]])
     if word_count > 80:
         return 0.0
 
-    # Penaliza palavras típicas de lote/kit/misturado.
-    bad_tokens = ["lote", "itens diversos", "diversos materiais", "kit ", "conjunto ", "varios itens"]
+    # Penaliza palavras típicas de lote/kit/misturado ou itens onde o alvo é só detalhe.
+    bad_tokens = [
+        "lote",
+        "itens diversos",
+        "diversos materiais",
+        "kit ",
+        "conjunto ",
+        "varios itens",
+        "cadeira",
+        "longarina",
+        "placa de regulamentacao",
+        "placas de regulamentacao",
+    ]
     for tok in bad_tokens:
         if tok.strip() and tok in full:
-            return 1.0
+            return 0.5
 
     # Requer casamento explícito de todos tokens principais da consulta
     # (ex.: "parafuso" e "aco") quando vierem no termo.
+    main_query_tokens: set[str] = set()
     if query_groups:
         hits = 0
         needed = 0
         words = set(text_norm.split())
         for group in query_groups:
             for tok in group:
+                main_query_tokens.add(tok)
                 needed += 1
                 if tok in words:
                     hits += 1
         if needed and hits / needed < 0.6:
             return 0.0
+
+    # Bônus forte quando a descrição começa com o termo principal.
+    # Ex.: "parafuso" / "parafusos" como primeira palavra.
+    score = 6.0
+    if main_query_tokens:
+        first_words = text_norm.split()[:5]
+        if any(w.startswith("parafus") for w in first_words) and any(
+            t.startswith("parafus") for t in main_query_tokens
+        ):
+            score += 5.0
+        # Se a consulta tiver token parecido com "aco"/"aço", exige presença explícita.
+        if any(t.startswith("aco") for t in main_query_tokens):
+            if "aco" not in text_norm and "aço" not in full:
+                score -= 4.0
 
     # Heurística de unidade / quantidade.
     qtd = item.get("quantidade")
@@ -752,7 +779,6 @@ def _score_clarity_and_unit(item: Dict[str, Any], query_groups: List[List[str]])
     except Exception:
         qtd_f = None
 
-    score = 6.0
     if um in {"UN", "UND", "UNID", "UNIDADE", "PC", "PÇ"}:
         score += 4.0
     if qtd_f is not None:

@@ -150,7 +150,7 @@
                     {{ row.risco }}
                   </span>
                 </td>
-                <td class="bia-cell-center">{{ row.score }}</td>
+                <td class="bia-cell-center">{{ formatScorePercent(row.score) }}</td>
                 <td>{{ row.processo }}</td>
               </tr>
             </tbody>
@@ -423,6 +423,13 @@ async function adicionarSelecionadosNaCotacao() {
 function parseMoeda(v) {
   const n = Number(String(v || '').replace(/[^\d,.-]/g, '').replace(',', '.'));
   return Number.isNaN(n) ? null : n;
+}
+
+function formatScorePercent(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return '0%';
+  const clamped = Math.max(0, Math.min(100, Math.round(n)));
+  return `${clamped}%`;
 }
 
 function normalizeText(v) {

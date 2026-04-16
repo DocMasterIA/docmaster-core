@@ -1222,10 +1222,12 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                 out.pop("_ia_id", None)
                 if picked.get("score_aprovacao") is not None:
                     out["score_aprovacao"] = int(picked["score_aprovacao"])
-                if picked.get("confiabilidade"):
-                    out["confiabilidade"] = picked["confiabilidade"]
-                if picked.get("risco"):
-                    out["risco"] = picked["risco"]
+                # Mantém consistência: confiabilidade/risco sempre derivados do score final.
+                final_score = int(max(0, min(100, _safe_float(out.get("score_aprovacao")))))
+                out["score_aprovacao"] = final_score
+                out["confiabilidade"] = _classify_confiabilidade(final_score)
+                out["risco"] = _classify_risco(final_score)
+                out["status"] = "Aprovado" if final_score >= 60 else "Revisar"
                 if picked.get("justificativa"):
                     out["ia_justificativa"] = picked["justificativa"]
                 chosen.append(out)

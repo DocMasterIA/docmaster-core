@@ -35,34 +35,7 @@
       <section class="bia-filters">
         <label class="bia-filter">
           <span>Descricao</span>
-          <input v-model.trim="filtros.descricao" type="text" placeholder="Ex.: ABACATE" />
-        </label>
-        <label class="bia-filter">
-          <span>Periodo</span>
-          <select v-model="filtros.periodo">
-            <option>Ultimos 3 meses</option>
-            <option>Ultimos 6 meses</option>
-            <option>Ultimos 12 meses</option>
-            <option>Ultimos 24 meses</option>
-          </select>
-        </label>
-        <label class="bia-filter">
-          <span>Tipo</span>
-          <select v-model="filtros.tipo">
-            <option>Todos</option>
-            <option>Material</option>
-            <option>Servico</option>
-          </select>
-        </label>
-        <label class="bia-filter">
-          <span>Modalidade</span>
-          <select v-model="filtros.modalidade">
-            <option>Todas</option>
-            <option>Pregao Eletronico</option>
-            <option>Chamada Publica</option>
-            <option>Dispensa Eletronica</option>
-            <option>Pregao Eletronico SRP</option>
-          </select>
+          <input v-model.trim="filtros.descricao" type="text" placeholder="Ex.: PARAFUSO DE AÇO" />
         </label>
         <div class="bia-filter">
           <span>UF</span>
@@ -99,48 +72,8 @@
         </div>
         <button type="button" class="bia-search-btn" @click="applyFilters">Buscar</button>
       </section>
-      <section class="bia-controls">
-        <div class="bia-controls__left">
-          <label class="bia-filter">
-            <span>Ordenar por</span>
-            <select v-model="filtros.ordenarPor">
-              <option>Produto</option>
-              <option>Quantidade</option>
-              <option>Valor</option>
-              <option>UF</option>
-              <option>Score</option>
-            </select>
-          </label>
-          <label class="bia-filter">
-            <span>Ordem</span>
-            <select v-model="filtros.ordem">
-              <option>Decrescente</option>
-              <option>Crescente</option>
-            </select>
-          </label>
-        </div>
-        <div class="bia-controls__right">
-          <label class="bia-filter">
-            <span>Valor Base</span>
-            <input v-model="filtros.valorBase" type="text" inputmode="decimal" placeholder="Ex.: 1500,00" />
-          </label>
-          <label class="bia-filter">
-            <span>Variação %</span>
-            <input
-              :value="filtros.variacao"
-              type="text"
-              inputmode="numeric"
-              maxlength="3"
-              @input="onVariacaoInput"
-            />
-          </label>
-        </div>
-      </section>
       <p v-if="searchError" class="bia-meta bia-meta--error">{{ searchError }}</p>
       <p v-else-if="isSearching" class="bia-meta">Consultando backend PNCP...</p>
-      <p v-if="faixaValorAtiva" class="bia-meta">
-        Faixa ativa por Valor Base + Variação: <strong>{{ faixaValorAtiva }}</strong>
-      </p>
 
       <section class="bia-table-shell">
         <div class="bia-table-head">
@@ -238,35 +171,8 @@ const cotacaoId = computed(() => route.params.cotacaoId || 'CT-2026-00421');
 
 const filtros = reactive({
   descricao: '',
-  periodo: 'Ultimos 12 meses',
-  tipo: 'Material',
-  modalidade: 'Todas',
-  ordenarPor: 'Produto',
-  ordem: 'Decrescente',
-  valorBase: '',
-  variacao: '0',
-  ufs: ['GO', 'MS'],
+  ufs: [],
 });
-
-const MODALIDADE_TO_CODIGO = {
-  Pregao: 8,
-  'Pregão Eletrônico': 8,
-  'Pregão Eletrônico SRP': 8,
-  Concorrencia: 6,
-  Concorrência: 6,
-  'Concorrência eletrônica': 6,
-  'Chamada Publica': 7,
-  'Chamada Pública': 7,
-  Dispensa: 9,
-  'Compra direta': 9,
-  'Dispensa Eletrônica': 9,
-  Inexigibilidade: 10,
-  Leilao: 11,
-  Leilão: 11,
-  Concurso: 12,
-  'Dialogo Competitivo': 13,
-  'Diálogo Competitivo': 13,
-};
 
 const UF_FLAGS = {
   AC: new URL('../assets/estados/02-acre-full.svg', import.meta.url).href,
@@ -369,16 +275,6 @@ const mediaValor = computed(() => {
   const media = nums.reduce((a, b) => a + b, 0) / nums.length;
   return formatCurrency(media);
 });
-const faixaValorAtiva = computed(() => {
-  const base = parseMoeda(filtros.valorBase);
-  if (base == null || base <= 0) return '';
-  const p = Number.parseFloat(String(filtros.variacao || '0'));
-  const perc = Number.isFinite(p) ? Math.max(0, p) : 0;
-  const min = base * (1 - perc / 100);
-  const max = base * (1 + perc / 100);
-  return `${formatCurrency(min)} até ${formatCurrency(max)} (${perc}% para baixo/cima)`;
-});
-
 function confiabilidadeClass(value) {
   if (value === 'Alta') return 'bia-badge--ok';
   if (value === 'Media' || value === 'Média') return 'bia-badge--warn';
@@ -395,66 +291,22 @@ function riscoClass(value) {
 
 const displayedRows = computed(() => {
   const base = [...rows.value];
-  const valorBase = parseMoeda(filtros.valorBase);
-  const variacao = Number.parseFloat(String(filtros.variacao || '0'));
-  const variacaoValida = Number.isFinite(variacao) ? Math.max(0, variacao) : 0;
-
   let filtrados = base;
-  if (valorBase != null && valorBase > 0) {
-    const fator = variacaoValida / 100;
-    const min = valorBase * (1 - fator);
-    const max = valorBase * (1 + fator);
-    filtrados = filtrados.filter((item) => {
-      const vBruto = item.valorUnitario ?? item.valorTotal ?? parseMoeda(item.valor);
-      const v = Number(vBruto);
-      return Number.isFinite(v) && v >= min && v <= max;
-    });
-  }
   if (filtros.ufs.length > 0 && filtros.ufs.length < ufOptions.length) {
     const selected = new Set(filtros.ufs);
     filtrados = filtrados.filter((item) => selected.has(String(item.uf || '').toUpperCase()));
   }
-  if (filtros.periodo) {
-    filtrados = filtrados.filter((item) => isWithinPeriodo(item.data, filtros.periodo));
-  }
-  if (filtros.tipo && filtros.tipo !== 'Todos') {
-    const tipoSelecionado = normalizeText(filtros.tipo);
-    filtrados = filtrados.filter((item) => normalizeText(resolveTipoItem(item)) === tipoSelecionado);
-  }
-  if (filtros.modalidade && filtros.modalidade !== 'Todas') {
-    const modalidadeSelecionada = normalizeText(filtros.modalidade);
-    filtrados = filtrados.filter((item) =>
-      normalizeText(item.modalidade || '').includes(modalidadeSelecionada)
-    );
-  }
-
-  const ordem = filtros.ordem === 'Crescente' ? 1 : -1;
-  const byText = (a, b, pick) => String(pick(a) || '').localeCompare(String(pick(b) || ''), 'pt-BR');
-  const byNumber = (a, b, pick) => {
-    const av = Number(pick(a));
-    const bv = Number(pick(b));
-    const ax = Number.isFinite(av) ? av : Number.POSITIVE_INFINITY;
-    const bx = Number.isFinite(bv) ? bv : Number.POSITIVE_INFINITY;
-    return ax - bx;
-  };
-
+  // Ordena sempre por score decrescente e, em seguida, por valor unitário crescente.
   filtrados.sort((a, b) => {
-    let cmp = 0;
-    if (filtros.ordenarPor === 'Quantidade') {
-      cmp = byNumber(a, b, (x) => x.quantidadeNum);
-    } else if (filtros.ordenarPor === 'Valor') {
-      cmp = byNumber(a, b, (x) => x.valorUnitario ?? x.valorTotal ?? parseMoeda(x.valor));
-    } else if (filtros.ordenarPor === 'UF') {
-      cmp = byText(a, b, (x) => x.uf);
-    } else if (filtros.ordenarPor === 'Score') {
-      cmp = byNumber(a, b, (x) => x.score);
-    } else {
-      cmp = byText(a, b, (x) => x.titulo);
-    }
-    if (cmp === 0) cmp = byText(a, b, (x) => x.titulo);
-    return cmp * ordem;
+    const sa = Number(a.score ?? 0);
+    const sb = Number(b.score ?? 0);
+    if (sa !== sb) return sb - sa;
+    const va = Number(a.valorUnitario ?? a.valorTotal ?? parseMoeda(a.valor));
+    const vb = Number(b.valorUnitario ?? b.valorTotal ?? parseMoeda(b.valor));
+    const av = Number.isFinite(va) ? va : Number.POSITIVE_INFINITY;
+    const bv = Number.isFinite(vb) ? vb : Number.POSITIVE_INFINITY;
+    return av - bv;
   });
-
   return filtrados;
 });
 
@@ -463,14 +315,10 @@ async function applyFilters() {
   isSearching.value = true;
   searchError.value = '';
   try {
-    const codigoModalidade =
-      filtros.modalidade && filtros.modalidade !== 'Todas'
-        ? (MODALIDADE_TO_CODIGO[filtros.modalidade] ?? null)
-        : null;
     const backend = await intelligentMarketSearch({
       termo_busca: filtros.descricao.trim(),
       uf: filtros.ufs.length === 1 ? filtros.ufs[0] : null,
-      codigo_modalidade: codigoModalidade,
+      codigo_modalidade: null,
       max_paginas: 500,
       tamanho_pagina: 200,
     });

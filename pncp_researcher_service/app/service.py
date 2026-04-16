@@ -695,7 +695,7 @@ def _score_recency(item: Dict[str, Any]) -> float:
 def _score_value_coherence(item: Dict[str, Any], median_val: Optional[float]) -> float:
     if not median_val or median_val <= 0:
         return 8.0
-    v = item.get("valor_global")
+    v = item.get("valor_unitario") or item.get("valor_total") or item.get("valor_global")
     try:
         f = float(v)
     except Exception:
@@ -708,6 +708,59 @@ def _score_value_coherence(item: Dict[str, Any], median_val: Optional[float]) ->
     if dev <= 0.4:
         return 9.0
     return 4.0
+
+
+def _score_clarity_and_unit(item: Dict[str, Any], query_groups: List[List[str]]) -> float:
+    """
+    Penaliza itens "lote/kit/diversos" e favorece descrições diretas e unidades razoáveis.
+    """
+    desc = str(item.get("descricao_item") or "").lower()
+    mat = str(item.get("material_servico") or "").lower()
+    full = f"{desc} {mat}"
+    text_norm = _normalize_text(full)
+
+    # Muito texto geralmente indica descrição de lote com vários itens.
+    word_count = len(text_norm.split())
+    if word_count > 80:
+        return 0.0
+
+    # Penaliza palavras típicas de lote/kit/misturado.
+    bad_tokens = ["lote", "itens diversos", "diversos materiais", "kit ", "conjunto ", "varios itens"]
+    for tok in bad_tokens:
+        if tok.strip() and tok in full:
+            return 1.0
+
+    # Requer casamento explícito de todos tokens principais da consulta
+    # (ex.: "parafuso" e "aco") quando vierem no termo.
+    if query_groups:
+        hits = 0
+        needed = 0
+        words = set(text_norm.split())
+        for group in query_groups:
+            for tok in group:
+                needed += 1
+                if tok in words:
+                    hits += 1
+        if needed and hits / needed < 0.6:
+            return 0.0
+
+    # Heurística de unidade / quantidade.
+    qtd = item.get("quantidade")
+    um = str(item.get("unidade_medida") or "").upper()
+    try:
+        qtd_f = float(qtd) if qtd is not None else None
+    except Exception:
+        qtd_f = None
+
+    score = 6.0
+    if um in {"UN", "UND", "UNID", "UNIDADE", "PC", "PÇ"}:
+        score += 4.0
+    if qtd_f is not None:
+        if 0 < qtd_f <= 10_000:
+            score += 3.0
+        elif qtd_f > 100_000:
+            score -= 2.0
+    return max(0.0, min(15.0, score))
 
 
 def _score_semantic(item: Dict[str, Any]) -> float:
@@ -800,19 +853,28 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         }
 
     query_groups = _build_query_groups(payload.termo_busca)
-    valores = [x.get("valor_unitario") or x.get("valor_total") for x in itens if isinstance((x.get("valor_unitario") or x.get("valor_total")), (int, float)) and (x.get("valor_unitario") or x.get("valor_total") or 0) > 0]
+    valores = [
+        x.get("valor_unitario") or x.get("valor_total") or x.get("valor_global")
+        for x in itens
+        if isinstance((x.get("valor_unitario") or x.get("valor_total") or x.get("valor_global")), (int, float))
+        and (x.get("valor_unitario") or x.get("valor_total") or x.get("valor_global") or 0) > 0
+    ]
     median_val = median(valores) if valores else None
 
     scored: List[Dict[str, Any]] = []
+    # Primeiro passa: filtra obviamente ruins (sem texto/valor) e calcula scores.
     for it in itens:
         texto_item = f"{it.get('descricao_item') or ''} {it.get('material_servico') or ''}".strip()
         sem_raw = _compute_match_score(texto_item, query_groups) if query_groups else 0.0
         sem = min(55.0, (min(sem_raw, 3.0) / 3.0) * 55.0) if sem_raw > 0 else 0.0
-        # Sem tabela de itens aqui: usa valor neutro intermediário.
-        tbl = 8.0
+        if sem <= 0:
+            # Nem bate semanticamente com o termo principal.
+            continue
+        tbl = 8.0  # neutro (sem tabela de itens aqui).
         rec = _score_recency(it)
         coh = _score_value_coherence(it, median_val)
-        score_0_100 = max(0, min(100, round(sem + tbl + rec + coh)))
+        clar = _score_clarity_and_unit(it, query_groups)
+        score_0_100 = max(0, min(100, round(sem + tbl + rec + coh + clar)))
         it2 = dict(it)
         it2["score_aprovacao"] = score_0_100
         it2["confiabilidade"] = _classify_confiabilidade(score_0_100)

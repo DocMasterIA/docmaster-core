@@ -198,13 +198,13 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { addItemsToResearchSession, searchLocalItems } from '../services/pncpResearch';
+import { addItemsToResearchSession, intelligentMarketSearch } from '../services/pncpResearch';
 
 const route = useRoute();
 const cotacaoId = computed(() => route.params.cotacaoId || 'CT-2026-00421');
 
 const filtros = reactive({
-  descricao: 'ABACATE',
+  descricao: '',
   periodo: 'Ultimos 12 meses',
   tipo: 'Material',
   modalidade: 'Todas',
@@ -332,11 +332,11 @@ async function applyFilters() {
   isSearching.value = true;
   searchError.value = '';
   try {
-    const backend = await searchLocalItems({
+    const backend = await intelligentMarketSearch({
       termo_busca: filtros.descricao.trim(),
       uf: filtros.ufs.length === 1 ? filtros.ufs[0] : null,
       codigo_modalidade: null,
-      max_paginas: 1,
+      max_paginas: 8,
       tamanho_pagina: 50,
     });
     if (backend?.ok && Array.isArray(backend.itens)) {
@@ -352,15 +352,18 @@ async function applyFilters() {
         processo: it.numero_pncp || '-',
         data: it.data_publicacao || '-',
         qtd: it.quantidade || '-',
-        valor: formatCurrency(it.valor_unitario ?? it.valor_total ?? 0),
-        score: '-',
-        confiabilidade: 'Média',
-        risco: 'Médio',
-        status: 'Disponível',
+        valor: formatCurrency(it.valor_global ?? it.valor_unitario ?? it.valor_total ?? 0),
+        score: Number.isFinite(Number(it.score_aprovacao)) ? Number(it.score_aprovacao) : 0,
+        confiabilidade: it.confiabilidade || 'Média',
+        risco: it.risco || 'Médio',
+        status: it.status || 'Aprovado',
         selecionado: false,
       }));
       rows.value = mapped;
       filteredRows.value = mapped;
+      if (!mapped.length) {
+        searchError.value = 'A IA não encontrou 3 cotações aderentes para este termo no recorte atual.';
+      }
     }
   } catch (err) {
     searchError.value = `Não foi possível consultar o backend (${err.message || 'erro desconhecido'}).`;
@@ -419,7 +422,7 @@ function parseMoeda(v) {
 }
 
 onMounted(() => {
-  applyFilters();
+  // Inicia vazio para forçar intenção de busca do usuário.
 });
 </script>
 

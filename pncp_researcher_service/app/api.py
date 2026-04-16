@@ -14,7 +14,7 @@ from .schemas import (
     MarketSearchRequest,
     MarketSearchResponse,
 )
-from .service import market_search, market_search_stream
+from .service import market_search, market_search_intelligent, market_search_stream
 from .local_index import (
     add_items_to_research_session,
     backfill_local_index,
@@ -39,6 +39,17 @@ async def health() -> HealthResponse:
 async def market_search_endpoint(body: MarketSearchRequest) -> MarketSearchResponse:
     try:
         data = await market_search(body)
+        return MarketSearchResponse(**data)
+    except PNCPClientError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/market-search/intelligent", response_model=MarketSearchResponse)
+async def market_search_intelligent_endpoint(body: MarketSearchRequest) -> MarketSearchResponse:
+    try:
+        data = await market_search_intelligent(body)
         return MarketSearchResponse(**data)
     except PNCPClientError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e

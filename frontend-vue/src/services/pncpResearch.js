@@ -150,6 +150,10 @@ export function searchLocalItems(payload, signal) {
   return researchRequest('local-index/search-items', { method: 'POST', body: payload, signal });
 }
 
+export function intelligentMarketSearch(payload, signal) {
+  return researchRequest('market-search/intelligent', { method: 'POST', body: payload, signal });
+}
+
 export function getLocalIndexStats(signal) {
   return researchRequest('local-index/stats', { signal });
 }

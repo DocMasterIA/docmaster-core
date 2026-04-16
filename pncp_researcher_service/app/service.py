@@ -448,6 +448,7 @@ async def _extract_matching_items_with_table_lookup(
             "municipio": unid.get("municipioNome"),
             "uf": unid.get("ufSigla"),
             "modalidade": raw.get("modalidadeNome"),
+            "data_publicacao": raw.get("dataPublicacaoPncp") or raw.get("dataInclusao") or raw.get("dataAtualizacao"),
             "valor_global": valor_f,
             "situacao": raw.get("situacaoCompraNome"),
             "ano_compra": raw.get("anoCompra"),
@@ -659,4 +660,157 @@ async def market_search(payload: MarketSearchRequest) -> Dict[str, Any]:
         "filtros": final_event.get("filtros", {}),
         "stats": final_event.get("stats", {}),
         "itens": final_event.get("itens", []),
+    }
+
+
+def _parse_any_date(v: Any) -> Optional[datetime]:
+    s = str(v or "").strip()
+    if not s:
+        return None
+    for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S.%f", "%Y%m%d"):
+        try:
+            return datetime.strptime(s[: len(fmt)], fmt)
+        except Exception:
+            continue
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _score_recency(item: Dict[str, Any]) -> float:
+    dt = _parse_any_date(item.get("data_publicacao"))
+    if not dt:
+        return 6.0
+    days = max(0, (datetime.utcnow() - dt.replace(tzinfo=None)).days)
+    if days <= 90:
+        return 15.0
+    if days <= 180:
+        return 12.0
+    if days <= 365:
+        return 8.0
+    return 4.0
+
+
+def _score_value_coherence(item: Dict[str, Any], median_val: Optional[float]) -> float:
+    if not median_val or median_val <= 0:
+        return 8.0
+    v = item.get("valor_global")
+    try:
+        f = float(v)
+    except Exception:
+        return 4.0
+    if f <= 0:
+        return 2.0
+    dev = abs(f - median_val) / median_val
+    if dev <= 0.2:
+        return 15.0
+    if dev <= 0.4:
+        return 9.0
+    return 4.0
+
+
+def _score_semantic(item: Dict[str, Any]) -> float:
+    raw = item.get("score_relevancia")
+    try:
+        f = float(raw)
+    except Exception:
+        return 0.0
+    if math.isnan(f) or math.isinf(f) or f <= 0:
+        return 0.0
+    # score_relevancia costuma variar pouco; cap para normalização estável.
+    return min(55.0, (min(f, 3.0) / 3.0) * 55.0)
+
+
+def _score_table_confirmation(item: Dict[str, Any]) -> float:
+    c = item.get("confirmado_nos_itens")
+    if c is True:
+        return 15.0
+    if c is False:
+        return 3.0
+    return 8.0
+
+
+def _classify_confiabilidade(score: float) -> str:
+    if score >= 75:
+        return "Alta"
+    if score >= 55:
+        return "Média"
+    return "Baixa"
+
+
+def _classify_risco(score: float) -> str:
+    if score >= 75:
+        return "Baixo"
+    if score >= 55:
+        return "Médio"
+    return "Alto"
+
+
+def _select_top3_with_diversity(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    selected: List[Dict[str, Any]] = []
+    used_org: set[str] = set()
+    for it in items:
+        org = str(it.get("orgao") or "").strip().lower()
+        if org and org not in used_org:
+            selected.append(it)
+            used_org.add(org)
+        if len(selected) >= 3:
+            return selected[:3]
+    for it in items:
+        if it in selected:
+            continue
+        selected.append(it)
+        if len(selected) >= 3:
+            break
+    return selected[:3]
+
+
+async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, Any]:
+    """
+    Busca PNCP + seleção inteligente de exatamente 3 cotações.
+    Score final (0-100) combina:
+    - aderência semântica
+    - confirmação em tabela de itens
+    - recência
+    - coerência de valor
+    """
+    base = await market_search(payload)
+    itens = list(base.get("itens") or [])
+    valores = [x.get("valor_global") for x in itens if isinstance(x.get("valor_global"), (int, float)) and x.get("valor_global", 0) > 0]
+    median_val = median(valores) if valores else None
+
+    scored: List[Dict[str, Any]] = []
+    for it in itens:
+        sem = _score_semantic(it)
+        tbl = _score_table_confirmation(it)
+        rec = _score_recency(it)
+        coh = _score_value_coherence(it, median_val)
+        score_0_100 = max(0, min(100, round(sem + tbl + rec + coh)))
+        it2 = dict(it)
+        it2["score_aprovacao"] = score_0_100
+        it2["confiabilidade"] = _classify_confiabilidade(score_0_100)
+        it2["risco"] = _classify_risco(score_0_100)
+        it2["status"] = "Aprovado" if score_0_100 >= 55 else "Revisar"
+        scored.append(it2)
+
+    scored.sort(
+        key=lambda x: (
+            float(x.get("score_aprovacao") or 0),
+            float(x.get("score_relevancia") or 0),
+        ),
+        reverse=True,
+    )
+    top3 = _select_top3_with_diversity(scored)[:3]
+
+    out_stats = dict(base.get("stats") or {})
+    out_stats["total_registros_ia"] = len(scored)
+    out_stats["total_selecionados_ia"] = len(top3)
+    out_stats["regra_selecao"] = "top3_com_diversidade_orgao"
+
+    return {
+        "ok": bool(base.get("ok", True)),
+        "filtros": base.get("filtros", {}),
+        "stats": out_stats,
+        "itens": top3,
     }

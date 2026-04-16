@@ -276,16 +276,16 @@ const mediaValor = computed(() => {
   return formatCurrency(media);
 });
 function confiabilidadeClass(value) {
-  if (value === 'Alta') return 'bia-badge--ok';
-  if (value === 'Media' || value === 'Média') return 'bia-badge--warn';
-  if (value === 'Baixa') return 'bia-badge--danger';
+  if (value === 'Alta') return 'bia-badge--conf-high';
+  if (value === 'Media' || value === 'Média') return 'bia-badge--conf-mid';
+  if (value === 'Baixa') return 'bia-badge--conf-low';
   return '';
 }
 
 function riscoClass(value) {
-  if (value === 'Baixo') return 'bia-badge--ok';
-  if (value === 'Medio' || value === 'Médio') return 'bia-badge--warn';
-  if (value === 'Alto') return 'bia-badge--danger';
+  if (value === 'Baixo') return 'bia-badge--risk-low';
+  if (value === 'Medio' || value === 'Médio') return 'bia-badge--risk-mid';
+  if (value === 'Alto') return 'bia-badge--risk-high';
   return '';
 }
 
@@ -683,4 +683,10 @@ function onVariacaoInput(event) {
 .bia-badge--ok { border-color: #b7d2ef; background: #e8f1fb; color: #1f4e79; }
 .bia-badge--warn { border-color: #f2dfb7; background: #fff7e6; color: #9a6a10; }
 .bia-badge--danger { border-color: #f0c8c8; background: #fff0f0; color: #a63f3f; }
+.bia-badge--conf-high { border-color: #86efac; background: #f0fdf4; color: #166534; }
+.bia-badge--conf-mid { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+.bia-badge--conf-low { border-color: #fca5a5; background: #fef2f2; color: #991b1b; }
+.bia-badge--risk-low { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+.bia-badge--risk-mid { border-color: #c4b5fd; background: #f5f3ff; color: #6d28d9; }
+.bia-badge--risk-high { border-color: #fda4af; background: #fff1f2; color: #be123c; }
 </style>

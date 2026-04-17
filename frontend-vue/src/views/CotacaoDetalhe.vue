@@ -849,11 +849,11 @@ async function submitRelatorioPdf() {
   relatorioError.value = '';
   relatorioLoading.value = true;
   try {
-    const blob = await downloadCotacaoRelatorioPdf(sessionId, t);
+    const { blob, filename } = await downloadCotacaoRelatorioPdf(sessionId, t);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `relatorio-cotacao-${sessionId}.pdf`;
+    a.download = (filename || '').trim() || `relatorio-cotacao-${sessionId}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
     relatorioModalOpen.value = false;

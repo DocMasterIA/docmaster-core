@@ -104,7 +104,20 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
             status=500,
         )
 
-    fname = nome_arquivo_relatorio(sessao_id, titulo_rel)
+    u = c.usuario
+    user_name = (
+        (getattr(c, "criado_por_nome", None) or "").strip()
+        or (u.get_full_name() or "").strip()
+        or (getattr(u, "email", None) or "").strip()
+        or str(u.pk)
+    )
+    fname = nome_arquivo_relatorio(
+        sessao_id,
+        titulo_rel,
+        sistema_nome=nome_sistema_relatorio(),
+        usuario_nome=user_name,
+        dt=timezone.now(),
+    )
     buf = io.BytesIO(pdf_bytes)
     return FileResponse(buf, as_attachment=True, filename=fname, content_type="application/pdf")
 

@@ -186,5 +186,15 @@ export async function downloadCotacaoRelatorioPdf(sessaoId, tituloRelatorio, sig
     const payload = ctype.includes('application/json') ? await res.json() : await res.text();
     throw new Error(extractErrorMessage(payload, res.status));
   }
-  return res.blob();
+  const blob = await res.blob();
+  const cd = res.headers.get('content-disposition') || '';
+  let filename = '';
+  const utf8Match = cd.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    filename = decodeURIComponent(utf8Match[1]);
+  } else {
+    const plainMatch = cd.match(/filename="?([^";]+)"?/i);
+    if (plainMatch?.[1]) filename = plainMatch[1];
+  }
+  return { blob, filename };
 }

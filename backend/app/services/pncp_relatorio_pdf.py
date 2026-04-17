@@ -437,7 +437,19 @@ def gerar_pdf_relatorio_cotacao(
     return HTML(string=html, base_url=base_url).write_pdf()
 
 
-def nome_arquivo_relatorio(cotacao_id: int, titulo_relatorio: str) -> str:
-    slug = re.sub(r"[^\w\s-]", "", titulo_relatorio, flags=re.UNICODE)[:60]
-    slug = re.sub(r"[-\s]+", "-", slug, flags=re.UNICODE).strip("-") or "relatorio"
-    return f"relatorio-cotacao-{cotacao_id}-{slug}.pdf"
+def _slug_part(value: str, max_len: int = 40) -> str:
+    raw = (value or "").strip().lower()
+    raw = re.sub(r"[^\w\s-]", "", raw, flags=re.UNICODE)
+    raw = re.sub(r"[-\s]+", "-", raw, flags=re.UNICODE).strip("-")
+    if not raw:
+        return ""
+    return raw[:max_len]
+
+
+def nome_arquivo_relatorio(cotacao_id: int, titulo_relatorio: str, *, sistema_nome: str = "", usuario_nome: str = "", dt=None) -> str:
+    now = dt or timezone.now()
+    stamp = timezone.localtime(now).strftime("%Y%m%d-%H%M")
+    sistema = _slug_part(sistema_nome, max_len=26) or "docmaster-pesquisador-pncp"
+    usuario = _slug_part(usuario_nome, max_len=26) or "usuario"
+    titulo = _slug_part(titulo_relatorio, max_len=42) or "relatorio"
+    return f"{sistema}_{usuario}_{stamp}_cotacao-{int(cotacao_id)}_{titulo}.pdf"

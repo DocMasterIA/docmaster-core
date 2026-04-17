@@ -748,8 +748,7 @@ def _score_clarity_and_unit(item: Dict[str, Any], query_groups: List[List[str]])
         if tok.strip() and tok in full:
             return 0.5
 
-    # Requer casamento explícito de todos tokens principais da consulta
-    # (ex.: "parafuso" e "aco") quando vierem no termo.
+    # Requer casamento explícito de todos tokens principais da consulta.
     main_query_tokens: set[str] = set()
     if query_groups:
         hits = 0
@@ -764,19 +763,7 @@ def _score_clarity_and_unit(item: Dict[str, Any], query_groups: List[List[str]])
         if needed and hits / needed < 0.6:
             return 0.0
 
-    # Bônus forte quando a descrição começa com o termo principal.
-    # Ex.: "parafuso" / "parafusos" como primeira palavra.
     score = 6.0
-    if main_query_tokens:
-        first_words = text_norm.split()[:5]
-        if any(w.startswith("parafus") for w in first_words) and any(
-            t.startswith("parafus") for t in main_query_tokens
-        ):
-            score += 5.0
-        # Se a consulta tiver token parecido com "aco"/"aço", exige presença explícita.
-        if any(t.startswith("aco") for t in main_query_tokens):
-            if "aco" not in text_norm and "aço" not in full:
-                score -= 4.0
 
     # Heurística de unidade / quantidade.
     qtd = item.get("quantidade")
@@ -794,6 +781,115 @@ def _score_clarity_and_unit(item: Dict[str, Any], query_groups: List[List[str]])
         elif qtd_f > 100_000:
             score -= 2.0
     return max(0.0, min(15.0, score))
+
+
+def _literal_query_tokens(termo_busca: str) -> List[str]:
+    """
+    Tokens literais do termo de busca (sem stopwords genéricas).
+    Mantém ordem para montar frases contíguas.
+    """
+    stop = {
+        "de", "da", "do", "das", "dos", "para", "com", "sem", "em", "no", "na", "nos", "nas",
+        "por", "e", "ou", "a", "o", "as", "os", "um", "uma", "uns", "umas",
+    }
+    norm = _normalize_text(termo_busca)
+    if not norm:
+        return []
+    return [t for t in norm.split() if len(t) >= 2 and t not in stop]
+
+
+def _literal_match_score(termo_busca: str, item: Dict[str, Any]) -> float:
+    """
+    Prioriza correspondência quase literal ao texto pesquisado.
+    Não depende de domínio específico: usa apenas o termo + descrição/material.
+    """
+    toks = _literal_query_tokens(termo_busca)
+    if not toks:
+        return 0.0
+    desc_raw = str(item.get("descricao_item") or "")
+    mat_raw = str(item.get("material_servico") or "")
+    haystack_norm = _normalize_text(f"{desc_raw} {mat_raw}")
+    haystack_compact = haystack_norm.replace(" ", "")
+    if not haystack_norm:
+        return 0.0
+
+    # Frase compacta do termo (ex.: "parafuso de aço" -> "parafuso aco")
+    phrase_compact = "".join(toks)
+    phrase_spaced = " ".join(toks)
+
+    score = 0.0
+    if phrase_compact and phrase_compact in haystack_compact:
+        score += 55.0
+    elif phrase_spaced and phrase_spaced in haystack_norm:
+        score += 48.0
+    else:
+        words = haystack_norm.split()
+        if not words:
+            return 0.0
+
+        def _stem_ok(w: str, t: str) -> bool:
+            return w == t or w.startswith(t) or t.startswith(w[: max(1, min(4, len(w))) ])
+
+        # Tokens na ordem, permitindo “ruído” entre eles (típico PNCP: rótulos, pontuação virando espaço).
+        idxs: List[int] = []
+        cursor = 0
+        max_gap = 10 if len(toks) <= 2 else 14
+        for t in toks:
+            found_at: Optional[int] = None
+            start = cursor
+            end = min(len(words), cursor + max_gap + 1)
+            for j in range(start, end):
+                if _stem_ok(words[j], t):
+                    found_at = j
+                    break
+            if found_at is None:
+                idxs = []
+                break
+            idxs.append(found_at)
+            cursor = found_at + 1
+
+        if len(idxs) == len(toks) and idxs:
+            span = idxs[-1] - idxs[0]
+            tight = max(0.0, 1.0 - (span / 40.0))
+            early = max(0.0, 1.0 - (idxs[0] / 25.0))
+            score += 22.0 + 34.0 * tight + 10.0 * early
+        else:
+            hits = sum(1 for t in toks if any(_stem_ok(w, t) for w in words))
+            score += 14.0 * (hits / max(1, len(toks)))
+
+    # Bônus se o início da descrição segue a ordem dos tokens (objeto principal).
+    words = haystack_norm.split()
+    if words:
+        pos = 0
+        matched_in_order = 0
+        for t in toks:
+            found = False
+            for j in range(pos, min(len(words), pos + 6)):
+                w = words[j]
+                if w == t or w.startswith(t) or t.startswith(w[: max(1, min(4, len(w))) ]):
+                    pos = j + 1
+                    matched_in_order += 1
+                    found = True
+                    break
+            if not found:
+                break
+        if matched_in_order >= 2:
+            score += 12.0 * (matched_in_order / max(1, len(toks)))
+
+    # Penaliza serviço embutido só quando o usuário não pediu isso no termo.
+    term_norm = _normalize_text(termo_busca)
+    wants_service = any(
+        k in term_norm
+        for k in ("instal", "montag", "desmontag", "monta", "desmonta", "fornec", "execuc", "execu")
+    )
+    if not wants_service:
+        if any(
+            k in haystack_norm
+            for k in ("instalacao", "montagem", "desmontagem", "fornecimento e instalacao", "fornecimento e montagem")
+        ):
+            score -= 10.0
+
+    return max(0.0, min(80.0, score))
 
 
 def _query_tokens(query_groups: List[List[str]]) -> set[str]:
@@ -930,29 +1026,6 @@ def _context_penalty(item: Dict[str, Any], query_groups: List[List[str]]) -> flo
         if medical_hits == 1:
             return -10.0
 
-    # Penalidade genérica de contexto acessório quando o núcleo da consulta
-    # não aparece cedo na descrição.
-    phrase_tokens = _query_phrase_tokens(query_groups)
-    if phrase_tokens:
-        words = full.split()
-        lead_window = words[:20]
-        lead_hits = sum(
-            1
-            for tok in phrase_tokens
-            if any((w == tok) or w.startswith(tok) or tok.startswith(w[: max(1, min(4, len(w)))]) for w in lead_window)
-        )
-        if lead_hits < max(1, math.ceil(len(phrase_tokens) * 0.5)):
-            return -14.0
-
-    accessory_hits = 0
-    for tok in ("cinta", "abracadeira", "poste", "suporte", "tenda", "lona", "longarina", "cadeira"):
-        if tok in full:
-            accessory_hits += 1
-    if accessory_hits >= 3:
-        return -16.0
-    if accessory_hits == 2:
-        return -8.0
-
     # Penaliza descrições muito longas e pouco objetivas.
     if len(full.split()) > 70:
         return -8.0
@@ -1038,6 +1111,10 @@ def _select_top3_quality_first(items: List[Dict[str, Any]]) -> List[Dict[str, An
             break
         if not bucket:
             continue
+        bucket.sort(
+            key=lambda it: (float(it.get("literal_match") or 0), score_of(it)),
+            reverse=True,
+        )
         already = {id(x) for x in selected}
         rest = [x for x in bucket if id(x) not in already]
         picks = _select_top3_with_diversity(rest)
@@ -1196,6 +1273,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         if sem <= 0:
             # Nem bate semanticamente com o termo principal.
             continue
+        literal_match = round(_literal_match_score(payload.termo_busca, it), 3)
         tbl = 8.0  # neutro (sem tabela de itens aqui).
         rec = _score_recency(it)
         coh = _score_value_coherence(it, median_val)
@@ -1205,6 +1283,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         score_0_100 = max(0, min(100, round(raw_score)))
         it2 = dict(it)
         it2["score_bruto"] = round(raw_score, 3)
+        it2["literal_match"] = literal_match
         it2["score_aprovacao"] = score_0_100
         it2["confiabilidade"] = _classify_confiabilidade(score_0_100)
         it2["risco"] = _classify_risco(score_0_100)
@@ -1231,6 +1310,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
 
     scored.sort(
         key=lambda x: (
+            float(x.get("literal_match") or 0),
             float(x.get("score_aprovacao") or 0),
             float(x.get("valor_unitario") or x.get("valor_total") or 0),
         ),
@@ -1271,6 +1351,13 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                 if len(chosen) >= 3:
                     break
             if chosen:
+                chosen.sort(
+                    key=lambda it: (
+                        float(it.get("literal_match") or _literal_match_score(payload.termo_busca, it)),
+                        float(it.get("score_aprovacao") or 0),
+                    ),
+                    reverse=True,
+                )
                 top3 = _select_top3_quality_first(chosen)[:3]
                 ia_used = True
 

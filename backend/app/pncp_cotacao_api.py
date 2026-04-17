@@ -19,7 +19,7 @@ from django.conf import settings
 from django.db import DatabaseError, transaction
 from django.db.models import Count
 from django.core.files.base import ContentFile
-from django.http import JsonResponse, HttpRequest
+from django.http import JsonResponse, HttpRequest, FileResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -908,6 +908,30 @@ def pncp_research_sessions_upload_supplier_pdf(request, sessao_id: int):
                 "content_type": anexo.content_type,
             },
         }
+    )
+
+
+@api_login_required
+@require_http_methods(["GET", "OPTIONS"])
+def pncp_research_sessions_download_supplier_pdf(request, sessao_id: int):
+    if request.method == "OPTIONS":
+        return JsonResponse({}, status=204)
+
+    c = _cotacao_qs_for_user(request.user).filter(pk=sessao_id).first()
+    if not c:
+        return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
+
+    anexo = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
+    if not anexo or not anexo.arquivo_pdf:
+        return JsonResponse({"ok": False, "error": "Anexo PDF do fornecedor não encontrado."}, status=404)
+
+    anexo.arquivo_pdf.open("rb")
+    filename = (anexo.nome_original or "").strip() or _nome_padrao_anexo_fornecedor(c.id)
+    return FileResponse(
+        anexo.arquivo_pdf,
+        as_attachment=True,
+        filename=filename,
+        content_type=(anexo.content_type or "application/pdf"),
     )
 
 

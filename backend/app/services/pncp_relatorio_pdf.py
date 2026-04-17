@@ -118,6 +118,7 @@ class RelatorioCotacaoContext:
     cnpjs_fontes: List[str]
     qr_data_url: str
     marca_agua_texto: str
+    anexo_fornecedor_url: str
 
 
 def _formatar_moeda_br(v: Any) -> str:
@@ -138,6 +139,7 @@ def montar_contexto_relatorio(
     itens_qs,
     titulo_relatorio: str,
     url_verificacao: str,
+    anexo_fornecedor_url: str = "",
 ) -> RelatorioCotacaoContext:
     itens = list(itens_qs.order_by("id"))
     grupos, total_linhas = agrupar_itens_relatorio_pesquisa_precos(itens)
@@ -168,6 +170,7 @@ def montar_contexto_relatorio(
         cnpjs_fontes=cnpjs,
         qr_data_url=_qr_png_data_url(url_verificacao),
         marca_agua_texto=nome_sistema_relatorio(),
+        anexo_fornecedor_url=(anexo_fornecedor_url or "").strip(),
     )
 
 
@@ -388,6 +391,18 @@ _HTML_TEMPLATE = _ENV.from_string(
       <p class="rpp-cnpj-empty">Nenhum CNPJ estruturado foi localizado nos metadados salvos dos itens.</p>
       {% endif %}
     </section>
+
+    <section class="rpp-block">
+      <h2 class="rpp-section-title">Anexo do fornecedor</h2>
+      {% if ctx.anexo_fornecedor_url %}
+      <p>
+        Arquivo PDF anexado:
+        <a href="{{ ctx.anexo_fornecedor_url }}">{{ ctx.anexo_fornecedor_url }}</a>
+      </p>
+      {% else %}
+      <p class="rpp-cnpj-empty">Nenhum PDF de fornecedor anexado para esta cotação.</p>
+      {% endif %}
+    </section>
   </div>
 </body>
 </html>
@@ -408,46 +423,18 @@ def gerar_pdf_relatorio_cotacao(
     itens_qs,
     titulo_relatorio: str,
     url_verificacao: str,
+    anexo_fornecedor_url: str = "",
 ) -> bytes:
     ctx = montar_contexto_relatorio(
         cotacao=cotacao,
         itens_qs=itens_qs,
         titulo_relatorio=titulo_relatorio,
         url_verificacao=url_verificacao,
+        anexo_fornecedor_url=anexo_fornecedor_url,
     )
     html = renderizar_html_relatorio(ctx)
     base_url = _SERVICES_DIR.as_uri() + "/"
     return HTML(string=html, base_url=base_url).write_pdf()
-
-
-def concatenar_relatorio_com_anexo_fornecedor(
-    *,
-    relatorio_pdf: bytes,
-    anexo_pdf: bytes,
-) -> bytes:
-    """
-    Concatena o relatório base com o PDF de anexo do fornecedor.
-    Requer `pypdf` quando houver anexo.
-    """
-    if not anexo_pdf:
-        return relatorio_pdf
-    try:
-        from pypdf import PdfReader, PdfWriter
-    except Exception as exc:
-        raise RuntimeError("Biblioteca 'pypdf' não instalada para concatenação do anexo.") from exc
-
-    writer = PdfWriter()
-    rel_reader = PdfReader(io.BytesIO(relatorio_pdf))
-    for page in rel_reader.pages:
-        writer.add_page(page)
-
-    anexo_reader = PdfReader(io.BytesIO(anexo_pdf))
-    for page in anexo_reader.pages:
-        writer.add_page(page)
-
-    out = io.BytesIO()
-    writer.write(out)
-    return out.getvalue()
 
 
 def nome_arquivo_relatorio(cotacao_id: int, titulo_relatorio: str) -> str:

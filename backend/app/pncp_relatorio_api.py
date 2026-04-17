@@ -21,12 +21,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 
 from backend.app.api import api_login_required
 from backend.app.models import PncpCotacao, PncpCotacaoAnexo
-from backend.app.services.pncp_relatorio_pdf import (
-    concatenar_relatorio_com_anexo_fornecedor,
-    gerar_pdf_relatorio_cotacao,
-    nome_arquivo_relatorio,
-    nome_sistema_relatorio,
-)
+from backend.app.services.pncp_relatorio_pdf import gerar_pdf_relatorio_cotacao, nome_arquivo_relatorio, nome_sistema_relatorio
 
 
 def _cotacao_qs_for_user(user):
@@ -50,6 +45,12 @@ def _url_qr_acesso_cotacao_no_sistema(sessao_id: int) -> str:
     base = getattr(settings, "PNCP_RELATORIO_QR_FRONTEND_BASE_URL", "https://docmasteria.com.br")
     base = str(base).strip().rstrip("/") or "https://docmasteria.com.br"
     return f"{base}/pesquisador-pncp/cotacoes/{int(sessao_id)}"
+
+
+def _url_download_anexo_fornecedor(request, sessao_id: int) -> str:
+    return request.build_absolute_uri(
+        f"/api/pncp/cotacoes/research/sessions/{int(sessao_id)}/attachments/supplier-pdf/download"
+    )
 
 
 @api_login_required
@@ -84,25 +85,19 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
 
     url_qr = _url_qr_acesso_cotacao_no_sistema(sessao_id)
 
+    anexo = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
+    anexo_url = ""
+    if anexo and anexo.arquivo_pdf:
+        anexo_url = _url_download_anexo_fornecedor(request, sessao_id)
+
     try:
         pdf_bytes = gerar_pdf_relatorio_cotacao(
             cotacao=c,
             itens_qs=itens_qs,
             titulo_relatorio=titulo_rel,
             url_verificacao=url_qr,
+            anexo_fornecedor_url=anexo_url,
         )
-        anexo = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
-        if anexo and anexo.arquivo_pdf:
-            anexo.arquivo_pdf.open("rb")
-            try:
-                anexo_bytes = anexo.arquivo_pdf.read() or b""
-            finally:
-                anexo.arquivo_pdf.close()
-            if anexo_bytes:
-                pdf_bytes = concatenar_relatorio_com_anexo_fornecedor(
-                    relatorio_pdf=pdf_bytes,
-                    anexo_pdf=anexo_bytes,
-                )
     except Exception as e:
         return JsonResponse(
             {"detail": f"Falha ao gerar PDF ({e}). Verifique se WeasyPrint e dependências estão instaladas."},

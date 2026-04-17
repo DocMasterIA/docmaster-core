@@ -93,7 +93,7 @@
             :disabled="isSavingSelecionados || totalSelecionados === 0"
             @click="adicionarSelecionadosNaCotacao"
           >
-            {{ isSavingSelecionados ? 'Salvando...' : 'Salvar selecionados' }}
+            {{ isSavingSelecionados ? 'Salvando...' : '+ Adicionar itens na cotação' }}
           </button>
         </div>
         <p v-if="saveMessage" class="bia-meta">{{ saveMessage }}</p>

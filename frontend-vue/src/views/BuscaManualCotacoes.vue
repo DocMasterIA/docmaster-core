@@ -158,7 +158,7 @@
             :disabled="isSavingSelecionados || totalSelecionados === 0"
             @click="adicionarSelecionadosNaCotacao(true)"
           >
-            {{ isSavingSelecionados ? 'Salvando...' : `Salvar e abrir cotação ${cotacaoId}` }}
+            {{ isSavingSelecionados ? 'Salvando...' : '+ Adicionar itens na cotação' }}
           </button>
           <RouterLink
             :to="`/pesquisador-pncp/cotacoes/${cotacaoId}`"

@@ -119,7 +119,10 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
         dt=timezone.now(),
     )
     buf = io.BytesIO(pdf_bytes)
-    return FileResponse(buf, as_attachment=True, filename=fname, content_type="application/pdf")
+    resp = FileResponse(buf, as_attachment=True, filename=fname, content_type="application/pdf")
+    # Permite ao frontend ler o nome do arquivo via Content-Disposition em cenários CORS.
+    resp["Access-Control-Expose-Headers"] = "Content-Disposition"
+    return resp
 
 
 @api_login_required

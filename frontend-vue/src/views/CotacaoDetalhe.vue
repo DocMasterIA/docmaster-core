@@ -831,6 +831,21 @@ function closeRelatorioModal() {
   relatorioModalOpen.value = false;
 }
 
+function fallbackRelatorioFilename(sessionId, titulo) {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
+  const slug = String(titulo || 'relatorio')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/[-\s]+/g, '-')
+    .slice(0, 42) || 'relatorio';
+  return `docmaster-pesquisador-pncp_usuario_${stamp}_cotacao-${sessionId}_${slug}.pdf`;
+}
+
 async function submitRelatorioPdf() {
   const sessionId = Number(cotacaoId.value);
   const t = (relatorioTitulo.value || '').trim();
@@ -853,7 +868,7 @@ async function submitRelatorioPdf() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = (filename || '').trim() || `relatorio-cotacao-${sessionId}.pdf`;
+    a.download = (filename || '').trim() || fallbackRelatorioFilename(sessionId, t);
     a.click();
     URL.revokeObjectURL(url);
     relatorioModalOpen.value = false;

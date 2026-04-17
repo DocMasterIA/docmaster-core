@@ -1,0 +1,244 @@
+<template>
+  <section class="gov-page">
+    <header class="gov-page__header">
+      <div class="item-header-row">
+        <div>
+          <h1 class="gov-page__title">Item da cotação</h1>
+          <p class="gov-page__subtitle">
+            Cotação #{{ cotacaoId }} · Item #{{ itemId }}
+          </p>
+        </div>
+        <RouterLink :to="`/pesquisador-pncp/cotacoes/${cotacaoId}`" class="item-back-btn">
+          <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+          Voltar para cotação
+        </RouterLink>
+      </div>
+    </header>
+
+    <div class="gov-surface gov-page__content">
+      <p v-if="isLoading" class="item-meta">Carregando item...</p>
+      <p v-else-if="loadError" class="item-meta item-meta--error">{{ loadError }}</p>
+
+      <template v-else-if="item">
+        <section class="item-summary">
+          <div class="item-card item-card--wide">
+            <span class="item-card__label">Descrição</span>
+            <strong>{{ item.descricao_item || '—' }}</strong>
+          </div>
+          <div class="item-card">
+            <span class="item-card__label">Quantidade</span>
+            <strong>{{ item.quantidade ?? '—' }}</strong>
+          </div>
+          <div class="item-card">
+            <span class="item-card__label">Unidade</span>
+            <strong>{{ item.unidade_medida || '—' }}</strong>
+          </div>
+          <div class="item-card">
+            <span class="item-card__label">Órgão</span>
+            <strong>{{ item.orgao || '—' }}</strong>
+          </div>
+          <div class="item-card">
+            <span class="item-card__label">Município/UF</span>
+            <strong>{{ itemCidadeUf }}</strong>
+          </div>
+          <div class="item-card">
+            <span class="item-card__label">Modalidade</span>
+            <strong>{{ item.modalidade || '—' }}</strong>
+          </div>
+          <div class="item-card">
+            <span class="item-card__label">Número PNCP</span>
+            <strong>{{ item.numero_pncp || '—' }}</strong>
+          </div>
+          <div class="item-card">
+            <span class="item-card__label">Data do registro</span>
+            <strong>{{ formatDateTimePt(item.created_at) }}</strong>
+          </div>
+        </section>
+
+        <section class="item-prices">
+          <div class="item-price-card">
+            <span>Valor unitário</span>
+            <strong>{{ formatCurrency(item.valor_unitario) }}</strong>
+          </div>
+          <div class="item-price-card">
+            <span>Valor total</span>
+            <strong>{{ formatCurrency(item.valor_total) }}</strong>
+          </div>
+          <div class="item-price-card">
+            <span>Valor base (faixa regional)</span>
+            <strong>{{ formatCurrency(faixaValorBase) }}</strong>
+          </div>
+          <div class="item-price-card">
+            <span>Variação (%)</span>
+            <strong>{{ faixaVariacaoFmt }}</strong>
+          </div>
+        </section>
+
+        <section class="item-related">
+          <h2>Cotações relacionadas do mesmo item</h2>
+          <p class="item-meta">
+            {{ relatedItems.length }} cotação(ões) no mesmo grupo de descrição/unidade/quantidade.
+          </p>
+          <div class="item-table-scroll">
+            <table class="item-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Órgão</th>
+                  <th>Município/UF</th>
+                  <th>Valor unitário</th>
+                  <th>Valor total</th>
+                  <th>Data</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="r in relatedItems" :key="r.id">
+                  <td>{{ r.id }}</td>
+                  <td>{{ r.orgao || '—' }}</td>
+                  <td>{{ formatCidadeUf(r) }}</td>
+                  <td>{{ formatCurrency(r.valor_unitario) }}</td>
+                  <td>{{ formatCurrency(r.valor_total) }}</td>
+                  <td>{{ formatDateTimePt(r.created_at) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </template>
+    </div>
+  </section>
+</template>
+
+<script setup>
+import { computed, onMounted, ref } from 'vue';
+import { useRoute } from 'vue-router';
+import { getResearchSession } from '../services/pncpResearch';
+
+const route = useRoute();
+const cotacaoId = computed(() => String(route.params.cotacaoId || ''));
+const itemId = computed(() => Number(route.params.itemId));
+
+const isLoading = ref(false);
+const loadError = ref('');
+const item = ref(null);
+const allItems = ref([]);
+
+const itemCidadeUf = computed(() => (item.value ? formatCidadeUf(item.value) : '—'));
+const relatedItems = computed(() => {
+  if (!item.value) return [];
+  const key = buildGrupoStatusKey(item.value?.descricao_item, item.value?.unidade_medida, item.value?.quantidade);
+  return allItems.value
+    .filter((it) => buildGrupoStatusKey(it?.descricao_item, it?.unidade_medida, it?.quantidade) === key)
+    .sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
+});
+
+const faixaValorBase = computed(() => {
+  const src = item.value?.source || {};
+  return pickNumeric(src?.valor_base, src?.valorBase, src?.preco_base, src?.precoBase);
+});
+
+const faixaVariacaoFmt = computed(() => {
+  const src = item.value?.source || {};
+  const n = pickNumeric(src?.variacao, src?.variacao_percentual, src?.variacaoPercentual);
+  if (!Number.isFinite(n)) return '—';
+  return `${Number(n).toLocaleString('pt-BR')}%`;
+});
+
+onMounted(loadItem);
+
+async function loadItem() {
+  const sessionId = Number(cotacaoId.value);
+  if (!Number.isFinite(sessionId) || sessionId <= 0 || !Number.isFinite(itemId.value) || itemId.value <= 0) {
+    loadError.value = 'Parâmetros inválidos para abrir o item.';
+    return;
+  }
+  isLoading.value = true;
+  loadError.value = '';
+  try {
+    const data = await getResearchSession(sessionId);
+    const itens = Array.isArray(data?.itens) ? data.itens : [];
+    allItems.value = itens;
+    item.value = itens.find((x) => Number(x?.id) === Number(itemId.value)) || null;
+    if (!item.value) loadError.value = 'Item não encontrado nesta cotação.';
+  } catch (err) {
+    loadError.value = `Não foi possível carregar o item (${err?.message || 'erro desconhecido'}).`;
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+function buildGrupoStatusKey(nome, unidade, quantidade) {
+  const n = String(nome || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+  const u = String(unidade || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+  const qRaw = String(quantidade ?? '').trim().replace(',', '.');
+  const qNum = Number(qRaw);
+  const q = Number.isFinite(qNum) ? String(qNum) : qRaw;
+  return `${n}|${u}|${q}`;
+}
+
+function pickNumeric(...vals) {
+  for (const v of vals) {
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function formatCurrency(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 'R$ —';
+  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function formatDateTimePt(iso) {
+  if (!iso) return '—';
+  const dt = new Date(iso);
+  if (!Number.isFinite(dt.getTime())) return String(iso);
+  return dt.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatCidadeUf(r) {
+  const m = String(r?.municipio || '').trim();
+  const uf = String(r?.uf || '').trim();
+  if (m && uf) return `${m}/${uf}`;
+  return m || uf || '—';
+}
+</script>
+
+<style scoped>
+.gov-page { display: flex; flex-direction: column; gap: 16px; width: 100%; min-width: 0; }
+.gov-page__title { margin: 0; font-size: 24px; }
+.gov-page__subtitle { margin: 6px 0 0; color: var(--color-text-soft); }
+.gov-page__content { padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.item-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.item-back-btn { border: 1px solid #cfd8e3; border-radius: 10px; background: #fff; color: #1f2937; padding: 7px 12px; font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 7px; }
+.item-meta { margin: 0; font-size: 12px; color: #64748b; }
+.item-meta--error { color: #b91c1c; }
+.item-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
+.item-card { border: 1px solid #d6dde8; border-radius: 10px; background: #fff; padding: 10px; display: flex; flex-direction: column; gap: 4px; }
+.item-card--wide { grid-column: 1 / -1; }
+.item-card__label { font-size: 10px; text-transform: uppercase; color: #64748b; }
+.item-prices { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+.item-price-card { border: 1px solid #b7d2ef; border-radius: 10px; background: #e8f1fb; padding: 10px; display: flex; flex-direction: column; gap: 4px; }
+.item-price-card span { font-size: 11px; text-transform: uppercase; color: #1f4e79; }
+.item-price-card strong { font-size: 18px; color: #0f4c81; }
+.item-related h2 { margin: 0 0 6px; font-size: 18px; }
+.item-table-scroll { width: 100%; overflow: auto; }
+.item-table { width: 100%; min-width: 760px; border-collapse: collapse; table-layout: fixed; }
+.item-table th, .item-table td { border-bottom: 1px solid #e5eaf3; padding: 8px; font-size: 12px; text-align: left; }
+.item-table th { font-size: 11px; text-transform: uppercase; color: #64748b; }
+</style>

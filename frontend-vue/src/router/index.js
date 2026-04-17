@@ -108,6 +108,12 @@ const routes = [
     meta: { title: 'Detalhes da Cotação' },
   },
   {
+    path: '/pesquisador-pncp/cotacoes/:cotacaoId/itens/:itemId',
+    name: 'CotacaoItemDetalhe',
+    component: () => import('../views/CotacaoItemDetalhe.vue'),
+    meta: { title: 'Item da Cotação' },
+  },
+  {
     path: '/pesquisador-pncp/cotacoes/:cotacaoId/busca-inteligente',
     name: 'BuscaInteligenteCotacoes',
     component: () => import('../views/BuscaInteligenteCotacoes.vue'),

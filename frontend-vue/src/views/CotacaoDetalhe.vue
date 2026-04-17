@@ -352,7 +352,12 @@
                 </td>
                 <td>
                   <div class="cot-sheet-actions">
-                    <button type="button" class="cot-sheet-action-btn">Abrir</button>
+                    <RouterLink
+                      class="cot-sheet-action-btn"
+                      :to="itemDetalheTo(linha.id)"
+                    >
+                      Abrir
+                    </RouterLink>
                     <button type="button" class="cot-sheet-action-btn">Editar</button>
                     <button
                       type="button"
@@ -1079,6 +1084,16 @@ function formatDateTimePt(iso) {
 
 function salvarTituloCotacao() {
   saveTituloNoBackend();
+}
+
+function itemDetalheTo(itemId) {
+  return {
+    name: 'CotacaoItemDetalhe',
+    params: {
+      cotacaoId: String(cotacaoId.value),
+      itemId: String(itemId),
+    },
+  };
 }
 
 async function saveTituloNoBackend() {

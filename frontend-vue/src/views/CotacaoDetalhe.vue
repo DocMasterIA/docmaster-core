@@ -358,7 +358,6 @@
                     >
                       Abrir
                     </RouterLink>
-                    <button type="button" class="cot-sheet-action-btn">Editar</button>
                     <button
                       type="button"
                       class="cot-sheet-action-btn cot-sheet-action-btn--danger"

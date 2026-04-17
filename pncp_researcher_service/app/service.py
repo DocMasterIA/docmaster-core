@@ -1154,7 +1154,7 @@ def _build_ia_rerank_prompt(termo_busca: str, candidatos: List[Dict[str, Any]]) 
         "Quando o termo NÃO for médico, evite itens médicos/hospitalares.\n"
         "Considere unidade/quantidade e descarte outliers de preço muito fora da faixa.\n\n"
         "Responda APENAS JSON válido neste formato:\n"
-        '{"selected":[{"id":"...","score_aprovacao":85,"confiabilidade":"Alta|Média|Baixa","risco":"Baixo|Médio|Alto","justificativa":"..."}]}\n\n'
+        '{"selected":[{"id":"...","score_aprovacao":"0-100 (variável por item)","confiabilidade":"Alta|Média|Baixa","risco":"Baixo|Médio|Alto","justificativa":"..."}]}\n\n'
         f"Candidatos:\n{itens_txt}\n"
     )
 

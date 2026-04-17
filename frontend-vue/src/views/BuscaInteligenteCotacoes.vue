@@ -81,20 +81,30 @@
             <span class="bia-pill bia-pill--ok">{{ displayedRows.length }} resultados</span>
             <span class="bia-pill">{{ totalUfs }} UFs</span>
           </div>
-          <RouterLink
-            :to="`/pesquisador-pncp/cotacoes/${cotacaoId}`"
-            class="bia-add-cotacao-btn bia-add-cotacao-btn--ghost"
-          >
-            Ir para cotação
-          </RouterLink>
-          <button
-            type="button"
-            class="bia-add-cotacao-btn"
-            :disabled="isSavingSelecionados || totalSelecionados === 0"
-            @click="adicionarSelecionadosNaCotacao"
-          >
-            {{ isSavingSelecionados ? 'Salvando...' : '+ Adicionar itens na cotação' }}
-          </button>
+          <div class="bia-table-head__actions">
+            <RouterLink
+              :to="`/pesquisador-pncp/cotacoes/${cotacaoId}`"
+              class="bia-add-cotacao-btn bia-add-cotacao-btn--ghost"
+            >
+              Ir para cotação
+            </RouterLink>
+            <button
+              type="button"
+              class="bia-add-cotacao-btn bia-add-cotacao-btn--ghost"
+              :disabled="displayedRows.length === 0"
+              @click="toggleSelecionarTop3"
+            >
+              {{ bulkSelectLabel }}
+            </button>
+            <button
+              type="button"
+              class="bia-add-cotacao-btn"
+              :disabled="isSavingSelecionados || totalSelecionados === 0"
+              @click="adicionarSelecionadosNaCotacao"
+            >
+              {{ isSavingSelecionados ? 'Salvando...' : '+ Adicionar itens na cotação' }}
+            </button>
+          </div>
         </div>
         <p v-if="saveMessage" class="bia-meta">{{ saveMessage }}</p>
 
@@ -268,6 +278,14 @@ const searchError = ref('');
 const saveMessage = ref('');
 const isSavingSelecionados = ref(false);
 const totalSelecionados = computed(() => displayedRows.value.filter((x) => x.selecionado).length);
+const allDisplayedSelecionados = computed(
+  () => displayedRows.value.length > 0 && displayedRows.value.every((x) => x.selecionado),
+);
+const bulkSelectLabel = computed(() => {
+  const n = displayedRows.value.length;
+  if (n <= 0) return 'Selecionar os 3';
+  return allDisplayedSelecionados.value ? `Desmarcar os ${n}` : `Selecionar os ${n}`;
+});
 const totalUfs = computed(() => new Set(displayedRows.value.map((x) => x.uf).filter(Boolean)).size);
 const mediaValor = computed(() => {
   const nums = displayedRows.value.map((x) => parseMoeda(x.valor)).filter((x) => typeof x === 'number');
@@ -372,6 +390,13 @@ function formatCurrency(v) {
 
 function toggleSelecionado(id) {
   rows.value = rows.value.map((r) => (r.id === id ? { ...r, selecionado: !r.selecionado } : r));
+}
+
+function toggleSelecionarTop3() {
+  if (!displayedRows.value.length) return;
+  const ids = new Set(displayedRows.value.map((r) => r.id));
+  const mark = !allDisplayedSelecionados.value;
+  rows.value = rows.value.map((r) => (ids.has(r.id) ? { ...r, selecionado: mark } : r));
 }
 
 async function adicionarSelecionadosNaCotacao() {
@@ -635,6 +660,12 @@ function onVariacaoInput(event) {
   align-items: center;
   min-width: 0;
 }
+.bia-table-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
 .bia-add-cotacao-btn {
   border: 1px solid #1f4e79;
   border-radius: 10px;
@@ -648,7 +679,6 @@ function onVariacaoInput(event) {
   align-items: center;
   gap: 7px;
   flex-shrink: 0;
-  margin-left: auto;
 }
 .bia-add-cotacao-btn:hover {
   filter: brightness(0.95);

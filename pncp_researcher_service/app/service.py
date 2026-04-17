@@ -1154,7 +1154,7 @@ def _build_ia_rerank_prompt(termo_busca: str, candidatos: List[Dict[str, Any]]) 
         "Quando o termo NÃO for médico, evite itens médicos/hospitalares.\n"
         "Considere unidade/quantidade e descarte outliers de preço muito fora da faixa.\n\n"
         "Responda APENAS JSON válido neste formato:\n"
-        '{"selected":[{"id":"...","score_aprovacao":0,"confiabilidade":"Alta|Média|Baixa","risco":"Baixo|Médio|Alto","justificativa":"..."}]}\n\n'
+        '{"selected":[{"id":"...","score_aprovacao":85,"confiabilidade":"Alta|Média|Baixa","risco":"Baixo|Médio|Alto","justificativa":"..."}]}\n\n'
         f"Candidatos:\n{itens_txt}\n"
     )
 
@@ -1338,7 +1338,12 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                 out = dict(row)
                 out.pop("_ia_id", None)
                 if picked.get("score_aprovacao") is not None:
-                    out["score_aprovacao"] = int(picked["score_aprovacao"])
+                    ia_score = int(max(0, min(100, _safe_float(picked["score_aprovacao"]))))
+                    base_score = int(max(0, min(100, _safe_float(row.get("score_aprovacao")))))
+                    literal = float(out.get("literal_match") or 0.0)
+                    # Blindagem: não deixa o rerank da IA colapsar score forte para ~0.
+                    if not (ia_score <= 15 and base_score >= 70 and literal >= 45):
+                        out["score_aprovacao"] = ia_score
                 # Mantém consistência: confiabilidade/risco sempre derivados do score final.
                 final_score = int(max(0, min(100, _safe_float(out.get("score_aprovacao")))))
                 out["score_aprovacao"] = final_score

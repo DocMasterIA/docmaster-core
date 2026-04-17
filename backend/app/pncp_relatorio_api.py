@@ -20,8 +20,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
 
 from backend.app.api import api_login_required
-from backend.app.models import PncpCotacao
+from backend.app.models import PncpCotacao, PncpCotacaoAnexo
 from backend.app.services.pncp_relatorio_pdf import (
+    concatenar_relatorio_com_anexo_fornecedor,
     gerar_pdf_relatorio_cotacao,
     nome_arquivo_relatorio,
     nome_sistema_relatorio,
@@ -90,6 +91,18 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
             titulo_relatorio=titulo_rel,
             url_verificacao=url_qr,
         )
+        anexo = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
+        if anexo and anexo.arquivo_pdf:
+            anexo.arquivo_pdf.open("rb")
+            try:
+                anexo_bytes = anexo.arquivo_pdf.read() or b""
+            finally:
+                anexo.arquivo_pdf.close()
+            if anexo_bytes:
+                pdf_bytes = concatenar_relatorio_com_anexo_fornecedor(
+                    relatorio_pdf=pdf_bytes,
+                    anexo_pdf=anexo_bytes,
+                )
     except Exception as e:
         return JsonResponse(
             {"detail": f"Falha ao gerar PDF ({e}). Verifique se WeasyPrint e dependências estão instaladas."},

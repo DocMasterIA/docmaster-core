@@ -420,6 +420,36 @@ def gerar_pdf_relatorio_cotacao(
     return HTML(string=html, base_url=base_url).write_pdf()
 
 
+def concatenar_relatorio_com_anexo_fornecedor(
+    *,
+    relatorio_pdf: bytes,
+    anexo_pdf: bytes,
+) -> bytes:
+    """
+    Concatena o relatório base com o PDF de anexo do fornecedor.
+    Requer `pypdf` quando houver anexo.
+    """
+    if not anexo_pdf:
+        return relatorio_pdf
+    try:
+        from pypdf import PdfReader, PdfWriter
+    except Exception as exc:
+        raise RuntimeError("Biblioteca 'pypdf' não instalada para concatenação do anexo.") from exc
+
+    writer = PdfWriter()
+    rel_reader = PdfReader(io.BytesIO(relatorio_pdf))
+    for page in rel_reader.pages:
+        writer.add_page(page)
+
+    anexo_reader = PdfReader(io.BytesIO(anexo_pdf))
+    for page in anexo_reader.pages:
+        writer.add_page(page)
+
+    out = io.BytesIO()
+    writer.write(out)
+    return out.getvalue()
+
+
 def nome_arquivo_relatorio(cotacao_id: int, titulo_relatorio: str) -> str:
     slug = re.sub(r"[^\w\s-]", "", titulo_relatorio, flags=re.UNICODE)[:60]
     slug = re.sub(r"[-\s]+", "-", slug, flags=re.UNICODE).strip("-") or "relatorio"

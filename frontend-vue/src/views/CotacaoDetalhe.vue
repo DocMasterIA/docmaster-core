@@ -411,15 +411,6 @@
                     >
                       Abrir
                     </RouterLink>
-                    <RouterLink
-                      class="cot-sheet-action-btn"
-                      :to="`/pesquisador-pncp/cotacoes/${cotacaoId}/busca-manual?itemId=${linha.id}`"
-                      :class="{ 'cot-sheet-action-btn--disabled': isSessaoFechada }"
-                      :aria-disabled="isSessaoFechada ? 'true' : 'false'"
-                      @click="onStartSearchClick"
-                    >
-                      Busca manual
-                    </RouterLink>
                     <button
                       type="button"
                       class="cot-sheet-action-btn cot-sheet-action-btn--danger"
@@ -1715,10 +1706,6 @@ async function saveTituloNoBackend() {
   color: #b05d5d;
 }
 
-.cot-sheet-action-btn--disabled {
-  opacity: 0.6;
-  pointer-events: none;
-}
 
 /* Alinhado ao modal de exclusão em `PncpResearcher.vue` */
 .pncp-modal-backdrop {

@@ -82,6 +82,13 @@
             <i class="fa-solid fa-robot" aria-hidden="true"></i>
             Buscar preços com I.A para este item
           </RouterLink>
+          <RouterLink
+            class="item-search-btn item-search-btn--manual"
+            :to="`/pesquisador-pncp/cotacoes/${cotacaoId}/busca-manual?itemId=${itemId}`"
+          >
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            Iniciar busca manual para este item
+          </RouterLink>
         </section>
 
         <section class="item-related">
@@ -331,6 +338,11 @@ function labelFonte(code) {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+}
+.item-search-btn--manual {
+  border-color: #cfd8e3;
+  background: #fff;
+  color: #1f2937;
 }
 .item-price-card { border: 1px solid #b7d2ef; border-radius: 10px; background: #e8f1fb; padding: 10px; display: flex; flex-direction: column; gap: 4px; }
 .item-price-card span { font-size: 11px; text-transform: uppercase; color: #1f4e79; }

@@ -360,11 +360,7 @@ function riscoClass(value) {
 
 const displayedRows = computed(() => {
   const base = [...rows.value];
-  let filtrados = base;
-  if (filtros.ufs.length > 0 && filtros.ufs.length < ufOptions.length) {
-    const selected = new Set(filtros.ufs);
-    filtrados = filtrados.filter((item) => selected.has(String(item.uf || '').toUpperCase()));
-  }
+  const filtrados = base;
   // Ordena sempre por score decrescente e, em seguida, por valor unitário crescente.
   filtrados.sort((a, b) => {
     const sa = Number(a.score ?? 0);

@@ -87,13 +87,15 @@
         <section class="item-related">
           <h2>Cotações de preço deste item</h2>
           <p class="item-meta">
-            {{ itemCotacoes.length }} cotação(ões) vinculadas ao item.
+            {{ itemCotacoesFiltradas.length }} de {{ itemCotacoes.length }} cotação(ões) vinculadas ao item
+            <template v-if="fonteSelecionadaLabel !== 'Todas'"> (filtro: {{ fonteSelecionadaLabel }})</template>.
           </p>
           <div class="item-table-scroll">
             <table class="item-table">
               <thead>
                 <tr>
                   <th>ID</th>
+                  <th>Fonte</th>
                   <th>Órgão</th>
                   <th>Município/UF</th>
                   <th>Valor unitário</th>
@@ -102,16 +104,17 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="r in itemCotacoes" :key="r.id">
+                <tr v-for="r in itemCotacoesFiltradas" :key="r.id">
                   <td>{{ r.id }}</td>
+                  <td>{{ labelFonte(classificarFonte(r)) }}</td>
                   <td>{{ r.orgao || '—' }}</td>
                   <td>{{ formatCidadeUf(r) }}</td>
                   <td>{{ formatCurrency(r.valor_unitario) }}</td>
                   <td>{{ formatCurrency(r.valor_total) }}</td>
                   <td>{{ formatDateTimePt(r.created_at) }}</td>
                 </tr>
-                <tr v-if="itemCotacoes.length === 0">
-                  <td colspan="6">Nenhuma cotação de preço registrada para este item.</td>
+                <tr v-if="itemCotacoesFiltradas.length === 0">
+                  <td colspan="7">Nenhuma cotação de preço registrada para este item neste filtro.</td>
                 </tr>
               </tbody>
             </table>
@@ -138,6 +141,8 @@ const allItems = ref([]);
 const itemCotacoes = ref([]);
 
 const itemCidadeUf = computed(() => (item.value ? formatCidadeUf(item.value) : '—'));
+const fonteSelecionada = computed(() => normalizeFonte(route.query.fonte));
+const fonteSelecionadaLabel = computed(() => labelFonte(fonteSelecionada.value));
 const faixaValorBase = computed(() => {
   const src = item.value?.source || {};
   return pickNumeric(src?.valor_base, src?.valorBase, src?.preco_base, src?.precoBase);
@@ -173,6 +178,12 @@ const valorTotalRefletido = computed(() => {
   }
   const legacy = Number(item.value?.valor_total);
   return Number.isFinite(legacy) ? legacy : null;
+});
+
+const itemCotacoesFiltradas = computed(() => {
+  const alvo = fonteSelecionada.value;
+  if (!alvo) return itemCotacoes.value;
+  return itemCotacoes.value.filter((c) => classificarFonte(c) === alvo);
 });
 
 onMounted(loadItem);
@@ -248,6 +259,44 @@ function formatCidadeUf(r) {
   const uf = String(r?.uf || '').trim();
   if (m && uf) return `${m}/${uf}`;
   return m || uf || '—';
+}
+
+function normalizeFonte(v) {
+  const s = String(v || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+  if (!s || s === 'todas') return '';
+  if (s.includes('govern') || s.includes('inciso_i') || s === 'inciso-i') return 'governamentais';
+  if (s.includes('ente') || s.includes('inciso_ii') || s === 'inciso-ii') return 'entes_publicos';
+  if (s.includes('dominio')) return 'dominio_amplo';
+  if (s.includes('direta')) return 'cotacao_direta';
+  if (s.includes('nota')) return 'notas_fiscais';
+  return '';
+}
+
+function classificarFonte(cotacao) {
+  const raw = normalizeFonte(
+    cotacao?.fonte ||
+      cotacao?.tipo_fonte ||
+      cotacao?.source?.fonte ||
+      cotacao?.source?.tipo_fonte ||
+      cotacao?.source?.categoria_fonte,
+  );
+  if (raw) return raw;
+  const src = cotacao?.source || {};
+  if (src?.numero_pncp || src?.numeroControlePNCP || src?.numero_controle_pncp) return 'governamentais';
+  return 'entes_publicos';
+}
+
+function labelFonte(code) {
+  if (code === 'governamentais') return 'Preços Governamentais (Inciso I)';
+  if (code === 'entes_publicos') return 'Outros Entes Públicos (Inciso II)';
+  if (code === 'dominio_amplo') return 'Domínio amplo';
+  if (code === 'cotacao_direta') return 'Cotação direta';
+  if (code === 'notas_fiscais') return 'Notas fiscais';
+  return 'Todas';
 }
 </script>
 

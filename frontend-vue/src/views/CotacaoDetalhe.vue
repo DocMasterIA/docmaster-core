@@ -353,6 +353,7 @@
                     type="button"
                     class="cot-sheet-source-cell"
                     :class="linha.id % 2 === 0 ? 'cot-sheet-source-cell--green' : 'cot-sheet-source-cell--gray'"
+                    @click="openItemCotacoesFromFonte(linha.id, 'governamentais')"
                   >
                     {{ linha.fontes.governamentais }}
                   </button>
@@ -362,6 +363,7 @@
                     type="button"
                     class="cot-sheet-source-cell"
                     :class="linha.id % 2 === 0 ? 'cot-sheet-source-cell--gray' : 'cot-sheet-source-cell--green'"
+                    @click="openItemCotacoesFromFonte(linha.id, 'entes_publicos')"
                   >
                     {{ linha.fontes.entesPublicos }}
                   </button>
@@ -371,6 +373,7 @@
                     type="button"
                     class="cot-sheet-source-cell"
                     :class="linha.id % 2 === 0 ? 'cot-sheet-source-cell--green' : 'cot-sheet-source-cell--gray'"
+                    @click="openItemCotacoesFromFonte(linha.id, 'dominio_amplo')"
                   >
                     {{ linha.fontes.dominioAmplo }}
                   </button>
@@ -380,6 +383,7 @@
                     type="button"
                     class="cot-sheet-source-cell"
                     :class="linha.id % 2 === 0 ? 'cot-sheet-source-cell--gray' : 'cot-sheet-source-cell--green'"
+                    @click="openItemCotacoesFromFonte(linha.id, 'cotacao_direta')"
                   >
                     {{ linha.fontes.cotacaoDireta }}
                   </button>
@@ -389,6 +393,7 @@
                     type="button"
                     class="cot-sheet-source-cell"
                     :class="linha.id % 2 === 0 ? 'cot-sheet-source-cell--green' : 'cot-sheet-source-cell--gray'"
+                    @click="openItemCotacoesFromFonte(linha.id, 'notas_fiscais')"
                   >
                     {{ linha.fontes.notasFiscais }}
                   </button>
@@ -524,7 +529,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import {
   addItemsToResearchSession,
   deleteItemsFromResearchSession,
@@ -536,6 +541,7 @@ import {
 } from '../services/pncpResearch';
 
 const route = useRoute();
+const router = useRouter();
 const cotacaoId = computed(() => route.params.cotacaoId || 'CT-2026-00421');
 
 const sessionBackendId = computed(() => {
@@ -1256,6 +1262,19 @@ function itemDetalheTo(itemId) {
       itemId: String(itemId),
     },
   };
+}
+
+function openItemCotacoesFromFonte(itemId, fonte) {
+  const iid = Number(itemId);
+  if (!Number.isFinite(iid) || iid <= 0) return;
+  router.push({
+    name: 'CotacaoItemDetalhe',
+    params: {
+      cotacaoId: String(cotacaoId.value),
+      itemId: String(iid),
+    },
+    query: { fonte },
+  });
 }
 
 async function saveTituloNoBackend() {

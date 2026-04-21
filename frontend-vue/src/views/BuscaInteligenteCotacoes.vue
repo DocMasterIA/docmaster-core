@@ -33,10 +33,6 @@
       </section>
 
       <section class="bia-filters">
-        <label class="bia-filter">
-          <span>Descricao</span>
-          <input v-model.trim="filtros.descricao" type="text" placeholder="Ex.: PARAFUSO DE AÇO" />
-        </label>
         <div class="bia-filter">
           <span>UF</span>
           <details class="bia-uf-dropdown">
@@ -70,7 +66,6 @@
             </div>
           </details>
         </div>
-        <button type="button" class="bia-search-btn" @click="applyFilters">Buscar</button>
       </section>
       <p v-if="isAutoSearchingAll" class="bia-meta">
         Busca automática em andamento: item {{ autoSearchProgress.done }} de {{ autoSearchProgress.total }}...
@@ -389,7 +384,7 @@ const groupedRows = computed(() => {
 
 async function applyFilters() {
   return runSearchWithContext({
-    descricao: filtros.descricao.trim(),
+    descricao: itemContext.value?.descricao_item || '',
     selectedUfCodes: [...filtros.ufs],
     context: itemContext.value,
     append: false,

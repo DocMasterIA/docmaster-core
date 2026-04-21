@@ -97,34 +97,42 @@
             {{ itemCotacoesFiltradas.length }} de {{ itemCotacoes.length }} cotação(ões) vinculadas ao item
             <template v-if="fonteSelecionadaLabel !== 'Todas'"> (filtro: {{ fonteSelecionadaLabel }})</template>.
           </p>
-          <div class="item-table-scroll">
-            <table class="item-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Fonte</th>
-                  <th>Órgão</th>
-                  <th>Município/UF</th>
-                  <th>Valor unitário</th>
-                  <th>Valor total</th>
-                  <th>Data</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="r in itemCotacoesFiltradas" :key="r.id">
-                  <td>{{ r.id }}</td>
-                  <td>{{ labelFonte(classificarFonte(r)) }}</td>
-                  <td>{{ r.orgao || '—' }}</td>
-                  <td>{{ formatCidadeUf(r) }}</td>
-                  <td>{{ formatCurrency(r.valor_unitario) }}</td>
-                  <td>{{ formatCurrency(r.valor_total) }}</td>
-                  <td>{{ formatDateTimePt(r.created_at) }}</td>
-                </tr>
-                <tr v-if="itemCotacoesFiltradas.length === 0">
-                  <td colspan="7">Nenhuma cotação de preço registrada para este item neste filtro.</td>
-                </tr>
-              </tbody>
-            </table>
+          <div v-if="itemCotacoesFiltradas.length > 0" class="item-cotacoes-cards">
+            <article v-for="r in itemCotacoesFiltradas" :key="r.id" class="item-cotacao-card">
+              <header class="item-cotacao-card__head">
+                <span class="item-cotacao-card__id">#{{ r.id }}</span>
+                <span class="item-cotacao-card__fonte">{{ labelFonte(classificarFonte(r)) }}</span>
+              </header>
+              <div class="item-cotacao-card__grid">
+                <div class="item-cotacao-card__field item-cotacao-card__field--wide">
+                  <span>Órgão</span>
+                  <strong>{{ r.orgao || '—' }}</strong>
+                </div>
+                <div class="item-cotacao-card__field">
+                  <span>Município/UF</span>
+                  <strong>{{ formatCidadeUf(r) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field">
+                  <span>Data</span>
+                  <strong>{{ formatDateTimePt(r.created_at) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field">
+                  <span>Inciso</span>
+                  <strong>{{ labelIncisoFromCotacao(r) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field">
+                  <span>Valor unitário</span>
+                  <strong>{{ formatCurrency(r.valor_unitario) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field">
+                  <span>Valor total</span>
+                  <strong>{{ formatCurrency(r.valor_total) }}</strong>
+                </div>
+              </div>
+            </article>
+          </div>
+          <div v-else class="item-empty-state">
+            Nenhuma cotação de preço registrada para este item neste filtro.
           </div>
         </section>
       </template>
@@ -310,6 +318,17 @@ function labelFonte(code) {
   if (code === 'notas_fiscais') return 'Notas fiscais';
   return 'Não classificada';
 }
+
+function labelIncisoFromCotacao(cotacao) {
+  const inciso = normalizeFonte(
+    cotacao?.inciso_classificacao ||
+      cotacao?.source?.inciso_classificacao ||
+      cotacao?.source?.incisoClassificacao,
+  );
+  if (inciso === 'inciso_i' || classificarFonte(cotacao) === 'governamentais') return 'Inciso I';
+  if (inciso === 'inciso_ii' || classificarFonte(cotacao) === 'entes_publicos') return 'Inciso II';
+  return 'Não classificado';
+}
 </script>
 
 <style scoped>
@@ -348,8 +367,65 @@ function labelFonte(code) {
 .item-price-card span { font-size: 11px; text-transform: uppercase; color: #1f4e79; }
 .item-price-card strong { font-size: 18px; color: #0f4c81; }
 .item-related h2 { margin: 0 0 6px; font-size: 18px; }
-.item-table-scroll { width: 100%; overflow: auto; }
-.item-table { width: 100%; min-width: 760px; border-collapse: collapse; table-layout: fixed; }
-.item-table th, .item-table td { border-bottom: 1px solid #e5eaf3; padding: 8px; font-size: 12px; text-align: left; }
-.item-table th { font-size: 11px; text-transform: uppercase; color: #64748b; }
+.item-cotacoes-cards { display: grid; gap: 10px; }
+.item-cotacao-card {
+  border: 1px solid #d6dde8;
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+.item-cotacao-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.item-cotacao-card__id {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1f4e79;
+}
+.item-cotacao-card__fonte {
+  border: 1px solid #cfe0f3;
+  border-radius: 999px;
+  background: #eef5fc;
+  color: #1f4e79;
+  padding: 3px 8px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.item-cotacao-card__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+.item-cotacao-card__field {
+  border: 1px solid #e5eaf3;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.item-cotacao-card__field--wide { grid-column: 1 / -1; }
+.item-cotacao-card__field span {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.item-cotacao-card__field strong {
+  font-size: 12px;
+  color: #0f172a;
+}
+.item-empty-state {
+  border: 1px dashed #d6dde8;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 14px;
+  font-size: 12px;
+  color: #64748b;
+}
 </style>

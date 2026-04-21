@@ -66,6 +66,17 @@
             </div>
           </details>
         </div>
+        <div class="bia-filter bia-filter--action">
+          <span>Busca por UF</span>
+          <button
+            type="button"
+            class="bia-add-cotacao-btn bia-add-cotacao-btn--ghost"
+            :disabled="isSearching || isAutoSearchingAll || !itemContext?.descricao_item"
+            @click="applyFilters"
+          >
+            Fazer pesquisa pelos UFs selecionados
+          </button>
+        </div>
       </section>
       <p v-if="isAutoSearchingAll" class="bia-meta">
         Busca automática em andamento: item {{ autoSearchProgress.done }} de {{ autoSearchProgress.total }}...
@@ -783,6 +794,7 @@ function onVariacaoInput(event) {
 .bia-controls__right { display: flex; flex-wrap: wrap; gap: 8px; }
 .bia-filter { border: 1px solid #d6dde8; border-radius: 10px; background: #f8fafc; padding: 7px 8px; display: flex; flex-direction: column; gap: 4px; }
 .bia-filter > span { font-size: 9px; color: #64748b; text-transform: uppercase; line-height: 1.1; }
+.bia-filter--action { justify-content: space-between; }
 .bia-meta { margin: 2px 0 0; font-size: 12px; color: #64748b; }
 .bia-meta--error { color: #b91c1c; }
 .bia-filter input,

@@ -1140,7 +1140,7 @@ async function loadSessionFromBackend() {
         return {
           id: it.id || idx + 1,
           nomeItem: it.descricao_item || `Item ${idx + 1}`,
-          fontes: { governamentais: 1, entesPublicos: 0, dominioAmplo: 0, cotacaoDireta: 0, notasFiscais: 0 },
+          fontes: { governamentais: 0, entesPublicos: 0, dominioAmplo: 0, cotacaoDireta: 0, notasFiscais: 0 },
           qtd: it.quantidade ?? '-',
           und: it.unidade_medida || '-',
           precoTotal: formatCurrency(it.valor_total ?? it.valor_unitario ?? 0),

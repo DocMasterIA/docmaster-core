@@ -171,10 +171,10 @@
             type="button"
             class="cot-btn cot-btn--primary"
             :disabled="isSessaoFechada || isAddingManualItem"
-            @click="addManualItem"
+            @click="toggleManualItemEditor"
           >
             <i class="fa-solid fa-plus" aria-hidden="true"></i>
-            {{ isAddingManualItem ? 'Adicionando item...' : 'Adicionar item manual' }}
+            {{ showManualItemEditor ? 'Fechar adição manual' : 'Adicionar item manual' }}
           </button>
           <RouterLink
             :to="`/pesquisador-pncp/cotacoes/${cotacaoId}/busca-inteligente?autostart=1`"
@@ -198,25 +198,32 @@
           </RouterLink>
         </div>
       </section>
-      <section class="cot-manual-item">
-        <label class="cot-manual-item__field cot-manual-item__field--wide">
-          <span>Descrição do item</span>
-          <input v-model.trim="manualItem.descricao_item" type="text" placeholder="Ex.: Parafuso de aço galvanizado" />
-        </label>
-        <label class="cot-manual-item__field">
-          <span>Faixa regional base</span>
-          <input v-model.trim="manualItem.valor_base" type="number" min="0" step="0.01" />
-        </label>
-        <label class="cot-manual-item__field">
-          <span>Faixa variação (%)</span>
-          <input v-model.trim="manualItem.variacao_percentual" type="number" min="0" step="0.01" />
-        </label>
-        <p class="cot-manual-item__hint">
-          Qtd./Und./Preço Total serão refletidos automaticamente pelas cotações de preço adicionadas ao item.
-        </p>
-      </section>
-
       <section class="cot-sheet-shell">
+        <section v-if="showManualItemEditor" class="cot-manual-item">
+          <label class="cot-manual-item__field cot-manual-item__field--wide">
+            <span>Descrição do item</span>
+            <input v-model.trim="manualItem.descricao_item" type="text" placeholder="Ex.: Parafuso de aço galvanizado" />
+          </label>
+          <label class="cot-manual-item__field">
+            <span>Faixa regional base</span>
+            <input v-model.trim="manualItem.valor_base" type="number" min="0" step="0.01" />
+          </label>
+          <label class="cot-manual-item__field">
+            <span>Faixa variação (%)</span>
+            <input v-model.trim="manualItem.variacao_percentual" type="number" min="0" step="0.01" />
+          </label>
+          <p class="cot-manual-item__hint">
+            Qtd./Und./Preço Total serão refletidos automaticamente pelas cotações de preço adicionadas ao item.
+          </p>
+          <div class="cot-manual-item__actions">
+            <button type="button" class="cot-btn cot-btn--primary" :disabled="isAddingManualItem" @click="addManualItem">
+              {{ isAddingManualItem ? 'Adicionando...' : 'Salvar item manual' }}
+            </button>
+            <button type="button" class="cot-btn" :disabled="isAddingManualItem" @click="toggleManualItemEditor">
+              Cancelar
+            </button>
+          </div>
+        </section>
         <div class="cot-sheet-toolbar">
           <label class="cot-sheet-search">
             <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
@@ -555,6 +562,7 @@ const sessaoStatus = ref('aberta');
 const isClosingCotacao = ref(false);
 const isReopeningCotacao = ref(false);
 const isAddingManualItem = ref(false);
+const showManualItemEditor = ref(false);
 const manualItem = ref({
   descricao_item: '',
   valor_base: '',
@@ -838,11 +846,17 @@ async function addManualItem() {
       valor_base: '',
       variacao_percentual: '',
     };
+    showManualItemEditor.value = false;
   } catch (err) {
     loadError.value = `Falha ao adicionar item manual (${err?.message || 'erro desconhecido'}).`;
   } finally {
     isAddingManualItem.value = false;
   }
+}
+
+function toggleManualItemEditor() {
+  if (isSessaoFechada.value || isAddingManualItem.value) return;
+  showManualItemEditor.value = !showManualItemEditor.value;
 }
 
 async function onImportSpreadsheetSelected(event) {
@@ -1403,6 +1417,12 @@ async function saveTituloNoBackend() {
   margin: 0;
   font-size: 12px;
   color: var(--color-text-soft);
+}
+.cot-manual-item__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .cot-sheet-shell {

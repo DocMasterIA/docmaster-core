@@ -218,6 +218,7 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   addItemsToResearchSession,
   backfillLocalIndex,
+  getResearchSession,
   getLocalIndexStats,
   searchLocalItems,
 } from '../services/pncpResearch';
@@ -225,6 +226,10 @@ import {
 const route = useRoute();
 const router = useRouter();
 const cotacaoId = computed(() => route.params.cotacaoId || 'CT-2026-00421');
+const itemId = computed(() => {
+  const n = Number(route.query.itemId);
+  return Number.isFinite(n) && n > 0 ? n : null;
+});
 
 const filtros = reactive({
   descricao: 'FORFIG',
@@ -668,8 +673,43 @@ function parseMoeda(v) {
   return Number.isNaN(n) ? null : n;
 }
 
-onMounted(() => {
+function applyFaixaDefaultsFromItem(it) {
+  if (!it) return;
+  const src = it?.source || {};
+  const base = Number(
+    src?.valor_base ?? src?.valorBase ?? src?.preco_base ?? src?.precoBase ?? it?.valor_base ?? null,
+  );
+  const variacao = Number(
+    src?.variacao_percentual ?? src?.variacaoPercentual ?? src?.variacao ?? it?.variacao_percentual ?? null,
+  );
+  if (Number.isFinite(base) && base > 0) {
+    const centavos = Math.round(base * 100);
+    filtros.valorBase = (centavos / 100).toFixed(2).replace('.', ',');
+  }
+  if (Number.isFinite(variacao) && variacao >= 0) {
+    filtros.variacao = String(Math.round(variacao));
+  }
+}
+
+onMounted(async () => {
   carregarStatusBaseLocal();
+  const sessionId = Number(cotacaoId.value);
+  if (Number.isFinite(sessionId) && sessionId > 0) {
+    try {
+      const data = await getResearchSession(sessionId);
+      const itens = Array.isArray(data?.itens) ? data.itens : [];
+      const target = itemId.value
+        ? itens.find((x) => Number(x?.id) === Number(itemId.value))
+        : itens.find((x) => {
+            const src = x?.source || {};
+            return Number.isFinite(Number(src?.valor_base ?? src?.valorBase ?? src?.preco_base ?? src?.precoBase))
+              || Number.isFinite(Number(src?.variacao_percentual ?? src?.variacaoPercentual ?? src?.variacao));
+          });
+      applyFaixaDefaultsFromItem(target || null);
+    } catch (_) {
+      // Faixa padrão é opcional; mantém valores existentes se falhar.
+    }
+  }
   buscarNoBackend();
 });
 </script>

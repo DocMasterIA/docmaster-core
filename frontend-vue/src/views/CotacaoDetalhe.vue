@@ -186,16 +186,6 @@
             <i class="fa-solid fa-robot" aria-hidden="true"></i>
             Iniciar busca com I.A
           </RouterLink>
-          <RouterLink
-            :to="`/pesquisador-pncp/cotacoes/${cotacaoId}/busca-manual`"
-            class="cot-btn"
-            :class="{ 'cot-btn--disabled': isSessaoFechada }"
-            :aria-disabled="isSessaoFechada ? 'true' : 'false'"
-            @click="onStartSearchClick"
-          >
-            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-            Iniciar busca manual
-          </RouterLink>
         </div>
       </section>
       <section class="cot-sheet-shell">
@@ -352,7 +342,7 @@
                   <button
                     type="button"
                     class="cot-sheet-source-cell"
-                    :class="linha.id % 2 === 0 ? 'cot-sheet-source-cell--green' : 'cot-sheet-source-cell--gray'"
+                    :class="Number(linha.fontes.governamentais || 0) > 0 ? 'cot-sheet-source-cell--green' : 'cot-sheet-source-cell--gray'"
                     @click="openItemCotacoesFromFonte(linha.id, 'governamentais')"
                   >
                     {{ linha.fontes.governamentais }}
@@ -362,7 +352,7 @@
                   <button
                     type="button"
                     class="cot-sheet-source-cell"
-                    :class="linha.id % 2 === 0 ? 'cot-sheet-source-cell--gray' : 'cot-sheet-source-cell--green'"
+                    :class="Number(linha.fontes.entesPublicos || 0) > 0 ? 'cot-sheet-source-cell--green' : 'cot-sheet-source-cell--gray'"
                     @click="openItemCotacoesFromFonte(linha.id, 'entes_publicos')"
                   >
                     {{ linha.fontes.entesPublicos }}
@@ -372,7 +362,7 @@
                   <button
                     type="button"
                     class="cot-sheet-source-cell"
-                    :class="linha.id % 2 === 0 ? 'cot-sheet-source-cell--green' : 'cot-sheet-source-cell--gray'"
+                    :class="Number(linha.fontes.dominioAmplo || 0) > 0 ? 'cot-sheet-source-cell--green' : 'cot-sheet-source-cell--gray'"
                     @click="openItemCotacoesFromFonte(linha.id, 'dominio_amplo')"
                   >
                     {{ linha.fontes.dominioAmplo }}
@@ -382,7 +372,7 @@
                   <button
                     type="button"
                     class="cot-sheet-source-cell"
-                    :class="linha.id % 2 === 0 ? 'cot-sheet-source-cell--gray' : 'cot-sheet-source-cell--green'"
+                    :class="Number(linha.fontes.cotacaoDireta || 0) > 0 ? 'cot-sheet-source-cell--green' : 'cot-sheet-source-cell--gray'"
                     @click="openItemCotacoesFromFonte(linha.id, 'cotacao_direta')"
                   >
                     {{ linha.fontes.cotacaoDireta }}
@@ -392,7 +382,7 @@
                   <button
                     type="button"
                     class="cot-sheet-source-cell"
-                    :class="linha.id % 2 === 0 ? 'cot-sheet-source-cell--green' : 'cot-sheet-source-cell--gray'"
+                    :class="Number(linha.fontes.notasFiscais || 0) > 0 ? 'cot-sheet-source-cell--green' : 'cot-sheet-source-cell--gray'"
                     @click="openItemCotacoesFromFonte(linha.id, 'notas_fiscais')"
                   >
                     {{ linha.fontes.notasFiscais }}
@@ -420,6 +410,15 @@
                       :to="itemDetalheTo(linha.id)"
                     >
                       Abrir
+                    </RouterLink>
+                    <RouterLink
+                      class="cot-sheet-action-btn"
+                      :to="`/pesquisador-pncp/cotacoes/${cotacaoId}/busca-manual?itemId=${linha.id}`"
+                      :class="{ 'cot-sheet-action-btn--disabled': isSessaoFechada }"
+                      :aria-disabled="isSessaoFechada ? 'true' : 'false'"
+                      @click="onStartSearchClick"
+                    >
+                      Busca manual
                     </RouterLink>
                     <button
                       type="button"
@@ -1714,6 +1713,11 @@ async function saveTituloNoBackend() {
 .cot-sheet-action-btn--danger {
   border-color: #e5c9c9;
   color: #b05d5d;
+}
+
+.cot-sheet-action-btn--disabled {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 /* Alinhado ao modal de exclusão em `PncpResearcher.vue` */

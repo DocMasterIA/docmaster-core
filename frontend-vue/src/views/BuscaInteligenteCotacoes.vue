@@ -440,6 +440,8 @@ function buildContextFromItem(it) {
     unidade_medida: it?.unidade_medida || null,
     valor_base_referencia:
       Number(src?.valor_base ?? src?.valorBase ?? src?.preco_base ?? src?.precoBase) || null,
+    variacao_percentual_referencia:
+      Number(src?.variacao_percentual ?? src?.variacaoPercentual ?? src?.variacao) || null,
     uf_padrao: String(it?.uf || '').trim().toUpperCase() || null,
   };
 }
@@ -461,6 +463,7 @@ async function runSearchWithContext({ descricao, selectedUfCodes = [], context =
         quantidade_referencia: context?.quantidade ?? null,
         unidade_medida_referencia: context?.unidade_medida ?? null,
         valor_base_referencia: context?.valor_base_referencia ?? null,
+        variacao_percentual_referencia: context?.variacao_percentual_referencia ?? null,
       });
       if (!backend?.ok || !Array.isArray(backend.itens)) continue;
       const mapped = backend.itens.map((it, idx) => ({

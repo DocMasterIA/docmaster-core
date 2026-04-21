@@ -43,6 +43,10 @@ class MarketSearchRequest(BaseModel):
         None,
         description="Valor base/faixa regional do item da cotação para coerência de preço.",
     )
+    variacao_percentual_referencia: Optional[float] = Field(
+        None,
+        description="Variação percentual da faixa regional do item (ex.: 20 => +/-20%).",
+    )
 
     @field_validator("max_paginas")
     @classmethod

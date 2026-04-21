@@ -1361,6 +1361,13 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     ref_qty = _safe_float(payload.quantidade_referencia)
     ref_unit = _normalize_unit(payload.unidade_medida_referencia)
     ref_value = _safe_float(payload.valor_base_referencia)
+    ref_var_pct = _safe_float(payload.variacao_percentual_referencia)
+    faixa_min: Optional[float] = None
+    faixa_max: Optional[float] = None
+    if payload.variacao_percentual_referencia is not None and ref_value > 0 and ref_var_pct >= 0:
+        margem = ref_value * (ref_var_pct / 100.0)
+        faixa_min = max(0.0, ref_value - margem)
+        faixa_max = ref_value + margem
     valores = [
         x.get("valor_unitario") or x.get("valor_total") or x.get("valor_global")
         for x in itens
@@ -1400,6 +1407,12 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             else:
                 ref_fit -= 2.0
         row_value = _safe_float(it.get("valor_unitario") or it.get("valor_total") or it.get("valor_global"))
+        if faixa_min is not None and faixa_max is not None:
+            if row_value <= 0:
+                continue
+            if row_value < faixa_min or row_value > faixa_max:
+                # Filtro obrigatório da Faixa Regional do Item.
+                continue
         if ref_value > 0 and row_value > 0:
             v_dev = abs(row_value - ref_value) / max(ref_value, 1e-9)
             if v_dev <= 0.25:
@@ -1522,6 +1535,9 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             "quantidade_referencia": payload.quantidade_referencia,
             "unidade_medida_referencia": payload.unidade_medida_referencia,
             "valor_base_referencia": payload.valor_base_referencia,
+            "variacao_percentual_referencia": payload.variacao_percentual_referencia,
+            "faixa_regional_min": faixa_min,
+            "faixa_regional_max": faixa_max,
         },
         "stats": out_stats,
         "itens": top3,

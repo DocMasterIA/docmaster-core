@@ -177,7 +177,7 @@
             {{ isAddingManualItem ? 'Adicionando item...' : 'Adicionar item manual' }}
           </button>
           <RouterLink
-            :to="`/pesquisador-pncp/cotacoes/${cotacaoId}/busca-inteligente`"
+            :to="`/pesquisador-pncp/cotacoes/${cotacaoId}/busca-inteligente?autostart=1`"
             class="cot-btn cot-btn--primary"
             :class="{ 'cot-btn--disabled': isSessaoFechada }"
             :aria-disabled="isSessaoFechada ? 'true' : 'false'"

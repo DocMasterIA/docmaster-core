@@ -72,6 +72,12 @@
         </div>
         <button type="button" class="bia-search-btn" @click="applyFilters">Buscar</button>
       </section>
+      <p v-if="isAutoSearchingAll" class="bia-meta">
+        Busca automática em andamento: item {{ autoSearchProgress.done }} de {{ autoSearchProgress.total }}...
+      </p>
+      <p v-else-if="autoSearchProgress.total > 0" class="bia-meta">
+        Busca automática concluída: {{ autoSearchProgress.done }} item(ns) processado(s).
+      </p>
       <p v-if="itemContext" class="bia-meta">
         Item de referência: <strong>{{ itemContext.descricao_item }}</strong>
         <span v-if="itemContext.quantidade != null"> • Qtd {{ itemContext.quantidade }}</span>
@@ -113,63 +119,75 @@
         </div>
         <p v-if="saveMessage" class="bia-meta">{{ saveMessage }}</p>
 
-        <div class="bia-table-scroll">
-          <table class="bia-table">
-            <thead>
-              <tr>
-                <th>Seleção</th>
-                <th>Cotação</th>
-                <th>Quantidade</th>
-                <th>UF</th>
-                <th>Data</th>
-                <th>Valor Unit.</th>
-                <th>Confiabilidade IA</th>
-                <th>Risco</th>
-                <th>Score</th>
-                <th>Cotação usada</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in displayedRows" :key="row.id">
-                <td class="bia-cell-center">
-                  <input type="checkbox" :checked="row.selecionado" @change="toggleSelecionado(row.id)" />
-                </td>
-                <td>
-                  <div class="bia-main">{{ row.titulo }}</div>
-                  <div class="bia-sub">
-                    <span class="bia-meta-token">{{ row.orgao }}</span>
-                    <span v-if="row.cidade && row.cidade !== '-'" class="bia-meta-sep">·</span>
-                    <span v-if="row.cidade && row.cidade !== '-'">{{ row.cidade }}</span>
-                  </div>
-                  <div class="bia-sub">
-                    {{ row.modalidade }} • {{ row.status }} • {{ row.normalizado }}
-                  </div>
-                </td>
-                <td>{{ row.qtd }}</td>
-                <td class="bia-cell-center">{{ row.uf }}</td>
-                <td class="bia-cell-center">{{ row.data }}</td>
-                <td class="bia-bold">{{ row.valor }}</td>
-                <td class="bia-cell-center">
-                  <span
-                    class="bia-badge"
-                    :class="confiabilidadeClass(row.confiabilidade)"
-                  >
-                    {{ row.confiabilidade }}
-                  </span>
-                </td>
-                <td class="bia-cell-center">
-                  <span
-                    class="bia-badge"
-                    :class="riscoClass(row.risco)"
-                  >
-                    {{ row.risco }}
-                  </span>
-                </td>
-                <td class="bia-cell-center">{{ formatScorePercent(row.score) }}</td>
-                <td>{{ row.processo }}</td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="bia-groups">
+          <article v-for="group in groupedRows" :key="group.key" class="bia-group-card">
+            <header class="bia-group-head">
+              <div>
+                <h3 class="bia-group-title">{{ group.label }}</h3>
+                <p class="bia-meta">{{ group.rows.length }} cotações sugeridas para este item</p>
+              </div>
+              <button
+                type="button"
+                class="bia-add-cotacao-btn bia-add-cotacao-btn--ghost"
+                :disabled="group.rows.length === 0"
+                @click="toggleSelecionarGrupo(group)"
+              >
+                {{ group.allSelected ? 'Desmarcar bloco' : 'Selecionar bloco' }}
+              </button>
+            </header>
+            <div class="bia-table-scroll">
+              <table class="bia-table">
+                <thead>
+                  <tr>
+                    <th>Seleção</th>
+                    <th>Cotação</th>
+                    <th>Quantidade</th>
+                    <th>UF</th>
+                    <th>Data</th>
+                    <th>Valor Unit.</th>
+                    <th>Confiabilidade IA</th>
+                    <th>Risco</th>
+                    <th>Score</th>
+                    <th>Cotação usada</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in group.rows" :key="row.id">
+                    <td class="bia-cell-center">
+                      <input type="checkbox" :checked="row.selecionado" @change="toggleSelecionado(row.id)" />
+                    </td>
+                    <td>
+                      <div class="bia-main">{{ row.titulo }}</div>
+                      <div class="bia-sub">
+                        <span class="bia-meta-token">{{ row.orgao }}</span>
+                        <span v-if="row.cidade && row.cidade !== '-'" class="bia-meta-sep">·</span>
+                        <span v-if="row.cidade && row.cidade !== '-'">{{ row.cidade }}</span>
+                      </div>
+                      <div class="bia-sub">
+                        {{ row.modalidade }} • {{ row.status }} • {{ row.normalizado }}
+                      </div>
+                    </td>
+                    <td>{{ row.qtd }}</td>
+                    <td class="bia-cell-center">{{ row.uf }}</td>
+                    <td class="bia-cell-center">{{ row.data }}</td>
+                    <td class="bia-bold">{{ row.valor }}</td>
+                    <td class="bia-cell-center">
+                      <span class="bia-badge" :class="confiabilidadeClass(row.confiabilidade)">
+                        {{ row.confiabilidade }}
+                      </span>
+                    </td>
+                    <td class="bia-cell-center">
+                      <span class="bia-badge" :class="riscoClass(row.risco)">
+                        {{ row.risco }}
+                      </span>
+                    </td>
+                    <td class="bia-cell-center">{{ formatScorePercent(row.score) }}</td>
+                    <td>{{ row.processo }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
         </div>
       </section>
     </div>
@@ -192,6 +210,7 @@ const itemId = computed(() => {
   const n = Number(route.query.itemId);
   return Number.isFinite(n) && n > 0 ? n : null;
 });
+const autostart = computed(() => String(route.query.autostart || '').trim() === '1');
 
 const filtros = reactive({
   descricao: '',
@@ -292,6 +311,8 @@ const searchError = ref('');
 const saveMessage = ref('');
 const isSavingSelecionados = ref(false);
 const itemContext = ref(null);
+const isAutoSearchingAll = ref(false);
+const autoSearchProgress = ref({ done: 0, total: 0 });
 const totalSelecionados = computed(() => displayedRows.value.filter((x) => x.selecionado).length);
 const allDisplayedSelecionados = computed(
   () => displayedRows.value.length > 0 && displayedRows.value.every((x) => x.selecionado),
@@ -343,24 +364,58 @@ const displayedRows = computed(() => {
   return filtrados;
 });
 
+const groupedRows = computed(() => {
+  const map = new Map();
+  for (const row of displayedRows.value) {
+    const key = Number.isFinite(Number(row.itemId)) ? `item-${row.itemId}` : `legacy-${row.itemRefLabel || '-'}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        itemId: row.itemId ?? null,
+        label: row.itemRefLabel || `Item ${row.itemId ?? '-'}`,
+        rows: [],
+        allSelected: false,
+      });
+    }
+    map.get(key).rows.push(row);
+  }
+  const groups = [...map.values()];
+  for (const g of groups) {
+    g.allSelected = g.rows.length > 0 && g.rows.every((x) => x.selecionado);
+  }
+  groups.sort((a, b) => String(a.label).localeCompare(String(b.label), 'pt-BR'));
+  return groups;
+});
+
 async function applyFilters() {
-  if (!filtros.descricao.trim()) return;
+  return runSearchWithContext({
+    descricao: filtros.descricao.trim(),
+    selectedUfCodes: [...filtros.ufs],
+    context: itemContext.value,
+    append: false,
+  });
+}
+
+async function runSearchWithContext({ descricao, selectedUfCodes = [], context = null, append = false }) {
+  if (!String(descricao || '').trim()) return;
   isSearching.value = true;
-  searchError.value = '';
+  if (!append) searchError.value = '';
   try {
     const backend = await intelligentMarketSearch({
-      termo_busca: filtros.descricao.trim(),
-      uf: filtros.ufs.length === 1 ? filtros.ufs[0] : null,
+      termo_busca: String(descricao).trim(),
+      uf: selectedUfCodes.length === 1 ? selectedUfCodes[0] : null,
       codigo_modalidade: null,
       max_paginas: 500,
       tamanho_pagina: 200,
-      quantidade_referencia: itemContext.value?.quantidade ?? null,
-      unidade_medida_referencia: itemContext.value?.unidade_medida ?? null,
-      valor_base_referencia: itemContext.value?.valor_base_referencia ?? null,
+      quantidade_referencia: context?.quantidade ?? null,
+      unidade_medida_referencia: context?.unidade_medida ?? null,
+      valor_base_referencia: context?.valor_base_referencia ?? null,
     });
     if (backend?.ok && Array.isArray(backend.itens)) {
       const mapped = backend.itens.map((it, idx) => ({
-        id: `backend-${idx}-${it.numero_pncp || ''}`,
+        id: `backend-${context?.id || 'none'}-${idx}-${it.numero_pncp || ''}`,
+        itemId: context?.id || null,
+        itemRefLabel: context?.descricao_item || '-',
         sourceRaw: it,
         numeroPncp: it.numero_pncp || null,
         anoCompra: it.ano_compra ?? null,
@@ -388,8 +443,8 @@ async function applyFilters() {
         status: it.status || 'Aprovado',
         selecionado: false,
       }));
-      rows.value = mapped;
-      if (!mapped.length) {
+      rows.value = append ? [...rows.value, ...mapped] : mapped;
+      if (!mapped.length && !append) {
         searchError.value = 'A IA não encontrou 3 cotações aderentes para este termo no recorte atual.';
       }
     }
@@ -417,6 +472,12 @@ function toggleSelecionarTop3() {
   rows.value = rows.value.map((r) => (ids.has(r.id) ? { ...r, selecionado: mark } : r));
 }
 
+function toggleSelecionarGrupo(group) {
+  const ids = new Set(group.rows.map((r) => r.id));
+  const mark = !group.allSelected;
+  rows.value = rows.value.map((r) => (ids.has(r.id) ? { ...r, selecionado: mark } : r));
+}
+
 async function adicionarSelecionadosNaCotacao() {
   if (isSavingSelecionados.value) return;
   const sessionId = Number(cotacaoId.value);
@@ -427,6 +488,7 @@ async function adicionarSelecionadosNaCotacao() {
   const selecionados = displayedRows.value
     .filter((r) => r.selecionado)
     .map((r) => ({
+      item_ref_id: r.itemId ?? null,
       numero_pncp: r.numeroPncp,
       ano_compra: r.anoCompra,
       sequencial_compra: r.sequencialCompra,
@@ -459,7 +521,21 @@ async function adicionarSelecionadosNaCotacao() {
   }
   try {
     isSavingSelecionados.value = true;
-    if (itemId.value) {
+    const selectedWithItem = enviar.filter((x) => Number.isFinite(Number(x.item_ref_id || x.itemId)));
+    if (selectedWithItem.length > 0) {
+      const byItem = new Map();
+      for (const row of selectedWithItem) {
+        const iid = Number(row.item_ref_id || row.itemId);
+        if (!byItem.has(iid)) byItem.set(iid, []);
+        byItem.get(iid).push(row);
+      }
+      let total = 0;
+      for (const [iid, arr] of byItem.entries()) {
+        const res = await addCotacoesToItemInResearchSession(sessionId, iid, arr);
+        total += Number(res?.cotacoes_inseridas || arr.length);
+      }
+      saveMessage.value = `${total} cotação(ões) adicionadas aos itens da cotação.`;
+    } else if (itemId.value) {
       const res = await addCotacoesToItemInResearchSession(sessionId, itemId.value, enviar);
       saveMessage.value = `${res.cotacoes_inseridas ?? enviar.length} cotação(ões) adicionadas ao item.`;
     } else {
@@ -474,32 +550,67 @@ async function adicionarSelecionadosNaCotacao() {
 }
 
 onMounted(async () => {
-  if (!itemId.value) return;
   const sessionId = Number(cotacaoId.value);
   if (!Number.isFinite(sessionId) || sessionId <= 0) return;
   try {
     const data = await getResearchSession(sessionId);
     const itens = Array.isArray(data?.itens) ? data.itens : [];
-    const it = itens.find((x) => Number(x?.id) === Number(itemId.value));
-    if (!it) return;
-    const src = it?.source || {};
-    itemContext.value = {
-      id: it.id,
-      descricao_item: it.descricao_item || '',
-      quantidade: it.quantidade ?? null,
-      unidade_medida: it.unidade_medida || null,
-      valor_base_referencia:
-        Number(src?.valor_base ?? src?.valorBase ?? src?.preco_base ?? src?.precoBase) || null,
-    };
-    filtros.descricao = String(it.descricao_item || '').trim();
-    if (String(it.uf || '').trim()) {
-      filtros.ufs = [String(it.uf).trim().toUpperCase()];
+    if (itemId.value) {
+      const it = itens.find((x) => Number(x?.id) === Number(itemId.value));
+      if (!it) return;
+      const src = it?.source || {};
+      itemContext.value = {
+        id: it.id,
+        descricao_item: it.descricao_item || '',
+        quantidade: it.quantidade ?? null,
+        unidade_medida: it.unidade_medida || null,
+        valor_base_referencia:
+          Number(src?.valor_base ?? src?.valorBase ?? src?.preco_base ?? src?.precoBase) || null,
+      };
+      filtros.descricao = String(it.descricao_item || '').trim();
+      if (String(it.uf || '').trim()) {
+        filtros.ufs = [String(it.uf).trim().toUpperCase()];
+      }
+      if (filtros.descricao) {
+        await applyFilters();
+      }
+      return;
     }
-    if (filtros.descricao) {
-      await applyFilters();
+
+    if (autostart.value && itens.length) {
+      isAutoSearchingAll.value = true;
+      rows.value = [];
+      autoSearchProgress.value = { done: 0, total: itens.length };
+      for (const it of itens) {
+        const src = it?.source || {};
+        const ctx = {
+          id: it.id,
+          descricao_item: String(it?.descricao_item || '').trim(),
+          quantidade: it?.quantidade ?? null,
+          unidade_medida: it?.unidade_medida || null,
+          valor_base_referencia:
+            Number(src?.valor_base ?? src?.valorBase ?? src?.preco_base ?? src?.precoBase) || null,
+        };
+        if (!ctx.descricao_item) {
+          autoSearchProgress.value.done += 1;
+          continue;
+        }
+        await runSearchWithContext({
+          descricao: ctx.descricao_item,
+          selectedUfCodes: String(it?.uf || '').trim() ? [String(it.uf).trim().toUpperCase()] : [],
+          context: ctx,
+          append: true,
+        });
+        autoSearchProgress.value.done += 1;
+      }
+      isAutoSearchingAll.value = false;
+      if (!rows.value.length) {
+        searchError.value = 'Nenhuma cotação aderente encontrada para os itens da cotação.';
+      }
     }
   } catch (_) {
     // contexto do item é opcional; não bloqueia uso normal da tela
+    isAutoSearchingAll.value = false;
   }
 });
 
@@ -754,6 +865,17 @@ function onVariacaoInput(event) {
 .bia-pill--warn { border-color: #f2dfb7; background: #fff7e6; color: #9a6a10; }
 
 .bia-table-scroll { width: 100%; overflow-x: auto; overflow-y: hidden; min-width: 0; }
+.bia-groups { display: flex; flex-direction: column; gap: 10px; }
+.bia-group-card { border-top: 1px solid #e5eaf3; }
+.bia-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px;
+  background: #fff;
+}
+.bia-group-title { margin: 0; font-size: 14px; color: #0f172a; }
 .bia-table { width: 100%; min-width: 1300px; border-collapse: collapse; table-layout: fixed; }
 .bia-table th, .bia-table td { border-bottom: 1px solid #e5eaf3; padding: 10px 8px; font-size: 12px; vertical-align: top; }
 .bia-table th { text-align: left; font-size: 11px; text-transform: uppercase; color: #64748b; background: #fff; }

@@ -27,11 +27,11 @@
           </div>
           <div class="item-card">
             <span class="item-card__label">Quantidade</span>
-            <strong>{{ item.quantidade ?? '—' }}</strong>
+            <strong>{{ quantidadeRefletida ?? '—' }}</strong>
           </div>
           <div class="item-card">
             <span class="item-card__label">Unidade</span>
-            <strong>{{ item.unidade_medida || '—' }}</strong>
+            <strong>{{ unidadeRefletida || '—' }}</strong>
           </div>
           <div class="item-card">
             <span class="item-card__label">Órgão</span>
@@ -62,7 +62,7 @@
           </div>
           <div class="item-price-card">
             <span>Valor total</span>
-            <strong>{{ formatCurrency(item.valor_total) }}</strong>
+            <strong>{{ formatCurrency(valorTotalRefletido) }}</strong>
           </div>
           <div class="item-price-card">
             <span>Valor base (faixa regional)</span>
@@ -148,6 +148,31 @@ const faixaVariacaoFmt = computed(() => {
   const n = pickNumeric(src?.variacao, src?.variacao_percentual, src?.variacaoPercentual);
   if (!Number.isFinite(n)) return '—';
   return `${Number(n).toLocaleString('pt-BR')}%`;
+});
+
+const quantidadeRefletida = computed(() => {
+  const first = itemCotacoes.value.find((x) => Number.isFinite(Number(x?.quantidade)));
+  if (first) return Number(first.quantidade);
+  if (Number.isFinite(Number(item.value?.quantidade))) return Number(item.value.quantidade);
+  return null;
+});
+
+const unidadeRefletida = computed(() => {
+  const first = itemCotacoes.value.find((x) => String(x?.unidade_medida || '').trim());
+  if (first) return String(first.unidade_medida || '').trim();
+  return String(item.value?.unidade_medida || '').trim() || null;
+});
+
+const valorTotalRefletido = computed(() => {
+  const vals = itemCotacoes.value
+    .map((x) => Number(x?.valor_total ?? x?.valor_unitario))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (vals.length > 0) {
+    const media = vals.reduce((a, b) => a + b, 0) / vals.length;
+    return media;
+  }
+  const legacy = Number(item.value?.valor_total);
+  return Number.isFinite(legacy) ? legacy : null;
 });
 
 onMounted(loadItem);

@@ -204,18 +204,6 @@
           <input v-model.trim="manualItem.descricao_item" type="text" placeholder="Ex.: Parafuso de aço galvanizado" />
         </label>
         <label class="cot-manual-item__field">
-          <span>Qtd.</span>
-          <input v-model.trim="manualItem.quantidade" type="number" min="0" step="0.01" />
-        </label>
-        <label class="cot-manual-item__field">
-          <span>Und.</span>
-          <input v-model.trim="manualItem.unidade_medida" type="text" placeholder="UN" />
-        </label>
-        <label class="cot-manual-item__field">
-          <span>Preço Total</span>
-          <input v-model.trim="manualItem.valor_total" type="number" min="0" step="0.01" />
-        </label>
-        <label class="cot-manual-item__field">
           <span>Faixa regional base</span>
           <input v-model.trim="manualItem.valor_base" type="number" min="0" step="0.01" />
         </label>
@@ -223,6 +211,9 @@
           <span>Faixa variação (%)</span>
           <input v-model.trim="manualItem.variacao_percentual" type="number" min="0" step="0.01" />
         </label>
+        <p class="cot-manual-item__hint">
+          Qtd./Und./Preço Total serão refletidos automaticamente pelas cotações de preço adicionadas ao item.
+        </p>
       </section>
 
       <section class="cot-sheet-shell">
@@ -566,9 +557,6 @@ const isReopeningCotacao = ref(false);
 const isAddingManualItem = ref(false);
 const manualItem = ref({
   descricao_item: '',
-  quantidade: '',
-  unidade_medida: 'UN',
-  valor_total: '',
   valor_base: '',
   variacao_percentual: '',
 });
@@ -826,8 +814,6 @@ async function addManualItem() {
     loadError.value = 'Informe a descrição do item manual.';
     return;
   }
-  const quantidade = Number(manualItem.value.quantidade);
-  const valorTotal = Number(manualItem.value.valor_total);
   const valorBase = Number(manualItem.value.valor_base);
   const variacao = Number(manualItem.value.variacao_percentual);
 
@@ -837,9 +823,6 @@ async function addManualItem() {
     await addItemsToResearchSession(sessionId, [
       {
         descricao_item: descricao,
-        quantidade: Number.isFinite(quantidade) ? quantidade : null,
-        unidade_medida: String(manualItem.value.unidade_medida || '').trim() || 'UN',
-        valor_total: Number.isFinite(valorTotal) ? valorTotal : null,
         valor_base: Number.isFinite(valorBase) ? valorBase : null,
         variacao_percentual: Number.isFinite(variacao) ? variacao : null,
         faixa_regional: {
@@ -852,9 +835,6 @@ async function addManualItem() {
     await loadSessionFromBackend();
     manualItem.value = {
       descricao_item: '',
-      quantidade: '',
-      unidade_medida: 'UN',
-      valor_total: '',
       valor_base: '',
       variacao_percentual: '',
     };
@@ -1417,6 +1397,12 @@ async function saveTituloNoBackend() {
   padding: 8px 10px;
   font-size: 13px;
   outline: none;
+}
+.cot-manual-item__hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-soft);
 }
 
 .cot-sheet-shell {

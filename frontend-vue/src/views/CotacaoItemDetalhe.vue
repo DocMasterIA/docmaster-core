@@ -277,6 +277,13 @@ function normalizeFonte(v) {
 }
 
 function classificarFonte(cotacao) {
+  const inciso = normalizeFonte(
+    cotacao?.inciso_classificacao ||
+      cotacao?.source?.inciso_classificacao ||
+      cotacao?.source?.incisoClassificacao,
+  );
+  if (inciso === 'governamentais' || inciso === 'inciso_i') return 'governamentais';
+  if (inciso === 'entes_publicos' || inciso === 'inciso_ii') return 'entes_publicos';
   const raw = normalizeFonte(
     cotacao?.fonte ||
       cotacao?.tipo_fonte ||
@@ -285,9 +292,7 @@ function classificarFonte(cotacao) {
       cotacao?.source?.categoria_fonte,
   );
   if (raw) return raw;
-  const src = cotacao?.source || {};
-  if (src?.numero_pncp || src?.numeroControlePNCP || src?.numero_controle_pncp) return 'governamentais';
-  return 'entes_publicos';
+  return '';
 }
 
 function labelFonte(code) {
@@ -296,7 +301,7 @@ function labelFonte(code) {
   if (code === 'dominio_amplo') return 'Domínio amplo';
   if (code === 'cotacao_direta') return 'Cotação direta';
   if (code === 'notas_fiscais') return 'Notas fiscais';
-  return 'Todas';
+  return 'Não classificada';
 }
 </script>
 

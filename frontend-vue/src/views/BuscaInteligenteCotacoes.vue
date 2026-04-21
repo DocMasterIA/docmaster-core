@@ -136,6 +136,8 @@
                   <tr>
                     <th>Seleção</th>
                     <th>Cotação</th>
+                    <th>Esfera</th>
+                    <th>Inciso</th>
                     <th>Quantidade</th>
                     <th>UF</th>
                     <th>Data</th>
@@ -161,6 +163,12 @@
                       <div class="bia-sub">
                         {{ row.modalidade }} • {{ row.status }} • {{ row.normalizado }}
                       </div>
+                    </td>
+                    <td class="bia-cell-center">
+                      <span class="bia-badge">{{ labelEsfera(row.esferaAdministrativa) }}</span>
+                    </td>
+                    <td class="bia-cell-center">
+                      <span class="bia-badge bia-badge--ok">{{ labelInciso(row.incisoClassificacao) }}</span>
                     </td>
                     <td>{{ row.qtd }}</td>
                     <td class="bia-cell-center">{{ row.uf }}</td>
@@ -408,6 +416,8 @@ async function runSearchWithContext({ descricao, selectedUfCodes = [], context =
     });
     if (backend?.ok && Array.isArray(backend.itens)) {
       const mapped = backend.itens.map((it, idx) => ({
+        esferaAdministrativa: classificarEsferaAdministrativa(it),
+        incisoClassificacao: mapEsferaParaInciso(classificarEsferaAdministrativa(it)),
         id: `backend-${context?.id || 'none'}-${idx}-${it.numero_pncp || ''}`,
         itemId: context?.id || null,
         itemRefLabel: context?.descricao_item || '-',
@@ -484,6 +494,14 @@ async function adicionarSelecionadosNaCotacao() {
     .filter((r) => r.selecionado)
     .map((r) => ({
       item_ref_id: r.itemId ?? null,
+      esfera_administrativa: r.esferaAdministrativa || null,
+      inciso_classificacao: r.incisoClassificacao || null,
+      fonte:
+        r.incisoClassificacao === 'inciso_i'
+          ? 'governamentais'
+          : r.incisoClassificacao === 'inciso_ii'
+            ? 'entes_publicos'
+            : null,
       numero_pncp: r.numeroPncp,
       ano_compra: r.anoCompra,
       sequencial_compra: r.sequencialCompra,
@@ -668,6 +686,65 @@ function resolveTipoItem(item) {
   const desc = normalizeText(item?.descricao || item?.item || item?.titulo || '');
   if (desc.includes('servico') || desc.includes('serviço')) return 'Servico';
   return 'Material';
+}
+
+function normalizeKey(v) {
+  return String(v ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function classificarEsferaAdministrativa(raw) {
+  const esferaId = normalizeKey(
+    raw?.esfera_id ||
+    raw?.esferaId ||
+    raw?.sourceRaw?.esfera_id ||
+    raw?.sourceRaw?.esferaId ||
+    raw?.sourceRaw?.orgaoEntidade?.esferaId ||
+    raw?.sourceRaw?.orgaoSubRogado?.esferaId,
+  ).toUpperCase();
+  if (esferaId === 'F') return 'federal';
+  if (esferaId === 'E') return 'estadual';
+  if (esferaId === 'M') return 'municipal';
+  if (esferaId === 'D') return 'distrital';
+
+  const candidatos = [
+    raw?.esfera,
+    raw?.esfera_administrativa,
+    raw?.esferaAdministrativa,
+    raw?.poder,
+    raw?.sourceRaw?.esfera,
+    raw?.sourceRaw?.esfera_administrativa,
+    raw?.sourceRaw?.poder,
+    raw?.orgao,
+  ];
+  const joined = candidatos.map((x) => normalizeKey(x)).filter(Boolean).join(' | ');
+  if (joined.includes('federal') || joined.includes('uniao') || joined.includes('união')) return 'federal';
+  if (joined.includes('estadual') || joined.includes('estado')) return 'estadual';
+  if (joined.includes('municipal') || joined.includes('municipio') || joined.includes('município')) return 'municipal';
+  return 'nao_definida';
+}
+
+function mapEsferaParaInciso(esfera) {
+  if (esfera === 'federal') return 'inciso_i';
+  if (esfera === 'estadual' || esfera === 'municipal' || esfera === 'distrital') return 'inciso_ii';
+  return null;
+}
+
+function labelEsfera(esfera) {
+  if (esfera === 'federal') return 'Federal';
+  if (esfera === 'estadual') return 'Estadual';
+  if (esfera === 'municipal') return 'Municipal';
+  if (esfera === 'distrital') return 'Distrital';
+  return 'Não definida';
+}
+
+function labelInciso(inciso) {
+  if (inciso === 'inciso_i') return 'Inciso I';
+  if (inciso === 'inciso_ii') return 'Inciso II';
+  return 'Não classificado';
 }
 
 function onVariacaoInput(event) {

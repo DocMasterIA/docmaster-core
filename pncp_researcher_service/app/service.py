@@ -92,6 +92,44 @@ def _normalize_text(text: str) -> str:
     return text
 
 
+def _normalize_esfera_id(v: Any) -> str:
+    s = str(v or "").strip().upper()
+    if s in {"F", "E", "M", "D"}:
+        return s
+    return ""
+
+
+def _esfera_label(esfera_id: str) -> str:
+    if esfera_id == "F":
+        return "federal"
+    if esfera_id == "E":
+        return "estadual"
+    if esfera_id == "M":
+        return "municipal"
+    if esfera_id == "D":
+        return "distrital"
+    return "nao_definida"
+
+
+def _extract_esfera_meta(raw: Dict[str, Any]) -> Dict[str, Any]:
+    """Extrai esfera/poder com prioridade em campos oficiais do PNCP."""
+    org = raw.get("orgaoEntidade") or {}
+    sub = raw.get("orgaoSubRogado") or {}
+    unidade = raw.get("unidadeOrgao") or {}
+    esfera_org = _normalize_esfera_id(org.get("esferaId") or org.get("esfera_id"))
+    esfera_sub = _normalize_esfera_id(sub.get("esferaId") or sub.get("esfera_id"))
+    esfera_id = esfera_org or esfera_sub
+    poder_id = str(org.get("poderId") or sub.get("poderId") or "").strip().upper()
+    return {
+        "esfera_id": esfera_id or None,
+        "esfera_administrativa": _esfera_label(esfera_id),
+        "esfera_fonte": "orgao_entidade.esferaId" if esfera_org else ("orgao_sub_rogado.esferaId" if esfera_sub else "nao_informada"),
+        "poder_id": poder_id or None,
+        "orgao_cnpj": str(org.get("cnpj") or org.get("cnpjOrgaoEntidade") or "").strip() or None,
+        "codigo_unidade_administrativa": str(unidade.get("codigoUnidade") or unidade.get("codigoUnidadeAdministrativa") or "").strip() or None,
+    }
+
+
 def _build_query_groups(termo_busca: str) -> List[List[str]]:
     """
     Divide consulta em grupos de itens para busca mais precisa.
@@ -234,6 +272,7 @@ def _extract_matching_items(raw_items: List[Dict[str, Any]], query_groups: List[
                 "ano_compra": raw.get("anoCompra"),
                 "sequencial_compra": raw.get("sequencialCompra"),
                 "score_relevancia": score,
+                **_extract_esfera_meta(raw),
             }
         )
     matched.sort(key=lambda x: x.get("score_relevancia") or 0, reverse=True)
@@ -469,6 +508,7 @@ async def _extract_matching_items_with_table_lookup(
             "qtd_itens_pncp": qtd_itens,
             "itens_pncp_modo": itens_modo,
             "itens_pncp": itens_json,
+            **_extract_esfera_meta(raw),
         }
 
     # Até o teto da própria página PNCP (50); antes cortava em 30 e descartava resultado.
@@ -1139,12 +1179,19 @@ def _select_top3_quality_first(items: List[Dict[str, Any]]) -> List[Dict[str, An
             break
         if not bucket:
             continue
-        bucket.sort(
+        federal = [it for it in bucket if str(it.get("esfera_id") or "").strip().upper() == "F"]
+        outros = [it for it in bucket if str(it.get("esfera_id") or "").strip().upper() != "F"]
+        federal.sort(
             key=lambda it: (float(it.get("literal_match") or 0), score_of(it)),
             reverse=True,
         )
+        outros.sort(
+            key=lambda it: (float(it.get("literal_match") or 0), score_of(it)),
+            reverse=True,
+        )
+        ordered_bucket = federal + outros
         already = {id(x) for x in selected}
-        rest = [x for x in bucket if id(x) not in already]
+        rest = [x for x in ordered_bucket if id(x) not in already]
         picks = _select_top3_with_diversity(rest)
         for p in picks:
             if len(selected) >= 3:
@@ -1153,6 +1200,35 @@ def _select_top3_quality_first(items: List[Dict[str, Any]]) -> List[Dict[str, An
                 continue
             selected.append(p)
     return selected[:3]
+
+
+def _merge_unique_items(primary: List[Dict[str, Any]], secondary: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Junta listas preservando ordem e evitando duplicados do mesmo item PNCP.
+    """
+    out: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def key_of(it: Dict[str, Any]) -> str:
+        return "|".join(
+            [
+                str(it.get("numero_pncp") or "").strip(),
+                str(it.get("numero_item") or "").strip(),
+                str(it.get("descricao_item") or "").strip().lower(),
+                str(it.get("orgao") or "").strip().lower(),
+            ]
+        )
+
+    for arr in (primary, secondary):
+        for row in arr:
+            k = key_of(row)
+            if not k:
+                continue
+            if k in seen:
+                continue
+            seen.add(k)
+            out.append(row)
+    return out
 
 
 def _safe_float(value: Any) -> float:
@@ -1417,7 +1493,9 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                     ),
                     reverse=True,
                 )
-                top3 = _select_top3_quality_first(chosen)[:3]
+                # Regra de negócio: prioriza esfera federal; se faltar, completa com demais esferas.
+                merged = _merge_unique_items(chosen, scored)
+                top3 = _select_top3_quality_first(merged)[:3]
                 ia_used = True
 
     if not top3:
@@ -1426,7 +1504,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     out_stats = dict(base_items.get("stats") or {})
     out_stats["total_registros_ia"] = len(scored)
     out_stats["total_selecionados_ia"] = len(top3)
-    out_stats["regra_selecao"] = "top3_quality_first_com_diversidade_orgao"
+    out_stats["regra_selecao"] = "top3_prioriza_federal_completa_estadual_municipal_diversidade_orgao"
     out_stats["ia_rerank_ativo"] = bool(PNCP_IA_RERANK_ENABLED)
     out_stats["ia_rerank_usado"] = ia_used
 

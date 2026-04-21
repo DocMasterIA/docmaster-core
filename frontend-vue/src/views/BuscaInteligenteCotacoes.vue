@@ -71,7 +71,7 @@
           <button
             type="button"
             class="bia-add-cotacao-btn bia-add-cotacao-btn--ghost"
-            :disabled="isSearching || isAutoSearchingAll || !itemContext?.descricao_item"
+            :disabled="isSearching || isAutoSearchingAll || (!itemContext?.descricao_item && allItemContexts.length === 0)"
             @click="applyFilters"
           >
             Fazer pesquisa pelos UFs selecionados
@@ -325,6 +325,7 @@ const searchError = ref('');
 const saveMessage = ref('');
 const isSavingSelecionados = ref(false);
 const itemContext = ref(null);
+const allItemContexts = ref([]);
 const isAutoSearchingAll = ref(false);
 const autoSearchProgress = ref({ done: 0, total: 0 });
 const totalSelecionados = computed(() => displayedRows.value.filter((x) => x.selecionado).length);
@@ -402,12 +403,49 @@ const groupedRows = computed(() => {
 });
 
 async function applyFilters() {
-  return runSearchWithContext({
-    descricao: itemContext.value?.descricao_item || '',
-    selectedUfCodes: [...filtros.ufs],
-    context: itemContext.value,
-    append: false,
-  });
+  // Fluxo item único (abertura por itemId)
+  if (String(itemContext.value?.descricao_item || '').trim()) {
+    rows.value = [];
+    return runSearchWithContext({
+      descricao: itemContext.value?.descricao_item || '',
+      selectedUfCodes: [...filtros.ufs],
+      context: itemContext.value,
+      append: false,
+    });
+  }
+
+  // Fluxo cotação completa: reaplica busca para todos os itens.
+  if (!allItemContexts.value.length) return;
+  rows.value = [];
+  isAutoSearchingAll.value = true;
+  autoSearchProgress.value = { done: 0, total: allItemContexts.value.length };
+  searchError.value = '';
+  for (const ctx of allItemContexts.value) {
+    await runSearchWithContext({
+      descricao: ctx.descricao_item,
+      selectedUfCodes: [...filtros.ufs],
+      context: ctx,
+      append: true,
+    });
+    autoSearchProgress.value.done += 1;
+  }
+  isAutoSearchingAll.value = false;
+  if (!rows.value.length) {
+    searchError.value = 'Nenhuma cotação aderente encontrada para os itens da cotação nos UFs selecionados.';
+  }
+}
+
+function buildContextFromItem(it) {
+  const src = it?.source || {};
+  return {
+    id: it.id,
+    descricao_item: String(it?.descricao_item || '').trim(),
+    quantidade: it?.quantidade ?? null,
+    unidade_medida: it?.unidade_medida || null,
+    valor_base_referencia:
+      Number(src?.valor_base ?? src?.valorBase ?? src?.preco_base ?? src?.precoBase) || null,
+    uf_padrao: String(it?.uf || '').trim().toUpperCase() || null,
+  };
 }
 
 async function runSearchWithContext({ descricao, selectedUfCodes = [], context = null, append = false }) {
@@ -415,21 +453,24 @@ async function runSearchWithContext({ descricao, selectedUfCodes = [], context =
   isSearching.value = true;
   if (!append) searchError.value = '';
   try {
-    const backend = await intelligentMarketSearch({
-      termo_busca: String(descricao).trim(),
-      uf: selectedUfCodes.length === 1 ? selectedUfCodes[0] : null,
-      codigo_modalidade: null,
-      max_paginas: 500,
-      tamanho_pagina: 200,
-      quantidade_referencia: context?.quantidade ?? null,
-      unidade_medida_referencia: context?.unidade_medida ?? null,
-      valor_base_referencia: context?.valor_base_referencia ?? null,
-    });
-    if (backend?.ok && Array.isArray(backend.itens)) {
+    const ufsToRun = selectedUfCodes.length > 0 ? [...new Set(selectedUfCodes)] : [context?.uf_padrao || null];
+    const aggregated = [];
+    for (const ufCode of ufsToRun) {
+      const backend = await intelligentMarketSearch({
+        termo_busca: String(descricao).trim(),
+        uf: ufCode || null,
+        codigo_modalidade: null,
+        max_paginas: 500,
+        tamanho_pagina: 200,
+        quantidade_referencia: context?.quantidade ?? null,
+        unidade_medida_referencia: context?.unidade_medida ?? null,
+        valor_base_referencia: context?.valor_base_referencia ?? null,
+      });
+      if (!backend?.ok || !Array.isArray(backend.itens)) continue;
       const mapped = backend.itens.map((it, idx) => ({
         esferaAdministrativa: classificarEsferaAdministrativa(it),
         incisoClassificacao: mapEsferaParaInciso(classificarEsferaAdministrativa(it)),
-        id: `backend-${context?.id || 'none'}-${idx}-${it.numero_pncp || ''}`,
+        id: `backend-${context?.id || 'none'}-${ufCode || 'all'}-${idx}-${it.numero_pncp || ''}`,
         itemId: context?.id || null,
         itemRefLabel: context?.descricao_item || '-',
         sourceRaw: it,
@@ -459,10 +500,12 @@ async function runSearchWithContext({ descricao, selectedUfCodes = [], context =
         status: it.status || 'Aprovado',
         selecionado: false,
       }));
-      rows.value = append ? [...rows.value, ...mapped] : mapped;
-      if (!mapped.length && !append) {
-        searchError.value = 'A IA não encontrou 3 cotações aderentes para este termo no recorte atual.';
-      }
+      aggregated.push(...mapped);
+    }
+    if (aggregated.length > 0) {
+      rows.value = append ? [...rows.value, ...aggregated] : aggregated;
+    } else if (!append) {
+      searchError.value = 'A IA não encontrou 3 cotações aderentes para este termo no recorte atual.';
     }
   } catch (err) {
     searchError.value = `Não foi possível consultar o backend (${err.message || 'erro desconhecido'}).`;
@@ -579,18 +622,11 @@ onMounted(async () => {
   try {
     const data = await getResearchSession(sessionId);
     const itens = Array.isArray(data?.itens) ? data.itens : [];
+    allItemContexts.value = itens.map((it) => buildContextFromItem(it)).filter((x) => x.descricao_item);
     if (itemId.value) {
       const it = itens.find((x) => Number(x?.id) === Number(itemId.value));
       if (!it) return;
-      const src = it?.source || {};
-      itemContext.value = {
-        id: it.id,
-        descricao_item: it.descricao_item || '',
-        quantidade: it.quantidade ?? null,
-        unidade_medida: it.unidade_medida || null,
-        valor_base_referencia:
-          Number(src?.valor_base ?? src?.valorBase ?? src?.preco_base ?? src?.precoBase) || null,
-      };
+      itemContext.value = buildContextFromItem(it);
       filtros.descricao = String(it.descricao_item || '').trim();
       if (String(it.uf || '').trim()) {
         filtros.ufs = [String(it.uf).trim().toUpperCase()];
@@ -606,22 +642,14 @@ onMounted(async () => {
       rows.value = [];
       autoSearchProgress.value = { done: 0, total: itens.length };
       for (const it of itens) {
-        const src = it?.source || {};
-        const ctx = {
-          id: it.id,
-          descricao_item: String(it?.descricao_item || '').trim(),
-          quantidade: it?.quantidade ?? null,
-          unidade_medida: it?.unidade_medida || null,
-          valor_base_referencia:
-            Number(src?.valor_base ?? src?.valorBase ?? src?.preco_base ?? src?.precoBase) || null,
-        };
+        const ctx = buildContextFromItem(it);
         if (!ctx.descricao_item) {
           autoSearchProgress.value.done += 1;
           continue;
         }
         await runSearchWithContext({
           descricao: ctx.descricao_item,
-          selectedUfCodes: String(it?.uf || '').trim() ? [String(it.uf).trim().toUpperCase()] : [],
+          selectedUfCodes: ctx.uf_padrao ? [ctx.uf_padrao] : [],
           context: ctx,
           append: true,
         });

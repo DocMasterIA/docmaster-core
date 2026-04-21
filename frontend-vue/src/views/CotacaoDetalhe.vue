@@ -199,31 +199,6 @@
         </div>
       </section>
       <section class="cot-sheet-shell">
-        <section v-if="showManualItemEditor" class="cot-manual-item">
-          <label class="cot-manual-item__field cot-manual-item__field--wide">
-            <span>Descrição do item</span>
-            <input v-model.trim="manualItem.descricao_item" type="text" placeholder="Ex.: Parafuso de aço galvanizado" />
-          </label>
-          <label class="cot-manual-item__field">
-            <span>Faixa regional base</span>
-            <input v-model.trim="manualItem.valor_base" type="number" min="0" step="0.01" />
-          </label>
-          <label class="cot-manual-item__field">
-            <span>Faixa variação (%)</span>
-            <input v-model.trim="manualItem.variacao_percentual" type="number" min="0" step="0.01" />
-          </label>
-          <p class="cot-manual-item__hint">
-            Qtd./Und./Preço Total serão refletidos automaticamente pelas cotações de preço adicionadas ao item.
-          </p>
-          <div class="cot-manual-item__actions">
-            <button type="button" class="cot-btn cot-btn--primary" :disabled="isAddingManualItem" @click="addManualItem">
-              {{ isAddingManualItem ? 'Adicionando...' : 'Salvar item manual' }}
-            </button>
-            <button type="button" class="cot-btn" :disabled="isAddingManualItem" @click="toggleManualItemEditor">
-              Cancelar
-            </button>
-          </div>
-        </section>
         <div class="cot-sheet-toolbar">
           <label class="cot-sheet-search">
             <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
@@ -311,6 +286,56 @@
               </tr>
             </thead>
             <tbody>
+              <tr v-if="showManualItemEditor" class="cot-sheet-row-add">
+                <td class="cot-sheet-center">+</td>
+                <td>
+                  <input
+                    v-model.trim="manualItem.descricao_item"
+                    type="text"
+                    class="cot-sheet-inline-input"
+                    placeholder="Nome/descrição do item"
+                  />
+                </td>
+                <td class="cot-sheet-center">—</td>
+                <td class="cot-sheet-center">—</td>
+                <td class="cot-sheet-center">—</td>
+                <td class="cot-sheet-center">—</td>
+                <td class="cot-sheet-center">—</td>
+                <td class="cot-sheet-center">—</td>
+                <td class="cot-sheet-center">—</td>
+                <td class="cot-sheet-center">—</td>
+                <td>
+                  <div class="cot-faixa-inline">
+                    <input
+                      v-model.trim="manualItem.valor_base"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      class="cot-sheet-inline-input"
+                      placeholder="Base"
+                    />
+                    <input
+                      v-model.trim="manualItem.variacao_percentual"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      class="cot-sheet-inline-input"
+                      placeholder="Variação %"
+                    />
+                  </div>
+                </td>
+                <td class="cot-sheet-center">Novo</td>
+                <td>
+                  <div class="cot-sheet-actions">
+                    <button type="button" class="cot-sheet-action-btn" :disabled="isAddingManualItem" @click="addManualItem">
+                      {{ isAddingManualItem ? 'Salvando...' : 'Salvar' }}
+                    </button>
+                    <button type="button" class="cot-sheet-action-btn" :disabled="isAddingManualItem" @click="toggleManualItemEditor">
+                      Cancelar
+                    </button>
+                  </div>
+                </td>
+              </tr>
               <tr v-for="linha in linhasMock" :key="linha.id">
                 <td class="cot-sheet-center">
                   <input
@@ -1383,46 +1408,20 @@ async function saveTituloNoBackend() {
   flex-wrap: wrap;
   gap: 8px;
 }
-.cot-manual-item {
-  border: 1px solid #d6dde8;
-  border-radius: 10px;
-  background: #fff;
-  padding: 10px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 8px;
-}
-.cot-manual-item__field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.cot-manual-item__field--wide {
-  grid-column: 1 / -1;
-}
-.cot-manual-item__field span {
-  font-size: 10px;
-  text-transform: uppercase;
-  color: var(--color-text-soft);
-}
-.cot-manual-item__field input {
+.cot-sheet-row-add { background: #f8fbff; }
+.cot-sheet-inline-input {
+  width: 100%;
   border: 1px solid #cfd8e3;
   border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 13px;
-  outline: none;
-}
-.cot-manual-item__hint {
-  grid-column: 1 / -1;
-  margin: 0;
+  padding: 6px 8px;
   font-size: 12px;
-  color: var(--color-text-soft);
+  outline: none;
+  background: #fff;
 }
-.cot-manual-item__actions {
-  grid-column: 1 / -1;
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
+.cot-faixa-inline {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
 }
 
 .cot-sheet-shell {

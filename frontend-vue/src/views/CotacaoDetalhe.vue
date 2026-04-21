@@ -1127,10 +1127,17 @@ async function loadSessionFromBackend() {
         }
         const statusKey = buildGrupoStatusKey(it?.descricao_item, it?.unidade_medida, it?.quantidade);
         const totalFontes = Number(fontesPorGrupo.get(statusKey) ?? 1);
+        const fontesContagem = it?.fontes_contagem || {};
         return {
           id: it.id || idx + 1,
           nomeItem: it.descricao_item || `Item ${idx + 1}`,
-          fontes: { governamentais: 0, entesPublicos: 0, dominioAmplo: 0, cotacaoDireta: 0, notasFiscais: 0 },
+          fontes: {
+            governamentais: Number(fontesContagem.governamentais || 0),
+            entesPublicos: Number(fontesContagem.entesPublicos || 0),
+            dominioAmplo: Number(fontesContagem.dominioAmplo || 0),
+            cotacaoDireta: Number(fontesContagem.cotacaoDireta || 0),
+            notasFiscais: Number(fontesContagem.notasFiscais || 0),
+          },
           qtd: it.quantidade ?? '-',
           und: it.unidade_medida || '-',
           precoTotal: formatCurrency(it.valor_total ?? it.valor_unitario ?? 0),

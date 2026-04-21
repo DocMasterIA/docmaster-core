@@ -12,6 +12,7 @@ import re
 import csv
 import io
 import unicodedata
+from collections import defaultdict
 from datetime import timezone as dt_timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -568,6 +569,49 @@ def _item_cotacao_dict(row: PncpCotacaoItemCotacao) -> Dict[str, Any]:
     }
 
 
+def _norm_fonte_text(v: Any) -> str:
+    s = str(v or "").strip().lower()
+    if not s:
+        return ""
+    s = "".join(ch for ch in unicodedata.normalize("NFD", s) if unicodedata.category(ch) != "Mn")
+    return s
+
+
+def _fonte_bucket_from_source(src: Dict[str, Any]) -> Optional[str]:
+    inciso = _norm_fonte_text(src.get("inciso_classificacao") or src.get("incisoClassificacao"))
+    fonte = _norm_fonte_text(src.get("fonte") or src.get("tipo_fonte") or src.get("categoria_fonte"))
+    if inciso in {"inciso_i", "inciso-i"}:
+        return "governamentais"
+    if inciso in {"inciso_ii", "inciso-ii"}:
+        return "entesPublicos"
+    if "govern" in fonte:
+        return "governamentais"
+    if "ente" in fonte:
+        return "entesPublicos"
+    if "dominio" in fonte:
+        return "dominioAmplo"
+    if "direta" in fonte:
+        return "cotacaoDireta"
+    if "nota" in fonte:
+        return "notasFiscais"
+    return None
+
+
+def _fontes_counts_for_session(sessao_id: int) -> Dict[int, Dict[str, int]]:
+    base = {"governamentais": 0, "entesPublicos": 0, "dominioAmplo": 0, "cotacaoDireta": 0, "notasFiscais": 0}
+    out: Dict[int, Dict[str, int]] = defaultdict(lambda: dict(base))
+    rows = PncpCotacaoItemCotacao.objects.filter(cotacao_id=sessao_id).values("item_id", "source")
+    for r in rows:
+        item_id = int(r.get("item_id"))
+        src = r.get("source") or {}
+        if not isinstance(src, dict):
+            src = {}
+        bucket = _fonte_bucket_from_source(src)
+        if bucket:
+            out[item_id][bucket] = int(out[item_id].get(bucket, 0)) + 1
+    return out
+
+
 def _item_identity_error(it: Dict[str, Any]) -> Optional[str]:
     """Exige âncora mínima para precisão: PNCP, par compra ou descrição não vazia."""
     np = str(it.get("numero_pncp") or it.get("numeroControlePNCP") or "").strip()
@@ -723,6 +767,7 @@ def pncp_research_sessions_detail(request, sessao_id: int):
 
     itens_asc = list(c.itens.all().order_by("id"))
     grupos_relatorio, total_linhas_cotacao = agrupar_itens_relatorio_pesquisa_precos(itens_asc)
+    fontes_counts = _fontes_counts_for_session(c.id)
     formula_id = _resolve_formula_calculo_id(c.filtros or {})
     formula_label = FORMULA_LABELS.get(formula_id, FORMULA_LABELS[DEFAULT_FORMULA_CALCULO])
     anexo = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
@@ -739,7 +784,22 @@ def pncp_research_sessions_detail(request, sessao_id: int):
                 "anexo_fornecedor_pdf": bool(anexo and anexo.arquivo_pdf),
                 "anexo_fornecedor_nome": (anexo.nome_original if anexo else "") or "",
             },
-            "itens": [_item_dict(x) for x in itens_desc],
+            "itens": [
+                {
+                    **_item_dict(x),
+                    "fontes_contagem": fontes_counts.get(
+                        int(x.id),
+                        {
+                            "governamentais": 0,
+                            "entesPublicos": 0,
+                            "dominioAmplo": 0,
+                            "cotacaoDireta": 0,
+                            "notasFiscais": 0,
+                        },
+                    ),
+                }
+                for x in itens_desc
+            ],
             "grupos_relatorio": grupos_relatorio,
             "calculo_precos": resumo_calculo_precos(grupos_relatorio, formula_id),
             "total_linhas_cotacao": total_linhas_cotacao,

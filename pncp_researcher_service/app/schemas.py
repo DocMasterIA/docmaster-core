@@ -31,6 +31,18 @@ class MarketSearchRequest(BaseModel):
         15,
         description=f"Quantidade máxima de páginas para varrer (1–{PNCP_MAX_PAGINAS_PER_REQUEST}, teto via PNCP_MAX_PAGINAS_PER_REQUEST).",
     )
+    quantidade_referencia: Optional[float] = Field(
+        None,
+        description="Quantidade de referência do item da cotação para melhorar julgamento de aderência.",
+    )
+    unidade_medida_referencia: Optional[str] = Field(
+        None,
+        description="Unidade de referência do item da cotação (ex.: UN, KG, M2).",
+    )
+    valor_base_referencia: Optional[float] = Field(
+        None,
+        description="Valor base/faixa regional do item da cotação para coerência de preço.",
+    )
 
     @field_validator("max_paginas")
     @classmethod

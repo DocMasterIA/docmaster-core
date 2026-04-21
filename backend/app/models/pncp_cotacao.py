@@ -86,3 +86,45 @@ class PncpCotacaoAnexo(models.Model):
 
     class Meta:
         ordering = ["-id"]
+
+
+class PncpCotacaoItemCotacao(models.Model):
+    """Cotação de preço coletada para um item manual da cotação."""
+
+    cotacao = models.ForeignKey(
+        PncpCotacao,
+        on_delete=models.CASCADE,
+        related_name="cotacoes_itens",
+    )
+    item = models.ForeignKey(
+        PncpCotacaoItem,
+        on_delete=models.CASCADE,
+        related_name="cotacoes",
+    )
+    numero_pncp = models.CharField(max_length=256, blank=True, default="")
+    ano_compra = models.IntegerField(null=True, blank=True)
+    sequencial_compra = models.IntegerField(null=True, blank=True)
+    numero_item = models.CharField(max_length=64, blank=True, default="")
+    descricao_item = models.TextField(blank=True, default="")
+    quantidade = models.FloatField(null=True, blank=True)
+    unidade_medida = models.CharField(max_length=64, blank=True, default="")
+    valor_unitario = models.FloatField(null=True, blank=True)
+    valor_total = models.FloatField(null=True, blank=True)
+    orgao = models.CharField(max_length=512, blank=True, default="")
+    municipio = models.CharField(max_length=256, blank=True, default="")
+    uf = models.CharField(max_length=8, blank=True, default="")
+    modalidade = models.CharField(max_length=256, blank=True, default="")
+    data_publicacao = models.CharField(max_length=64, blank=True, default="")
+    score_aprovacao = models.IntegerField(default=0)
+    confiabilidade = models.CharField(max_length=32, blank=True, default="")
+    risco = models.CharField(max_length=32, blank=True, default="")
+    status = models.CharField(max_length=32, blank=True, default="")
+    source = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-id"]
+        indexes = [
+            models.Index(fields=["item", "-id"]),
+            models.Index(fields=["cotacao", "-id"]),
+        ]

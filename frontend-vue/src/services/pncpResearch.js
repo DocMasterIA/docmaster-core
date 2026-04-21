@@ -99,6 +99,24 @@ export function addItemsToResearchSession(sessaoId, itens, signal) {
   });
 }
 
+export function getItemCotacoesFromResearchSession(sessaoId, itemId, signal) {
+  return cotacaoRequest(
+    `research/sessions/${encodeURIComponent(sessaoId)}/items/${encodeURIComponent(itemId)}/cotacoes`,
+    { signal },
+  );
+}
+
+export function addCotacoesToItemInResearchSession(sessaoId, itemId, cotacoes, signal) {
+  return cotacaoRequest(
+    `research/sessions/${encodeURIComponent(sessaoId)}/items/${encodeURIComponent(itemId)}/cotacoes`,
+    {
+      method: 'POST',
+      body: { cotacoes },
+      signal,
+    },
+  );
+}
+
 export function deleteItemsFromResearchSession(sessaoId, itemIds, signal) {
   return cotacaoRequest(`research/sessions/${encodeURIComponent(sessaoId)}/items/delete`, {
     method: 'POST',

@@ -72,6 +72,11 @@
         </div>
         <button type="button" class="bia-search-btn" @click="applyFilters">Buscar</button>
       </section>
+      <p v-if="itemContext" class="bia-meta">
+        Item de referência: <strong>{{ itemContext.descricao_item }}</strong>
+        <span v-if="itemContext.quantidade != null"> • Qtd {{ itemContext.quantidade }}</span>
+        <span v-if="itemContext.unidade_medida"> {{ itemContext.unidade_medida }}</span>
+      </p>
       <p v-if="searchError" class="bia-meta bia-meta--error">{{ searchError }}</p>
       <p v-else-if="isSearching" class="bia-meta">Consultando backend PNCP...</p>
 
@@ -102,7 +107,7 @@
               :disabled="isSavingSelecionados || totalSelecionados === 0"
               @click="adicionarSelecionadosNaCotacao"
             >
-              {{ isSavingSelecionados ? 'Salvando...' : '+ Adicionar itens na cotação' }}
+              {{ isSavingSelecionados ? 'Salvando...' : (itemId ? '+ Adicionar cotações ao item' : '+ Adicionar itens na cotação') }}
             </button>
           </div>
         </div>
@@ -172,12 +177,21 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { addItemsToResearchSession, intelligentMarketSearch } from '../services/pncpResearch';
+import {
+  addCotacoesToItemInResearchSession,
+  addItemsToResearchSession,
+  getResearchSession,
+  intelligentMarketSearch,
+} from '../services/pncpResearch';
 
 const route = useRoute();
 const cotacaoId = computed(() => route.params.cotacaoId || 'CT-2026-00421');
+const itemId = computed(() => {
+  const n = Number(route.query.itemId);
+  return Number.isFinite(n) && n > 0 ? n : null;
+});
 
 const filtros = reactive({
   descricao: '',
@@ -277,6 +291,7 @@ const isSearching = ref(false);
 const searchError = ref('');
 const saveMessage = ref('');
 const isSavingSelecionados = ref(false);
+const itemContext = ref(null);
 const totalSelecionados = computed(() => displayedRows.value.filter((x) => x.selecionado).length);
 const allDisplayedSelecionados = computed(
   () => displayedRows.value.length > 0 && displayedRows.value.every((x) => x.selecionado),
@@ -339,6 +354,9 @@ async function applyFilters() {
       codigo_modalidade: null,
       max_paginas: 500,
       tamanho_pagina: 200,
+      quantidade_referencia: itemContext.value?.quantidade ?? null,
+      unidade_medida_referencia: itemContext.value?.unidade_medida ?? null,
+      valor_base_referencia: itemContext.value?.valor_base_referencia ?? null,
     });
     if (backend?.ok && Array.isArray(backend.itens)) {
       const mapped = backend.itens.map((it, idx) => ({
@@ -406,7 +424,7 @@ async function adicionarSelecionadosNaCotacao() {
     saveMessage.value = 'Cotação inválida para salvar no backend.';
     return;
   }
-  const itens = displayedRows.value
+  const selecionados = displayedRows.value
     .filter((r) => r.selecionado)
     .map((r) => ({
       numero_pncp: r.numeroPncp,
@@ -423,27 +441,67 @@ async function adicionarSelecionadosNaCotacao() {
       valor_unitario: r.valorUnitario ?? parseMoeda(r.valor),
       valor_total: r.valorTotal,
       material_servico: r.normalizado,
+      score_aprovacao: r.score,
+      confiabilidade: r.confiabilidade,
+      risco: r.risco,
+      status: r.status,
+      data_publicacao: r.data,
     }));
-  if (!itens.length) {
+  if (!selecionados.length) {
     saveMessage.value = 'Selecione ao menos um item.';
     return;
   }
   const MAX_ITENS_POR_ENVIO = 2000;
-  let enviar = itens;
-  if (itens.length > MAX_ITENS_POR_ENVIO) {
-    enviar = itens.slice(0, MAX_ITENS_POR_ENVIO);
+  let enviar = selecionados;
+  if (selecionados.length > MAX_ITENS_POR_ENVIO) {
+    enviar = selecionados.slice(0, MAX_ITENS_POR_ENVIO);
     saveMessage.value = `Limite de ${MAX_ITENS_POR_ENVIO} itens por envio; gravando os primeiros ${MAX_ITENS_POR_ENVIO}.`;
   }
   try {
     isSavingSelecionados.value = true;
-    const res = await addItemsToResearchSession(sessionId, enviar);
-    saveMessage.value = `${res.itens_inseridos ?? enviar.length} item(ns) adicionados à cotação.`;
+    if (itemId.value) {
+      const res = await addCotacoesToItemInResearchSession(sessionId, itemId.value, enviar);
+      saveMessage.value = `${res.cotacoes_inseridas ?? enviar.length} cotação(ões) adicionadas ao item.`;
+    } else {
+      const res = await addItemsToResearchSession(sessionId, enviar);
+      saveMessage.value = `${res.itens_inseridos ?? enviar.length} item(ns) adicionados à cotação.`;
+    }
   } catch (err) {
     saveMessage.value = `Falha ao salvar: ${err.message || 'erro desconhecido'}`;
   } finally {
     isSavingSelecionados.value = false;
   }
 }
+
+onMounted(async () => {
+  if (!itemId.value) return;
+  const sessionId = Number(cotacaoId.value);
+  if (!Number.isFinite(sessionId) || sessionId <= 0) return;
+  try {
+    const data = await getResearchSession(sessionId);
+    const itens = Array.isArray(data?.itens) ? data.itens : [];
+    const it = itens.find((x) => Number(x?.id) === Number(itemId.value));
+    if (!it) return;
+    const src = it?.source || {};
+    itemContext.value = {
+      id: it.id,
+      descricao_item: it.descricao_item || '',
+      quantidade: it.quantidade ?? null,
+      unidade_medida: it.unidade_medida || null,
+      valor_base_referencia:
+        Number(src?.valor_base ?? src?.valorBase ?? src?.preco_base ?? src?.precoBase) || null,
+    };
+    filtros.descricao = String(it.descricao_item || '').trim();
+    if (String(it.uf || '').trim()) {
+      filtros.ufs = [String(it.uf).trim().toUpperCase()];
+    }
+    if (filtros.descricao) {
+      await applyFilters();
+    }
+  } catch (_) {
+    // contexto do item é opcional; não bloqueia uso normal da tela
+  }
+});
 
 function parseMoeda(v) {
   const n = Number(String(v || '').replace(/[^\d,.-]/g, '').replace(',', '.'));

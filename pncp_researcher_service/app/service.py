@@ -783,6 +783,34 @@ def _score_clarity_and_unit(item: Dict[str, Any], query_groups: List[List[str]])
     return max(0.0, min(15.0, score))
 
 
+def _normalize_unit(value: Any) -> str:
+    s = _normalize_text(str(value or ""))
+    if not s:
+        return ""
+    unit_map = {
+        "unidade": "un",
+        "unid": "un",
+        "und": "un",
+        "un": "un",
+        "peca": "pc",
+        "pecas": "pc",
+        "pc": "pc",
+        "kg": "kg",
+        "quilo": "kg",
+        "quilograma": "kg",
+        "g": "g",
+        "grama": "g",
+        "l": "l",
+        "lt": "l",
+        "litro": "l",
+        "m": "m",
+        "metro": "m",
+        "m2": "m2",
+        "metro quadrado": "m2",
+    }
+    return unit_map.get(s, s)
+
+
 def _literal_query_tokens(termo_busca: str) -> List[str]:
     """
     Tokens literais do termo de busca (sem stopwords genéricas).
@@ -1254,6 +1282,9 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         }
 
     query_groups = _build_query_groups(payload.termo_busca)
+    ref_qty = _safe_float(payload.quantidade_referencia)
+    ref_unit = _normalize_unit(payload.unidade_medida_referencia)
+    ref_value = _safe_float(payload.valor_base_referencia)
     valores = [
         x.get("valor_unitario") or x.get("valor_total") or x.get("valor_global")
         for x in itens
@@ -1279,10 +1310,33 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         coh = _score_value_coherence(it, median_val)
         clar = _score_clarity_and_unit(it, query_groups)
         pen = _context_penalty(it, query_groups)
-        raw_score = sem + tbl + rec + coh + clar + pen
+        ref_fit = 0.0
+        row_unit = _normalize_unit(it.get("unidade_medida"))
+        if ref_unit and row_unit:
+            ref_fit += 6.0 if ref_unit == row_unit else -4.0
+        row_qty = _safe_float(it.get("quantidade"))
+        if ref_qty > 0 and row_qty > 0:
+            q_dev = abs(row_qty - ref_qty) / max(ref_qty, 1e-9)
+            if q_dev <= 0.2:
+                ref_fit += 5.0
+            elif q_dev <= 0.5:
+                ref_fit += 2.0
+            else:
+                ref_fit -= 2.0
+        row_value = _safe_float(it.get("valor_unitario") or it.get("valor_total") or it.get("valor_global"))
+        if ref_value > 0 and row_value > 0:
+            v_dev = abs(row_value - ref_value) / max(ref_value, 1e-9)
+            if v_dev <= 0.25:
+                ref_fit += 6.0
+            elif v_dev <= 0.5:
+                ref_fit += 3.0
+            else:
+                ref_fit -= 2.0
+        raw_score = sem + tbl + rec + coh + clar + pen + ref_fit
         score_0_100 = max(0, min(100, round(raw_score)))
         it2 = dict(it)
         it2["score_bruto"] = round(raw_score, 3)
+        it2["score_ref_fit"] = round(ref_fit, 3)
         it2["literal_match"] = literal_match
         it2["score_aprovacao"] = score_0_100
         it2["confiabilidade"] = _classify_confiabilidade(score_0_100)
@@ -1387,6 +1441,9 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             "max_paginas": payload.max_paginas,
             "tamanho_pagina": payload.tamanho_pagina,
             "fonte": "local_item_search",
+            "quantidade_referencia": payload.quantidade_referencia,
+            "unidade_medida_referencia": payload.unidade_medida_referencia,
+            "valor_base_referencia": payload.valor_base_referencia,
         },
         "stats": out_stats,
         "itens": top3,

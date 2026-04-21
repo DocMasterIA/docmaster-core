@@ -74,10 +74,20 @@
           </div>
         </section>
 
+        <section class="item-actions">
+          <RouterLink
+            class="item-search-btn"
+            :to="`/pesquisador-pncp/cotacoes/${cotacaoId}/busca-inteligente?itemId=${itemId}`"
+          >
+            <i class="fa-solid fa-robot" aria-hidden="true"></i>
+            Buscar preços com I.A para este item
+          </RouterLink>
+        </section>
+
         <section class="item-related">
-          <h2>Cotações relacionadas do mesmo item</h2>
+          <h2>Cotações de preço deste item</h2>
           <p class="item-meta">
-            {{ relatedItems.length }} cotação(ões) no mesmo grupo de descrição/unidade/quantidade.
+            {{ itemCotacoes.length }} cotação(ões) vinculadas ao item.
           </p>
           <div class="item-table-scroll">
             <table class="item-table">
@@ -92,13 +102,16 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="r in relatedItems" :key="r.id">
+                <tr v-for="r in itemCotacoes" :key="r.id">
                   <td>{{ r.id }}</td>
                   <td>{{ r.orgao || '—' }}</td>
                   <td>{{ formatCidadeUf(r) }}</td>
                   <td>{{ formatCurrency(r.valor_unitario) }}</td>
                   <td>{{ formatCurrency(r.valor_total) }}</td>
                   <td>{{ formatDateTimePt(r.created_at) }}</td>
+                </tr>
+                <tr v-if="itemCotacoes.length === 0">
+                  <td colspan="6">Nenhuma cotação de preço registrada para este item.</td>
                 </tr>
               </tbody>
             </table>
@@ -112,7 +125,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { getResearchSession } from '../services/pncpResearch';
+import { getItemCotacoesFromResearchSession, getResearchSession } from '../services/pncpResearch';
 
 const route = useRoute();
 const cotacaoId = computed(() => String(route.params.cotacaoId || ''));
@@ -122,16 +135,9 @@ const isLoading = ref(false);
 const loadError = ref('');
 const item = ref(null);
 const allItems = ref([]);
+const itemCotacoes = ref([]);
 
 const itemCidadeUf = computed(() => (item.value ? formatCidadeUf(item.value) : '—'));
-const relatedItems = computed(() => {
-  if (!item.value) return [];
-  const key = buildGrupoStatusKey(item.value?.descricao_item, item.value?.unidade_medida, item.value?.quantidade);
-  return allItems.value
-    .filter((it) => buildGrupoStatusKey(it?.descricao_item, it?.unidade_medida, it?.quantidade) === key)
-    .sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
-});
-
 const faixaValorBase = computed(() => {
   const src = item.value?.source || {};
   return pickNumeric(src?.valor_base, src?.valorBase, src?.preco_base, src?.precoBase);
@@ -160,6 +166,8 @@ async function loadItem() {
     allItems.value = itens;
     item.value = itens.find((x) => Number(x?.id) === Number(itemId.value)) || null;
     if (!item.value) loadError.value = 'Item não encontrado nesta cotação.';
+    const cot = await getItemCotacoesFromResearchSession(sessionId, itemId.value);
+    itemCotacoes.value = Array.isArray(cot?.cotacoes) ? cot.cotacoes : [];
   } catch (err) {
     loadError.value = `Não foi possível carregar o item (${err?.message || 'erro desconhecido'}).`;
   } finally {
@@ -183,7 +191,6 @@ function buildGrupoStatusKey(nome, unidade, quantidade) {
   const q = Number.isFinite(qNum) ? String(qNum) : qRaw;
   return `${n}|${u}|${q}`;
 }
-
 function pickNumeric(...vals) {
   for (const v of vals) {
     const n = Number(v);
@@ -233,6 +240,19 @@ function formatCidadeUf(r) {
 .item-card--wide { grid-column: 1 / -1; }
 .item-card__label { font-size: 10px; text-transform: uppercase; color: #64748b; }
 .item-prices { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+.item-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.item-search-btn {
+  border: 1px solid #1f4e79;
+  border-radius: 10px;
+  background: #1f4e79;
+  color: #fff;
+  padding: 8px 12px;
+  font-size: 12px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
 .item-price-card { border: 1px solid #b7d2ef; border-radius: 10px; background: #e8f1fb; padding: 10px; display: flex; flex-direction: column; gap: 4px; }
 .item-price-card span { font-size: 11px; text-transform: uppercase; color: #1f4e79; }
 .item-price-card strong { font-size: 18px; color: #0f4c81; }

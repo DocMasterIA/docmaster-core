@@ -25,7 +25,13 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from backend.app.api import api_login_required
-from backend.app.models import PncpCotacao, PncpCotacaoAnexo, PncpCotacaoItem, Prefeitura
+from backend.app.models import (
+    PncpCotacao,
+    PncpCotacaoAnexo,
+    PncpCotacaoItem,
+    PncpCotacaoItemCotacao,
+    Prefeitura,
+)
 from backend.app.services.pncp_relatorio_itens import (
     agrupar_itens_relatorio_pesquisa_precos,
     resumo_calculo_precos,
@@ -527,6 +533,33 @@ def _item_dict(row: PncpCotacaoItem) -> Dict[str, Any]:
     }
 
 
+def _item_cotacao_dict(row: PncpCotacaoItemCotacao) -> Dict[str, Any]:
+    return {
+        "id": row.id,
+        "item_id": row.item_id,
+        "numero_pncp": row.numero_pncp or None,
+        "ano_compra": row.ano_compra,
+        "sequencial_compra": row.sequencial_compra,
+        "numero_item": row.numero_item or None,
+        "descricao_item": row.descricao_item or None,
+        "quantidade": row.quantidade,
+        "unidade_medida": row.unidade_medida or None,
+        "valor_unitario": row.valor_unitario,
+        "valor_total": row.valor_total,
+        "orgao": row.orgao or None,
+        "municipio": row.municipio or None,
+        "uf": row.uf or None,
+        "modalidade": row.modalidade or None,
+        "data_publicacao": row.data_publicacao or None,
+        "score_aprovacao": row.score_aprovacao,
+        "confiabilidade": row.confiabilidade or None,
+        "risco": row.risco or None,
+        "status": row.status or None,
+        "source": row.source or {},
+        "created_at": _iso_z(row.created_at),
+    }
+
+
 def _item_identity_error(it: Dict[str, Any]) -> Optional[str]:
     """Exige âncora mínima para precisão: PNCP, par compra ou descrição não vazia."""
     np = str(it.get("numero_pncp") or it.get("numeroControlePNCP") or "").strip()
@@ -849,6 +882,96 @@ def pncp_research_sessions_add_items(request, sessao_id: int):
         c.save(update_fields=["updated_at"])
 
     return JsonResponse({"ok": True, "sessao_id": c.id, "itens_inseridos": inserted})
+
+
+@api_login_required
+@csrf_exempt
+@require_http_methods(["GET", "POST", "OPTIONS"])
+def pncp_research_sessions_item_cotacoes(request, sessao_id: int, item_id: int):
+    if request.method == "OPTIONS":
+        return JsonResponse({}, status=204)
+
+    c = _cotacao_qs_for_user(request.user).filter(pk=sessao_id).first()
+    if not c:
+        return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
+
+    item = c.itens.filter(pk=item_id).first()
+    if not item:
+        return JsonResponse({"ok": False, "error": "Item não encontrado na sessão.", "item_id": item_id}, status=404)
+
+    if request.method == "GET":
+        rows = list(item.cotacoes.all().order_by("-id"))
+        return JsonResponse(
+            {
+                "ok": True,
+                "sessao_id": c.id,
+                "item_id": item.id,
+                "cotacoes": [_item_cotacao_dict(x) for x in rows],
+                "stats": {"total_cotacoes": len(rows)},
+            }
+        )
+
+    body, err = _parse_json_body(request)
+    if err:
+        return err
+    raw_cotacoes = body.get("cotacoes")
+    if not isinstance(raw_cotacoes, list):
+        return JsonResponse({"detail": "Campo cotacoes deve ser uma lista."}, status=422)
+    if len(raw_cotacoes) > MAX_ITEMS_PER_REQUEST:
+        return JsonResponse(
+            {"detail": f"No máximo {MAX_ITEMS_PER_REQUEST} cotações por requisição.", "received": len(raw_cotacoes)},
+            status=422,
+        )
+    if c.status in CLOSED_FOR_ITEMS:
+        return JsonResponse({"detail": "Cotação encerrada; não é permitido adicionar cotações."}, status=409)
+
+    built: List[PncpCotacaoItemCotacao] = []
+    for row in raw_cotacoes:
+        if not isinstance(row, dict):
+            continue
+        built.append(
+            PncpCotacaoItemCotacao(
+                cotacao=c,
+                item=item,
+                numero_pncp=str(row.get("numero_pncp") or row.get("numeroControlePNCP") or "")[:256],
+                ano_compra=_safe_int_field(row.get("ano_compra"), min_v=1990, max_v=2100),
+                sequencial_compra=_safe_int_field(row.get("sequencial_compra"), min_v=1, max_v=2_147_483_647),
+                numero_item=str(row.get("numero_item") or row.get("numeroItem") or "")[:64],
+                descricao_item=str(row.get("descricao_item") or row.get("descricao") or row.get("objeto_resumido") or "")[:10000],
+                quantidade=_safe_float(row.get("quantidade")),
+                unidade_medida=str(row.get("unidade_medida") or row.get("unidadeMedida") or "")[:64],
+                valor_unitario=_safe_float(row.get("valor_unitario") or row.get("valorUnitario")),
+                valor_total=_safe_float(row.get("valor_total") or row.get("valor_global") or row.get("valorTotal")),
+                orgao=str(row.get("orgao") or "")[:512],
+                municipio=str(row.get("municipio") or "")[:256],
+                uf=_normalize_uf(row.get("uf")),
+                modalidade=str(row.get("modalidade") or "")[:256],
+                data_publicacao=str(row.get("data_publicacao") or row.get("dataPublicacao") or "")[:64],
+                score_aprovacao=int(max(0, min(100, _safe_float(row.get("score_aprovacao"))))),
+                confiabilidade=str(row.get("confiabilidade") or "")[:32],
+                risco=str(row.get("risco") or "")[:32],
+                status=str(row.get("status") or "")[:32],
+                source=_compact_item_source(row),
+            )
+        )
+
+    if not built:
+        return JsonResponse({"detail": "Nenhuma cotação válida para inserir."}, status=422)
+
+    with transaction.atomic():
+        for i in range(0, len(built), BULK_CREATE_BATCH):
+            chunk = built[i : i + BULK_CREATE_BATCH]
+            PncpCotacaoItemCotacao.objects.bulk_create(chunk, batch_size=BULK_CREATE_BATCH)
+        c.save(update_fields=["updated_at"])
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "sessao_id": c.id,
+            "item_id": item.id,
+            "cotacoes_inseridas": len(built),
+        }
+    )
 
 
 @api_login_required

@@ -167,6 +167,15 @@
           <p>Escolha como deseja iniciar a pesquisa para adicionar novos itens à cotação.</p>
         </div>
         <div class="cot-new-item-block__actions">
+          <button
+            type="button"
+            class="cot-btn cot-btn--primary"
+            :disabled="isSessaoFechada || isAddingManualItem"
+            @click="addManualItem"
+          >
+            <i class="fa-solid fa-plus" aria-hidden="true"></i>
+            {{ isAddingManualItem ? 'Adicionando item...' : 'Adicionar item manual' }}
+          </button>
           <RouterLink
             :to="`/pesquisador-pncp/cotacoes/${cotacaoId}/busca-inteligente`"
             class="cot-btn cot-btn--primary"
@@ -188,6 +197,32 @@
             Iniciar busca manual
           </RouterLink>
         </div>
+      </section>
+      <section class="cot-manual-item">
+        <label class="cot-manual-item__field cot-manual-item__field--wide">
+          <span>Descrição do item</span>
+          <input v-model.trim="manualItem.descricao_item" type="text" placeholder="Ex.: Parafuso de aço galvanizado" />
+        </label>
+        <label class="cot-manual-item__field">
+          <span>Qtd.</span>
+          <input v-model.trim="manualItem.quantidade" type="number" min="0" step="0.01" />
+        </label>
+        <label class="cot-manual-item__field">
+          <span>Und.</span>
+          <input v-model.trim="manualItem.unidade_medida" type="text" placeholder="UN" />
+        </label>
+        <label class="cot-manual-item__field">
+          <span>Preço Total</span>
+          <input v-model.trim="manualItem.valor_total" type="number" min="0" step="0.01" />
+        </label>
+        <label class="cot-manual-item__field">
+          <span>Faixa regional base</span>
+          <input v-model.trim="manualItem.valor_base" type="number" min="0" step="0.01" />
+        </label>
+        <label class="cot-manual-item__field">
+          <span>Faixa variação (%)</span>
+          <input v-model.trim="manualItem.variacao_percentual" type="number" min="0" step="0.01" />
+        </label>
       </section>
 
       <section class="cot-sheet-shell">
@@ -468,6 +503,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
+  addItemsToResearchSession,
   deleteItemsFromResearchSession,
   downloadCotacaoRelatorioPdf,
   getResearchSession,
@@ -527,6 +563,15 @@ const supplierPdfFilename = ref('');
 const sessaoStatus = ref('aberta');
 const isClosingCotacao = ref(false);
 const isReopeningCotacao = ref(false);
+const isAddingManualItem = ref(false);
+const manualItem = ref({
+  descricao_item: '',
+  quantidade: '',
+  unidade_medida: 'UN',
+  valor_total: '',
+  valor_base: '',
+  variacao_percentual: '',
+});
 
 const isSessaoFechada = computed(() => ['finalizada', 'cancelada'].includes(String(sessaoStatus.value || '')));
 const sessaoStatusLabel = computed(() => {
@@ -766,6 +811,57 @@ async function reabrirCotacao() {
     loadError.value = `Falha ao reabrir cotação (${err?.message || 'erro desconhecido'}).`;
   } finally {
     isReopeningCotacao.value = false;
+  }
+}
+
+async function addManualItem() {
+  const sessionId = Number(cotacaoId.value);
+  if (Number.isNaN(sessionId)) {
+    loadError.value = 'Cotação inválida para adicionar item manual.';
+    return;
+  }
+  if (isSessaoFechada.value || isAddingManualItem.value) return;
+  const descricao = String(manualItem.value.descricao_item || '').trim();
+  if (!descricao) {
+    loadError.value = 'Informe a descrição do item manual.';
+    return;
+  }
+  const quantidade = Number(manualItem.value.quantidade);
+  const valorTotal = Number(manualItem.value.valor_total);
+  const valorBase = Number(manualItem.value.valor_base);
+  const variacao = Number(manualItem.value.variacao_percentual);
+
+  isAddingManualItem.value = true;
+  loadError.value = '';
+  try {
+    await addItemsToResearchSession(sessionId, [
+      {
+        descricao_item: descricao,
+        quantidade: Number.isFinite(quantidade) ? quantidade : null,
+        unidade_medida: String(manualItem.value.unidade_medida || '').trim() || 'UN',
+        valor_total: Number.isFinite(valorTotal) ? valorTotal : null,
+        valor_base: Number.isFinite(valorBase) ? valorBase : null,
+        variacao_percentual: Number.isFinite(variacao) ? variacao : null,
+        faixa_regional: {
+          valor_base: Number.isFinite(valorBase) ? valorBase : null,
+          variacao_percentual: Number.isFinite(variacao) ? variacao : null,
+        },
+        origem: 'item_manual_cotacao',
+      },
+    ]);
+    await loadSessionFromBackend();
+    manualItem.value = {
+      descricao_item: '',
+      quantidade: '',
+      unidade_medida: 'UN',
+      valor_total: '',
+      valor_base: '',
+      variacao_percentual: '',
+    };
+  } catch (err) {
+    loadError.value = `Falha ao adicionar item manual (${err?.message || 'erro desconhecido'}).`;
+  } finally {
+    isAddingManualItem.value = false;
   }
 }
 
@@ -1292,6 +1388,35 @@ async function saveTituloNoBackend() {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+.cot-manual-item {
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+.cot-manual-item__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cot-manual-item__field--wide {
+  grid-column: 1 / -1;
+}
+.cot-manual-item__field span {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--color-text-soft);
+}
+.cot-manual-item__field input {
+  border: 1px solid #cfd8e3;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  outline: none;
 }
 
 .cot-sheet-shell {

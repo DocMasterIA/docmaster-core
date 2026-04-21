@@ -307,20 +307,20 @@
                 <td>
                   <div class="cot-faixa-inline">
                     <input
-                      v-model.trim="manualItem.valor_base"
-                      type="number"
-                      min="0"
-                      step="0.01"
+                      :value="manualItem.valor_base"
+                      type="text"
+                      inputmode="numeric"
                       class="cot-sheet-inline-input"
-                      placeholder="Base"
+                      placeholder="R$ 0,00"
+                      @input="onManualBaseInput"
                     />
                     <input
-                      v-model.trim="manualItem.variacao_percentual"
-                      type="number"
-                      min="0"
-                      step="0.01"
+                      :value="manualItem.variacao_percentual"
+                      type="text"
+                      inputmode="numeric"
                       class="cot-sheet-inline-input"
-                      placeholder="Variação %"
+                      placeholder="0%"
+                      @input="onManualVariacaoInput"
                     />
                   </div>
                 </td>
@@ -847,8 +847,8 @@ async function addManualItem() {
     loadError.value = 'Informe a descrição do item manual.';
     return;
   }
-  const valorBase = Number(manualItem.value.valor_base);
-  const variacao = Number(manualItem.value.variacao_percentual);
+  const valorBase = parseCurrencyInputToNumber(manualItem.value.valor_base);
+  const variacao = parsePercentInputToNumber(manualItem.value.variacao_percentual);
 
   isAddingManualItem.value = true;
   loadError.value = '';
@@ -882,6 +882,54 @@ async function addManualItem() {
 function toggleManualItemEditor() {
   if (isSessaoFechada.value || isAddingManualItem.value) return;
   showManualItemEditor.value = !showManualItemEditor.value;
+}
+
+function onManualBaseInput(event) {
+  const raw = String(event?.target?.value || '');
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) {
+    manualItem.value.valor_base = '';
+    return;
+  }
+  const cents = Number.parseInt(digits, 10);
+  if (!Number.isFinite(cents)) {
+    manualItem.value.valor_base = '';
+    return;
+  }
+  const value = cents / 100;
+  manualItem.value.valor_base = value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function onManualVariacaoInput(event) {
+  const raw = String(event?.target?.value || '');
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) {
+    manualItem.value.variacao_percentual = '';
+    return;
+  }
+  const n = Number.parseInt(digits, 10);
+  if (!Number.isFinite(n)) {
+    manualItem.value.variacao_percentual = '';
+    return;
+  }
+  manualItem.value.variacao_percentual = `${n}%`;
+}
+
+function parseCurrencyInputToNumber(value) {
+  const s = String(value || '').trim();
+  if (!s) return null;
+  const only = s.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.');
+  const n = Number(only);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parsePercentInputToNumber(value) {
+  const s = String(value || '').trim();
+  if (!s) return null;
+  const only = s.replace(/\D/g, '');
+  if (!only) return null;
+  const n = Number.parseInt(only, 10);
+  return Number.isFinite(n) ? n : null;
 }
 
 async function onImportSpreadsheetSelected(event) {

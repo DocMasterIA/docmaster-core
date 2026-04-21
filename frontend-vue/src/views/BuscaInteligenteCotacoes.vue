@@ -503,7 +503,32 @@ async function runSearchWithContext({ descricao, selectedUfCodes = [], context =
       aggregated.push(...mapped);
     }
     if (aggregated.length > 0) {
-      rows.value = append ? [...rows.value, ...aggregated] : aggregated;
+      const unique = [];
+      const seen = new Set();
+      for (const row of aggregated) {
+        const key = [
+          String(row.itemId || ''),
+          String(row.numeroPncp || ''),
+          String(row.numeroItem || ''),
+          String(row.titulo || '').toLowerCase(),
+          String(row.orgao || '').toLowerCase(),
+        ].join('|');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        unique.push(row);
+      }
+      unique.sort((a, b) => {
+        const sa = Number(a.score ?? 0);
+        const sb = Number(b.score ?? 0);
+        if (sa !== sb) return sb - sa;
+        const va = Number(a.valorUnitario ?? a.valorTotal ?? parseMoeda(a.valor));
+        const vb = Number(b.valorUnitario ?? b.valorTotal ?? parseMoeda(b.valor));
+        const av = Number.isFinite(va) ? va : Number.POSITIVE_INFINITY;
+        const bv = Number.isFinite(vb) ? vb : Number.POSITIVE_INFINITY;
+        return av - bv;
+      });
+      const top3 = unique.slice(0, 3);
+      rows.value = append ? [...rows.value, ...top3] : top3;
     } else if (!append) {
       searchError.value = 'A IA não encontrou 3 cotações aderentes para este termo no recorte atual.';
     }

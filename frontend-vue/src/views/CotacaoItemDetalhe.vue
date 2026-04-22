@@ -292,13 +292,29 @@ function normalizeFonte(v) {
 }
 
 function classificarFonte(cotacao) {
-  const inciso = normalizeFonte(
+  const incisoRaw = normalizeFonte(
     cotacao?.inciso_classificacao ||
       cotacao?.source?.inciso_classificacao ||
       cotacao?.source?.incisoClassificacao,
   );
-  if (inciso === 'governamentais' || inciso === 'inciso_i') return 'governamentais';
-  if (inciso === 'entes_publicos' || inciso === 'inciso_ii') return 'entes_publicos';
+  if (
+    [
+      'inciso_i',
+      'inciso-i',
+      'governamentais',
+      'precos_governamentais',
+      'precos governamentais',
+    ].includes(incisoRaw)
+  ) return 'governamentais';
+  if (
+    [
+      'inciso_ii',
+      'inciso-ii',
+      'entes_publicos',
+      'outros_entes_publicos',
+      'outros entes publicos',
+    ].includes(incisoRaw)
+  ) return 'entes_publicos';
 
   const esferaId = normalizeFonte(
     cotacao?.esfera_id ||

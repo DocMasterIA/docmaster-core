@@ -402,6 +402,10 @@ const groupedRows = computed(() => {
 async function applyFilters() {
   // Fluxo item único (abertura por itemId)
   if (String(itemContext.value?.descricao_item || '').trim()) {
+    if (Number(itemContext.value?.total_cotacoes_item || 0) >= 3) {
+      searchError.value = 'Item já está completo (3+ preços). A busca automática é aplicada apenas em itens incompletos.';
+      return;
+    }
     rows.value = [];
     return runSearchWithContext({
       descricao: itemContext.value?.descricao_item || '',
@@ -412,12 +416,16 @@ async function applyFilters() {
   }
 
   // Fluxo cotação completa: reaplica busca para todos os itens.
-  if (!allItemContexts.value.length) return;
+  const pendentes = allItemContexts.value.filter((ctx) => Number(ctx?.total_cotacoes_item || 0) < 3);
+  if (!pendentes.length) {
+    searchError.value = 'Todos os itens já estão completos (3+ preços).';
+    return;
+  }
   rows.value = [];
   isAutoSearchingAll.value = true;
-  autoSearchProgress.value = { done: 0, total: allItemContexts.value.length };
+  autoSearchProgress.value = { done: 0, total: pendentes.length };
   searchError.value = '';
-  for (const ctx of allItemContexts.value) {
+  for (const ctx of pendentes) {
     await runSearchWithContext({
       descricao: ctx.descricao_item,
       selectedUfCodes: [...filtros.ufs],
@@ -434,6 +442,12 @@ async function applyFilters() {
 
 function buildContextFromItem(it) {
   const src = it?.source || {};
+  const fontes = it?.fontes_contagem || {};
+  const totalCotacoesItem = Number(fontes.governamentais || 0)
+    + Number(fontes.entesPublicos || 0)
+    + Number(fontes.dominioAmplo || 0)
+    + Number(fontes.cotacaoDireta || 0)
+    + Number(fontes.notasFiscais || 0);
   return {
     id: it.id,
     descricao_item: String(it?.descricao_item || '').trim(),
@@ -444,6 +458,7 @@ function buildContextFromItem(it) {
     variacao_percentual_referencia:
       Number(src?.variacao_percentual ?? src?.variacaoPercentual ?? src?.variacao) || null,
     uf_padrao: String(it?.uf || '').trim().toUpperCase() || null,
+    total_cotacoes_item: totalCotacoesItem,
   };
 }
 
@@ -673,10 +688,23 @@ onMounted(async () => {
     }
 
     if (autostart.value && itens.length) {
+      const pendentes = itens.filter((it) => {
+        const fontes = it?.fontes_contagem || {};
+        const totalCot = Number(fontes.governamentais || 0)
+          + Number(fontes.entesPublicos || 0)
+          + Number(fontes.dominioAmplo || 0)
+          + Number(fontes.cotacaoDireta || 0)
+          + Number(fontes.notasFiscais || 0);
+        return totalCot < 3;
+      });
+      if (!pendentes.length) {
+        searchError.value = 'Todos os itens da cotação já estão completos (3+ preços).';
+        return;
+      }
       isAutoSearchingAll.value = true;
       rows.value = [];
-      autoSearchProgress.value = { done: 0, total: itens.length };
-      for (const it of itens) {
+      autoSearchProgress.value = { done: 0, total: pendentes.length };
+      for (const it of pendentes) {
         const ctx = buildContextFromItem(it);
         if (!ctx.descricao_item) {
           autoSearchProgress.value.done += 1;

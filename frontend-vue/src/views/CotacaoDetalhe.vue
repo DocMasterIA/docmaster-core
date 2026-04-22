@@ -1101,8 +1101,10 @@ async function loadSessionFromBackend() {
         }
       }
       linhasMock.value = data.itens.map((it, idx) => {
-        const vt = Number(it.valor_total ?? it.valor_unitario);
-        if (!Number.isNaN(vt) && vt > 0) {
+        const vt = Number(
+          it.valor_total_refletido ?? it.valor_total ?? it.valor_unitario,
+        );
+        if (Number.isFinite(vt) && vt >= 0) {
           soma += vt;
           temValor = true;
         }

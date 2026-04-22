@@ -611,13 +611,30 @@ def _fonte_bucket_from_source(src: Dict[str, Any]) -> Optional[str]:
 def _fontes_counts_for_session(sessao_id: int) -> Dict[int, Dict[str, int]]:
     base = {"governamentais": 0, "entesPublicos": 0, "dominioAmplo": 0, "cotacaoDireta": 0, "notasFiscais": 0}
     out: Dict[int, Dict[str, int]] = defaultdict(lambda: dict(base))
-    rows = PncpCotacaoItemCotacao.objects.filter(cotacao_id=sessao_id).values("item_id", "source")
+    rows = PncpCotacaoItemCotacao.objects.filter(cotacao_id=sessao_id).values(
+        "item_id",
+        "source",
+        "numero_pncp",
+        "uf",
+    )
     for r in rows:
         item_id = int(r.get("item_id"))
         src = r.get("source") or {}
+        if isinstance(src, str):
+            try:
+                parsed = json.loads(src)
+                src = parsed if isinstance(parsed, dict) else {}
+            except Exception:
+                src = {}
         if not isinstance(src, dict):
             src = {}
         bucket = _fonte_bucket_from_source(src)
+        # Fallback resiliente para legado:
+        # se não houver metadado de fonte/inciso/esfera, assume governamentais quando há número PNCP.
+        if bucket is None:
+            numero_pncp = str(r.get("numero_pncp") or "").strip()
+            if numero_pncp:
+                bucket = "governamentais"
         if bucket:
             out[item_id][bucket] = int(out[item_id].get(bucket, 0)) + 1
     return out

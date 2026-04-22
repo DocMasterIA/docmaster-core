@@ -26,7 +26,11 @@ from django.utils import timezone
 from jinja2 import Environment, BaseLoader, select_autoescape
 from weasyprint import HTML
 
-from backend.app.services.pncp_relatorio_itens import agrupar_itens_relatorio_pesquisa_precos
+from backend.app.services.pncp_relatorio_itens import (
+    FORMULA_LABELS,
+    agrupar_cotacoes_por_item_relatorio_pesquisa_precos,
+    agrupar_itens_relatorio_pesquisa_precos,
+)
 
 _SERVICES_DIR = Path(__file__).resolve().parent
 
@@ -119,6 +123,8 @@ class RelatorioCotacaoContext:
     qr_data_url: str
     marca_agua_texto: str
     anexo_fornecedor_url: str
+    formula_calculo_id: str
+    formula_calculo_label: str
 
 
 def _formatar_moeda_br(v: Any) -> str:
@@ -140,9 +146,15 @@ def montar_contexto_relatorio(
     titulo_relatorio: str,
     url_verificacao: str,
     anexo_fornecedor_url: str = "",
+    formula_id: str = "media_aritmetica_precos_obtidos",
 ) -> RelatorioCotacaoContext:
     itens = list(itens_qs.order_by("id"))
-    grupos, total_linhas = agrupar_itens_relatorio_pesquisa_precos(itens)
+    cotacoes_qs = getattr(cotacao, "cotacoes_itens", None)
+    cotacoes = list(cotacoes_qs.select_related("item").order_by("item_id", "id")) if cotacoes_qs is not None else []
+    if cotacoes:
+        grupos, total_linhas = agrupar_cotacoes_por_item_relatorio_pesquisa_precos(itens, cotacoes, formula_id)
+    else:
+        grupos, total_linhas = agrupar_itens_relatorio_pesquisa_precos(itens)
     cnpjs = extrair_cnpjs_dos_itens(itens)
 
     tz = timezone.get_current_timezone()
@@ -171,6 +183,8 @@ def montar_contexto_relatorio(
         qr_data_url=_qr_png_data_url(url_verificacao),
         marca_agua_texto=nome_sistema_relatorio(),
         anexo_fornecedor_url=(anexo_fornecedor_url or "").strip(),
+        formula_calculo_id=formula_id,
+        formula_calculo_label=FORMULA_LABELS.get(formula_id, FORMULA_LABELS["media_aritmetica_precos_obtidos"]),
     )
 
 
@@ -244,7 +258,7 @@ _HTML_TEMPLATE = _ENV.from_string(
         <h3 class="rpp-metodologia__title">IN 65/2021 · Lei 14.133</h3>
         <p>
           A presente pesquisa de preços foi materializada com base na Lei nº 14.133/2021 e na Instrução Normativa nº 65/2021,
-          adotando como método matemático a média aritmética dos preços obtidos, em conformidade com o art. 3º da referida instrução.
+          adotando como método matemático {{ ctx.formula_calculo_label|lower }}, em conformidade com os parâmetros definidos para esta cotação.
         </p>
         <p>
           Para composição do valor estimado, foram consideradas cotações provenientes de contratação direta, PNCP, CMED,
@@ -287,7 +301,7 @@ _HTML_TEMPLATE = _ENV.from_string(
 
     <section class="rpp-block">
       <h2 class="rpp-section-title">Resultado consolidado</h2>
-      <p class="rpp-section-lead">Resumo dos itens com média das cotações e situação da pesquisa (mínimo de 3 fontes por item para «Válido»).</p>
+      <p class="rpp-section-lead">Resumo dos itens com valor calculado por {{ ctx.formula_calculo_label|lower }} e situação da pesquisa (mínimo de 3 fontes por item para «Válido»).</p>
       <div class="rpp-table-wrap">
         <table class="rpp-table rpp-table--consolidado">
           <thead>
@@ -296,7 +310,7 @@ _HTML_TEMPLATE = _ENV.from_string(
               <th>Descrição</th>
               <th>Quantidade</th>
               <th>Cotações</th>
-              <th>Média</th>
+              <th>Valor calculado</th>
               <th>Situação</th>
             </tr>
           </thead>
@@ -424,6 +438,7 @@ def gerar_pdf_relatorio_cotacao(
     titulo_relatorio: str,
     url_verificacao: str,
     anexo_fornecedor_url: str = "",
+    formula_id: str = "media_aritmetica_precos_obtidos",
 ) -> bytes:
     ctx = montar_contexto_relatorio(
         cotacao=cotacao,
@@ -431,6 +446,7 @@ def gerar_pdf_relatorio_cotacao(
         titulo_relatorio=titulo_relatorio,
         url_verificacao=url_verificacao,
         anexo_fornecedor_url=anexo_fornecedor_url,
+        formula_id=formula_id,
     )
     html = renderizar_html_relatorio(ctx)
     base_url = _SERVICES_DIR.as_uri() + "/"

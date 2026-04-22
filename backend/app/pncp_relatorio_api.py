@@ -23,6 +23,17 @@ from backend.app.api import api_login_required
 from backend.app.models import PncpCotacao, PncpCotacaoAnexo
 from backend.app.services.pncp_relatorio_pdf import gerar_pdf_relatorio_cotacao, nome_arquivo_relatorio, nome_sistema_relatorio
 
+DEFAULT_FORMULA_CALCULO = "media_aritmetica_precos_obtidos"
+FORMULA_LABELS = {
+    "media_aritmetica_precos_obtidos": "Média aritmética dos preços obtidos",
+    "mediana_precos_obtidos": "Mediana dos preços obtidos",
+    "menor_preco": "Menor preço",
+    "media_saneada": "Média saneada",
+    "media_ponderada": "Média ponderada",
+    "media_relativa_25_50": "Média relativa 25% - 50%",
+}
+FORMULA_LABELS_TO_ID = {v.lower(): k for k, v in FORMULA_LABELS.items()}
+
 
 def _cotacao_qs_for_user(user):
     qs = PncpCotacao.objects.all()
@@ -51,6 +62,20 @@ def _url_download_anexo_fornecedor(request, sessao_id: int) -> str:
     return request.build_absolute_uri(
         f"/api/pncp/cotacoes/research/sessions/{int(sessao_id)}/attachments/supplier-pdf/download"
     )
+
+
+def _resolve_formula_calculo_id(filtros: Any) -> str:
+    if not isinstance(filtros, dict):
+        return DEFAULT_FORMULA_CALCULO
+    fid = str(filtros.get("formula_calculo") or "").strip()
+    if not fid:
+        return DEFAULT_FORMULA_CALCULO
+    by_label = FORMULA_LABELS_TO_ID.get(fid.lower())
+    if by_label:
+        return by_label
+    if fid in FORMULA_LABELS:
+        return fid
+    return DEFAULT_FORMULA_CALCULO
 
 
 @api_login_required
@@ -82,6 +107,7 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
             {"detail": "Esta cotação ainda não possui itens. Adicione ao menos 1 item para gerar o PDF."},
             status=422,
         )
+    formula_id = _resolve_formula_calculo_id(c.filtros or {})
 
     url_qr = _url_qr_acesso_cotacao_no_sistema(sessao_id)
 
@@ -97,6 +123,7 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
             titulo_relatorio=titulo_rel,
             url_verificacao=url_qr,
             anexo_fornecedor_url=anexo_url,
+            formula_id=formula_id,
         )
     except Exception as e:
         return JsonResponse(

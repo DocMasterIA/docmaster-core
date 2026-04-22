@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 import re
+from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
 from django.utils import timezone
@@ -256,6 +257,84 @@ def agrupar_itens_relatorio_pesquisa_precos(itens: List[Any]) -> Tuple[List[Dict
                 "valores_fontes": vals,
                 "media_valor": media_valor,
                 "media_fmt": media_fmt,
+                "situacao": situacao,
+                "fontes": fontes,
+            }
+        )
+
+    return grupos, total_linhas
+
+
+def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
+    itens: List[Any],
+    cotacoes: List[Any],
+    formula_id: str,
+) -> Tuple[List[Dict[str, Any]], int]:
+    """
+    Novo fluxo: item manual + múltiplas cotações vinculadas.
+
+    - `itens`: linhas de PncpCotacaoItem (ordem/base visual do relatório).
+    - `cotacoes`: linhas de PncpCotacaoItemCotacao vinculadas aos itens.
+    """
+    if not itens:
+        return [], 0
+
+    tz = timezone.get_current_timezone()
+    total_linhas = len(cotacoes or [])
+    cotacoes_por_item: Dict[int, List[Any]] = defaultdict(list)
+    for c in cotacoes or []:
+        item_id = getattr(c, "item_id", None)
+        if item_id is None:
+            continue
+        cotacoes_por_item[int(item_id)].append(c)
+
+    grupos: List[Dict[str, Any]] = []
+    for ordem, it in enumerate(itens, start=1):
+        item_id = int(getattr(it, "id", 0) or 0)
+        members = sorted(cotacoes_por_item.get(item_id, []), key=lambda x: int(getattr(x, "pk", 0) or 0))
+
+        nome = (getattr(it, "descricao_item", None) or "—")[:500]
+        und = (getattr(it, "unidade_medida", None) or "").strip()[:64]
+
+        vals = [v for v in (_valor_numerico_item(x) for x in members) if v is not None]
+        valor_calc = _valor_formula_em_lista(vals, formula_id)
+        valor_fmt = f"R$ {_formatar_moeda_br(valor_calc)}" if valor_calc is not None else "—"
+
+        quantidades: List[float] = []
+        for m in members:
+            q = getattr(m, "quantidade", None)
+            if q is None:
+                continue
+            try:
+                fq = float(q)
+            except (TypeError, ValueError):
+                continue
+            if math.isnan(fq) or math.isinf(fq):
+                continue
+            quantidades.append(fq)
+
+        qtd_refletida: Any = sum(quantidades) if quantidades else getattr(it, "quantidade", None)
+        q_fmt = _fmt_quantidade(qtd_refletida)
+        if not und:
+            und = ((getattr(members[0], "unidade_medida", None) if members else None) or "—")[:64]
+
+        n_cot = len(members)
+        if n_cot >= MIN_FONTES_SITUACAO_VALIDA:
+            situacao = "Válido"
+        else:
+            situacao = f"Insuficiente ({n_cot} de {MIN_FONTES_SITUACAO_VALIDA} fontes)"
+
+        fontes = [fonte_dict_de_item(m, tz=tz) for m in members]
+        grupos.append(
+            {
+                "ordem": ordem,
+                "nome": nome,
+                "quantidade_fmt": q_fmt,
+                "unidade": und or "—",
+                "n_cotacoes": n_cot,
+                "valores_fontes": vals,
+                "media_valor": valor_calc,
+                "media_fmt": valor_fmt,
                 "situacao": situacao,
                 "fontes": fontes,
             }

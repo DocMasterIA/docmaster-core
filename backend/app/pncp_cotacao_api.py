@@ -725,8 +725,8 @@ def _itens_refletidos_for_session(sessao_id: int) -> Dict[int, Dict[str, Any]]:
 
     for item_id, b in bucket.items():
         quantidades = [float(v) for v in b["quantidades"] if isinstance(v, (int, float)) and v > 0]
-        # Quantidade refletida deve considerar o conjunto todo sem perder outliers válidos.
-        qtd_refletida = max(quantidades) if quantidades else None
+        # Qtd TOTAL deve refletir o conjunto somado das cotações adicionadas.
+        qtd_refletida = (sum(quantidades) if quantidades else None)
         valores = [float(v) for v in b["valores"] if isinstance(v, (int, float))]
         media = (sum(valores) / len(valores)) if valores else None
         out[item_id] = {

@@ -1126,8 +1126,13 @@ async function loadSessionFromBackend() {
           temValor = true;
         }
         const statusKey = buildGrupoStatusKey(it?.descricao_item, it?.unidade_medida, it?.quantidade);
-        const totalFontes = Number(fontesPorGrupo.get(statusKey) ?? 1);
+        const totalFontesRelatorio = Number(fontesPorGrupo.get(statusKey) ?? 0);
         const fontesContagem = it?.fontes_contagem || {};
+        const totalCotacoesItem = Number(fontesContagem.governamentais || 0)
+          + Number(fontesContagem.entesPublicos || 0)
+          + Number(fontesContagem.dominioAmplo || 0)
+          + Number(fontesContagem.cotacaoDireta || 0)
+          + Number(fontesContagem.notasFiscais || 0);
         return {
           id: it.id || idx + 1,
           nomeItem: it.descricao_item || `Item ${idx + 1}`,
@@ -1145,7 +1150,9 @@ async function loadSessionFromBackend() {
           ),
           faixaRegionalBase: formatFaixaRegionalBase(it),
           faixaRegionalVariacao: formatFaixaRegionalVariacao(it),
-          status: totalFontes >= 3 ? 'Completo' : 'Incompleto',
+          // Regra de status: 3 ou mais preços/cotações no item => Completo.
+          // Fallback para grupos de relatório apenas quando não houver contagem detalhada.
+          status: (totalCotacoesItem > 0 ? totalCotacoesItem : totalFontesRelatorio) >= 3 ? 'Completo' : 'Incompleto',
         };
       });
       valorTotalItensFmt.value = temValor ? formatCurrency(soma) : 'R$ —';

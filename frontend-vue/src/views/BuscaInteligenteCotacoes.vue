@@ -210,7 +210,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import {
   addCotacoesToItemInResearchSession,
   addItemsToResearchSession,
@@ -219,6 +219,7 @@ import {
 } from '../services/pncpResearch';
 
 const route = useRoute();
+const router = useRouter();
 const cotacaoId = computed(() => route.params.cotacaoId || 'CT-2026-00421');
 const itemId = computed(() => {
   const n = Number(route.query.itemId);
@@ -626,9 +627,19 @@ async function adicionarSelecionadosNaCotacao() {
         total += Number(res?.cotacoes_inseridas || arr.length);
       }
       saveMessage.value = `${total} cotação(ões) adicionadas aos itens da cotação.`;
+      const selectedIds = new Set(displayedRows.value.filter((r) => r.selecionado).map((r) => r.id));
+      rows.value = rows.value.filter((r) => !selectedIds.has(r.id));
+      await router.push(`/pesquisador-pncp/cotacoes/${sessionId}`);
     } else if (itemId.value) {
       const res = await addCotacoesToItemInResearchSession(sessionId, itemId.value, enviar);
-      saveMessage.value = `${res.cotacoes_inseridas ?? enviar.length} cotação(ões) adicionadas ao item.`;
+      const inseridas = Number(res?.cotacoes_inseridas ?? 0);
+      const ignoradas = Number(res?.cotacoes_ignoradas_duplicadas ?? 0);
+      saveMessage.value = ignoradas > 0
+        ? `${inseridas} cotação(ões) adicionadas ao item (${ignoradas} duplicada(s) ignorada(s)).`
+        : `${inseridas || enviar.length} cotação(ões) adicionadas ao item.`;
+      const selectedIds = new Set(displayedRows.value.filter((r) => r.selecionado).map((r) => r.id));
+      rows.value = rows.value.filter((r) => !selectedIds.has(r.id));
+      await router.push(`/pesquisador-pncp/cotacoes/${sessionId}`);
     } else {
       const res = await addItemsToResearchSession(sessionId, enviar);
       saveMessage.value = `${res.itens_inseridos ?? enviar.length} item(ns) adicionados à cotação.`;

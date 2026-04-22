@@ -706,7 +706,12 @@ def _itens_refletidos_for_session(sessao_id: int) -> Dict[int, Dict[str, Any]]:
     for r in rows:
         item_id = int(r.get("item_id"))
         q = _extract_numeric_quantity(r.get("quantidade"))
-        u = _norm_unidade(r.get("unidade_medida"))
+        u_raw = r.get("unidade_medida")
+        # Alguns fornecedores enviam "54 PEÇAS (PÇ)" no campo de unidade.
+        # Se quantidade vier vazia, tentamos extrair do texto da unidade.
+        if q is None:
+            q = _extract_numeric_quantity(u_raw)
+        u = _norm_unidade(u_raw)
         vt = _safe_float(r.get("valor_total"))
         vu = _safe_float(r.get("valor_unitario"))
         b = bucket[item_id]
@@ -1115,10 +1120,45 @@ def pncp_research_sessions_item_cotacoes(request, sessao_id: int, item_id: int):
     if c.status in CLOSED_FOR_ITEMS:
         return JsonResponse({"detail": "Cotação encerrada; não é permitido adicionar cotações."}, status=409)
 
+    def _dedupe_key(row: Dict[str, Any]) -> str:
+        np = str(row.get("numero_pncp") or row.get("numeroControlePNCP") or "").strip().lower()
+        ni = str(row.get("numero_item") or row.get("numeroItem") or "").strip().lower()
+        desc = str(row.get("descricao_item") or row.get("descricao") or row.get("objeto_resumido") or "").strip().lower()
+        val = _safe_float(row.get("valor_total") or row.get("valor_global") or row.get("valorTotal") or row.get("valor_unitario") or row.get("valorUnitario"))
+        vtxt = f"{float(val):.6f}" if isinstance(val, (int, float)) and val > 0 else ""
+        return "|".join([np, ni, desc, vtxt])
+
+    existing_keys: set[str] = set()
+    for ex in item.cotacoes.all().values(
+        "numero_pncp",
+        "numero_item",
+        "descricao_item",
+        "valor_total",
+        "valor_unitario",
+    ):
+        existing_keys.add(
+            "|".join(
+                [
+                    str(ex.get("numero_pncp") or "").strip().lower(),
+                    str(ex.get("numero_item") or "").strip().lower(),
+                    str(ex.get("descricao_item") or "").strip().lower(),
+                    f"{float(ex.get('valor_total') or ex.get('valor_unitario') or 0):.6f}" if _safe_float(ex.get("valor_total") or ex.get("valor_unitario")) > 0 else "",
+                ]
+            )
+        )
+
     built: List[PncpCotacaoItemCotacao] = []
+    ignored_duplicadas = 0
+    request_seen: set[str] = set()
     for row in raw_cotacoes:
         if not isinstance(row, dict):
             continue
+        k = _dedupe_key(row)
+        if k and (k in existing_keys or k in request_seen):
+            ignored_duplicadas += 1
+            continue
+        if k:
+            request_seen.add(k)
         built.append(
             PncpCotacaoItemCotacao(
                 cotacao=c,
@@ -1160,6 +1200,7 @@ def pncp_research_sessions_item_cotacoes(request, sessao_id: int, item_id: int):
             "sessao_id": c.id,
             "item_id": item.id,
             "cotacoes_inseridas": len(built),
+            "cotacoes_ignoradas_duplicadas": ignored_duplicadas,
         }
     )
 

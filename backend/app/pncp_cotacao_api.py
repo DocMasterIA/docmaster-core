@@ -12,7 +12,6 @@ import re
 import csv
 import io
 import unicodedata
-from statistics import median
 from collections import defaultdict
 from datetime import timezone as dt_timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -655,6 +654,33 @@ def _fontes_counts_for_session(sessao_id: int) -> Dict[int, Dict[str, int]]:
 
 
 def _itens_refletidos_for_session(sessao_id: int) -> Dict[int, Dict[str, Any]]:
+    def _extract_numeric_quantity(v: Any) -> Optional[float]:
+        if v is None:
+            return None
+        if isinstance(v, (int, float)):
+            n = float(v)
+            return n if n > 0 else None
+        s = str(v).strip()
+        if not s:
+            return None
+        # Extrai o primeiro número válido do texto:
+        # "54 PEÇAS (PÇ)" -> 54 ; "1 UN" -> 1 ; "1.200,50 KG" -> 1200.50
+        m = re.search(r"\d[\d\.,]*", s)
+        if not m:
+            return None
+        num = m.group(0)
+        # Se houver vírgula, assume padrão pt-BR: "." milhar e "," decimal.
+        if "," in num:
+            num = num.replace(".", "").replace(",", ".")
+        else:
+            # Sem vírgula, remove separadores de milhar redundantes.
+            num = num.replace(",", "")
+        try:
+            n = float(num)
+            return n if n > 0 else None
+        except Exception:
+            return None
+
     def _norm_unidade(v: Any) -> str:
         s = str(v or "").strip().lower()
         if not s:
@@ -679,7 +705,7 @@ def _itens_refletidos_for_session(sessao_id: int) -> Dict[int, Dict[str, Any]]:
     )
     for r in rows:
         item_id = int(r.get("item_id"))
-        q = _safe_float(r.get("quantidade"))
+        q = _extract_numeric_quantity(r.get("quantidade"))
         u = _norm_unidade(r.get("unidade_medida"))
         vt = _safe_float(r.get("valor_total"))
         vu = _safe_float(r.get("valor_unitario"))
@@ -694,7 +720,8 @@ def _itens_refletidos_for_session(sessao_id: int) -> Dict[int, Dict[str, Any]]:
 
     for item_id, b in bucket.items():
         quantidades = [float(v) for v in b["quantidades"] if isinstance(v, (int, float)) and v > 0]
-        qtd_refletida = median(quantidades) if quantidades else None
+        # Quantidade refletida deve considerar o conjunto todo sem perder outliers válidos.
+        qtd_refletida = max(quantidades) if quantidades else None
         valores = [float(v) for v in b["valores"] if isinstance(v, (int, float))]
         media = (sum(valores) / len(valores)) if valores else None
         out[item_id] = {

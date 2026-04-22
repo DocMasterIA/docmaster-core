@@ -440,6 +440,39 @@ def _row_matches_search_tokens(text: str, tokens: List[List[str]]) -> bool:
     return True
 
 
+def _extract_esfera_from_raw_blob(raw_blob: Any) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    if not raw_blob:
+        return None, None, None
+    try:
+        if isinstance(raw_blob, memoryview):
+            raw_blob = raw_blob.tobytes()
+        if isinstance(raw_blob, (bytes, bytearray)):
+            payload = zlib.decompress(raw_blob)
+            raw = json.loads(payload.decode("utf-8"))
+        else:
+            return None, None, None
+    except Exception:
+        return None, None, None
+    if not isinstance(raw, dict):
+        return None, None, None
+    org = raw.get("orgaoEntidade") or {}
+    sub = raw.get("orgaoSubRogado") or {}
+    esfera = str(org.get("esferaId") or sub.get("esferaId") or "").strip().upper()
+    poder = str(org.get("poderId") or sub.get("poderId") or "").strip().upper()
+    if esfera == "F":
+        esfera_adm = "federal"
+    elif esfera == "E":
+        esfera_adm = "estadual"
+    elif esfera == "M":
+        esfera_adm = "municipal"
+    elif esfera == "D":
+        esfera_adm = "distrital"
+    else:
+        esfera = ""
+        esfera_adm = None
+    return (esfera or None), esfera_adm, (poder or None)
+
+
 def local_item_search(
     termo_busca: str,
     *,
@@ -477,7 +510,7 @@ def local_item_search(
     sql = f"""
         SELECT numero_pncp, ano_compra, sequencial_compra, numero_item, descricao, material_servico,
                quantidade, unidade_medida, valor_unitario, valor_total, orgao, municipio, uf,
-               modalidade_nome, data_publicacao
+               modalidade_nome, data_publicacao, raw_json_zlib
         FROM pncp_itens
         WHERE {' AND '.join(where)}
         ORDER BY updated_at DESC
@@ -494,6 +527,7 @@ def local_item_search(
         texto_item = f"{desc} {mat}".strip()
         if not _row_matches_search_tokens(texto_item, token_groups):
             continue
+        esfera_id, esfera_adm, poder_id = _extract_esfera_from_raw_blob(r["raw_json_zlib"])
         itens.append(
             {
                 "numero_pncp": r["numero_pncp"],
@@ -511,6 +545,9 @@ def local_item_search(
                 "uf": r["uf"],
                 "modalidade": r["modalidade_nome"],
                 "data_publicacao": r["data_publicacao"],
+                "esfera_id": esfera_id,
+                "esfera_administrativa": esfera_adm,
+                "poder_id": poder_id,
                 "origem": "base_local_itens",
             }
         )

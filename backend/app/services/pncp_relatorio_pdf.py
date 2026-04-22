@@ -366,7 +366,7 @@ _HTML_TEMPLATE = _ENV.from_string(
                 <th>CNPJ</th>
                 <th>Data</th>
                 <th>Valor</th>
-                <th>Quantidade</th>
+                <th>QTD.</th>
                 <th>Órgão</th>
                 <th>Município/UF</th>
                 <th>Processo</th>

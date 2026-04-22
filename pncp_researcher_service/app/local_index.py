@@ -473,6 +473,35 @@ def _extract_esfera_from_raw_blob(raw_blob: Any) -> tuple[Optional[str], Optiona
     return (esfera or None), esfera_adm, (poder or None)
 
 
+def _extract_esfera_from_contract_raw_json(raw_json_text: Any) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    if not raw_json_text:
+        return None, None, None
+    try:
+        if isinstance(raw_json_text, (bytes, bytearray, memoryview)):
+            raw_json_text = bytes(raw_json_text).decode("utf-8")
+        raw = json.loads(str(raw_json_text))
+    except Exception:
+        return None, None, None
+    if not isinstance(raw, dict):
+        return None, None, None
+    org = raw.get("orgaoEntidade") or {}
+    sub = raw.get("orgaoSubRogado") or {}
+    esfera = str(org.get("esferaId") or sub.get("esferaId") or "").strip().upper()
+    poder = str(org.get("poderId") or sub.get("poderId") or "").strip().upper()
+    if esfera == "F":
+        esfera_adm = "federal"
+    elif esfera == "E":
+        esfera_adm = "estadual"
+    elif esfera == "M":
+        esfera_adm = "municipal"
+    elif esfera == "D":
+        esfera_adm = "distrital"
+    else:
+        esfera = ""
+        esfera_adm = None
+    return (esfera or None), esfera_adm, (poder or None)
+
+
 def local_item_search(
     termo_busca: str,
     *,
@@ -486,10 +515,10 @@ def local_item_search(
         return {"ok": True, "itens": [], "stats": {"total_registros": 0}}
     # Anchor no SQL para reduzir leitura; match final é feito em Python com variações de token.
     anchor = token_groups[0][0]
-    where = ["descricao LIKE ?"]
+    where = ["i.descricao LIKE ?"]
     params: List[Any] = [f"%{anchor}%"]
     if uf:
-        where.append("uf = ?")
+        where.append("i.uf = ?")
         params.append(uf)
     if codigo_modalidade is not None:
         modalidade_patterns = {
@@ -504,16 +533,17 @@ def local_item_search(
         }.get(int(codigo_modalidade), [])
         if modalidade_patterns:
             where.append(
-                "(" + " OR ".join(["LOWER(COALESCE(modalidade_nome, '')) LIKE ?" for _ in modalidade_patterns]) + ")"
+                "(" + " OR ".join(["LOWER(COALESCE(i.modalidade_nome, '')) LIKE ?" for _ in modalidade_patterns]) + ")"
             )
             params.extend([f"%{pattern}%" for pattern in modalidade_patterns])
     sql = f"""
-        SELECT numero_pncp, ano_compra, sequencial_compra, numero_item, descricao, material_servico,
-               quantidade, unidade_medida, valor_unitario, valor_total, orgao, municipio, uf,
-               modalidade_nome, data_publicacao, raw_json_zlib
-        FROM pncp_itens
+        SELECT i.numero_pncp, i.ano_compra, i.sequencial_compra, i.numero_item, i.descricao, i.material_servico,
+               i.quantidade, i.unidade_medida, i.valor_unitario, i.valor_total, i.orgao, i.municipio, i.uf,
+               i.modalidade_nome, i.data_publicacao, i.raw_json_zlib, c.raw_json AS contrato_raw_json
+        FROM pncp_itens i
+        LEFT JOIN pncp_contratos c ON c.numero_pncp = i.numero_pncp
         WHERE {' AND '.join(where)}
-        ORDER BY updated_at DESC
+        ORDER BY i.updated_at DESC
         LIMIT ?
     """
     sql_limit = max(1, min(int(limit) * 8, 20000))
@@ -528,6 +558,8 @@ def local_item_search(
         if not _row_matches_search_tokens(texto_item, token_groups):
             continue
         esfera_id, esfera_adm, poder_id = _extract_esfera_from_raw_blob(r["raw_json_zlib"])
+        if not esfera_id:
+            esfera_id, esfera_adm, poder_id = _extract_esfera_from_contract_raw_json(r["contrato_raw_json"])
         itens.append(
             {
                 "numero_pncp": r["numero_pncp"],

@@ -1627,12 +1627,17 @@ async function saveTituloNoBackend() {
 }
 
 .cot-sheet-source-cell {
-  min-width: 32px;
+  min-width: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 7px;
   border: 1px solid #d4dbe6;
   padding: 4px 7px;
   font-size: 11px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
   cursor: pointer;
 }
 

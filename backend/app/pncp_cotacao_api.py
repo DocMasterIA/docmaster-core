@@ -580,9 +580,20 @@ def _norm_fonte_text(v: Any) -> str:
 def _fonte_bucket_from_source(src: Dict[str, Any]) -> Optional[str]:
     inciso = _norm_fonte_text(src.get("inciso_classificacao") or src.get("incisoClassificacao"))
     fonte = _norm_fonte_text(src.get("fonte") or src.get("tipo_fonte") or src.get("categoria_fonte"))
+    esfera_id = _norm_fonte_text(src.get("esfera_id") or src.get("esferaId"))
+    esfera_adm = _norm_fonte_text(src.get("esfera_administrativa") or src.get("esferaAdministrativa"))
     if inciso in {"inciso_i", "inciso-i"}:
         return "governamentais"
     if inciso in {"inciso_ii", "inciso-ii"}:
+        return "entesPublicos"
+    # Regra mandatória de esfera: Federal => Inciso I; Estadual/Municipal/Distrital => Inciso II.
+    if esfera_id == "f":
+        return "governamentais"
+    if esfera_id in {"e", "m", "d"}:
+        return "entesPublicos"
+    if esfera_adm == "federal":
+        return "governamentais"
+    if esfera_adm in {"estadual", "municipal", "distrital"}:
         return "entesPublicos"
     if "govern" in fonte:
         return "governamentais"

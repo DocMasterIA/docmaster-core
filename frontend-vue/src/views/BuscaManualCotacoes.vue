@@ -175,6 +175,7 @@
                 <th>Seleção</th>
                 <th>Cotação</th>
                 <th>Quantidade</th>
+                <th>Inciso</th>
                 <th>UF</th>
                 <th>Data</th>
                 <th>Valor Unit.</th>
@@ -196,6 +197,7 @@
                   </div>
                 </td>
                 <td>{{ item.quantidade }}</td>
+                <td class="manual-cell-center">{{ item.inciso }}</td>
                 <td class="manual-cell-center">{{ item.uf }}</td>
                 <td class="manual-cell-center">{{ item.data }}</td>
                 <td class="manual-cell-money">{{ item.valor }}</td>
@@ -483,6 +485,7 @@ async function buscarNoBackend() {
         quantidade: `${it.quantidade || '-'} ${it.unidade_medida || ''}`.trim(),
         quantidadeNum: it.quantidade ?? null,
         unidadeMedida: it.unidade_medida || null,
+        inciso: resolveIncisoFromItem(it),
         uf: it.uf || '-',
         municipio: it.municipio || null,
         data: it.data_publicacao || '-',
@@ -541,6 +544,16 @@ function normalizeText(v) {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim();
+}
+
+function resolveIncisoFromItem(it) {
+  const esferaId = normalizeText(it?.esfera_id || it?.esferaId).toUpperCase();
+  const esferaAdm = normalizeText(it?.esfera_administrativa || it?.esferaAdministrativa);
+  if (esferaId === 'F' || esferaAdm === 'federal') return 'Inciso I';
+  if (['E', 'M', 'D'].includes(esferaId) || ['estadual', 'municipal', 'distrital'].includes(esferaAdm)) {
+    return 'Inciso II';
+  }
+  return '—';
 }
 
 function parseDateFlexible(v) {

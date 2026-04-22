@@ -1211,21 +1211,24 @@ def _is_federal_item(it: Dict[str, Any]) -> bool:
 def _select_top3_prioritize_federal(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Regra de negócio:
-    1) seleciona somente itens federais (Inciso I) até 3;
-    2) se não atingir 3, completa com demais esferas (Inciso II).
+    1) Se houver ao menos 3 federais com score >= 80, seleciona apenas federais;
+    2) Caso contrário, seleção geral por qualidade (mescla I/II quando necessário).
     """
     if not items:
         return []
     federais = [it for it in items if _is_federal_item(it)]
-    outros = [it for it in items if not _is_federal_item(it)]
+    federais_80 = [it for it in federais if _safe_float(it.get("score_aprovacao")) >= 80.0]
 
-    selected_federal = _select_top3_quality_first(federais)
-    if len(selected_federal) >= 3:
+    # Priorização total de Inciso I só quando há 3 federais "fortes" (>=80).
+    if len(federais_80) >= 3:
+        selected_federal = _select_top3_quality_first(federais)
         return selected_federal[:3]
 
-    restante = _select_top3_quality_first(outros)
-    out = selected_federal + [x for x in restante if x not in selected_federal]
-    return out[:3]
+    # Sem 3 federais fortes, usa ranking geral (pode cair em II ou mesclar I/II).
+    selected_all = _select_top3_quality_first(items)
+    if len(selected_all) >= 3:
+        return selected_all[:3]
+    return selected_all
 
 
 def _merge_unique_items(primary: List[Dict[str, Any]], secondary: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -1541,9 +1544,13 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         top3 = _select_top3_prioritize_federal(scored)[:3]
 
     out_stats = dict(base_items.get("stats") or {})
+    total_federais = sum(1 for x in scored if _is_federal_item(x))
+    federais_score_80 = sum(1 for x in scored if _is_federal_item(x) and _safe_float(x.get("score_aprovacao")) >= 80.0)
     out_stats["total_registros_ia"] = len(scored)
     out_stats["total_selecionados_ia"] = len(top3)
     out_stats["regra_selecao"] = "top3_federal_primeiro_depois_inciso_ii"
+    out_stats["federais_encontrados"] = total_federais
+    out_stats["federais_score_maior_igual_80"] = federais_score_80
     out_stats["ia_rerank_ativo"] = bool(PNCP_IA_RERANK_ENABLED)
     out_stats["ia_rerank_usado"] = ia_used
 

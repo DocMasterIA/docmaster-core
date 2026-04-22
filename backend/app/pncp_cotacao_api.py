@@ -543,6 +543,11 @@ def _item_dict(row: PncpCotacaoItem) -> Dict[str, Any]:
 
 
 def _item_cotacao_dict(row: PncpCotacaoItemCotacao) -> Dict[str, Any]:
+    src = row.source or {}
+    if not isinstance(src, dict):
+        src = {}
+    bucket = _resolve_fonte_bucket(src, row.numero_pncp)
+    inciso_resolvido = "inciso_i" if bucket == "governamentais" else ("inciso_ii" if bucket == "entesPublicos" else None)
     return {
         "id": row.id,
         "item_id": row.item_id,
@@ -564,7 +569,9 @@ def _item_cotacao_dict(row: PncpCotacaoItemCotacao) -> Dict[str, Any]:
         "confiabilidade": row.confiabilidade or None,
         "risco": row.risco or None,
         "status": row.status or None,
-        "source": row.source or {},
+        "source": src,
+        "fonte_resolvida": bucket,
+        "inciso_resolvido": inciso_resolvido,
         "created_at": _iso_z(row.created_at),
     }
 
@@ -608,6 +615,18 @@ def _fonte_bucket_from_source(src: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def _resolve_fonte_bucket(src: Dict[str, Any], numero_pncp: Any) -> Optional[str]:
+    bucket = _fonte_bucket_from_source(src)
+    if bucket:
+        return bucket
+    # Fallback resiliente para legado:
+    # se não houver metadado de fonte/inciso/esfera, assume governamentais quando há número PNCP.
+    numero = str(numero_pncp or "").strip()
+    if numero:
+        return "governamentais"
+    return None
+
+
 def _fontes_counts_for_session(sessao_id: int) -> Dict[int, Dict[str, int]]:
     base = {"governamentais": 0, "entesPublicos": 0, "dominioAmplo": 0, "cotacaoDireta": 0, "notasFiscais": 0}
     out: Dict[int, Dict[str, int]] = defaultdict(lambda: dict(base))
@@ -628,13 +647,7 @@ def _fontes_counts_for_session(sessao_id: int) -> Dict[int, Dict[str, int]]:
                 src = {}
         if not isinstance(src, dict):
             src = {}
-        bucket = _fonte_bucket_from_source(src)
-        # Fallback resiliente para legado:
-        # se não houver metadado de fonte/inciso/esfera, assume governamentais quando há número PNCP.
-        if bucket is None:
-            numero_pncp = str(r.get("numero_pncp") or "").strip()
-            if numero_pncp:
-                bucket = "governamentais"
+        bucket = _resolve_fonte_bucket(src, r.get("numero_pncp"))
         if bucket:
             out[item_id][bucket] = int(out[item_id].get(bucket, 0)) + 1
     return out

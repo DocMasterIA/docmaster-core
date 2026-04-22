@@ -292,6 +292,10 @@ function normalizeFonte(v) {
 }
 
 function classificarFonte(cotacao) {
+  const resolved = normalizeFonte(cotacao?.fonte_resolvida || cotacao?.inciso_resolvido);
+  if (resolved === 'governamentais' || resolved === 'inciso_i') return 'governamentais';
+  if (resolved === 'entespublicos' || resolved === 'entes_publicos' || resolved === 'inciso_ii') return 'entes_publicos';
+
   const incisoRaw = normalizeFonte(
     cotacao?.inciso_classificacao ||
       cotacao?.source?.inciso_classificacao ||

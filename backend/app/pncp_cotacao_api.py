@@ -653,7 +653,49 @@ def _fontes_counts_for_session(sessao_id: int) -> Dict[int, Dict[str, int]]:
     return out
 
 
-def _itens_refletidos_for_session(sessao_id: int) -> Dict[int, Dict[str, Any]]:
+def _itens_refletidos_for_session(sessao_id: int, formula_id: str) -> Dict[int, Dict[str, Any]]:
+    def _percentile(sorted_vals: List[float], p: float) -> Optional[float]:
+        if not sorted_vals:
+            return None
+        if p <= 0:
+            return sorted_vals[0]
+        if p >= 1:
+            return sorted_vals[-1]
+        idx = (len(sorted_vals) - 1) * p
+        lo = int(math.floor(idx))
+        hi = int(math.ceil(idx))
+        if lo == hi:
+            return sorted_vals[lo]
+        frac = idx - lo
+        return sorted_vals[lo] * (1 - frac) + sorted_vals[hi] * frac
+
+    def _valor_formula_em_lista(values: List[float], formula_id: str) -> Optional[float]:
+        if not values:
+            return None
+        s = sorted(values)
+        if formula_id == "mediana_precos_obtidos":
+            n = len(s)
+            if n % 2 == 1:
+                return s[n // 2]
+            return (s[n // 2 - 1] + s[n // 2]) / 2
+        if formula_id == "menor_preco":
+            return min(s)
+        if formula_id == "media_saneada":
+            cut = int(len(s) * 0.2)
+            saneados = s[cut : len(s) - cut] if len(s) - (2 * cut) >= 1 else s
+            return sum(saneados) / len(saneados)
+        if formula_id == "media_relativa_25_50":
+            p25 = _percentile(s, 0.25)
+            p50 = _percentile(s, 0.50)
+            if p25 is None or p50 is None:
+                return None
+            faixa = [x for x in s if p25 <= x <= p50]
+            if not faixa:
+                faixa = [p25, p50]
+            return sum(faixa) / len(faixa)
+        # media_aritmetica_precos_obtidos e media_ponderada (peso uniforme por fonte).
+        return sum(s) / len(s)
+
     def _extract_numeric_quantity(v: Any) -> Optional[float]:
         if v is None:
             return None
@@ -728,11 +770,11 @@ def _itens_refletidos_for_session(sessao_id: int) -> Dict[int, Dict[str, Any]]:
         # Qtd TOTAL deve refletir o conjunto somado das cotações adicionadas.
         qtd_refletida = (sum(quantidades) if quantidades else None)
         valores = [float(v) for v in b["valores"] if isinstance(v, (int, float))]
-        media = (sum(valores) / len(valores)) if valores else None
+        valor_formula = _valor_formula_em_lista(valores, formula_id)
         out[item_id] = {
             "quantidade_refletida": qtd_refletida,
             "unidade_medida_refletida": b["unidade"] or ("UN" if quantidades else None),
-            "valor_total_refletido": media,
+            "valor_total_refletido": valor_formula,
         }
     return out
 
@@ -893,8 +935,8 @@ def pncp_research_sessions_detail(request, sessao_id: int):
     itens_asc = list(c.itens.all().order_by("id"))
     grupos_relatorio, total_linhas_cotacao = agrupar_itens_relatorio_pesquisa_precos(itens_asc)
     fontes_counts = _fontes_counts_for_session(c.id)
-    refletidos = _itens_refletidos_for_session(c.id)
     formula_id = _resolve_formula_calculo_id(c.filtros or {})
+    refletidos = _itens_refletidos_for_session(c.id, formula_id)
     formula_label = FORMULA_LABELS.get(formula_id, FORMULA_LABELS[DEFAULT_FORMULA_CALCULO])
     anexo = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
     itens_desc = list(reversed(itens_asc))

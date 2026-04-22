@@ -299,6 +299,24 @@ function classificarFonte(cotacao) {
   );
   if (inciso === 'governamentais' || inciso === 'inciso_i') return 'governamentais';
   if (inciso === 'entes_publicos' || inciso === 'inciso_ii') return 'entes_publicos';
+
+  const esferaId = normalizeFonte(
+    cotacao?.esfera_id ||
+      cotacao?.source?.esfera_id ||
+      cotacao?.source?.esferaId,
+  );
+  const esferaAdm = normalizeFonte(
+    cotacao?.esfera_administrativa ||
+      cotacao?.source?.esfera_administrativa ||
+      cotacao?.source?.esferaAdministrativa,
+  );
+  // Mesma regra do backend para evitar divergência visual:
+  // Federal => Inciso I; Estadual/Municipal/Distrital => Inciso II.
+  if (esferaId === 'f' || esferaAdm === 'federal') return 'governamentais';
+  if (['e', 'm', 'd'].includes(esferaId) || ['estadual', 'municipal', 'distrital'].includes(esferaAdm)) {
+    return 'entes_publicos';
+  }
+
   const raw = normalizeFonte(
     cotacao?.fonte ||
       cotacao?.tipo_fonte ||

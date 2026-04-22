@@ -623,6 +623,42 @@ def _fontes_counts_for_session(sessao_id: int) -> Dict[int, Dict[str, int]]:
     return out
 
 
+def _itens_refletidos_for_session(sessao_id: int) -> Dict[int, Dict[str, Any]]:
+    out: Dict[int, Dict[str, Any]] = {}
+    rows = PncpCotacaoItemCotacao.objects.filter(cotacao_id=sessao_id).values(
+        "item_id",
+        "quantidade",
+        "unidade_medida",
+        "valor_total",
+        "valor_unitario",
+    )
+    bucket: Dict[int, Dict[str, Any]] = defaultdict(lambda: {"quantidade": None, "unidade": "", "valores": []})
+    for r in rows:
+        item_id = int(r.get("item_id"))
+        q = _safe_float(r.get("quantidade"))
+        u = str(r.get("unidade_medida") or "").strip()
+        vt = _safe_float(r.get("valor_total"))
+        vu = _safe_float(r.get("valor_unitario"))
+        b = bucket[item_id]
+        if b["quantidade"] is None and q is not None and q > 0:
+            b["quantidade"] = q
+        if not b["unidade"] and u:
+            b["unidade"] = u
+        val = vt if vt is not None and vt > 0 else (vu if vu is not None and vu > 0 else None)
+        if val is not None:
+            b["valores"].append(val)
+
+    for item_id, b in bucket.items():
+        valores = [float(v) for v in b["valores"] if isinstance(v, (int, float))]
+        media = (sum(valores) / len(valores)) if valores else None
+        out[item_id] = {
+            "quantidade_refletida": b["quantidade"],
+            "unidade_medida_refletida": b["unidade"] or None,
+            "valor_total_refletido": media,
+        }
+    return out
+
+
 def _item_identity_error(it: Dict[str, Any]) -> Optional[str]:
     """Exige âncora mínima para precisão: PNCP, par compra ou descrição não vazia."""
     np = str(it.get("numero_pncp") or it.get("numeroControlePNCP") or "").strip()
@@ -779,6 +815,7 @@ def pncp_research_sessions_detail(request, sessao_id: int):
     itens_asc = list(c.itens.all().order_by("id"))
     grupos_relatorio, total_linhas_cotacao = agrupar_itens_relatorio_pesquisa_precos(itens_asc)
     fontes_counts = _fontes_counts_for_session(c.id)
+    refletidos = _itens_refletidos_for_session(c.id)
     formula_id = _resolve_formula_calculo_id(c.filtros or {})
     formula_label = FORMULA_LABELS.get(formula_id, FORMULA_LABELS[DEFAULT_FORMULA_CALCULO])
     anexo = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
@@ -798,6 +835,7 @@ def pncp_research_sessions_detail(request, sessao_id: int):
             "itens": [
                 {
                     **_item_dict(x),
+                    **refletidos.get(int(x.id), {}),
                     "fontes_contagem": fontes_counts.get(
                         int(x.id),
                         {

@@ -366,6 +366,7 @@ _HTML_TEMPLATE = _ENV.from_string(
                 <th>CNPJ</th>
                 <th>Data</th>
                 <th>Valor</th>
+                <th>Quantidade</th>
                 <th>Órgão</th>
                 <th>Município/UF</th>
                 <th>Processo</th>
@@ -380,6 +381,7 @@ _HTML_TEMPLATE = _ENV.from_string(
                 <td>{{ f.cnpj }}</td>
                 <td>{{ f.data }}</td>
                 <td>{{ f.valor }}</td>
+                <td>{{ f.quantidade }}</td>
                 <td>{{ f.orgao }}</td>
                 <td>{{ f.municipio_uf }}</td>
                 <td>{{ f.processo }}</td>

@@ -495,13 +495,6 @@
             <button type="button" class="pncp-modal__btn pncp-modal__btn--ghost" @click="closeRelatorioModal">
               Cancelar
             </button>
-            <RouterLink
-              v-if="sessionBackendId != null"
-              class="pncp-modal__btn pncp-modal__btn--ghost pncp-modal__link-btn"
-              :to="relatorioPreviewTo"
-            >
-              Pré-visualizar layout
-            </RouterLink>
             <button
               type="button"
               class="pncp-modal__btn pncp-modal__btn--primary"
@@ -598,18 +591,6 @@ const sessaoStatusLabel = computed(() => {
   if (s === 'aberta') return 'Aberta';
   return s || '—';
 });
-
-const relatorioPreviewTo = computed(() => ({
-  name: 'RelatorioPesquisaPrecos',
-  query: {
-    cotacaoId: sessionBackendId.value != null ? String(sessionBackendId.value) : '',
-    titulo:
-      (relatorioTitulo.value || '').trim() ||
-      (tituloCotacao.value || '').trim() ||
-      (sessionBackendId.value != null ? `Relatório — cotação ${sessionBackendId.value}` : ''),
-  },
-}));
-
 
 const allSelected = computed(() => {
   const rows = linhasMock.value;

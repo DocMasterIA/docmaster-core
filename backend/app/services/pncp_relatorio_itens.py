@@ -192,6 +192,7 @@ def fonte_dict_de_item(it: Any, *, tz) -> Dict[str, str]:
         "cnpj": cnpj[:32],
         "data": data_str,
         "valor": valor[:32],
+        "quantidade": _fmt_quantidade(getattr(it, "quantidade", None)),
         "orgao": orgao,
         "municipio_uf": municipio_uf[:120],
         "processo": str(processo)[:120],

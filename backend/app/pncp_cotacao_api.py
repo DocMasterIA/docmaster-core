@@ -12,6 +12,7 @@ import re
 import csv
 import io
 import unicodedata
+from statistics import median
 from collections import defaultdict
 from datetime import timezone as dt_timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -654,6 +655,17 @@ def _fontes_counts_for_session(sessao_id: int) -> Dict[int, Dict[str, int]]:
 
 
 def _itens_refletidos_for_session(sessao_id: int) -> Dict[int, Dict[str, Any]]:
+    def _norm_unidade(v: Any) -> str:
+        s = str(v or "").strip().lower()
+        if not s:
+            return ""
+        s = "".join(ch for ch in unicodedata.normalize("NFD", s) if unicodedata.category(ch) != "Mn")
+        s = re.sub(r"[^a-z0-9]+", " ", s).strip()
+        # Regra de negócio: peça/peças é unidade.
+        if s in {"un", "und", "unid", "unidade", "unidades", "peca", "pecas", "pc", "pcs"}:
+            return "UN"
+        return s.upper()
+
     out: Dict[int, Dict[str, Any]] = {}
     rows = PncpCotacaoItemCotacao.objects.filter(cotacao_id=sessao_id).values(
         "item_id",
@@ -662,16 +674,18 @@ def _itens_refletidos_for_session(sessao_id: int) -> Dict[int, Dict[str, Any]]:
         "valor_total",
         "valor_unitario",
     )
-    bucket: Dict[int, Dict[str, Any]] = defaultdict(lambda: {"quantidade": None, "unidade": "", "valores": []})
+    bucket: Dict[int, Dict[str, Any]] = defaultdict(
+        lambda: {"quantidades": [], "unidade": "", "valores": []}
+    )
     for r in rows:
         item_id = int(r.get("item_id"))
         q = _safe_float(r.get("quantidade"))
-        u = str(r.get("unidade_medida") or "").strip()
+        u = _norm_unidade(r.get("unidade_medida"))
         vt = _safe_float(r.get("valor_total"))
         vu = _safe_float(r.get("valor_unitario"))
         b = bucket[item_id]
-        if b["quantidade"] is None and q is not None and q > 0:
-            b["quantidade"] = q
+        if q is not None and q > 0:
+            b["quantidades"].append(float(q))
         if not b["unidade"] and u:
             b["unidade"] = u
         val = vt if vt is not None and vt > 0 else (vu if vu is not None and vu > 0 else None)
@@ -679,11 +693,13 @@ def _itens_refletidos_for_session(sessao_id: int) -> Dict[int, Dict[str, Any]]:
             b["valores"].append(val)
 
     for item_id, b in bucket.items():
+        quantidades = [float(v) for v in b["quantidades"] if isinstance(v, (int, float)) and v > 0]
+        qtd_refletida = median(quantidades) if quantidades else None
         valores = [float(v) for v in b["valores"] if isinstance(v, (int, float))]
         media = (sum(valores) / len(valores)) if valores else None
         out[item_id] = {
-            "quantidade_refletida": b["quantidade"],
-            "unidade_medida_refletida": b["unidade"] or None,
+            "quantidade_refletida": qtd_refletida,
+            "unidade_medida_refletida": b["unidade"] or ("UN" if quantidades else None),
             "valor_total_refletido": media,
         }
     return out

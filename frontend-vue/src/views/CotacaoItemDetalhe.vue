@@ -157,7 +157,7 @@ const itemCotacoes = ref([]);
 
 const itemCidadeUf = computed(() => (item.value ? formatCidadeUf(item.value) : '—'));
 const fonteSelecionada = computed(() => normalizeFonte(route.query.fonte));
-const fonteSelecionadaLabel = computed(() => labelFonte(fonteSelecionada.value));
+const fonteSelecionadaLabel = computed(() => (fonteSelecionada.value ? labelFonte(fonteSelecionada.value) : 'Todas'));
 const faixaValorBase = computed(() => {
   const src = item.value?.source || {};
   return pickNumeric(src?.valor_base, src?.valorBase, src?.preco_base, src?.precoBase);

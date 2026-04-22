@@ -1202,6 +1202,32 @@ def _select_top3_quality_first(items: List[Dict[str, Any]]) -> List[Dict[str, An
     return selected[:3]
 
 
+def _is_federal_item(it: Dict[str, Any]) -> bool:
+    esfera_id = str(it.get("esfera_id") or "").strip().upper()
+    esfera_adm = _normalize_text(str(it.get("esfera_administrativa") or ""))
+    return esfera_id == "F" or esfera_adm == "federal"
+
+
+def _select_top3_prioritize_federal(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Regra de negócio:
+    1) seleciona somente itens federais (Inciso I) até 3;
+    2) se não atingir 3, completa com demais esferas (Inciso II).
+    """
+    if not items:
+        return []
+    federais = [it for it in items if _is_federal_item(it)]
+    outros = [it for it in items if not _is_federal_item(it)]
+
+    selected_federal = _select_top3_quality_first(federais)
+    if len(selected_federal) >= 3:
+        return selected_federal[:3]
+
+    restante = _select_top3_quality_first(outros)
+    out = selected_federal + [x for x in restante if x not in selected_federal]
+    return out[:3]
+
+
 def _merge_unique_items(primary: List[Dict[str, Any]], secondary: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Junta listas preservando ordem e evitando duplicados do mesmo item PNCP.
@@ -1508,16 +1534,16 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                 )
                 # Regra de negócio: prioriza esfera federal; se faltar, completa com demais esferas.
                 merged = _merge_unique_items(chosen, scored)
-                top3 = _select_top3_quality_first(merged)[:3]
+                top3 = _select_top3_prioritize_federal(merged)[:3]
                 ia_used = True
 
     if not top3:
-        top3 = _select_top3_quality_first(scored)[:3]
+        top3 = _select_top3_prioritize_federal(scored)[:3]
 
     out_stats = dict(base_items.get("stats") or {})
     out_stats["total_registros_ia"] = len(scored)
     out_stats["total_selecionados_ia"] = len(top3)
-    out_stats["regra_selecao"] = "top3_prioriza_federal_completa_estadual_municipal_diversidade_orgao"
+    out_stats["regra_selecao"] = "top3_federal_primeiro_depois_inciso_ii"
     out_stats["ia_rerank_ativo"] = bool(PNCP_IA_RERANK_ENABLED)
     out_stats["ia_rerank_usado"] = ia_used
 

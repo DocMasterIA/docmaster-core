@@ -134,13 +134,9 @@ _SOURCE_KEEP_KEYS = frozenset(
 IMPORT_REQUIRED_COLUMN_IDS = ("descricao_item",)
 IMPORT_OPTIONAL_COLUMN_IDS = (
     "numero_item",
-    "numero_pncp",
-    "ano_compra",
-    "sequencial_compra",
-    "orgao",
-    "municipio",
-    "uf",
-    "modalidade",
+    "quantidade",
+    "unidade_medida",
+    "valor_unitario",
     "valor_base",
     "variacao_percentual",
 )
@@ -163,9 +159,6 @@ _IMPORT_ALIASES = {
     "valor": "valor_unitario",
     "valor_unitario": "valor_unitario",
     "valorunitario": "valor_unitario",
-    "numeropncp": "numero_pncp",
-    "ano": "ano_compra",
-    "sequencial": "sequencial_compra",
     "variacao": "variacao_percentual",
     "variacao_percentual": "variacao_percentual",
     "valor_base": "valor_base",

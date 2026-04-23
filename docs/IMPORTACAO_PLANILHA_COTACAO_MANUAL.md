@@ -37,13 +37,6 @@ As colunas abaixo devem existir (diretamente ou via alias/mapeamento):
 - `valor_base`
 - `variacao_percentual`
 - `numero_item`
-- `numero_pncp`
-- `ano_compra`
-- `sequencial_compra`
-- `orgao`
-- `municipio`
-- `uf`
-- `modalidade`
 - `quantidade` (legado)
 - `unidade_medida` (legado)
 - `valor_unitario` (legado)
@@ -54,13 +47,6 @@ Ordem usada no modelo padrao:
 2. `valor_base`
 3. `variacao_percentual`
 4. `numero_item`
-5. `numero_pncp`
-6. `ano_compra`
-7. `sequencial_compra`
-8. `orgao`
-9. `municipio`
-10. `uf`
-11. `modalidade`
 
 ## Aliases aceitos (normalizacao automatica)
 
@@ -79,9 +65,6 @@ Exemplos de alias que sao convertidos automaticamente para IDs canonicos:
 - `id_item` -> `numero_item`
 - `item_id` -> `numero_item`
 - `item` -> `numero_item`
-- `numeropncp` -> `numero_pncp`
-- `ano` -> `ano_compra`
-- `sequencial` -> `sequencial_compra`
 
 ## Regras de normalizacao de cabecalho
 

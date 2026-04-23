@@ -933,13 +933,6 @@ async function onImportSpreadsheetSelected(event) {
       unidade_medida: 'unidade_medida',
       valor_unitario: 'valor_unitario',
       numero_item: 'numero_item',
-      numero_pncp: 'numero_pncp',
-      ano_compra: 'ano_compra',
-      sequencial_compra: 'sequencial_compra',
-      orgao: 'orgao',
-      municipio: 'municipio',
-      uf: 'uf',
-      modalidade: 'modalidade',
     });
     await loadSessionFromBackend();
     const invalid = Number(res?.linhas_invalidas || 0);

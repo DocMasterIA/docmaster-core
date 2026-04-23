@@ -326,6 +326,35 @@ def _safe_int_field(v: Any, *, min_v: int, max_v: int) -> Optional[int]:
     return i
 
 
+def _parse_numero_item_seq(v: Any) -> Optional[int]:
+    s = str(v or "").strip()
+    if not s:
+        return None
+    if not re.fullmatch(r"\d+", s):
+        return None
+    try:
+        n = int(s)
+    except (TypeError, ValueError):
+        return None
+    return n if n > 0 else None
+
+
+def _next_numero_item_seq_for_cotacao(cotacao: PncpCotacao) -> int:
+    max_n = 0
+    for raw in cotacao.itens.values_list("numero_item", flat=True):
+        n = _parse_numero_item_seq(raw)
+        if n is not None and n > max_n:
+            max_n = n
+    return max_n + 1
+
+
+def _item_order_key_by_numero_item(it: PncpCotacaoItem) -> Tuple[int, int, int]:
+    n = _parse_numero_item_seq(getattr(it, "numero_item", None))
+    if n is not None:
+        return (0, n, int(getattr(it, "id", 0) or 0))
+    return (1, 10**9, int(getattr(it, "id", 0) or 0))
+
+
 def _normalize_uf(uf: Any) -> str:
     if uf is None:
         return ""
@@ -937,6 +966,7 @@ def pncp_research_sessions_detail(request, sessao_id: int):
         return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
 
     itens_asc = list(c.itens.all().order_by("id"))
+    itens_visual = sorted(itens_asc, key=_item_order_key_by_numero_item)
     grupos_relatorio, total_linhas_cotacao = agrupar_itens_relatorio_pesquisa_precos(itens_asc)
     fontes_counts = _fontes_counts_for_session(c.id)
     formula_id = _resolve_formula_calculo_id(c.filtros or {})
@@ -970,7 +1000,7 @@ def pncp_research_sessions_detail(request, sessao_id: int):
                         },
                     ),
                 }
-                for x in itens_asc
+                for x in itens_visual
             ],
             "grupos_relatorio": grupos_relatorio,
             "calculo_precos": resumo_calculo_precos(grupos_relatorio, formula_id),
@@ -1114,7 +1144,21 @@ def pncp_research_sessions_add_items(request, sessao_id: int):
                 {"detail": "Cotação encerrada; não é permitido adicionar itens."},
                 status=409,
             )
-        built = [_item_from_payload(it, c) for it in raw_itens]
+        next_numero_item = _next_numero_item_seq_for_cotacao(c)
+        normalized_itens: List[Dict[str, Any]] = []
+        for it in raw_itens:
+            payload = dict(it)
+            n = _parse_numero_item_seq(payload.get("numero_item") or payload.get("numeroItem"))
+            if n is None:
+                payload["numero_item"] = str(next_numero_item)
+                next_numero_item += 1
+            else:
+                payload["numero_item"] = str(n)
+                if n >= next_numero_item:
+                    next_numero_item = n + 1
+            normalized_itens.append(payload)
+
+        built = [_item_from_payload(it, c) for it in normalized_itens]
         for i in range(0, len(built), BULK_CREATE_BATCH):
             chunk = built[i : i + BULK_CREATE_BATCH]
             PncpCotacaoItem.objects.bulk_create(chunk, batch_size=BULK_CREATE_BATCH)
@@ -1370,10 +1414,30 @@ def pncp_research_sessions_import_items(request, sessao_id: int):
                 status=409,
             )
 
+        existing_before = list(c.itens.all().only("id", "numero_item").order_by("id"))
+
+        used_numeros: set[int] = set()
+        next_import_seq = 1
+        for it in items_payload:
+            n = _parse_numero_item_seq(it.get("numero_item") or it.get("numeroItem"))
+            if n is None or n in used_numeros:
+                while next_import_seq in used_numeros:
+                    next_import_seq += 1
+                n = next_import_seq
+            used_numeros.add(n)
+            if n >= next_import_seq:
+                next_import_seq = n + 1
+            it["numero_item"] = str(n)
+
         built = [_item_from_payload(it, c) for it in items_payload]
         for i in range(0, len(built), BULK_CREATE_BATCH):
             chunk = built[i : i + BULK_CREATE_BATCH]
             PncpCotacaoItem.objects.bulk_create(chunk, batch_size=BULK_CREATE_BATCH)
+        if existing_before:
+            start_seq = (max(used_numeros) + 1) if used_numeros else (len(built) + 1)
+            for idx, row in enumerate(existing_before, start=start_seq):
+                row.numero_item = str(idx)
+            PncpCotacaoItem.objects.bulk_update(existing_before, ["numero_item"], batch_size=BULK_CREATE_BATCH)
         inserted = len(built)
         c.save(update_fields=["updated_at"])
 

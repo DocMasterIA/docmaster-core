@@ -943,7 +943,6 @@ def pncp_research_sessions_detail(request, sessao_id: int):
     refletidos = _itens_refletidos_for_session(c.id, formula_id)
     formula_label = FORMULA_LABELS.get(formula_id, FORMULA_LABELS[DEFAULT_FORMULA_CALCULO])
     anexo = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
-    itens_desc = list(reversed(itens_asc))
     return JsonResponse(
         {
             "ok": True,
@@ -971,7 +970,7 @@ def pncp_research_sessions_detail(request, sessao_id: int):
                         },
                     ),
                 }
-                for x in itens_desc
+                for x in itens_asc
             ],
             "grupos_relatorio": grupos_relatorio,
             "calculo_precos": resumo_calculo_precos(grupos_relatorio, formula_id),

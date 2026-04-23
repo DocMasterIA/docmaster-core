@@ -146,14 +146,20 @@ IMPORT_OPTIONAL_COLUMN_IDS = (
 )
 _IMPORT_ALLOWED_IDS = frozenset(IMPORT_REQUIRED_COLUMN_IDS + IMPORT_OPTIONAL_COLUMN_IDS)
 _IMPORT_ALIASES = {
+    "nome_do_item": "descricao_item",
+    "nome_item": "descricao_item",
     "id_item": "numero_item",
     "item_id": "numero_item",
     "item": "numero_item",
     "descricao": "descricao_item",
     "descricaoitem": "descricao_item",
     "qtd": "quantidade",
+    "qtd_": "quantidade",
+    "und": "unidade_medida",
     "unidade": "unidade_medida",
     "unidade_medida": "unidade_medida",
+    "preco_total": "valor_unitario",
+    "preco_total_item": "valor_unitario",
     "valor": "valor_unitario",
     "valor_unitario": "valor_unitario",
     "valorunitario": "valor_unitario",

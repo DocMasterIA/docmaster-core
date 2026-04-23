@@ -34,22 +34,6 @@
             <strong>{{ unidadeRefletida || '—' }}</strong>
           </div>
           <div class="item-card">
-            <span class="item-card__label">Órgão</span>
-            <strong>{{ item.orgao || '—' }}</strong>
-          </div>
-          <div class="item-card">
-            <span class="item-card__label">Município/UF</span>
-            <strong>{{ itemCidadeUf }}</strong>
-          </div>
-          <div class="item-card">
-            <span class="item-card__label">Modalidade</span>
-            <strong>{{ item.modalidade || '—' }}</strong>
-          </div>
-          <div class="item-card">
-            <span class="item-card__label">Número PNCP</span>
-            <strong>{{ item.numero_pncp || '—' }}</strong>
-          </div>
-          <div class="item-card">
             <span class="item-card__label">Data do registro</span>
             <strong>{{ formatDateTimePt(item.created_at) }}</strong>
           </div>
@@ -155,7 +139,6 @@ const item = ref(null);
 const allItems = ref([]);
 const itemCotacoes = ref([]);
 
-const itemCidadeUf = computed(() => (item.value ? formatCidadeUf(item.value) : '—'));
 const fonteSelecionada = computed(() => normalizeFonte(route.query.fonte));
 const fonteSelecionadaLabel = computed(() => (fonteSelecionada.value ? labelFonte(fonteSelecionada.value) : 'Todas'));
 const faixaValorBase = computed(() => {

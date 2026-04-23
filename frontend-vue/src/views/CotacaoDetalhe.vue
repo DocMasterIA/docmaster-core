@@ -738,13 +738,13 @@ function triggerTemplateDownload(url, filename) {
 
 function downloadModeloExcel() {
   triggerTemplateDownload(
-    '/modelos/cotacao-manual-modelo-docmasteria.xlsx',
+    '/modelos/cotacao-manual-modelo-docmasteria.xlsx?v=20260420',
     'cotacao-manual-modelo-docmasteria.xlsx',
   );
 }
 
 function downloadModeloSheetsCsv() {
-  triggerTemplateDownload('/modelos/cotacao-manual-modelo.csv', 'cotacao-manual-modelo.csv');
+  triggerTemplateDownload('/modelos/cotacao-manual-modelo.csv?v=20260420', 'cotacao-manual-modelo.csv');
 }
 
 async function onChangeFormulaCalculo(event) {

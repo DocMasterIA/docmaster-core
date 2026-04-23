@@ -131,7 +131,7 @@ _SOURCE_KEEP_KEYS = frozenset(
     }
 )
 
-IMPORT_REQUIRED_COLUMN_IDS = ("descricao_item", "quantidade", "unidade_medida", "valor_unitario")
+IMPORT_REQUIRED_COLUMN_IDS = ("descricao_item",)
 IMPORT_OPTIONAL_COLUMN_IDS = (
     "numero_item",
     "numero_pncp",
@@ -163,6 +163,11 @@ _IMPORT_ALIASES = {
     "variacao": "variacao_percentual",
     "variacao_percentual": "variacao_percentual",
     "valor_base": "valor_base",
+    "faixa_regional_base": "valor_base",
+    "faixa_base": "valor_base",
+    "variacao_base": "variacao_percentual",
+    "faixa_variacao": "variacao_percentual",
+    "faixa_variacao_percentual": "variacao_percentual",
 }
 
 

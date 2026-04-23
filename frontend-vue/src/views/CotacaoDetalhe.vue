@@ -212,6 +212,7 @@
           <table class="cot-sheet-table" aria-label="Estrutura base da planilha de cotacao">
             <colgroup class="cot-sheet-columns">
               <col style="width: 56px" />
+              <col style="width: 64px" />
               <col style="width: 260px" />
               <col style="width: 110px" />
               <col style="width: 110px" />
@@ -238,6 +239,7 @@
                     aria-label="Selecionar todos os itens"
                   />
                 </th>
+                <th rowspan="2" class="cot-sheet-center">#</th>
                 <th rowspan="2">Nome do Item</th>
                 <th colspan="5" class="cot-sheet-group">Fontes de Preco (Art. 5º)</th>
                 <th rowspan="2" class="cot-sheet-center">Qtd.</th>
@@ -278,6 +280,7 @@
             <tbody>
               <tr v-if="showManualItemEditor" class="cot-sheet-row-add">
                 <td class="cot-sheet-center">+</td>
+                <td class="cot-sheet-center">—</td>
                 <td>
                   <input
                     v-model.trim="manualItem.descricao_item"
@@ -326,7 +329,7 @@
                   </div>
                 </td>
               </tr>
-              <tr v-for="linha in linhasMock" :key="linha.id">
+              <tr v-for="(linha, idx) in linhasMock" :key="linha.id">
                 <td class="cot-sheet-center">
                   <input
                     type="checkbox"
@@ -337,6 +340,7 @@
                     :aria-label="`Selecionar item ${linha.id}`"
                   />
                 </td>
+                <td class="cot-sheet-center">{{ idx + 1 }}</td>
                 <td>{{ linha.nomeItem }}</td>
                 <td class="cot-sheet-center">
                   <button
@@ -923,6 +927,8 @@ async function onImportSpreadsheetSelected(event) {
   try {
     const res = await importItemsSpreadsheetToResearchSession(sessionId, file, {
       descricao_item: 'descricao_item',
+      valor_base: 'valor_base',
+      variacao_percentual: 'variacao_percentual',
       quantidade: 'quantidade',
       unidade_medida: 'unidade_medida',
       valor_unitario: 'valor_unitario',
@@ -942,7 +948,7 @@ async function onImportSpreadsheetSelected(event) {
         ? `Planilha importada com sucesso: ${res?.itens_inseridos || 0} itens. ${invalid} linha(s) inválida(s).`
         : '';
   } catch (err) {
-    loadError.value = `Falha ao importar planilha: ${err?.message || 'erro desconhecido'}. Colunas obrigatórias: descricao_item, quantidade, unidade_medida, valor_unitario.`;
+    loadError.value = `Falha ao importar planilha: ${err?.message || 'erro desconhecido'}. Coluna obrigatória: descricao_item. Recomendadas: valor_base, variacao_percentual.`;
   } finally {
     importLoading.value = false;
   }

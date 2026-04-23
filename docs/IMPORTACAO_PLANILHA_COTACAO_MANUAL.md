@@ -31,12 +31,11 @@ Observacao:
 As colunas abaixo devem existir (diretamente ou via alias/mapeamento):
 
 - `descricao_item`
-- `quantidade`
-- `unidade_medida`
-- `valor_unitario`
 
 ## IDs de coluna opcionais
 
+- `valor_base`
+- `variacao_percentual`
 - `numero_item`
 - `numero_pncp`
 - `ano_compra`
@@ -45,25 +44,23 @@ As colunas abaixo devem existir (diretamente ou via alias/mapeamento):
 - `municipio`
 - `uf`
 - `modalidade`
-- `valor_base`
-- `variacao_percentual`
+- `quantidade` (legado)
+- `unidade_medida` (legado)
+- `valor_unitario` (legado)
 
 Ordem usada no modelo padrao:
 
 1. `descricao_item`
-2. `quantidade`
-3. `unidade_medida`
-4. `valor_unitario`
-5. `numero_item`
-6. `numero_pncp`
-7. `ano_compra`
-8. `sequencial_compra`
-9. `orgao`
-10. `municipio`
-11. `uf`
-12. `modalidade`
-13. `valor_base`
-14. `variacao_percentual`
+2. `valor_base`
+3. `variacao_percentual`
+4. `numero_item`
+5. `numero_pncp`
+6. `ano_compra`
+7. `sequencial_compra`
+8. `orgao`
+9. `municipio`
+10. `uf`
+11. `modalidade`
 
 ## Aliases aceitos (normalizacao automatica)
 
@@ -75,6 +72,10 @@ Exemplos de alias que sao convertidos automaticamente para IDs canonicos:
 - `unidade` -> `unidade_medida`
 - `valor` -> `valor_unitario`
 - `valorunitario` -> `valor_unitario`
+- `faixa_regional_base` -> `valor_base`
+- `faixa_base` -> `valor_base`
+- `faixa_variacao` -> `variacao_percentual`
+- `faixa_variacao_percentual` -> `variacao_percentual`
 - `id_item` -> `numero_item`
 - `item_id` -> `numero_item`
 - `item` -> `numero_item`

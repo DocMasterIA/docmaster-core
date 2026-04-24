@@ -118,3 +118,7 @@ PNCP_IA_GENERATE_PATH: str = os.getenv("PNCP_IA_GENERATE_PATH", "/api/llm/genera
 PNCP_IA_MODEL: str = os.getenv("PNCP_IA_MODEL", "").strip()
 PNCP_IA_TIMEOUT_SECONDS: float = float(os.getenv("PNCP_IA_TIMEOUT_SECONDS", "4.5"))
 PNCP_IA_MAX_CANDIDATES: int = _env_int("PNCP_IA_MAX_CANDIDATES", 36)
+
+# Resumo curto (1–2 frases) do núcleo do item PNCP para títulos ambíguos / descrições longas.
+PNCP_IA_ITEM_RESUMO_ENABLED: bool = _env_bool("PNCP_IA_ITEM_RESUMO_ENABLED", True)
+PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS: float = float(os.getenv("PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS", "3.5"))

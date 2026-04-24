@@ -30,10 +30,13 @@ from .config import (
     PNCP_IA_MODEL,
     PNCP_IA_TIMEOUT_SECONDS,
     PNCP_IA_MAX_CANDIDATES,
+    PNCP_IA_ITEM_RESUMO_ENABLED,
+    PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS,
 )
 from .pncp_client import create_pncp_http_client, search_contracts, get_contract_items
 from .local_index import upsert_contracts, local_item_search
 from .schemas import MarketSearchRequest
+from .search_text_clean import apply_item_display_cleanup, normalize_for_search
 
 
 def _default_dates() -> tuple[str, str]:
@@ -82,14 +85,8 @@ def _contains_tokens(text: str, tokens: List[str]) -> bool:
 
 
 def _normalize_text(text: str) -> str:
-    text = (text or "").strip().lower()
-    if not text:
-        return ""
-    # Remove acentos para melhorar match (ex.: "bambolê" -> "bambole")
-    text = "".join(ch for ch in unicodedata.normalize("NFD", text) if unicodedata.category(ch) != "Mn")
-    text = re.sub(r"[^a-z0-9\s]", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+    """Texto normalizado para matching (acentos, ruído, nº, números por extenso comuns)."""
+    return normalize_for_search(text or "")
 
 
 def _normalize_esfera_id(v: Any) -> str:
@@ -1330,6 +1327,80 @@ def _parse_ia_rerank_response(raw_text: str) -> List[Dict[str, Any]]:
     return out
 
 
+async def _ia_post_generate_plain(prompt: str) -> str:
+    """Chamada mínima ao mesmo endpoint usado no rerank (`/api/llm/generate`)."""
+    payload: Dict[str, Any] = {"prompt": prompt, "stream": False}
+    if PNCP_IA_MODEL:
+        payload["model"] = PNCP_IA_MODEL
+    url = f"{PNCP_IA_BASE_URL}{PNCP_IA_GENERATE_PATH}"
+    timeout = httpx.Timeout(PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        resp = await client.post(url, json=payload)
+        resp.raise_for_status()
+        body = resp.json()
+    return str(((body or {}).get("data") or {}).get("response") or "").strip()
+
+
+async def _ia_interpret_item_leve(termo_busca: str, item: Dict[str, Any]) -> str:
+    """
+    Uma leitura curta do núcleo do item PNCP para títulos ambíguos ou descrições muito agregadas.
+    """
+    desc_full = str(
+        item.get("descricao_item_original")
+        or item.get("descricao_item")
+        or item.get("material_servico_original")
+        or item.get("material_servico")
+        or ""
+    ).strip()
+    if len(desc_full) > 4500:
+        desc_full = desc_full[:4500].rstrip() + "…"
+    mat = str(item.get("material_servico_original") or item.get("material_servico") or "").strip()
+    if len(mat) > 800:
+        mat = mat[:800].rstrip() + "…"
+    org = str(item.get("orgao") or "").strip()
+    uf = str(item.get("uf") or "").strip()
+    prompt = (
+        "Você apoia pesquisa de preços na contratação pública brasileira (PNCP).\n"
+        "O título/descrição PNCP pode ser genérico ou agregar vários produtos; o usuário precisa de uma leitura rápida.\n\n"
+        f"Termo ou item de referência do usuário:\n{termo_busca.strip()}\n\n"
+        "Descrição do item retornada pelo PNCP:\n"
+        f"{desc_full}\n\n"
+    )
+    if mat:
+        prompt += f"Material / serviço (campo auxiliar):\n{mat}\n\n"
+    if org or uf:
+        prompt += f"Órgão / UF (contexto): {org or '—'} / {uf or '—'}\n\n"
+    prompt += (
+        "Tarefa: escreva NO MÁXIMO 2 frases curtas em português do Brasil.\n"
+        "- Identifique o núcleo do bem ou serviço que parece estar em causa (ex.: 'abacate in natura', 'frutas frescas para merenda').\n"
+        "- Indique se a inferência é confiante, moderada ou incerta (ex.: descrição só macro ou ambígua).\n"
+        "Regras: não invente marca, lote ou norma que não apareça no texto; não copie a descrição inteira.\n"
+        "Responda em texto plano (sem markdown, sem JSON)."
+    )
+    raw = await _ia_post_generate_plain(prompt)
+    return re.sub(r"\s+", " ", (raw or "").strip())
+
+
+async def _enriquecer_interpretacao_ia_itens(termo_busca: str, itens: List[Dict[str, Any]]) -> None:
+    if not PNCP_IA_ITEM_RESUMO_ENABLED or not itens:
+        return
+
+    async def _one(it: Dict[str, Any]) -> None:
+        try:
+            out = await asyncio.wait_for(
+                _ia_interpret_item_leve(termo_busca, it),
+                timeout=max(1.0, float(PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS)),
+            )
+            s = re.sub(r"\s+", " ", (out or "").strip())
+            if len(s) > 420:
+                s = s[:420].rstrip(" ,.;") + "…"
+            it["ia_interpretacao_item"] = s or None
+        except Exception:
+            it["ia_interpretacao_item"] = None
+
+    await asyncio.gather(*(_one(it) for it in itens))
+
+
 async def _rerank_top3_with_ia(
     termo_busca: str,
     candidatos: List[Dict[str, Any]],
@@ -1367,6 +1438,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         uf=payload.uf,
         codigo_modalidade=payload.codigo_modalidade,
         limit=limit,
+        cleanup_for_display=False,
     )
     itens = list(base_items.get("itens") or [])
     if not itens:
@@ -1543,6 +1615,14 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     if not top3:
         top3 = _select_top3_prioritize_federal(scored)[:3]
 
+    for row in top3:
+        apply_item_display_cleanup(row)
+
+    ia_resumo_ok = False
+    if PNCP_IA_ITEM_RESUMO_ENABLED and top3:
+        await _enriquecer_interpretacao_ia_itens(payload.termo_busca, top3)
+        ia_resumo_ok = any(bool(str(x.get("ia_interpretacao_item") or "").strip()) for x in top3)
+
     out_stats = dict(base_items.get("stats") or {})
     total_federais = sum(1 for x in scored if _is_federal_item(x))
     federais_score_80 = sum(1 for x in scored if _is_federal_item(x) and _safe_float(x.get("score_aprovacao")) >= 80.0)
@@ -1553,6 +1633,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     out_stats["federais_score_maior_igual_80"] = federais_score_80
     out_stats["ia_rerank_ativo"] = bool(PNCP_IA_RERANK_ENABLED)
     out_stats["ia_rerank_usado"] = ia_used
+    out_stats["ia_interpretacao_item_ativo"] = bool(PNCP_IA_ITEM_RESUMO_ENABLED)
+    out_stats["ia_interpretacao_item_usado"] = bool(ia_resumo_ok)
 
     return {
         "ok": bool(base_items.get("ok", True)),

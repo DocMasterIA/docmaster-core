@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
-import unicodedata
 import zlib
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -16,6 +15,7 @@ from .config import (
     PNCP_MODALIDADES_DEFAULT,
 )
 from .pncp_client import PNCPClientError, create_pncp_http_client, get_contract_items, search_contracts
+from .search_text_clean import apply_item_display_cleanup, normalize_for_search
 
 
 @contextmanager
@@ -395,13 +395,7 @@ def local_search(
 
 
 def _normalize_search_text(text: str) -> str:
-    s = (text or "").strip().lower()
-    if not s:
-        return ""
-    s = "".join(ch for ch in unicodedata.normalize("NFD", s) if unicodedata.category(ch) != "Mn")
-    s = re.sub(r"[^a-z0-9\s]", " ", s)
-    s = re.sub(r"\s+", " ", s).strip()
-    return s
+    return normalize_for_search(text or "")
 
 
 def _token_variants(token: str) -> List[str]:
@@ -508,6 +502,7 @@ def local_item_search(
     uf: Optional[str] = None,
     codigo_modalidade: Optional[int] = None,
     limit: int = 500,
+    cleanup_for_display: bool = True,
 ) -> Dict[str, Any]:
     ensure_local_index()
     token_groups = _build_search_tokens(termo_busca)
@@ -560,29 +555,30 @@ def local_item_search(
         esfera_id, esfera_adm, poder_id = _extract_esfera_from_raw_blob(r["raw_json_zlib"])
         if not esfera_id:
             esfera_id, esfera_adm, poder_id = _extract_esfera_from_contract_raw_json(r["contrato_raw_json"])
-        itens.append(
-            {
-                "numero_pncp": r["numero_pncp"],
-                "ano_compra": r["ano_compra"],
-                "sequencial_compra": r["sequencial_compra"],
-                "numero_item": r["numero_item"],
-                "descricao_item": r["descricao"],
-                "material_servico": r["material_servico"],
-                "quantidade": r["quantidade"],
-                "unidade_medida": r["unidade_medida"],
-                "valor_unitario": r["valor_unitario"],
-                "valor_total": r["valor_total"],
-                "orgao": r["orgao"],
-                "municipio": r["municipio"],
-                "uf": r["uf"],
-                "modalidade": r["modalidade_nome"],
-                "data_publicacao": r["data_publicacao"],
-                "esfera_id": esfera_id,
-                "esfera_administrativa": esfera_adm,
-                "poder_id": poder_id,
-                "origem": "base_local_itens",
-            }
-        )
+        entry: Dict[str, Any] = {
+            "numero_pncp": r["numero_pncp"],
+            "ano_compra": r["ano_compra"],
+            "sequencial_compra": r["sequencial_compra"],
+            "numero_item": r["numero_item"],
+            "descricao_item": r["descricao"],
+            "material_servico": r["material_servico"],
+            "quantidade": r["quantidade"],
+            "unidade_medida": r["unidade_medida"],
+            "valor_unitario": r["valor_unitario"],
+            "valor_total": r["valor_total"],
+            "orgao": r["orgao"],
+            "municipio": r["municipio"],
+            "uf": r["uf"],
+            "modalidade": r["modalidade_nome"],
+            "data_publicacao": r["data_publicacao"],
+            "esfera_id": esfera_id,
+            "esfera_administrativa": esfera_adm,
+            "poder_id": poder_id,
+            "origem": "base_local_itens",
+        }
+        if cleanup_for_display:
+            apply_item_display_cleanup(entry)
+        itens.append(entry)
         if len(itens) >= max(1, min(int(limit), 5000)):
             break
     return {"ok": True, "itens": itens, "stats": {"total_registros": len(itens)}}

@@ -166,6 +166,9 @@
                     </td>
                     <td>
                       <div class="bia-main">{{ row.titulo }}</div>
+                      <div v-if="row.interpretacaoIa" class="bia-ia-hint" title="Leitura auxiliar gerada por IA">
+                        <strong>IA:</strong> {{ row.interpretacaoIa }}
+                      </div>
                       <div class="bia-sub">
                         <span class="bia-meta-token">{{ row.orgao }}</span>
                         <span v-if="row.cidade && row.cidade !== '-'" class="bia-meta-sep">·</span>
@@ -513,6 +516,7 @@ async function runSearchWithContext({ descricao, selectedUfCodes = [], context =
         confiabilidade: it.confiabilidade || 'Média',
         risco: it.risco || 'Médio',
         status: it.status || 'Aprovado',
+        interpretacaoIa: String(it.ia_interpretacao_item || '').trim() || null,
         selecionado: false,
       }));
       aggregated.push(...mapped);
@@ -1059,6 +1063,16 @@ function onVariacaoInput(event) {
   padding-right: 14px;
 }
 .bia-main { font-weight: 600; color: #0f172a; line-height: 1.3; }
+.bia-ia-hint {
+  margin-top: 6px;
+  font-size: 0.875rem;
+  color: #475569;
+  font-style: italic;
+  line-height: 1.45;
+  border-left: 3px solid #cbd5e1;
+  padding-left: 10px;
+}
+.bia-ia-hint strong { font-style: normal; font-weight: 600; color: #334155; margin-right: 4px; }
 .bia-sub { color: #64748b; margin-top: 4px; line-height: 1.4; }
 .bia-cell-center { text-align: center; }
 .bia-meta-token { white-space: nowrap; }

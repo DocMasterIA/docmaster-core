@@ -1341,9 +1341,37 @@ async def _ia_post_generate_plain(prompt: str) -> str:
     return str(((body or {}).get("data") or {}).get("response") or "").strip()
 
 
+def _sanitize_ia_interpretacao_item(text: str) -> str:
+    """Remove rótulos metafóricos e meta-comentários de confiança que o modelo às vezes insere."""
+    s = re.sub(r"\s+", " ", (text or "").strip())
+    if not s:
+        return s
+    s = re.sub(
+        r"^(n[úu]cleo do bem|ess[êe]ncia|foco|resumo|categoria|classifica[çc][ãa]o)\s*:\s*",
+        "",
+        s,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(
+        r"^(infer[êe]ncia\s+(?:confiante|moderada|incerta)|confian[çc]a\s*(?:alta|m[ée]dia|baixa|moderada))\s*[.:,;]\s*",
+        "",
+        s,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(
+        r"\s*[.;]?\s*(infer[êe]ncia\s+(?:confiante|moderada|incerta)|"
+        r"confian[çc]a\s*(?:alta|m[ée]dia|baixa|moderada))\s*\.?\s*$",
+        "",
+        s,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(r"\s+", " ", s).strip(" ,.;:")
+    return s
+
+
 async def _ia_interpret_item_leve(termo_busca: str, item: Dict[str, Any]) -> str:
     """
-    Uma leitura curta do núcleo do item PNCP para títulos ambíguos ou descrições muito agregadas.
+    Uma linha curta identificando o bem/serviço (estilo catálogo), para títulos ambíguos ou descrições agregadas.
     """
     desc_full = str(
         item.get("descricao_item_original")
@@ -1371,14 +1399,17 @@ async def _ia_interpret_item_leve(termo_busca: str, item: Dict[str, Any]) -> str
     if org or uf:
         prompt += f"Órgão / UF (contexto): {org or '—'} / {uf or '—'}\n\n"
     prompt += (
-        "Tarefa: escreva NO MÁXIMO 2 frases curtas em português do Brasil.\n"
-        "- Identifique o núcleo do bem ou serviço que parece estar em causa (ex.: 'abacate in natura', 'frutas frescas para merenda').\n"
-        "- Indique se a inferência é confiante, moderada ou incerta (ex.: descrição só macro ou ambígua).\n"
-        "Regras: não invente marca, lote ou norma que não apareça no texto; não copie a descrição inteira.\n"
-        "Responda em texto plano (sem markdown, sem JSON)."
+        "Tarefa: em UMA ÚNICA frase curta em português do Brasil, diga o que o item parece ser, "
+        "como rótulo de produto/serviço (ex.: 'Abacate in natura', 'Parafuso de aço inox, cabeça sextavada').\n"
+        "Use o termo do usuário só para desambiguar quando a descrição PNCP for genérica ou misturar vários bens.\n"
+        "PROIBIDO: expressões como 'núcleo do bem', 'essência', 'categoria', 'resumo'; "
+        "dois pontos seguidos de rótulo vazio (ex.: 'Núcleo: ...'); "
+        "qualquer comentário sobre confiança, certeza ou 'inferência confiante/moderada/incerta'.\n"
+        "Regras: não invente marca, lote ou norma que não apareça no texto; não copie a descrição inteira nem liste tudo.\n"
+        "Responda só com essa frase, em texto plano (sem markdown, sem JSON)."
     )
     raw = await _ia_post_generate_plain(prompt)
-    return re.sub(r"\s+", " ", (raw or "").strip())
+    return _sanitize_ia_interpretacao_item(raw)
 
 
 async def _enriquecer_interpretacao_ia_itens(termo_busca: str, itens: List[Dict[str, Any]]) -> None:

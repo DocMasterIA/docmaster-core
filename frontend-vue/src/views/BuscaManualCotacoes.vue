@@ -158,7 +158,7 @@
             :disabled="isSavingSelecionados || totalSelecionados === 0"
             @click="adicionarSelecionadosNaCotacao(true)"
           >
-            {{ isSavingSelecionados ? 'Salvando...' : '+ Adicionar itens na cotação' }}
+            {{ isSavingSelecionados ? 'Salvando...' : addButtonLabel }}
           </button>
           <RouterLink
             :to="`/pesquisador-pncp/cotacoes/${cotacaoId}`"
@@ -219,6 +219,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   addItemsToResearchSession,
+  addCotacoesToItemInResearchSession,
   backfillLocalIndex,
   getResearchSession,
   getLocalIndexStats,
@@ -339,6 +340,11 @@ const saveMessage = ref('');
 const localStats = ref(null);
 const isBackfilling = ref(false);
 const isSavingSelecionados = ref(false);
+const addButtonLabel = computed(() => (
+  itemId.value
+    ? '+ Adicionar preços ao item selecionado'
+    : '+ Adicionar itens na cotação'
+));
 const totalSelecionados = computed(() => resultados.value.filter((x) => x.selecionado).length);
 const totalUfs = computed(() => new Set(resultadosFiltradosOrdenados.value.map((x) => x.uf).filter(Boolean)).size);
 const mediaValor = computed(() => {
@@ -614,7 +620,7 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
   const variacaoPercentual = Number.isFinite(variacaoSelecionada) && variacaoSelecionada >= 0
     ? variacaoSelecionada
     : null;
-  const itens = resultados.value
+  const registros = resultados.value
     .filter((r) => r.selecionado)
     .map((r) => ({
       numero_pncp: toNullableText(r.numeroPncp),
@@ -642,15 +648,15 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
       },
     }))
     .filter((it) => !!it.descricao_item || !!it.numero_pncp || (it.ano_compra != null && it.sequencial_compra != null));
-  if (!itens.length) {
+  if (!registros.length) {
     saveMessage.value = 'Selecione ao menos um item.';
     return;
   }
   const MAX_ITENS_TOTAL = 2000;
   const BATCH_SIZE = 250;
-  let enviar = itens;
-  if (itens.length > MAX_ITENS_TOTAL) {
-    enviar = itens.slice(0, MAX_ITENS_TOTAL);
+  let enviar = registros;
+  if (registros.length > MAX_ITENS_TOTAL) {
+    enviar = registros.slice(0, MAX_ITENS_TOTAL);
     saveMessage.value = `Limite de ${MAX_ITENS_TOTAL} itens por operação; gravando os primeiros ${MAX_ITENS_TOTAL}.`;
   }
   isSavingSelecionados.value = true;
@@ -658,14 +664,25 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
     let totalInseridos = 0;
     for (let i = 0; i < enviar.length; i += BATCH_SIZE) {
       const lote = enviar.slice(i, i + BATCH_SIZE);
-      const res = await addItemsToResearchSession(sessionId, lote);
-      totalInseridos += Number(res.itens_inseridos ?? lote.length);
+      if (itemId.value) {
+        const res = await addCotacoesToItemInResearchSession(sessionId, itemId.value, lote);
+        totalInseridos += Number(res.cotacoes_inseridas ?? lote.length);
+      } else {
+        const res = await addItemsToResearchSession(sessionId, lote);
+        totalInseridos += Number(res.itens_inseridos ?? lote.length);
+      }
     }
-    saveMessage.value = `${totalInseridos} item(ns) adicionados à cotação ${sessionId}.`;
+    saveMessage.value = itemId.value
+      ? `${totalInseridos} cotação(ões) adicionadas ao item #${itemId.value}.`
+      : `${totalInseridos} item(ns) adicionados à cotação ${sessionId}.`;
     if (totalInseridos > 0) {
       resultados.value = resultados.value.map((r) => (r.selecionado ? { ...r, selecionado: false } : r));
       if (goToCotacao) {
-        await router.push(`/pesquisador-pncp/cotacoes/${sessionId}`);
+        if (itemId.value) {
+          await router.push(`/pesquisador-pncp/cotacoes/${sessionId}/itens/${itemId.value}`);
+        } else {
+          await router.push(`/pesquisador-pncp/cotacoes/${sessionId}`);
+        }
       }
     }
   } catch (err) {

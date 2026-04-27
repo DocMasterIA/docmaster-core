@@ -167,15 +167,18 @@ const unidadeRefletida = computed(() => {
 });
 
 const valorTotalRefletido = computed(() => {
-  const vals = itemCotacoes.value
-    .map((x) => Number(x?.valor_total ?? x?.valor_unitario))
-    .filter((n) => Number.isFinite(n) && n > 0);
-  if (vals.length > 0) {
-    const media = vals.reduce((a, b) => a + b, 0) / vals.length;
-    return media;
+  // Prioriza o total consolidado do item (sessão), sem usar média das cotações.
+  const totalConsolidado = pickNumeric(item.value?.valor_total_refletido, item.value?.valor_total);
+  if (Number.isFinite(totalConsolidado) && totalConsolidado >= 0) return totalConsolidado;
+
+  const qtd = Number(quantidadeRefletida.value);
+  const unit = Number(item.value?.valor_unitario);
+  if (Number.isFinite(qtd) && qtd > 0 && Number.isFinite(unit) && unit >= 0) {
+    return qtd * unit;
   }
-  const legacy = Number(item.value?.valor_total);
-  return Number.isFinite(legacy) ? legacy : null;
+
+  const totalPrimeiraCotacao = Number(itemCotacoes.value.find((x) => Number.isFinite(Number(x?.valor_total)))?.valor_total);
+  return Number.isFinite(totalPrimeiraCotacao) ? totalPrimeiraCotacao : null;
 });
 
 const itemCotacoesFiltradas = computed(() => {

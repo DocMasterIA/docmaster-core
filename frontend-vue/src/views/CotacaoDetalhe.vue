@@ -193,6 +193,7 @@
           <label class="cot-sheet-search">
             <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
             <input
+              v-model.trim="searchTerm"
               type="text"
               placeholder="Buscar itens"
               aria-label="Buscar itens na planilha"
@@ -329,7 +330,7 @@
                   </div>
                 </td>
               </tr>
-              <tr v-for="(linha, idx) in linhasMock" :key="linha.id">
+              <tr v-for="(linha, idx) in linhasFiltradas" :key="linha.id">
                 <td class="cot-sheet-center">
                   <input
                     type="checkbox"
@@ -542,6 +543,7 @@ const MODELO_COTACAO_LABELS = {
 };
 
 const linhasMock = ref([]);
+const searchTerm = ref('');
 
 const selectedIds = ref(new Set());
 const tituloCotacao = ref('');
@@ -597,13 +599,29 @@ const sessaoStatusLabel = computed(() => {
 });
 
 const allSelected = computed(() => {
-  const rows = linhasMock.value;
+  const rows = linhasFiltradas.value;
   return rows.length > 0 && selectedIds.value.size === rows.length;
 });
 
 const isPartiallySelected = computed(() => {
-  const rows = linhasMock.value;
+  const rows = linhasFiltradas.value;
   return selectedIds.value.size > 0 && selectedIds.value.size < rows.length;
+});
+
+const linhasFiltradas = computed(() => {
+  const q = String(searchTerm.value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+  if (!q) return linhasMock.value;
+  return linhasMock.value.filter((linha) => {
+    const nome = String(linha?.nomeItem || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+    return nome.includes(q);
+  });
 });
 
 function toggleSelectRow(id) {
@@ -618,7 +636,7 @@ function toggleSelectRow(id) {
 
 function toggleSelectAll(event) {
   if (event.target.checked) {
-    selectedIds.value = new Set(linhasMock.value.map((linha) => linha.id));
+    selectedIds.value = new Set(linhasFiltradas.value.map((linha) => linha.id));
     return;
   }
   selectedIds.value = new Set();

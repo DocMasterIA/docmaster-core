@@ -1136,6 +1136,18 @@ def _classify_risco(score: float) -> str:
     return "Alto"
 
 
+def _is_similaridade_encontrada(item: Dict[str, Any]) -> bool:
+    """
+    Marca match por similaridade quando a aderência semântica é boa,
+    mas o encaixe literal com o termo buscado é baixo.
+    """
+    literal = _safe_float(item.get("literal_match"))
+    aprov = _safe_float(item.get("score_aprovacao"))
+    sem_raw = _safe_float(item.get("score_relevancia"))
+    # `score_relevancia` > 0 indica match semântico básico; score aprovado evita ruído.
+    return bool(sem_raw > 0 and aprov >= 60 and literal < 45)
+
+
 def _select_top3_with_diversity(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     selected: List[Dict[str, Any]] = []
     used_org: set[str] = set()
@@ -1563,6 +1575,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         it2["confiabilidade"] = _classify_confiabilidade(score_0_100)
         it2["risco"] = _classify_risco(score_0_100)
         it2["status"] = "Aprovado" if score_0_100 >= 55 else "Revisar"
+        it2["similaridade_encontrada"] = _is_similaridade_encontrada(it2)
         scored.append(it2)
 
     # Reescala para ampliar separação entre bons e ruins no conjunto atual.
@@ -1582,6 +1595,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             row["confiabilidade"] = _classify_confiabilidade(score_adj)
             row["risco"] = _classify_risco(score_adj)
             row["status"] = "Aprovado" if score_adj >= 60 else "Revisar"
+            row["similaridade_encontrada"] = _is_similaridade_encontrada(row)
 
     scored.sort(
         key=lambda x: (

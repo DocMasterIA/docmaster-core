@@ -342,7 +342,18 @@
                   />
                 </td>
                 <td class="cot-sheet-center">{{ idx + 1 }}</td>
-                <td>{{ linha.nomeItem }}</td>
+                <td>
+                  <div class="cot-item-nome-wrap">
+                    <span>{{ linha.nomeItem }}</span>
+                    <span
+                      v-if="Number(linha.fontes.similaridadeEncontrada || 0) > 0"
+                      class="cot-similaridade-tag"
+                      title="A IA identificou cotação por similaridade de contexto"
+                    >
+                      Similaridade encontrada
+                    </span>
+                  </div>
+                </td>
                 <td class="cot-sheet-center">
                   <button
                     type="button"
@@ -1142,6 +1153,7 @@ async function loadSessionFromBackend() {
             dominioAmplo: Number(fontesContagem.dominioAmplo || 0),
             cotacaoDireta: Number(fontesContagem.cotacaoDireta || 0),
             notasFiscais: Number(fontesContagem.notasFiscais || 0),
+            similaridadeEncontrada: Number(fontesContagem.similaridadeEncontrada || 0),
           },
           qtd: Number.isFinite(Number(it.quantidade_refletida)) ? Number(it.quantidade_refletida) : (it.quantidade ?? '-'),
           und: String(it.unidade_medida_refletida || '').trim() || it.unidade_medida || '-',
@@ -1725,6 +1737,26 @@ async function saveTituloNoBackend() {
 .cot-sheet-action-btn--danger {
   border-color: #e5c9c9;
   color: #b05d5d;
+}
+
+.cot-item-nome-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cot-similaridade-tag {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #f2dfb7;
+  background: #fff7e6;
+  color: #9a6a10;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 

@@ -128,6 +128,7 @@ _SOURCE_KEEP_KEYS = frozenset(
         "variacaoPercentual",
         "faixa_regional",
         "faixaRegional",
+        "similaridade_encontrada",
     }
 )
 
@@ -665,7 +666,14 @@ def _resolve_fonte_bucket(src: Dict[str, Any], numero_pncp: Any) -> Optional[str
 
 
 def _fontes_counts_for_session(sessao_id: int) -> Dict[int, Dict[str, int]]:
-    base = {"governamentais": 0, "entesPublicos": 0, "dominioAmplo": 0, "cotacaoDireta": 0, "notasFiscais": 0}
+    base = {
+        "governamentais": 0,
+        "entesPublicos": 0,
+        "dominioAmplo": 0,
+        "cotacaoDireta": 0,
+        "notasFiscais": 0,
+        "similaridadeEncontrada": 0,
+    }
     out: Dict[int, Dict[str, int]] = defaultdict(lambda: dict(base))
     rows = PncpCotacaoItemCotacao.objects.filter(cotacao_id=sessao_id).values(
         "item_id",
@@ -687,6 +695,8 @@ def _fontes_counts_for_session(sessao_id: int) -> Dict[int, Dict[str, int]]:
         bucket = _resolve_fonte_bucket(src, r.get("numero_pncp"))
         if bucket:
             out[item_id][bucket] = int(out[item_id].get(bucket, 0)) + 1
+        if bool(src.get("similaridade_encontrada")):
+            out[item_id]["similaridadeEncontrada"] = int(out[item_id].get("similaridadeEncontrada", 0)) + 1
     return out
 
 
@@ -1001,6 +1011,7 @@ def pncp_research_sessions_detail(request, sessao_id: int):
                             "dominioAmplo": 0,
                             "cotacaoDireta": 0,
                             "notasFiscais": 0,
+                            "similaridadeEncontrada": 0,
                         },
                     ),
                 }

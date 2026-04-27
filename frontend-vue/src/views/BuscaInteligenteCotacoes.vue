@@ -517,6 +517,7 @@ async function runSearchWithContext({ descricao, selectedUfCodes = [], context =
         risco: it.risco || 'Médio',
         status: it.status || 'Aprovado',
         interpretacaoIa: String(it.ia_interpretacao_item || '').trim() || null,
+        similaridadeEncontrada: Boolean(it.similaridade_encontrada),
         selecionado: false,
       }));
       aggregated.push(...mapped);
@@ -618,6 +619,7 @@ async function adicionarSelecionadosNaCotacao() {
       confiabilidade: r.confiabilidade,
       risco: r.risco,
       status: r.status,
+      similaridade_encontrada: Boolean(r.similaridadeEncontrada),
       data_publicacao: r.data,
     }));
   if (!selecionados.length) {

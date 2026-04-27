@@ -350,7 +350,7 @@
                       class="cot-similaridade-tag"
                       title="A IA identificou cotação por similaridade de contexto"
                     >
-                      Similaridade encontrada
+                      Similaridade parcial encontrada
                     </span>
                   </div>
                 </td>

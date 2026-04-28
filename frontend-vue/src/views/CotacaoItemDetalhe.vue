@@ -22,7 +22,7 @@
       <template v-else-if="item">
         <section class="item-summary">
           <div class="item-card item-card--wide">
-            <span class="item-card__label">Descrição</span>
+            <span class="item-card__label">Nome do item</span>
             <strong>{{ item.descricao_item || '—' }}</strong>
           </div>
           <div class="item-card">

@@ -141,7 +141,52 @@ def _pick_source(src: Dict[str, Any], *keys: str, default: str = "—") -> str:
     return default
 
 
-def fonte_dict_de_item(it: Any, *, tz) -> Dict[str, str]:
+def _pick_supplier_name_from_source(src: Dict[str, Any]) -> str:
+    nome = _pick_source(
+        src,
+        "fornecedor",
+        "nomeRazaoSocialFornecedor",
+        "razaoSocialFornecedor",
+        "razao_social",
+        "nome_fornecedor",
+        "fornecedor_nome",
+        default="",
+    ).strip()
+    return nome
+
+
+def _pick_supplier_cnpj_from_source(src: Dict[str, Any]) -> str:
+    raw = _pick_source(
+        src,
+        "cnpj_fornecedor",
+        "cnpjCpfFornecedor",
+        "niFornecedor",
+        "cnpjFornecedor",
+        default="",
+    ).strip()
+    digits = re.sub(r"\D", "", raw)
+    if len(digits) == 14:
+        return _normalize_cnpj(digits)
+    return ""
+
+
+def _build_supplier_name_index(rows: List[Any]) -> Dict[str, str]:
+    """
+    Índice local CNPJ fornecedor -> nome fornecedor, sem usar órgão comprador.
+    """
+    idx: Dict[str, str] = {}
+    for r in rows or []:
+        src = getattr(r, "source", None) or {}
+        if not isinstance(src, dict):
+            continue
+        cnpj = _pick_supplier_cnpj_from_source(src)
+        nome = _pick_supplier_name_from_source(src)
+        if cnpj and nome:
+            idx[cnpj] = nome
+    return idx
+
+
+def fonte_dict_de_item(it: Any, *, tz, supplier_name_by_cnpj: Optional[Dict[str, str]] = None) -> Dict[str, str]:
     """Uma linha ORM → uma linha da tabela «fontes» do detalhamento."""
     src: Dict[str, Any] = getattr(it, "source", None) or {}
     if not isinstance(src, dict):
@@ -152,30 +197,13 @@ def fonte_dict_de_item(it: Any, *, tz) -> Dict[str, str]:
         np = (getattr(it, "numero_pncp", None) or "").strip()
         tipo = "PNCP" if np else "Registro importado"
 
-    fornecedor = _pick_source(
-        src,
-        "fornecedor",
-        "nomeRazaoSocialFornecedor",
-        "razaoSocialFornecedor",
-        "razao_social",
-        "nome_fornecedor",
-        "fornecedor_nome",
-    )
-    if fornecedor == "—":
-        fornecedor = (getattr(it, "orgao", None) or "—")[:400]
-
-    cnpj = _pick_source(
-        src,
-        "cnpj",
-        "cnpj_fornecedor",
-        "cnpjCpfFornecedor",
-        "niFornecedor",
-        "cnpjFornecedor",
-    )
-    if cnpj == "—":
-        cnpj = _primeiro_cnpj_no_json(src)
-    if cnpj == "—":
-        cnpj = _primeiro_cnpj_no_json(getattr(it, "__dict__", {}))
+    cnpj_fornecedor = _pick_supplier_cnpj_from_source(src)
+    fornecedor = _pick_supplier_name_from_source(src)
+    if not fornecedor and cnpj_fornecedor and supplier_name_by_cnpj:
+        fornecedor = str(supplier_name_by_cnpj.get(cnpj_fornecedor) or "").strip()
+    if not fornecedor:
+        fornecedor = "Não informado"
+    cnpj = cnpj_fornecedor or "Não informado"
 
     created = getattr(it, "created_at", None)
     data_str = "—"
@@ -243,6 +271,7 @@ def agrupar_itens_relatorio_pesquisa_precos(itens: List[Any]) -> Tuple[List[Dict
     for ordem, key in enumerate(order_keys, start=1):
         members = buckets[key]
         members.sort(key=lambda x: int(getattr(x, "pk", 0) or 0))
+        supplier_name_idx = _build_supplier_name_index(members)
 
         first = members[0]
         nome = (getattr(first, "descricao_item", None) or "—")[:500]
@@ -263,7 +292,7 @@ def agrupar_itens_relatorio_pesquisa_precos(itens: List[Any]) -> Tuple[List[Dict
         else:
             situacao = f"Insuficiente ({n_cot} de {MIN_FONTES_SITUACAO_VALIDA} fontes)"
 
-        fontes = [fonte_dict_de_item(m, tz=tz) for m in members]
+        fontes = [fonte_dict_de_item(m, tz=tz, supplier_name_by_cnpj=supplier_name_idx) for m in members]
 
         grupos.append(
             {
@@ -310,6 +339,7 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
     for ordem, it in enumerate(itens, start=1):
         item_id = int(getattr(it, "id", 0) or 0)
         members = sorted(cotacoes_por_item.get(item_id, []), key=lambda x: int(getattr(x, "pk", 0) or 0))
+        supplier_name_idx = _build_supplier_name_index(members)
 
         nome = (getattr(it, "descricao_item", None) or "—")[:500]
         und = (getattr(it, "unidade_medida", None) or "").strip()[:64]
@@ -355,7 +385,7 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
         else:
             situacao = f"Insuficiente ({n_cot} de {MIN_FONTES_SITUACAO_VALIDA} fontes)"
 
-        fontes = [fonte_dict_de_item(m, tz=tz) for m in members]
+        fontes = [fonte_dict_de_item(m, tz=tz, supplier_name_by_cnpj=supplier_name_idx) for m in members]
         grupos.append(
             {
                 "ordem": ordem,

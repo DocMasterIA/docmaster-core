@@ -8,6 +8,7 @@ import re
 import unicodedata
 import math
 import asyncio
+from difflib import SequenceMatcher
 
 import httpx
 
@@ -1184,6 +1185,31 @@ def _has_core_token_overlap(item: Dict[str, Any], query_groups: List[List[str]],
     return hits >= required
 
 
+def _aggressive_similarity_score(termo_busca: str, item: Dict[str, Any]) -> float:
+    """
+    Similaridade textual agressiva (0..1) entre o termo e descrição/material.
+    """
+    q = _normalize_text(termo_busca)
+    d = _normalize_text(str(item.get("descricao_item") or ""))
+    m = _normalize_text(str(item.get("material_servico") or ""))
+    text = f"{d} {m}".strip()
+    if not q or not text:
+        return 0.0
+    ratios = [
+        SequenceMatcher(None, q, d).ratio() if d else 0.0,
+        SequenceMatcher(None, q, m).ratio() if m else 0.0,
+        SequenceMatcher(None, q, text).ratio(),
+    ]
+    q_toks = [t for t in q.split() if len(t) >= 3]
+    words = [w for w in text.split() if len(w) >= 3]
+    hit = 0
+    for qt in q_toks:
+        if any(_word_like_match(w, qt) for w in words):
+            hit += 1
+    token_cov = (hit / max(1, len(q_toks))) if q_toks else 0.0
+    return max(max(ratios), token_cov)
+
+
 def _select_top3_with_diversity(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     selected: List[Dict[str, Any]] = []
     used_org: set[str] = set()
@@ -1556,12 +1582,28 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     ]
     median_val = median(valores) if valores else None
 
-    def _score_candidates(candidates: List[Dict[str, Any]], *, relaxed: bool) -> List[Dict[str, Any]]:
+    def _score_candidates(candidates: List[Dict[str, Any]], *, mode: str) -> List[Dict[str, Any]]:
         out_rows: List[Dict[str, Any]] = []
         for it in candidates:
+            relaxed = mode != "strict"
+            aggressive = mode == "aggressive"
             if not relaxed and not _is_strict_candidate_match(it, query_groups):
                 continue
-            if relaxed and not _has_core_token_overlap(it, query_groups, min_hits=2):
+            if mode == "relaxed" and not _has_core_token_overlap(it, query_groups, min_hits=2):
+                continue
+            if aggressive and not _has_core_token_overlap(it, query_groups, min_hits=1):
+                sim = _aggressive_similarity_score(payload.termo_busca, it)
+                if sim < 0.62:
+                    continue
+            elif aggressive:
+                sim = _aggressive_similarity_score(payload.termo_busca, it)
+                if sim < 0.50:
+                    continue
+            if aggressive:
+                # Mesmo agressivo: impede itens muito desconexos.
+                if _context_penalty(it, query_groups) <= -14.0:
+                    continue
+            elif relaxed and not _has_core_token_overlap(it, query_groups, min_hits=2):
                 continue
             # Contexto totalmente incompatível continua bloqueado mesmo em fallback.
             pen_probe = _context_penalty(it, query_groups)
@@ -1577,7 +1619,9 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             # No fallback semântico, aceita variação literal mais ampla.
             if not relaxed and literal_match < 12:
                 continue
-            if relaxed and literal_match < 6:
+            if mode == "relaxed" and literal_match < 6:
+                continue
+            if aggressive and literal_match < 2:
                 continue
             tbl = 8.0
             rec = _score_recency(it)
@@ -1624,16 +1668,24 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             it2["similaridade_encontrada"] = _is_similaridade_encontrada(it2) or relaxed
             if relaxed:
                 it2["match_relaxado"] = True
+            if aggressive:
+                it2["match_agressivo"] = True
             out_rows.append(it2)
         return out_rows
 
-    scored: List[Dict[str, Any]] = _score_candidates(itens, relaxed=False)
+    scored: List[Dict[str, Any]] = _score_candidates(itens, mode="strict")
     fallback_relaxado_usado = False
+    fallback_agressivo_usado = False
     # Fallback: se a busca estrita não atingir massa crítica, abre variações claras.
     if len(scored) < 3:
-        fallback_rows = _score_candidates(itens, relaxed=True)
+        fallback_rows = _score_candidates(itens, mode="relaxed")
         fallback_relaxado_usado = bool(fallback_rows)
         scored = _merge_unique_items(scored, fallback_rows)
+    # Fallback agressivo: se ainda estiver fraco, tenta aproximação textual forte.
+    if len(scored) < 2:
+        fallback_agressivo = _score_candidates(itens, mode="aggressive")
+        fallback_agressivo_usado = bool(fallback_agressivo)
+        scored = _merge_unique_items(scored, fallback_agressivo)
 
     # Reescala para ampliar separação entre bons e ruins no conjunto atual.
     if scored:
@@ -1739,6 +1791,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     out_stats["ia_interpretacao_item_usado"] = bool(ia_resumo_ok)
     out_stats["fallback_similaridade_ativo"] = True
     out_stats["fallback_similaridade_usado"] = bool(fallback_relaxado_usado)
+    out_stats["fallback_similaridade_agressivo_usado"] = bool(fallback_agressivo_usado)
 
     return {
         "ok": bool(base_items.get("ok", True)),

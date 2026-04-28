@@ -42,7 +42,7 @@
         <section class="item-prices">
           <div class="item-price-card">
             <span>Valor unitário</span>
-            <strong>{{ formatCurrency(item.valor_unitario) }}</strong>
+            <strong>{{ formatCurrency(valorUnitarioRefletido) }}</strong>
           </div>
           <div class="item-price-card">
             <span>Valor total</span>
@@ -173,6 +173,38 @@ const unidadeRefletida = computed(() => {
   const first = itemCotacoes.value.find((x) => String(x?.unidade_medida || '').trim());
   if (first) return String(first.unidade_medida || '').trim();
   return String(item.value?.unidade_medida || '').trim() || null;
+});
+
+const valorUnitarioRefletido = computed(() => {
+  const rows = itemCotacoesFiltradas.value;
+
+  // Prioriza valor_unitario válido (> 0) vindo das cotações filtradas.
+  const units = rows
+    .map((x) => Number(x?.valor_unitario))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (units.length > 0) {
+    return units.reduce((acc, n) => acc + n, 0) / units.length;
+  }
+
+  // Fallback: deriva unitário de total/quantidade quando unitário vier ausente/zerado.
+  const derivados = rows
+    .map((x) => {
+      const total = Number(x?.valor_total);
+      const qtd = Number.isFinite(Number(item.value?.quantidade))
+        ? Number(item.value.quantidade)
+        : Number(x?.quantidade);
+      if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(qtd) || qtd <= 0) return null;
+      return total / qtd;
+    })
+    .filter((n) => Number.isFinite(n) && Number(n) > 0);
+  if (derivados.length > 0) {
+    return derivados.reduce((acc, n) => acc + Number(n), 0) / derivados.length;
+  }
+
+  const itemUnit = Number(item.value?.valor_unitario);
+  if (Number.isFinite(itemUnit) && itemUnit > 0) return itemUnit;
+
+  return null;
 });
 
 const valorTotalRefletido = computed(() => {

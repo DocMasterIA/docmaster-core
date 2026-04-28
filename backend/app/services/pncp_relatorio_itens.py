@@ -141,6 +141,24 @@ def _pick_source(src: Dict[str, Any], *keys: str, default: str = "—") -> str:
     return default
 
 
+def _iter_source_pairs(obj: Any, prefix: str = ""):
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            key = str(k or "")
+            path = f"{prefix}.{key}" if prefix else key
+            yield path, key, v
+            yield from _iter_source_pairs(v, path)
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            path = f"{prefix}[{i}]"
+            yield from _iter_source_pairs(v, path)
+
+
+def _looks_orgao_context(path: str) -> bool:
+    p = (path or "").lower()
+    return any(x in p for x in ("orgaoentidade", "orgao_entidade", "orgao", "unidadeorgao", "unidade_orgao"))
+
+
 def _pick_supplier_name_from_source(src: Dict[str, Any]) -> str:
     nome = _pick_source(
         src,
@@ -152,6 +170,17 @@ def _pick_supplier_name_from_source(src: Dict[str, Any]) -> str:
         "fornecedor_nome",
         default="",
     ).strip()
+    if nome:
+        return nome
+    # Busca aninhada por chaves de fornecedor, sem cair em contexto de órgão.
+    for path, key, value in _iter_source_pairs(src):
+        if _looks_orgao_context(path):
+            continue
+        k = key.lower()
+        if any(t in k for t in ("fornecedor", "razaosocial", "razao_social", "nomefornecedor", "nome_fornecedor")):
+            s = str(value or "").strip()
+            if s and len(s) > 2:
+                return s
     return nome
 
 
@@ -162,11 +191,22 @@ def _pick_supplier_cnpj_from_source(src: Dict[str, Any]) -> str:
         "cnpjCpfFornecedor",
         "niFornecedor",
         "cnpjFornecedor",
+        "cnpj",
         default="",
     ).strip()
     digits = re.sub(r"\D", "", raw)
     if len(digits) == 14:
         return _normalize_cnpj(digits)
+    # Busca aninhada por CNPJ/NI de fornecedor, excluindo contexto de órgão.
+    for path, key, value in _iter_source_pairs(src):
+        if _looks_orgao_context(path):
+            continue
+        k = key.lower()
+        if not any(t in k for t in ("cnpj", "nifornecedor", "ni_fornecedor", "cnpjcpf", "fornecedor")):
+            continue
+        d = re.sub(r"\D", "", str(value or ""))
+        if len(d) == 14:
+            return _normalize_cnpj(d)
     return ""
 
 
@@ -192,10 +232,8 @@ def fonte_dict_de_item(it: Any, *, tz, supplier_name_by_cnpj: Optional[Dict[str,
     if not isinstance(src, dict):
         src = {}
 
-    tipo = _pick_source(src, "tipo_fonte", "fonte", "origem", "tipoFonte", "tipo")
-    if tipo == "—":
-        np = (getattr(it, "numero_pncp", None) or "").strip()
-        tipo = "PNCP" if np else "Registro importado"
+    # Regra de negócio: no relatório final, a fonte deve ser exibida como PNCP.
+    tipo = "PNCP"
 
     cnpj_fornecedor = _pick_supplier_cnpj_from_source(src)
     fornecedor = _pick_supplier_name_from_source(src)

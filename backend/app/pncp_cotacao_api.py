@@ -129,6 +129,17 @@ _SOURCE_KEEP_KEYS = frozenset(
         "faixa_regional",
         "faixaRegional",
         "similaridade_encontrada",
+        # Campos de fornecedor (para relatório sem confundir com órgão).
+        "fornecedor",
+        "fornecedor_nome",
+        "nome_fornecedor",
+        "razaoSocialFornecedor",
+        "nomeRazaoSocialFornecedor",
+        "cnpj_fornecedor",
+        "cnpjFornecedor",
+        "cnpjCpfFornecedor",
+        "niFornecedor",
+        "cnpj",
     }
 )
 

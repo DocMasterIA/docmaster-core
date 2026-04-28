@@ -1773,12 +1773,35 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         reverse=True,
     )
 
+    def _is_literal_candidate(it: Dict[str, Any]) -> bool:
+        # Literal "de verdade": veio do fluxo estrito e não está marcado como similaridade/fallback.
+        if bool(it.get("match_relaxado")) or bool(it.get("match_agressivo")):
+            return False
+        if bool(it.get("similaridade_encontrada")):
+            return False
+        return float(it.get("literal_match") or 0) >= 12.0
+
+    literal_scored = [x for x in scored if _is_literal_candidate(x)]
+    similar_scored = [x for x in scored if not _is_literal_candidate(x)]
+    pool_mode = "mixed_fallback"
+    if len(literal_scored) >= 3:
+        selection_pool = list(literal_scored)
+        pool_mode = "literal_only"
+    elif len(literal_scored) == 0:
+        selection_pool = list(similar_scored)
+        pool_mode = "similar_only"
+    else:
+        # Regra do cliente: similaridade só complementa quando faltar literal.
+        selection_pool = _merge_unique_items(literal_scored, similar_scored)
+
     top3: List[Dict[str, Any]] = []
     ia_used = False
-    if PNCP_IA_RERANK_ENABLED and scored:
-        limite_candidatos = max(6, min(PNCP_IA_MAX_CANDIDATES, len(scored)))
+    # IA rerank apenas quando não houver risco de substituir literais por similaridade.
+    ia_rerank_allowed = pool_mode in {"literal_only", "similar_only"}
+    if PNCP_IA_RERANK_ENABLED and ia_rerank_allowed and selection_pool:
+        limite_candidatos = max(6, min(PNCP_IA_MAX_CANDIDATES, len(selection_pool)))
         candidatos_ia: List[Dict[str, Any]] = []
-        for idx, base_item in enumerate(scored[:limite_candidatos]):
+        for idx, base_item in enumerate(selection_pool[:limite_candidatos]):
             row = dict(base_item)
             row["_ia_id"] = f"cand-{idx}"
             candidatos_ia.append(row)
@@ -1820,12 +1843,22 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                     reverse=True,
                 )
                 # Regra de negócio: prioriza esfera federal; se faltar, completa com demais esferas.
-                merged = _merge_unique_items(chosen, scored)
+                merged = _merge_unique_items(chosen, selection_pool)
                 top3 = _select_top3_prioritize_federal(merged)[:3]
                 ia_used = True
 
     if not top3:
-        top3 = _select_top3_prioritize_federal(scored)[:3]
+        if pool_mode == "literal_only":
+            top3 = _select_top3_prioritize_federal(literal_scored)[:3]
+        elif pool_mode == "similar_only":
+            top3 = _select_top3_prioritize_federal(similar_scored)[:3]
+        else:
+            base_literal = _select_top3_prioritize_federal(literal_scored)[:3]
+            faltantes = max(0, 3 - len(base_literal))
+            usados = {id(x) for x in base_literal}
+            complemento = [x for x in similar_scored if id(x) not in usados]
+            base_similar = _select_top3_prioritize_federal(complemento)[:faltantes]
+            top3 = base_literal + base_similar
 
     for row in top3:
         apply_item_display_cleanup(row)
@@ -1850,6 +1883,9 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     out_stats["fallback_similaridade_ativo"] = True
     out_stats["fallback_similaridade_usado"] = bool(fallback_relaxado_usado)
     out_stats["fallback_similaridade_agressivo_usado"] = bool(fallback_agressivo_usado)
+    out_stats["literal_encontrados"] = len(literal_scored)
+    out_stats["similaridade_encontrados"] = len(similar_scored)
+    out_stats["modo_selecao_literal_similaridade"] = pool_mode
 
     return {
         "ok": bool(base_items.get("ok", True)),

@@ -232,7 +232,7 @@
                     aria-label="Selecionar todos os itens"
                   />
                 </th>
-                <th rowspan="2" class="cot-sheet-center">#</th>
+                <th rowspan="2" class="cot-sheet-center">Número do Item</th>
                 <th rowspan="2">Nome do Item</th>
                 <th colspan="5" class="cot-sheet-group">Fontes de Preco (Art. 5º)</th>
                 <th rowspan="2" class="cot-sheet-center">Qtd.</th>
@@ -273,7 +273,7 @@
             <tbody>
               <tr v-if="showManualItemEditor" class="cot-sheet-row-add">
                 <td class="cot-sheet-center">+</td>
-                <td class="cot-sheet-center">Número do Item</td>
+                <td class="cot-sheet-center">—</td>
                 <td>
                   <input
                     v-model.trim="manualItem.descricao_item"

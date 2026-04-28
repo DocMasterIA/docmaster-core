@@ -125,6 +125,8 @@ class RelatorioCotacaoContext:
     anexo_fornecedor_url: str
     formula_calculo_id: str
     formula_calculo_label: str
+    orgao_exibicao: str
+    valor_total_estimado_fmt: str
 
 
 def _formatar_moeda_br(v: Any) -> str:
@@ -137,6 +139,25 @@ def _formatar_moeda_br(v: Any) -> str:
     s = f"{n:.2f}"
     inteiro, frac = s.split(".")
     return f"{inteiro},{frac}"
+
+
+def _parse_qtd_br(v: Any) -> float:
+    s = str(v or "").strip()
+    if not s:
+        return 0.0
+    m = re.search(r"\d[\d\.,]*", s)
+    if not m:
+        return 0.0
+    num = m.group(0)
+    if "," in num:
+        num = num.replace(".", "").replace(",", ".")
+    else:
+        num = num.replace(",", "")
+    try:
+        n = float(num)
+        return n if n > 0 else 0.0
+    except Exception:
+        return 0.0
 
 
 def montar_contexto_relatorio(
@@ -167,6 +188,25 @@ def montar_contexto_relatorio(
     criado_por = snap_nome or (u.get_full_name() or "").strip() or getattr(u, "email", "") or str(u.pk)
     snap_email = (getattr(cotacao, "criado_por_email", None) or "").strip()
     criado_email = snap_email or (getattr(u, "email", None) or "").strip()
+    orgao_exibicao = "—"
+    for g in grupos:
+        fontes = g.get("fontes") or []
+        if fontes:
+            org = str((fontes[0] or {}).get("orgao") or "").strip()
+            if org:
+                orgao_exibicao = org
+                break
+    valor_total_estimado = 0.0
+    for g in grupos:
+        qtd = _parse_qtd_br(g.get("quantidade_fmt"))
+        try:
+            media = float(g.get("media_valor")) if g.get("media_valor") is not None else 0.0
+        except (TypeError, ValueError):
+            media = 0.0
+        total_item = (qtd * media) if (qtd > 0 and media > 0) else 0.0
+        g["valor_total_item"] = total_item
+        g["valor_total_item_fmt"] = f"R$ {_formatar_moeda_br(total_item)}"
+        valor_total_estimado += total_item
 
     return RelatorioCotacaoContext(
         titulo_relatorio=(titulo_relatorio or "").strip()[:500],
@@ -185,6 +225,8 @@ def montar_contexto_relatorio(
         anexo_fornecedor_url=(anexo_fornecedor_url or "").strip(),
         formula_calculo_id=formula_id,
         formula_calculo_label=FORMULA_LABELS.get(formula_id, FORMULA_LABELS["media_aritmetica_precos_obtidos"]),
+        orgao_exibicao=orgao_exibicao,
+        valor_total_estimado_fmt=f"R$ {_formatar_moeda_br(valor_total_estimado)}",
     )
 
 
@@ -224,33 +266,25 @@ _HTML_TEMPLATE = _ENV.from_string(
     </header>
 
     <div class="rpp-meta-grid">
-      <div class="rpp-card rpp-card--accent">
-        <span class="rpp-card__label">Cotação (título interno)</span>
-        <span class="rpp-card__value">{{ ctx.titulo_cotacao }}</span>
+      <div class="rpp-card">
+        <span class="rpp-card__label">Órgão</span>
+        <span class="rpp-card__value">{{ ctx.orgao_exibicao }}</span>
+      </div>
+      <div class="rpp-card">
+        <span class="rpp-card__label">Responsável</span>
+        <span class="rpp-card__value">{{ ctx.criado_por }}</span>
       </div>
       <div class="rpp-card">
         <span class="rpp-card__label">Data da pesquisa</span>
         <span class="rpp-card__value">{{ ctx.data_pesquisa_exibicao }}</span>
       </div>
       <div class="rpp-card">
-        <span class="rpp-card__label">Emitido em</span>
-        <span class="rpp-card__value">{{ ctx.emitido_em_exibicao }}</span>
+        <span class="rpp-card__label">Método aplicado</span>
+        <span class="rpp-card__value">{{ ctx.formula_calculo_label }}</span>
       </div>
-      <div class="rpp-card">
-        <span class="rpp-card__label">Responsável</span>
-        <span class="rpp-card__value">{{ ctx.criado_por }}{% if ctx.criado_por_email %}<span class="rpp-card__value--muted"> — {{ ctx.criado_por_email }}</span>{% endif %}</span>
-      </div>
-      <div class="rpp-card">
-        <span class="rpp-card__label">Termo PNCP</span>
-        <span class="rpp-card__value">{{ ctx.termo_pncp }}</span>
-      </div>
-      <div class="rpp-card">
-        <span class="rpp-card__label">Itens (grupos)</span>
-        <span class="rpp-card__value">{{ ctx.total_itens }}</span>
-      </div>
-      <div class="rpp-card">
-        <span class="rpp-card__label">Cotações registradas</span>
-        <span class="rpp-card__value">{{ ctx.total_linhas_cotacao }}</span>
+      <div class="rpp-card rpp-card--accent">
+        <span class="rpp-card__label">Valor total estimado</span>
+        <span class="rpp-card__value">{{ ctx.valor_total_estimado_fmt }}</span>
       </div>
     </div>
 
@@ -334,7 +368,7 @@ _HTML_TEMPLATE = _ENV.from_string(
 
     <section class="rpp-block">
       <h2 class="rpp-section-title">Resultado consolidado</h2>
-      <p class="rpp-section-lead">Resumo dos itens com valor calculado por {{ ctx.formula_calculo_label|lower }} e situação da pesquisa (mínimo de 3 fontes por item para «Válido»).</p>
+      <p class="rpp-section-lead">Resumo dos itens com média definida e situação da pesquisa.</p>
       <div class="rpp-table-wrap">
         <table class="rpp-table rpp-table--consolidado">
           <thead>
@@ -342,9 +376,9 @@ _HTML_TEMPLATE = _ENV.from_string(
               <th>Item</th>
               <th>Descrição</th>
               <th>Quantidade</th>
-              <th>Cotações</th>
-              <th>Valor calculado</th>
-              <th>Situação</th>
+              <th>Cotações válidas</th>
+              <th>Média</th>
+              <th>Valor total</th>
             </tr>
           </thead>
           <tbody>
@@ -355,7 +389,7 @@ _HTML_TEMPLATE = _ENV.from_string(
               <td>{{ g.quantidade_fmt }} {{ g.unidade }}</td>
               <td>{{ g.n_cotacoes }}</td>
               <td>{{ g.media_fmt }}</td>
-              <td>{{ g.situacao }}</td>
+              <td>{{ g.valor_total_item_fmt }}</td>
             </tr>
             {% else %}
             <tr>
@@ -448,17 +482,6 @@ _HTML_TEMPLATE = _ENV.from_string(
       {% endif %}
     </section>
 
-    <section class="rpp-block">
-      <h2 class="rpp-section-title">Anexo do fornecedor</h2>
-      {% if ctx.anexo_fornecedor_url %}
-      <p>
-        Arquivo PDF anexado:
-        <a href="{{ ctx.anexo_fornecedor_url }}">{{ ctx.anexo_fornecedor_url }}</a>
-      </p>
-      {% else %}
-      <p class="rpp-cnpj-empty">Nenhum PDF de fornecedor anexado para esta cotação.</p>
-      {% endif %}
-    </section>
   </div>
 </body>
 </html>

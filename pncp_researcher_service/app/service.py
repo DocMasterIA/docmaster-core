@@ -1142,6 +1142,8 @@ def _is_similaridade_encontrada(item: Dict[str, Any]) -> bool:
     Marca match por similaridade quando a aderência semântica é boa,
     mas o encaixe literal com o termo buscado é baixo.
     """
+    if bool(item.get("partial_anchor_match")):
+        return True
     literal = _safe_float(item.get("literal_match"))
     aprov = _safe_float(item.get("score_aprovacao"))
     sem_raw = _safe_float(item.get("score_relevancia"))
@@ -1183,6 +1185,54 @@ def _has_core_token_overlap(item: Dict[str, Any], query_groups: List[List[str]],
             hits += 1
     required = max(1, min(min_hits, len(q_tokens)))
     return hits >= required
+
+
+def _is_spec_token(tok: str) -> bool:
+    t = str(tok or "").strip().lower()
+    if not t:
+        return False
+    # Ex.: 250ml, 500mg, 1l, 2kg, 10cm, 20mm, 30un, 50cp, 100ui.
+    return bool(
+        re.search(r"\d", t)
+        and re.search(r"(ml|mg|g|kg|l|lt|mcg|ui|mm|cm|m|un|und|cp|caps|comprim|amp|fr)$", t)
+    )
+
+
+def _has_partial_anchor_match(item: Dict[str, Any], query_groups: List[List[str]]) -> bool:
+    """
+    Similaridade parcial literal:
+    - exige 1 token textual forte do núcleo (ex.: "remedio"/nome principal)
+    - e 1 token de especificação/presentação (ex.: "250ml", "500mg")
+    """
+    q_tokens = [t for t in _query_phrase_tokens(query_groups) if t]
+    if not q_tokens:
+        q_tokens = sorted(_query_tokens(query_groups))
+    if not q_tokens:
+        return False
+
+    text = _normalize_text(f"{item.get('descricao_item') or ''} {item.get('material_servico') or ''}")
+    words = [w for w in text.split() if w]
+    if not words:
+        return False
+
+    spec_tokens = [t for t in q_tokens if _is_spec_token(t)]
+    core_tokens = [t for t in q_tokens if not re.search(r"\d", t) and len(t) >= 4]
+    if not core_tokens:
+        core_tokens = [t for t in q_tokens if len(t) >= 3]
+
+    core_hit = any(any(_word_like_match(w, tok) for w in words) for tok in core_tokens)
+    if not core_hit:
+        return False
+
+    if spec_tokens:
+        return any(any(_word_like_match(w, tok) for w in words) for tok in spec_tokens)
+
+    # Sem token de especificação: exige pelo menos 2 tokens do núcleo.
+    core_hits = 0
+    for tok in core_tokens:
+        if any(_word_like_match(w, tok) for w in words):
+            core_hits += 1
+    return core_hits >= min(2, len(core_tokens))
 
 
 def _aggressive_similarity_score(termo_busca: str, item: Dict[str, Any]) -> float:
@@ -1587,17 +1637,19 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         for it in candidates:
             relaxed = mode != "strict"
             aggressive = mode == "aggressive"
+            partial_anchor = _has_partial_anchor_match(it, query_groups)
             if not relaxed and not _is_strict_candidate_match(it, query_groups):
                 continue
             if mode == "relaxed" and not _has_core_token_overlap(it, query_groups, min_hits=2):
-                continue
+                if not partial_anchor:
+                    continue
             if aggressive and not _has_core_token_overlap(it, query_groups, min_hits=1):
                 sim = _aggressive_similarity_score(payload.termo_busca, it)
-                if sim < 0.62:
+                if sim < 0.62 and not partial_anchor:
                     continue
             elif aggressive:
                 sim = _aggressive_similarity_score(payload.termo_busca, it)
-                if sim < 0.50:
+                if sim < 0.50 and not partial_anchor:
                     continue
             if aggressive:
                 # Mesmo agressivo: impede itens muito desconexos.
@@ -1613,6 +1665,9 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             texto_item = f"{it.get('descricao_item') or ''} {it.get('material_servico') or ''}".strip()
             sem_raw = _compute_match_score(texto_item, query_groups) if query_groups else 0.0
             sem = min(55.0, (min(sem_raw, 3.0) / 3.0) * 55.0) if sem_raw > 0 else 0.0
+            if sem <= 0 and partial_anchor:
+                # Permite "match parcial literal" (núcleo + apresentação), mesmo sem frase completa.
+                sem = 18.0
             if sem <= 0:
                 continue
             literal_match = round(_literal_match_score(payload.termo_busca, it), 3)
@@ -1620,9 +1675,11 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             if not relaxed and literal_match < 12:
                 continue
             if mode == "relaxed" and literal_match < 6:
-                continue
+                if not partial_anchor:
+                    continue
             if aggressive and literal_match < 2:
-                continue
+                if not partial_anchor:
+                    continue
             tbl = 8.0
             rec = _score_recency(it)
             coh = _score_value_coherence(it, median_val)
@@ -1665,7 +1722,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             it2["confiabilidade"] = _classify_confiabilidade(score_0_100)
             it2["risco"] = _classify_risco(score_0_100)
             it2["status"] = "Aprovado" if score_0_100 >= 55 else "Revisar"
-            it2["similaridade_encontrada"] = _is_similaridade_encontrada(it2) or relaxed
+            it2["partial_anchor_match"] = bool(partial_anchor)
+            it2["similaridade_encontrada"] = _is_similaridade_encontrada(it2) or relaxed or partial_anchor
             if relaxed:
                 it2["match_relaxado"] = True
             if aggressive:

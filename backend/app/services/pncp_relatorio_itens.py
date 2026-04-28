@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import math
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
 from django.utils import timezone
@@ -84,18 +84,35 @@ def _fmt_quantidade(q: Any) -> str:
     return f"{f:.2f}".replace(".", ",")
 
 
-def _valor_numerico_item(it: Any) -> Optional[float]:
-    for attr in ("valor_total", "valor_unitario"):
-        v = getattr(it, attr, None)
-        if v is None:
+def _valor_numerico_item(it: Any, *, quantidade_base: Optional[float] = None) -> Optional[float]:
+    vt = getattr(it, "valor_total", None)
+    if vt is not None:
+        try:
+            fvt = float(vt)
+        except (TypeError, ValueError):
+            fvt = None
+        if fvt is not None and not (math.isnan(fvt) or math.isinf(fvt)):
+            return fvt
+
+    vu = getattr(it, "valor_unitario", None)
+    try:
+        fvu = float(vu)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(fvu) or math.isinf(fvu):
+        return None
+
+    q_candidates: List[Any] = [quantidade_base, getattr(it, "quantidade", None)]
+    for q in q_candidates:
+        if q is None:
             continue
         try:
-            f = float(v)
+            fq = float(q)
         except (TypeError, ValueError):
             continue
-        if math.isnan(f) or math.isinf(f):
+        if math.isnan(fq) or math.isinf(fq) or fq <= 0:
             continue
-        return f
+        return fvu * fq
     return None
 
 
@@ -297,7 +314,15 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
         nome = (getattr(it, "descricao_item", None) or "—")[:500]
         und = (getattr(it, "unidade_medida", None) or "").strip()[:64]
 
-        vals = [v for v in (_valor_numerico_item(x) for x in members) if v is not None]
+        qtd_item = getattr(it, "quantidade", None)
+        try:
+            qtd_item_f = float(qtd_item) if qtd_item is not None else None
+            if qtd_item_f is not None and (math.isnan(qtd_item_f) or math.isinf(qtd_item_f) or qtd_item_f <= 0):
+                qtd_item_f = None
+        except (TypeError, ValueError):
+            qtd_item_f = None
+
+        vals = [v for v in (_valor_numerico_item(x, quantidade_base=qtd_item_f) for x in members) if v is not None]
         valor_calc = _valor_formula_em_lista(vals, formula_id)
         valor_fmt = f"R$ {_formatar_moeda_br(valor_calc)}" if valor_calc is not None else "—"
 
@@ -314,7 +339,12 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
                 continue
             quantidades.append(fq)
 
-        qtd_refletida: Any = sum(quantidades) if quantidades else getattr(it, "quantidade", None)
+        if qtd_item_f is not None and qtd_item_f > 0:
+            qtd_refletida: Any = qtd_item_f
+        elif quantidades:
+            qtd_refletida = Counter(quantidades).most_common(1)[0][0]
+        else:
+            qtd_refletida = getattr(it, "quantidade", None)
         q_fmt = _fmt_quantidade(qtd_refletida)
         if not und:
             und = ((getattr(members[0], "unidade_medida", None) if members else None) or "—")[:64]

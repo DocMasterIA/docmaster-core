@@ -282,8 +282,23 @@
                     placeholder="Nome/descrição do item"
                   />
                 </td>
-                <td class="cot-sheet-center">—</td>
-                <td class="cot-sheet-center">—</td>
+                <td class="cot-sheet-center">
+                  <input
+                    v-model.trim="manualItem.quantidade"
+                    type="text"
+                    inputmode="decimal"
+                    class="cot-sheet-inline-input"
+                    placeholder="Qtd."
+                  />
+                </td>
+                <td class="cot-sheet-center">
+                  <input
+                    v-model.trim="manualItem.unidade_medida"
+                    type="text"
+                    class="cot-sheet-inline-input"
+                    placeholder="Unidade (ex.: UN, CX, KG)"
+                  />
+                </td>
                 <td class="cot-sheet-center">—</td>
                 <td class="cot-sheet-center">—</td>
                 <td class="cot-sheet-center">—</td>
@@ -586,6 +601,8 @@ const isAddingManualItem = ref(false);
 const showManualItemEditor = ref(false);
 const manualItem = ref({
   descricao_item: '',
+  quantidade: '',
+  unidade_medida: '',
   valor_base: '',
   variacao_percentual: '',
 });
@@ -847,6 +864,17 @@ async function addManualItem() {
     loadError.value = 'Informe a descrição do item manual.';
     return;
   }
+  const unidadeMedida = String(manualItem.value.unidade_medida || '').trim().toUpperCase();
+  if (!unidadeMedida) {
+    loadError.value = 'Informe a unidade do item manual (definida pelo usuário).';
+    return;
+  }
+  const quantidadeTexto = String(manualItem.value.quantidade || '').trim().replace(',', '.');
+  const quantidade = quantidadeTexto ? Number(quantidadeTexto) : null;
+  if (quantidadeTexto && (!Number.isFinite(quantidade) || quantidade <= 0)) {
+    loadError.value = 'Quantidade inválida. Use um número maior que zero.';
+    return;
+  }
   const valorBase = parseCurrencyInputToNumber(manualItem.value.valor_base);
   const variacao = parsePercentInputToNumber(manualItem.value.variacao_percentual);
 
@@ -856,6 +884,8 @@ async function addManualItem() {
     await addItemsToResearchSession(sessionId, [
       {
         descricao_item: descricao,
+        quantidade: Number.isFinite(quantidade) ? quantidade : null,
+        unidade_medida: unidadeMedida,
         valor_base: Number.isFinite(valorBase) ? valorBase : null,
         variacao_percentual: Number.isFinite(variacao) ? variacao : null,
         faixa_regional: {
@@ -863,11 +893,14 @@ async function addManualItem() {
           variacao_percentual: Number.isFinite(variacao) ? variacao : null,
         },
         origem: 'item_manual_cotacao',
+        unidade_definida_usuario: true,
       },
     ]);
     await loadSessionFromBackend();
     manualItem.value = {
       descricao_item: '',
+      quantidade: '',
+      unidade_medida: '',
       valor_base: '',
       variacao_percentual: '',
     };

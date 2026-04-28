@@ -12,7 +12,7 @@ import re
 import csv
 import io
 import unicodedata
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import timezone as dt_timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -782,6 +782,14 @@ def _itens_refletidos_for_session(sessao_id: int, formula_id: str) -> Dict[int, 
         return s.upper()
 
     out: Dict[int, Dict[str, Any]] = {}
+    quantidade_item_map: Dict[int, Optional[float]] = {}
+    for it in (
+        PncpCotacaoItem.objects.filter(cotacao_id=sessao_id)
+        .values("id", "quantidade")
+    ):
+        q_item = _safe_float(it.get("quantidade"))
+        quantidade_item_map[int(it.get("id"))] = q_item if q_item is not None and q_item > 0 else None
+
     rows = PncpCotacaoItemCotacao.objects.filter(cotacao_id=sessao_id).values(
         "item_id",
         "quantidade",
@@ -812,17 +820,26 @@ def _itens_refletidos_for_session(sessao_id: int, formula_id: str) -> Dict[int, 
         # 1) usa valor_total quando disponível;
         # 2) fallback para valor_unitario * quantidade.
         val = None
+        q_item = quantidade_item_map.get(item_id)
+        q_base = q_item if q_item is not None and q_item > 0 else q
         if vt is not None and vt > 0:
             val = vt
-        elif vu is not None and vu > 0 and q is not None and q > 0:
-            val = vu * q
+        elif vu is not None and vu > 0 and q_base is not None and q_base > 0:
+            # Mantém comparabilidade entre cotações usando a quantidade do item quando disponível.
+            val = vu * q_base
         if val is not None:
             b["valores"].append(val)
 
     for item_id, b in bucket.items():
         quantidades = [float(v) for v in b["quantidades"] if isinstance(v, (int, float)) and v > 0]
-        # Qtd TOTAL deve refletir o conjunto somado das cotações adicionadas.
-        qtd_refletida = (sum(quantidades) if quantidades else None)
+        qtd_item = quantidade_item_map.get(item_id)
+        if qtd_item is not None and qtd_item > 0:
+            qtd_refletida = qtd_item
+        elif quantidades:
+            # Evita inflar quantidade ao repetir a mesma qtd em múltiplas cotações.
+            qtd_refletida = Counter(quantidades).most_common(1)[0][0]
+        else:
+            qtd_refletida = None
         valores = [float(v) for v in b["valores"] if isinstance(v, (int, float))]
         valor_formula = _valor_formula_em_lista(valores, formula_id)
         out[item_id] = {
@@ -1152,6 +1169,17 @@ def pncp_research_sessions_add_items(request, sessao_id: int):
                 {"detail": "Cada item deve ser um objeto JSON.", "index": idx},
                 status=422,
             )
+        origem = str(it.get("origem") or "").strip().lower()
+        if origem == "item_manual_cotacao":
+            unidade = str(it.get("unidade_medida") or it.get("unidadeMedida") or "").strip()
+            if not unidade:
+                return JsonResponse(
+                    {
+                        "detail": "Item manual exige unidade_medida definida pelo usuário.",
+                        "index": idx,
+                    },
+                    status=422,
+                )
         id_err = _item_identity_error(it)
         if id_err:
             return JsonResponse({"detail": id_err, "index": idx}, status=422)

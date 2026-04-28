@@ -163,9 +163,9 @@ const faixaVariacaoFmt = computed(() => {
 });
 
 const quantidadeRefletida = computed(() => {
+  if (Number.isFinite(Number(item.value?.quantidade))) return Number(item.value.quantidade);
   const first = itemCotacoes.value.find((x) => Number.isFinite(Number(x?.quantidade)));
   if (first) return Number(first.quantidade);
-  if (Number.isFinite(Number(item.value?.quantidade))) return Number(item.value.quantidade);
   return null;
 });
 
@@ -188,7 +188,9 @@ const valorTotalRefletido = computed(() => {
 
   const derivados = rows
     .map((x) => {
-      const qtd = Number(x?.quantidade);
+      const qtd = Number.isFinite(Number(item.value?.quantidade))
+        ? Number(item.value.quantidade)
+        : Number(x?.quantidade);
       const unit = Number(x?.valor_unitario);
       if (!Number.isFinite(qtd) || qtd < 0 || !Number.isFinite(unit) || unit < 0) return null;
       return qtd * unit;

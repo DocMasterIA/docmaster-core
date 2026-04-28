@@ -735,6 +735,12 @@ onMounted(async () => {
             return Number.isFinite(Number(src?.valor_base ?? src?.valorBase ?? src?.preco_base ?? src?.precoBase))
               || Number.isFinite(Number(src?.variacao_percentual ?? src?.variacaoPercentual ?? src?.variacao));
           });
+      if (itemId.value && target) {
+        const descricaoItem = String(target?.descricao_item || '').trim();
+        if (descricaoItem) {
+          filtros.descricao = descricaoItem;
+        }
+      }
       applyFaixaDefaultsFromItem(target || null);
     } catch (_) {
       // Faixa padrão é opcional; mantém valores existentes se falhar.

@@ -273,7 +273,7 @@
             <tbody>
               <tr v-if="showManualItemEditor" class="cot-sheet-row-add">
                 <td class="cot-sheet-center">+</td>
-                <td class="cot-sheet-center">—</td>
+                <td class="cot-sheet-center">Número do Item</td>
                 <td>
                   <input
                     v-model.trim="manualItem.descricao_item"

@@ -214,6 +214,9 @@ _HTML_TEMPLATE = _ENV.from_string(
         <p class="rpp-kicker">Relatório institucional</p>
         <h1 class="rpp-title">{{ ctx.titulo_relatorio }}</h1>
         <p class="rpp-subtitle">Pesquisa de preços (PNCP)</p>
+        <p class="rpp-subtitle rpp-subtitle--detail">
+          Documento técnico consolidado com metodologia, rastreabilidade das cotações e conclusão para suporte à contratação.
+        </p>
       </div>
       <div class="rpp-head-main__col rpp-head-main__col--qr">
         <img class="rpp-head-main__qr" src="{{ ctx.qr_data_url }}" alt="" />
@@ -287,6 +290,20 @@ _HTML_TEMPLATE = _ENV.from_string(
             </tr>
           </tbody>
         </table>
+        <div class="rpp-mini-metrics">
+          <div class="rpp-mini-metric">
+            <span class="rpp-mini-metric__label">Critério</span>
+            <strong class="rpp-mini-metric__value">Compatibilidade</strong>
+          </div>
+          <div class="rpp-mini-metric">
+            <span class="rpp-mini-metric__label">Recência</span>
+            <strong class="rpp-mini-metric__value">Até 12 meses</strong>
+          </div>
+          <div class="rpp-mini-metric">
+            <span class="rpp-mini-metric__label">Rastreabilidade</span>
+            <strong class="rpp-mini-metric__value">CNPJ, fonte e data</strong>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -296,6 +313,22 @@ _HTML_TEMPLATE = _ENV.from_string(
         Com base nas cotações obtidas, na metodologia aplicada e na análise técnica dos dados, conclui-se que os valores
         estimados refletem adequadamente os preços praticados no mercado, estando aptos a subsidiar a contratação pública
         pretendida, com observância aos princípios da economicidade, razoabilidade e eficiência.
+      </p>
+    </section>
+
+    <section class="rpp-block">
+      <h2 class="rpp-section-title">Responsabilidade sobre as informações</h2>
+      <p class="rpp-conclusao">
+        A plataforma disponibiliza um ambiente digital de apoio à pesquisa de preços, consolidando informações
+        de bases públicas e registros de mercado para auxiliar a formação de referência.
+      </p>
+      <p class="rpp-conclusao">
+        Compete exclusivamente ao servidor público responsável a análise crítica, validação, seleção e utilização
+        dos preços, em conformidade com a Lei nº 14.133/2021 e normativos aplicáveis.
+      </p>
+      <p class="rpp-conclusao">
+        Assim, a plataforma atua como ferramenta de apoio à decisão, não substituindo o dever de diligência e
+        responsabilidade técnica do agente público.
       </p>
     </section>
 
@@ -396,13 +429,20 @@ _HTML_TEMPLATE = _ENV.from_string(
     </section>
 
     <section class="rpp-block">
-      <h2 class="rpp-section-title">CNPJ identificados nas fontes (quando disponíveis)</h2>
+      <h2 class="rpp-section-title">Informações dos fornecedores</h2>
+      <p class="rpp-section-lead">Dados cadastrais identificados nas fontes da pesquisa</p>
       {% if ctx.cnpjs_fontes %}
-      <ul class="rpp-cnpj-list">
+      <div class="rpp-fornecedores-grid">
         {% for c in ctx.cnpjs_fontes %}
-        <li>{{ c }}</li>
+        <div class="rpp-fornecedor-card">
+          <div class="rpp-fornecedor-card__title">Fornecedor {{ loop.index }}</div>
+          <div class="rpp-fornecedor-card__line"><strong>CNPJ:</strong> {{ c }}</div>
+          <div class="rpp-fornecedor-card__line"><strong>Telefone:</strong> Não informado</div>
+          <div class="rpp-fornecedor-card__line"><strong>Email:</strong> Não informado</div>
+          <div class="rpp-fornecedor-card__line"><strong>Endereço:</strong> Não informado</div>
+        </div>
         {% endfor %}
-      </ul>
+      </div>
       {% else %}
       <p class="rpp-cnpj-empty">Nenhum CNPJ estruturado foi localizado nos metadados salvos dos itens.</p>
       {% endif %}

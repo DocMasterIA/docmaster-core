@@ -41,14 +41,6 @@
       <section class="cot-head">
         <div class="cot-head__summary">
           <div class="cot-card">
-            <span class="cot-card__label">Modelo</span>
-            <strong>{{ sessaoModeloLabel }}</strong>
-          </div>
-          <div class="cot-card">
-            <span class="cot-card__label">Termo PNCP</span>
-            <strong class="cot-card__truncate" :title="sessaoTermoBusca">{{ sessaoTermoBusca }}</strong>
-          </div>
-          <div class="cot-card">
             <span class="cot-card__label">Criado por</span>
             <strong>{{ sessaoCriadoPor }}</strong>
             <span v-if="sessaoCriadoPorEmail" class="cot-card__email">{{ sessaoCriadoPorEmail }}</span>
@@ -417,7 +409,12 @@
                   </div>
                 </td>
                 <td class="cot-sheet-center">
-                  <span class="cot-sheet-status">{{ linha.status }}</span>
+                  <span
+                    class="cot-sheet-status"
+                    :class="linha.status === 'Completo' ? 'cot-sheet-status--completo' : 'cot-sheet-status--incompleto'"
+                  >
+                    {{ linha.status }}
+                  </span>
                 </td>
                 <td>
                   <div class="cot-sheet-actions">
@@ -548,18 +545,11 @@ const sessionBackendId = computed(() => {
   return Number.isFinite(n) ? n : null;
 });
 
-const MODELO_COTACAO_LABELS = {
-  pesquisa_precos_padrao: 'Pesquisa de preços (padrão)',
-  referencia_mercado: 'Referência de mercado',
-};
-
 const linhasMock = ref([]);
 const searchTerm = ref('');
 
 const selectedIds = ref(new Set());
 const tituloCotacao = ref('');
-const sessaoModeloLabel = ref('—');
-const sessaoTermoBusca = ref('—');
 const sessaoCreatedAt = ref('—');
 const sessaoCriadoPor = ref('—');
 const sessaoCriadoPorEmail = ref('');
@@ -1101,9 +1091,6 @@ async function loadSessionFromBackend() {
     if (data?.ok && data.sessao) {
       const s = data.sessao;
       tituloCotacao.value = s.titulo || `Cotação ${cotacaoId.value}`;
-      const mk = s.modelo_cotacao || 'pesquisa_precos_padrao';
-      sessaoModeloLabel.value = MODELO_COTACAO_LABELS[mk] || mk;
-      sessaoTermoBusca.value = s.termo_busca || '—';
       sessaoCreatedAt.value = formatDateTimePt(s.created_at);
       sessaoCriadoPor.value = s.criado_por || '—';
       sessaoCriadoPorEmail.value = (s.criado_por_email || '').trim();
@@ -1337,16 +1324,6 @@ async function saveTituloNoBackend() {
   color: var(--color-text-soft);
   word-break: break-all;
 }
-.cot-card__truncate {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  word-break: break-word;
-  font-weight: 600;
-}
-
 .cot-title-editor {
   border: 1px solid #d6dde8;
   border-radius: 10px;
@@ -1682,13 +1659,22 @@ async function saveTituloNoBackend() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #b7d2ef;
-  background: #e8f1ff;
-  color: #1f4e79;
   border-radius: 999px;
   padding: 2px 8px;
   font-size: 10px;
   white-space: nowrap;
+}
+
+.cot-sheet-status--completo {
+  border: 1px solid #b7d2ef;
+  background: #e8f1ff;
+  color: #1f4e79;
+}
+
+.cot-sheet-status--incompleto {
+  border: 1px solid #f3c1c1;
+  background: #fff1f1;
+  color: #b42323;
 }
 
 .cot-faixa-block {

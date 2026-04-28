@@ -1148,6 +1148,42 @@ def _is_similaridade_encontrada(item: Dict[str, Any]) -> bool:
     return bool(sem_raw > 0 and aprov >= 60 and literal < 45)
 
 
+def _word_like_match(word: str, token: str) -> bool:
+    if not word or not token:
+        return False
+    if word == token:
+        return True
+    if len(token) >= 4 and word.startswith(token):
+        return True
+    if len(word) >= 4 and token.startswith(word[:4]):
+        return True
+    return False
+
+
+def _has_core_token_overlap(item: Dict[str, Any], query_groups: List[List[str]], min_hits: int = 2) -> bool:
+    """
+    Fallback semântico: exige pelo menos sobreposição mínima de tokens centrais
+    para evitar matches genéricos demais.
+    """
+    q_tokens = [t for t in _query_phrase_tokens(query_groups) if t]
+    if not q_tokens:
+        q_tokens = sorted(_query_tokens(query_groups))
+    if not q_tokens:
+        return False
+    text = _normalize_text(
+        f"{item.get('descricao_item') or ''} {item.get('material_servico') or ''}"
+    )
+    words = [w for w in text.split() if w]
+    if not words:
+        return False
+    hits = 0
+    for tok in q_tokens:
+        if any(_word_like_match(w, tok) for w in words):
+            hits += 1
+    required = max(1, min(min_hits, len(q_tokens)))
+    return hits >= required
+
+
 def _select_top3_with_diversity(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     selected: List[Dict[str, Any]] = []
     used_org: set[str] = set()
@@ -1520,63 +1556,84 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     ]
     median_val = median(valores) if valores else None
 
-    scored: List[Dict[str, Any]] = []
-    # Primeiro passa: filtra obviamente ruins (sem texto/valor) e calcula scores.
-    for it in itens:
-        if not _is_strict_candidate_match(it, query_groups):
-            continue
-        texto_item = f"{it.get('descricao_item') or ''} {it.get('material_servico') or ''}".strip()
-        sem_raw = _compute_match_score(texto_item, query_groups) if query_groups else 0.0
-        sem = min(55.0, (min(sem_raw, 3.0) / 3.0) * 55.0) if sem_raw > 0 else 0.0
-        if sem <= 0:
-            # Nem bate semanticamente com o termo principal.
-            continue
-        literal_match = round(_literal_match_score(payload.termo_busca, it), 3)
-        tbl = 8.0  # neutro (sem tabela de itens aqui).
-        rec = _score_recency(it)
-        coh = _score_value_coherence(it, median_val)
-        clar = _score_clarity_and_unit(it, query_groups)
-        pen = _context_penalty(it, query_groups)
-        ref_fit = 0.0
-        row_unit = _normalize_unit(it.get("unidade_medida"))
-        if ref_unit and row_unit:
-            ref_fit += 6.0 if ref_unit == row_unit else -4.0
-        row_qty = _safe_float(it.get("quantidade"))
-        if ref_qty > 0 and row_qty > 0:
-            q_dev = abs(row_qty - ref_qty) / max(ref_qty, 1e-9)
-            if q_dev <= 0.2:
-                ref_fit += 5.0
-            elif q_dev <= 0.5:
-                ref_fit += 2.0
-            else:
-                ref_fit -= 2.0
-        row_value = _safe_float(it.get("valor_unitario") or it.get("valor_total") or it.get("valor_global"))
-        if faixa_min is not None and faixa_max is not None:
-            if row_value <= 0:
+    def _score_candidates(candidates: List[Dict[str, Any]], *, relaxed: bool) -> List[Dict[str, Any]]:
+        out_rows: List[Dict[str, Any]] = []
+        for it in candidates:
+            if not relaxed and not _is_strict_candidate_match(it, query_groups):
                 continue
-            if row_value < faixa_min or row_value > faixa_max:
-                # Filtro obrigatório da Faixa Regional do Item.
+            if relaxed and not _has_core_token_overlap(it, query_groups, min_hits=2):
                 continue
-        if ref_value > 0 and row_value > 0:
-            v_dev = abs(row_value - ref_value) / max(ref_value, 1e-9)
-            if v_dev <= 0.25:
-                ref_fit += 6.0
-            elif v_dev <= 0.5:
-                ref_fit += 3.0
-            else:
-                ref_fit -= 2.0
-        raw_score = sem + tbl + rec + coh + clar + pen + ref_fit
-        score_0_100 = max(0, min(100, round(raw_score)))
-        it2 = dict(it)
-        it2["score_bruto"] = round(raw_score, 3)
-        it2["score_ref_fit"] = round(ref_fit, 3)
-        it2["literal_match"] = literal_match
-        it2["score_aprovacao"] = score_0_100
-        it2["confiabilidade"] = _classify_confiabilidade(score_0_100)
-        it2["risco"] = _classify_risco(score_0_100)
-        it2["status"] = "Aprovado" if score_0_100 >= 55 else "Revisar"
-        it2["similaridade_encontrada"] = _is_similaridade_encontrada(it2)
-        scored.append(it2)
+            # Contexto totalmente incompatível continua bloqueado mesmo em fallback.
+            pen_probe = _context_penalty(it, query_groups)
+            if pen_probe <= -20.0:
+                continue
+
+            texto_item = f"{it.get('descricao_item') or ''} {it.get('material_servico') or ''}".strip()
+            sem_raw = _compute_match_score(texto_item, query_groups) if query_groups else 0.0
+            sem = min(55.0, (min(sem_raw, 3.0) / 3.0) * 55.0) if sem_raw > 0 else 0.0
+            if sem <= 0:
+                continue
+            literal_match = round(_literal_match_score(payload.termo_busca, it), 3)
+            # No fallback semântico, aceita variação literal mais ampla.
+            if not relaxed and literal_match < 12:
+                continue
+            if relaxed and literal_match < 6:
+                continue
+            tbl = 8.0
+            rec = _score_recency(it)
+            coh = _score_value_coherence(it, median_val)
+            clar = _score_clarity_and_unit(it, query_groups)
+            pen = pen_probe
+            ref_fit = 0.0
+            row_unit = _normalize_unit(it.get("unidade_medida"))
+            if ref_unit and row_unit:
+                ref_fit += 6.0 if ref_unit == row_unit else -4.0
+            row_qty = _safe_float(it.get("quantidade"))
+            if ref_qty > 0 and row_qty > 0:
+                q_dev = abs(row_qty - ref_qty) / max(ref_qty, 1e-9)
+                if q_dev <= 0.2:
+                    ref_fit += 5.0
+                elif q_dev <= 0.5:
+                    ref_fit += 2.0
+                else:
+                    ref_fit -= 2.0
+            row_value = _safe_float(it.get("valor_unitario") or it.get("valor_total") or it.get("valor_global"))
+            if faixa_min is not None and faixa_max is not None:
+                if row_value <= 0:
+                    continue
+                if row_value < faixa_min or row_value > faixa_max:
+                    continue
+            if ref_value > 0 and row_value > 0:
+                v_dev = abs(row_value - ref_value) / max(ref_value, 1e-9)
+                if v_dev <= 0.25:
+                    ref_fit += 6.0
+                elif v_dev <= 0.5:
+                    ref_fit += 3.0
+                else:
+                    ref_fit -= 2.0
+            raw_score = sem + tbl + rec + coh + clar + pen + ref_fit
+            score_0_100 = max(0, min(100, round(raw_score)))
+            it2 = dict(it)
+            it2["score_bruto"] = round(raw_score, 3)
+            it2["score_ref_fit"] = round(ref_fit, 3)
+            it2["literal_match"] = literal_match
+            it2["score_aprovacao"] = score_0_100
+            it2["confiabilidade"] = _classify_confiabilidade(score_0_100)
+            it2["risco"] = _classify_risco(score_0_100)
+            it2["status"] = "Aprovado" if score_0_100 >= 55 else "Revisar"
+            it2["similaridade_encontrada"] = _is_similaridade_encontrada(it2) or relaxed
+            if relaxed:
+                it2["match_relaxado"] = True
+            out_rows.append(it2)
+        return out_rows
+
+    scored: List[Dict[str, Any]] = _score_candidates(itens, relaxed=False)
+    fallback_relaxado_usado = False
+    # Fallback: se a busca estrita não atingir massa crítica, abre variações claras.
+    if len(scored) < 3:
+        fallback_rows = _score_candidates(itens, relaxed=True)
+        fallback_relaxado_usado = bool(fallback_rows)
+        scored = _merge_unique_items(scored, fallback_rows)
 
     # Reescala para ampliar separação entre bons e ruins no conjunto atual.
     if scored:
@@ -1680,6 +1737,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     out_stats["ia_rerank_usado"] = ia_used
     out_stats["ia_interpretacao_item_ativo"] = bool(PNCP_IA_ITEM_RESUMO_ENABLED)
     out_stats["ia_interpretacao_item_usado"] = bool(ia_resumo_ok)
+    out_stats["fallback_similaridade_ativo"] = True
+    out_stats["fallback_similaridade_usado"] = bool(fallback_relaxado_usado)
 
     return {
         "ok": bool(base_items.get("ok", True)),

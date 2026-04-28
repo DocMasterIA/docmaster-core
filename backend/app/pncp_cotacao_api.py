@@ -808,7 +808,14 @@ def _itens_refletidos_for_session(sessao_id: int, formula_id: str) -> Dict[int, 
             b["quantidades"].append(float(q))
         if not b["unidade"] and u:
             b["unidade"] = u
-        val = vt if vt is not None and vt > 0 else (vu if vu is not None and vu > 0 else None)
+        # Fórmula de preço deve operar sobre total por cotação:
+        # 1) usa valor_total quando disponível;
+        # 2) fallback para valor_unitario * quantidade.
+        val = None
+        if vt is not None and vt > 0:
+            val = vt
+        elif vu is not None and vu > 0 and q is not None and q > 0:
+            val = vu * q
         if val is not None:
             b["valores"].append(val)
 

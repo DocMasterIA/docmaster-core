@@ -85,7 +85,16 @@
             <article v-for="r in itemCotacoesFiltradas" :key="r.id" class="item-cotacao-card">
               <header class="item-cotacao-card__head">
                 <span class="item-cotacao-card__id">#{{ r.id }}</span>
-                <span class="item-cotacao-card__fonte">{{ labelFonte(classificarFonte(r)) }}</span>
+                <div class="item-cotacao-card__badges">
+                  <span class="item-cotacao-card__fonte">{{ labelFonte(classificarFonte(r)) }}</span>
+                  <span
+                    v-if="Boolean(r?.source?.similaridade_encontrada)"
+                    class="item-cotacao-card__similaridade"
+                    title="Cotação vinculada por similaridade semântica"
+                  >
+                    Similaridade parcial encontrada
+                  </span>
+                </div>
               </header>
               <div class="item-cotacao-card__grid">
                 <div class="item-cotacao-card__field item-cotacao-card__field--wide">
@@ -430,6 +439,23 @@ function labelIncisoFromCotacao(cotacao) {
   color: #1f4e79;
   padding: 3px 8px;
   font-size: 10px;
+  white-space: nowrap;
+}
+.item-cotacao-card__badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.item-cotacao-card__similaridade {
+  border: 1px solid #f2dfb7;
+  border-radius: 999px;
+  background: #fff7e6;
+  color: #9a6a10;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 700;
   white-space: nowrap;
 }
 .item-cotacao-card__grid {

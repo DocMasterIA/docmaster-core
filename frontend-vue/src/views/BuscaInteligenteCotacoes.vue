@@ -177,6 +177,9 @@
                       <div class="bia-sub">
                         {{ row.modalidade }} • {{ row.status }} • {{ row.normalizado }}
                       </div>
+                      <div v-if="row.similaridadeEncontrada" class="bia-sub">
+                        <span class="bia-badge bia-badge--warn">Similaridade parcial encontrada</span>
+                      </div>
                     </td>
                     <td class="bia-cell-center">
                       <span class="bia-badge">{{ labelEsfera(row.esferaAdministrativa) }}</span>

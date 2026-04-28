@@ -235,7 +235,7 @@ const itemId = computed(() => {
 });
 
 const filtros = reactive({
-  descricao: 'FORFIG',
+  descricao: '',
   periodo: 'Último Ano',
   tipo: 'Todos',
   modalidade: 'Todas',

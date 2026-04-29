@@ -7,6 +7,7 @@
           <p class="gov-page__subtitle">
             Cotação #{{ cotacaoId }} · Item #{{ itemId }}
           </p>
+          <p v-if="isEditMode" class="cd-meta">Modo edição da cotação direta #{{ cotacaoDiretaId }}</p>
         </div>
         <RouterLink :to="backToItemUrl" class="cd-back-btn">
           <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
@@ -116,7 +117,7 @@
 
           <div class="cd-actions">
             <button type="submit" class="cd-btn" :disabled="isSaving">
-              {{ isSaving ? 'Salvando...' : 'Salvar cotação direta' }}
+              {{ isSaving ? 'Salvando...' : (isEditMode ? 'Salvar edição da cotação direta' : 'Salvar cotação direta') }}
             </button>
             <RouterLink :to="backToItemUrl" class="cd-btn cd-btn--ghost">Cancelar</RouterLink>
           </div>
@@ -248,9 +249,11 @@ import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   addCotacoesToItemInResearchSession,
+  getItemCotacoesFromResearchSession,
   getResearchSession,
   listFornecedoresCadastrados,
   saveFornecedorCadastrado,
+  updateCotacaoInItemResearchSession,
 } from '../services/pncpResearch';
 
 const route = useRoute();
@@ -258,6 +261,7 @@ const router = useRouter();
 
 const cotacaoId = computed(() => Number(route.params.cotacaoId));
 const itemId = computed(() => Number(route.params.itemId));
+const cotacaoDiretaId = computed(() => Number(route.query.cotacaoDiretaId));
 
 const isLoading = ref(false);
 const loadError = ref('');
@@ -311,6 +315,7 @@ const fornecedorForm = ref({
 const backToItemUrl = computed(
   () => `/pesquisador-pncp/cotacoes/${cotacaoId.value}/itens/${itemId.value}?fonte=cotacao_direta`,
 );
+const isEditMode = computed(() => Number.isFinite(cotacaoDiretaId.value) && cotacaoDiretaId.value > 0);
 
 function toNumberBR(value) {
   const s = String(value || '').trim();
@@ -478,11 +483,54 @@ async function carregarItem() {
     if (!form.value.descricao) {
       form.value.descricao = itemNome.value;
     }
+    if (isEditMode.value) {
+      await carregarCotacaoDiretaParaEdicao(sessaoId, iid, cotacaoDiretaId.value);
+    }
   } catch (err) {
     loadError.value = `Falha ao carregar item (${err?.message || 'erro desconhecido'}).`;
   } finally {
     isLoading.value = false;
   }
+}
+
+async function carregarCotacaoDiretaParaEdicao(sessaoId, iid, cotId) {
+  const data = await getItemCotacoesFromResearchSession(sessaoId, iid);
+  const rows = Array.isArray(data?.cotacoes) ? data.cotacoes : [];
+  const row = rows.find((x) => Number(x?.id) === Number(cotId));
+  if (!row) return;
+
+  const src = row?.source || {};
+  form.value.fornecedor = diretaFornecedorLabelFromRow(row);
+  form.value.descricao = String(row?.descricao_item || '').trim() || form.value.descricao;
+  form.value.descricao_complementar = String(src?.descricao_complementar || src?.descricaoComplementar || '').trim();
+  form.value.quantidade = Number.isFinite(Number(row?.quantidade)) ? String(row.quantidade) : '';
+  form.value.unidade_medida = String(row?.unidade_medida || '').trim();
+  form.value.valor_unitario = Number.isFinite(Number(row?.valor_unitario)) ? String(row.valor_unitario).replace('.', ',') : '';
+  form.value.ajuste_frete = String(src?.ajuste_frete || '').trim();
+  form.value.valor_frete = Number.isFinite(Number(src?.valor_frete)) ? String(src.valor_frete).replace('.', ',') : '';
+  form.value.observacoes = String(src?.observacoes || '').trim();
+
+  const dt = String(row?.data_publicacao || '').trim();
+  if (dt) {
+    const d = new Date(dt);
+    if (Number.isFinite(d.getTime())) {
+      form.value.data_cotacao = d.toISOString().slice(0, 10);
+      form.value.hora_cotacao = d.toTimeString().slice(0, 5);
+    }
+  }
+
+  if (src?.fornecedor_cadastro && typeof src.fornecedor_cadastro === 'object') {
+    fornecedorForm.value = { ...fornecedorForm.value, ...src.fornecedor_cadastro };
+  }
+}
+
+function diretaFornecedorLabelFromRow(row) {
+  const src = row?.source || {};
+  const cad = src?.fornecedor_cadastro || {};
+  const cnpj = String(cad?.cnpj || src?.cnpj_fornecedor || src?.cnpj || '').trim();
+  const nome = String(cad?.razao_social || cad?.nome_fantasia || src?.fornecedor || row?.orgao || '').trim();
+  if (cnpj && nome) return `${cnpj} - ${nome}`;
+  return nome || cnpj || '';
 }
 
 async function carregarFornecedoresCadastrados() {
@@ -604,8 +652,13 @@ async function salvarCotacaoDireta() {
     } catch (_) {
       // Não bloqueia gravação da cotação direta se o cadastro falhar.
     }
-    await addCotacoesToItemInResearchSession(sessaoId, iid, [payload]);
-    saveSuccess.value = 'Cotação direta registrada com sucesso.';
+    if (isEditMode.value) {
+      await updateCotacaoInItemResearchSession(sessaoId, iid, cotacaoDiretaId.value, payload);
+      saveSuccess.value = 'Cotação direta atualizada com sucesso.';
+    } else {
+      await addCotacoesToItemInResearchSession(sessaoId, iid, [payload]);
+      saveSuccess.value = 'Cotação direta registrada com sucesso.';
+    }
     setTimeout(() => {
       router.push(backToItemUrl.value);
     }, 450);

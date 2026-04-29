@@ -143,6 +143,15 @@
                   <span>Observações</span>
                   <strong>{{ diretaObservacoes(r) }}</strong>
                 </div>
+                <div class="item-cotacao-card__field item-cotacao-card__field--wide">
+                  <RouterLink
+                    class="item-search-btn item-search-btn--direta"
+                    :to="`/pesquisador-pncp/cotacoes/${cotacaoId}/itens/${itemId}/cotacao-direta?cotacaoDiretaId=${r.id}`"
+                  >
+                    <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+                    Editar cotação direta
+                  </RouterLink>
+                </div>
               </div>
               <div
                 v-else-if="isDominioAmploCotacao(r)"

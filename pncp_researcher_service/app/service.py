@@ -472,13 +472,14 @@ async def _extract_matching_items_with_table_lookup(
             ano = raw.get("anoCompra")
             seq = raw.get("sequencialCompra")
             should_fetch = cnpj and ano is not None and seq is not None
-            if should_fetch and (PNCP_FETCH_ITEMS_ALWAYS or score_obj_bruto <= 0):
+            if should_fetch:
                 async with sem:
-                    lookup_coro = get_contract_items(cnpj, ano, seq, client=http_client)
-                    if PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS > 0:
-                        rows = await asyncio.wait_for(lookup_coro, timeout=PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS)
-                    else:
-                        rows = await lookup_coro
+                    if PNCP_FETCH_ITEMS_ALWAYS or score_obj_bruto <= 0:
+                        lookup_coro = get_contract_items(cnpj, ano, seq, client=http_client)
+                        if PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS > 0:
+                            rows = await asyncio.wait_for(lookup_coro, timeout=PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS)
+                        else:
+                            rows = await lookup_coro
                     fornecedor_coro = get_contract_supplier_snapshot(cnpj, ano, seq, client=http_client)
                     try:
                         fornecedor_data = await asyncio.wait_for(

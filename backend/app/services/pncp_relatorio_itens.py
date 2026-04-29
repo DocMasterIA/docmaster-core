@@ -156,7 +156,13 @@ def _iter_source_pairs(obj: Any, prefix: str = ""):
 
 def _looks_orgao_context(path: str) -> bool:
     p = (path or "").lower()
-    return any(x in p for x in ("orgaoentidade", "orgao_entidade", "orgao", "unidadeorgao", "unidade_orgao"))
+    if not p:
+        return False
+    blocked_tokens = ("orgaoentidade", "orgao_entidade", "unidadeorgao", "unidade_orgao")
+    if any(x in p for x in blocked_tokens):
+        return True
+    parts = [x for x in re.split(r"[.\[\]]+", p) if x]
+    return any(part in {"orgao", "orgaoentidade", "unidadeorgao"} for part in parts)
 
 
 def _pick_supplier_name_from_source(src: Dict[str, Any]) -> str:

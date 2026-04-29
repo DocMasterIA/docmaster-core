@@ -311,7 +311,15 @@ def _walk_supplier_candidates(obj: Any, *, path: str = "", acc: Optional[List[Di
 
 def _is_orgao_path(path: str) -> bool:
     p = (path or "").lower()
-    return any(x in p for x in ("orgaoentidade", "orgao_entidade", "orgao", "unidadeorgao", "unidade_orgao"))
+    if not p:
+        return False
+    # Evita falso positivo por conter "orgao" em qualquer trecho;
+    # só bloqueia quando o caminho aponta de forma explícita para entidade compradora.
+    blocked_tokens = ("orgaoentidade", "orgao_entidade", "unidadeorgao", "unidade_orgao")
+    if any(tok in p for tok in blocked_tokens):
+        return True
+    parts = [x for x in re.split(r"[.\[\]]+", p) if x]
+    return any(part in {"orgao", "unidadeorgao", "orgaoentidade"} for part in parts)
 
 
 def _normalize_cnpj(raw: str) -> str:

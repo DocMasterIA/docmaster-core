@@ -554,6 +554,8 @@ async function runSearchWithContext({ descricao, selectedUfCodes = [], context =
         status: it.status || 'Aprovado',
         interpretacaoIa: String(it.ia_interpretacao_item || '').trim() || null,
         similaridadeEncontrada: Boolean(it.similaridade_encontrada),
+        fornecedor: String(it.fornecedor || '').trim() || null,
+        cnpjFornecedor: String(it.cnpj_fornecedor || it.cnpjFornecedor || '').trim() || null,
         selecionado: false,
       }));
       aggregated.push(...mapped);
@@ -657,6 +659,13 @@ async function adicionarSelecionadosNaCotacao() {
       status: r.status,
       similaridade_encontrada: Boolean(r.similaridadeEncontrada),
       data_publicacao: r.data,
+      fornecedor: r.fornecedor || null,
+      cnpj_fornecedor: r.cnpjFornecedor || null,
+      source: {
+        ...(r.sourceRaw && typeof r.sourceRaw === 'object' ? r.sourceRaw : {}),
+        fornecedor: r.fornecedor || null,
+        cnpj_fornecedor: r.cnpjFornecedor || null,
+      },
     }));
   if (!selecionados.length) {
     saveMessage.value = 'Selecione ao menos um item.';

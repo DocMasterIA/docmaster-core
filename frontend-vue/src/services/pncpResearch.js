@@ -129,6 +129,17 @@ export function addCotacoesToItemInResearchSession(sessaoId, itemId, cotacoes, s
   );
 }
 
+export function updateCotacaoInItemResearchSession(sessaoId, itemId, cotacaoId, cotacao, signal) {
+  return cotacaoRequest(
+    `research/sessions/${encodeURIComponent(sessaoId)}/items/${encodeURIComponent(itemId)}/cotacoes/${encodeURIComponent(cotacaoId)}/update`,
+    {
+      method: 'POST',
+      body: { cotacao },
+      signal,
+    },
+  );
+}
+
 export function deleteItemsFromResearchSession(sessaoId, itemIds, signal) {
   return cotacaoRequest(`research/sessions/${encodeURIComponent(sessaoId)}/items/delete`, {
     method: 'POST',

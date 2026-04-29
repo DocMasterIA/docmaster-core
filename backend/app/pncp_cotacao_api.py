@@ -1509,6 +1509,67 @@ def pncp_research_sessions_item_cotacoes(request, sessao_id: int, item_id: int):
 @api_login_required
 @csrf_exempt
 @require_http_methods(["POST", "OPTIONS"])
+def pncp_research_sessions_item_cotacoes_update(request, sessao_id: int, item_id: int, cotacao_id: int):
+    if request.method == "OPTIONS":
+        return JsonResponse({}, status=204)
+
+    c = _cotacao_qs_for_user(request.user).filter(pk=sessao_id).first()
+    if not c:
+        return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
+    if c.status in CLOSED_FOR_ITEMS:
+        return JsonResponse({"detail": "Cotação encerrada; não é permitido editar cotações."}, status=409)
+
+    item = c.itens.filter(pk=item_id).first()
+    if not item:
+        return JsonResponse({"ok": False, "error": "Item não encontrado na sessão.", "item_id": item_id}, status=404)
+
+    row = item.cotacoes.filter(pk=cotacao_id).first()
+    if not row:
+        return JsonResponse({"ok": False, "error": "Cotação não encontrada para este item.", "cotacao_id": cotacao_id}, status=404)
+
+    body, err = _parse_json_body(request)
+    if err:
+        return err
+    payload = body.get("cotacao") if isinstance(body.get("cotacao"), dict) else body
+    if not isinstance(payload, dict):
+        return JsonResponse({"detail": "Envie objeto de cotação para atualização."}, status=422)
+
+    row.numero_pncp = str(payload.get("numero_pncp") or payload.get("numeroControlePNCP") or "")[:256]
+    row.ano_compra = _safe_int_field(payload.get("ano_compra"), min_v=1990, max_v=2100)
+    row.sequencial_compra = _safe_int_field(payload.get("sequencial_compra"), min_v=1, max_v=2_147_483_647)
+    row.numero_item = str(payload.get("numero_item") or payload.get("numeroItem") or "")[:64]
+    row.descricao_item = str(payload.get("descricao_item") or payload.get("descricao") or payload.get("objeto_resumido") or "")[:10000]
+    row.quantidade = _safe_float(payload.get("quantidade"))
+    row.unidade_medida = str(payload.get("unidade_medida") or payload.get("unidadeMedida") or "")[:64]
+    row.valor_unitario = _safe_float(payload.get("valor_unitario") or payload.get("valorUnitario"))
+    row.valor_total = _safe_float(payload.get("valor_total") or payload.get("valor_global") or payload.get("valorTotal"))
+    row.orgao = str(payload.get("orgao") or "")[:512]
+    row.municipio = str(payload.get("municipio") or "")[:256]
+    row.uf = _normalize_uf(payload.get("uf"))
+    row.modalidade = str(payload.get("modalidade") or "")[:256]
+    row.data_publicacao = str(payload.get("data_publicacao") or payload.get("dataPublicacao") or "")[:64]
+    row.score_aprovacao = int(max(0, min(100, _safe_float(payload.get("score_aprovacao")))))
+    row.confiabilidade = str(payload.get("confiabilidade") or "")[:32]
+    row.risco = str(payload.get("risco") or "")[:32]
+    row.status = str(payload.get("status") or "")[:32]
+    row.source = _compact_item_source(payload)
+    row.save()
+    c.save(update_fields=["updated_at"])
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "sessao_id": c.id,
+            "item_id": item.id,
+            "cotacao_id": row.id,
+            "cotacao": _item_cotacao_dict(row),
+        }
+    )
+
+
+@api_login_required
+@csrf_exempt
+@require_http_methods(["POST", "OPTIONS"])
 def pncp_research_sessions_upload_supplier_pdf(request, sessao_id: int):
     if request.method == "OPTIONS":
         return JsonResponse({}, status=204)

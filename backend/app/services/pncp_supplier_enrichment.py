@@ -107,6 +107,45 @@ def _cnpj_digits(raw: Any) -> str:
     return re.sub(r"\D", "", str(raw or ""))
 
 
+def _fornecedor_display_name_from_source(src: Dict[str, Any]) -> str:
+    return str(
+        src.get("fornecedor")
+        or src.get("fornecedor_nome")
+        or src.get("nome_fornecedor")
+        or ""
+    ).strip()
+
+
+def _nome_e_somente_cnpj_formatado(nome: str) -> bool:
+    """
+    PNCP (ou importações) às vezes repetem o CNPJ no campo de razão social.
+    Qualquer texto sem letras e com exatamente 14 dígitos conta como placeholder.
+    """
+    nome = str(nome or "").strip()
+    if not nome or any(ch.isalpha() for ch in nome):
+        return False
+    return len(_cnpj_digits(nome)) == 14
+
+
+def _fornecedor_tem_nome_util(src: Dict[str, Any]) -> bool:
+    """Nome legível para exibição (não genérico PNCP nem o próprio CNPJ)."""
+    nome = _fornecedor_display_name_from_source(src)
+    if not nome:
+        return False
+    generic_names = {"demais", "nao informado", "não informado", "epp", "me", "mei", "outros"}
+    nome_norm = re.sub(r"\s+", " ", nome).strip().lower()
+    if nome_norm in generic_names:
+        return False
+    if _nome_e_somente_cnpj_formatado(nome):
+        return False
+    cnpj_raw = src.get("cnpj_fornecedor") or ""
+    d_cnpj = _cnpj_digits(cnpj_raw)
+    d_nome = _cnpj_digits(nome)
+    if len(d_cnpj) == 14 and len(d_nome) == 14 and d_nome == d_cnpj:
+        return False
+    return True
+
+
 def _extract_supplier_cnpj_only(payload: Any) -> str:
     """Só CNPJ do fornecedor a partir do JSON PNCP; ignora nome (vem da BrasilAPI)."""
     cands = _walk_supplier_candidates(payload)
@@ -264,14 +303,26 @@ def enrich_missing_supplier_fields_for_cotacao(cotacao_id: int, *, max_lookups: 
     for row in rows:
         src = row.source if isinstance(row.source, dict) else {}
         has_cnpj = bool(str(src.get("cnpj_fornecedor") or "").strip())
-        has_nome = bool(str(src.get("fornecedor") or src.get("fornecedor_nome") or src.get("nome_fornecedor") or "").strip())
-        if has_cnpj and has_nome:
+        tem_nome_util = _fornecedor_tem_nome_util(src)
+        if has_cnpj and tem_nome_util:
             continue
 
-        if has_cnpj and not has_nome:
-            nome_br, cad_br = fetch_brasilapi_fornecedor_por_cnpj(str(src.get("cnpj_fornecedor") or ""))
+        cnpj_para_api = ""
+        if has_cnpj:
+            cnpj_para_api = str(src.get("cnpj_fornecedor") or "").strip()
+        else:
+            display = _fornecedor_display_name_from_source(src)
+            if _nome_e_somente_cnpj_formatado(display):
+                cnpj_para_api = _normalize_cnpj(_cnpj_digits(display))
+
+        if cnpj_para_api and not tem_nome_util:
+            nome_br, cad_br = fetch_brasilapi_fornecedor_por_cnpj(cnpj_para_api)
             if nome_br or cad_br:
                 new_src = dict(src)
+                if not has_cnpj:
+                    fmt = _normalize_cnpj(_cnpj_digits(cnpj_para_api))
+                    if fmt:
+                        new_src["cnpj_fornecedor"] = fmt
                 if nome_br:
                     new_src["fornecedor"] = nome_br
                 if cad_br:
@@ -303,7 +354,7 @@ def enrich_missing_supplier_fields_for_cotacao(cotacao_id: int, *, max_lookups: 
         new_src = dict(src)
         if cnpj_f and not has_cnpj:
             new_src["cnpj_fornecedor"] = cnpj_f
-        if nome_f and not has_nome:
+        if nome_f and not tem_nome_util:
             new_src["fornecedor"] = nome_f
         cad_snap = snap.get("fornecedor_cadastro")
         if isinstance(cad_snap, dict) and cad_snap:

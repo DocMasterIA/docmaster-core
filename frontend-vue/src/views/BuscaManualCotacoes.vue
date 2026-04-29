@@ -514,6 +514,36 @@ function confiabilidadeManual(query, desc) {
   return 'Baixa';
 }
 
+function buildSimilarityFallbackTerms(query) {
+  const raw = String(query || '').trim().replace(/\s+/g, ' ');
+  if (!raw) return [];
+  const out = [];
+  const push = (s) => {
+    const t = String(s || '').trim().replace(/\s+/g, ' ');
+    if (t && t.length >= 8 && !out.includes(t)) out.push(t);
+  };
+
+  // Caso "item x com y": tenta a parte antes do conector.
+  const splitByConnector = raw.match(/^(.*?)\s+\b(com|para|tipo|modelo|marca)\b\s+.+$/i);
+  if (splitByConnector?.[1]) push(splitByConnector[1]);
+
+  const tokens = raw.split(/\s+/).filter(Boolean);
+  if (tokens.length >= 4) {
+    // Remove sufixos gradualmente (termo base + especificação principal tende a ficar).
+    for (let cut = 1; cut <= Math.min(5, tokens.length - 3); cut += 1) {
+      push(tokens.slice(0, tokens.length - cut).join(' '));
+    }
+  }
+
+  // Prefixo até o primeiro token de especificação (ex.: 1mg/ml), incluindo esse token.
+  const specIdx = tokens.findIndex((t) => isSpecToken(normalizeText(t)));
+  if (specIdx >= 1) {
+    push(tokens.slice(0, specIdx + 1).join(' '));
+  }
+
+  return out;
+}
+
 async function buscarNoBackend() {
   if (!filtros.descricao.trim()) return;
   isSearching.value = true;
@@ -533,6 +563,7 @@ async function buscarNoBackend() {
       tamanho_pagina: 200,
     });
     let fallbackPorSimilaridadeIa = false;
+    let termoFallbackUsado = '';
     if (!data?.ok || !Array.isArray(data?.itens) || data.itens.length < 3) {
       const iaData = await intelligentMarketSearch({
         termo_busca: termoBuscaEfetivo,
@@ -544,6 +575,24 @@ async function buscarNoBackend() {
       if (iaData?.ok && Array.isArray(iaData?.itens) && iaData.itens.length > 0) {
         data = iaData;
         fallbackPorSimilaridadeIa = true;
+      }
+    }
+    if (!data?.ok || !Array.isArray(data?.itens) || data.itens.length < 3) {
+      const fallbackTerms = buildSimilarityFallbackTerms(termoBuscaEfetivo);
+      for (const term of fallbackTerms) {
+        const iaFallback = await intelligentMarketSearch({
+          termo_busca: term,
+          uf: filtros.ufs.length === 1 ? filtros.ufs[0] : null,
+          codigo_modalidade: codigoModalidade,
+          max_paginas: 500,
+          tamanho_pagina: 200,
+        });
+        if (iaFallback?.ok && Array.isArray(iaFallback?.itens) && iaFallback.itens.length > 0) {
+          data = iaFallback;
+          fallbackPorSimilaridadeIa = true;
+          termoFallbackUsado = term;
+          break;
+        }
       }
     }
     if (data?.ok && Array.isArray(data.itens)) {
@@ -562,7 +611,8 @@ async function buscarNoBackend() {
           termoBuscaEfetivo,
           descricaoLinha,
         ) || fallbackPorSimilaridadeIa;
-        const conf = confiabilidadeManual(termoBuscaEfetivo, descricaoLinha);
+        const termoParaConfiabilidade = termoFallbackUsado || termoBuscaEfetivo;
+        const conf = confiabilidadeManual(termoParaConfiabilidade, descricaoLinha);
         return {
         id: `backend-${idx}-${it.numero_pncp || ''}`,
         sourceRaw: it,

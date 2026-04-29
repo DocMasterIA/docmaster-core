@@ -114,6 +114,12 @@ const routes = [
     meta: { title: 'Item da Cotação' },
   },
   {
+    path: '/pesquisador-pncp/cotacoes/:cotacaoId/itens/:itemId/cotacao-direta',
+    name: 'CotacaoDiretaRegistro',
+    component: () => import('../views/CotacaoDiretaRegistro.vue'),
+    meta: { title: 'Registro de Cotação Direta' },
+  },
+  {
     path: '/pesquisador-pncp/cotacoes/:cotacaoId/busca-inteligente',
     name: 'BuscaInteligenteCotacoes',
     component: () => import('../views/BuscaInteligenteCotacoes.vue'),

@@ -1330,6 +1330,16 @@ function itemDetalheTo(itemId) {
 function openItemCotacoesFromFonte(itemId, fonte) {
   const iid = Number(itemId);
   if (!Number.isFinite(iid) || iid <= 0) return;
+  if (String(fonte || '').trim() === 'cotacao_direta') {
+    router.push({
+      name: 'CotacaoDiretaRegistro',
+      params: {
+        cotacaoId: String(cotacaoId.value),
+        itemId: String(iid),
+      },
+    });
+    return;
+  }
   router.push({
     name: 'CotacaoItemDetalhe',
     params: {

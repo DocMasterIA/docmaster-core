@@ -73,6 +73,13 @@
             <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
             Iniciar busca manual para este item
           </RouterLink>
+          <RouterLink
+            class="item-search-btn item-search-btn--direta"
+            :to="`/pesquisador-pncp/cotacoes/${cotacaoId}/itens/${itemId}/cotacao-direta`"
+          >
+            <i class="fa-solid fa-file-signature" aria-hidden="true"></i>
+            Registrar Cotação Direta (Inciso IV)
+          </RouterLink>
         </section>
 
         <section class="item-related">
@@ -475,6 +482,10 @@ function labelIncisoFromCotacao(cotacao) {
   border-color: #cfd8e3;
   background: #fff;
   color: #1f2937;
+}
+.item-search-btn--direta {
+  border-color: #0f766e;
+  background: #0f766e;
 }
 .item-price-card { border: 1px solid #b7d2ef; border-radius: 10px; background: #e8f1fb; padding: 10px; display: flex; flex-direction: column; gap: 4px; }
 .item-price-card span { font-size: 11px; text-transform: uppercase; color: #1f4e79; }

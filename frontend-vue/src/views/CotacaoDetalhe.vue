@@ -191,6 +191,14 @@
               aria-label="Buscar itens na planilha"
             />
           </label>
+          <label class="cot-sheet-status-filter">
+            <span>Status</span>
+            <select v-model="statusFilter" aria-label="Filtrar itens por status">
+              <option value="todos">Todos</option>
+              <option value="completo">Completo</option>
+              <option value="incompleto">Incompleto</option>
+            </select>
+          </label>
           <button
             type="button"
             class="cot-sheet-bulk-delete"
@@ -553,6 +561,7 @@ const sessionBackendId = computed(() => {
 
 const linhasMock = ref([]);
 const searchTerm = ref('');
+const statusFilter = ref('todos');
 
 const selectedIds = ref(new Set());
 const tituloCotacao = ref('');
@@ -622,8 +631,14 @@ const linhasFiltradas = computed(() => {
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
     .toLowerCase();
-  if (!q) return linhasMock.value;
-  return linhasMock.value.filter((linha) => {
+  const byStatus = linhasMock.value.filter((linha) => {
+    const st = String(linha?.status || '').trim().toLowerCase();
+    if (statusFilter.value === 'completo') return st === 'completo';
+    if (statusFilter.value === 'incompleto') return st === 'incompleto';
+    return true;
+  });
+  if (!q) return byStatus;
+  return byStatus.filter((linha) => {
     const nome = String(linha?.nomeItem || '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
@@ -1541,6 +1556,32 @@ async function saveTituloNoBackend() {
   font-size: 12px;
   color: #1f2937;
   background: transparent;
+}
+
+.cot-sheet-status-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #cfd8e3;
+  border-radius: 10px;
+  background: #fff;
+  color: #475569;
+  padding: 7px 10px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.cot-sheet-status-filter span {
+  font-weight: 600;
+  color: #64748b;
+}
+
+.cot-sheet-status-filter select {
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #1f2937;
+  font-size: 12px;
 }
 
 .cot-sheet-bulk-delete {

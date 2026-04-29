@@ -91,42 +91,36 @@ def _render_anexo_fornecedor_capa_pdf(*, titulo_relatorio: str, nome_arquivo: st
       margin: 0;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
       color: #0f172a;
+      min-height: 100vh;
+    }}
+    .page-center {{
+      min-height: 240mm;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }}
     .box {{
       border: 1px solid #d6dde8;
       border-radius: 12px;
-      padding: 18px 20px;
+      padding: 24px 28px;
       background: #fff;
-    }}
-    .kicker {{
-      margin: 0 0 8px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #1f4e79;
+      text-align: center;
+      min-width: 360px;
     }}
     h1 {{
       margin: 0;
-      font-size: 26px;
+      font-size: 32px;
       line-height: 1.2;
       color: #1f4e79;
-    }}
-    p {{
-      margin: 12px 0 0;
-      font-size: 14px;
-      line-height: 1.5;
-      color: #334155;
     }}
   </style>
 </head>
 <body>
-  <section class="box">
-    <p class="kicker">Anexo incorporado ao relatório</p>
-    <h1>Cotação do fornecedor</h1>
-    <p><strong>Relatório:</strong> {titulo_relatorio}</p>
-    <p><strong>Arquivo anexado:</strong> {nome_arquivo}</p>
-  </section>
+  <div class="page-center">
+    <section class="box">
+      <h1>Anexo da Cotação</h1>
+    </section>
+  </div>
 </body>
 </html>
 """

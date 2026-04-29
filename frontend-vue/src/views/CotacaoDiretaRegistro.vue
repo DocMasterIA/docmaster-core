@@ -375,8 +375,8 @@ function aplicarFornecedorSelecionado(pick) {
     ...pick,
     cnpj: formatCnpj(pick?.cnpj),
   };
-  const nome = String(pick?.razao_social || pick?.nome_fantasia || '').trim();
-  if (nome) form.value.fornecedor = nome;
+  const label = formatFornecedorLabel(pick);
+  if (label) form.value.fornecedor = label;
 }
 
 function aplicarFornecedorPorLabel() {

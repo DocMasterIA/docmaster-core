@@ -68,6 +68,22 @@ def extrair_cnpjs_dos_itens(itens: List[Any]) -> List[str]:
     return sorted(acc)
 
 
+def extrair_cnpjs_das_fontes_grupos(grupos: List[Dict[str, Any]]) -> List[str]:
+    acc: Set[str] = set()
+    for g in grupos or []:
+        fontes = g.get("fontes") or []
+        if not isinstance(fontes, list):
+            continue
+        for f in fontes:
+            if not isinstance(f, dict):
+                continue
+            raw = str(f.get("cnpj") or "").strip()
+            cnpj = _normalize_cnpj(raw)
+            if cnpj:
+                acc.add(cnpj)
+    return sorted(acc)
+
+
 # ---------------------------------------------------------------------------
 # QR Code (PNG em data URL para embutir no HTML)
 # ---------------------------------------------------------------------------
@@ -176,7 +192,10 @@ def montar_contexto_relatorio(
         grupos, total_linhas = agrupar_cotacoes_por_item_relatorio_pesquisa_precos(itens, cotacoes, formula_id)
     else:
         grupos, total_linhas = agrupar_itens_relatorio_pesquisa_precos(itens)
-    cnpjs = extrair_cnpjs_dos_itens(itens)
+    # Prioriza CNPJs presentes nas fontes (cotações reais exibidas no relatório).
+    cnpjs = extrair_cnpjs_das_fontes_grupos(grupos)
+    if not cnpjs:
+        cnpjs = extrair_cnpjs_dos_itens(itens)
 
     tz = timezone.get_current_timezone()
     agora = timezone.now()

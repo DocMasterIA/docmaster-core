@@ -29,16 +29,18 @@
           <div class="cd-field cd-field--full">
             <span>Fornecedor</span>
             <div class="cd-inline-row">
-              <input v-model.trim="form.fornecedor" type="text" required placeholder="Nome do fornecedor" />
-              <select v-model="fornecedorSelecionadoId" class="cd-inline-select">
-                <option value="">Fornecedor salvo</option>
-                <option v-for="f in fornecedoresCadastrados" :key="f.id" :value="String(f.id)">
-                  {{ formatFornecedorLabel(f) }}
-                </option>
-              </select>
-              <button type="button" class="cd-btn cd-btn--ghost" @click="aplicarFornecedorSelecionado">
-                Usar fornecedor salvo
-              </button>
+              <input
+                v-model.trim="form.fornecedor"
+                list="fornecedores-salvos-list"
+                type="text"
+                required
+                placeholder="Nome do fornecedor"
+                @change="aplicarFornecedorPorLabel"
+                @blur="aplicarFornecedorPorLabel"
+              />
+              <datalist id="fornecedores-salvos-list">
+                <option v-for="f in fornecedoresCadastrados" :key="f.id" :value="formatFornecedorLabel(f)" />
+              </datalist>
               <button type="button" class="cd-btn cd-btn--ghost" @click="openFornecedorModal">
                 Adicionar fornecedor
               </button>
@@ -267,7 +269,6 @@ const fornecedorModalOpen = ref(false);
 const fornecedorModalError = ref('');
 const isBuscandoCnpj = ref(false);
 const fornecedoresCadastrados = ref([]);
-const fornecedorSelecionadoId = ref('');
 
 const form = ref({
   fornecedor: '',
@@ -367,10 +368,7 @@ function closeFornecedorModal() {
   fornecedorModalError.value = '';
 }
 
-function aplicarFornecedorSelecionado() {
-  const idSel = Number(fornecedorSelecionadoId.value);
-  if (!Number.isFinite(idSel) || idSel <= 0) return;
-  const pick = fornecedoresCadastrados.value.find((x) => Number(x?.id) === idSel);
+function aplicarFornecedorSelecionado(pick) {
   if (!pick) return;
   fornecedorForm.value = {
     ...fornecedorForm.value,
@@ -379,6 +377,13 @@ function aplicarFornecedorSelecionado() {
   };
   const nome = String(pick?.razao_social || pick?.nome_fantasia || '').trim();
   if (nome) form.value.fornecedor = nome;
+}
+
+function aplicarFornecedorPorLabel() {
+  const label = String(form.value.fornecedor || '').trim();
+  if (!label) return;
+  const pick = fornecedoresCadastrados.value.find((x) => formatFornecedorLabel(x) === label);
+  if (pick) aplicarFornecedorSelecionado(pick);
 }
 
 async function aplicarFornecedorNoFormulario() {
@@ -394,7 +399,6 @@ async function aplicarFornecedorNoFormulario() {
     if (saveRes?.fornecedor?.id) {
       fornecedorForm.value = { ...fornecedorForm.value, ...saveRes.fornecedor };
       await carregarFornecedoresCadastrados();
-      fornecedorSelecionadoId.value = String(saveRes.fornecedor.id);
     }
   } catch (_) {
     // Não interrompe o uso do formulário.
@@ -661,10 +665,6 @@ onMounted(() => {
 }
 .cd-inline-row { display: flex; gap: 8px; align-items: center; }
 .cd-inline-row > input { flex: 1; min-width: 0; }
-.cd-inline-select {
-  min-width: 260px;
-  max-width: 360px;
-}
 .cd-actions { display: flex; gap: 8px; align-items: center; grid-column: 1 / -1; }
 .cd-btn {
   border: 1px solid #1f4e79;

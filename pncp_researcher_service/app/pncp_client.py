@@ -329,15 +329,47 @@ def _normalize_cnpj(raw: str) -> str:
     return f"{d[:2]}.{d[2:5]}.{d[5:8]}/{d[8:12]}-{d[12:14]}"
 
 
+def _extract_item_numbers(items_payload: Any, *, max_items: int = 12) -> List[str]:
+    nums: List[str] = []
+    if isinstance(items_payload, dict) and isinstance(items_payload.get("data"), list):
+        rows = items_payload.get("data") or []
+    elif isinstance(items_payload, list):
+        rows = items_payload
+    else:
+        rows = []
+    for it in rows:
+        if not isinstance(it, dict):
+            continue
+        cand = it.get("numeroItem") or it.get("ordemItem") or it.get("sequencialItem")
+        s = str(cand or "").strip()
+        if not s:
+            continue
+        if s not in nums:
+            nums.append(s)
+        if len(nums) >= max(1, int(max_items)):
+            break
+    return nums
+
+
 def _extract_supplier_snapshot(payload: Any) -> Dict[str, str]:
     cands = _walk_supplier_candidates(payload)
+    generic_names = {"demais", "nao informado", "não informado", "epp", "me", "mei", "outros"}
+    best: Dict[str, str] | None = None
     for cand in cands:
         if _is_orgao_path(cand.get("path", "")):
             continue
         cnpj = _normalize_cnpj(cand.get("cnpj", ""))
         nome = str(cand.get("fornecedor") or "").strip()
-        if cnpj or nome:
+        nome_norm = re.sub(r"\s+", " ", nome).strip().lower()
+        nome_ok = bool(nome and nome_norm not in generic_names)
+        if cnpj and nome_ok:
             return {"cnpj_fornecedor": cnpj, "fornecedor": nome}
+        if cnpj and not best:
+            best = {"cnpj_fornecedor": cnpj, "fornecedor": nome if nome_ok else ""}
+        elif nome_ok and not best:
+            best = {"cnpj_fornecedor": "", "fornecedor": nome}
+    if best:
+        return best
     return {"cnpj_fornecedor": "", "fornecedor": ""}
 
 
@@ -364,9 +396,12 @@ async def get_contract_supplier_snapshot(
         "resultados",
         "fornecedor",
         "fornecedores",
+        "vencedores",
         "atas",
         "contrato",
         "contratos",
+        "empenhos",
+        "partes-envolvidas",
     )
 
     close_client = False
@@ -388,6 +423,29 @@ async def get_contract_supplier_snapshot(
             except ValueError:
                 continue
             snap = _extract_supplier_snapshot(data)
+            if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
+                return snap
+
+        # Alternativa usada por integradores: resultado por item
+        # /itens/{numeroItem}/resultados costuma carregar niFornecedor/fornecedor vencedor.
+        itens_endpoint = f"{base}/itens"
+        itens_resp = await _get_pncp(client, itens_endpoint, params=None, tolerate_rate_limit=True)
+        item_nums: List[str] = []
+        if itens_resp is not None and itens_resp.status_code < 400:
+            try:
+                item_nums = _extract_item_numbers(itens_resp.json(), max_items=12)
+            except Exception:
+                item_nums = []
+        for numero_item in item_nums:
+            res_endpoint = f"{base}/itens/{numero_item}/resultados"
+            res_resp = await _get_pncp(client, res_endpoint, params=None, tolerate_rate_limit=True)
+            if res_resp is None or res_resp.status_code in (204, 404) or res_resp.status_code >= 400:
+                continue
+            try:
+                res_data = res_resp.json()
+            except ValueError:
+                continue
+            snap = _extract_supplier_snapshot(res_data)
             if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
                 return snap
     finally:

@@ -98,6 +98,10 @@
               </header>
               <div class="item-cotacao-card__grid">
                 <div class="item-cotacao-card__field item-cotacao-card__field--wide">
+                  <span>Nome (PNCP)</span>
+                  <strong>{{ nomeItemDaCotacao(r) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field item-cotacao-card__field--wide">
                   <span>Órgão</span>
                   <strong>{{ r.orgao || '—' }}</strong>
                 </div>
@@ -330,6 +334,21 @@ function formatQuantidadeCotacao(r) {
   }
   if (und) return und;
   return '—';
+}
+
+function nomeItemDaCotacao(r) {
+  const src = r?.source || {};
+  const nome = String(
+    r?.descricao_item ||
+      src?.descricao_item ||
+      src?.descricaoItem ||
+      src?.descricao ||
+      src?.objeto_resumido ||
+      src?.objetoResumido ||
+      src?.objetoCompra ||
+      '',
+  ).trim();
+  return nome || '—';
 }
 
 function normalizeFonte(v) {

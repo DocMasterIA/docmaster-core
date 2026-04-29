@@ -26,10 +26,15 @@
         </section>
 
         <form class="cd-form" @submit.prevent="salvarCotacaoDireta">
-          <label class="cd-field">
+          <div class="cd-field cd-field--full">
             <span>Fornecedor</span>
-            <input v-model.trim="form.fornecedor" type="text" required placeholder="Nome do fornecedor" />
-          </label>
+            <div class="cd-inline-row">
+              <input v-model.trim="form.fornecedor" type="text" required placeholder="Nome do fornecedor" />
+              <button type="button" class="cd-btn cd-btn--ghost" @click="openFornecedorModal">
+                Adicionar fornecedor
+              </button>
+            </div>
+          </div>
 
           <label class="cd-field">
             <span>Descrição</span>
@@ -101,6 +106,124 @@
         </form>
       </template>
     </div>
+
+    <div v-if="fornecedorModalOpen" class="cd-modal-backdrop" @click.self="closeFornecedorModal">
+      <div class="cd-modal">
+        <header class="cd-modal__header">
+          <h2>Cadastro de fornecedor</h2>
+          <button type="button" class="cd-modal__close" @click="closeFornecedorModal">Fechar</button>
+        </header>
+
+        <div class="cd-modal__content">
+          <p class="cd-meta">Preencha manualmente ou informe CNPJ para completar automaticamente.</p>
+
+          <div class="cd-form">
+            <label class="cd-field">
+              <span>Tipo (Pessoa Jurídica)</span>
+              <input v-model.trim="fornecedorForm.tipo_pessoa" type="text" />
+            </label>
+            <label class="cd-field">
+              <span>CNPJ</span>
+              <div class="cd-inline-row">
+                <input v-model.trim="fornecedorForm.cnpj" type="text" placeholder="00.000.000/0000-00" />
+                <button
+                  type="button"
+                  class="cd-btn"
+                  :disabled="isBuscandoCnpj"
+                  @click="buscarFornecedorPorCnpj"
+                >
+                  {{ isBuscandoCnpj ? 'Buscando...' : 'Buscar CNPJ' }}
+                </button>
+              </div>
+            </label>
+
+            <label class="cd-field">
+              <span>Razão Social</span>
+              <input v-model.trim="fornecedorForm.razao_social" type="text" />
+            </label>
+            <label class="cd-field">
+              <span>Tipo</span>
+              <input v-model.trim="fornecedorForm.tipo" type="text" />
+            </label>
+            <label class="cd-field">
+              <span>Data de abertura</span>
+              <input v-model="fornecedorForm.data_abertura" type="date" />
+            </label>
+            <label class="cd-field">
+              <span>Porte</span>
+              <input v-model.trim="fornecedorForm.porte" type="text" />
+            </label>
+            <label class="cd-field">
+              <span>Nome fantasia</span>
+              <input v-model.trim="fornecedorForm.nome_fantasia" type="text" />
+            </label>
+            <label class="cd-field">
+              <span>Logradouro</span>
+              <input v-model.trim="fornecedorForm.logradouro" type="text" />
+            </label>
+            <label class="cd-field">
+              <span>Número</span>
+              <input v-model.trim="fornecedorForm.numero" type="text" />
+            </label>
+            <label class="cd-field">
+              <span>Complemento</span>
+              <input v-model.trim="fornecedorForm.complemento" type="text" />
+            </label>
+            <label class="cd-field">
+              <span>CEP</span>
+              <input v-model.trim="fornecedorForm.cep" type="text" />
+            </label>
+            <label class="cd-field">
+              <span>Bairro</span>
+              <input v-model.trim="fornecedorForm.bairro" type="text" />
+            </label>
+            <label class="cd-field">
+              <span>Município</span>
+              <input v-model.trim="fornecedorForm.municipio" type="text" />
+            </label>
+            <label class="cd-field">
+              <span>UF</span>
+              <input v-model.trim="fornecedorForm.uf" type="text" />
+            </label>
+            <label class="cd-field">
+              <span>E-mail</span>
+              <input v-model.trim="fornecedorForm.email" type="email" />
+            </label>
+            <label class="cd-field">
+              <span>Telefone</span>
+              <input v-model.trim="fornecedorForm.telefone" type="text" />
+            </label>
+            <label class="cd-field">
+              <span>Situação</span>
+              <input v-model.trim="fornecedorForm.situacao" type="text" />
+            </label>
+            <label class="cd-field">
+              <span>Data da situação</span>
+              <input v-model="fornecedorForm.data_situacao" type="date" />
+            </label>
+            <label class="cd-field cd-field--full">
+              <span>Motivo da situação</span>
+              <input v-model.trim="fornecedorForm.motivo_situacao" type="text" />
+            </label>
+            <label class="cd-field">
+              <span>Situação especial</span>
+              <input v-model.trim="fornecedorForm.situacao_especial" type="text" />
+            </label>
+            <label class="cd-field">
+              <span>Data da situação especial</span>
+              <input v-model="fornecedorForm.data_situacao_especial" type="date" />
+            </label>
+          </div>
+
+          <p v-if="fornecedorModalError" class="cd-meta cd-meta--error">{{ fornecedorModalError }}</p>
+        </div>
+
+        <footer class="cd-modal__footer">
+          <button type="button" class="cd-btn cd-btn--ghost" @click="closeFornecedorModal">Cancelar</button>
+          <button type="button" class="cd-btn" @click="aplicarFornecedorNoFormulario">Usar fornecedor</button>
+        </footer>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -121,6 +244,9 @@ const isSaving = ref(false);
 const saveError = ref('');
 const saveSuccess = ref('');
 const itemNome = ref('—');
+const fornecedorModalOpen = ref(false);
+const fornecedorModalError = ref('');
+const isBuscandoCnpj = ref(false);
 
 const form = ref({
   fornecedor: '',
@@ -134,6 +260,30 @@ const form = ref({
   ajuste_frete: '',
   valor_frete: '',
   observacoes: '',
+});
+
+const fornecedorForm = ref({
+  tipo_pessoa: 'Pessoa Jurídica',
+  cnpj: '',
+  razao_social: '',
+  tipo: '',
+  data_abertura: '',
+  porte: '',
+  nome_fantasia: '',
+  logradouro: '',
+  numero: '',
+  complemento: '',
+  cep: '',
+  bairro: '',
+  municipio: '',
+  uf: '',
+  email: '',
+  telefone: '',
+  situacao: '',
+  data_situacao: '',
+  motivo_situacao: '',
+  situacao_especial: '',
+  data_situacao_especial: '',
 });
 
 const backToItemUrl = computed(
@@ -155,6 +305,92 @@ function buildDataPublicacaoIso(dataCotacao, horaCotacao) {
   const iso = `${d}T${t}:00`;
   const dt = new Date(iso);
   return Number.isFinite(dt.getTime()) ? dt.toISOString() : null;
+}
+
+function normalizeDateToInput(value) {
+  const s = String(value || '').trim();
+  if (!s) return '';
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const br = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (br) return `${br[3]}-${br[2]}-${br[1]}`;
+  return '';
+}
+
+function onlyDigits(v) {
+  return String(v || '').replace(/\D/g, '');
+}
+
+function formatCnpj(v) {
+  const d = onlyDigits(v).slice(0, 14);
+  if (d.length <= 2) return d;
+  if (d.length <= 5) return `${d.slice(0, 2)}.${d.slice(2)}`;
+  if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`;
+  if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`;
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+}
+
+function openFornecedorModal() {
+  fornecedorModalOpen.value = true;
+  fornecedorModalError.value = '';
+}
+
+function closeFornecedorModal() {
+  fornecedorModalOpen.value = false;
+  fornecedorModalError.value = '';
+}
+
+function aplicarFornecedorNoFormulario() {
+  const razao = String(fornecedorForm.value.razao_social || '').trim();
+  const fantasia = String(fornecedorForm.value.nome_fantasia || '').trim();
+  const nome = razao || fantasia;
+  if (nome) form.value.fornecedor = nome;
+  closeFornecedorModal();
+}
+
+async function buscarFornecedorPorCnpj() {
+  fornecedorModalError.value = '';
+  const cnpjDigits = onlyDigits(fornecedorForm.value.cnpj);
+  if (cnpjDigits.length !== 14) {
+    fornecedorModalError.value = 'Informe um CNPJ válido com 14 dígitos.';
+    return;
+  }
+  isBuscandoCnpj.value = true;
+  try {
+    const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjDigits}`);
+    const payload = await res.json();
+    if (!res.ok) {
+      throw new Error(String(payload?.message || payload?.error || 'falha na consulta do CNPJ'));
+    }
+
+    fornecedorForm.value.cnpj = formatCnpj(cnpjDigits);
+    fornecedorForm.value.razao_social = String(payload?.razao_social || '').trim();
+    fornecedorForm.value.tipo = String(payload?.descricao_identificador_matriz_filial || '').trim();
+    fornecedorForm.value.data_abertura = normalizeDateToInput(payload?.data_inicio_atividade);
+    fornecedorForm.value.porte = String(payload?.porte?.descricao || payload?.porte || '').trim();
+    fornecedorForm.value.nome_fantasia = String(payload?.nome_fantasia || '').trim();
+    fornecedorForm.value.logradouro = String(payload?.logradouro || '').trim();
+    fornecedorForm.value.numero = String(payload?.numero || '').trim();
+    fornecedorForm.value.complemento = String(payload?.complemento || '').trim();
+    fornecedorForm.value.cep = String(payload?.cep || '').trim();
+    fornecedorForm.value.bairro = String(payload?.bairro || '').trim();
+    fornecedorForm.value.municipio = String(payload?.municipio || '').trim();
+    fornecedorForm.value.uf = String(payload?.uf || '').trim();
+    fornecedorForm.value.email = String(payload?.email || '').trim();
+    fornecedorForm.value.telefone = String(payload?.ddd_telefone_1 || payload?.ddd_telefone_2 || '').trim();
+    fornecedorForm.value.situacao = String(payload?.descricao_situacao_cadastral || '').trim();
+    fornecedorForm.value.data_situacao = normalizeDateToInput(payload?.data_situacao_cadastral);
+    fornecedorForm.value.motivo_situacao = String(payload?.motivo_situacao_cadastral || '').trim();
+    fornecedorForm.value.situacao_especial = String(payload?.situacao_especial || '').trim();
+    fornecedorForm.value.data_situacao_especial = normalizeDateToInput(payload?.data_situacao_especial);
+
+    const nome = String(fornecedorForm.value.razao_social || fornecedorForm.value.nome_fantasia || '').trim();
+    if (nome) form.value.fornecedor = nome;
+  } catch (err) {
+    fornecedorModalError.value = `Não foi possível consultar o CNPJ (${err?.message || 'erro desconhecido'}).`;
+  } finally {
+    isBuscandoCnpj.value = false;
+  }
 }
 
 async function carregarItem() {
@@ -270,6 +506,10 @@ async function salvarCotacaoDireta() {
     tipo_fonte: 'cotacao_direta',
     source: {
       fornecedor,
+      fornecedor_cadastro: {
+        ...fornecedorForm.value,
+        cnpj: formatCnpj(fornecedorForm.value.cnpj),
+      },
       descricao_complementar: descricaoComplementar || null,
       ajuste_frete: ajusteFrete || null,
       valor_frete: Number.isFinite(valorFrete) ? valorFrete : null,
@@ -327,6 +567,8 @@ onMounted(() => {
   background: #fff;
 }
 .cd-field textarea { resize: vertical; min-height: 74px; }
+.cd-inline-row { display: flex; gap: 8px; align-items: center; }
+.cd-inline-row > input { flex: 1; min-width: 0; }
 .cd-actions { display: flex; gap: 8px; align-items: center; grid-column: 1 / -1; }
 .cd-btn {
   border: 1px solid #1f4e79;
@@ -340,4 +582,55 @@ onMounted(() => {
 }
 .cd-btn:disabled { opacity: 0.65; cursor: not-allowed; }
 .cd-btn--ghost { background: #fff; color: #1f4e79; }
+.cd-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 70;
+  padding: 16px;
+}
+.cd-modal {
+  width: min(960px, 100%);
+  max-height: calc(100vh - 32px);
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #cfd8e3;
+  display: flex;
+  flex-direction: column;
+}
+.cd-modal__header,
+.cd-modal__footer {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.cd-modal__footer {
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 0;
+  justify-content: flex-end;
+}
+.cd-modal__header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.cd-modal__close {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.cd-modal__content {
+  padding: 14px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 </style>

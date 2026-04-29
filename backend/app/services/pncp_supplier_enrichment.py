@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import json
 import re
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
@@ -10,6 +9,9 @@ from backend.app.models import PncpCotacaoItemCotacao
 
 PNCP_API_BASE = "https://pncp.gov.br/api/pncp"
 _CNPJ_RE = re.compile(r"\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}")
+
+# GET curto: evita travar geração de PDF (o browser cancela com "Failed to fetch").
+_DEFAULT_TIMEOUT = (1.2, 2.4)
 
 
 def _normalize_cnpj(raw: Any) -> str:
@@ -98,9 +100,9 @@ def _extract_supplier_snapshot(payload: Any) -> Dict[str, str]:
     return best or {"cnpj_fornecedor": "", "fornecedor": ""}
 
 
-def _get_json(url: str, timeout_s: float = 5.0) -> Any:
+def _get_json(url: str, timeout=_DEFAULT_TIMEOUT) -> Any:
     try:
-        r = requests.get(url, timeout=timeout_s)
+        r = requests.get(url, timeout=timeout)
     except Exception:
         return None
     if r.status_code in (204, 404) or r.status_code >= 400:
@@ -118,12 +120,27 @@ def _extract_item_numbers(items_payload: Any, max_items: int = 8) -> List[str]:
         rows = items_payload
     else:
         rows = []
-    out: List[str] = []
+    scored: List[Tuple[int, str]] = []
     for it in rows:
         if not isinstance(it, dict):
             continue
         n = str(it.get("numeroItem") or it.get("ordemItem") or it.get("sequencialItem") or "").strip()
-        if n and n not in out:
+        if not n:
+            continue
+        score = 0
+        if bool(it.get("temResultado")):
+            score += 5
+        sit = str(it.get("situacaoCompraItemNome") or it.get("situacaoCompraItem") or "").lower()
+        if "homolog" in sit:
+            score += 3
+        if "result" in sit:
+            score += 1
+        scored.append((score, n))
+
+    scored.sort(key=lambda x: (-x[0], int(re.sub(r"\D", "", x[1]) or 0)))
+    out: List[str] = []
+    for _, n in scored:
+        if n not in out:
             out.append(n)
         if len(out) >= max_items:
             break
@@ -138,26 +155,28 @@ def get_contract_supplier_snapshot_sync(cnpj_orgao: str, ano_compra: Any, sequen
         return {"cnpj_fornecedor": "", "fornecedor": ""}
 
     base = f"{PNCP_API_BASE}/v1/orgaos/{cnpj}/compras/{ano}/{seq}"
-    for suffix in ("resultado", "resultados", "fornecedor", "fornecedores", "vencedores", "atas", "contrato", "contratos", "empenhos", "partes-envolvidas"):
-        data = _get_json(f"{base}/{suffix}")
-        if data is None:
-            continue
-        snap = _extract_supplier_snapshot(data)
-        if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
-            return snap
 
+    # Caminho mais eficiente (documentado no manual PNCP): resultado por item.
     itens_data = _get_json(f"{base}/itens")
-    for n_item in _extract_item_numbers(itens_data, max_items=8):
+    nums = _extract_item_numbers(itens_data, max_items=3)
+    if nums:
+        n_item = nums[0]
         data = _get_json(f"{base}/itens/{n_item}/resultados")
-        if data is None:
-            continue
+        if data is not None:
+            snap = _extract_supplier_snapshot(data)
+            if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
+                return snap
+
+    # Fallback mínimo (1 GET) quando o resultado por item não responde.
+    data = _get_json(f"{base}/resultados")
+    if data is not None:
         snap = _extract_supplier_snapshot(data)
         if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
             return snap
     return {"cnpj_fornecedor": "", "fornecedor": ""}
 
 
-def enrich_missing_supplier_fields_for_cotacao(cotacao_id: int, *, max_lookups: int = 150) -> int:
+def enrich_missing_supplier_fields_for_cotacao(cotacao_id: int, *, max_lookups: int = 12) -> int:
     rows = list(
         PncpCotacaoItemCotacao.objects.filter(cotacao_id=cotacao_id).only(
             "id", "numero_pncp", "ano_compra", "sequencial_compra", "source"

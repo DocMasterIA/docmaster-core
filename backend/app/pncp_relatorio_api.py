@@ -225,7 +225,7 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
     try:
         # Auto-enriquecimento para cotações legadas que ficaram sem fornecedor/CNPJ.
         try:
-            enrich_missing_supplier_fields_for_cotacao(c.id, max_lookups=150)
+            enrich_missing_supplier_fields_for_cotacao(c.id, max_lookups=10)
         except Exception:
             pass
 

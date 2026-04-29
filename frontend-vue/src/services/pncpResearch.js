@@ -215,22 +215,44 @@ export function backfillLocalIndex(payload, signal) {
 
 /** PDF do relatório institucional da cotação (WeasyPrint no Django). */
 export async function downloadCotacaoRelatorioPdf(sessaoId, tituloRelatorio, signal) {
-  const res = await fetch(
-    `${API_BASE}/api/pncp/cotacoes/research/sessions/${encodeURIComponent(sessaoId)}/relatorio/pdf`,
-    {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ titulo_relatorio: tituloRelatorio }),
-      signal,
-    },
-  );
+  let res;
+  try {
+    res = await fetch(
+      `${API_BASE}/api/pncp/cotacoes/research/sessions/${encodeURIComponent(sessaoId)}/relatorio/pdf`,
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ titulo_relatorio: tituloRelatorio }),
+        signal,
+      },
+    );
+  } catch (err) {
+    const msg = String(err?.message || err || '');
+    if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+      throw new Error(
+        'A conexão com o servidor caiu ou o tempo esgotou ao gerar o PDF. Tente novamente em instantes; se persistir, o servidor pode estar sobrecarregado.',
+      );
+    }
+    throw err;
+  }
   const ctype = (res.headers.get('content-type') || '').toLowerCase();
   if (!res.ok) {
     const payload = ctype.includes('application/json') ? await res.json() : await res.text();
     throw new Error(extractErrorMessage(payload, res.status));
   }
-  const blob = await res.blob();
+  let blob;
+  try {
+    blob = await res.blob();
+  } catch (err) {
+    const msg = String(err?.message || err || '');
+    if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+      throw new Error(
+        'O download do PDF foi interrompido (rede ou tempo esgotado). Tente novamente; se o relatório for muito grande, aguarde alguns segundos e gere de novo.',
+      );
+    }
+    throw err;
+  }
   const cd = res.headers.get('content-disposition') || '';
   let filename = '';
   const utf8Match = cd.match(/filename\*=UTF-8''([^;]+)/i);

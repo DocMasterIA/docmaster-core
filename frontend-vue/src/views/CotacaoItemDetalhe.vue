@@ -114,6 +114,10 @@
                   <strong>{{ labelIncisoFromCotacao(r) }}</strong>
                 </div>
                 <div class="item-cotacao-card__field">
+                  <span>Quantidade</span>
+                  <strong>{{ formatQuantidadeCotacao(r) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field">
                   <span>Valor unitário</span>
                   <strong>{{ formatCurrency(r.valor_unitario) }}</strong>
                 </div>
@@ -315,6 +319,17 @@ function formatCidadeUf(r) {
   const uf = String(r?.uf || '').trim();
   if (m && uf) return `${m}/${uf}`;
   return m || uf || '—';
+}
+
+function formatQuantidadeCotacao(r) {
+  const qtd = Number(r?.quantidade);
+  const und = String(r?.unidade_medida || '').trim();
+  if (Number.isFinite(qtd)) {
+    const qtdFmt = Number.isInteger(qtd) ? String(qtd) : qtd.toLocaleString('pt-BR');
+    return und ? `${qtdFmt} ${und}` : qtdFmt;
+  }
+  if (und) return und;
+  return '—';
 }
 
 function normalizeFonte(v) {

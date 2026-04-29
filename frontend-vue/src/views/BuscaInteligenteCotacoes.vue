@@ -448,6 +448,7 @@ async function applyFilters() {
 
 function buildContextFromItem(it) {
   const src = it?.source || {};
+  const faixa = src?.faixa_regional || src?.faixaRegional || {};
   const fontes = it?.fontes_contagem || {};
   const totalCotacoesItem = Number(fontes.governamentais || 0)
     + Number(fontes.entesPublicos || 0)
@@ -460,12 +461,44 @@ function buildContextFromItem(it) {
     quantidade: it?.quantidade ?? null,
     unidade_medida: it?.unidade_medida || null,
     valor_base_referencia:
-      Number(src?.valor_base ?? src?.valorBase ?? src?.preco_base ?? src?.precoBase) || null,
+      parseNumericRef(
+        src?.valor_base,
+        src?.valorBase,
+        src?.preco_base,
+        src?.precoBase,
+        faixa?.valor_base,
+        faixa?.valorBase,
+      ),
     variacao_percentual_referencia:
-      Number(src?.variacao_percentual ?? src?.variacaoPercentual ?? src?.variacao) || null,
+      parseNumericRef(
+        src?.variacao_percentual,
+        src?.variacaoPercentual,
+        src?.variacao,
+        faixa?.variacao_percentual,
+        faixa?.variacaoPercentual,
+        faixa?.variacao,
+      ),
     uf_padrao: String(it?.uf || '').trim().toUpperCase() || null,
     total_cotacoes_item: totalCotacoesItem,
   };
+}
+
+function parseNumericRef(...vals) {
+  for (const v of vals) {
+    if (v === null || v === undefined) continue;
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
+    const raw = String(v).trim();
+    if (!raw) continue;
+    const cleaned = raw
+      .replace(/\s+/g, '')
+      .replace(/[R$r$\u00A0]/g, '')
+      .replace(/%/g, '')
+      .replace(/\./g, '')
+      .replace(',', '.');
+    const n = Number(cleaned);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
 }
 
 async function runSearchWithContext({ descricao, selectedUfCodes = [], context = null, append = false }) {

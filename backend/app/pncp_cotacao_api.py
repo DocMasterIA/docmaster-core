@@ -30,6 +30,7 @@ from backend.app.models import (
     PncpCotacao,
     PncpCotacaoAnexo,
     PncpCotacaoAnexoArquivo,
+    PncpFornecedorCadastro,
     PncpCotacaoItem,
     PncpCotacaoItemCotacao,
     Prefeitura,
@@ -213,6 +214,39 @@ def _parse_json_body(request: HttpRequest) -> Tuple[Optional[Dict[str, Any]], Op
     if not isinstance(data, dict):
         return None, JsonResponse({"detail": "JSON raiz deve ser um objeto."}, status=422)
     return data, None
+
+
+def _normalize_cnpj_digits(v: Any) -> str:
+    return re.sub(r"\D", "", str(v or ""))
+
+
+def _fornecedor_dict(row: PncpFornecedorCadastro) -> Dict[str, Any]:
+    return {
+        "id": int(row.id),
+        "tipo_pessoa": row.tipo_pessoa or "",
+        "cnpj": row.cnpj or "",
+        "razao_social": row.razao_social or "",
+        "tipo": row.tipo or "",
+        "data_abertura": row.data_abertura or "",
+        "porte": row.porte or "",
+        "nome_fantasia": row.nome_fantasia or "",
+        "logradouro": row.logradouro or "",
+        "numero": row.numero or "",
+        "complemento": row.complemento or "",
+        "cep": row.cep or "",
+        "bairro": row.bairro or "",
+        "municipio": row.municipio or "",
+        "uf": row.uf or "",
+        "email": row.email or "",
+        "telefone": row.telefone or "",
+        "situacao": row.situacao or "",
+        "data_situacao": row.data_situacao or "",
+        "motivo_situacao": row.motivo_situacao or "",
+        "situacao_especial": row.situacao_especial or "",
+        "data_situacao_especial": row.data_situacao_especial or "",
+        "created_at": _iso_z(row.created_at),
+        "updated_at": _iso_z(row.updated_at),
+    }
 
 
 def _normalize_column_id(v: Any) -> str:
@@ -920,6 +954,79 @@ def _item_from_payload(it: Dict[str, Any], cotacao: PncpCotacao) -> PncpCotacaoI
         modalidade=str(it.get("modalidade") or "")[:256],
         source=_compact_item_source(it),
     )
+
+
+@api_login_required
+@csrf_exempt
+@require_http_methods(["GET", "POST", "OPTIONS"])
+def pncp_fornecedores_cadastrados(request):
+    if request.method == "OPTIONS":
+        return JsonResponse({}, status=204)
+
+    if request.method == "GET":
+        limit_raw = request.GET.get("limit", "100")
+        try:
+            limit = max(1, min(int(limit_raw), 500))
+        except Exception:
+            limit = 100
+        qs = PncpFornecedorCadastro.objects.filter(usuario_id=request.user.id).order_by("-updated_at", "-id")[:limit]
+        rows = [_fornecedor_dict(x) for x in qs]
+        return JsonResponse({"ok": True, "fornecedores": rows, "stats": {"total": len(rows)}})
+
+    body, err = _parse_json_body(request)
+    if err:
+        return err
+    payload = body.get("fornecedor") if isinstance(body.get("fornecedor"), dict) else body
+    if not isinstance(payload, dict):
+        return JsonResponse({"detail": "Corpo inválido. Envie objeto de fornecedor."}, status=422)
+
+    cnpj_digits = _normalize_cnpj_digits(payload.get("cnpj"))
+    razao_social = str(payload.get("razao_social") or "").strip()
+    nome_fantasia = str(payload.get("nome_fantasia") or "").strip()
+    if not (cnpj_digits or razao_social or nome_fantasia):
+        return JsonResponse({"detail": "Informe ao menos CNPJ, razão social ou nome fantasia."}, status=422)
+
+    with transaction.atomic():
+        row = None
+        if cnpj_digits:
+            row = (
+                PncpFornecedorCadastro.objects.select_for_update()
+                .filter(usuario_id=request.user.id, cnpj=cnpj_digits)
+                .first()
+            )
+        if not row and razao_social:
+            row = (
+                PncpFornecedorCadastro.objects.select_for_update()
+                .filter(usuario_id=request.user.id, razao_social__iexact=razao_social)
+                .first()
+            )
+        if not row:
+            row = PncpFornecedorCadastro(usuario_id=request.user.id)
+
+        row.tipo_pessoa = str(payload.get("tipo_pessoa") or row.tipo_pessoa or "").strip()[:80]
+        row.cnpj = cnpj_digits[:24]
+        row.razao_social = razao_social[:255]
+        row.tipo = str(payload.get("tipo") or "").strip()[:120]
+        row.data_abertura = str(payload.get("data_abertura") or "").strip()[:32]
+        row.porte = str(payload.get("porte") or "").strip()[:120]
+        row.nome_fantasia = nome_fantasia[:255]
+        row.logradouro = str(payload.get("logradouro") or "").strip()[:255]
+        row.numero = str(payload.get("numero") or "").strip()[:64]
+        row.complemento = str(payload.get("complemento") or "").strip()[:255]
+        row.cep = str(payload.get("cep") or "").strip()[:24]
+        row.bairro = str(payload.get("bairro") or "").strip()[:120]
+        row.municipio = str(payload.get("municipio") or "").strip()[:120]
+        row.uf = _normalize_uf(payload.get("uf"))
+        row.email = str(payload.get("email") or "").strip()[:255]
+        row.telefone = str(payload.get("telefone") or "").strip()[:64]
+        row.situacao = str(payload.get("situacao") or "").strip()[:120]
+        row.data_situacao = str(payload.get("data_situacao") or "").strip()[:32]
+        row.motivo_situacao = str(payload.get("motivo_situacao") or "").strip()[:255]
+        row.situacao_especial = str(payload.get("situacao_especial") or "").strip()[:255]
+        row.data_situacao_especial = str(payload.get("data_situacao_especial") or "").strip()[:32]
+        row.save()
+
+    return JsonResponse({"ok": True, "fornecedor": _fornecedor_dict(row)})
 
 
 @api_login_required

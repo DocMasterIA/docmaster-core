@@ -122,6 +122,20 @@
 
         <div class="cd-modal__content">
           <p class="cd-meta">Preencha manualmente ou informe CNPJ para completar automaticamente.</p>
+          <label class="cd-field cd-field--full">
+            <span>Fornecedores cadastrados</span>
+            <div class="cd-inline-row">
+              <select v-model="fornecedorSelecionadoId">
+                <option value="">Selecione um fornecedor salvo</option>
+                <option v-for="f in fornecedoresCadastrados" :key="f.id" :value="String(f.id)">
+                  {{ f.razao_social || f.nome_fantasia || 'Fornecedor sem nome' }}{{ f.cnpj ? ` · ${f.cnpj}` : '' }}
+                </option>
+              </select>
+              <button type="button" class="cd-btn cd-btn--ghost" @click="aplicarFornecedorSelecionado">
+                Carregar
+              </button>
+            </div>
+          </label>
 
           <div class="cd-form">
             <label class="cd-field">
@@ -236,7 +250,12 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { addCotacoesToItemInResearchSession, getResearchSession } from '../services/pncpResearch';
+import {
+  addCotacoesToItemInResearchSession,
+  getResearchSession,
+  listFornecedoresCadastrados,
+  saveFornecedorCadastrado,
+} from '../services/pncpResearch';
 
 const route = useRoute();
 const router = useRouter();
@@ -253,6 +272,8 @@ const itemNome = ref('—');
 const fornecedorModalOpen = ref(false);
 const fornecedorModalError = ref('');
 const isBuscandoCnpj = ref(false);
+const fornecedoresCadastrados = ref([]);
+const fornecedorSelecionadoId = ref('');
 
 const form = ref({
   fornecedor: '',
@@ -346,11 +367,38 @@ function closeFornecedorModal() {
   fornecedorModalError.value = '';
 }
 
-function aplicarFornecedorNoFormulario() {
+function aplicarFornecedorSelecionado() {
+  const idSel = Number(fornecedorSelecionadoId.value);
+  if (!Number.isFinite(idSel) || idSel <= 0) return;
+  const pick = fornecedoresCadastrados.value.find((x) => Number(x?.id) === idSel);
+  if (!pick) return;
+  fornecedorForm.value = {
+    ...fornecedorForm.value,
+    ...pick,
+    cnpj: formatCnpj(pick?.cnpj),
+  };
+  const nome = String(pick?.razao_social || pick?.nome_fantasia || '').trim();
+  if (nome) form.value.fornecedor = nome;
+}
+
+async function aplicarFornecedorNoFormulario() {
   const razao = String(fornecedorForm.value.razao_social || '').trim();
   const fantasia = String(fornecedorForm.value.nome_fantasia || '').trim();
   const nome = razao || fantasia;
   if (nome) form.value.fornecedor = nome;
+  try {
+    const saveRes = await saveFornecedorCadastrado({
+      ...fornecedorForm.value,
+      cnpj: formatCnpj(fornecedorForm.value.cnpj),
+    });
+    if (saveRes?.fornecedor?.id) {
+      fornecedorForm.value = { ...fornecedorForm.value, ...saveRes.fornecedor };
+      await carregarFornecedoresCadastrados();
+      fornecedorSelecionadoId.value = String(saveRes.fornecedor.id);
+    }
+  } catch (_) {
+    // Não interrompe o uso do formulário.
+  }
   closeFornecedorModal();
 }
 
@@ -430,6 +478,15 @@ async function carregarItem() {
     loadError.value = `Falha ao carregar item (${err?.message || 'erro desconhecido'}).`;
   } finally {
     isLoading.value = false;
+  }
+}
+
+async function carregarFornecedoresCadastrados() {
+  try {
+    const res = await listFornecedoresCadastrados(200);
+    fornecedoresCadastrados.value = Array.isArray(res?.fornecedores) ? res.fornecedores : [];
+  } catch (_) {
+    fornecedoresCadastrados.value = [];
   }
 }
 
@@ -529,6 +586,20 @@ async function salvarCotacaoDireta() {
 
   isSaving.value = true;
   try {
+    const fornecedorCadastroPayload = {
+      ...fornecedorForm.value,
+      cnpj: formatCnpj(fornecedorForm.value.cnpj),
+      razao_social: String(fornecedorForm.value.razao_social || fornecedor || '').trim(),
+      nome_fantasia: String(fornecedorForm.value.nome_fantasia || '').trim(),
+    };
+    try {
+      const saveRes = await saveFornecedorCadastrado(fornecedorCadastroPayload);
+      if (saveRes?.fornecedor?.id) {
+        fornecedorForm.value = { ...fornecedorForm.value, ...saveRes.fornecedor };
+      }
+    } catch (_) {
+      // Não bloqueia gravação da cotação direta se o cadastro falhar.
+    }
     await addCotacoesToItemInResearchSession(sessaoId, iid, [payload]);
     saveSuccess.value = 'Cotação direta registrada com sucesso.';
     setTimeout(() => {
@@ -546,6 +617,7 @@ onMounted(() => {
   form.value.data_cotacao = now.toISOString().slice(0, 10);
   form.value.hora_cotacao = now.toTimeString().slice(0, 5);
   carregarItem();
+  carregarFornecedoresCadastrados();
 });
 </script>
 

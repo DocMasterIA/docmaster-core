@@ -24,6 +24,7 @@ from .api import (
 from .llm_proxy import llm_proxy
 from .pncp_research_proxy import pncp_research_proxy
 from .pncp_cotacao_api import (
+    pncp_fornecedores_cadastrados,
     pncp_research_sessions_add_items,
     pncp_research_sessions_download_supplier_pdf,
     pncp_research_sessions_delete_items,
@@ -66,6 +67,11 @@ urlpatterns = [
     # Proxy LLM: sessão Django obrigatória; repassa para FastAPI (LLM_API_BASE_URL)
     path('api/llm/<path:path>', llm_proxy, name='api_llm_proxy'),
     # Cotações PNCP persistidas no Django (ORM)
+    path(
+        'api/pncp/cotacoes/fornecedores',
+        pncp_fornecedores_cadastrados,
+        name='api_pncp_cotacoes_fornecedores',
+    ),
     path(
         'api/pncp/cotacoes/research/sessions',
         pncp_research_sessions_list_create,

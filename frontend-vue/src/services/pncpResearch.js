@@ -64,6 +64,18 @@ export function listResearchSessions(limit = 100, signal) {
   return cotacaoRequest(`research/sessions?limit=${encodeURIComponent(limit)}`, { signal });
 }
 
+export function listFornecedoresCadastrados(limit = 100, signal) {
+  return cotacaoRequest(`fornecedores?limit=${encodeURIComponent(limit)}`, { signal });
+}
+
+export function saveFornecedorCadastrado(fornecedor, signal) {
+  return cotacaoRequest('fornecedores', {
+    method: 'POST',
+    body: { fornecedor },
+    signal,
+  });
+}
+
 export function createResearchSession(payload, signal) {
   return cotacaoRequest('research/sessions', {
     method: 'POST',

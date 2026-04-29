@@ -110,6 +110,46 @@ class PncpCotacaoAnexoArquivo(models.Model):
         ]
 
 
+class PncpFornecedorCadastro(models.Model):
+    """Cadastro persistente de fornecedores para reutilização em cotações diretas."""
+
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="pncp_fornecedores_cadastrados",
+    )
+    tipo_pessoa = models.CharField(max_length=80, blank=True, default="")
+    cnpj = models.CharField(max_length=24, blank=True, default="")
+    razao_social = models.CharField(max_length=255, blank=True, default="")
+    tipo = models.CharField(max_length=120, blank=True, default="")
+    data_abertura = models.CharField(max_length=32, blank=True, default="")
+    porte = models.CharField(max_length=120, blank=True, default="")
+    nome_fantasia = models.CharField(max_length=255, blank=True, default="")
+    logradouro = models.CharField(max_length=255, blank=True, default="")
+    numero = models.CharField(max_length=64, blank=True, default="")
+    complemento = models.CharField(max_length=255, blank=True, default="")
+    cep = models.CharField(max_length=24, blank=True, default="")
+    bairro = models.CharField(max_length=120, blank=True, default="")
+    municipio = models.CharField(max_length=120, blank=True, default="")
+    uf = models.CharField(max_length=8, blank=True, default="")
+    email = models.CharField(max_length=255, blank=True, default="")
+    telefone = models.CharField(max_length=64, blank=True, default="")
+    situacao = models.CharField(max_length=120, blank=True, default="")
+    data_situacao = models.CharField(max_length=32, blank=True, default="")
+    motivo_situacao = models.CharField(max_length=255, blank=True, default="")
+    situacao_especial = models.CharField(max_length=255, blank=True, default="")
+    data_situacao_especial = models.CharField(max_length=32, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-id"]
+        indexes = [
+            models.Index(fields=["usuario", "-id"]),
+            models.Index(fields=["usuario", "cnpj"]),
+        ]
+
+
 class PncpCotacaoItemCotacao(models.Model):
     """Cotação de preço coletada para um item manual da cotação."""
 

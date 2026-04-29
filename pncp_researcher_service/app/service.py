@@ -467,6 +467,8 @@ async def _extract_matching_items_with_table_lookup(
         rows: List[Dict[str, Any]] = []
         fornecedor_nome = ""
         fornecedor_cnpj = ""
+        fornecedor_cadastro: Dict[str, Any] = {}
+        fornecedor_fonte_nome = ""
         try:
             cnpj = _extract_cnpj_from_raw(raw)
             ano = raw.get("anoCompra")
@@ -490,12 +492,18 @@ async def _extract_matching_items_with_table_lookup(
                         fornecedor_data = {}
                     fornecedor_nome = str((fornecedor_data or {}).get("fornecedor") or "").strip()
                     fornecedor_cnpj = str((fornecedor_data or {}).get("cnpj_fornecedor") or "").strip()
+                    fornecedor_cadastro = (fornecedor_data or {}).get("fornecedor_cadastro")
+                    if not isinstance(fornecedor_cadastro, dict):
+                        fornecedor_cadastro = {}
+                    fornecedor_fonte_nome = str((fornecedor_data or {}).get("fornecedor_fonte_nome") or "").strip()
                 item_table_text = _item_text_from_table_rows(rows)
                 score_table = _compute_match_score(item_table_text, query_groups) if item_table_text else 0.0
         except Exception:
             # Não derruba busca por falha pontual na consulta de itens
             score_table = 0.0
             rows = []
+            fornecedor_cadastro = {}
+            fornecedor_fonte_nome = ""
 
         confirmado_itens: bool | None = None
         if rows and PNCP_REQUIRE_TABLE_MATCH_WHEN_ITENS_EXIST:
@@ -563,6 +571,8 @@ async def _extract_matching_items_with_table_lookup(
             "itens_pncp": itens_json,
             "fornecedor": fornecedor_nome,
             "cnpj_fornecedor": fornecedor_cnpj,
+            "fornecedor_cadastro": fornecedor_cadastro,
+            "fornecedor_fonte_nome": fornecedor_fonte_nome,
             **_extract_esfera_meta(raw),
         }
 

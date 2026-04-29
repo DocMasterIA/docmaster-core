@@ -329,48 +329,113 @@ def _normalize_cnpj(raw: str) -> str:
     return f"{d[:2]}.{d[2:5]}.{d[5:8]}/{d[8:12]}-{d[12:14]}"
 
 
-def _extract_item_numbers(items_payload: Any, *, max_items: int = 12) -> List[str]:
-    nums: List[str] = []
+def _cnpj_digits(raw: Any) -> str:
+    return re.sub(r"\D", "", str(raw or ""))
+
+
+BRASILAPI_CNPJ_URL = "https://brasilapi.com.br/api/cnpj/v1/{cnpj_digits}"
+
+
+def _extract_supplier_cnpj_only(payload: Any) -> str:
+    """Apenas CNPJ a partir do JSON PNCP; razão social / nome vêm da BrasilAPI."""
+    cands = _walk_supplier_candidates(payload)
+    for cand in cands:
+        if _is_orgao_path(cand.get("path", "")):
+            continue
+        cj = _normalize_cnpj(str(cand.get("cnpj") or "").strip())
+        if cj:
+            return cj
+    return ""
+
+
+def _parse_brasilapi_to_fornecedor(payload: Dict[str, Any], *, cnpj_digits: str) -> tuple[str, Dict[str, Any]]:
+    """Alinha campos ao fluxo de cotação direta (BrasilAPI CNPJ)."""
+    razao = str(payload.get("razao_social") or "").strip()
+    fantasia = str(payload.get("nome_fantasia") or "").strip()
+    nome = razao or fantasia
+    porte_raw = payload.get("porte")
+    if isinstance(porte_raw, dict):
+        porte_txt = str(porte_raw.get("descricao") or porte_raw.get("descricaoPorte") or "").strip()
+    else:
+        porte_txt = str(porte_raw or "").strip()
+    cadastro: Dict[str, Any] = {
+        "cnpj": _normalize_cnpj(cnpj_digits),
+        "razao_social": razao,
+        "nome_fantasia": fantasia,
+        "tipo_pessoa": "Pessoa Jurídica",
+        "tipo": str(payload.get("descricao_identificador_matriz_filial") or "").strip(),
+        "porte": porte_txt,
+        "logradouro": str(payload.get("logradouro") or "").strip(),
+        "numero": str(payload.get("numero") or "").strip(),
+        "complemento": str(payload.get("complemento") or "").strip(),
+        "cep": str(payload.get("cep") or "").strip(),
+        "bairro": str(payload.get("bairro") or "").strip(),
+        "municipio": str(payload.get("municipio") or "").strip(),
+        "uf": str(payload.get("uf") or "").strip(),
+        "email": str(payload.get("email") or "").strip(),
+        "telefone": str(payload.get("ddd_telefone_1") or payload.get("ddd_telefone_2") or "").strip(),
+        "situacao": str(payload.get("descricao_situacao_cadastral") or "").strip(),
+        "data_situacao": str(payload.get("data_situacao_cadastral") or "").strip(),
+        "motivo_situacao": str(payload.get("motivo_situacao_cadastral") or "").strip(),
+        "situacao_especial": str(payload.get("situacao_especial") or "").strip(),
+        "data_situacao_especial": str(payload.get("data_situacao_especial") or "").strip(),
+    }
+    return nome, {k: v for k, v in cadastro.items() if v}
+
+
+async def fetch_brasilapi_fornecedor_por_cnpj(
+    client: httpx.AsyncClient, cnpj_formatted_or_digits: str
+) -> tuple[str, Dict[str, Any]]:
+    d = _cnpj_digits(cnpj_formatted_or_digits)
+    if len(d) != 14:
+        return "", {}
+    url = BRASILAPI_CNPJ_URL.format(cnpj_digits=d)
+    try:
+        resp = await client.get(url, timeout=httpx.Timeout(12.0, connect=5.0))
+    except httpx.RequestError:
+        return "", {}
+    if resp.status_code in (204, 404) or resp.status_code >= 400:
+        return "", {}
+    try:
+        body = resp.json()
+    except ValueError:
+        return "", {}
+    if not isinstance(body, dict):
+        return "", {}
+    return _parse_brasilapi_to_fornecedor(body, cnpj_digits=d)
+
+
+def _extract_item_numbers_prioritized(items_payload: Any, *, max_items: int = 8) -> List[str]:
     if isinstance(items_payload, dict) and isinstance(items_payload.get("data"), list):
-        rows = items_payload.get("data") or []
+        rows = items_payload["data"]
     elif isinstance(items_payload, list):
         rows = items_payload
     else:
         rows = []
+    scored: List[tuple[int, str]] = []
     for it in rows:
         if not isinstance(it, dict):
             continue
-        cand = it.get("numeroItem") or it.get("ordemItem") or it.get("sequencialItem")
-        s = str(cand or "").strip()
-        if not s:
+        n = str(it.get("numeroItem") or it.get("ordemItem") or it.get("sequencialItem") or "").strip()
+        if not n:
             continue
-        if s not in nums:
-            nums.append(s)
-        if len(nums) >= max(1, int(max_items)):
+        score = 0
+        if bool(it.get("temResultado")):
+            score += 5
+        sit = str(it.get("situacaoCompraItemNome") or it.get("situacaoCompraItem") or "").lower()
+        if "homolog" in sit:
+            score += 3
+        if "result" in sit:
+            score += 1
+        scored.append((score, n))
+    scored.sort(key=lambda x: (-x[0], int(re.sub(r"\D", "", x[1]) or 0)))
+    out: List[str] = []
+    for _, n in scored:
+        if n not in out:
+            out.append(n)
+        if len(out) >= max_items:
             break
-    return nums
-
-
-def _extract_supplier_snapshot(payload: Any) -> Dict[str, str]:
-    cands = _walk_supplier_candidates(payload)
-    generic_names = {"demais", "nao informado", "não informado", "epp", "me", "mei", "outros"}
-    best: Dict[str, str] | None = None
-    for cand in cands:
-        if _is_orgao_path(cand.get("path", "")):
-            continue
-        cnpj = _normalize_cnpj(cand.get("cnpj", ""))
-        nome = str(cand.get("fornecedor") or "").strip()
-        nome_norm = re.sub(r"\s+", " ", nome).strip().lower()
-        nome_ok = bool(nome and nome_norm not in generic_names)
-        if cnpj and nome_ok:
-            return {"cnpj_fornecedor": cnpj, "fornecedor": nome}
-        if cnpj and not best:
-            best = {"cnpj_fornecedor": cnpj, "fornecedor": nome if nome_ok else ""}
-        elif nome_ok and not best:
-            best = {"cnpj_fornecedor": "", "fornecedor": nome}
-    if best:
-        return best
-    return {"cnpj_fornecedor": "", "fornecedor": ""}
+    return out
 
 
 async def get_contract_supplier_snapshot(
@@ -379,77 +444,67 @@ async def get_contract_supplier_snapshot(
     sequencial_compra: Any,
     *,
     client: Optional[httpx.AsyncClient] = None,
-) -> Dict[str, str]:
+) -> Dict[str, Any]:
     """
-    Busca, de forma tolerante, possíveis dados de fornecedor vencedor em endpoints
-    complementares da contratação no PNCP API.
+    Obtém CNPJ do fornecedor vencedor via PNCP (/itens/.../resultados ou /resultados)
+    e resolve nome + cadastro na BrasilAPI (mesma fonte da cotação direta).
     """
-    cnpj = str(cnpj_orgao or "").strip()
+    cnpj = _cnpj_digits(str(cnpj_orgao or ""))
     ano = str(ano_compra or "").strip()
     seq = str(sequencial_compra or "").strip()
-    if not cnpj or not ano or not seq:
-        return {"cnpj_fornecedor": "", "fornecedor": ""}
+    if len(cnpj) != 14 or not ano or not seq:
+        return {"cnpj_fornecedor": "", "fornecedor": "", "fornecedor_cadastro": {}}
 
     base = f"{PNCP_PNCP_API_BASE_URL}/v1/orgaos/{cnpj}/compras/{ano}/{seq}"
-    candidate_paths = (
-        "resultado",
-        "resultados",
-        "fornecedor",
-        "fornecedores",
-        "vencedores",
-        "atas",
-        "contrato",
-        "contratos",
-        "empenhos",
-        "partes-envolvidas",
-    )
 
     close_client = False
     if client is None:
         client = create_pncp_http_client()
         close_client = True
-    try:
-        for suffix in candidate_paths:
-            endpoint = f"{base}/{suffix}"
-            resp = await _get_pncp(client, endpoint, params=None, tolerate_rate_limit=True)
-            if resp is None:
-                continue
-            if resp.status_code in (204, 404):
-                continue
-            if resp.status_code >= 400:
-                continue
-            try:
-                data = resp.json()
-            except ValueError:
-                continue
-            snap = _extract_supplier_snapshot(data)
-            if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
-                return snap
 
-        # Alternativa usada por integradores: resultado por item
-        # /itens/{numeroItem}/resultados costuma carregar niFornecedor/fornecedor vencedor.
-        itens_endpoint = f"{base}/itens"
-        itens_resp = await _get_pncp(client, itens_endpoint, params=None, tolerate_rate_limit=True)
-        item_nums: List[str] = []
+    async def _finalize(cnpj_fmt: str) -> Dict[str, Any]:
+        if not cnpj_fmt:
+            return {"cnpj_fornecedor": "", "fornecedor": "", "fornecedor_cadastro": {}}
+        nome, cad = await fetch_brasilapi_fornecedor_por_cnpj(client, cnpj_fmt)
+        out: Dict[str, Any] = {"cnpj_fornecedor": cnpj_fmt, "fornecedor": nome, "fornecedor_cadastro": cad or {}}
+        if nome or cad:
+            out["fornecedor_fonte_nome"] = "brasilapi_cnpj"
+        return out
+
+    try:
+        itens_resp = await _get_pncp(client, f"{base}/itens", params=None, tolerate_rate_limit=True)
+        nums: List[str] = []
         if itens_resp is not None and itens_resp.status_code < 400:
             try:
-                item_nums = _extract_item_numbers(itens_resp.json(), max_items=12)
+                nums = _extract_item_numbers_prioritized(itens_resp.json(), max_items=3)
             except Exception:
-                item_nums = []
-        for numero_item in item_nums:
-            res_endpoint = f"{base}/itens/{numero_item}/resultados"
-            res_resp = await _get_pncp(client, res_endpoint, params=None, tolerate_rate_limit=True)
+                nums = []
+        for n_item in nums:
+            res_resp = await _get_pncp(
+                client, f"{base}/itens/{n_item}/resultados", params=None, tolerate_rate_limit=True
+            )
             if res_resp is None or res_resp.status_code in (204, 404) or res_resp.status_code >= 400:
                 continue
             try:
                 res_data = res_resp.json()
             except ValueError:
                 continue
-            snap = _extract_supplier_snapshot(res_data)
-            if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
-                return snap
+            cj = _extract_supplier_cnpj_only(res_data)
+            if cj:
+                return await _finalize(cj)
+
+        res_root = await _get_pncp(client, f"{base}/resultados", params=None, tolerate_rate_limit=True)
+        if res_root is not None and res_root.status_code < 400:
+            try:
+                root_data = res_root.json()
+            except ValueError:
+                root_data = None
+            if root_data is not None:
+                cj = _extract_supplier_cnpj_only(root_data)
+                if cj:
+                    return await _finalize(cj)
     finally:
         if close_client:
             await client.aclose()
 
-    return {"cnpj_fornecedor": "", "fornecedor": ""}
+    return {"cnpj_fornecedor": "", "fornecedor": "", "fornecedor_cadastro": {}}

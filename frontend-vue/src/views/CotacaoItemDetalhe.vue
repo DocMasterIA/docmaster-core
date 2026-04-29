@@ -103,7 +103,61 @@
                   </span>
                 </div>
               </header>
-              <div class="item-cotacao-card__grid">
+              <div
+                v-if="isDominioAmploCotacao(r)"
+                class="item-cotacao-card__grid item-cotacao-card__grid--dominio"
+              >
+                <div class="item-cotacao-card__field item-cotacao-card__field--wide">
+                  <span>Produto/Referência capturada</span>
+                  <strong>{{ nomeItemDaCotacao(r) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field item-cotacao-card__field--wide">
+                  <span>Fonte / Loja</span>
+                  <strong>{{ dominioFonteNome(r) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field item-cotacao-card__field--wide">
+                  <span>Link da oferta</span>
+                  <a
+                    v-if="dominioLink(r)"
+                    :href="dominioLink(r)"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="item-cotacao-card__link"
+                  >
+                    {{ dominioLink(r) }}
+                  </a>
+                  <strong v-else>—</strong>
+                </div>
+                <div class="item-cotacao-card__field">
+                  <span>Fornecedor</span>
+                  <strong>{{ dominioFornecedor(r) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field">
+                  <span>Data da captura</span>
+                  <strong>{{ formatDateTimePt(r.created_at) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field">
+                  <span>Código / Referência</span>
+                  <strong>{{ dominioReferencia(r) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field">
+                  <span>Quantidade</span>
+                  <strong>{{ formatQuantidadeCotacao(r) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field">
+                  <span>Valor unitário</span>
+                  <strong>{{ formatCurrency(r.valor_unitario) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field">
+                  <span>Valor total</span>
+                  <strong>{{ formatCurrency(r.valor_total) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field item-cotacao-card__field--wide">
+                  <span>Observações do domínio amplo</span>
+                  <strong>{{ dominioObservacoes(r) }}</strong>
+                </div>
+              </div>
+              <div v-else class="item-cotacao-card__grid">
                 <div class="item-cotacao-card__field item-cotacao-card__field--wide">
                   <span>Nome (PNCP)</span>
                   <strong>{{ nomeItemDaCotacao(r) }}</strong>
@@ -358,6 +412,70 @@ function nomeItemDaCotacao(r) {
   return nome || '—';
 }
 
+function isDominioAmploCotacao(r) {
+  return classificarFonte(r) === 'dominio_amplo';
+}
+
+function dominioFonteNome(r) {
+  const src = r?.source || {};
+  return String(
+    src?.site ||
+      src?.fonte_nome ||
+      src?.fonteNome ||
+      src?.origem_site ||
+      src?.origemSite ||
+      src?.marketplace ||
+      src?.loja ||
+      r?.orgao ||
+      '',
+  ).trim() || '—';
+}
+
+function dominioLink(r) {
+  const src = r?.source || {};
+  const link = String(src?.url || src?.link || src?.link_oferta || src?.linkOferta || '').trim();
+  if (!link) return '';
+  if (/^https?:\/\//i.test(link)) return link;
+  return `https://${link}`;
+}
+
+function dominioFornecedor(r) {
+  const src = r?.source || {};
+  return String(
+    src?.fornecedor ||
+      src?.fornecedor_nome ||
+      src?.nome_fornecedor ||
+      src?.razao_social ||
+      src?.razaoSocial ||
+      r?.orgao ||
+      '',
+  ).trim() || '—';
+}
+
+function dominioReferencia(r) {
+  const src = r?.source || {};
+  return String(
+    src?.codigo_referencia ||
+      src?.codigoReferencia ||
+      src?.sku ||
+      src?.modelo ||
+      src?.numero_item ||
+      r?.numero_item ||
+      '',
+  ).trim() || '—';
+}
+
+function dominioObservacoes(r) {
+  const src = r?.source || {};
+  return String(
+    src?.observacoes ||
+      src?.descricao_complementar ||
+      src?.descricaoComplementar ||
+      src?.observacao ||
+      '',
+  ).trim() || '—';
+}
+
 function normalizeFonte(v) {
   const s = String(v || '')
     .normalize('NFD')
@@ -545,6 +663,10 @@ function labelIncisoFromCotacao(cotacao) {
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 8px;
 }
+.item-cotacao-card__grid--dominio {
+  border-top: 1px dashed #cbd5e1;
+  padding-top: 8px;
+}
 .item-cotacao-card__field {
   border: 1px solid #e5eaf3;
   border-radius: 10px;
@@ -563,6 +685,12 @@ function labelIncisoFromCotacao(cotacao) {
 .item-cotacao-card__field strong {
   font-size: 12px;
   color: #0f172a;
+}
+.item-cotacao-card__link {
+  color: #0f4c81;
+  text-decoration: underline;
+  word-break: break-all;
+  font-size: 12px;
 }
 .item-empty-state {
   border: 1px dashed #d6dde8;

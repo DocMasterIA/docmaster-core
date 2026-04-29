@@ -104,7 +104,48 @@
                 </div>
               </header>
               <div
-                v-if="isDominioAmploCotacao(r)"
+                v-if="isCotacaoDireta(r)"
+                class="item-cotacao-card__grid item-cotacao-card__grid--direta"
+              >
+                <div class="item-cotacao-card__field item-cotacao-card__field--wide">
+                  <span>Fornecedor (cotação direta)</span>
+                  <strong>{{ diretaFornecedorLabel(r) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field item-cotacao-card__field--wide">
+                  <span>Descrição da proposta</span>
+                  <strong>{{ nomeItemDaCotacao(r) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field">
+                  <span>Data/Hora da cotação</span>
+                  <strong>{{ formatDateTimePt(r.data_publicacao || r.created_at) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field">
+                  <span>Ajuste de frete</span>
+                  <strong>{{ diretaAjusteFrete(r) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field">
+                  <span>Valor de frete</span>
+                  <strong>{{ formatCurrency(diretaValorFrete(r)) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field">
+                  <span>Quantidade</span>
+                  <strong>{{ formatQuantidadeCotacao(r) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field">
+                  <span>Valor unitário</span>
+                  <strong>{{ formatCurrency(r.valor_unitario) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field">
+                  <span>Valor total</span>
+                  <strong>{{ formatCurrency(r.valor_total) }}</strong>
+                </div>
+                <div class="item-cotacao-card__field item-cotacao-card__field--wide">
+                  <span>Observações</span>
+                  <strong>{{ diretaObservacoes(r) }}</strong>
+                </div>
+              </div>
+              <div
+                v-else-if="isDominioAmploCotacao(r)"
                 class="item-cotacao-card__grid item-cotacao-card__grid--dominio"
               >
                 <div class="item-cotacao-card__field item-cotacao-card__field--wide">
@@ -412,6 +453,51 @@ function nomeItemDaCotacao(r) {
   return nome || '—';
 }
 
+function isCotacaoDireta(r) {
+  return classificarFonte(r) === 'cotacao_direta';
+}
+
+function diretaFornecedorLabel(r) {
+  const src = r?.source || {};
+  const cadastro = src?.fornecedor_cadastro || {};
+  const cnpj = String(cadastro?.cnpj || src?.cnpj_fornecedor || src?.cnpj || '').trim();
+  const nome = String(
+    cadastro?.razao_social ||
+      cadastro?.nome_fantasia ||
+      src?.fornecedor ||
+      src?.fornecedor_nome ||
+      src?.nome_fornecedor ||
+      r?.orgao ||
+      '',
+  ).trim();
+  if (cnpj && nome) return `${cnpj} - ${nome}`;
+  return nome || cnpj || '—';
+}
+
+function diretaAjusteFrete(r) {
+  const src = r?.source || {};
+  const a = String(src?.ajuste_frete || '').trim().toLowerCase();
+  if (a === 'com_frete') return 'Com frete';
+  if (a === 'sem_frete') return 'Sem frete';
+  return 'Não informado';
+}
+
+function diretaValorFrete(r) {
+  const src = r?.source || {};
+  const n = Number(src?.valor_frete);
+  return Number.isFinite(n) ? n : null;
+}
+
+function diretaObservacoes(r) {
+  const src = r?.source || {};
+  return String(
+    src?.observacoes ||
+      src?.descricao_complementar ||
+      src?.descricaoComplementar ||
+      '',
+  ).trim() || '—';
+}
+
 function isDominioAmploCotacao(r) {
   return classificarFonte(r) === 'dominio_amplo';
 }
@@ -665,6 +751,10 @@ function labelIncisoFromCotacao(cotacao) {
 }
 .item-cotacao-card__grid--dominio {
   border-top: 1px dashed #cbd5e1;
+  padding-top: 8px;
+}
+.item-cotacao-card__grid--direta {
+  border-top: 1px dashed #bbf7d0;
   padding-top: 8px;
 }
 .item-cotacao-card__field {

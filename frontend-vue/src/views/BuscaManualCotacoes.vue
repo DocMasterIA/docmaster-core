@@ -490,7 +490,27 @@ function isSimilaridadeParcialManual(query, desc) {
     return specTokens.some((t) => dWords.some((w) => hasWordLikeMatch(w, t)));
   }
   const hits = coreTokens.filter((t) => dWords.some((w) => hasWordLikeMatch(w, t))).length;
-  return hits >= Math.min(2, coreTokens.length);
+  if (hits >= Math.min(2, coreTokens.length)) return true;
+  // Fallback mais permissivo para variações claras no manual.
+  return scoreAderenciaManual(query, desc) >= 0.45;
+}
+
+function scoreAderenciaManual(query, desc) {
+  const qTokens = tokenizeForSimilarity(query);
+  const dWords = tokenizeForSimilarity(desc);
+  if (!qTokens.length || !dWords.length) return 0;
+  let hits = 0;
+  for (const t of qTokens) {
+    if (dWords.some((w) => hasWordLikeMatch(w, t))) hits += 1;
+  }
+  return hits / Math.max(1, qTokens.length);
+}
+
+function confiabilidadeManual(query, desc) {
+  const score = scoreAderenciaManual(query, desc);
+  if (score >= 0.85) return 'Alta';
+  if (score >= 0.55) return 'Média';
+  return 'Baixa';
 }
 
 async function buscarNoBackend() {
@@ -519,7 +539,15 @@ async function buscarNoBackend() {
           // Não exibe itens zerados (R$ 0,00) na busca manual.
           return v == null || v > 0;
         })
-        .map((it, idx) => ({
+        .map((it, idx) => {
+        const descricaoLinha = it.descricao_item || it.objeto_resumido || '';
+        const similaridadeBackend = Boolean(it?.similaridade_encontrada);
+        const similaridadeParcial = similaridadeBackend || isSimilaridadeParcialManual(
+          filtros.descricao,
+          descricaoLinha,
+        );
+        const conf = confiabilidadeManual(filtros.descricao, descricaoLinha);
+        return {
         id: `backend-${idx}-${it.numero_pncp || ''}`,
         sourceRaw: it,
         numeroPncp: it.numero_pncp || null,
@@ -527,7 +555,7 @@ async function buscarNoBackend() {
         sequencialCompra: it.sequencial_compra ?? null,
         numeroItem: it.numero_item ?? null,
         titulo: it.orgao || 'Órgão não informado',
-        descricao: it.descricao_item || it.objeto_resumido || 'Descrição indisponível',
+        descricao: descricaoLinha || 'Descrição indisponível',
         municipioUfCompacto: [it.municipio, it.uf].filter(Boolean).join('/') || '-',
         quantidade: `${it.quantidade || '-'} ${it.unidade_medida || ''}`.trim(),
         quantidadeNum: it.quantidade ?? null,
@@ -539,14 +567,12 @@ async function buscarNoBackend() {
         valor: formatCurrency(it.valor_unitario ?? it.valor_total ?? 0),
         valorUnitario: it.valor_unitario ?? null,
         valorTotal: it.valor_total ?? null,
-        statusIa: 'Média',
+        statusIa: similaridadeParcial && conf === 'Alta' ? 'Média' : conf,
         observacao: it.modalidade || 'Importado do backend PNCP',
-        similaridadeEncontrada: isSimilaridadeParcialManual(
-          filtros.descricao,
-          it.descricao_item || it.objeto_resumido || '',
-        ),
+        similaridadeEncontrada: similaridadeParcial,
         selecionado: false,
-      }));
+      };
+      });
     }
   } catch (err) {
     searchError.value = `Não foi possível consultar o backend (${err.message || 'erro desconhecido'}).`;

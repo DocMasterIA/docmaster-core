@@ -562,9 +562,10 @@ async function buscarNoBackend() {
       max_paginas: 500,
       tamanho_pagina: 200,
     });
+    const localItemsCount = Array.isArray(data?.itens) ? data.itens.length : 0;
     let fallbackPorSimilaridadeIa = false;
     let termoFallbackUsado = '';
-    if (!data?.ok || !Array.isArray(data?.itens) || data.itens.length < 3) {
+    if (!data?.ok || !Array.isArray(data?.itens) || localItemsCount === 0) {
       const iaData = await intelligentMarketSearch({
         termo_busca: termoBuscaEfetivo,
         uf: filtros.ufs.length === 1 ? filtros.ufs[0] : null,
@@ -577,7 +578,7 @@ async function buscarNoBackend() {
         fallbackPorSimilaridadeIa = true;
       }
     }
-    if (!data?.ok || !Array.isArray(data?.itens) || data.itens.length < 3) {
+    if (!data?.ok || !Array.isArray(data?.itens) || (Array.isArray(data?.itens) && data.itens.length === 0)) {
       const fallbackTerms = buildSimilarityFallbackTerms(termoBuscaEfetivo);
       for (const term of fallbackTerms) {
         const iaFallback = await intelligentMarketSearch({

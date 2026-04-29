@@ -36,7 +36,12 @@ from .config import (
     PNCP_BLOCK_SERVICE_ITEMS,
     PNCP_SERVICE_BLOCK_TERMS,
 )
-from .pncp_client import create_pncp_http_client, search_contracts, get_contract_items
+from .pncp_client import (
+    create_pncp_http_client,
+    search_contracts,
+    get_contract_items,
+    get_contract_supplier_snapshot,
+)
 from .local_index import upsert_contracts, local_item_search
 from .schemas import MarketSearchRequest
 from .search_text_clean import apply_item_display_cleanup, normalize_for_search
@@ -460,6 +465,8 @@ async def _extract_matching_items_with_table_lookup(
         item_table_text = ""
         score_table = 0.0
         rows: List[Dict[str, Any]] = []
+        fornecedor_nome = ""
+        fornecedor_cnpj = ""
         try:
             cnpj = _extract_cnpj_from_raw(raw)
             ano = raw.get("anoCompra")
@@ -472,6 +479,16 @@ async def _extract_matching_items_with_table_lookup(
                         rows = await asyncio.wait_for(lookup_coro, timeout=PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS)
                     else:
                         rows = await lookup_coro
+                    fornecedor_coro = get_contract_supplier_snapshot(cnpj, ano, seq, client=http_client)
+                    try:
+                        fornecedor_data = await asyncio.wait_for(
+                            fornecedor_coro,
+                            timeout=max(2.0, float(PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS or 0)),
+                        )
+                    except Exception:
+                        fornecedor_data = {}
+                    fornecedor_nome = str((fornecedor_data or {}).get("fornecedor") or "").strip()
+                    fornecedor_cnpj = str((fornecedor_data or {}).get("cnpj_fornecedor") or "").strip()
                 item_table_text = _item_text_from_table_rows(rows)
                 score_table = _compute_match_score(item_table_text, query_groups) if item_table_text else 0.0
         except Exception:
@@ -543,6 +560,8 @@ async def _extract_matching_items_with_table_lookup(
             "qtd_itens_pncp": qtd_itens,
             "itens_pncp_modo": itens_modo,
             "itens_pncp": itens_json,
+            "fornecedor": fornecedor_nome,
+            "cnpj_fornecedor": fornecedor_cnpj,
             **_extract_esfera_meta(raw),
         }
 

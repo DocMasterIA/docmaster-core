@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+import re
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -23,6 +24,9 @@ from .config import (
 
 class PNCPClientError(Exception):
     pass
+
+
+_CNPJ_RE = re.compile(r"\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}")
 
 
 # 429/5xx: limite/instabilidade PNCP ou gateway/proxy (transitório).
@@ -262,3 +266,124 @@ async def get_contract_items(
     if isinstance(data, list):
         return data
     return []
+
+
+def _walk_supplier_candidates(obj: Any, *, path: str = "", acc: Optional[List[Dict[str, str]]] = None) -> List[Dict[str, str]]:
+    if acc is None:
+        acc = []
+    if isinstance(obj, dict):
+        name_keys = (
+            "fornecedor",
+            "razaosocial",
+            "razao_social",
+            "nomerazaosocialfornecedor",
+            "nome_fornecedor",
+            "fornecedor_nome",
+            "vencedor",
+        )
+        cnpj_keys = ("cnpj", "cnpjfornecedor", "cnpjcpffornecedor", "nifornecedor", "ni_fornecedor")
+        nome = ""
+        cnpj = ""
+        for k, v in obj.items():
+            kk = str(k or "").strip().lower()
+            vv = str(v or "").strip()
+            if vv:
+                if any(x in kk for x in name_keys) and len(vv) > 2:
+                    nome = vv
+                if any(x in kk for x in cnpj_keys):
+                    m = _CNPJ_RE.search(vv)
+                    if m:
+                        cnpj = m.group()
+                    else:
+                        d = re.sub(r"\D", "", vv)
+                        if len(d) == 14:
+                            cnpj = d
+        if nome or cnpj:
+            acc.append({"path": path, "fornecedor": nome, "cnpj": cnpj})
+        for k, v in obj.items():
+            nxt = f"{path}.{k}" if path else str(k)
+            _walk_supplier_candidates(v, path=nxt, acc=acc)
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            _walk_supplier_candidates(v, path=f"{path}[{i}]", acc=acc)
+    return acc
+
+
+def _is_orgao_path(path: str) -> bool:
+    p = (path or "").lower()
+    return any(x in p for x in ("orgaoentidade", "orgao_entidade", "orgao", "unidadeorgao", "unidade_orgao"))
+
+
+def _normalize_cnpj(raw: str) -> str:
+    d = re.sub(r"\D", "", str(raw or ""))
+    if len(d) != 14:
+        return ""
+    return f"{d[:2]}.{d[2:5]}.{d[5:8]}/{d[8:12]}-{d[12:14]}"
+
+
+def _extract_supplier_snapshot(payload: Any) -> Dict[str, str]:
+    cands = _walk_supplier_candidates(payload)
+    for cand in cands:
+        if _is_orgao_path(cand.get("path", "")):
+            continue
+        cnpj = _normalize_cnpj(cand.get("cnpj", ""))
+        nome = str(cand.get("fornecedor") or "").strip()
+        if cnpj or nome:
+            return {"cnpj_fornecedor": cnpj, "fornecedor": nome}
+    return {"cnpj_fornecedor": "", "fornecedor": ""}
+
+
+async def get_contract_supplier_snapshot(
+    cnpj_orgao: str,
+    ano_compra: Any,
+    sequencial_compra: Any,
+    *,
+    client: Optional[httpx.AsyncClient] = None,
+) -> Dict[str, str]:
+    """
+    Busca, de forma tolerante, possíveis dados de fornecedor vencedor em endpoints
+    complementares da contratação no PNCP API.
+    """
+    cnpj = str(cnpj_orgao or "").strip()
+    ano = str(ano_compra or "").strip()
+    seq = str(sequencial_compra or "").strip()
+    if not cnpj or not ano or not seq:
+        return {"cnpj_fornecedor": "", "fornecedor": ""}
+
+    base = f"{PNCP_PNCP_API_BASE_URL}/v1/orgaos/{cnpj}/compras/{ano}/{seq}"
+    candidate_paths = (
+        "resultado",
+        "resultados",
+        "fornecedor",
+        "fornecedores",
+        "atas",
+        "contrato",
+        "contratos",
+    )
+
+    close_client = False
+    if client is None:
+        client = create_pncp_http_client()
+        close_client = True
+    try:
+        for suffix in candidate_paths:
+            endpoint = f"{base}/{suffix}"
+            resp = await _get_pncp(client, endpoint, params=None, tolerate_rate_limit=True)
+            if resp is None:
+                continue
+            if resp.status_code in (204, 404):
+                continue
+            if resp.status_code >= 400:
+                continue
+            try:
+                data = resp.json()
+            except ValueError:
+                continue
+            snap = _extract_supplier_snapshot(data)
+            if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
+                return snap
+    finally:
+        if close_client:
+            await client.aclose()
+
+    return {"cnpj_fornecedor": "", "fornecedor": ""}

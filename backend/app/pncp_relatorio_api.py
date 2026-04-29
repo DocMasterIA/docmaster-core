@@ -18,6 +18,7 @@ from django.http import FileResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
+from weasyprint import HTML
 
 from backend.app.api import api_login_required
 from backend.app.models import PncpCotacao, PncpCotacaoAnexo
@@ -78,6 +79,75 @@ def _resolve_formula_calculo_id(filtros: Any) -> str:
     return DEFAULT_FORMULA_CALCULO
 
 
+def _render_anexo_fornecedor_capa_pdf(*, titulo_relatorio: str, nome_arquivo: str) -> bytes:
+    html = f"""
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <style>
+    @page {{ size: A4; margin: 22mm 18mm; }}
+    body {{
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      color: #0f172a;
+    }}
+    .box {{
+      border: 1px solid #d6dde8;
+      border-radius: 12px;
+      padding: 18px 20px;
+      background: #fff;
+    }}
+    .kicker {{
+      margin: 0 0 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #1f4e79;
+    }}
+    h1 {{
+      margin: 0;
+      font-size: 26px;
+      line-height: 1.2;
+      color: #1f4e79;
+    }}
+    p {{
+      margin: 12px 0 0;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #334155;
+    }}
+  </style>
+</head>
+<body>
+  <section class="box">
+    <p class="kicker">Anexo incorporado ao relatório</p>
+    <h1>Cotação do fornecedor</h1>
+    <p><strong>Relatório:</strong> {titulo_relatorio}</p>
+    <p><strong>Arquivo anexado:</strong> {nome_arquivo}</p>
+  </section>
+</body>
+</html>
+"""
+    return HTML(string=html).write_pdf()
+
+
+def _merge_pdf_bytes(parts: list[bytes]) -> bytes:
+    from pypdf import PdfReader, PdfWriter
+
+    writer = PdfWriter()
+    for payload in parts:
+        if not payload:
+            continue
+        reader = PdfReader(io.BytesIO(payload))
+        for page in reader.pages:
+            writer.add_page(page)
+    out = io.BytesIO()
+    writer.write(out)
+    return out.getvalue()
+
+
 @api_login_required
 @csrf_exempt
 @require_http_methods(["POST", "OPTIONS"])
@@ -113,8 +183,19 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
 
     anexo = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
     anexo_url = ""
+    anexo_bytes = b""
+    anexo_nome = ""
     if anexo and anexo.arquivo_pdf:
         anexo_url = _url_download_anexo_fornecedor(request, sessao_id)
+        anexo_nome = (anexo.nome_original or "").strip() or "cotacao-fornecedor.pdf"
+        try:
+            anexo.arquivo_pdf.open("rb")
+            anexo_bytes = anexo.arquivo_pdf.read()
+        finally:
+            try:
+                anexo.arquivo_pdf.close()
+            except Exception:
+                pass
 
     try:
         pdf_bytes = gerar_pdf_relatorio_cotacao(
@@ -125,6 +206,12 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
             anexo_fornecedor_url=anexo_url,
             formula_id=formula_id,
         )
+        if anexo_bytes:
+            capa_anexo_pdf = _render_anexo_fornecedor_capa_pdf(
+                titulo_relatorio=titulo_rel,
+                nome_arquivo=anexo_nome,
+            )
+            pdf_bytes = _merge_pdf_bytes([pdf_bytes, capa_anexo_pdf, anexo_bytes])
     except Exception as e:
         return JsonResponse(
             {"detail": f"Falha ao gerar PDF ({e}). Verifique se WeasyPrint e dependências estão instaladas."},

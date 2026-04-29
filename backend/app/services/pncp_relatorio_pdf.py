@@ -436,7 +436,7 @@ _HTML_TEMPLATE = _ENV.from_string(
                 <th>QTD.</th>
                 <th>Órgão</th>
                 <th>Município/UF</th>
-                <th>Processo</th>
+                <th>ID / Processo</th>
                 <th>Ajuste</th>
               </tr>
             </thead>

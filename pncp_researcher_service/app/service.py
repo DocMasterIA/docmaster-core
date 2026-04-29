@@ -33,6 +33,8 @@ from .config import (
     PNCP_IA_MAX_CANDIDATES,
     PNCP_IA_ITEM_RESUMO_ENABLED,
     PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS,
+    PNCP_BLOCK_SERVICE_ITEMS,
+    PNCP_SERVICE_BLOCK_TERMS,
 )
 from .pncp_client import create_pncp_http_client, search_contracts, get_contract_items
 from .local_index import upsert_contracts, local_item_search
@@ -88,6 +90,37 @@ def _contains_tokens(text: str, tokens: List[str]) -> bool:
 def _normalize_text(text: str) -> str:
     """Texto normalizado para matching (acentos, ruído, nº, números por extenso comuns)."""
     return normalize_for_search(text or "")
+
+
+_SERVICE_BLOCK_TERMS_NORM = tuple(
+    _normalize_text(t) for t in (PNCP_SERVICE_BLOCK_TERMS or []) if str(t).strip()
+)
+
+
+def _is_service_like_item(item: Dict[str, Any]) -> bool:
+    """
+    Bloqueio duro para itens de prestação de serviço/locação.
+    """
+    if not PNCP_BLOCK_SERVICE_ITEMS:
+        return False
+    if not _SERVICE_BLOCK_TERMS_NORM:
+        return False
+    text = _normalize_text(
+        " ".join(
+            [
+                str(item.get("descricao_item") or ""),
+                str(item.get("material_servico") or ""),
+                str(item.get("objeto_resumido") or ""),
+                str(item.get("objetoCompra") or ""),
+                str(item.get("objeto") or ""),
+                str(item.get("descricao") or ""),
+                str(item.get("modalidade") or ""),
+            ]
+        )
+    )
+    if not text:
+        return False
+    return any(term in text for term in _SERVICE_BLOCK_TERMS_NORM)
 
 
 def _normalize_esfera_id(v: Any) -> str:
@@ -246,6 +279,8 @@ def _extract_matching_items(raw_items: List[Dict[str, Any]], query_groups: List[
     """Transforma payload bruto do PNCP em itens filtrados/rankeados."""
     matched: List[Dict[str, Any]] = []
     for raw in raw_items:
+        if _is_service_like_item(raw):
+            continue
         obj = _objeto_compra_text(raw)
         score = _compute_match_score(obj, query_groups)
         if score <= 0:
@@ -417,6 +452,8 @@ async def _extract_matching_items_with_table_lookup(
     sem = asyncio.Semaphore(max(1, PNCP_ITEM_LOOKUP_CONCURRENCY))
 
     async def process_one(raw: Dict[str, Any]) -> Dict[str, Any] | None:
+        if _is_service_like_item(raw):
+            return None
         obj = _objeto_compra_text(raw)
         score_obj_bruto = _compute_match_score(obj, query_groups)
 
@@ -1600,6 +1637,15 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         cleanup_for_display=False,
     )
     itens = list(base_items.get("itens") or [])
+    service_blocked_count = 0
+    if PNCP_BLOCK_SERVICE_ITEMS and itens:
+        filtered_items: List[Dict[str, Any]] = []
+        for it in itens:
+            if _is_service_like_item(it):
+                service_blocked_count += 1
+                continue
+            filtered_items.append(it)
+        itens = filtered_items
     if not itens:
         return {
             "ok": True,
@@ -1613,7 +1659,11 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                 "tamanho_pagina": payload.tamanho_pagina,
                 "fonte": "local_item_search",
             },
-            "stats": base_items.get("stats", {}),
+            "stats": {
+                **dict(base_items.get("stats", {})),
+                "servico_bloqueio_ativo": bool(PNCP_BLOCK_SERVICE_ITEMS),
+                "servico_bloqueados": int(service_blocked_count),
+            },
             "itens": [],
         }
 
@@ -1892,6 +1942,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     out_stats["literal_encontrados"] = len(literal_scored)
     out_stats["similaridade_encontrados"] = len(similar_scored)
     out_stats["modo_selecao_literal_similaridade"] = pool_mode
+    out_stats["servico_bloqueio_ativo"] = bool(PNCP_BLOCK_SERVICE_ITEMS)
+    out_stats["servico_bloqueados"] = int(service_blocked_count)
 
     return {
         "ok": bool(base_items.get("ok", True)),

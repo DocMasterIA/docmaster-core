@@ -34,6 +34,18 @@ def _env_bool(key: str, default: bool) -> bool:
     return str(raw).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _env_str_list(key: str, default: list[str]) -> list[str]:
+    raw = (os.getenv(key) or "").strip()
+    if not raw:
+        return default
+    out: list[str] = []
+    for chunk in raw.split(","):
+        c = chunk.strip()
+        if c:
+            out.append(c)
+    return out or default
+
+
 PNCP_BASE_URL: str = os.getenv("PNCP_BASE_URL", "https://pncp.gov.br/api/consulta").rstrip("/")
 # API de compras/itens/arquivos (diferente da API de consulta por publicação).
 PNCP_PNCP_API_BASE_URL: str = os.getenv("PNCP_PNCP_API_BASE_URL", "https://pncp.gov.br/pncp-api").rstrip("/")
@@ -122,3 +134,24 @@ PNCP_IA_MAX_CANDIDATES: int = _env_int("PNCP_IA_MAX_CANDIDATES", 36)
 # Resumo curto (1–2 frases) do núcleo do item PNCP para títulos ambíguos / descrições longas.
 PNCP_IA_ITEM_RESUMO_ENABLED: bool = _env_bool("PNCP_IA_ITEM_RESUMO_ENABLED", True)
 PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS: float = float(os.getenv("PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS", "3.5"))
+
+# Bloqueio de itens ligados à prestação de serviço/locação no resultado de busca.
+PNCP_BLOCK_SERVICE_ITEMS: bool = _env_bool("PNCP_BLOCK_SERVICE_ITEMS", True)
+PNCP_SERVICE_BLOCK_TERMS: list[str] = _env_str_list(
+    "PNCP_SERVICE_BLOCK_TERMS",
+    [
+        "servico",
+        "servicos",
+        "prestacao de servico",
+        "prestacao de servicos",
+        "aluguel",
+        "locacao",
+        "manutencao",
+        "instalacao",
+        "montagem",
+        "desmontagem",
+        "terceirizacao",
+        "consultoria",
+        "assessoria",
+    ],
+)

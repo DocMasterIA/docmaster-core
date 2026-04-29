@@ -23,6 +23,7 @@ from weasyprint import HTML
 from backend.app.api import api_login_required
 from backend.app.models import PncpCotacao, PncpCotacaoAnexo, PncpCotacaoAnexoArquivo
 from backend.app.services.pncp_relatorio_pdf import gerar_pdf_relatorio_cotacao, nome_arquivo_relatorio, nome_sistema_relatorio
+from backend.app.services.pncp_supplier_enrichment import enrich_missing_supplier_fields_for_cotacao
 
 DEFAULT_FORMULA_CALCULO = "media_aritmetica_precos_obtidos"
 FORMULA_LABELS = {
@@ -222,6 +223,12 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
                 pass
 
     try:
+        # Auto-enriquecimento para cotações legadas que ficaram sem fornecedor/CNPJ.
+        try:
+            enrich_missing_supplier_fields_for_cotacao(c.id, max_lookups=150)
+        except Exception:
+            pass
+
         pdf_bytes = gerar_pdf_relatorio_cotacao(
             cotacao=c,
             itens_qs=itens_qs,

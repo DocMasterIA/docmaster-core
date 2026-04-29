@@ -295,7 +295,15 @@
                 <td class="cot-sheet-center">—</td>
                 <td class="cot-sheet-center">—</td>
                 <td class="cot-sheet-center">—</td>
-                <td class="cot-sheet-center">—</td>
+                <td class="cot-sheet-center">
+                  <input
+                    v-model.trim="manualItem.quantidade"
+                    type="text"
+                    inputmode="decimal"
+                    class="cot-sheet-inline-input"
+                    placeholder="Qtd."
+                  />
+                </td>
                 <td class="cot-sheet-center">
                   <input
                     v-model.trim="manualItem.unidade_medida"
@@ -601,6 +609,7 @@ const isAddingManualItem = ref(false);
 const showManualItemEditor = ref(false);
 const manualItem = ref({
   descricao_item: '',
+  quantidade: '',
   unidade_medida: '',
   valor_base: '',
   variacao_percentual: '',
@@ -874,6 +883,15 @@ async function addManualItem() {
     loadError.value = 'Informe a unidade do item manual (definida pelo usuário).';
     return;
   }
+  const quantidade = parseQuantityInputToNumber(manualItem.value.quantidade);
+  if (manualItem.value.quantidade && !Number.isFinite(quantidade)) {
+    loadError.value = 'Quantidade inválida. Use apenas números (ex.: 10 ou 10,5).';
+    return;
+  }
+  if (Number.isFinite(quantidade) && quantidade <= 0) {
+    loadError.value = 'Quantidade deve ser maior que zero.';
+    return;
+  }
   const valorBase = parseCurrencyInputToNumber(manualItem.value.valor_base);
   const variacao = parsePercentInputToNumber(manualItem.value.variacao_percentual);
 
@@ -883,6 +901,7 @@ async function addManualItem() {
     await addItemsToResearchSession(sessionId, [
       {
         descricao_item: descricao,
+        quantidade: Number.isFinite(quantidade) ? quantidade : null,
         unidade_medida: unidadeMedida,
         valor_base: Number.isFinite(valorBase) ? valorBase : null,
         variacao_percentual: Number.isFinite(variacao) ? variacao : null,
@@ -897,6 +916,7 @@ async function addManualItem() {
     await loadSessionFromBackend();
     manualItem.value = {
       descricao_item: '',
+      quantidade: '',
       unidade_medida: '',
       valor_base: '',
       variacao_percentual: '',
@@ -959,6 +979,14 @@ function parsePercentInputToNumber(value) {
   const only = s.replace(/\D/g, '');
   if (!only) return null;
   const n = Number.parseInt(only, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseQuantityInputToNumber(value) {
+  const s = String(value || '').trim();
+  if (!s) return null;
+  const normalized = s.replace(/\s+/g, '').replace(/\./g, '').replace(',', '.');
+  const n = Number(normalized);
   return Number.isFinite(n) ? n : null;
 }
 

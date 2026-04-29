@@ -1147,8 +1147,12 @@ def _is_similaridade_encontrada(item: Dict[str, Any]) -> bool:
     literal = _safe_float(item.get("literal_match"))
     aprov = _safe_float(item.get("score_aprovacao"))
     sem_raw = _safe_float(item.get("score_relevancia"))
+    # Preserva match vanilla quando o literal está forte o bastante.
+    if literal >= 30:
+        return False
     # `score_relevancia` > 0 indica match semântico básico; score aprovado evita ruído.
-    return bool(sem_raw > 0 and aprov >= 60 and literal < 45)
+    # Para evitar excesso de "similaridade", limita aos casos de aderência literal realmente baixa.
+    return bool(sem_raw > 0 and aprov >= 60 and literal < 30)
 
 
 def _word_like_match(word: str, token: str) -> bool:
@@ -1700,10 +1704,12 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                     ref_fit -= 2.0
             row_value = _safe_float(it.get("valor_unitario") or it.get("valor_total") or it.get("valor_global"))
             if faixa_min is not None and faixa_max is not None:
+                # Regressão evitada: faixa de referência não deve barrar item válido.
+                # Ela orienta o ranking; fora da faixa recebe penalidade.
                 if row_value <= 0:
-                    continue
-                if row_value < faixa_min or row_value > faixa_max:
-                    continue
+                    ref_fit -= 6.0
+                elif row_value < faixa_min or row_value > faixa_max:
+                    ref_fit -= 8.0
             if ref_value > 0 and row_value > 0:
                 v_dev = abs(row_value - ref_value) / max(ref_value, 1e-9)
                 if v_dev <= 0.25:

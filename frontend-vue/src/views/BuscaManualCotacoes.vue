@@ -195,6 +195,11 @@
                     <span v-if="item.municipioUfCompacto && item.municipioUfCompacto !== '-'" class="manual-cot-meta-sep">·</span>
                     <span v-if="item.municipioUfCompacto && item.municipioUfCompacto !== '-'">{{ item.municipioUfCompacto }}</span>
                   </div>
+                  <div v-if="item.similaridadeEncontrada" class="manual-cot-sub">
+                    <span class="manual-similaridade-tag" title="Match por variação de contexto">
+                      Similaridade parcial encontrada
+                    </span>
+                  </div>
                 </td>
                 <td>{{ item.quantidade }}</td>
                 <td class="manual-cell-center">{{ item.inciso }}</td>
@@ -452,6 +457,42 @@ function statusClass(status) {
   return 'manual-ia-dot--low';
 }
 
+function tokenizeForSimilarity(v) {
+  return normalizeText(v)
+    .split(/\s+/)
+    .map((x) => x.trim())
+    .filter((x) => x.length >= 3);
+}
+
+function isSpecToken(tok) {
+  return /\d/.test(tok) && /(ml|mg|g|kg|l|lt|mcg|ui|mm|cm|m|un|und|cp|caps|comprim|amp|fr)$/.test(tok);
+}
+
+function hasWordLikeMatch(word, token) {
+  if (!word || !token) return false;
+  if (word === token) return true;
+  if (token.length >= 4 && word.startsWith(token)) return true;
+  if (word.length >= 4 && token.startsWith(word.slice(0, 4))) return true;
+  return false;
+}
+
+function isSimilaridadeParcialManual(query, desc) {
+  const qTokens = tokenizeForSimilarity(query);
+  const dWords = tokenizeForSimilarity(desc);
+  if (!qTokens.length || !dWords.length) return false;
+  const hasExactFull = qTokens.every((t) => dWords.some((w) => hasWordLikeMatch(w, t)));
+  if (hasExactFull) return false;
+  const specTokens = qTokens.filter((t) => isSpecToken(t));
+  const coreTokens = qTokens.filter((t) => !/\d/.test(t) && t.length >= 4);
+  const coreHit = coreTokens.some((t) => dWords.some((w) => hasWordLikeMatch(w, t)));
+  if (!coreHit) return false;
+  if (specTokens.length > 0) {
+    return specTokens.some((t) => dWords.some((w) => hasWordLikeMatch(w, t)));
+  }
+  const hits = coreTokens.filter((t) => dWords.some((w) => hasWordLikeMatch(w, t))).length;
+  return hits >= Math.min(2, coreTokens.length);
+}
+
 async function buscarNoBackend() {
   if (!filtros.descricao.trim()) return;
   isSearching.value = true;
@@ -500,6 +541,10 @@ async function buscarNoBackend() {
         valorTotal: it.valor_total ?? null,
         statusIa: 'Média',
         observacao: it.modalidade || 'Importado do backend PNCP',
+        similaridadeEncontrada: isSimilaridadeParcialManual(
+          filtros.descricao,
+          it.descricao_item || it.objeto_resumido || '',
+        ),
         selecionado: false,
       }));
     }
@@ -646,6 +691,7 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
         valor_base: faixaBaseSelecionada,
         variacao_percentual: variacaoPercentual,
       },
+      similaridade_encontrada: Boolean(r.similaridadeEncontrada),
     }))
     .filter((it) => !!it.descricao_item || !!it.numero_pncp || (it.ano_compra != null && it.sequencial_compra != null));
   if (!registros.length) {
@@ -1037,6 +1083,18 @@ onMounted(async () => {
   vertical-align: bottom;
 }
 .manual-cot-meta-sep { margin: 0 6px; color: #94a3b8; }
+.manual-similaridade-tag {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #f2dfb7;
+  border-radius: 999px;
+  background: #fff7e6;
+  color: #9a6a10;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
 
 .manual-status {
   display: inline-flex;

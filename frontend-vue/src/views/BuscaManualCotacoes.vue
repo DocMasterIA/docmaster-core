@@ -228,6 +228,7 @@ import {
   backfillLocalIndex,
   getResearchSession,
   getLocalIndexStats,
+  intelligentMarketSearch,
   searchLocalItems,
 } from '../services/pncpResearch';
 
@@ -522,14 +523,29 @@ async function buscarNoBackend() {
       filtros.modalidade && filtros.modalidade !== 'Todas'
         ? (MODALIDADE_TO_CODIGO[filtros.modalidade] ?? null)
         : null;
-    const data = await searchLocalItems({
-      termo_busca: filtros.descricao.trim(),
+    const termoBuscaEfetivo = filtros.descricao.trim();
+    let data = await searchLocalItems({
+      termo_busca: termoBuscaEfetivo,
       uf: filtros.ufs.length === 1 ? filtros.ufs[0] : null,
       codigo_modalidade: codigoModalidade,
       // Busca agressiva para varrer o máximo possível (backend limita teto de segurança).
       max_paginas: 500,
       tamanho_pagina: 200,
     });
+    let fallbackPorSimilaridadeIa = false;
+    if (!data?.ok || !Array.isArray(data?.itens) || data.itens.length < 3) {
+      const iaData = await intelligentMarketSearch({
+        termo_busca: termoBuscaEfetivo,
+        uf: filtros.ufs.length === 1 ? filtros.ufs[0] : null,
+        codigo_modalidade: codigoModalidade,
+        max_paginas: 500,
+        tamanho_pagina: 200,
+      });
+      if (iaData?.ok && Array.isArray(iaData?.itens) && iaData.itens.length > 0) {
+        data = iaData;
+        fallbackPorSimilaridadeIa = true;
+      }
+    }
     if (data?.ok && Array.isArray(data.itens)) {
       resultados.value = data.itens
         .filter((it) => {
@@ -543,10 +559,10 @@ async function buscarNoBackend() {
         const descricaoLinha = it.descricao_item || it.objeto_resumido || '';
         const similaridadeBackend = Boolean(it?.similaridade_encontrada);
         const similaridadeParcial = similaridadeBackend || isSimilaridadeParcialManual(
-          filtros.descricao,
+          termoBuscaEfetivo,
           descricaoLinha,
-        );
-        const conf = confiabilidadeManual(filtros.descricao, descricaoLinha);
+        ) || fallbackPorSimilaridadeIa;
+        const conf = confiabilidadeManual(termoBuscaEfetivo, descricaoLinha);
         return {
         id: `backend-${idx}-${it.numero_pncp || ''}`,
         sourceRaw: it,
@@ -567,7 +583,7 @@ async function buscarNoBackend() {
         valor: formatCurrency(it.valor_unitario ?? it.valor_total ?? 0),
         valorUnitario: it.valor_unitario ?? null,
         valorTotal: it.valor_total ?? null,
-        statusIa: similaridadeParcial && conf === 'Alta' ? 'Média' : conf,
+        statusIa: (similaridadeParcial && conf === 'Alta') || fallbackPorSimilaridadeIa ? 'Média' : conf,
         observacao: it.modalidade || 'Importado do backend PNCP',
         similaridadeEncontrada: similaridadeParcial,
         selecionado: false,

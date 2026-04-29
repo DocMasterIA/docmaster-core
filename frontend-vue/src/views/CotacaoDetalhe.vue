@@ -104,8 +104,8 @@
           <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
           {{
             supplierPdfLoading
-              ? 'Anexando PDF...'
-              : (hasSupplierPdfAttachment ? 'Trocar PDF do Fornecedor' : 'Anexar Cotação do Fornecedor')
+              ? 'Anexando PDF(s)...'
+              : (hasSupplierPdfAttachment ? 'Adicionar mais PDFs do Fornecedor' : 'Anexar Cotação do Fornecedor')
           }}
         </button>
         <button type="button" class="cot-btn cot-btn--primary" @click="openRelatorioModal">
@@ -134,9 +134,13 @@
       </section>
       <section class="cot-fornecedor-field">
         <span class="cot-fornecedor-field__label">Cotação do Fornecedor</span>
-        <strong class="cot-fornecedor-field__value">
-          {{ supplierPdfFilename || 'Nenhum PDF anexado' }}
+        <strong class="cot-fornecedor-field__value" v-if="supplierPdfFilenames.length">
+          {{ supplierPdfFilenames.length }} arquivo(s) anexado(s)
         </strong>
+        <strong class="cot-fornecedor-field__value" v-else>Nenhum PDF anexado</strong>
+        <ul v-if="supplierPdfFilenames.length" class="cot-fornecedor-field__list">
+          <li v-for="(nome, idx) in supplierPdfFilenames" :key="`${idx}-${nome}`">{{ nome }}</li>
+        </ul>
       </section>
       <input
         ref="importSpreadsheetInput"
@@ -149,6 +153,7 @@
         ref="supplierPdfInput"
         type="file"
         accept="application/pdf,.pdf"
+        multiple
         class="cot-hidden-file-input"
         @change="onSupplierPdfSelected"
       />
@@ -601,7 +606,7 @@ const importSpreadsheetInput = ref(null);
 const supplierPdfInput = ref(null);
 const supplierPdfLoading = ref(false);
 const hasSupplierPdfAttachment = ref(false);
-const supplierPdfFilename = ref('');
+const supplierPdfFilenames = ref([]);
 const sessaoStatus = ref('aberta');
 const isClosingCotacao = ref(false);
 const isReopeningCotacao = ref(false);
@@ -1026,19 +1031,22 @@ async function onImportSpreadsheetSelected(event) {
 
 async function onSupplierPdfSelected(event) {
   const sessionId = Number(cotacaoId.value);
-  const file = event?.target?.files?.[0];
+  const files = Array.from(event?.target?.files || []);
   event.target.value = '';
   if (Number.isNaN(sessionId)) {
     loadError.value = 'Cotação inválida para anexar PDF.';
     return;
   }
-  if (!file) return;
+  if (!files.length) return;
   supplierPdfLoading.value = true;
   loadError.value = '';
   try {
-    const res = await uploadSupplierPdfToResearchSession(sessionId, file);
+    const res = await uploadSupplierPdfToResearchSession(sessionId, files);
     hasSupplierPdfAttachment.value = true;
-    supplierPdfFilename.value = String(res?.arquivo?.nome || '').trim() || 'cotacao-fornecedor.pdf';
+    const novos = Array.isArray(res?.arquivos)
+      ? res.arquivos.map((x) => String(x?.nome || '').trim()).filter(Boolean)
+      : [];
+    supplierPdfFilenames.value = [...novos, ...supplierPdfFilenames.value].filter(Boolean);
   } catch (err) {
     loadError.value = `Falha ao anexar PDF do fornecedor: ${err?.message || 'erro desconhecido'}.`;
   } finally {
@@ -1154,7 +1162,9 @@ async function loadSessionFromBackend() {
       sessaoCriadoPorEmail.value = (s.criado_por_email || '').trim();
       sessaoStatus.value = String(s.status || 'aberta').toLowerCase();
       hasSupplierPdfAttachment.value = !!s.anexo_fornecedor_pdf;
-      supplierPdfFilename.value = String(s.anexo_fornecedor_nome || '').trim();
+      supplierPdfFilenames.value = Array.isArray(s.anexos_fornecedor)
+        ? s.anexos_fornecedor.map((x) => String(x?.nome || '').trim()).filter(Boolean)
+        : (s.anexo_fornecedor_nome ? [String(s.anexo_fornecedor_nome).trim()] : []);
       totalItensSessao.value = Number(s.total_itens) || 0;
       formulaCalculoId.value = s.formula_calculo_id || 'media_aritmetica_precos_obtidos';
       formulaCalculoLabel.value =
@@ -1226,7 +1236,7 @@ async function loadSessionFromBackend() {
     sessaoCriadoPorEmail.value = '';
     sessaoStatus.value = 'aberta';
     hasSupplierPdfAttachment.value = false;
-    supplierPdfFilename.value = '';
+    supplierPdfFilenames.value = [];
     totalItensSessao.value = 0;
     formulaCalculoId.value = 'media_aritmetica_precos_obtidos';
     formulaCalculoLabel.value = 'Média aritmética dos preços obtidos';
@@ -1507,6 +1517,14 @@ async function saveTituloNoBackend() {
   font-size: 13px;
   color: #111827;
   word-break: break-word;
+}
+.cot-fornecedor-field__list {
+  margin: 2px 0 0;
+  padding-left: 18px;
+  color: #374151;
+  font-size: 12px;
+  display: grid;
+  gap: 2px;
 }
 .cot-hidden-file-input { display: none; }
 

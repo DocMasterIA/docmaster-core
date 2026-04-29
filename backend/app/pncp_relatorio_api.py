@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import io
 import json
-from typing import Any, Dict
+from typing import Any, Dict, List, Tuple
 
 from django.conf import settings
 from django.http import FileResponse, JsonResponse
@@ -21,7 +21,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 from weasyprint import HTML
 
 from backend.app.api import api_login_required
-from backend.app.models import PncpCotacao, PncpCotacaoAnexo
+from backend.app.models import PncpCotacao, PncpCotacaoAnexo, PncpCotacaoAnexoArquivo
 from backend.app.services.pncp_relatorio_pdf import gerar_pdf_relatorio_cotacao, nome_arquivo_relatorio, nome_sistema_relatorio
 
 DEFAULT_FORMULA_CALCULO = "media_aritmetica_precos_obtidos"
@@ -189,19 +189,35 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
 
     url_qr = _url_qr_acesso_cotacao_no_sistema(sessao_id)
 
-    anexo = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
+    anexos_merge: List[Tuple[str, bytes]] = []
     anexo_url = ""
-    anexo_bytes = b""
-    anexo_nome = ""
-    if anexo and anexo.arquivo_pdf:
-        anexo_url = _url_download_anexo_fornecedor(request, sessao_id)
-        anexo_nome = (anexo.nome_original or "").strip() or "cotacao-fornecedor.pdf"
+    anexos = list(PncpCotacaoAnexoArquivo.objects.filter(cotacao_id=c.id).order_by("id"))
+    for an in anexos:
+        if not an.arquivo_pdf:
+            continue
+        nome = (an.nome_original or "").strip() or "cotacao-fornecedor.pdf"
         try:
-            anexo.arquivo_pdf.open("rb")
-            anexo_bytes = anexo.arquivo_pdf.read()
+            an.arquivo_pdf.open("rb")
+            body = an.arquivo_pdf.read()
+            if body:
+                anexos_merge.append((nome, body))
         finally:
             try:
-                anexo.arquivo_pdf.close()
+                an.arquivo_pdf.close()
+            except Exception:
+                pass
+    anexo_legacy = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
+    if anexo_legacy and anexo_legacy.arquivo_pdf:
+        anexo_url = _url_download_anexo_fornecedor(request, sessao_id)
+        nome = (anexo_legacy.nome_original or "").strip() or "cotacao-fornecedor.pdf"
+        try:
+            anexo_legacy.arquivo_pdf.open("rb")
+            body = anexo_legacy.arquivo_pdf.read()
+            if body:
+                anexos_merge.append((nome, body))
+        finally:
+            try:
+                anexo_legacy.arquivo_pdf.close()
             except Exception:
                 pass
 
@@ -214,13 +230,16 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
             anexo_fornecedor_url=anexo_url,
             formula_id=formula_id,
         )
-        if anexo_bytes:
+        if anexos_merge:
             try:
-                capa_anexo_pdf = _render_anexo_fornecedor_capa_pdf(
-                    titulo_relatorio=titulo_rel,
-                    nome_arquivo=anexo_nome,
-                )
-                pdf_bytes = _merge_pdf_bytes([pdf_bytes, capa_anexo_pdf, anexo_bytes])
+                merge_parts = [pdf_bytes]
+                for nome, anexo_bytes in anexos_merge:
+                    capa_anexo_pdf = _render_anexo_fornecedor_capa_pdf(
+                        titulo_relatorio=titulo_rel,
+                        nome_arquivo=nome,
+                    )
+                    merge_parts.extend([capa_anexo_pdf, anexo_bytes])
+                pdf_bytes = _merge_pdf_bytes(merge_parts)
             except Exception:
                 # Não bloqueia a geração do relatório principal quando faltar lib de merge.
                 pass

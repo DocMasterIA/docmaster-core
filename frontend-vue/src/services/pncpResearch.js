@@ -146,9 +146,12 @@ export async function importItemsSpreadsheetToResearchSession(sessaoId, file, co
   return payload;
 }
 
-export async function uploadSupplierPdfToResearchSession(sessaoId, file, signal) {
+export async function uploadSupplierPdfToResearchSession(sessaoId, files, signal) {
   const form = new FormData();
-  form.append('arquivo', file);
+  const list = Array.isArray(files) ? files : [files];
+  for (const f of list) {
+    if (f) form.append('arquivo', f);
+  }
   const res = await fetch(
     `${API_BASE}/api/pncp/cotacoes/research/sessions/${encodeURIComponent(sessaoId)}/attachments/supplier-pdf`,
     {

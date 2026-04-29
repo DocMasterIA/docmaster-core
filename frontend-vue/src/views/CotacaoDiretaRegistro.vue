@@ -36,16 +36,22 @@
             </div>
           </div>
 
-          <label class="cd-field">
+          <label class="cd-field cd-field--full">
             <span>Descrição</span>
-            <input v-model.trim="form.descricao" type="text" required placeholder="Descrição principal da cotação" />
+            <textarea
+              v-model.trim="form.descricao"
+              rows="4"
+              required
+              class="cd-desc-textarea"
+              placeholder="Descrição principal da cotação"
+            />
           </label>
 
           <label class="cd-field cd-field--full">
             <span>Descrição complementar</span>
             <textarea
               v-model.trim="form.descricao_complementar"
-              rows="2"
+              rows="3"
               placeholder="Especificações adicionais, marca, modelo, validade etc."
             />
           </label>
@@ -555,18 +561,32 @@ onMounted(() => {
 .cd-meta--ok { color: #065f46; }
 .cd-item-card { border: 1px solid #d6dde8; border-radius: 10px; background: #fff; padding: 10px; display: flex; flex-direction: column; gap: 4px; }
 .cd-item-card__label { font-size: 10px; text-transform: uppercase; color: #64748b; }
-.cd-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
-.cd-field { display: flex; flex-direction: column; gap: 4px; }
+.cd-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.cd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .cd-field--full { grid-column: 1 / -1; }
 .cd-field > span { font-size: 11px; color: #475569; font-weight: 600; }
 .cd-field input, .cd-field select, .cd-field textarea {
   border: 1px solid #cbd5e1;
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 9px 11px;
   font-size: 13px;
   background: #fff;
 }
-.cd-field textarea { resize: vertical; min-height: 74px; }
+.cd-field textarea { resize: vertical; min-height: 86px; }
+.cd-desc-textarea {
+  min-height: 128px !important;
+  font-size: 14px;
+  line-height: 1.45;
+}
 .cd-inline-row { display: flex; gap: 8px; align-items: center; }
 .cd-inline-row > input { flex: 1; min-width: 0; }
 .cd-actions { display: flex; gap: 8px; align-items: center; grid-column: 1 / -1; }
@@ -632,5 +652,10 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+@media (max-width: 900px) {
+  .cd-form {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

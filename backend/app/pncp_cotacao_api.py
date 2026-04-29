@@ -29,6 +29,7 @@ from backend.app.api import api_login_required
 from backend.app.models import (
     PncpCotacao,
     PncpCotacaoAnexo,
+    PncpCotacaoAnexoArquivo,
     PncpCotacaoItem,
     PncpCotacaoItemCotacao,
     Prefeitura,
@@ -80,8 +81,10 @@ FORMULA_LABELS = {
 FORMULA_LABELS_TO_ID = {v.lower(): k for k, v in FORMULA_LABELS.items()}
 
 
-def _nome_padrao_anexo_fornecedor(sessao_id: int) -> str:
-    return f"cotacao-fornecedor-sessao-{int(sessao_id)}.pdf"
+def _nome_padrao_anexo_fornecedor(sessao_id: int, idx: Optional[int] = None) -> str:
+    if idx is None:
+        return f"cotacao-fornecedor-sessao-{int(sessao_id)}.pdf"
+    return f"cotacao-fornecedor-sessao-{int(sessao_id)}-{int(idx)}.pdf"
 
 _UF_RE = re.compile(r"^[A-Z]{2}$")
 
@@ -1025,7 +1028,33 @@ def pncp_research_sessions_detail(request, sessao_id: int):
     formula_id = _resolve_formula_calculo_id(c.filtros or {})
     refletidos = _itens_refletidos_for_session(c.id, formula_id)
     formula_label = FORMULA_LABELS.get(formula_id, FORMULA_LABELS[DEFAULT_FORMULA_CALCULO])
-    anexo = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
+    anexos = list(
+        PncpCotacaoAnexoArquivo.objects.filter(cotacao_id=c.id)
+        .only("id", "nome_original", "tamanho_bytes", "content_type", "created_at")
+        .order_by("-id")
+    )
+    anexo_legacy = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
+    anexos_payload = [
+        {
+            "id": int(a.id),
+            "nome": (a.nome_original or "").strip() or _nome_padrao_anexo_fornecedor(c.id, int(a.id)),
+            "tamanho_bytes": int(a.tamanho_bytes or 0),
+            "content_type": (a.content_type or "application/pdf"),
+            "legacy": False,
+        }
+        for a in anexos
+        if getattr(a, "arquivo_pdf", None)
+    ]
+    if anexo_legacy and anexo_legacy.arquivo_pdf:
+        anexos_payload.append(
+            {
+                "id": int(anexo_legacy.id),
+                "nome": (anexo_legacy.nome_original or "").strip() or _nome_padrao_anexo_fornecedor(c.id),
+                "tamanho_bytes": int(anexo_legacy.tamanho_bytes or 0),
+                "content_type": (anexo_legacy.content_type or "application/pdf"),
+                "legacy": True,
+            }
+        )
     return JsonResponse(
         {
             "ok": True,
@@ -1035,8 +1064,9 @@ def pncp_research_sessions_detail(request, sessao_id: int):
                 "total_grupos_relatorio": len(grupos_relatorio),
                 "formula_calculo": formula_label,
                 "formula_calculo_id": formula_id,
-                "anexo_fornecedor_pdf": bool(anexo and anexo.arquivo_pdf),
-                "anexo_fornecedor_nome": (anexo.nome_original if anexo else "") or "",
+                "anexo_fornecedor_pdf": bool(anexos_payload),
+                "anexo_fornecedor_nome": (anexos_payload[0]["nome"] if anexos_payload else ""),
+                "anexos_fornecedor": anexos_payload,
             },
             "itens": [
                 {
@@ -1376,23 +1406,40 @@ def pncp_research_sessions_upload_supplier_pdf(request, sessao_id: int):
     if request.method == "OPTIONS":
         return JsonResponse({}, status=204)
 
-    upload = request.FILES.get("arquivo")
-    if not upload:
-        return JsonResponse({"detail": "Envie o arquivo em 'arquivo'."}, status=422)
+    uploads = list(request.FILES.getlist("arquivo") or [])
+    if not uploads:
+        single = request.FILES.get("arquivo")
+        if single:
+            uploads = [single]
+    if not uploads:
+        return JsonResponse({"detail": "Envie ao menos um PDF em 'arquivo'."}, status=422)
 
-    name = str(getattr(upload, "name", "")).strip()
-    ctype = str(getattr(upload, "content_type", "")).lower().strip()
-    if not name.lower().endswith(".pdf"):
-        return JsonResponse({"detail": "Apenas arquivo PDF é aceito."}, status=422)
-    if ctype and ctype not in {"application/pdf", "application/x-pdf"}:
-        return JsonResponse({"detail": "Tipo de arquivo inválido. Envie PDF."}, status=422)
-    size = int(getattr(upload, "size", 0) or 0)
-    if size <= 0:
-        return JsonResponse({"detail": "Arquivo vazio."}, status=422)
-    if size > MAX_ANEXO_PDF_BYTES:
-        return JsonResponse(
-            {"detail": f"Arquivo excede limite de {MAX_ANEXO_PDF_BYTES} bytes."},
-            status=422,
+    if len(uploads) > 30:
+        return JsonResponse({"detail": "No máximo 30 arquivos por envio."}, status=422)
+
+    parsed: List[Dict[str, Any]] = []
+    for idx, upload in enumerate(uploads, start=1):
+        name = str(getattr(upload, "name", "")).strip()
+        ctype = str(getattr(upload, "content_type", "")).lower().strip()
+        if not name.lower().endswith(".pdf"):
+            return JsonResponse({"detail": f"Arquivo #{idx} não é PDF."}, status=422)
+        if ctype and ctype not in {"application/pdf", "application/x-pdf"}:
+            return JsonResponse({"detail": f"Arquivo #{idx} possui tipo inválido."}, status=422)
+        size = int(getattr(upload, "size", 0) or 0)
+        if size <= 0:
+            return JsonResponse({"detail": f"Arquivo #{idx} está vazio."}, status=422)
+        if size > MAX_ANEXO_PDF_BYTES:
+            return JsonResponse(
+                {"detail": f"Arquivo #{idx} excede limite de {MAX_ANEXO_PDF_BYTES} bytes."},
+                status=422,
+            )
+        parsed.append(
+            {
+                "upload": upload,
+                "name": name,
+                "ctype": ctype or "application/pdf",
+                "size": size,
+            }
         )
 
     with transaction.atomic():
@@ -1400,19 +1447,25 @@ def pncp_research_sessions_upload_supplier_pdf(request, sessao_id: int):
         if not c:
             return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
 
-        anexo = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
-        if anexo:
-            if anexo.arquivo_pdf:
-                anexo.arquivo_pdf.delete(save=False)
-        else:
-            anexo = PncpCotacaoAnexo(cotacao=c)
-        std_name = _nome_padrao_anexo_fornecedor(c.id)
-        file_bytes = upload.read()
-        anexo.arquivo_pdf.save(std_name, ContentFile(file_bytes), save=False)
-        anexo.nome_original = std_name[:255]
-        anexo.tamanho_bytes = size
-        anexo.content_type = ctype or "application/pdf"
-        anexo.save()
+        created_files: List[Dict[str, Any]] = []
+        for idx, p in enumerate(parsed, start=1):
+            upload = p["upload"]
+            std_name = _nome_padrao_anexo_fornecedor(c.id, idx)
+            file_bytes = upload.read()
+            anexo = PncpCotacaoAnexoArquivo(cotacao=c)
+            anexo.arquivo_pdf.save(std_name, ContentFile(file_bytes), save=False)
+            anexo.nome_original = (p["name"] or std_name)[:255]
+            anexo.tamanho_bytes = int(p["size"])
+            anexo.content_type = str(p["ctype"] or "application/pdf")
+            anexo.save()
+            created_files.append(
+                {
+                    "id": int(anexo.id),
+                    "nome": anexo.nome_original,
+                    "tamanho_bytes": anexo.tamanho_bytes,
+                    "content_type": anexo.content_type,
+                }
+            )
         c.save(update_fields=["updated_at"])
 
     return JsonResponse(
@@ -1420,11 +1473,8 @@ def pncp_research_sessions_upload_supplier_pdf(request, sessao_id: int):
             "ok": True,
             "sessao_id": c.id,
             "anexo_fornecedor_pdf": True,
-            "arquivo": {
-                "nome": anexo.nome_original,
-                "tamanho_bytes": anexo.tamanho_bytes,
-                "content_type": anexo.content_type,
-            },
+            "arquivos_inseridos": len(created_files),
+            "arquivos": created_files,
         }
     )
 
@@ -1439,12 +1489,17 @@ def pncp_research_sessions_download_supplier_pdf(request, sessao_id: int):
     if not c:
         return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
 
-    anexo = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
-    if not anexo or not anexo.arquivo_pdf:
-        return JsonResponse({"ok": False, "error": "Anexo PDF do fornecedor não encontrado."}, status=404)
-
-    anexo.arquivo_pdf.open("rb")
-    filename = (anexo.nome_original or "").strip() or _nome_padrao_anexo_fornecedor(c.id)
+    anexo = PncpCotacaoAnexoArquivo.objects.filter(cotacao_id=c.id).order_by("-id").first()
+    if anexo and anexo.arquivo_pdf:
+        anexo.arquivo_pdf.open("rb")
+        filename = (anexo.nome_original or "").strip() or _nome_padrao_anexo_fornecedor(c.id, int(anexo.id))
+    else:
+        anexo_legacy = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
+        if not anexo_legacy or not anexo_legacy.arquivo_pdf:
+            return JsonResponse({"ok": False, "error": "Anexo PDF do fornecedor não encontrado."}, status=404)
+        anexo = anexo_legacy
+        anexo.arquivo_pdf.open("rb")
+        filename = (anexo.nome_original or "").strip() or _nome_padrao_anexo_fornecedor(c.id)
     return FileResponse(
         anexo.arquivo_pdf,
         as_attachment=True,

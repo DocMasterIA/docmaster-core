@@ -794,12 +794,15 @@ def _itens_refletidos_for_session(sessao_id: int, formula_id: str) -> Dict[int, 
 
     out: Dict[int, Dict[str, Any]] = {}
     quantidade_item_map: Dict[int, Optional[float]] = {}
+    unidade_item_map: Dict[int, str] = {}
     for it in (
         PncpCotacaoItem.objects.filter(cotacao_id=sessao_id)
-        .values("id", "quantidade")
+        .values("id", "quantidade", "unidade_medida")
     ):
         q_item = _safe_float(it.get("quantidade"))
-        quantidade_item_map[int(it.get("id"))] = q_item if q_item is not None and q_item > 0 else None
+        iid = int(it.get("id"))
+        quantidade_item_map[iid] = q_item if q_item is not None and q_item > 0 else None
+        unidade_item_map[iid] = _norm_unidade(it.get("unidade_medida"))
 
     rows = PncpCotacaoItemCotacao.objects.filter(cotacao_id=sessao_id).values(
         "item_id",
@@ -855,7 +858,8 @@ def _itens_refletidos_for_session(sessao_id: int, formula_id: str) -> Dict[int, 
         valor_formula = _valor_formula_em_lista(valores, formula_id)
         out[item_id] = {
             "quantidade_refletida": qtd_refletida,
-            "unidade_medida_refletida": b["unidade"] or ("UN" if quantidades else None),
+            # Unidade definida no item é soberana; cotações não devem sobrescrever.
+            "unidade_medida_refletida": unidade_item_map.get(item_id) or b["unidade"] or ("UN" if quantidades else None),
             "valor_total_refletido": valor_formula,
         }
     return out

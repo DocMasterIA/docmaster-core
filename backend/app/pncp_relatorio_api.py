@@ -134,7 +134,21 @@ def _render_anexo_fornecedor_capa_pdf(*, titulo_relatorio: str, nome_arquivo: st
 
 
 def _merge_pdf_bytes(parts: list[bytes]) -> bytes:
-    from pypdf import PdfReader, PdfWriter
+    PdfReader = None
+    PdfWriter = None
+    try:
+        from pypdf import PdfReader as _PdfReader, PdfWriter as _PdfWriter
+
+        PdfReader = _PdfReader
+        PdfWriter = _PdfWriter
+    except Exception:
+        try:
+            from PyPDF2 import PdfReader as _PdfReader, PdfWriter as _PdfWriter
+
+            PdfReader = _PdfReader
+            PdfWriter = _PdfWriter
+        except Exception as e:
+            raise RuntimeError("biblioteca de merge PDF não instalada (pypdf/PyPDF2)") from e
 
     writer = PdfWriter()
     for payload in parts:
@@ -207,11 +221,15 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
             formula_id=formula_id,
         )
         if anexo_bytes:
-            capa_anexo_pdf = _render_anexo_fornecedor_capa_pdf(
-                titulo_relatorio=titulo_rel,
-                nome_arquivo=anexo_nome,
-            )
-            pdf_bytes = _merge_pdf_bytes([pdf_bytes, capa_anexo_pdf, anexo_bytes])
+            try:
+                capa_anexo_pdf = _render_anexo_fornecedor_capa_pdf(
+                    titulo_relatorio=titulo_rel,
+                    nome_arquivo=anexo_nome,
+                )
+                pdf_bytes = _merge_pdf_bytes([pdf_bytes, capa_anexo_pdf, anexo_bytes])
+            except Exception:
+                # Não bloqueia a geração do relatório principal quando faltar lib de merge.
+                pass
     except Exception as e:
         return JsonResponse(
             {"detail": f"Falha ao gerar PDF ({e}). Verifique se WeasyPrint e dependências estão instaladas."},

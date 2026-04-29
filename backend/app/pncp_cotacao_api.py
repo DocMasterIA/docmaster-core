@@ -1340,7 +1340,17 @@ def pncp_research_sessions_item_cotacoes(request, sessao_id: int, item_id: int):
         )
 
     if not built:
-        return JsonResponse({"detail": "Nenhuma cotação válida para inserir."}, status=422)
+        # Fluxo amigável: ausência de novas linhas (ex.: tudo duplicado) não deve quebrar a UX.
+        return JsonResponse(
+            {
+                "ok": True,
+                "sessao_id": c.id,
+                "item_id": item.id,
+                "cotacoes_inseridas": 0,
+                "cotacoes_ignoradas_duplicadas": ignored_duplicadas,
+                "mensagem": "Nenhuma cotação nova para inserir.",
+            }
+        )
 
     with transaction.atomic():
         for i in range(0, len(built), BULK_CREATE_BATCH):

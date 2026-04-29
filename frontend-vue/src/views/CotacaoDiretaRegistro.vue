@@ -30,6 +30,15 @@
             <span>Fornecedor</span>
             <div class="cd-inline-row">
               <input v-model.trim="form.fornecedor" type="text" required placeholder="Nome do fornecedor" />
+              <select v-model="fornecedorSelecionadoId" class="cd-inline-select">
+                <option value="">Fornecedor salvo</option>
+                <option v-for="f in fornecedoresCadastrados" :key="f.id" :value="String(f.id)">
+                  {{ formatFornecedorLabel(f) }}
+                </option>
+              </select>
+              <button type="button" class="cd-btn cd-btn--ghost" @click="aplicarFornecedorSelecionado">
+                Usar fornecedor salvo
+              </button>
               <button type="button" class="cd-btn cd-btn--ghost" @click="openFornecedorModal">
                 Adicionar fornecedor
               </button>
@@ -122,21 +131,6 @@
 
         <div class="cd-modal__content">
           <p class="cd-meta">Preencha manualmente ou informe CNPJ para completar automaticamente.</p>
-          <label class="cd-field cd-field--full">
-            <span>Fornecedores cadastrados</span>
-            <div class="cd-inline-row">
-              <select v-model="fornecedorSelecionadoId">
-                <option value="">Selecione um fornecedor salvo</option>
-                <option v-for="f in fornecedoresCadastrados" :key="f.id" :value="String(f.id)">
-                  {{ f.razao_social || f.nome_fantasia || 'Fornecedor sem nome' }}{{ f.cnpj ? ` · ${f.cnpj}` : '' }}
-                </option>
-              </select>
-              <button type="button" class="cd-btn cd-btn--ghost" @click="aplicarFornecedorSelecionado">
-                Carregar
-              </button>
-            </div>
-          </label>
-
           <div class="cd-form">
             <label class="cd-field">
               <span>Tipo (Pessoa Jurídica)</span>
@@ -355,6 +349,12 @@ function formatCnpj(v) {
   if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`;
   if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`;
   return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+}
+
+function formatFornecedorLabel(f) {
+  const cnpj = formatCnpj(f?.cnpj);
+  const nome = String(f?.razao_social || f?.nome_fantasia || 'Fornecedor sem nome').trim();
+  return cnpj ? `${cnpj} - ${nome}` : nome;
 }
 
 function openFornecedorModal() {
@@ -661,6 +661,10 @@ onMounted(() => {
 }
 .cd-inline-row { display: flex; gap: 8px; align-items: center; }
 .cd-inline-row > input { flex: 1; min-width: 0; }
+.cd-inline-select {
+  min-width: 260px;
+  max-width: 360px;
+}
 .cd-actions { display: flex; gap: 8px; align-items: center; grid-column: 1 / -1; }
 .cd-btn {
   border: 1px solid #1f4e79;

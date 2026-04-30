@@ -1,12 +1,19 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br';
 
 function extractErrorMessage(payload, status) {
-  const raw = typeof payload === 'object' ? payload?.detail || payload?.error : payload;
+  const raw =
+    typeof payload === 'object' && payload !== null ? payload?.detail || payload?.error : payload;
   const msg = String(raw || '').trim();
-  // Django 500 default HTML should not leak to UI.
-  if (msg.startsWith('<!doctype html') || msg.startsWith('<html')) {
-    if (status >= 500) return 'Erro interno no backend PNCP. Tente novamente em instantes.';
+  const looksLikeHtml =
+    /^<!doctype html/i.test(msg) || /^<html/i.test(msg) || /<body[\s>]/i.test(msg.slice(0, 400));
+  // Gateway/Django HTML error page — não há JSON com detalhe.
+  if (looksLikeHtml) {
+    if (status >= 500)
+      return 'Servidor ou proxy retornou erro temporário (sem detalhe). Tente novamente em instantes.';
     return `Erro HTTP ${status}`;
+  }
+  if (status >= 500 && !msg) {
+    return 'Erro temporário no servidor. Tente novamente em instantes.';
   }
   return msg || `Erro HTTP ${status}`;
 }

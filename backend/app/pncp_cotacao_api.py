@@ -6,7 +6,9 @@ Validação, limites de payload e transações com select_for_update ao gravar i
 """
 from __future__ import annotations
 
+import functools
 import json
+import logging
 import math
 import re
 import csv
@@ -40,6 +42,33 @@ from backend.app.services.pncp_relatorio_itens import (
     resumo_calculo_precos,
 )
 from backend.app.services.pncp_relatorio_pdf import extrair_cnpjs_dos_itens
+
+logger = logging.getLogger(__name__)
+
+
+def _pncp_json_errors(view_func):
+    """
+    Evita resposta 500 em HTML (Django default) para o front tratar como JSON.
+    Em DEBUG re-lança para o desenvolvedor ver o traceback.
+    """
+
+    @functools.wraps(view_func)
+    def _inner(request: HttpRequest, *args, **kwargs):
+        try:
+            return view_func(request, *args, **kwargs)
+        except Exception:
+            if getattr(settings, "DEBUG", False):
+                raise
+            logger.exception("PNCP cotacao_api: erro não tratado em %s", view_func.__name__)
+            return JsonResponse(
+                {
+                    "detail": "Erro interno ao processar a solicitação. Tente novamente em alguns instantes.",
+                    "error_code": "pncp_api",
+                },
+                status=500,
+            )
+
+    return _inner
 
 
 def _cfg_int(name: str, default: int) -> int:
@@ -365,6 +394,21 @@ def _safe_float(v: Any) -> Optional[float]:
     if math.isnan(f) or math.isinf(f):
         return None
     return f
+
+
+def _coerce_score_aprovacao_0_100(v: Any) -> int:
+    """score_aprovacao 0–100; ausente ou inválido => 0 (evita TypeError em min/max)."""
+    x = _safe_float(v)
+    if x is None:
+        return 0
+    return int(max(0, min(100, x)))
+
+
+def _valor_unitario_para_chave_dedupe(ex: Dict[str, Any]) -> str:
+    v = _safe_float(ex.get("valor_total") or ex.get("valor_unitario"))
+    if v is None or v <= 0:
+        return ""
+    return f"{float(v):.6f}"
 
 
 def _safe_int_field(v: Any, *, min_v: int, max_v: int) -> Optional[int]:
@@ -959,6 +1003,7 @@ def _item_from_payload(it: Dict[str, Any], cotacao: PncpCotacao) -> PncpCotacaoI
 @api_login_required
 @csrf_exempt
 @require_http_methods(["GET", "POST", "OPTIONS"])
+@_pncp_json_errors
 def pncp_fornecedores_cadastrados(request):
     if request.method == "OPTIONS":
         return JsonResponse({}, status=204)
@@ -1032,6 +1077,7 @@ def pncp_fornecedores_cadastrados(request):
 @api_login_required
 @csrf_exempt
 @require_http_methods(["GET", "POST", "OPTIONS"])
+@_pncp_json_errors
 def pncp_research_sessions_list_create(request):
     if request.method == "OPTIONS":
         return JsonResponse({}, status=204)
@@ -1112,6 +1158,7 @@ def pncp_research_sessions_list_create(request):
 @api_login_required
 @csrf_exempt
 @require_http_methods(["GET", "DELETE", "OPTIONS"])
+@_pncp_json_errors
 def pncp_research_sessions_detail(request, sessao_id: int):
     if request.method == "OPTIONS":
         return JsonResponse({}, status=204)
@@ -1205,6 +1252,7 @@ def pncp_research_sessions_detail(request, sessao_id: int):
 @api_login_required
 @csrf_exempt
 @require_http_methods(["POST", "OPTIONS"])
+@_pncp_json_errors
 def pncp_research_sessions_update(request, sessao_id: int):
     if request.method == "OPTIONS":
         return JsonResponse({}, status=204)
@@ -1288,6 +1336,7 @@ def pncp_research_sessions_update(request, sessao_id: int):
 @api_login_required
 @csrf_exempt
 @require_http_methods(["POST", "OPTIONS"])
+@_pncp_json_errors
 def pncp_research_sessions_add_items(request, sessao_id: int):
     if request.method == "OPTIONS":
         return JsonResponse({}, status=204)
@@ -1373,6 +1422,7 @@ def pncp_research_sessions_add_items(request, sessao_id: int):
 @api_login_required
 @csrf_exempt
 @require_http_methods(["GET", "POST", "OPTIONS"])
+@_pncp_json_errors
 def pncp_research_sessions_item_cotacoes(request, sessao_id: int, item_id: int):
     if request.method == "OPTIONS":
         return JsonResponse({}, status=204)
@@ -1433,7 +1483,7 @@ def pncp_research_sessions_item_cotacoes(request, sessao_id: int, item_id: int):
                     str(ex.get("numero_pncp") or "").strip().lower(),
                     str(ex.get("numero_item") or "").strip().lower(),
                     str(ex.get("descricao_item") or "").strip().lower(),
-                    f"{float(ex.get('valor_total') or ex.get('valor_unitario') or 0):.6f}" if _safe_float(ex.get("valor_total") or ex.get("valor_unitario")) > 0 else "",
+                    _valor_unitario_para_chave_dedupe(ex),
                 ]
             )
         )
@@ -1468,7 +1518,7 @@ def pncp_research_sessions_item_cotacoes(request, sessao_id: int, item_id: int):
                 uf=_normalize_uf(row.get("uf")),
                 modalidade=str(row.get("modalidade") or "")[:256],
                 data_publicacao=str(row.get("data_publicacao") or row.get("dataPublicacao") or "")[:64],
-                score_aprovacao=int(max(0, min(100, _safe_float(row.get("score_aprovacao"))))),
+                score_aprovacao=_coerce_score_aprovacao_0_100(row.get("score_aprovacao")),
                 confiabilidade=str(row.get("confiabilidade") or "")[:32],
                 risco=str(row.get("risco") or "")[:32],
                 status=str(row.get("status") or "")[:32],
@@ -1509,6 +1559,7 @@ def pncp_research_sessions_item_cotacoes(request, sessao_id: int, item_id: int):
 @api_login_required
 @csrf_exempt
 @require_http_methods(["POST", "OPTIONS"])
+@_pncp_json_errors
 def pncp_research_sessions_item_cotacoes_update(request, sessao_id: int, item_id: int, cotacao_id: int):
     if request.method == "OPTIONS":
         return JsonResponse({}, status=204)
@@ -1548,7 +1599,7 @@ def pncp_research_sessions_item_cotacoes_update(request, sessao_id: int, item_id
     row.uf = _normalize_uf(payload.get("uf"))
     row.modalidade = str(payload.get("modalidade") or "")[:256]
     row.data_publicacao = str(payload.get("data_publicacao") or payload.get("dataPublicacao") or "")[:64]
-    row.score_aprovacao = int(max(0, min(100, _safe_float(payload.get("score_aprovacao")))))
+    row.score_aprovacao = _coerce_score_aprovacao_0_100(payload.get("score_aprovacao"))
     row.confiabilidade = str(payload.get("confiabilidade") or "")[:32]
     row.risco = str(payload.get("risco") or "")[:32]
     row.status = str(payload.get("status") or "")[:32]
@@ -1570,6 +1621,7 @@ def pncp_research_sessions_item_cotacoes_update(request, sessao_id: int, item_id
 @api_login_required
 @csrf_exempt
 @require_http_methods(["POST", "OPTIONS"])
+@_pncp_json_errors
 def pncp_research_sessions_upload_supplier_pdf(request, sessao_id: int):
     if request.method == "OPTIONS":
         return JsonResponse({}, status=204)
@@ -1649,6 +1701,7 @@ def pncp_research_sessions_upload_supplier_pdf(request, sessao_id: int):
 
 @api_login_required
 @require_http_methods(["GET", "OPTIONS"])
+@_pncp_json_errors
 def pncp_research_sessions_download_supplier_pdf(request, sessao_id: int):
     if request.method == "OPTIONS":
         return JsonResponse({}, status=204)
@@ -1679,6 +1732,7 @@ def pncp_research_sessions_download_supplier_pdf(request, sessao_id: int):
 @api_login_required
 @csrf_exempt
 @require_http_methods(["POST", "OPTIONS"])
+@_pncp_json_errors
 def pncp_research_sessions_import_items(request, sessao_id: int):
     if request.method == "OPTIONS":
         return JsonResponse({}, status=204)
@@ -1755,6 +1809,7 @@ def pncp_research_sessions_import_items(request, sessao_id: int):
 @api_login_required
 @csrf_exempt
 @require_http_methods(["POST", "OPTIONS"])
+@_pncp_json_errors
 def pncp_research_sessions_delete_items(request, sessao_id: int):
     if request.method == "OPTIONS":
         return JsonResponse({}, status=204)

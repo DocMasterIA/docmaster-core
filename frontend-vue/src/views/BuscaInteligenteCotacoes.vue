@@ -455,29 +455,34 @@ function buildContextFromItem(it) {
     + Number(fontes.dominioAmplo || 0)
     + Number(fontes.cotacaoDireta || 0)
     + Number(fontes.notasFiscais || 0);
+  const valorBaseRef = parseNumericRef(
+    src?.valor_base,
+    src?.valorBase,
+    src?.preco_base,
+    src?.precoBase,
+    faixa?.valor_base,
+    faixa?.valorBase,
+    it?.valor_unitario,
+    it?.valor_total,
+  );
+  let variacaoRef = parseNumericRef(
+    src?.variacao_percentual,
+    src?.variacaoPercentual,
+    src?.variacao,
+    faixa?.variacao_percentual,
+    faixa?.variacaoPercentual,
+    faixa?.variacao,
+  );
+  if ((variacaoRef === null || !Number.isFinite(variacaoRef)) && valorBaseRef != null && Number.isFinite(valorBaseRef)) {
+    variacaoRef = 20;
+  }
   return {
     id: it.id,
     descricao_item: String(it?.descricao_item || '').trim(),
     quantidade: it?.quantidade ?? null,
     unidade_medida: it?.unidade_medida || null,
-    valor_base_referencia:
-      parseNumericRef(
-        src?.valor_base,
-        src?.valorBase,
-        src?.preco_base,
-        src?.precoBase,
-        faixa?.valor_base,
-        faixa?.valorBase,
-      ),
-    variacao_percentual_referencia:
-      parseNumericRef(
-        src?.variacao_percentual,
-        src?.variacaoPercentual,
-        src?.variacao,
-        faixa?.variacao_percentual,
-        faixa?.variacaoPercentual,
-        faixa?.variacao,
-      ),
+    valor_base_referencia: valorBaseRef,
+    variacao_percentual_referencia: variacaoRef,
     uf_padrao: String(it?.uf || '').trim().toUpperCase() || null,
     total_cotacoes_item: totalCotacoesItem,
   };

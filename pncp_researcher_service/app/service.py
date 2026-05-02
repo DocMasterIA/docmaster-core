@@ -1462,7 +1462,83 @@ def _safe_float(value: Any) -> float:
     return out
 
 
-def _build_ia_rerank_prompt(termo_busca: str, candidatos: List[Dict[str, Any]]) -> str:
+def _row_price_for_faixa(it: Dict[str, Any]) -> float:
+    return _safe_float(it.get("valor_unitario") or it.get("valor_total") or it.get("valor_global"))
+
+
+def _ia_item_key(it: Dict[str, Any]) -> str:
+    return "|".join(
+        [
+            str(it.get("numero_pncp") or "").strip(),
+            str(it.get("numero_item") or "").strip(),
+            str(it.get("descricao_item") or "").strip().lower(),
+            str(it.get("orgao") or "").strip().lower(),
+        ]
+    )
+
+
+def _preco_dentro_faixa(it: Dict[str, Any], lo: float, hi: float) -> bool:
+    v = _row_price_for_faixa(it)
+    return v > 0.0 and lo <= v <= hi
+
+
+def _enforce_faixa_no_top3(
+    top3: List[Dict[str, Any]],
+    pool: List[Dict[str, Any]],
+    *,
+    lo: float,
+    hi: float,
+    termo_busca: str,
+) -> List[Dict[str, Any]]:
+    """
+    Substitui escolhas fora da faixa regional (valor base ± %) por candidatos dentro da faixa,
+    preservando ordem de preferência por literal_match + score.
+    """
+    if not top3 or not pool:
+        return top3
+    in_band = [dict(x) for x in pool if _preco_dentro_faixa(x, lo, hi)]
+    in_band.sort(
+        key=lambda it: (
+            float(it.get("literal_match") or _literal_match_score(termo_busca, it)),
+            float(it.get("score_aprovacao") or 0),
+        ),
+        reverse=True,
+    )
+    used: set[str] = set()
+    out: List[Dict[str, Any]] = []
+    for it in top3:
+        row = dict(it)
+        if _preco_dentro_faixa(row, lo, hi):
+            k = _ia_item_key(row) or f"id:{id(row)}"
+            used.add(k)
+            out.append(row)
+            continue
+        replaced = False
+        for cand in in_band:
+            k2 = _ia_item_key(cand) or f"id:{id(cand)}"
+            if k2 in used:
+                continue
+            out.append(dict(cand))
+            used.add(k2)
+            replaced = True
+            break
+        if not replaced:
+            k = _ia_item_key(row) or f"id:{id(row)}"
+            if k not in used:
+                used.add(k)
+            out.append(row)
+    return out[:3]
+
+
+def _build_ia_rerank_prompt(
+    termo_busca: str,
+    candidatos: List[Dict[str, Any]],
+    *,
+    faixa_min: Optional[float] = None,
+    faixa_max: Optional[float] = None,
+    valor_base_ref: Optional[float] = None,
+    variacao_pct_ref: Optional[float] = None,
+) -> str:
     linhas: List[str] = []
     for c in candidatos:
         linhas.append(
@@ -1471,13 +1547,32 @@ def _build_ia_rerank_prompt(termo_busca: str, candidatos: List[Dict[str, Any]]) 
             f"| orgao={c.get('orgao') or ''} | uf={c.get('uf') or ''}"
         )
     itens_txt = "\n".join(linhas)
+    faixa_txt = ""
+    if (
+        faixa_min is not None
+        and faixa_max is not None
+        and valor_base_ref is not None
+        and valor_base_ref > 0
+        and variacao_pct_ref is not None
+        and variacao_pct_ref >= 0
+    ):
+        faixa_txt = (
+            "\n**Faixa regional de preço (obrigatória):** o item de referência do usuário tem valor base "
+            f"R$ {valor_base_ref:.2f} com tolerância de ±{variacao_pct_ref:.1f}% sobre esse valor.\n"
+            f"Apenas candidatos cujo campo `valor` (preço unitário ou total exibido) estiver entre "
+            f"**R$ {faixa_min:.2f}** e **R$ {faixa_max:.2f}** podem ser escolhidos nos 3 IDs finais.\n"
+            "Se um candidato estiver fora dessa faixa, **não** o selecione; prefira o próximo mais aderente "
+            "ao termo **e** dentro da faixa.\n"
+            "Só inclua fora da faixa se **nenhum** candidato da lista estiver dentro — nesse caso explique na justificativa.\n"
+        )
     return (
         "Você é um avaliador de cotações PNCP.\n"
         f"Termo de busca: {termo_busca}\n\n"
-        "Escolha EXATAMENTE 3 IDs mais aderentes ao termo, com boa leitura de descrição e preço saudável.\n"
+        "Escolha EXATAMENTE 3 IDs mais aderentes ao termo, com boa leitura de descrição e preço coerente.\n"
         "Priorize item principal no texto (não detalhe secundário de outro produto).\n"
         "Quando o termo NÃO for médico, evite itens médicos/hospitalares.\n"
-        "Considere unidade/quantidade e descarte outliers de preço muito fora da faixa.\n\n"
+        "Considere unidade/quantidade.\n"
+        f"{faixa_txt}\n"
         "Responda APENAS JSON válido neste formato:\n"
         '{"selected":[{"id":"...","score_aprovacao":"0-100 (variável por item)","confiabilidade":"Alta|Média|Baixa","risco":"Baixo|Médio|Alto","justificativa":"..."}]}\n\n'
         f"Candidatos:\n{itens_txt}\n"
@@ -1630,10 +1725,22 @@ async def _enriquecer_interpretacao_ia_itens(termo_busca: str, itens: List[Dict[
 async def _rerank_top3_with_ia(
     termo_busca: str,
     candidatos: List[Dict[str, Any]],
+    *,
+    faixa_min: Optional[float] = None,
+    faixa_max: Optional[float] = None,
+    valor_base_ref: Optional[float] = None,
+    variacao_pct_ref: Optional[float] = None,
 ) -> List[Dict[str, Any]]:
     if not PNCP_IA_RERANK_ENABLED or not candidatos:
         return []
-    prompt = _build_ia_rerank_prompt(termo_busca, candidatos)
+    prompt = _build_ia_rerank_prompt(
+        termo_busca,
+        candidatos,
+        faixa_min=faixa_min,
+        faixa_max=faixa_max,
+        valor_base_ref=valor_base_ref,
+        variacao_pct_ref=variacao_pct_ref,
+    )
     payload: Dict[str, Any] = {"prompt": prompt, "stream": False}
     if PNCP_IA_MODEL:
         payload["model"] = PNCP_IA_MODEL
@@ -1700,11 +1807,19 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     query_groups = _build_query_groups(payload.termo_busca)
     ref_qty = _safe_float(payload.quantidade_referencia)
     ref_unit = _normalize_unit(payload.unidade_medida_referencia)
-    ref_value = _safe_float(payload.valor_base_referencia)
-    ref_var_pct = _safe_float(payload.variacao_percentual_referencia)
+    ref_val_set = payload.valor_base_referencia is not None
+    ref_var_set = payload.variacao_percentual_referencia is not None
+    try:
+        ref_value = float(payload.valor_base_referencia) if ref_val_set else 0.0
+    except (TypeError, ValueError):
+        ref_value = 0.0
+    try:
+        ref_var_pct = float(payload.variacao_percentual_referencia) if ref_var_set else 0.0
+    except (TypeError, ValueError):
+        ref_var_pct = 0.0
     faixa_min: Optional[float] = None
     faixa_max: Optional[float] = None
-    if payload.variacao_percentual_referencia is not None and ref_value > 0 and ref_var_pct >= 0:
+    if ref_val_set and ref_var_set and ref_value > 0 and ref_var_pct >= 0:
         margem = ref_value * (ref_var_pct / 100.0)
         faixa_min = max(0.0, ref_value - margem)
         faixa_max = ref_value + margem
@@ -1789,7 +1904,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                 if row_value <= 0:
                     ref_fit -= 6.0
                 elif row_value < faixa_min or row_value > faixa_max:
-                    ref_fit -= 8.0
+                    ref_fit -= 22.0
             if ref_value > 0 and row_value > 0:
                 v_dev = abs(row_value - ref_value) / max(ref_value, 1e-9)
                 if v_dev <= 0.25:
@@ -1886,12 +2001,24 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     ia_rerank_allowed = pool_mode in {"literal_only", "similar_only"}
     if PNCP_IA_RERANK_ENABLED and ia_rerank_allowed and selection_pool:
         limite_candidatos = max(6, min(PNCP_IA_MAX_CANDIDATES, len(selection_pool)))
+        pool_ia = list(selection_pool)
+        if faixa_min is not None and faixa_max is not None:
+            in_band_ia = [x for x in selection_pool if _preco_dentro_faixa(x, faixa_min, faixa_max)]
+            if len(in_band_ia) >= 3:
+                pool_ia = in_band_ia
         candidatos_ia: List[Dict[str, Any]] = []
-        for idx, base_item in enumerate(selection_pool[:limite_candidatos]):
+        for idx, base_item in enumerate(pool_ia[:limite_candidatos]):
             row = dict(base_item)
             row["_ia_id"] = f"cand-{idx}"
             candidatos_ia.append(row)
-        ia_selected = await _rerank_top3_with_ia(payload.termo_busca, candidatos_ia)
+        ia_selected = await _rerank_top3_with_ia(
+            payload.termo_busca,
+            candidatos_ia,
+            faixa_min=faixa_min,
+            faixa_max=faixa_max,
+            valor_base_ref=ref_value if ref_val_set else None,
+            variacao_pct_ref=ref_var_pct if ref_var_set else None,
+        )
         if ia_selected:
             by_id = {str(c.get("_ia_id")): c for c in candidatos_ia}
             chosen: List[Dict[str, Any]] = []
@@ -1945,6 +2072,15 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             complemento = [x for x in similar_scored if id(x) not in usados]
             base_similar = _select_top3_prioritize_federal(complemento)[:faltantes]
             top3 = base_literal + base_similar
+
+    if faixa_min is not None and faixa_max is not None and top3:
+        top3 = _enforce_faixa_no_top3(
+            top3,
+            scored,
+            lo=faixa_min,
+            hi=faixa_max,
+            termo_busca=payload.termo_busca,
+        )
 
     for row in top3:
         apply_item_display_cleanup(row)

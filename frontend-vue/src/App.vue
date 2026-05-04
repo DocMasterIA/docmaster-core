@@ -1142,6 +1142,38 @@ watch(
   color: #e2e8f0 !important;
 }
 
+/* Força final para cards da tela de cotação */
+.dm-dark .dm-content :deep(.cot-title-editor),
+.dm-dark .dm-content :deep(.cot-formula),
+.dm-dark .dm-content :deep(.cot-global-variacao),
+.dm-dark .dm-content :deep(.cot-fornecedor-field),
+.dm-dark .dm-content :deep(.cot-new-item-block) {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+.dm-dark .dm-content :deep(.cot-title-editor__field span),
+.dm-dark .dm-content :deep(.cot-formula__subtitle),
+.dm-dark .dm-content :deep(.cot-global-variacao__subtitle),
+.dm-dark .dm-content :deep(.cot-fornecedor-field__label),
+.dm-dark .dm-content :deep(.cot-new-item-block__text p) {
+  color: #94a3b8 !important;
+}
+
+.dm-dark .dm-content :deep(.cot-formula__title),
+.dm-dark .dm-content :deep(.cot-global-variacao__title),
+.dm-dark .dm-content :deep(.cot-fornecedor-field__value),
+.dm-dark .dm-content :deep(.cot-new-item-block__text h2) {
+  color: #e2e8f0 !important;
+}
+
+.dm-dark .dm-content :deep(.cot-title-editor__field input),
+.dm-dark .dm-content :deep(.cot-formula__select) {
+  background: #111827 !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
 .dm-dark .dm-content :deep(.pncp-mock__subtitle),
 .dm-dark .dm-content :deep(.pncp-mock__summary-label),
 .dm-dark .dm-content :deep(.pncp-mock__table th),

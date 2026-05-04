@@ -413,6 +413,65 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.area-usuario {
+  color: #0f172a;
+}
+
+:deep(.gov-surface) {
+  border-radius: 24px;
+  border: 1px solid #e2e8f0;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.045);
+}
+
+:deep(.gov-surface__title) {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+:deep(.gov-surface__subtitle) {
+  color: #64748b;
+}
+
+:deep(.gov-input) {
+  border-radius: 16px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+:deep(.gov-input:focus) {
+  border-color: #254e78;
+  box-shadow: 0 0 0 4px rgba(37, 78, 120, 0.1);
+}
+
+:deep(.gov-btn) {
+  border-radius: 999px;
+  font-weight: 700;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+:deep(.gov-btn:hover) {
+  transform: translateY(-1px);
+}
+
+:deep(.gov-btn--primary) {
+  background: #254e78;
+  border-color: #254e78;
+  color: #fff;
+  box-shadow: 0 16px 34px rgba(37, 78, 120, 0.24);
+}
+
+:deep(.gov-btn--primary:hover) {
+  background: #1f4468;
+  border-color: #1f4468;
+}
+
+:deep(.gov-btn--outline) {
+  border-color: #cbd5e1;
+}
+
 .area-usuario__grid {
   display: grid;
   grid-template-columns: 1fr 2fr;
@@ -579,6 +638,7 @@ onMounted(() => {
 .area-usuario__doc-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 .area-usuario__status--draft {
   color: #b45309;
@@ -611,5 +671,57 @@ onMounted(() => {
 }
 .area-usuario__msg--success {
   color: var(--color-success);
+}
+
+:global(.dm-dark) .area-usuario {
+  color: #e2e8f0;
+}
+
+:global(.dm-dark) .area-usuario :deep(.gov-surface) {
+  border-color: #1e293b;
+  background: rgba(15, 23, 42, 0.74);
+  box-shadow: 0 16px 36px rgba(2, 6, 23, 0.3);
+}
+
+:global(.dm-dark) .area-usuario :deep(.gov-surface__title) {
+  color: #f8fafc;
+}
+
+:global(.dm-dark) .area-usuario :deep(.gov-surface__subtitle),
+:global(.dm-dark) .area-usuario :deep(.gov-text-soft) {
+  color: #94a3b8;
+}
+
+:global(.dm-dark) .area-usuario :deep(.gov-input) {
+  border-color: #334155;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+:global(.dm-dark) .area-usuario :deep(.gov-input--readonly) {
+  background: #111827;
+  color: #94a3b8;
+}
+
+:global(.dm-dark) .area-usuario :deep(.gov-btn--outline) {
+  border-color: #475569;
+  color: #e2e8f0;
+  background: #0f172a;
+}
+
+:global(.dm-dark) .area-usuario :deep(.gov-btn--outline:hover) {
+  background: #1e293b;
+}
+
+:global(.dm-dark) .area-usuario .area-usuario__docs-header,
+:global(.dm-dark) .area-usuario .area-usuario__doc-row,
+:global(.dm-dark) .area-usuario .area-usuario__docs-list,
+:global(.dm-dark) .area-usuario .area-usuario__meta {
+  border-color: #334155;
+}
+
+:global(.dm-dark) .area-usuario .area-usuario__meta-value,
+:global(.dm-dark) .area-usuario .area-usuario__doc-title {
+  color: #f8fafc;
 }
 </style>

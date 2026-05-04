@@ -755,6 +755,102 @@ watch(
   background: rgba(2, 6, 23, 0.48);
 }
 
+/* Base visual global para todas as views internas */
+:deep(.gov-surface) {
+  border-radius: 24px !important;
+  border: 1px solid #e2e8f0 !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.045) !important;
+}
+
+:deep(.gov-surface__title) {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+}
+
+:deep(.gov-surface__subtitle),
+:deep(.gov-text-soft),
+:deep(.gov-page__meta) {
+  color: #64748b !important;
+}
+
+:deep(.gov-input) {
+  border-radius: 16px !important;
+  border: 1px solid #cbd5e1 !important;
+  background: #fff !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+:deep(.gov-input:focus) {
+  border-color: #254e78 !important;
+  box-shadow: 0 0 0 4px rgba(37, 78, 120, 0.1) !important;
+}
+
+:deep(.gov-btn) {
+  border-radius: 999px !important;
+  font-weight: 700 !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+:deep(.gov-btn:hover) {
+  transform: translateY(-1px);
+}
+
+:deep(.gov-btn--primary) {
+  background: #254e78 !important;
+  border-color: #254e78 !important;
+  color: #fff !important;
+  box-shadow: 0 16px 34px rgba(37, 78, 120, 0.24) !important;
+}
+
+:deep(.gov-btn--primary:hover) {
+  background: #1f4468 !important;
+  border-color: #1f4468 !important;
+}
+
+:deep(.gov-btn--outline) {
+  border-color: #cbd5e1 !important;
+  background: #fff !important;
+}
+
+.dm-dark :deep(.gov-surface) {
+  border-color: #1e293b !important;
+  background: rgba(15, 23, 42, 0.74) !important;
+  box-shadow: 0 16px 36px rgba(2, 6, 23, 0.3) !important;
+}
+
+.dm-dark :deep(.gov-surface__title) {
+  color: #f8fafc !important;
+}
+
+.dm-dark :deep(.gov-surface__subtitle),
+.dm-dark :deep(.gov-text-soft),
+.dm-dark :deep(.gov-page__meta) {
+  color: #94a3b8 !important;
+}
+
+.dm-dark :deep(.gov-input) {
+  border-color: #334155 !important;
+  background: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
+.dm-dark :deep(.gov-input--readonly) {
+  background: #111827 !important;
+  color: #94a3b8 !important;
+}
+
+.dm-dark :deep(.gov-btn--outline) {
+  border-color: #475569 !important;
+  color: #e2e8f0 !important;
+  background: #0f172a !important;
+}
+
+.dm-dark :deep(.gov-btn--outline:hover) {
+  background: #1e293b !important;
+}
+
 @media (max-width: 1279px) {
   .dm-body {
     grid-template-columns: 1fr;

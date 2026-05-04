@@ -376,6 +376,54 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.doc-analyzer {
+  color: #0f172a;
+}
+
+:deep(.gov-surface) {
+  border-radius: 24px;
+  border: 1px solid #e2e8f0;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.045);
+}
+
+:deep(.gov-surface__title) {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+:deep(.gov-surface__subtitle),
+:deep(.gov-text-soft) {
+  color: #64748b;
+}
+
+:deep(.gov-btn) {
+  border-radius: 999px;
+  font-weight: 700;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+:deep(.gov-btn:hover) {
+  transform: translateY(-1px);
+}
+
+:deep(.gov-btn--primary) {
+  background: #254e78;
+  border-color: #254e78;
+  color: #fff;
+  box-shadow: 0 16px 34px rgba(37, 78, 120, 0.24);
+}
+
+:deep(.gov-btn--primary:hover) {
+  background: #1f4468;
+  border-color: #1f4468;
+}
+
+:deep(.gov-btn--outline) {
+  border-color: #cbd5e1;
+}
+
 .doc-analyzer__grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -401,7 +449,7 @@ onUnmounted(() => {
 .doc-analyzer__dropzone:hover,
 .doc-analyzer__dropzone--active {
   border-color: var(--color-primary);
-  background: #e5f3fa;
+  background: #edf4ff;
 }
 .doc-analyzer__dropzone--has-files {
   padding: 20px;
@@ -572,5 +620,51 @@ onUnmounted(() => {
 }
 .gov-text-sm {
   font-size: 12px;
+}
+
+:global(.dm-dark) .doc-analyzer {
+  color: #e2e8f0;
+}
+
+:global(.dm-dark) .doc-analyzer :deep(.gov-surface) {
+  border-color: #1e293b;
+  background: rgba(15, 23, 42, 0.74);
+  box-shadow: 0 16px 36px rgba(2, 6, 23, 0.3);
+}
+
+:global(.dm-dark) .doc-analyzer :deep(.gov-surface__title) {
+  color: #f8fafc;
+}
+
+:global(.dm-dark) .doc-analyzer :deep(.gov-surface__subtitle),
+:global(.dm-dark) .doc-analyzer :deep(.gov-text-soft) {
+  color: #94a3b8;
+}
+
+:global(.dm-dark) .doc-analyzer :deep(.gov-btn--outline) {
+  border-color: #475569;
+  color: #e2e8f0;
+  background: #0f172a;
+}
+
+:global(.dm-dark) .doc-analyzer :deep(.gov-btn--outline:hover) {
+  background: #1e293b;
+}
+
+:global(.dm-dark) .doc-analyzer .doc-analyzer__dropzone {
+  border-color: #334155;
+  background: #0f172a;
+}
+
+:global(.dm-dark) .doc-analyzer .doc-analyzer__dropzone:hover,
+:global(.dm-dark) .doc-analyzer .doc-analyzer__dropzone--active {
+  border-color: #64748b;
+  background: #1e293b;
+}
+
+:global(.dm-dark) .doc-analyzer .doc-analyzer__file-item,
+:global(.dm-dark) .doc-analyzer .doc-analyzer__suggestion-item {
+  border-color: #334155;
+  background: #0f172a;
 }
 </style>

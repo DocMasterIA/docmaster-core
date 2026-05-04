@@ -704,12 +704,12 @@ onMounted(() => {
 
 /* Dark mode: alinhado ao shell dm-dark global */
 :deep(.dm-dark) .pncp-mock {
-  border-color: #334155;
-  background: #0f172a;
+  border-color: #334155 !important;
+  background: #0f172a !important;
 }
 
 :deep(.dm-dark) .pncp-mock__title {
-  color: #f8fafc;
+  color: #f8fafc !important;
 }
 
 :deep(.dm-dark) .pncp-mock__subtitle,
@@ -717,19 +717,19 @@ onMounted(() => {
 :deep(.dm-dark) .pncp-mock__desc-sub,
 :deep(.dm-dark) .pncp-mock__table th,
 :deep(.dm-dark) .pncp-empty {
-  color: #94a3b8;
+  color: #94a3b8 !important;
 }
 
 :deep(.dm-dark) .pncp-mock__summary-card {
-  border-color: #334155;
-  background: #111827;
+  border-color: #334155 !important;
+  background: #111827 !important;
 }
 
 :deep(.dm-dark) .pncp-mock__summary-card strong,
 :deep(.dm-dark) .pncp-mock__desc,
 :deep(.dm-dark) .pncp-mock__usuario,
 :deep(.dm-dark) .pncp-mock__table td {
-  color: #e2e8f0;
+  color: #e2e8f0 !important;
 }
 
 :deep(.dm-dark) .pncp-mock__summary-card--highlight strong {
@@ -737,15 +737,15 @@ onMounted(() => {
 }
 
 :deep(.dm-dark) .pncp-chip {
-  border-color: #475569;
-  background: #0f172a;
-  color: #cbd5e1;
+  border-color: #475569 !important;
+  background: #0f172a !important;
+  color: #cbd5e1 !important;
 }
 
 :deep(.dm-dark) .pncp-chip--active {
-  border-color: #64748b;
-  background: #1e293b;
-  color: #f8fafc;
+  border-color: #64748b !important;
+  background: #1e293b !important;
+  color: #f8fafc !important;
 }
 
 :deep(.dm-dark) .pncp-status--ok {
@@ -761,56 +761,63 @@ onMounted(() => {
 }
 
 :deep(.dm-dark) .pncp-action-btn {
-  border-color: #475569;
-  background: #0f172a;
-  color: #e2e8f0;
+  border-color: #475569 !important;
+  background: #0f172a !important;
+  color: #e2e8f0 !important;
 }
 
 :deep(.dm-dark) .pncp-action-btn:hover {
-  background: #1e293b;
+  background: #1e293b !important;
 }
 
 :deep(.dm-dark) .pncp-mock__table th,
 :deep(.dm-dark) .pncp-mock__table td {
-  border-bottom-color: #1e293b;
+  border-bottom-color: #1e293b !important;
 }
 
 :deep(.dm-dark) .pncp-mock__table tbody tr:hover td {
-  background: rgba(30, 41, 59, 0.62);
+  background: rgba(30, 41, 59, 0.62) !important;
 }
 
-:deep(.dm-dark) .pncp-modal-backdrop {
-  background: rgba(2, 6, 23, 0.78);
+:global(body.dm-dark-theme) .pncp-modal-backdrop {
+  background: rgba(2, 6, 23, 0.8) !important;
 }
 
-:deep(.dm-dark) .pncp-modal {
-  border-color: #334155;
-  background: #0f172a;
-  box-shadow: 0 24px 48px rgba(2, 6, 23, 0.45);
+:global(body.dm-dark-theme) .pncp-modal {
+  border-color: #334155 !important;
+  background: #0f172a !important;
+  box-shadow: 0 24px 48px rgba(2, 6, 23, 0.45) !important;
 }
 
-:deep(.dm-dark) .pncp-modal__title {
-  color: #f8fafc;
+:global(body.dm-dark-theme) .pncp-modal__title {
+  color: #f8fafc !important;
 }
 
-:deep(.dm-dark) .pncp-modal__text,
-:deep(.dm-dark) .pncp-modal__field {
-  color: #94a3b8;
+:global(body.dm-dark-theme) .pncp-modal__text,
+:global(body.dm-dark-theme) .pncp-modal__field,
+:global(body.dm-dark-theme) .pncp-modal__field span {
+  color: #94a3b8 !important;
 }
 
-:deep(.dm-dark) .pncp-modal__quote {
-  border-color: #334155;
-  background: #111827;
-  color: #cbd5e1;
+:global(body.dm-dark-theme) .pncp-modal__quote {
+  border-color: #334155 !important;
+  background: #111827 !important;
+  color: #cbd5e1 !important;
 }
 
-:deep(.dm-dark) .pncp-modal__btn--ghost {
-  border-color: #475569;
-  background: #0f172a;
-  color: #e2e8f0;
+:global(body.dm-dark-theme) .pncp-modal .gov-input {
+  border-color: #334155 !important;
+  background: #111827 !important;
+  color: #e2e8f0 !important;
 }
 
-:deep(.dm-dark) .pncp-modal__btn--ghost:hover {
-  background: #1e293b;
+:global(body.dm-dark-theme) .pncp-modal__btn--ghost {
+  border-color: #475569 !important;
+  background: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
+:global(body.dm-dark-theme) .pncp-modal__btn--ghost:hover {
+  background: #1e293b !important;
 }
 </style>

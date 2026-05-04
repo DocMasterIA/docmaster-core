@@ -343,15 +343,29 @@ function toggleDarkMode() {
   }
 }
 
+function syncDarkModeRootClass(enabled) {
+  if (typeof document === 'undefined') return;
+  document.documentElement.classList.toggle('dm-dark-theme', !!enabled);
+  document.body.classList.toggle('dm-dark-theme', !!enabled);
+}
+
 onMounted(() => {
   try {
     darkMode.value = localStorage.getItem(DARK_MODE_KEY) === '1';
   } catch (_) {
     darkMode.value = false;
   }
+  syncDarkModeRootClass(darkMode.value);
   fetchMe();
   if (['dispensa', 'inexigibilidade', 'etp'].includes(activeMainTabKey.value)) generationMenuOpen.value = true;
 });
+
+watch(
+  () => darkMode.value,
+  (enabled) => {
+    syncDarkModeRootClass(enabled);
+  }
+);
 
 watch(
   () => route.fullPath,

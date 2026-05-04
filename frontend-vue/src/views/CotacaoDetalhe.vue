@@ -2060,4 +2060,156 @@ a.pncp-modal__link-btn {
   font-size: 12px;
   color: #475569;
 }
+
+/* Dark mode dedicado da rota /pesquisador-pncp/cotacoes/:id */
+:deep(.dm-dark) .cot-back-btn,
+:deep(.dm-dark) .cot-btn,
+:deep(.dm-dark) .cot-sheet-action-btn,
+:deep(.dm-dark) .cot-sheet-bulk-delete {
+  background: #0f172a !important;
+  border-color: #475569 !important;
+  color: #e2e8f0 !important;
+}
+
+:deep(.dm-dark) .cot-btn--primary {
+  background: #1e293b !important;
+  border-color: #64748b !important;
+  color: #f8fafc !important;
+}
+
+:deep(.dm-dark) .cot-btn--danger,
+:deep(.dm-dark) .cot-sheet-action-btn--danger {
+  background: rgba(185, 28, 28, 0.18) !important;
+  border-color: #7f1d1d !important;
+  color: #fecaca !important;
+}
+
+:deep(.dm-dark) .cot-card,
+:deep(.dm-dark) .cot-title-editor,
+:deep(.dm-dark) .cot-formula,
+:deep(.dm-dark) .cot-global-variacao,
+:deep(.dm-dark) .cot-fornecedor-field,
+:deep(.dm-dark) .cot-new-item-block,
+:deep(.dm-dark) .cot-sheet-shell {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+:deep(.dm-dark) .cot-card strong,
+:deep(.dm-dark) .cot-new-item-block__text h2,
+:deep(.dm-dark) .cot-fornecedor-field__value,
+:deep(.dm-dark) .cot-sheet-table td,
+:deep(.dm-dark) .cot-item-nome-wrap span {
+  color: #e2e8f0 !important;
+}
+
+:deep(.dm-dark) .cot-card__label,
+:deep(.dm-dark) .cot-meta,
+:deep(.dm-dark) .cot-title-editor__field span,
+:deep(.dm-dark) .cot-formula__subtitle,
+:deep(.dm-dark) .cot-global-variacao__subtitle,
+:deep(.dm-dark) .cot-fornecedor-field__label,
+:deep(.dm-dark) .cot-new-item-block__text p,
+:deep(.dm-dark) .cot-sheet-table thead th,
+:deep(.dm-dark) .cot-sheet-source__sub,
+:deep(.dm-dark) .cot-faixa-block__label,
+:deep(.dm-dark) .cot-relatorio-field,
+:deep(.dm-dark) .cot-relatorio-info {
+  color: #94a3b8 !important;
+}
+
+:deep(.dm-dark) .cot-title-editor__field input,
+:deep(.dm-dark) .cot-formula__select,
+:deep(.dm-dark) .cot-sheet-inline-input,
+:deep(.dm-dark) .cot-sheet-search,
+:deep(.dm-dark) .cot-sheet-status-filter,
+:deep(.dm-dark) .cot-sheet-search input,
+:deep(.dm-dark) .cot-sheet-status-filter select {
+  background: #111827 !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+:deep(.dm-dark) .cot-sheet-row-add,
+:deep(.dm-dark) .cot-sheet-table thead th {
+  background: #111827 !important;
+}
+
+:deep(.dm-dark) .cot-sheet-table th,
+:deep(.dm-dark) .cot-sheet-table td {
+  border-color: #334155 !important;
+}
+
+:deep(.dm-dark) .cot-sheet-group,
+:deep(.dm-dark) .cot-sheet-source {
+  background: #1e293b !important;
+}
+
+:deep(.dm-dark) .cot-sheet-source__icon,
+:deep(.dm-dark) .cot-sheet-source__title {
+  color: #cbd5e1 !important;
+}
+
+:deep(.dm-dark) .cot-sheet-source-cell--gray {
+  background: #0f172a !important;
+  border-color: #475569 !important;
+  color: #cbd5e1 !important;
+}
+
+:deep(.dm-dark) .cot-sheet-source-cell--green {
+  background: rgba(30, 64, 175, 0.22) !important;
+  border-color: #1d4ed8 !important;
+  color: #93c5fd !important;
+}
+
+:deep(.dm-dark) .cot-sheet-status--completo {
+  background: rgba(22, 101, 52, 0.22) !important;
+  border-color: #166534 !important;
+  color: #86efac !important;
+}
+
+:deep(.dm-dark) .cot-sheet-status--incompleto {
+  background: rgba(185, 28, 28, 0.22) !important;
+  border-color: #7f1d1d !important;
+  color: #fecaca !important;
+}
+
+:deep(.dm-dark) .cot-faixa-block {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+:deep(.dm-dark) .cot-faixa-block__value,
+:deep(.dm-dark) .cot-faixa-block__dot {
+  color: #e2e8f0 !important;
+}
+
+:deep(.dm-dark) .cot-similaridade-tag {
+  background: rgba(161, 98, 7, 0.22) !important;
+  color: #fcd34d !important;
+  border-color: #a16207 !important;
+}
+
+:global(body.dm-dark-theme) .pncp-modal {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+:global(body.dm-dark-theme) .pncp-modal__title {
+  color: #f8fafc !important;
+}
+
+:global(body.dm-dark-theme) .pncp-modal__text,
+:global(body.dm-dark-theme) .pncp-modal__quote,
+:global(body.dm-dark-theme) .pncp-modal__error,
+:global(body.dm-dark-theme) .cot-relatorio-field,
+:global(body.dm-dark-theme) .cot-relatorio-info {
+  color: #cbd5e1 !important;
+}
+
+:global(body.dm-dark-theme) .pncp-modal__quote {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
 </style>

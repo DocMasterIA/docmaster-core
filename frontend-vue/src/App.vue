@@ -1230,6 +1230,7 @@ watch(
 :global(body.dm-dark-theme) .dm-content .item-card,
 :global(body.dm-dark-theme) .dm-content .item-price-card,
 :global(body.dm-dark-theme) .dm-content .item-cotacao-card,
+:global(body.dm-dark-theme) .dm-content .item-cotacao-card__field,
 :global(body.dm-dark-theme) .dm-content .manual-summary-card,
 :global(body.dm-dark-theme) .dm-content .bia-summary-card,
 :global(body.dm-dark-theme) .dm-content .pncp-mock__summary-card {

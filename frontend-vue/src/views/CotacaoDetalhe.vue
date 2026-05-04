@@ -2061,6 +2061,38 @@ a.pncp-modal__link-btn {
   color: #475569;
 }
 
+/* Hotfix final de contraste (cards citados pelo usuário) */
+:global(body.dm-dark-theme) .cot-title-editor,
+:global(body.dm-dark-theme) .cot-formula,
+:global(body.dm-dark-theme) .cot-global-variacao,
+:global(body.dm-dark-theme) .cot-fornecedor-field,
+:global(body.dm-dark-theme) .cot-new-item-block {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+:global(body.dm-dark-theme) .cot-title-editor__field span,
+:global(body.dm-dark-theme) .cot-formula__subtitle,
+:global(body.dm-dark-theme) .cot-global-variacao__subtitle,
+:global(body.dm-dark-theme) .cot-fornecedor-field__label,
+:global(body.dm-dark-theme) .cot-new-item-block__text p {
+  color: #94a3b8 !important;
+}
+
+:global(body.dm-dark-theme) .cot-title-editor__field input,
+:global(body.dm-dark-theme) .cot-formula__select {
+  background: #111827 !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+:global(body.dm-dark-theme) .cot-formula__title,
+:global(body.dm-dark-theme) .cot-global-variacao__title,
+:global(body.dm-dark-theme) .cot-fornecedor-field__value,
+:global(body.dm-dark-theme) .cot-new-item-block__text h2 {
+  color: #e2e8f0 !important;
+}
+
 /* Dark mode dedicado da rota /pesquisador-pncp/cotacoes/:id */
 :deep(.dm-dark) .cot-back-btn,
 :deep(.dm-dark) .cot-btn,

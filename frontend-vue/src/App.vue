@@ -1174,6 +1174,40 @@ watch(
   color: #e2e8f0 !important;
 }
 
+/* CotacaoDetalhe: reforco em Status, Buscar item e colunas da tabela */
+.dm-dark .dm-content :deep(.cot-sheet-search),
+.dm-dark .dm-content :deep(.cot-sheet-status-filter) {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #cbd5e1 !important;
+}
+
+.dm-dark .dm-content :deep(.cot-sheet-search input),
+.dm-dark .dm-content :deep(.cot-sheet-status-filter select) {
+  background: transparent !important;
+  color: #e2e8f0 !important;
+}
+
+.dm-dark .dm-content :deep(.cot-sheet-status-filter span) {
+  color: #94a3b8 !important;
+}
+
+.dm-dark .dm-content :deep(.cot-sheet-table thead th) {
+  background: #1e293b !important;
+  color: #cbd5e1 !important;
+}
+
+.dm-dark .dm-content :deep(.cot-sheet-table tbody td) {
+  background: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
+.dm-dark .dm-content :deep(.cot-sheet-group),
+.dm-dark .dm-content :deep(.cot-sheet-source) {
+  background: #1e293b !important;
+  color: #cbd5e1 !important;
+}
+
 .dm-dark .dm-content :deep(.pncp-mock__subtitle),
 .dm-dark .dm-content :deep(.pncp-mock__summary-label),
 .dm-dark .dm-content :deep(.pncp-mock__table th),

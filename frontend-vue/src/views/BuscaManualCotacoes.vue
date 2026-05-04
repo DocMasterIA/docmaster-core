@@ -327,6 +327,12 @@ function toggleAllUfs(event) {
 }
 
 function onVariacaoInput(event) {
+  if (Number.isFinite(Number(variacaoGlobalDaSessao.value)) && Number(variacaoGlobalDaSessao.value) >= 0) {
+    const locked = String(Math.round(Number(variacaoGlobalDaSessao.value)));
+    filtros.variacao = locked;
+    event.target.value = locked;
+    return;
+  }
   const raw = String(event.target.value || '');
   const onlyDigits = raw.replace(/\D/g, '');
   if (!onlyDigits) {
@@ -346,6 +352,7 @@ const saveMessage = ref('');
 const localStats = ref(null);
 const isBackfilling = ref(false);
 const isSavingSelecionados = ref(false);
+const variacaoGlobalDaSessao = ref(null);
 const addButtonLabel = computed(() => (
   itemId.value
     ? '+ Adicionar preços ao item selecionado'
@@ -754,10 +761,6 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
   }
   saveMessage.value = '';
   const faixaBaseSelecionada = parseMoeda(filtros.valorBase);
-  const variacaoSelecionada = Number.parseFloat(String(filtros.variacao || '0'));
-  const variacaoPercentual = Number.isFinite(variacaoSelecionada) && variacaoSelecionada >= 0
-    ? variacaoSelecionada
-    : null;
   const registros = resultados.value
     .filter((r) => r.selecionado)
     .map((r) => ({
@@ -779,10 +782,8 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
       data_publicacao: toNullableText(r.data),
       material_servico: toNullableText(r.sourceRaw?.material_servico),
       valor_base: faixaBaseSelecionada,
-      variacao_percentual: variacaoPercentual,
       faixa_regional: {
         valor_base: faixaBaseSelecionada,
-        variacao_percentual: variacaoPercentual,
       },
       similaridade_encontrada: Boolean(r.similaridadeEncontrada),
     }))
@@ -855,7 +856,11 @@ function applyFaixaDefaultsFromItem(it) {
     const centavos = Math.round(base * 100);
     filtros.valorBase = (centavos / 100).toFixed(2).replace('.', ',');
   }
-  if (Number.isFinite(variacao) && variacao >= 0) {
+  if (
+    variacaoGlobalDaSessao.value == null
+    && Number.isFinite(variacao)
+    && variacao >= 0
+  ) {
     filtros.variacao = String(Math.round(variacao));
   }
 }
@@ -866,6 +871,14 @@ onMounted(async () => {
   if (Number.isFinite(sessionId) && sessionId > 0) {
     try {
       const data = await getResearchSession(sessionId);
+      const filtrosSessao = (data?.sessao?.filtros && typeof data.sessao.filtros === 'object') ? data.sessao.filtros : {};
+      const variacaoGlobal = Number(
+        filtrosSessao.variacao_percentual_global ?? filtrosSessao.variacao_global_percentual ?? null,
+      );
+      variacaoGlobalDaSessao.value = Number.isFinite(variacaoGlobal) && variacaoGlobal >= 0 ? variacaoGlobal : null;
+      if (variacaoGlobalDaSessao.value != null) {
+        filtros.variacao = String(Math.round(variacaoGlobalDaSessao.value));
+      }
       const itens = Array.isArray(data?.itens) ? data.itens : [];
       const target = itemId.value
         ? itens.find((x) => Number(x?.id) === Number(itemId.value))

@@ -1315,9 +1315,21 @@ def pncp_research_sessions_update(request, sessao_id: int):
             filtros["formula_calculo"] = fid
             c.filtros = _sanitize_filtros(filtros)
 
+        incoming_variacao_global = body.get("variacao_percentual_global")
+        if incoming_variacao_global is None and body.get("variacao_global_percentual") is not None:
+            incoming_variacao_global = body.get("variacao_global_percentual")
+        if incoming_variacao_global is not None:
+            vg = _safe_float(incoming_variacao_global)
+            if vg is None or vg < 0:
+                return JsonResponse({"detail": "variacao_percentual_global inválida."}, status=422)
+            filtros = dict(c.filtros or {})
+            filtros["variacao_percentual_global"] = float(vg)
+            c.filtros = _sanitize_filtros(filtros)
+
         c.save()
 
     formula_id = _resolve_formula_calculo_id(c.filtros or {})
+    variacao_global = _safe_float((c.filtros or {}).get("variacao_percentual_global"))
     return JsonResponse(
         {
             "ok": True,
@@ -1328,6 +1340,7 @@ def pncp_research_sessions_update(request, sessao_id: int):
             "modelo_cotacao": c.modelo_cotacao,
             "formula_calculo_id": formula_id,
             "formula_calculo": FORMULA_LABELS.get(formula_id, FORMULA_LABELS[DEFAULT_FORMULA_CALCULO]),
+            "variacao_percentual_global": variacao_global,
             "updated_at": _iso_z(c.updated_at),
         }
     )

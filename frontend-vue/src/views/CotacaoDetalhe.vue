@@ -82,6 +82,32 @@
         </select>
       </section>
 
+      <section class="cot-global-variacao">
+        <div class="cot-global-variacao__text">
+          <div class="cot-global-variacao__title">Variação global da cotação</div>
+          <div class="cot-global-variacao__subtitle">Aplicada para todos os itens da sessão</div>
+        </div>
+        <div class="cot-global-variacao__actions">
+          <input
+            :value="variacaoGlobalPercentual"
+            type="text"
+            inputmode="numeric"
+            class="cot-sheet-inline-input"
+            placeholder="0%"
+            :disabled="isSessaoFechada || isSavingVariacaoGlobal"
+            @input="onVariacaoGlobalInput"
+          />
+          <button
+            type="button"
+            class="cot-btn cot-btn--primary"
+            :disabled="isSessaoFechada || isSavingVariacaoGlobal"
+            @click="salvarVariacaoGlobal"
+          >
+            {{ isSavingVariacaoGlobal ? 'Salvando...' : 'Salvar variação global' }}
+          </button>
+        </div>
+      </section>
+
       <section class="cot-actions">
         <button type="button" class="cot-btn" :disabled="importLoading || isSessaoFechada" @click="openImportSpreadsheet">
           <i class="fa-solid fa-file-arrow-up" aria-hidden="true"></i>
@@ -326,14 +352,6 @@
                       class="cot-sheet-inline-input"
                       placeholder="R$ 0,00"
                       @input="onManualBaseInput"
-                    />
-                    <input
-                      :value="manualItem.variacao_percentual"
-                      type="text"
-                      inputmode="numeric"
-                      class="cot-sheet-inline-input"
-                      placeholder="0%"
-                      @input="onManualVariacaoInput"
                     />
                   </div>
                 </td>
@@ -617,8 +635,9 @@ const manualItem = ref({
   quantidade: '',
   unidade_medida: '',
   valor_base: '',
-  variacao_percentual: '',
 });
+const variacaoGlobalPercentual = ref('20');
+const isSavingVariacaoGlobal = ref(false);
 
 const isSessaoFechada = computed(() => ['finalizada', 'cancelada'].includes(String(sessaoStatus.value || '')));
 const sessaoStatusLabel = computed(() => {
@@ -898,7 +917,6 @@ async function addManualItem() {
     return;
   }
   const valorBase = parseCurrencyInputToNumber(manualItem.value.valor_base);
-  const variacao = parsePercentInputToNumber(manualItem.value.variacao_percentual);
 
   isAddingManualItem.value = true;
   loadError.value = '';
@@ -909,10 +927,8 @@ async function addManualItem() {
         quantidade: Number.isFinite(quantidade) ? quantidade : null,
         unidade_medida: unidadeMedida,
         valor_base: Number.isFinite(valorBase) ? valorBase : null,
-        variacao_percentual: Number.isFinite(variacao) ? variacao : null,
         faixa_regional: {
           valor_base: Number.isFinite(valorBase) ? valorBase : null,
-          variacao_percentual: Number.isFinite(variacao) ? variacao : null,
         },
         origem: 'item_manual_cotacao',
         unidade_definida_usuario: true,
@@ -924,7 +940,6 @@ async function addManualItem() {
       quantidade: '',
       unidade_medida: '',
       valor_base: '',
-      variacao_percentual: '',
     };
     showManualItemEditor.value = false;
   } catch (err) {
@@ -955,21 +970,6 @@ function onManualBaseInput(event) {
   manualItem.value.valor_base = value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function onManualVariacaoInput(event) {
-  const raw = String(event?.target?.value || '');
-  const digits = raw.replace(/\D/g, '');
-  if (!digits) {
-    manualItem.value.variacao_percentual = '';
-    return;
-  }
-  const n = Number.parseInt(digits, 10);
-  if (!Number.isFinite(n)) {
-    manualItem.value.variacao_percentual = '';
-    return;
-  }
-  manualItem.value.variacao_percentual = `${n}%`;
-}
-
 function parseCurrencyInputToNumber(value) {
   const s = String(value || '').trim();
   if (!s) return null;
@@ -985,6 +985,44 @@ function parsePercentInputToNumber(value) {
   if (!only) return null;
   const n = Number.parseInt(only, 10);
   return Number.isFinite(n) ? n : null;
+}
+
+function onVariacaoGlobalInput(event) {
+  const raw = String(event?.target?.value || '');
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) {
+    variacaoGlobalPercentual.value = '0';
+    event.target.value = '0';
+    return;
+  }
+  const n = Number.parseInt(digits, 10);
+  const normalized = Number.isFinite(n) ? String(Math.min(100, Math.max(0, n))) : '0';
+  variacaoGlobalPercentual.value = normalized;
+  event.target.value = normalized;
+}
+
+async function salvarVariacaoGlobal() {
+  const sessionId = Number(cotacaoId.value);
+  if (Number.isNaN(sessionId)) {
+    loadError.value = 'Cotação inválida para salvar variação global.';
+    return;
+  }
+  if (isSessaoFechada.value || isSavingVariacaoGlobal.value) return;
+  const vg = parsePercentInputToNumber(variacaoGlobalPercentual.value);
+  if (!Number.isFinite(vg) || vg < 0) {
+    loadError.value = 'Informe uma variação global válida.';
+    return;
+  }
+  isSavingVariacaoGlobal.value = true;
+  loadError.value = '';
+  try {
+    await updateResearchSession(sessionId, { variacao_percentual_global: vg });
+    await loadSessionFromBackend();
+  } catch (err) {
+    loadError.value = `Falha ao salvar variação global (${err?.message || 'erro desconhecido'}).`;
+  } finally {
+    isSavingVariacaoGlobal.value = false;
+  }
 }
 
 function parseQuantityInputToNumber(value) {
@@ -1010,7 +1048,6 @@ async function onImportSpreadsheetSelected(event) {
     const res = await importItemsSpreadsheetToResearchSession(sessionId, file, {
       descricao_item: 'descricao_item',
       valor_base: 'valor_base',
-      variacao_percentual: 'variacao_percentual',
       quantidade: 'quantidade',
       unidade_medida: 'unidade_medida',
       valor_unitario: 'valor_unitario',
@@ -1023,7 +1060,7 @@ async function onImportSpreadsheetSelected(event) {
         ? `Planilha importada com sucesso: ${res?.itens_inseridos || 0} itens. ${invalid} linha(s) inválida(s).`
         : '';
   } catch (err) {
-    loadError.value = `Falha ao importar planilha: ${err?.message || 'erro desconhecido'}. Coluna obrigatória: descricao_item. Recomendadas: valor_base, variacao_percentual.`;
+    loadError.value = `Falha ao importar planilha: ${err?.message || 'erro desconhecido'}. Coluna obrigatória: descricao_item. Recomendada: valor_base.`;
   } finally {
     importLoading.value = false;
   }
@@ -1171,6 +1208,11 @@ async function loadSessionFromBackend() {
         s.formula_calculo ||
         data?.calculo_precos?.formula_label ||
         'Média aritmética dos preços obtidos';
+      const filtrosSessao = (s?.filtros && typeof s.filtros === 'object') ? s.filtros : {};
+      const variacaoGlobal = Number(filtrosSessao.variacao_percentual_global);
+      variacaoGlobalPercentual.value = Number.isFinite(variacaoGlobal) && variacaoGlobal >= 0
+        ? String(Math.round(variacaoGlobal))
+        : '20';
     }
     if (data?.ok && Array.isArray(data.itens)) {
       let soma = 0;
@@ -1216,7 +1258,7 @@ async function loadSessionFromBackend() {
             it.valor_total_refletido ?? it.valor_total ?? it.valor_unitario ?? 0,
           ),
           faixaRegionalBase: formatFaixaRegionalBase(it),
-          faixaRegionalVariacao: formatFaixaRegionalVariacao(it),
+          faixaRegionalVariacao: formatFaixaRegionalVariacao(it, variacaoGlobalPercentual.value),
           // Regra de status: 3 ou mais preços/cotações no item => Completo.
           // Fallback para grupos de relatório apenas quando não houver contagem detalhada.
           status: (totalCotacoesItem > 0 ? totalCotacoesItem : totalFontesRelatorio) >= 3 ? 'Completo' : 'Incompleto',
@@ -1240,6 +1282,7 @@ async function loadSessionFromBackend() {
     totalItensSessao.value = 0;
     formulaCalculoId.value = 'media_aritmetica_precos_obtidos';
     formulaCalculoLabel.value = 'Média aritmética dos preços obtidos';
+    variacaoGlobalPercentual.value = '20';
   } finally {
     isLoading.value = false;
   }
@@ -1296,11 +1339,12 @@ function formatFaixaRegionalBase(item) {
   return base ? formatCurrency(base) : 'R$ —';
 }
 
-function formatFaixaRegionalVariacao(item) {
+function formatFaixaRegionalVariacao(item, variacaoGlobalFallback = null) {
   const byItem = pickNumeric(
     extractItemSourceNumber(item, 'variacao', 'variacao_percentual', 'variacaoPercentual'),
   );
-  const v = byItem;
+  const byGlobal = Number(variacaoGlobalFallback);
+  const v = byItem ?? (Number.isFinite(byGlobal) && byGlobal >= 0 ? byGlobal : null);
   return v ? `${Number(v).toLocaleString('pt-BR')}%` : '—';
 }
 
@@ -1480,6 +1524,40 @@ async function saveTituloNoBackend() {
   align-items: center;
   gap: 8px;
   cursor: pointer;
+}
+
+.cot-global-variacao {
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cot-global-variacao__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cot-global-variacao__title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cot-global-variacao__subtitle {
+  font-size: 12px;
+  color: var(--color-text-soft);
+}
+
+.cot-global-variacao__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .cot-actions { display: flex; flex-wrap: wrap; gap: 8px; }

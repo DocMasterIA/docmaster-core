@@ -333,6 +333,7 @@ const saveMessage = ref('');
 const isSavingSelecionados = ref(false);
 const itemContext = ref(null);
 const allItemContexts = ref([]);
+const variacaoPercentualGlobal = ref(null);
 const isAutoSearchingAll = ref(false);
 const autoSearchProgress = ref({ done: 0, total: 0 });
 const totalSelecionados = computed(() => displayedRows.value.filter((x) => x.selecionado).length);
@@ -473,6 +474,9 @@ function buildContextFromItem(it) {
     faixa?.variacaoPercentual,
     faixa?.variacao,
   );
+  if (Number.isFinite(Number(variacaoPercentualGlobal.value)) && Number(variacaoPercentualGlobal.value) >= 0) {
+    variacaoRef = Number(variacaoPercentualGlobal.value);
+  }
   if ((variacaoRef === null || !Number.isFinite(variacaoRef)) && valorBaseRef != null && Number.isFinite(valorBaseRef)) {
     variacaoRef = 20;
   }
@@ -727,6 +731,13 @@ onMounted(async () => {
   if (!Number.isFinite(sessionId) || sessionId <= 0) return;
   try {
     const data = await getResearchSession(sessionId);
+    const filtrosSessao = (data?.sessao?.filtros && typeof data.sessao.filtros === 'object') ? data.sessao.filtros : {};
+    const variacaoGlobal = Number(
+      filtrosSessao.variacao_percentual_global ?? filtrosSessao.variacao_global_percentual ?? null,
+    );
+    variacaoPercentualGlobal.value = Number.isFinite(variacaoGlobal) && variacaoGlobal >= 0
+      ? variacaoGlobal
+      : null;
     const itens = Array.isArray(data?.itens) ? data.itens : [];
     allItemContexts.value = itens.map((it) => buildContextFromItem(it)).filter((x) => x.descricao_item);
     if (itemId.value) {

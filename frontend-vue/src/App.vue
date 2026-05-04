@@ -1270,6 +1270,34 @@ watch(
   color: #e2e8f0 !important;
 }
 
+/* Pedido do usuário: textos cinza -> branco no dark mode */
+.dm-dark :deep(.gov-surface__subtitle),
+.dm-dark :deep(.gov-text-soft),
+.dm-dark :deep(.gov-page__meta),
+.dm-dark .dm-content :deep(.pncp-mock__subtitle),
+.dm-dark .dm-content :deep(.pncp-mock__summary-label),
+.dm-dark .dm-content :deep(.pncp-mock__table th),
+.dm-dark .dm-content :deep(.pncp-mock__desc-sub),
+.dm-dark .dm-content :deep(.bia-meta),
+.dm-dark .dm-content :deep(.manual-meta),
+.dm-dark .dm-content :deep(.cot-sheet-table th),
+.dm-dark .dm-content :deep(.item-cotacao-card__field span),
+.dm-dark .dm-content :deep(.cot-title-editor__field span),
+.dm-dark .dm-content :deep(.cot-formula__subtitle),
+.dm-dark .dm-content :deep(.cot-global-variacao__subtitle),
+.dm-dark .dm-content :deep(.cot-fornecedor-field__label),
+.dm-dark .dm-content :deep(.cot-new-item-block__text p),
+.dm-dark .dm-content :deep(.cot-sheet-status-filter span) {
+  color: #ffffff !important;
+}
+
+:global(body.dm-dark-theme) .pncp-modal__text,
+:global(body.dm-dark-theme) .pncp-modal__field,
+:global(body.dm-dark-theme) .pncp-modal__quote,
+:global(body.dm-dark-theme) .cd-meta {
+  color: #ffffff !important;
+}
+
 @media (max-width: 1279px) {
   .dm-body {
     grid-template-columns: 1fr;

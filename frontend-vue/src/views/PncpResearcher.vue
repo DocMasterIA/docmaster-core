@@ -576,6 +576,10 @@ onMounted(() => {
   background: #f6f9fc;
 }
 
+.pncp-mock__table tbody tr:hover td {
+  background: #f8fafc;
+}
+
 .pncp-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -696,5 +700,117 @@ onMounted(() => {
 .pncp-modal__btn--primary:disabled {
   opacity: 0.65;
   cursor: not-allowed;
+}
+
+/* Dark mode: alinhado ao shell dm-dark global */
+:deep(.dm-dark) .pncp-mock {
+  border-color: #334155;
+  background: #0f172a;
+}
+
+:deep(.dm-dark) .pncp-mock__title {
+  color: #f8fafc;
+}
+
+:deep(.dm-dark) .pncp-mock__subtitle,
+:deep(.dm-dark) .pncp-mock__summary-label,
+:deep(.dm-dark) .pncp-mock__desc-sub,
+:deep(.dm-dark) .pncp-mock__table th,
+:deep(.dm-dark) .pncp-empty {
+  color: #94a3b8;
+}
+
+:deep(.dm-dark) .pncp-mock__summary-card {
+  border-color: #334155;
+  background: #111827;
+}
+
+:deep(.dm-dark) .pncp-mock__summary-card strong,
+:deep(.dm-dark) .pncp-mock__desc,
+:deep(.dm-dark) .pncp-mock__usuario,
+:deep(.dm-dark) .pncp-mock__table td {
+  color: #e2e8f0;
+}
+
+:deep(.dm-dark) .pncp-mock__summary-card--highlight strong {
+  color: #86efac;
+}
+
+:deep(.dm-dark) .pncp-chip {
+  border-color: #475569;
+  background: #0f172a;
+  color: #cbd5e1;
+}
+
+:deep(.dm-dark) .pncp-chip--active {
+  border-color: #64748b;
+  background: #1e293b;
+  color: #f8fafc;
+}
+
+:deep(.dm-dark) .pncp-status--ok {
+  border-color: #166534;
+  background: rgba(22, 101, 52, 0.22);
+  color: #86efac;
+}
+
+:deep(.dm-dark) .pncp-status--run {
+  border-color: #1d4ed8;
+  background: rgba(30, 64, 175, 0.22);
+  color: #93c5fd;
+}
+
+:deep(.dm-dark) .pncp-action-btn {
+  border-color: #475569;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+:deep(.dm-dark) .pncp-action-btn:hover {
+  background: #1e293b;
+}
+
+:deep(.dm-dark) .pncp-mock__table th,
+:deep(.dm-dark) .pncp-mock__table td {
+  border-bottom-color: #1e293b;
+}
+
+:deep(.dm-dark) .pncp-mock__table tbody tr:hover td {
+  background: rgba(30, 41, 59, 0.62);
+}
+
+:deep(.dm-dark) .pncp-modal-backdrop {
+  background: rgba(2, 6, 23, 0.78);
+}
+
+:deep(.dm-dark) .pncp-modal {
+  border-color: #334155;
+  background: #0f172a;
+  box-shadow: 0 24px 48px rgba(2, 6, 23, 0.45);
+}
+
+:deep(.dm-dark) .pncp-modal__title {
+  color: #f8fafc;
+}
+
+:deep(.dm-dark) .pncp-modal__text,
+:deep(.dm-dark) .pncp-modal__field {
+  color: #94a3b8;
+}
+
+:deep(.dm-dark) .pncp-modal__quote {
+  border-color: #334155;
+  background: #111827;
+  color: #cbd5e1;
+}
+
+:deep(.dm-dark) .pncp-modal__btn--ghost {
+  border-color: #475569;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+:deep(.dm-dark) .pncp-modal__btn--ghost:hover {
+  background: #1e293b;
 }
 </style>

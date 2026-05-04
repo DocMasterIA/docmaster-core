@@ -1090,6 +1090,69 @@ watch(
   color: #e2e8f0 !important;
 }
 
+/* Safety net de contraste no dark mode (evita branco+branco) */
+:global(body.dm-dark-theme) .pncp-modal,
+:global(body.dm-dark-theme) .cd-modal {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+:global(body.dm-dark-theme) .pncp-modal__title,
+:global(body.dm-dark-theme) .cd-modal__header h2 {
+  color: #f8fafc !important;
+}
+
+:global(body.dm-dark-theme) .pncp-modal__text,
+:global(body.dm-dark-theme) .pncp-modal__field,
+:global(body.dm-dark-theme) .pncp-modal__quote,
+:global(body.dm-dark-theme) .cd-meta {
+  color: #cbd5e1 !important;
+}
+
+:global(body.dm-dark-theme) .pncp-modal .gov-input,
+:global(body.dm-dark-theme) .cd-modal input,
+:global(body.dm-dark-theme) .cd-modal textarea,
+:global(body.dm-dark-theme) .cd-modal select {
+  background: #111827 !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+.dm-dark .dm-content :deep(.pncp-mock),
+.dm-dark .dm-content :deep(.bia-table-shell),
+.dm-dark .dm-content :deep(.manual-results-table-shell),
+.dm-dark .dm-content :deep(.cot-sheet-shell),
+.dm-dark .dm-content :deep(.item-cotacao-card),
+.dm-dark .dm-content :deep(.cot-card),
+.dm-dark .dm-content :deep(.manual-summary-card),
+.dm-dark .dm-content :deep(.bia-summary-card) {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+.dm-dark .dm-content :deep(.pncp-mock__title),
+.dm-dark .dm-content :deep(.pncp-mock__desc),
+.dm-dark .dm-content :deep(.pncp-mock__usuario),
+.dm-dark .dm-content :deep(.pncp-mock__table td),
+.dm-dark .dm-content :deep(.bia-main),
+.dm-dark .dm-content :deep(.manual-cot-main),
+.dm-dark .dm-content :deep(.cot-sheet-table td),
+.dm-dark .dm-content :deep(.item-cotacao-card__field strong) {
+  color: #e2e8f0 !important;
+}
+
+.dm-dark .dm-content :deep(.pncp-mock__subtitle),
+.dm-dark .dm-content :deep(.pncp-mock__summary-label),
+.dm-dark .dm-content :deep(.pncp-mock__table th),
+.dm-dark .dm-content :deep(.pncp-mock__desc-sub),
+.dm-dark .dm-content :deep(.bia-meta),
+.dm-dark .dm-content :deep(.manual-meta),
+.dm-dark .dm-content :deep(.cot-sheet-table th),
+.dm-dark .dm-content :deep(.item-cotacao-card__field span) {
+  color: #94a3b8 !important;
+}
+
 @media (max-width: 1279px) {
   .dm-body {
     grid-template-columns: 1fr;

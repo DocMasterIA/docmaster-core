@@ -101,6 +101,17 @@
             />
             <span class="cot-global-variacao__suffix" aria-hidden="true">%</span>
           </div>
+          <label class="cot-global-variacao__direction">
+            <span>Direção</span>
+            <select
+              v-model="variacaoGlobalSentido"
+              class="cot-formula__select cot-global-variacao__select"
+              :disabled="isSessaoFechada || isSavingVariacaoGlobal"
+            >
+              <option value="cima">Para cima</option>
+              <option value="baixo">Para baixo</option>
+            </select>
+          </label>
           <button
             type="button"
             class="cot-btn cot-btn--primary cot-global-variacao__submit"
@@ -662,6 +673,7 @@ const manualItem = ref({
   valor_base: '',
 });
 const variacaoGlobalPercentual = ref('20');
+const variacaoGlobalSentido = ref('cima');
 const isSavingVariacaoGlobal = ref(false);
 /** Rascunho local do campo moeda por item_id (valor base da faixa). */
 const faixaBaseDraft = ref({});
@@ -1044,7 +1056,10 @@ async function salvarVariacaoGlobal() {
   isSavingVariacaoGlobal.value = true;
   loadError.value = '';
   try {
-    await updateResearchSession(sessionId, { variacao_percentual_global: vg });
+    await updateResearchSession(sessionId, {
+      variacao_percentual_global: vg,
+      variacao_sentido_global: variacaoGlobalSentido.value,
+    });
     await loadSessionFromBackend();
   } catch (err) {
     loadError.value = `Falha ao salvar variação global (${err?.message || 'erro desconhecido'}).`;
@@ -1242,6 +1257,8 @@ async function loadSessionFromBackend() {
       variacaoGlobalPercentual.value = Number.isFinite(variacaoGlobal) && variacaoGlobal >= 0
         ? String(Math.round(variacaoGlobal))
         : '20';
+      const sentidoRaw = String(filtrosSessao.variacao_sentido_global || '').trim().toLowerCase();
+      variacaoGlobalSentido.value = sentidoRaw === 'baixo' ? 'baixo' : 'cima';
     }
     if (data?.ok && Array.isArray(data.itens)) {
       let soma = 0;
@@ -1318,6 +1335,7 @@ async function loadSessionFromBackend() {
     formulaCalculoId.value = 'media_aritmetica_precos_obtidos';
     formulaCalculoLabel.value = 'Média aritmética dos preços obtidos';
     variacaoGlobalPercentual.value = '20';
+    variacaoGlobalSentido.value = 'cima';
   } finally {
     isLoading.value = false;
   }
@@ -1672,6 +1690,26 @@ async function saveTituloNoBackend() {
   min-width: 0;
   max-width: 100%;
   justify-self: end;
+}
+
+.cot-global-variacao__direction {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--color-text-soft);
+  white-space: nowrap;
+}
+
+.cot-global-variacao__direction > span {
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.cot-global-variacao__select {
+  margin-left: 0;
+  min-width: 110px;
+  padding: 6px 10px;
 }
 
 .cot-global-variacao__percent-wrap {
@@ -2324,6 +2362,10 @@ a.pncp-modal__link-btn {
 :deep(.dm-dark) .cot-global-variacao__sep,
 :deep(.dm-dark) .cot-global-variacao__suffix {
   color: #f8fafc !important;
+}
+
+:deep(.dm-dark) .cot-global-variacao__direction {
+  color: #e2e8f0 !important;
 }
 
 :deep(.dm-dark) .cot-fornecedor-field__label,

@@ -137,6 +137,13 @@
               <span class="manual-input-suffix">%</span>
             </div>
           </label>
+          <label class="manual-field">
+            <span>Direção da variação</span>
+            <select v-model="filtros.variacaoSentido" :disabled="variacaoGlobalDaSessao != null">
+              <option value="cima">Para cima</option>
+              <option value="baixo">Para baixo</option>
+            </select>
+          </label>
         </div>
       </section>
 
@@ -250,6 +257,7 @@ const filtros = reactive({
   ordem: 'Decrescente',
   valorBase: '15,00',
   variacao: '20',
+  variacaoSentido: 'cima',
 });
 
 const UF_FLAGS = {
@@ -371,9 +379,12 @@ const faixaValorAtiva = computed(() => {
   if (base == null || base <= 0) return '';
   const p = Number.parseFloat(String(filtros.variacao || '0'));
   const perc = Number.isFinite(p) ? Math.max(0, p) : 0;
-  const min = base * (1 - perc / 100);
-  const max = base * (1 + perc / 100);
-  return `${formatCurrency(min)} até ${formatCurrency(max)} (${perc}% para baixo/cima)`;
+  const fator = perc / 100;
+  const sentido = filtros.variacaoSentido === 'baixo' ? 'baixo' : 'cima';
+  const min = sentido === 'baixo' ? Math.max(0, base * (1 - fator)) : base;
+  const max = sentido === 'baixo' ? base : base * (1 + fator);
+  const labelSentido = sentido === 'baixo' ? 'para baixo' : 'para cima';
+  return `${formatCurrency(min)} até ${formatCurrency(max)} (${perc}% ${labelSentido})`;
 });
 const selectedUfLabel = computed(() => {
   if (!filtros.ufs.length) return 'Selecionar UFs';
@@ -394,8 +405,9 @@ const resultadosFiltradosOrdenados = computed(() => {
   let filtrados = base;
   if (valorBase != null && valorBase > 0) {
     const fator = variacaoValida / 100;
-    const min = valorBase * (1 - fator);
-    const max = valorBase * (1 + fator);
+    const sentido = filtros.variacaoSentido === 'baixo' ? 'baixo' : 'cima';
+    const min = sentido === 'baixo' ? Math.max(0, valorBase * (1 - fator)) : valorBase;
+    const max = sentido === 'baixo' ? valorBase : valorBase * (1 + fator);
     filtrados = base.filter((item) => {
       // Usa valor numérico bruto do item para evitar ruído de formatação.
       const vBruto = item.valorUnitario ?? item.valorTotal ?? parseMoeda(item.valor);
@@ -879,6 +891,8 @@ onMounted(async () => {
       if (variacaoGlobalDaSessao.value != null) {
         filtros.variacao = String(Math.round(variacaoGlobalDaSessao.value));
       }
+      const sentidoRaw = String(filtrosSessao.variacao_sentido_global || '').trim().toLowerCase();
+      filtros.variacaoSentido = sentidoRaw === 'baixo' ? 'baixo' : 'cima';
       const itens = Array.isArray(data?.itens) ? data.itens : [];
       const target = itemId.value
         ? itens.find((x) => Number(x?.id) === Number(itemId.value))

@@ -1,8 +1,8 @@
 <template>
   <section class="gov-page mod-placeholder">
     <header class="gov-page__header">
-      <h1 class="gov-page__title">{{ title }}</h1>
-      <p class="gov-page__subtitle">{{ subtitle }}</p>
+      <h1 class="gov-page__title">Disponível em breve</h1>
+      <p class="gov-page__subtitle"><strong>{{ title }}</strong> — {{ subtitle }}</p>
     </header>
     <div class="gov-surface gov-page__content mod-placeholder__surface" aria-hidden="true" />
   </section>

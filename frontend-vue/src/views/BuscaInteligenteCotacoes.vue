@@ -334,6 +334,7 @@ const isSavingSelecionados = ref(false);
 const itemContext = ref(null);
 const allItemContexts = ref([]);
 const variacaoPercentualGlobal = ref(null);
+const variacaoSentidoGlobal = ref('cima');
 const isAutoSearchingAll = ref(false);
 const autoSearchProgress = ref({ done: 0, total: 0 });
 const totalSelecionados = computed(() => displayedRows.value.filter((x) => x.selecionado).length);
@@ -480,6 +481,22 @@ function buildContextFromItem(it) {
   if ((variacaoRef === null || !Number.isFinite(variacaoRef)) && valorBaseRef != null && Number.isFinite(valorBaseRef)) {
     variacaoRef = 20;
   }
+  const sentidoRef = String(variacaoSentidoGlobal.value || 'cima').trim().toLowerCase() === 'baixo'
+    ? 'baixo'
+    : 'cima';
+  const fator = Number.isFinite(Number(variacaoRef)) ? Math.max(0, Number(variacaoRef)) / 100 : null;
+  let valorMinRef = null;
+  let valorMaxRef = null;
+  if (valorBaseRef != null && Number.isFinite(Number(valorBaseRef)) && fator != null) {
+    const vb = Number(valorBaseRef);
+    if (sentidoRef === 'baixo') {
+      valorMinRef = Math.max(0, vb * (1 - fator));
+      valorMaxRef = vb;
+    } else {
+      valorMinRef = vb;
+      valorMaxRef = vb * (1 + fator);
+    }
+  }
   return {
     id: it.id,
     descricao_item: String(it?.descricao_item || '').trim(),
@@ -487,6 +504,9 @@ function buildContextFromItem(it) {
     unidade_medida: it?.unidade_medida || null,
     valor_base_referencia: valorBaseRef,
     variacao_percentual_referencia: variacaoRef,
+    variacao_sentido_referencia: sentidoRef,
+    valor_min_referencia: valorMinRef,
+    valor_max_referencia: valorMaxRef,
     uf_padrao: String(it?.uf || '').trim().toUpperCase() || null,
     total_cotacoes_item: totalCotacoesItem,
   };
@@ -528,6 +548,9 @@ async function runSearchWithContext({ descricao, selectedUfCodes = [], context =
         unidade_medida_referencia: context?.unidade_medida ?? null,
         valor_base_referencia: context?.valor_base_referencia ?? null,
         variacao_percentual_referencia: context?.variacao_percentual_referencia ?? null,
+        variacao_sentido_referencia: context?.variacao_sentido_referencia ?? null,
+        valor_min_referencia: context?.valor_min_referencia ?? null,
+        valor_max_referencia: context?.valor_max_referencia ?? null,
       });
       if (!backend?.ok || !Array.isArray(backend.itens)) continue;
       const mapped = backend.itens.map((it, idx) => ({
@@ -738,6 +761,8 @@ onMounted(async () => {
     variacaoPercentualGlobal.value = Number.isFinite(variacaoGlobal) && variacaoGlobal >= 0
       ? variacaoGlobal
       : null;
+    const sentidoRaw = String(filtrosSessao.variacao_sentido_global || '').trim().toLowerCase();
+    variacaoSentidoGlobal.value = sentidoRaw === 'baixo' ? 'baixo' : 'cima';
     const itens = Array.isArray(data?.itens) ? data.itens : [];
     allItemContexts.value = itens.map((it) => buildContextFromItem(it)).filter((x) => x.descricao_item);
     if (itemId.value) {

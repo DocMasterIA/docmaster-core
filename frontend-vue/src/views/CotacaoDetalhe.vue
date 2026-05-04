@@ -1532,13 +1532,13 @@ async function saveTituloNoBackend() {
   border-radius: 10px;
   background: #fff;
   padding: 10px 12px;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: nowrap;
+  box-sizing: border-box;
+  max-width: 100%;
   min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px 12px;
 }
 
 .cot-global-variacao__text {
@@ -1548,7 +1548,7 @@ async function saveTituloNoBackend() {
   flex-wrap: nowrap;
   gap: 6px;
   min-width: 0;
-  flex: 1 1 auto;
+  overflow: hidden;
   line-height: 1.25;
 }
 
@@ -1556,7 +1556,9 @@ async function saveTituloNoBackend() {
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
-  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .cot-global-variacao__sep {
@@ -1580,29 +1582,31 @@ async function saveTituloNoBackend() {
   flex-direction: row;
   align-items: center;
   gap: 8px;
-  flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
+  justify-self: end;
 }
 
 .cot-sheet-inline-input--variacao-global {
   width: 4.5rem;
   min-width: 4.5rem;
-  flex-shrink: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .cot-global-variacao__submit {
   white-space: nowrap;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 720px) {
   .cot-global-variacao {
-    flex-wrap: wrap;
-  }
-  .cot-global-variacao__text {
-    flex-basis: 100%;
+    grid-template-columns: 1fr;
   }
   .cot-global-variacao__actions {
-    width: 100%;
+    justify-self: stretch;
     justify-content: flex-end;
+    flex-wrap: wrap;
+    row-gap: 8px;
   }
 }
 

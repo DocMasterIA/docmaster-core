@@ -5,6 +5,7 @@ import DocMasterBuscaCompacta from './DocMasterBuscaCompacta.jsx';
 import TelaResultadosComSemaforoIA from './DocMasterTelaManual.jsx';
 import TelaRelatorioPesquisaPrecos from './DocMasterRelatorioPesquisaPrecos.jsx';
 import TelaRelatorioFinalPesquisaPrecosPreview from '../../relatorio_final_pesquisa_precos_preview.jsx';
+import PaginaInicialDocmaster from '../../pagina_inicial_docmaster_final (2) (1).jsx';
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
       <Route path="/busca-manual" element={<TelaResultadosComSemaforoIA />} />
       <Route path="/relatorio-pesquisa-precos" element={<TelaRelatorioPesquisaPrecos />} />
       <Route path="/relatorio-final-preview" element={<TelaRelatorioFinalPesquisaPrecosPreview />} />
+      <Route path="/pagina-inicial-docmaster" element={<PaginaInicialDocmaster />} />
     </Routes>
   );
 }

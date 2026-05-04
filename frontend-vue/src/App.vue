@@ -2,158 +2,114 @@
   <div v-if="$route.name === 'Login'" class="app-auth-wrap">
     <router-view />
   </div>
-  <div v-else class="gov-shell">
-    <header class="gov-shell__topbar">
-      <div class="gov-topbar__brand">
-        <img src="@/assets/logo_branca.png" alt="DocMasterIA" class="gov-topbar__logo" />
-        <span>DocMaster IA</span>
-      </div>
-      <div class="gov-topbar__meta">
-        <span>Ambiente Vue.js</span>
-        <span>|</span>
-        <span v-if="user" class="gov-topbar__meta-uf">
-          <img
-            v-if="ufFlagUrl"
-            :src="ufFlagUrl"
-            :alt="`Bandeira do estado ${user.prefeitura_uf}`"
-            class="gov-topbar__uf-flag"
-          />
-          UF: {{ user.prefeitura_uf || '—' }} • Órgão: Prefeitura de {{ user.prefeitura_nome || '—' }}
-        </span>
-        <button
-          type="button"
-          class="gov-topbar__logout"
-          title="Sair e ir para o login"
-          @click="logout"
-        >
-          <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
-          Sair
-        </button>
-      </div>
-    </header>
-
-    <div class="gov-shell__body">
-      <aside class="gov-shell__sidebar">
-        <nav>
-          <div class="gov-nav__section">
-            <div class="gov-nav__section-label">Navegação</div>
-            <ul class="gov-nav">
-              <li class="gov-nav__item">
-                <button
-                  type="button"
-                  class="gov-nav__link gov-nav__link--expandable"
-                  :class="{ 'gov-nav__link--active': isGenerationSectionActive }"
-                  @click="generationMenuOpen = !generationMenuOpen"
-                >
-                  <span class="gov-nav__link-main">
-                    <i class="gov-nav__link-icon fa-solid fa-file-lines" aria-hidden="true"></i>
-                    Geração de Documentos
-                  </span>
-                  <i
-                    class="fa-solid"
-                    :class="generationMenuOpen ? 'fa-chevron-up' : 'fa-chevron-down'"
-                    aria-hidden="true"
-                  ></i>
-                </button>
-                <ul v-if="generationMenuOpen" class="gov-subnav">
-                  <li
-                    v-for="page in generationPages"
-                    :key="page.name"
-                    class="gov-subnav__item"
-                  >
-                    <button
-                      type="button"
-                      class="gov-subnav__link gov-subnav__link--expandable"
-                      :class="{ 'gov-subnav__link--active': isGroupActive(page) }"
-                      @click="toggleGroup(page.name)"
-                    >
-                      <span class="gov-subnav__link-main">
-                        <i class="gov-nav__link-icon fa-solid" :class="page.icon" aria-hidden="true"></i>
-                        {{ page.label }}
-                      </span>
-                      <i
-                        class="fa-solid"
-                        :class="isGroupOpen(page.name) ? 'fa-chevron-up' : 'fa-chevron-down'"
-                        aria-hidden="true"
-                      ></i>
-                    </button>
-                    <ul v-if="isGroupOpen(page.name) && page.children?.length" class="gov-subsubnav">
-                      <li
-                        v-for="child in page.children"
-                        :key="child.name"
-                        class="gov-subsubnav__item"
-                      >
-                        <router-link
-                          :to="child.to"
-                          class="gov-subsubnav__link"
-                          :class="{ 'gov-subsubnav__link--active': isRouteActive(child.name) }"
-                        >
-                          <i class="gov-nav__link-icon fa-solid" :class="child.icon" aria-hidden="true"></i>
-                          {{ child.label }}
-                        </router-link>
-                      </li>
-                    </ul>
-                    <div
-                      v-else-if="isGroupOpen(page.name)"
-                      class="gov-subsubnav__empty"
-                    >
-                      Em breve...
-                    </div>
-                  </li>
-                </ul>
-              </li>
-              <li class="gov-nav__item">
-                <router-link
-                  to="/biblioteca"
-                  class="gov-nav__link"
-                  :class="{ 'gov-nav__link--active': $route.name === 'TemplateList' }"
-                  active-class="gov-nav__link--active"
-                >
-                  <i class="gov-nav__link-icon fa-solid fa-book" aria-hidden="true"></i>
-                  Biblioteca de Documentos
-                </router-link>
-              </li>
-              <li class="gov-nav__item">
-                <router-link
-                  to="/analisador"
-                  class="gov-nav__link"
-                  :class="{ 'gov-nav__link--active': $route.name === 'DocumentAnalyzer' }"
-                  active-class="gov-nav__link--active"
-                >
-                  <i class="gov-nav__link-icon fa-solid fa-magnifying-glass-chart" aria-hidden="true"></i>
-                  Analisador de Documentos
-                </router-link>
-              </li>
-              <li class="gov-nav__item">
-                <router-link
-                  to="/pesquisador-pncp"
-                  class="gov-nav__link"
-                  :class="{ 'gov-nav__link--active': $route.name === 'PncpResearcher' }"
-                  active-class="gov-nav__link--active"
-                >
-                  <i class="gov-nav__link-icon fa-solid fa-database" aria-hidden="true"></i>
-                  Pesquisador de Dados PNCP
-                </router-link>
-              </li>
-              <li class="gov-nav__item">
-                <router-link
-                  to="/area-do-usuario"
-                  class="gov-nav__link"
-                  :class="{ 'gov-nav__link--active': $route.name === 'AreaDoUsuario' }"
-                  active-class="gov-nav__link--active"
-                >
-                  <i class="gov-nav__link-icon fa-solid fa-user" aria-hidden="true"></i>
-                  Área do Usuário
-                </router-link>
-              </li>
-            </ul>
+  <div v-else class="dm-layout-bg">
+    <div class="dm-layout-wrap">
+      <div class="dm-shell">
+        <header class="dm-topbar">
+          <div class="dm-topbar-main">
+            <div class="dm-brand">
+              <div class="dm-brand-logo-wrap">
+                <img src="@/assets/logo_branca.png" alt="DocMasterIA" class="dm-brand-logo" />
+              </div>
+              <div class="dm-brand-text">
+                <h1>DocMaster IA</h1>
+                <span>Gestão Documental</span>
+              </div>
+            </div>
+            <div class="dm-topbar-actions">
+              <span v-if="user" class="dm-topbar-meta">
+                <img v-if="ufFlagUrl" :src="ufFlagUrl" :alt="`Bandeira ${user.prefeitura_uf}`" class="dm-uf-flag" />
+                UF {{ user.prefeitura_uf || '—' }}
+              </span>
+              <button type="button" class="dm-chip-btn" title="Sair e ir para o login" @click="logout">
+                <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+                Sair
+              </button>
+            </div>
           </div>
-        </nav>
-      </aside>
+          <div class="dm-top-tabs">
+            <button
+              v-for="tab in mainTabs"
+              :key="tab.key"
+              type="button"
+              class="dm-top-tab"
+              :class="{ 'dm-top-tab--active': isMainTabActive(tab.key) }"
+              @click="onMainTabClick(tab)"
+            >
+              <i class="fa-solid" :class="tab.icon" aria-hidden="true"></i>
+              <span>{{ tab.label }}</span>
+            </button>
+          </div>
+        </header>
 
-      <main class="gov-shell__content">
-        <router-view />
-      </main>
+        <div class="dm-body">
+          <aside class="dm-sidebar">
+            <div class="dm-sidebar-head">
+              <div class="dm-sidebar-kicker">Navegação da seção</div>
+              <div class="dm-sidebar-title">{{ activeSectionLabel }}</div>
+              <p>Selecione uma opção para avançar no fluxo.</p>
+            </div>
+            <nav class="dm-sidebar-nav">
+              <button
+                type="button"
+                class="dm-nav-item dm-nav-item--expandable"
+                :class="{ 'dm-nav-item--active': isGenerationSectionActive }"
+                @click="generationMenuOpen = !generationMenuOpen"
+              >
+                <span><i class="fa-solid fa-file-lines" aria-hidden="true"></i>Geração de Documentos</span>
+                <i class="fa-solid" :class="generationMenuOpen ? 'fa-chevron-up' : 'fa-chevron-down'" aria-hidden="true"></i>
+              </button>
+
+              <div v-if="generationMenuOpen" class="dm-subnav">
+                <div v-for="page in generationPages" :key="page.name" class="dm-subnav-item">
+                  <button
+                    type="button"
+                    class="dm-subnav-btn"
+                    :class="{ 'dm-subnav-btn--active': isGroupActive(page) }"
+                    @click="toggleGroup(page.name)"
+                  >
+                    <span><i class="fa-solid" :class="page.icon" aria-hidden="true"></i>{{ page.label }}</span>
+                    <i class="fa-solid" :class="isGroupOpen(page.name) ? 'fa-chevron-up' : 'fa-chevron-down'" aria-hidden="true"></i>
+                  </button>
+                  <div v-if="isGroupOpen(page.name) && page.children?.length" class="dm-subsubnav">
+                    <router-link
+                      v-for="child in page.children"
+                      :key="child.name"
+                      :to="child.to"
+                      class="dm-subsubnav-link"
+                      :class="{ 'dm-subsubnav-link--active': isRouteActive(child.name) }"
+                    >
+                      <i class="fa-solid" :class="child.icon" aria-hidden="true"></i>
+                      {{ child.label }}
+                    </router-link>
+                  </div>
+                </div>
+              </div>
+
+              <router-link to="/biblioteca" class="dm-nav-item" :class="{ 'dm-nav-item--active': $route.name === 'TemplateList' }">
+                <i class="fa-solid fa-book" aria-hidden="true"></i>
+                Biblioteca de Documentos
+              </router-link>
+              <router-link to="/analisador" class="dm-nav-item" :class="{ 'dm-nav-item--active': $route.name === 'DocumentAnalyzer' }">
+                <i class="fa-solid fa-magnifying-glass-chart" aria-hidden="true"></i>
+                Analisador de Documentos
+              </router-link>
+              <router-link to="/pesquisador-pncp" class="dm-nav-item" :class="{ 'dm-nav-item--active': $route.name === 'PncpResearcher' }">
+                <i class="fa-solid fa-database" aria-hidden="true"></i>
+                Pesquisador de Dados PNCP
+              </router-link>
+              <router-link to="/area-do-usuario" class="dm-nav-item" :class="{ 'dm-nav-item--active': $route.name === 'AreaDoUsuario' }">
+                <i class="fa-solid fa-user" aria-hidden="true"></i>
+                Área do Usuário
+              </router-link>
+            </nav>
+          </aside>
+
+          <main class="dm-content">
+            <router-view />
+          </main>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -252,9 +208,42 @@ const generationRouteNames = new Set(
   generationPages.flatMap((page) => [page.name, ...(page.children || []).map((child) => child.name)]),
 );
 
+const mainTabs = [
+  { key: 'geracao', label: 'Geração', icon: 'fa-file-lines', to: '/geracao/etp-livre' },
+  { key: 'biblioteca', label: 'Biblioteca', icon: 'fa-book', to: '/biblioteca' },
+  { key: 'analisador', label: 'Analisador', icon: 'fa-magnifying-glass-chart', to: '/analisador' },
+  { key: 'pncp', label: 'Pesquisa de Preços', icon: 'fa-database', to: '/pesquisador-pncp' },
+  { key: 'usuario', label: 'Área do Usuário', icon: 'fa-user', to: '/area-do-usuario' },
+];
+
 const isGenerationSectionActive = computed(() => {
   return route.name === 'DocumentGenerator' || generationRouteNames.has(route.name);
 });
+
+const activeSectionLabel = computed(() => {
+  if (isGenerationSectionActive.value) return 'Geração de Documentos';
+  if (route.name === 'TemplateList') return 'Biblioteca de Documentos';
+  if (route.name === 'DocumentAnalyzer') return 'Analisador de Documentos';
+  if (route.name === 'PncpResearcher' || String(route.path || '').startsWith('/pesquisador-pncp')) return 'Pesquisa de Preços';
+  if (route.name === 'AreaDoUsuario') return 'Área do Usuário';
+  return 'Módulo';
+});
+
+function isMainTabActive(key) {
+  if (key === 'geracao') return isGenerationSectionActive.value;
+  if (key === 'biblioteca') return route.name === 'TemplateList';
+  if (key === 'analisador') return route.name === 'DocumentAnalyzer';
+  if (key === 'pncp') return route.name === 'PncpResearcher' || String(route.path || '').startsWith('/pesquisador-pncp');
+  if (key === 'usuario') return route.name === 'AreaDoUsuario';
+  return false;
+}
+
+function onMainTabClick(tab) {
+  if (tab.key === 'geracao') {
+    generationMenuOpen.value = true;
+  }
+  if (tab.to) router.push(tab.to);
+}
 
 function isRouteActive(name) {
   return route.name === name;
@@ -333,122 +322,328 @@ async function logout() {
 
 onMounted(() => {
   fetchMe();
+  if (isGenerationSectionActive.value) generationMenuOpen.value = true;
 });
 </script>
 
 <style scoped>
-.gov-topbar__meta-uf {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.dm-layout-bg {
+  height: 100vh;
+  overflow: hidden;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 52%, #eef2f6 100%);
 }
 
-.gov-topbar__uf-flag {
-  width: 28px;
-  height: 20px;
-  object-fit: cover;
-  border-radius: 2px;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4);
+.dm-layout-wrap {
+  height: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 12px 16px;
 }
 
-.gov-topbar__logout {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  margin-left: 8px;
-  font-size: 12px;
-  font-weight: 500;
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
-}
-.gov-topbar__logout:hover {
-  background: rgba(255, 255, 255, 0.25);
-  border-color: rgba(255, 255, 255, 0.6);
+.dm-shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid #dbe3ee;
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.1);
 }
 
-.gov-nav__link--expandable {
+.dm-topbar {
+  flex-shrink: 0;
+  background: #254e78;
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.dm-topbar-main {
+  display: flex;
   justify-content: space-between;
-}
-
-.gov-nav__link-main {
-  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  padding: 14px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
 }
 
-.gov-subnav,
-.gov-subsubnav {
-  list-style: none;
-  margin: 4px 0 8px;
-  padding: 0;
-}
-
-.gov-subnav {
-  padding-left: 12px;
-}
-
-.gov-subsubnav {
-  padding-left: 14px;
-}
-
-.gov-subnav__item,
-.gov-subsubnav__item {
-  margin: 2px 0;
-}
-
-.gov-subnav__link,
-.gov-subsubnav__link {
-  display: block;
-  border-radius: var(--radius-md);
-  padding: 5px 8px;
-  color: var(--color-text);
-  font-size: 12px;
-  text-decoration: none;
-}
-
-.gov-subnav__link:hover,
-.gov-subsubnav__link:hover {
-  background: #dde4ef;
-  text-decoration: none;
-}
-
-.gov-subnav__link--active,
-.gov-subsubnav__link--active {
-  border: 1px solid var(--color-primary);
-  background-color: #d5edf7;
-}
-
-.gov-subnav__link--expandable {
-  width: 100%;
+.dm-brand {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  border: 1px solid transparent;
-  background: transparent;
-  font-family: inherit;
+  gap: 12px;
+}
+
+.dm-brand-logo-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+.dm-brand-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.dm-brand-text h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.dm-brand-text span {
+  display: inline-flex;
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  padding: 2px 10px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.dm-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dm-topbar-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.dm-uf-flag {
+  width: 24px;
+  height: 16px;
+  object-fit: cover;
+  border-radius: 2px;
+}
+
+.dm-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 14px;
   cursor: pointer;
 }
 
-.gov-subnav__link-main {
+.dm-chip-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.dm-top-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 20px;
+}
+
+.dm-top-tab {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  cursor: pointer;
 }
 
-.gov-subsubnav__link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+.dm-top-tab:hover {
+  background: rgba(255, 255, 255, 0.15);
 }
 
-.gov-subsubnav__empty {
-  margin: 4px 0 8px 14px;
-  color: var(--color-text-soft);
+.dm-top-tab--active {
+  background: #fff;
+  color: #254e78;
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.dm-body {
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  grid-template-columns: 284px minmax(0, 1fr);
+}
+
+.dm-sidebar {
+  overflow: hidden;
+  border-right: 1px solid #c6d3e1;
+  background: #dce5ee;
+}
+
+.dm-sidebar-head {
+  padding: 16px 18px;
+  border-bottom: 1px solid #bccbda;
+  background: #d2dee9;
+}
+
+.dm-sidebar-head .dm-sidebar-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #2c5a89;
+}
+
+.dm-sidebar-head .dm-sidebar-title {
+  margin-top: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #254e78;
+}
+
+.dm-sidebar-head p {
+  margin: 6px 0 0;
   font-size: 12px;
+  color: #475569;
+}
+
+.dm-sidebar-nav {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dm-nav-item,
+.dm-nav-item:visited {
+  text-decoration: none;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dm-nav-item--expandable {
+  width: 100%;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.dm-nav-item--expandable span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dm-nav-item:hover,
+.dm-subnav-btn:hover,
+.dm-subsubnav-link:hover {
+  background: #f8fafc;
+}
+
+.dm-nav-item--active {
+  border-color: #254e78;
+  color: #254e78;
+  background: #f1f5f9;
+}
+
+.dm-subnav {
+  margin-left: 8px;
+  padding-left: 10px;
+  border-left: 1px solid #cbd5e1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dm-subnav-btn {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #fff;
+  color: #334155;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.dm-subnav-btn span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dm-subnav-btn--active {
+  border-color: #254e78;
+  color: #254e78;
+}
+
+.dm-subsubnav {
+  margin-left: 10px;
+  padding-left: 10px;
+  border-left: 1px solid #d1d5db;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dm-subsubnav-link,
+.dm-subsubnav-link:visited {
+  text-decoration: none;
+  color: #334155;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #fff;
+  padding: 7px 10px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dm-subsubnav-link--active {
+  border-color: #254e78;
+  background: #254e78;
+  color: #fff;
+}
+
+.dm-content {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  background: rgba(248, 250, 252, 0.62);
+}
+
+@media (max-width: 1279px) {
+  .dm-body {
+    grid-template-columns: 1fr;
+  }
+  .dm-sidebar {
+    display: none;
+  }
 }
 </style>

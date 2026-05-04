@@ -50,19 +50,19 @@
               <p>Selecione uma opção para avançar no fluxo.</p>
             </div>
             <nav class="dm-sidebar-nav">
-              <template v-if="activeMainTabKey === 'geracao'">
+              <template v-if="['dispensa', 'inexigibilidade', 'etp'].includes(activeMainTabKey)">
                 <button
                   type="button"
                   class="dm-nav-item dm-nav-item--expandable"
                   :class="{ 'dm-nav-item--active': isGenerationSectionActive }"
                   @click="generationMenuOpen = !generationMenuOpen"
                 >
-                  <span><i class="fa-solid fa-file-lines" aria-hidden="true"></i>Geração de Documentos</span>
+                  <span><i class="fa-solid fa-file-lines" aria-hidden="true"></i>{{ activeSectionLabel }}</span>
                   <i class="fa-solid" :class="generationMenuOpen ? 'fa-chevron-up' : 'fa-chevron-down'" aria-hidden="true"></i>
                 </button>
 
                 <div v-if="generationMenuOpen" class="dm-subnav">
-                  <div v-for="page in generationPages" :key="page.name" class="dm-subnav-item">
+                  <div v-for="page in visibleGenerationPages" :key="page.name" class="dm-subnav-item">
                     <button
                       type="button"
                       class="dm-subnav-btn"
@@ -88,13 +88,6 @@
                 </div>
               </template>
 
-              <template v-else-if="activeMainTabKey === 'biblioteca'">
-                <router-link to="/biblioteca" class="dm-nav-item dm-nav-item--active">
-                  <i class="fa-solid fa-book" aria-hidden="true"></i>
-                  Biblioteca de Documentos
-                </router-link>
-              </template>
-
               <template v-else-if="activeMainTabKey === 'analisador'">
                 <router-link to="/analisador" class="dm-nav-item dm-nav-item--active">
                   <i class="fa-solid fa-magnifying-glass-chart" aria-hidden="true"></i>
@@ -102,10 +95,10 @@
                 </router-link>
               </template>
 
-              <template v-else-if="activeMainTabKey === 'pncp'">
+              <template v-else-if="activeMainTabKey === 'pesquisa'">
                 <router-link to="/pesquisador-pncp" class="dm-nav-item dm-nav-item--active">
                   <i class="fa-solid fa-database" aria-hidden="true"></i>
-                  Pesquisador de Dados PNCP
+                  Pesquisa de Preços Inteligente
                 </router-link>
               </template>
 
@@ -114,6 +107,14 @@
                   <i class="fa-solid fa-user" aria-hidden="true"></i>
                   Área do Usuário
                 </router-link>
+              </template>
+
+              <template v-else>
+                <div class="dm-nav-item dm-nav-item--active">
+                  <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                  {{ activeSectionLabel }}
+                </div>
+                <div class="dm-subsubnav__empty">Módulo em preparação.</div>
               </template>
             </nav>
           </aside>
@@ -128,7 +129,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br';
@@ -224,10 +225,18 @@ const generationRouteNames = new Set(
 );
 
 const mainTabs = [
-  { key: 'geracao', label: 'Geração', icon: 'fa-file-lines', to: '/geracao/etp-livre' },
-  { key: 'biblioteca', label: 'Biblioteca', icon: 'fa-book', to: '/biblioteca' },
-  { key: 'analisador', label: 'Analisador', icon: 'fa-magnifying-glass-chart', to: '/analisador' },
-  { key: 'pncp', label: 'Pesquisa de Preços', icon: 'fa-database', to: '/pesquisador-pncp' },
+  { key: 'dispensa', label: 'Dispensa', icon: 'fa-file-lines', to: '/geracao/dispensa-art-75-i/obras-servicos-engenharia' },
+  { key: 'dispensa_eletronica', label: 'Dispensa Eletrônica', icon: 'fa-file-lines' },
+  { key: 'pregao', label: 'Pregão', icon: 'fa-file-lines' },
+  { key: 'pregao_eletronico', label: 'Pregão Eletrônico', icon: 'fa-file-lines' },
+  { key: 'inexigibilidade', label: 'Inexigibilidade', icon: 'fa-file-lines', to: '/geracao/inexigibilidade-art-74-i/show-artistico' },
+  { key: 'etp', label: 'ETP', icon: 'fa-file-lines', to: '/geracao/etp-livre' },
+  { key: 'analisador', label: 'Analisador de Documentos', icon: 'fa-magnifying-glass-chart', to: '/analisador' },
+  { key: 'pesquisa', label: 'Pesquisa de Preços Inteligente', icon: 'fa-database', to: '/pesquisador-pncp' },
+  { key: 'contratos', label: 'Contratos', icon: 'fa-file-lines' },
+  { key: 'controle_interno', label: 'Controle Interno', icon: 'fa-file-lines' },
+  { key: 'impugnacao', label: 'Impugnação', icon: 'fa-file-lines' },
+  { key: 'recurso', label: 'Recurso Processo Licitatório', icon: 'fa-file-lines' },
   { key: 'usuario', label: 'Área do Usuário', icon: 'fa-user', to: '/area-do-usuario' },
 ];
 
@@ -235,20 +244,47 @@ const isGenerationSectionActive = computed(() => {
   return route.name === 'DocumentGenerator' || generationRouteNames.has(route.name);
 });
 
-const activeMainTabKey = computed(() => {
-  if (isGenerationSectionActive.value) return 'geracao';
-  if (route.name === 'TemplateList') return 'biblioteca';
-  if (route.name === 'DocumentAnalyzer') return 'analisador';
-  if (route.name === 'PncpResearcher' || String(route.path || '').startsWith('/pesquisador-pncp')) return 'pncp';
-  if (route.name === 'AreaDoUsuario') return 'usuario';
-  return 'geracao';
+function inferMainTabFromRoute() {
+  const rname = String(route.name || '');
+  const rpath = String(route.path || '');
+  if (rname.startsWith('DispensaArt75')) return 'dispensa';
+  if (rname.startsWith('InexigibilidadeArt74')) return 'inexigibilidade';
+  if (rname === 'EtpLivre' || rpath.startsWith('/geracao/etp-livre')) return 'etp';
+  if (rname === 'DocumentAnalyzer') return 'analisador';
+  if (rname === 'PncpResearcher' || rpath.startsWith('/pesquisador-pncp')) return 'pesquisa';
+  if (rname === 'AreaDoUsuario') return 'usuario';
+  return 'dispensa';
+}
+
+const selectedMainTabKey = ref(inferMainTabFromRoute());
+const activeMainTabKey = computed(() => selectedMainTabKey.value);
+
+const visibleGenerationPages = computed(() => {
+  if (activeMainTabKey.value === 'dispensa') {
+    return generationPages.filter((p) => p.name === 'DispensaArt75I' || p.name === 'DispensaArt75II');
+  }
+  if (activeMainTabKey.value === 'inexigibilidade') {
+    return generationPages.filter((p) => p.name === 'InexigibilidadeArt74I');
+  }
+  if (activeMainTabKey.value === 'etp') {
+    return generationPages.filter((p) => p.name === 'EtpLivreGroup');
+  }
+  return [];
 });
 
 const activeSectionLabel = computed(() => {
-  if (activeMainTabKey.value === 'geracao') return 'Geração de Documentos';
-  if (activeMainTabKey.value === 'biblioteca') return 'Biblioteca de Documentos';
+  if (activeMainTabKey.value === 'dispensa') return 'Dispensa';
+  if (activeMainTabKey.value === 'dispensa_eletronica') return 'Dispensa Eletrônica';
+  if (activeMainTabKey.value === 'pregao') return 'Pregão';
+  if (activeMainTabKey.value === 'pregao_eletronico') return 'Pregão Eletrônico';
+  if (activeMainTabKey.value === 'inexigibilidade') return 'Inexigibilidade';
+  if (activeMainTabKey.value === 'etp') return 'ETP';
   if (activeMainTabKey.value === 'analisador') return 'Analisador de Documentos';
-  if (activeMainTabKey.value === 'pncp') return 'Pesquisa de Preços';
+  if (activeMainTabKey.value === 'pesquisa') return 'Pesquisa de Preços Inteligente';
+  if (activeMainTabKey.value === 'contratos') return 'Contratos';
+  if (activeMainTabKey.value === 'controle_interno') return 'Controle Interno';
+  if (activeMainTabKey.value === 'impugnacao') return 'Impugnação';
+  if (activeMainTabKey.value === 'recurso') return 'Recurso Processo Licitatório';
   if (activeMainTabKey.value === 'usuario') return 'Área do Usuário';
   return 'Módulo';
 });
@@ -258,7 +294,8 @@ function isMainTabActive(key) {
 }
 
 function onMainTabClick(tab) {
-  if (tab.key === 'geracao') {
+  selectedMainTabKey.value = tab.key;
+  if (['dispensa', 'inexigibilidade', 'etp'].includes(tab.key)) {
     generationMenuOpen.value = true;
   }
   if (tab.to) router.push(tab.to);
@@ -317,8 +354,15 @@ onMounted(() => {
     darkMode.value = false;
   }
   fetchMe();
-  if (isGenerationSectionActive.value) generationMenuOpen.value = true;
+  if (['dispensa', 'inexigibilidade', 'etp'].includes(activeMainTabKey.value)) generationMenuOpen.value = true;
 });
+
+watch(
+  () => route.fullPath,
+  () => {
+    selectedMainTabKey.value = inferMainTabFromRoute();
+  }
+);
 </script>
 
 <style scoped>
@@ -700,6 +744,11 @@ onMounted(() => {
    o contexto principal agora é dado pelo shell (topbar + sidebar). */
 :deep(.gov-page__header .gov-page__title),
 :deep(.gov-page__header .gov-page__subtitle) {
+  display: none !important;
+}
+
+:deep(.gov-page-header .gov-page-title),
+:deep(.gov-page-header .gov-page-subtitle) {
   display: none !important;
 }
 .dm-dark .dm-content {

@@ -22,7 +22,7 @@
 
       <template v-else>
         <section class="cd-item-card">
-          <span class="cd-item-card__label">Nome do item</span>
+          <span class="cd-item-card__label">Descrição do item</span>
           <strong>{{ itemNome }}</strong>
         </section>
 
@@ -79,7 +79,7 @@
           </label>
 
           <label class="cd-field">
-            <span>Valor unitário</span>
+            <span>Valor médio do item</span>
             <input v-model.trim="form.valor_unitario" type="text" inputmode="decimal" placeholder="Ex.: 145,00" />
           </label>
 
@@ -569,11 +569,11 @@ async function salvarCotacaoDireta() {
 
   const valorUnitario = toNumberBR(form.value.valor_unitario);
   if (form.value.valor_unitario && !Number.isFinite(valorUnitario)) {
-    saveError.value = 'Valor unitário inválido.';
+    saveError.value = 'Valor médio do item inválido.';
     return;
   }
   if (Number.isFinite(valorUnitario) && valorUnitario <= 0) {
-    saveError.value = 'Valor unitário deve ser maior que zero.';
+    saveError.value = 'Valor médio do item deve ser maior que zero.';
     return;
   }
 

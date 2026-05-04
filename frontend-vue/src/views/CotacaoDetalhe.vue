@@ -270,6 +270,7 @@
               <col style="width: 70px" />
               <col style="width: 70px" />
               <col style="width: 120px" />
+              <col style="width: 120px" />
               <col style="width: 170px" />
               <col style="width: 110px" />
               <col style="width: 170px" />
@@ -287,11 +288,12 @@
                     aria-label="Selecionar todos os itens"
                   />
                 </th>
-                <th rowspan="2" class="cot-sheet-center">Número do Item</th>
-                <th rowspan="2">Nome do Item</th>
+                <th rowspan="2" class="cot-sheet-center">N°</th>
+                <th rowspan="2">Descrição do Item</th>
                 <th colspan="5" class="cot-sheet-group">Fontes de Preco (Art. 5º)</th>
                 <th rowspan="2" class="cot-sheet-center">Qtd.</th>
                 <th rowspan="2" class="cot-sheet-center">Und.</th>
+                <th rowspan="2" class="cot-sheet-center">Média de preço</th>
                 <th rowspan="2" class="cot-sheet-center">Preco Total</th>
                 <th rowspan="2">Faixa Regional do Item</th>
                 <th rowspan="2" class="cot-sheet-center">Status</th>
@@ -359,6 +361,7 @@
                     placeholder="Unidade (ex.: UN, CX, KG)"
                   />
                 </td>
+                <td class="cot-sheet-center">—</td>
                 <td class="cot-sheet-center">—</td>
                 <td>
                   <div class="cot-faixa-inline cot-faixa-inline--manual">
@@ -460,6 +463,7 @@
                 </td>
                 <td class="cot-sheet-center">{{ linha.qtd }}</td>
                 <td class="cot-sheet-center">{{ linha.und }}</td>
+                <td class="cot-sheet-center">{{ linha.precoMedio }}</td>
                 <td class="cot-sheet-center">{{ linha.precoTotal }}</td>
                 <td>
                   <div class="cot-faixa-cell">
@@ -1306,6 +1310,9 @@ async function loadSessionFromBackend() {
             return Number.isFinite(n) ? n : '—';
           })(),
           und: String(it.unidade_medida_refletida || '').trim() || it.unidade_medida || '-',
+          precoMedio: formatCurrency(
+            it.valor_unitario ?? (Number(it?.quantidade) > 0 ? Number(it?.valor_total) / Number(it?.quantidade) : null) ?? 0,
+          ),
           precoTotal: formatCurrency(
             it.valor_total_refletido ?? it.valor_total ?? it.valor_unitario ?? 0,
           ),

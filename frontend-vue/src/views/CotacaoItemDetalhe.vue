@@ -22,7 +22,7 @@
       <template v-else-if="item">
         <section class="item-summary">
           <div class="item-card item-card--wide">
-            <span class="item-card__label">Nome do item</span>
+            <span class="item-card__label">Descrição do item</span>
             <strong>{{ item.descricao_item || '—' }}</strong>
           </div>
           <div class="item-card">
@@ -41,7 +41,7 @@
 
         <section class="item-prices">
           <div class="item-price-card">
-            <span>Valor unitário</span>
+            <span>Valor médio do item</span>
             <strong>{{ formatCurrency(valorUnitarioRefletido) }}</strong>
           </div>
           <div class="item-price-card">
@@ -132,7 +132,7 @@
                   <strong>{{ formatQuantidadeCotacao(r) }}</strong>
                 </div>
                 <div class="item-cotacao-card__field">
-                  <span>Valor unitário</span>
+                  <span>Valor médio do item</span>
                   <strong>{{ formatCurrency(r.valor_unitario) }}</strong>
                 </div>
                 <div class="item-cotacao-card__field">
@@ -195,7 +195,7 @@
                   <strong>{{ formatQuantidadeCotacao(r) }}</strong>
                 </div>
                 <div class="item-cotacao-card__field">
-                  <span>Valor unitário</span>
+                  <span>Valor médio do item</span>
                   <strong>{{ formatCurrency(r.valor_unitario) }}</strong>
                 </div>
                 <div class="item-cotacao-card__field">
@@ -233,7 +233,7 @@
                   <strong>{{ formatQuantidadeCotacao(r) }}</strong>
                 </div>
                 <div class="item-cotacao-card__field">
-                  <span>Valor unitário</span>
+                  <span>Valor médio do item</span>
                   <strong>{{ formatCurrency(r.valor_unitario) }}</strong>
                 </div>
                 <div class="item-cotacao-card__field">

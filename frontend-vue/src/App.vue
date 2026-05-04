@@ -157,7 +157,7 @@ const groupOpenState = ref({
 const generationPages = [
   {
     name: 'DispensaArt75I',
-    label: 'Dispensa - Art. 75, I',
+    label: 'Dispensa rápida',
     icon: 'fa-gavel',
     children: [
       {
@@ -176,7 +176,7 @@ const generationPages = [
   },
   {
     name: 'DispensaArt75II',
-    label: 'Dispensa - Art. 75, II',
+    label: 'Dispensa normal',
     icon: 'fa-scale-balanced',
     children: [
       {

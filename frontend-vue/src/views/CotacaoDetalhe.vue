@@ -344,14 +344,15 @@
                     placeholder="Unidade (ex.: UN, CX, KG)"
                   />
                 </td>
+                <td class="cot-sheet-center">—</td>
                 <td>
-                  <div class="cot-faixa-inline">
+                  <div class="cot-faixa-inline cot-faixa-inline--manual">
                     <input
                       :value="manualItem.valor_base"
                       type="text"
                       inputmode="numeric"
-                      class="cot-sheet-inline-input"
-                      placeholder="R$ 0,00"
+                      class="cot-sheet-inline-input cot-sheet-inline-input--faixa-base-manual"
+                      placeholder="Valor base (R$)"
                       @input="onManualBaseInput"
                     />
                   </div>
@@ -1766,6 +1767,18 @@ async function saveTituloNoBackend() {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
+}
+
+.cot-faixa-inline--manual {
+  grid-template-columns: 1fr;
+  min-width: 0;
+}
+
+.cot-sheet-inline-input--faixa-base-manual {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .cot-faixa-cell {

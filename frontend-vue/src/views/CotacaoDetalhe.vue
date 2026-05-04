@@ -446,12 +446,31 @@
                 <td class="cot-sheet-center">{{ linha.und }}</td>
                 <td class="cot-sheet-center">{{ linha.precoTotal }}</td>
                 <td>
-                  <div class="cot-faixa-block">
-                    <span class="cot-faixa-block__label">BASE</span>
-                    <strong class="cot-faixa-block__value">{{ linha.faixaRegionalBase }}</strong>
-                    <span class="cot-faixa-block__dot" aria-hidden="true">·</span>
-                    <span class="cot-faixa-block__label">VAR</span>
-                    <strong class="cot-faixa-block__value">{{ linha.faixaRegionalVariacao }}</strong>
+                  <div class="cot-faixa-cell">
+                    <div class="cot-faixa-edit-row">
+                      <span class="cot-faixa-block__label">BASE</span>
+                      <input
+                        type="text"
+                        inputmode="numeric"
+                        class="cot-sheet-inline-input cot-sheet-inline-input--faixa-base"
+                        :disabled="isSessaoFechada || savingFaixaItemId === linha.id"
+                        :value="faixaBaseDisplay(linha)"
+                        @input="onFaixaBaseRowInput(linha.id, $event)"
+                      />
+                      <button
+                        type="button"
+                        class="cot-sheet-action-btn cot-sheet-action-btn--compact"
+                        :disabled="isSessaoFechada || savingFaixaItemId === linha.id"
+                        @click="salvarFaixaBaseItem(linha)"
+                      >
+                        {{ savingFaixaItemId === linha.id ? '…' : 'Salvar' }}
+                      </button>
+                    </div>
+                    <div class="cot-faixa-var-row">
+                      <span class="cot-faixa-block__label">VAR</span>
+                      <strong class="cot-faixa-var-row__value">{{ linha.faixaRegionalVariacao }}</strong>
+                      <span class="cot-faixa-var-row__hint">(global da cotação)</span>
+                    </div>
                   </div>
                 </td>
                 <td class="cot-sheet-center">
@@ -580,6 +599,7 @@ import {
   importItemsSpreadsheetToResearchSession,
   uploadSupplierPdfToResearchSession,
   updateResearchSession,
+  updateResearchSessionItem,
 } from '../services/pncpResearch';
 
 const route = useRoute();
@@ -639,6 +659,9 @@ const manualItem = ref({
 });
 const variacaoGlobalPercentual = ref('20');
 const isSavingVariacaoGlobal = ref(false);
+/** Rascunho local do campo moeda por item_id (valor base da faixa). */
+const faixaBaseDraft = ref({});
+const savingFaixaItemId = ref(null);
 
 const isSessaoFechada = computed(() => ['finalizada', 'cancelada'].includes(String(sessaoStatus.value || '')));
 const sessaoStatusLabel = computed(() => {
@@ -1190,6 +1213,7 @@ async function loadSessionFromBackend() {
   }
   isLoading.value = true;
   loadError.value = '';
+  faixaBaseDraft.value = {};
   try {
     const data = await getResearchSession(sessionId);
     if (data?.ok && data.sessao) {
@@ -1259,6 +1283,7 @@ async function loadSessionFromBackend() {
             it.valor_total_refletido ?? it.valor_total ?? it.valor_unitario ?? 0,
           ),
           faixaRegionalBase: formatFaixaRegionalBase(it),
+          faixaBaseInputSeed: initialFaixaBaseCurrencyInput(it),
           faixaRegionalVariacao: formatFaixaRegionalVariacao(it, variacaoGlobalPercentual.value),
           // Regra de status: 3 ou mais preços/cotações no item => Completo.
           // Fallback para grupos de relatório apenas quando não houver contagem detalhada.
@@ -1340,13 +1365,66 @@ function formatFaixaRegionalBase(item) {
   return base ? formatCurrency(base) : 'R$ —';
 }
 
-function formatFaixaRegionalVariacao(item, variacaoGlobalFallback = null) {
-  const byItem = pickNumeric(
-    extractItemSourceNumber(item, 'variacao', 'variacao_percentual', 'variacaoPercentual'),
-  );
+function formatFaixaRegionalVariacao(_item, variacaoGlobalFallback = null) {
   const byGlobal = Number(variacaoGlobalFallback);
-  const v = byItem ?? (Number.isFinite(byGlobal) && byGlobal >= 0 ? byGlobal : null);
-  return v ? `${Number(v).toLocaleString('pt-BR')}%` : '—';
+  const v = Number.isFinite(byGlobal) && byGlobal >= 0 ? byGlobal : null;
+  return v !== null ? `${Math.round(Number(v)).toLocaleString('pt-BR')}%` : '—';
+}
+
+function initialFaixaBaseCurrencyInput(item) {
+  const byItem = pickNumeric(
+    extractItemSourceNumber(item, 'valor_base', 'valorBase', 'preco_base', 'precoBase'),
+  );
+  const byValue = pickNumeric(item?.valor_unitario, item?.valor_total);
+  const base = byItem ?? byValue;
+  if (!base) return '';
+  return formatCurrency(base);
+}
+
+function faixaBaseDisplay(linha) {
+  const d = faixaBaseDraft.value[linha.id];
+  if (d !== undefined) return d;
+  return linha.faixaBaseInputSeed || '';
+}
+
+function onFaixaBaseRowInput(itemId, event) {
+  const raw = String(event?.target?.value || '');
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) {
+    faixaBaseDraft.value = { ...faixaBaseDraft.value, [itemId]: '' };
+    return;
+  }
+  const cents = Number.parseInt(digits, 10);
+  if (!Number.isFinite(cents)) {
+    faixaBaseDraft.value = { ...faixaBaseDraft.value, [itemId]: '' };
+    return;
+  }
+  const value = cents / 100;
+  const formatted = value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  faixaBaseDraft.value = { ...faixaBaseDraft.value, [itemId]: formatted };
+}
+
+async function salvarFaixaBaseItem(linha) {
+  const sessionId = Number(cotacaoId.value);
+  if (Number.isNaN(sessionId) || isSessaoFechada.value) return;
+  if (savingFaixaItemId.value) return;
+  const display = faixaBaseDisplay(linha);
+  const valorNum = parseCurrencyInputToNumber(display);
+  savingFaixaItemId.value = linha.id;
+  loadError.value = '';
+  try {
+    await updateResearchSessionItem(sessionId, linha.id, {
+      valor_base: valorNum,
+    });
+    const next = { ...faixaBaseDraft.value };
+    delete next[linha.id];
+    faixaBaseDraft.value = next;
+    await loadSessionFromBackend();
+  } catch (err) {
+    loadError.value = `Falha ao salvar valor base do item (${err?.message || 'erro desconhecido'}).`;
+  } finally {
+    savingFaixaItemId.value = null;
+  }
 }
 
 function formatCurrency(v) {
@@ -1688,6 +1766,54 @@ async function saveTituloNoBackend() {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
+}
+
+.cot-faixa-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cot-faixa-edit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cot-sheet-inline-input--faixa-base {
+  width: 6.5rem;
+  min-width: 4rem;
+  flex: 1 1 4rem;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.cot-faixa-var-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+  font-size: 11px;
+  color: var(--color-text-soft);
+}
+
+.cot-faixa-var-row__value {
+  font-size: 12px;
+  color: #0f172a;
+}
+
+.cot-faixa-var-row__hint {
+  font-size: 10px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.cot-sheet-action-btn--compact {
+  padding: 4px 8px;
+  font-size: 11px;
 }
 
 .cot-sheet-shell {
@@ -2228,6 +2354,14 @@ a.pncp-modal__link-btn {
 :deep(.dm-dark) .cot-faixa-block {
   background: #111827 !important;
   border-color: #334155 !important;
+}
+
+:deep(.dm-dark) .cot-faixa-var-row__value {
+  color: #e2e8f0 !important;
+}
+
+:deep(.dm-dark) .cot-faixa-var-row__hint {
+  color: #94a3b8 !important;
 }
 
 :deep(.dm-dark) .cot-faixa-block__value,

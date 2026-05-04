@@ -155,6 +155,18 @@ export function deleteItemsFromResearchSession(sessaoId, itemIds, signal) {
   });
 }
 
+/** Atualiza metadados do item (ex.: valor base da faixa regional). Variação % é só na sessão. */
+export function updateResearchSessionItem(sessaoId, itemId, payload, signal) {
+  return cotacaoRequest(
+    `research/sessions/${encodeURIComponent(sessaoId)}/items/${encodeURIComponent(itemId)}/update`,
+    {
+      method: 'POST',
+      body: payload,
+      signal,
+    },
+  );
+}
+
 export async function importItemsSpreadsheetToResearchSession(sessaoId, file, columnMap = {}, signal) {
   const form = new FormData();
   form.append('arquivo', file);

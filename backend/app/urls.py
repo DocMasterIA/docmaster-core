@@ -31,6 +31,7 @@ from .pncp_cotacao_api import (
     pncp_research_sessions_detail,
     pncp_research_sessions_item_cotacoes,
     pncp_research_sessions_item_cotacoes_update,
+    pncp_research_sessions_item_update,
     pncp_research_sessions_import_items,
     pncp_research_sessions_list_create,
     pncp_research_sessions_upload_supplier_pdf,
@@ -112,6 +113,11 @@ urlpatterns = [
         'api/pncp/cotacoes/research/sessions/<int:sessao_id>/items/delete',
         pncp_research_sessions_delete_items,
         name='api_pncp_cotacoes_session_items_delete',
+    ),
+    path(
+        'api/pncp/cotacoes/research/sessions/<int:sessao_id>/items/<int:item_id>/update',
+        pncp_research_sessions_item_update,
+        name='api_pncp_cotacoes_session_item_update',
     ),
     path(
         'api/pncp/cotacoes/research/sessions/<int:sessao_id>/items/<int:item_id>/cotacoes',

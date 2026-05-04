@@ -53,7 +53,7 @@
             <strong>{{ formatCurrency(faixaValorBase) }}</strong>
           </div>
           <div class="item-price-card">
-            <span>Variação (%)</span>
+            <span>Variação (%) — global da cotação</span>
             <strong>{{ faixaVariacaoFmt }}</strong>
           </div>
         </section>
@@ -266,19 +266,24 @@ const loadError = ref('');
 const item = ref(null);
 const allItems = ref([]);
 const itemCotacoes = ref([]);
+const variacaoGlobalSessao = ref(20);
 
 const fonteSelecionada = computed(() => normalizeFonte(route.query.fonte));
 const fonteSelecionadaLabel = computed(() => (fonteSelecionada.value ? labelFonte(fonteSelecionada.value) : 'Todas'));
 const faixaValorBase = computed(() => {
   const src = item.value?.source || {};
+  const fr = src.faixa_regional || src.faixaRegional;
+  if (fr && typeof fr === 'object') {
+    const b = pickNumeric(fr.valor_base, fr.valorBase);
+    if (Number.isFinite(b) && b > 0) return b;
+  }
   return pickNumeric(src?.valor_base, src?.valorBase, src?.preco_base, src?.precoBase);
 });
 
 const faixaVariacaoFmt = computed(() => {
-  const src = item.value?.source || {};
-  const n = pickNumeric(src?.variacao, src?.variacao_percentual, src?.variacaoPercentual);
-  if (!Number.isFinite(n)) return '—';
-  return `${Number(n).toLocaleString('pt-BR')}%`;
+  const n = Number(variacaoGlobalSessao.value);
+  if (!Number.isFinite(n) || n < 0) return '—';
+  return `${Math.round(n).toLocaleString('pt-BR')}%`;
 });
 
 const quantidadeRefletida = computed(() => {
@@ -373,6 +378,9 @@ async function loadItem() {
   loadError.value = '';
   try {
     const data = await getResearchSession(sessionId);
+    const filtros = data?.sessao?.filtros && typeof data.sessao.filtros === 'object' ? data.sessao.filtros : {};
+    const vg = Number(filtros.variacao_percentual_global);
+    variacaoGlobalSessao.value = Number.isFinite(vg) && vg >= 0 ? vg : 20;
     const itens = Array.isArray(data?.itens) ? data.itens : [];
     allItems.value = itens;
     item.value = itens.find((x) => Number(x?.id) === Number(itemId.value)) || null;

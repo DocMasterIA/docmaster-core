@@ -373,10 +373,9 @@ def _build_items_from_import_rows(rows: List[Dict[str, Any]], column_map: Dict[s
             "uf": _normalize_uf(it.get("uf")),
             "modalidade": str(it.get("modalidade") or "").strip(),
             "valor_base": _safe_float(it.get("valor_base")),
-            "variacao_percentual": _safe_float(it.get("variacao_percentual")),
+            # Variação é só global na sessão; planilha define apenas valor base por item.
             "faixa_regional": {
                 "valor_base": _safe_float(it.get("valor_base")),
-                "variacao_percentual": _safe_float(it.get("variacao_percentual")),
             },
             "origem": "planilha_manual",
         }
@@ -1862,4 +1861,83 @@ def pncp_research_sessions_delete_items(request, sessao_id: int):
 
     return JsonResponse(
         {"ok": True, "sessao_id": c.id, "itens_excluidos": int(deleted_count), "item_ids": ids}
+    )
+
+
+@api_login_required
+@csrf_exempt
+@require_http_methods(["POST", "OPTIONS"])
+@_pncp_json_errors
+def pncp_research_sessions_item_update(request, sessao_id: int, item_id: int):
+    """Atualiza apenas dados do item (ex.: valor base da faixa regional). Variação % é só na sessão."""
+    if request.method == "OPTIONS":
+        return JsonResponse({}, status=204)
+
+    body, err = _parse_json_body(request)
+    if err:
+        return err
+
+    vb_raw: Any = None
+    has_vb_key = False
+    if "valor_base" in body:
+        has_vb_key = True
+        vb_raw = body.get("valor_base")
+    else:
+        fr_in = body.get("faixa_regional")
+        if isinstance(fr_in, dict) and "valor_base" in fr_in:
+            has_vb_key = True
+            vb_raw = fr_in.get("valor_base")
+
+    if not has_vb_key:
+        return JsonResponse(
+            {"detail": "Informe valor_base (número) ou faixa_regional.valor_base para atualizar o item."},
+            status=422,
+        )
+
+    clear_base = vb_raw is None or (isinstance(vb_raw, str) and not str(vb_raw).strip())
+    vb_num = None if clear_base else _safe_float(vb_raw)
+    if not clear_base and vb_num is None:
+        return JsonResponse({"detail": "valor_base inválido."}, status=422)
+    if vb_num is not None and vb_num < 0:
+        return JsonResponse({"detail": "valor_base não pode ser negativo."}, status=422)
+
+    with transaction.atomic():
+        c = _cotacao_qs_for_user(request.user).select_for_update().filter(pk=sessao_id).first()
+        if not c:
+            return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
+        if c.status in CLOSED_FOR_ITEMS:
+            return JsonResponse(
+                {"detail": "Cotação encerrada; não é permitido alterar itens."},
+                status=409,
+            )
+        item = c.itens.filter(pk=item_id).first()
+        if not item:
+            return JsonResponse({"ok": False, "error": "Item não encontrado na sessão.", "item_id": item_id}, status=404)
+
+        src = dict(item.source) if isinstance(item.source, dict) else {}
+        fr = dict(src.get("faixa_regional") or {}) if isinstance(src.get("faixa_regional"), dict) else {}
+        for k in ("variacao_percentual", "variacaoPercentual", "variacao"):
+            fr.pop(k, None)
+        if clear_base:
+            fr.pop("valor_base", None)
+            if not fr:
+                src.pop("faixa_regional", None)
+            else:
+                src["faixa_regional"] = fr
+        else:
+            fr["valor_base"] = float(vb_num)  # type: ignore[arg-type]
+            src["faixa_regional"] = fr
+        for k in ("variacao_percentual", "variacaoPercentual", "variacao"):
+            src.pop(k, None)
+        item.source = src
+        item.save(update_fields=["source"])
+        c.save(update_fields=["updated_at"])
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "sessao_id": c.id,
+            "item_id": item.id,
+            "item": _item_dict(item),
+        }
     )

@@ -778,46 +778,4 @@ onMounted(() => {
 :deep(.dm-dark) .pncp-mock__table tbody tr:hover td {
   background: rgba(30, 41, 59, 0.62) !important;
 }
-
-:global(body.dm-dark-theme) .pncp-modal-backdrop {
-  background: rgba(2, 6, 23, 0.8) !important;
-}
-
-:global(body.dm-dark-theme) .pncp-modal {
-  border-color: #334155 !important;
-  background: #0f172a !important;
-  box-shadow: 0 24px 48px rgba(2, 6, 23, 0.45) !important;
-}
-
-:global(body.dm-dark-theme) .pncp-modal__title {
-  color: #f8fafc !important;
-}
-
-:global(body.dm-dark-theme) .pncp-modal__text,
-:global(body.dm-dark-theme) .pncp-modal__field,
-:global(body.dm-dark-theme) .pncp-modal__field span {
-  color: #94a3b8 !important;
-}
-
-:global(body.dm-dark-theme) .pncp-modal__quote {
-  border-color: #334155 !important;
-  background: #111827 !important;
-  color: #cbd5e1 !important;
-}
-
-:global(body.dm-dark-theme) .pncp-modal .gov-input {
-  border-color: #334155 !important;
-  background: #111827 !important;
-  color: #e2e8f0 !important;
-}
-
-:global(body.dm-dark-theme) .pncp-modal__btn--ghost {
-  border-color: #475569 !important;
-  background: #0f172a !important;
-  color: #e2e8f0 !important;
-}
-
-:global(body.dm-dark-theme) .pncp-modal__btn--ghost:hover {
-  background: #1e293b !important;
-}
 </style>

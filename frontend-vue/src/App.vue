@@ -1033,6 +1033,8 @@ watch(
 .dm-dark .dm-content :deep(.cot-card),
 .dm-dark .dm-content :deep(.item-card),
 .dm-dark .dm-content :deep(.item-price-card),
+.dm-dark .dm-content :deep(.item-cotacao-card__field),
+.dm-dark .dm-content :deep(.item-empty-state),
 .dm-dark .dm-content :deep(.cd-item-card),
 .dm-dark .dm-content :deep(.bia-group-card),
 .dm-dark .dm-content :deep(.item-cotacao-card),
@@ -1087,35 +1089,6 @@ watch(
 .dm-dark .dm-content :deep(.gov-page__content textarea) {
   border-color: #334155 !important;
   background: #0f172a !important;
-  color: #e2e8f0 !important;
-}
-
-/* Safety net de contraste no dark mode (evita branco+branco) */
-:global(body.dm-dark-theme) .pncp-modal,
-:global(body.dm-dark-theme) .cd-modal {
-  background: #0f172a !important;
-  border-color: #334155 !important;
-  color: #e2e8f0 !important;
-}
-
-:global(body.dm-dark-theme) .pncp-modal__title,
-:global(body.dm-dark-theme) .cd-modal__header h2 {
-  color: #f8fafc !important;
-}
-
-:global(body.dm-dark-theme) .pncp-modal__text,
-:global(body.dm-dark-theme) .pncp-modal__field,
-:global(body.dm-dark-theme) .pncp-modal__quote,
-:global(body.dm-dark-theme) .cd-meta {
-  color: #cbd5e1 !important;
-}
-
-:global(body.dm-dark-theme) .pncp-modal .gov-input,
-:global(body.dm-dark-theme) .cd-modal input,
-:global(body.dm-dark-theme) .cd-modal textarea,
-:global(body.dm-dark-theme) .cd-modal select {
-  background: #111827 !important;
-  border-color: #334155 !important;
   color: #e2e8f0 !important;
 }
 
@@ -1219,58 +1192,6 @@ watch(
   color: #94a3b8 !important;
 }
 
-/* Força de contraste para fluxo PNCP/cotações em dark mode */
-:global(body.dm-dark-theme) .dm-content .cot-card,
-:global(body.dm-dark-theme) .dm-content .cot-title-editor,
-:global(body.dm-dark-theme) .dm-content .cot-formula,
-:global(body.dm-dark-theme) .dm-content .cot-global-variacao,
-:global(body.dm-dark-theme) .dm-content .cot-fornecedor-field,
-:global(body.dm-dark-theme) .dm-content .cot-new-item-block,
-:global(body.dm-dark-theme) .dm-content .cot-sheet-shell,
-:global(body.dm-dark-theme) .dm-content .item-card,
-:global(body.dm-dark-theme) .dm-content .item-price-card,
-:global(body.dm-dark-theme) .dm-content .item-cotacao-card,
-:global(body.dm-dark-theme) .dm-content .item-cotacao-card__field,
-:global(body.dm-dark-theme) .dm-content .manual-summary-card,
-:global(body.dm-dark-theme) .dm-content .bia-summary-card,
-:global(body.dm-dark-theme) .dm-content .pncp-mock__summary-card {
-  background: #0f172a !important;
-  border-color: #334155 !important;
-  color: #e2e8f0 !important;
-}
-
-:global(body.dm-dark-theme) .dm-content .cot-sheet-search,
-:global(body.dm-dark-theme) .dm-content .cot-sheet-status-filter,
-:global(body.dm-dark-theme) .dm-content .cot-sheet-inline-input,
-:global(body.dm-dark-theme) .dm-content .cot-formula__select,
-:global(body.dm-dark-theme) .dm-content .cot-title-editor__field input,
-:global(body.dm-dark-theme) .dm-content .manual-field,
-:global(body.dm-dark-theme) .dm-content .bia-filter {
-  background: #111827 !important;
-  border-color: #334155 !important;
-  color: #e2e8f0 !important;
-}
-
-:global(body.dm-dark-theme) .dm-content .cot-sheet-table thead th,
-:global(body.dm-dark-theme) .dm-content .cot-sheet-row-add,
-:global(body.dm-dark-theme) .dm-content .cot-sheet-group,
-:global(body.dm-dark-theme) .dm-content .cot-sheet-source {
-  background: #1e293b !important;
-  color: #cbd5e1 !important;
-}
-
-:global(body.dm-dark-theme) .dm-content .cot-sheet-table th,
-:global(body.dm-dark-theme) .dm-content .cot-sheet-table td {
-  border-color: #334155 !important;
-}
-
-:global(body.dm-dark-theme) .dm-content .cot-card strong,
-:global(body.dm-dark-theme) .dm-content .cot-fornecedor-field__value,
-:global(body.dm-dark-theme) .dm-content .cot-sheet-table td,
-:global(body.dm-dark-theme) .dm-content .item-cotacao-card__field strong {
-  color: #e2e8f0 !important;
-}
-
 /* Pedido do usuário: textos cinza -> branco no dark mode */
 .dm-dark :deep(.gov-surface__subtitle),
 .dm-dark :deep(.gov-text-soft),
@@ -1289,13 +1210,6 @@ watch(
 .dm-dark .dm-content :deep(.cot-fornecedor-field__label),
 .dm-dark .dm-content :deep(.cot-new-item-block__text p),
 .dm-dark .dm-content :deep(.cot-sheet-status-filter span) {
-  color: #ffffff !important;
-}
-
-:global(body.dm-dark-theme) .pncp-modal__text,
-:global(body.dm-dark-theme) .pncp-modal__field,
-:global(body.dm-dark-theme) .pncp-modal__quote,
-:global(body.dm-dark-theme) .cd-meta {
   color: #ffffff !important;
 }
 

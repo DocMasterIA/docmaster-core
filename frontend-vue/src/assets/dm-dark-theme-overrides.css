@@ -1,0 +1,196 @@
+/**
+ * Dark mode — fundos de cards/painéis no fluxo autenticado.
+ * Não use :global(body.dm-dark-theme) .foo em <style scoped>: o bundler
+ * pode reduzir a só "body", quebrando o seletor (ver issue nos builds).
+ */
+body.dm-dark-theme .dm-content .item-card,
+body.dm-dark-theme .dm-content .item-price-card,
+body.dm-dark-theme .dm-content .item-cotacao-card,
+body.dm-dark-theme .dm-content .item-cotacao-card__field,
+body.dm-dark-theme .dm-content .item-empty-state,
+body.dm-dark-theme .dm-content .cot-card,
+body.dm-dark-theme .dm-content .cot-title-editor,
+body.dm-dark-theme .dm-content .cot-formula,
+body.dm-dark-theme .dm-content .cot-global-variacao,
+body.dm-dark-theme .dm-content .cot-fornecedor-field,
+body.dm-dark-theme .dm-content .cot-new-item-block,
+body.dm-dark-theme .dm-content .cot-sheet-shell,
+body.dm-dark-theme .dm-content .cot-sheet-search,
+body.dm-dark-theme .dm-content .cot-sheet-status-filter,
+body.dm-dark-theme .dm-content .cot-sheet-row-add,
+body.dm-dark-theme .dm-content .cot-faixa-block,
+body.dm-dark-theme .dm-content .cot-page-toast,
+body.dm-dark-theme .dm-content .manual-summary-card,
+body.dm-dark-theme .dm-content .manual-controls,
+body.dm-dark-theme .dm-content .manual-field,
+body.dm-dark-theme .dm-content .manual-filters,
+body.dm-dark-theme .dm-content .manual-results-table-shell,
+body.dm-dark-theme .dm-content .manual-results-head,
+body.dm-dark-theme .dm-content .manual-uf-dropdown__summary,
+body.dm-dark-theme .dm-content .manual-uf-dropdown__menu,
+body.dm-dark-theme .dm-content .bia-summary-card,
+body.dm-dark-theme .dm-content .bia-filter,
+body.dm-dark-theme .dm-content .bia-group-card,
+body.dm-dark-theme .dm-content .bia-table-shell,
+body.dm-dark-theme .dm-content .pncp-mock,
+body.dm-dark-theme .dm-content .pncp-mock__summary-card,
+body.dm-dark-theme .dm-content .pncp-mock__table-wrap,
+body.dm-dark-theme .dm-content .cd-item-card,
+body.dm-dark-theme .dm-content .rpp-card,
+body.dm-dark-theme .dm-content .rpp-mini-card,
+body.dm-dark-theme .dm-content .tpl-list__card {
+  background-color: #0f172a !important;
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+body.dm-dark-theme .dm-content .cot-sheet-inline-input,
+body.dm-dark-theme .dm-content .cot-title-editor__field input,
+body.dm-dark-theme .dm-content .cot-formula__select,
+body.dm-dark-theme .dm-content .manual-field select {
+  background-color: #111827 !important;
+  background: #111827 !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+body.dm-dark-theme .dm-content .cot-sheet-table thead th,
+body.dm-dark-theme .dm-content .cot-sheet-row-add,
+body.dm-dark-theme .dm-content .cot-sheet-group,
+body.dm-dark-theme .dm-content .cot-sheet-source {
+  background-color: #1e293b !important;
+  background: #1e293b !important;
+  color: #e2e8f0 !important;
+}
+
+body.dm-dark-theme .dm-content .cot-sheet-table th,
+body.dm-dark-theme .dm-content .cot-sheet-table td {
+  border-color: #334155 !important;
+}
+
+body.dm-dark-theme .dm-content .bia-table th,
+body.dm-dark-theme .dm-content .bia-table td,
+body.dm-dark-theme .dm-content .manual-results-table th,
+body.dm-dark-theme .dm-content .manual-results-table td,
+body.dm-dark-theme .dm-content .pncp-mock__table th,
+body.dm-dark-theme .dm-content .pncp-mock__table td {
+  background-color: #0f172a !important;
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+body.dm-dark-theme .dm-content .item-card__label,
+body.dm-dark-theme .dm-content .item-cotacao-card__field span,
+body.dm-dark-theme .dm-content .item-meta,
+body.dm-dark-theme .dm-content .cot-card__label,
+body.dm-dark-theme .dm-content .cot-meta,
+body.dm-dark-theme .dm-content .manual-meta,
+body.dm-dark-theme .dm-content .bia-meta {
+  color: #ffffff !important;
+}
+
+body.dm-dark-theme .dm-content .item-card strong,
+body.dm-dark-theme .dm-content .item-cotacao-card__field strong,
+body.dm-dark-theme .dm-content .item-price-card strong,
+body.dm-dark-theme .dm-content .cot-card strong {
+  color: #f8fafc !important;
+}
+
+body.dm-dark-theme .dm-content .item-price-card span {
+  color: #ffffff !important;
+}
+
+body.dm-dark-theme .dm-content .item-back-btn,
+body.dm-dark-theme .dm-content .item-search-btn--manual,
+body.dm-dark-theme .dm-content .cot-back-btn,
+body.dm-dark-theme .dm-content .manual-link-back,
+body.dm-dark-theme .dm-content .bia-back-btn,
+body.dm-dark-theme .dm-content .cd-back-btn {
+  background-color: #0f172a !important;
+  background: #0f172a !important;
+  border-color: #475569 !important;
+  color: #f8fafc !important;
+}
+
+body.dm-dark-theme .dm-content .item-related h2 {
+  color: #f8fafc !important;
+}
+
+body.dm-dark-theme .dm-content .item-cotacao-card__id {
+  color: #93c5fd !important;
+}
+
+body.dm-dark-theme .dm-content .item-cotacao-card__link {
+  color: #93c5fd !important;
+}
+
+body.dm-dark-theme .dm-content .item-cotacao-card__fonte {
+  background: rgba(30, 64, 175, 0.25) !important;
+  border-color: #1d4ed8 !important;
+  color: #93c5fd !important;
+}
+
+body.dm-dark-theme .dm-content .item-cotacao-card__similaridade {
+  background: rgba(161, 98, 7, 0.25) !important;
+  border-color: #a16207 !important;
+  color: #fcd34d !important;
+}
+
+/* Modais (Teleport para body — fora de .dm-content) */
+body.dm-dark-theme .pncp-modal-backdrop {
+  background: rgba(2, 6, 23, 0.8) !important;
+}
+
+body.dm-dark-theme .pncp-modal,
+body.dm-dark-theme .cd-modal {
+  background-color: #0f172a !important;
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+  box-shadow: 0 24px 48px rgba(2, 6, 23, 0.45) !important;
+}
+
+body.dm-dark-theme .pncp-modal__title,
+body.dm-dark-theme .cd-modal__header h2 {
+  color: #f8fafc !important;
+}
+
+body.dm-dark-theme .pncp-modal__text,
+body.dm-dark-theme .pncp-modal__field,
+body.dm-dark-theme .pncp-modal__field span,
+body.dm-dark-theme .pncp-modal__quote,
+body.dm-dark-theme .pncp-modal__error,
+body.dm-dark-theme .cd-meta,
+body.dm-dark-theme .cot-relatorio-field,
+body.dm-dark-theme .cot-relatorio-info {
+  color: #ffffff !important;
+}
+
+body.dm-dark-theme .pncp-modal__quote {
+  background-color: #111827 !important;
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+body.dm-dark-theme .pncp-modal .gov-input,
+body.dm-dark-theme .cd-modal input,
+body.dm-dark-theme .cd-modal textarea,
+body.dm-dark-theme .cd-modal select {
+  background-color: #111827 !important;
+  background: #111827 !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+body.dm-dark-theme .pncp-modal__btn--ghost {
+  border-color: #475569 !important;
+  background-color: #0f172a !important;
+  background: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
+body.dm-dark-theme .pncp-modal__btn--ghost:hover {
+  background-color: #1e293b !important;
+  background: #1e293b !important;
+}

@@ -890,6 +890,192 @@ watch(
   background: #1e293b !important;
 }
 
+/* Padrao visual unificado para telas PNCP/Cotacoes (bia/pncp/cot/manual/item/cd) */
+.dm-content :deep(.pncp-mock__summary-card),
+.dm-content :deep(.bia-summary-card),
+.dm-content :deep(.manual-summary-card),
+.dm-content :deep(.cot-card),
+.dm-content :deep(.item-card),
+.dm-content :deep(.item-price-card),
+.dm-content :deep(.cd-item-card),
+.dm-content :deep(.bia-group-card),
+.dm-content :deep(.item-cotacao-card),
+.dm-content :deep(.pncp-modal),
+.dm-content :deep(.cd-modal) {
+  border: 1px solid #dbe4ef !important;
+  border-radius: 16px !important;
+  background: #ffffff !important;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06) !important;
+}
+
+.dm-content :deep(.pncp-new-btn),
+.dm-content :deep(.pncp-chip),
+.dm-content :deep(.pncp-action-btn),
+.dm-content :deep(.pncp-modal__btn),
+.dm-content :deep(.bia-add-cotacao-btn),
+.dm-content :deep(.bia-back-btn),
+.dm-content :deep(.manual-btn-search),
+.dm-content :deep(.manual-btn-backfill),
+.dm-content :deep(.manual-add-cotacao-btn),
+.dm-content :deep(.cot-btn),
+.dm-content :deep(.cot-back-btn),
+.dm-content :deep(.item-search-btn),
+.dm-content :deep(.item-back-btn),
+.dm-content :deep(.cd-btn),
+.dm-content :deep(.cd-back-btn) {
+  border-radius: 999px !important;
+  border: 1px solid #cfd9e6 !important;
+  background: #fff !important;
+  color: #1e293b !important;
+  font-weight: 700 !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease !important;
+}
+
+.dm-content :deep(.pncp-new-btn:hover),
+.dm-content :deep(.pncp-chip:hover),
+.dm-content :deep(.pncp-action-btn:hover),
+.dm-content :deep(.pncp-modal__btn:hover),
+.dm-content :deep(.bia-add-cotacao-btn:hover),
+.dm-content :deep(.bia-back-btn:hover),
+.dm-content :deep(.manual-btn-search:hover),
+.dm-content :deep(.manual-btn-backfill:hover),
+.dm-content :deep(.manual-add-cotacao-btn:hover),
+.dm-content :deep(.cot-btn:hover),
+.dm-content :deep(.cot-back-btn:hover),
+.dm-content :deep(.item-search-btn:hover),
+.dm-content :deep(.item-back-btn:hover),
+.dm-content :deep(.cd-btn:hover),
+.dm-content :deep(.cd-back-btn:hover) {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.1) !important;
+}
+
+.dm-content :deep(.pncp-new-btn),
+.dm-content :deep(.pncp-modal__btn--primary),
+.dm-content :deep(.bia-add-cotacao-btn:not(.bia-add-cotacao-btn--ghost)),
+.dm-content :deep(.manual-btn-search),
+.dm-content :deep(.manual-add-cotacao-btn:not(.manual-add-cotacao-btn--ghost)),
+.dm-content :deep(.cot-btn--primary),
+.dm-content :deep(.item-search-btn),
+.dm-content :deep(.cd-btn:not(.cd-btn--ghost)) {
+  background: #254e78 !important;
+  border-color: #254e78 !important;
+  color: #fff !important;
+}
+
+.dm-content :deep(.pncp-chip--active),
+.dm-content :deep(.pncp-status),
+.dm-content :deep(.bia-pill),
+.dm-content :deep(.bia-badge),
+.dm-content :deep(.manual-status),
+.dm-content :deep(.item-cotacao-card__fonte),
+.dm-content :deep(.item-cotacao-card__similaridade) {
+  border-radius: 999px !important;
+}
+
+.dm-content :deep(.pncp-mock__table-wrap),
+.dm-content :deep(.bia-table-shell),
+.dm-content :deep(.bia-table-scroll),
+.dm-content :deep(.manual-results-table-shell),
+.dm-content :deep(.manual-results-table-scroll),
+.dm-content :deep(.cot-sheet-shell),
+.dm-content :deep(.cot-sheet-scroll) {
+  border: 1px solid #dbe4ef !important;
+  border-radius: 16px !important;
+  background: #fff !important;
+}
+
+.dm-content :deep(.pncp-mock__table th),
+.dm-content :deep(.pncp-mock__table td),
+.dm-content :deep(.bia-table th),
+.dm-content :deep(.bia-table td),
+.dm-content :deep(.manual-results-table th),
+.dm-content :deep(.manual-results-table td),
+.dm-content :deep(.cot-sheet-table th),
+.dm-content :deep(.cot-sheet-table td) {
+  border-color: #e2e8f0 !important;
+}
+
+.dm-content :deep(.gov-page__content input:not([type='checkbox']):not([type='radio'])),
+.dm-content :deep(.gov-page__content select),
+.dm-content :deep(.gov-page__content textarea) {
+  border-radius: 14px !important;
+  border: 1px solid #cbd5e1 !important;
+  background: #fff !important;
+  color: #0f172a !important;
+}
+
+.dm-content :deep(.gov-page__content input:not([type='checkbox']):not([type='radio']):focus),
+.dm-content :deep(.gov-page__content select:focus),
+.dm-content :deep(.gov-page__content textarea:focus) {
+  border-color: #254e78 !important;
+  box-shadow: 0 0 0 4px rgba(37, 78, 120, 0.1) !important;
+  outline: none !important;
+}
+
+.dm-dark .dm-content :deep(.pncp-mock__summary-card),
+.dm-dark .dm-content :deep(.bia-summary-card),
+.dm-dark .dm-content :deep(.manual-summary-card),
+.dm-dark .dm-content :deep(.cot-card),
+.dm-dark .dm-content :deep(.item-card),
+.dm-dark .dm-content :deep(.item-price-card),
+.dm-dark .dm-content :deep(.cd-item-card),
+.dm-dark .dm-content :deep(.bia-group-card),
+.dm-dark .dm-content :deep(.item-cotacao-card),
+.dm-dark .dm-content :deep(.pncp-modal),
+.dm-dark .dm-content :deep(.cd-modal),
+.dm-dark .dm-content :deep(.pncp-mock__table-wrap),
+.dm-dark .dm-content :deep(.bia-table-shell),
+.dm-dark .dm-content :deep(.bia-table-scroll),
+.dm-dark .dm-content :deep(.manual-results-table-shell),
+.dm-dark .dm-content :deep(.manual-results-table-scroll),
+.dm-dark .dm-content :deep(.cot-sheet-shell),
+.dm-dark .dm-content :deep(.cot-sheet-scroll) {
+  border-color: #334155 !important;
+  background: rgba(15, 23, 42, 0.86) !important;
+}
+
+.dm-dark .dm-content :deep(.pncp-new-btn),
+.dm-dark .dm-content :deep(.pncp-chip),
+.dm-dark .dm-content :deep(.pncp-action-btn),
+.dm-dark .dm-content :deep(.pncp-modal__btn),
+.dm-dark .dm-content :deep(.bia-add-cotacao-btn),
+.dm-dark .dm-content :deep(.bia-back-btn),
+.dm-dark .dm-content :deep(.manual-btn-search),
+.dm-dark .dm-content :deep(.manual-btn-backfill),
+.dm-dark .dm-content :deep(.manual-add-cotacao-btn),
+.dm-dark .dm-content :deep(.cot-btn),
+.dm-dark .dm-content :deep(.cot-back-btn),
+.dm-dark .dm-content :deep(.item-search-btn),
+.dm-dark .dm-content :deep(.item-back-btn),
+.dm-dark .dm-content :deep(.cd-btn),
+.dm-dark .dm-content :deep(.cd-back-btn) {
+  border-color: #475569 !important;
+  background: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
+.dm-dark .dm-content :deep(.pncp-new-btn),
+.dm-dark .dm-content :deep(.pncp-modal__btn--primary),
+.dm-dark .dm-content :deep(.bia-add-cotacao-btn:not(.bia-add-cotacao-btn--ghost)),
+.dm-dark .dm-content :deep(.manual-btn-search),
+.dm-dark .dm-content :deep(.manual-add-cotacao-btn:not(.manual-add-cotacao-btn--ghost)),
+.dm-dark .dm-content :deep(.cot-btn--primary),
+.dm-dark .dm-content :deep(.item-search-btn),
+.dm-dark .dm-content :deep(.cd-btn:not(.cd-btn--ghost)) {
+  border-color: #64748b !important;
+  background: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+.dm-dark .dm-content :deep(.gov-page__content input:not([type='checkbox']):not([type='radio'])),
+.dm-dark .dm-content :deep(.gov-page__content select),
+.dm-dark .dm-content :deep(.gov-page__content textarea) {
+  border-color: #334155 !important;
+  background: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
 @media (max-width: 1279px) {
   .dm-body {
     grid-template-columns: 1fr;

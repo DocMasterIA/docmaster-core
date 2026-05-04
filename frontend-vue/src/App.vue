@@ -2,7 +2,7 @@
   <div v-if="$route.name === 'Login'" class="app-auth-wrap">
     <router-view />
   </div>
-  <div v-else class="dm-layout-bg">
+  <div v-else class="dm-layout-bg" :class="{ 'dm-dark': darkMode }">
     <div class="dm-layout-wrap">
       <div class="dm-shell">
         <header class="dm-topbar">
@@ -21,6 +21,10 @@
                 <img v-if="ufFlagUrl" :src="ufFlagUrl" :alt="`Bandeira ${user.prefeitura_uf}`" class="dm-uf-flag" />
                 UF {{ user.prefeitura_uf || '—' }}
               </span>
+              <button type="button" class="dm-chip-btn" @click="toggleDarkMode">
+                <i class="fa-solid" :class="darkMode ? 'fa-sun' : 'fa-moon'" aria-hidden="true"></i>
+                {{ darkMode ? 'Claro' : 'Escuro' }}
+              </button>
               <button type="button" class="dm-chip-btn" title="Sair e ir para o login" @click="logout">
                 <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
                 Sair
@@ -50,58 +54,71 @@
               <p>Selecione uma opção para avançar no fluxo.</p>
             </div>
             <nav class="dm-sidebar-nav">
-              <button
-                type="button"
-                class="dm-nav-item dm-nav-item--expandable"
-                :class="{ 'dm-nav-item--active': isGenerationSectionActive }"
-                @click="generationMenuOpen = !generationMenuOpen"
-              >
-                <span><i class="fa-solid fa-file-lines" aria-hidden="true"></i>Geração de Documentos</span>
-                <i class="fa-solid" :class="generationMenuOpen ? 'fa-chevron-up' : 'fa-chevron-down'" aria-hidden="true"></i>
-              </button>
+              <template v-if="activeMainTabKey === 'geracao'">
+                <button
+                  type="button"
+                  class="dm-nav-item dm-nav-item--expandable"
+                  :class="{ 'dm-nav-item--active': isGenerationSectionActive }"
+                  @click="generationMenuOpen = !generationMenuOpen"
+                >
+                  <span><i class="fa-solid fa-file-lines" aria-hidden="true"></i>Geração de Documentos</span>
+                  <i class="fa-solid" :class="generationMenuOpen ? 'fa-chevron-up' : 'fa-chevron-down'" aria-hidden="true"></i>
+                </button>
 
-              <div v-if="generationMenuOpen" class="dm-subnav">
-                <div v-for="page in generationPages" :key="page.name" class="dm-subnav-item">
-                  <button
-                    type="button"
-                    class="dm-subnav-btn"
-                    :class="{ 'dm-subnav-btn--active': isGroupActive(page) }"
-                    @click="toggleGroup(page.name)"
-                  >
-                    <span><i class="fa-solid" :class="page.icon" aria-hidden="true"></i>{{ page.label }}</span>
-                    <i class="fa-solid" :class="isGroupOpen(page.name) ? 'fa-chevron-up' : 'fa-chevron-down'" aria-hidden="true"></i>
-                  </button>
-                  <div v-if="isGroupOpen(page.name) && page.children?.length" class="dm-subsubnav">
-                    <router-link
-                      v-for="child in page.children"
-                      :key="child.name"
-                      :to="child.to"
-                      class="dm-subsubnav-link"
-                      :class="{ 'dm-subsubnav-link--active': isRouteActive(child.name) }"
+                <div v-if="generationMenuOpen" class="dm-subnav">
+                  <div v-for="page in generationPages" :key="page.name" class="dm-subnav-item">
+                    <button
+                      type="button"
+                      class="dm-subnav-btn"
+                      :class="{ 'dm-subnav-btn--active': isGroupActive(page) }"
+                      @click="toggleGroup(page.name)"
                     >
-                      <i class="fa-solid" :class="child.icon" aria-hidden="true"></i>
-                      {{ child.label }}
-                    </router-link>
+                      <span><i class="fa-solid" :class="page.icon" aria-hidden="true"></i>{{ page.label }}</span>
+                      <i class="fa-solid" :class="isGroupOpen(page.name) ? 'fa-chevron-up' : 'fa-chevron-down'" aria-hidden="true"></i>
+                    </button>
+                    <div v-if="isGroupOpen(page.name) && page.children?.length" class="dm-subsubnav">
+                      <router-link
+                        v-for="child in page.children"
+                        :key="child.name"
+                        :to="child.to"
+                        class="dm-subsubnav-link"
+                        :class="{ 'dm-subsubnav-link--active': isRouteActive(child.name) }"
+                      >
+                        <i class="fa-solid" :class="child.icon" aria-hidden="true"></i>
+                        {{ child.label }}
+                      </router-link>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </template>
 
-              <router-link to="/biblioteca" class="dm-nav-item" :class="{ 'dm-nav-item--active': $route.name === 'TemplateList' }">
-                <i class="fa-solid fa-book" aria-hidden="true"></i>
-                Biblioteca de Documentos
-              </router-link>
-              <router-link to="/analisador" class="dm-nav-item" :class="{ 'dm-nav-item--active': $route.name === 'DocumentAnalyzer' }">
-                <i class="fa-solid fa-magnifying-glass-chart" aria-hidden="true"></i>
-                Analisador de Documentos
-              </router-link>
-              <router-link to="/pesquisador-pncp" class="dm-nav-item" :class="{ 'dm-nav-item--active': $route.name === 'PncpResearcher' }">
-                <i class="fa-solid fa-database" aria-hidden="true"></i>
-                Pesquisador de Dados PNCP
-              </router-link>
-              <router-link to="/area-do-usuario" class="dm-nav-item" :class="{ 'dm-nav-item--active': $route.name === 'AreaDoUsuario' }">
-                <i class="fa-solid fa-user" aria-hidden="true"></i>
-                Área do Usuário
-              </router-link>
+              <template v-else-if="activeMainTabKey === 'biblioteca'">
+                <router-link to="/biblioteca" class="dm-nav-item dm-nav-item--active">
+                  <i class="fa-solid fa-book" aria-hidden="true"></i>
+                  Biblioteca de Documentos
+                </router-link>
+              </template>
+
+              <template v-else-if="activeMainTabKey === 'analisador'">
+                <router-link to="/analisador" class="dm-nav-item dm-nav-item--active">
+                  <i class="fa-solid fa-magnifying-glass-chart" aria-hidden="true"></i>
+                  Analisador de Documentos
+                </router-link>
+              </template>
+
+              <template v-else-if="activeMainTabKey === 'pncp'">
+                <router-link to="/pesquisador-pncp" class="dm-nav-item dm-nav-item--active">
+                  <i class="fa-solid fa-database" aria-hidden="true"></i>
+                  Pesquisador de Dados PNCP
+                </router-link>
+              </template>
+
+              <template v-else-if="activeMainTabKey === 'usuario'">
+                <router-link to="/area-do-usuario" class="dm-nav-item dm-nav-item--active">
+                  <i class="fa-solid fa-user" aria-hidden="true"></i>
+                  Área do Usuário
+                </router-link>
+              </template>
             </nav>
           </aside>
 
@@ -119,10 +136,12 @@ import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br';
+const DARK_MODE_KEY = 'docmaster.ui.darkmode';
 const router = useRouter();
 const route = useRoute();
 
 const user = ref(null);
+const darkMode = ref(false);
 const generationMenuOpen = ref(false);
 const groupOpenState = ref({
   DispensaArt75I: false,
@@ -220,22 +239,26 @@ const isGenerationSectionActive = computed(() => {
   return route.name === 'DocumentGenerator' || generationRouteNames.has(route.name);
 });
 
+const activeMainTabKey = computed(() => {
+  if (isGenerationSectionActive.value) return 'geracao';
+  if (route.name === 'TemplateList') return 'biblioteca';
+  if (route.name === 'DocumentAnalyzer') return 'analisador';
+  if (route.name === 'PncpResearcher' || String(route.path || '').startsWith('/pesquisador-pncp')) return 'pncp';
+  if (route.name === 'AreaDoUsuario') return 'usuario';
+  return 'geracao';
+});
+
 const activeSectionLabel = computed(() => {
-  if (isGenerationSectionActive.value) return 'Geração de Documentos';
-  if (route.name === 'TemplateList') return 'Biblioteca de Documentos';
-  if (route.name === 'DocumentAnalyzer') return 'Analisador de Documentos';
-  if (route.name === 'PncpResearcher' || String(route.path || '').startsWith('/pesquisador-pncp')) return 'Pesquisa de Preços';
-  if (route.name === 'AreaDoUsuario') return 'Área do Usuário';
+  if (activeMainTabKey.value === 'geracao') return 'Geração de Documentos';
+  if (activeMainTabKey.value === 'biblioteca') return 'Biblioteca de Documentos';
+  if (activeMainTabKey.value === 'analisador') return 'Analisador de Documentos';
+  if (activeMainTabKey.value === 'pncp') return 'Pesquisa de Preços';
+  if (activeMainTabKey.value === 'usuario') return 'Área do Usuário';
   return 'Módulo';
 });
 
 function isMainTabActive(key) {
-  if (key === 'geracao') return isGenerationSectionActive.value;
-  if (key === 'biblioteca') return route.name === 'TemplateList';
-  if (key === 'analisador') return route.name === 'DocumentAnalyzer';
-  if (key === 'pncp') return route.name === 'PncpResearcher' || String(route.path || '').startsWith('/pesquisador-pncp');
-  if (key === 'usuario') return route.name === 'AreaDoUsuario';
-  return false;
+  return activeMainTabKey.value === key;
 }
 
 function onMainTabClick(tab) {
@@ -320,7 +343,21 @@ async function logout() {
   router.push('/login');
 }
 
+function toggleDarkMode() {
+  darkMode.value = !darkMode.value;
+  try {
+    localStorage.setItem(DARK_MODE_KEY, darkMode.value ? '1' : '0');
+  } catch (_) {
+    // noop
+  }
+}
+
 onMounted(() => {
+  try {
+    darkMode.value = localStorage.getItem(DARK_MODE_KEY) === '1';
+  } catch (_) {
+    darkMode.value = false;
+  }
   fetchMe();
   if (isGenerationSectionActive.value) generationMenuOpen.value = true;
 });
@@ -332,23 +369,31 @@ onMounted(() => {
   overflow: hidden;
   background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 52%, #eef2f6 100%);
 }
+.dm-layout-bg.dm-dark {
+  background: linear-gradient(180deg, #020617 0%, #0f172a 52%, #111827 100%);
+}
 
 .dm-layout-wrap {
   height: 100%;
-  max-width: 1600px;
-  margin: 0 auto;
-  padding: 12px 16px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
 }
 
 .dm-shell {
   height: 100%;
+  width: 100%;
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid #dbe3ee;
+  border: 0;
   background: rgba(255, 255, 255, 0.75);
-  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.1);
+  box-shadow: none;
+}
+.dm-dark .dm-shell {
+  background: rgba(2, 6, 23, 0.78);
 }
 
 .dm-topbar {
@@ -356,6 +401,9 @@ onMounted(() => {
   background: #254e78;
   color: #fff;
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+.dm-dark .dm-topbar {
+  background: #020617;
 }
 
 .dm-topbar-main {
@@ -480,6 +528,19 @@ onMounted(() => {
   color: #254e78;
   border-color: rgba(255, 255, 255, 0.45);
 }
+.dm-dark .dm-top-tab {
+  border-color: rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.8);
+  color: #e2e8f0;
+}
+.dm-dark .dm-top-tab:hover {
+  background: rgba(30, 41, 59, 0.95);
+}
+.dm-dark .dm-top-tab--active {
+  background: #1e293b;
+  color: #f8fafc;
+  border-color: #475569;
+}
 
 .dm-body {
   min-height: 0;
@@ -493,11 +554,19 @@ onMounted(() => {
   border-right: 1px solid #c6d3e1;
   background: #dce5ee;
 }
+.dm-dark .dm-sidebar {
+  border-right-color: #1e293b;
+  background: #020617;
+}
 
 .dm-sidebar-head {
   padding: 16px 18px;
   border-bottom: 1px solid #bccbda;
   background: #d2dee9;
+}
+.dm-dark .dm-sidebar-head {
+  border-bottom-color: #1e293b;
+  background: #0f172a;
 }
 
 .dm-sidebar-head .dm-sidebar-kicker {
@@ -507,6 +576,9 @@ onMounted(() => {
   text-transform: uppercase;
   color: #2c5a89;
 }
+.dm-dark .dm-sidebar-head .dm-sidebar-kicker {
+  color: #94a3b8;
+}
 
 .dm-sidebar-head .dm-sidebar-title {
   margin-top: 6px;
@@ -514,11 +586,17 @@ onMounted(() => {
   font-weight: 700;
   color: #254e78;
 }
+.dm-dark .dm-sidebar-head .dm-sidebar-title {
+  color: #f8fafc;
+}
 
 .dm-sidebar-head p {
   margin: 6px 0 0;
   font-size: 12px;
   color: #475569;
+}
+.dm-dark .dm-sidebar-head p {
+  color: #cbd5e1;
 }
 
 .dm-sidebar-nav {
@@ -541,6 +619,12 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+.dm-dark .dm-nav-item,
+.dm-dark .dm-nav-item:visited {
+  color: #cbd5e1;
+  border-color: #334155;
+  background: #0f172a;
 }
 
 .dm-nav-item--expandable {
@@ -566,6 +650,11 @@ onMounted(() => {
   color: #254e78;
   background: #f1f5f9;
 }
+.dm-dark .dm-nav-item--active {
+  border-color: #64748b;
+  color: #f8fafc;
+  background: #1e293b;
+}
 
 .dm-subnav {
   margin-left: 8px;
@@ -574,6 +663,9 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+.dm-dark .dm-subnav {
+  border-left-color: #334155;
 }
 
 .dm-subnav-btn {
@@ -590,6 +682,11 @@ onMounted(() => {
   justify-content: space-between;
   cursor: pointer;
 }
+.dm-dark .dm-subnav-btn {
+  border-color: #334155;
+  background: #0f172a;
+  color: #cbd5e1;
+}
 
 .dm-subnav-btn span {
   display: inline-flex;
@@ -601,6 +698,10 @@ onMounted(() => {
   border-color: #254e78;
   color: #254e78;
 }
+.dm-dark .dm-subnav-btn--active {
+  border-color: #64748b;
+  color: #f8fafc;
+}
 
 .dm-subsubnav {
   margin-left: 10px;
@@ -609,6 +710,9 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+.dm-dark .dm-subsubnav {
+  border-left-color: #334155;
 }
 
 .dm-subsubnav-link,
@@ -624,6 +728,12 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
 }
+.dm-dark .dm-subsubnav-link,
+.dm-dark .dm-subsubnav-link:visited {
+  color: #cbd5e1;
+  border-color: #334155;
+  background: #0f172a;
+}
 
 .dm-subsubnav-link--active {
   border-color: #254e78;
@@ -636,6 +746,9 @@ onMounted(() => {
   overflow-y: auto;
   padding: 16px;
   background: rgba(248, 250, 252, 0.62);
+}
+.dm-dark .dm-content {
+  background: rgba(2, 6, 23, 0.48);
 }
 
 @media (max-width: 1279px) {

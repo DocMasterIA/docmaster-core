@@ -1153,6 +1153,57 @@ watch(
   color: #94a3b8 !important;
 }
 
+/* Força de contraste para fluxo PNCP/cotações em dark mode */
+:global(body.dm-dark-theme) .dm-content .cot-card,
+:global(body.dm-dark-theme) .dm-content .cot-title-editor,
+:global(body.dm-dark-theme) .dm-content .cot-formula,
+:global(body.dm-dark-theme) .dm-content .cot-global-variacao,
+:global(body.dm-dark-theme) .dm-content .cot-fornecedor-field,
+:global(body.dm-dark-theme) .dm-content .cot-new-item-block,
+:global(body.dm-dark-theme) .dm-content .cot-sheet-shell,
+:global(body.dm-dark-theme) .dm-content .item-card,
+:global(body.dm-dark-theme) .dm-content .item-price-card,
+:global(body.dm-dark-theme) .dm-content .item-cotacao-card,
+:global(body.dm-dark-theme) .dm-content .manual-summary-card,
+:global(body.dm-dark-theme) .dm-content .bia-summary-card,
+:global(body.dm-dark-theme) .dm-content .pncp-mock__summary-card {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+:global(body.dm-dark-theme) .dm-content .cot-sheet-search,
+:global(body.dm-dark-theme) .dm-content .cot-sheet-status-filter,
+:global(body.dm-dark-theme) .dm-content .cot-sheet-inline-input,
+:global(body.dm-dark-theme) .dm-content .cot-formula__select,
+:global(body.dm-dark-theme) .dm-content .cot-title-editor__field input,
+:global(body.dm-dark-theme) .dm-content .manual-field,
+:global(body.dm-dark-theme) .dm-content .bia-filter {
+  background: #111827 !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+:global(body.dm-dark-theme) .dm-content .cot-sheet-table thead th,
+:global(body.dm-dark-theme) .dm-content .cot-sheet-row-add,
+:global(body.dm-dark-theme) .dm-content .cot-sheet-group,
+:global(body.dm-dark-theme) .dm-content .cot-sheet-source {
+  background: #1e293b !important;
+  color: #cbd5e1 !important;
+}
+
+:global(body.dm-dark-theme) .dm-content .cot-sheet-table th,
+:global(body.dm-dark-theme) .dm-content .cot-sheet-table td {
+  border-color: #334155 !important;
+}
+
+:global(body.dm-dark-theme) .dm-content .cot-card strong,
+:global(body.dm-dark-theme) .dm-content .cot-fornecedor-field__value,
+:global(body.dm-dark-theme) .dm-content .cot-sheet-table td,
+:global(body.dm-dark-theme) .dm-content .item-cotacao-card__field strong {
+  color: #e2e8f0 !important;
+}
+
 @media (max-width: 1279px) {
   .dm-body {
     grid-template-columns: 1fr;

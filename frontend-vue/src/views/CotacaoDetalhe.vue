@@ -110,6 +110,7 @@
             >
               <option value="cima">Para cima</option>
               <option value="baixo">Para baixo</option>
+              <option value="ambos">Ambos</option>
             </select>
           </label>
           <button
@@ -673,7 +674,7 @@ const manualItem = ref({
   valor_base: '',
 });
 const variacaoGlobalPercentual = ref('20');
-const variacaoGlobalSentido = ref('cima');
+const variacaoGlobalSentido = ref('ambos');
 const isSavingVariacaoGlobal = ref(false);
 /** Rascunho local do campo moeda por item_id (valor base da faixa). */
 const faixaBaseDraft = ref({});
@@ -1258,7 +1259,7 @@ async function loadSessionFromBackend() {
         ? String(Math.round(variacaoGlobal))
         : '20';
       const sentidoRaw = String(filtrosSessao.variacao_sentido_global || '').trim().toLowerCase();
-      variacaoGlobalSentido.value = sentidoRaw === 'baixo' ? 'baixo' : 'cima';
+      variacaoGlobalSentido.value = ['cima', 'baixo', 'ambos'].includes(sentidoRaw) ? sentidoRaw : 'ambos';
     }
     if (data?.ok && Array.isArray(data.itens)) {
       let soma = 0;
@@ -1335,7 +1336,7 @@ async function loadSessionFromBackend() {
     formulaCalculoId.value = 'media_aritmetica_precos_obtidos';
     formulaCalculoLabel.value = 'Média aritmética dos preços obtidos';
     variacaoGlobalPercentual.value = '20';
-    variacaoGlobalSentido.value = 'cima';
+    variacaoGlobalSentido.value = 'ambos';
   } finally {
     isLoading.value = false;
   }

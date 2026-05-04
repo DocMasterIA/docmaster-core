@@ -1325,9 +1325,9 @@ def pncp_research_sessions_update(request, sessao_id: int):
         incoming_variacao_sentido = body.get("variacao_sentido_global")
         if incoming_variacao_sentido is not None:
             sentido = str(incoming_variacao_sentido).strip().lower()
-            if sentido not in {"cima", "baixo"}:
+            if sentido not in {"cima", "baixo", "ambos"}:
                 return JsonResponse(
-                    {"detail": "variacao_sentido_global inválido.", "allowed": ["cima", "baixo"]},
+                    {"detail": "variacao_sentido_global inválido.", "allowed": ["cima", "baixo", "ambos"]},
                     status=422,
                 )
             filtros = dict(c.filtros or {})
@@ -1338,9 +1338,9 @@ def pncp_research_sessions_update(request, sessao_id: int):
 
     formula_id = _resolve_formula_calculo_id(c.filtros or {})
     variacao_global = _safe_float((c.filtros or {}).get("variacao_percentual_global"))
-    variacao_sentido_global = str((c.filtros or {}).get("variacao_sentido_global") or "cima").strip().lower()
-    if variacao_sentido_global not in {"cima", "baixo"}:
-        variacao_sentido_global = "cima"
+    variacao_sentido_global = str((c.filtros or {}).get("variacao_sentido_global") or "ambos").strip().lower()
+    if variacao_sentido_global not in {"cima", "baixo", "ambos"}:
+        variacao_sentido_global = "ambos"
     return JsonResponse(
         {
             "ok": True,

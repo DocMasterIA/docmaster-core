@@ -334,7 +334,7 @@ const isSavingSelecionados = ref(false);
 const itemContext = ref(null);
 const allItemContexts = ref([]);
 const variacaoPercentualGlobal = ref(null);
-const variacaoSentidoGlobal = ref('cima');
+const variacaoSentidoGlobal = ref('ambos');
 const isAutoSearchingAll = ref(false);
 const autoSearchProgress = ref({ done: 0, total: 0 });
 const totalSelecionados = computed(() => displayedRows.value.filter((x) => x.selecionado).length);
@@ -481,9 +481,8 @@ function buildContextFromItem(it) {
   if ((variacaoRef === null || !Number.isFinite(variacaoRef)) && valorBaseRef != null && Number.isFinite(valorBaseRef)) {
     variacaoRef = 20;
   }
-  const sentidoRef = String(variacaoSentidoGlobal.value || 'cima').trim().toLowerCase() === 'baixo'
-    ? 'baixo'
-    : 'cima';
+  const sentidoRaw = String(variacaoSentidoGlobal.value || 'ambos').trim().toLowerCase();
+  const sentidoRef = ['cima', 'baixo', 'ambos'].includes(sentidoRaw) ? sentidoRaw : 'ambos';
   const fator = Number.isFinite(Number(variacaoRef)) ? Math.max(0, Number(variacaoRef)) / 100 : null;
   let valorMinRef = null;
   let valorMaxRef = null;
@@ -492,8 +491,11 @@ function buildContextFromItem(it) {
     if (sentidoRef === 'baixo') {
       valorMinRef = Math.max(0, vb * (1 - fator));
       valorMaxRef = vb;
-    } else {
+    } else if (sentidoRef === 'cima') {
       valorMinRef = vb;
+      valorMaxRef = vb * (1 + fator);
+    } else {
+      valorMinRef = Math.max(0, vb * (1 - fator));
       valorMaxRef = vb * (1 + fator);
     }
   }
@@ -762,7 +764,7 @@ onMounted(async () => {
       ? variacaoGlobal
       : null;
     const sentidoRaw = String(filtrosSessao.variacao_sentido_global || '').trim().toLowerCase();
-    variacaoSentidoGlobal.value = sentidoRaw === 'baixo' ? 'baixo' : 'cima';
+    variacaoSentidoGlobal.value = ['cima', 'baixo', 'ambos'].includes(sentidoRaw) ? sentidoRaw : 'ambos';
     const itens = Array.isArray(data?.itens) ? data.itens : [];
     allItemContexts.value = itens.map((it) => buildContextFromItem(it)).filter((x) => x.descricao_item);
     if (itemId.value) {

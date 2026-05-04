@@ -142,6 +142,7 @@
             <select v-model="filtros.variacaoSentido" :disabled="variacaoGlobalDaSessao != null">
               <option value="cima">Para cima</option>
               <option value="baixo">Para baixo</option>
+              <option value="ambos">Ambos</option>
             </select>
           </label>
         </div>
@@ -257,7 +258,7 @@ const filtros = reactive({
   ordem: 'Decrescente',
   valorBase: '15,00',
   variacao: '20',
-  variacaoSentido: 'cima',
+  variacaoSentido: 'ambos',
 });
 
 const UF_FLAGS = {
@@ -380,10 +381,10 @@ const faixaValorAtiva = computed(() => {
   const p = Number.parseFloat(String(filtros.variacao || '0'));
   const perc = Number.isFinite(p) ? Math.max(0, p) : 0;
   const fator = perc / 100;
-  const sentido = filtros.variacaoSentido === 'baixo' ? 'baixo' : 'cima';
-  const min = sentido === 'baixo' ? Math.max(0, base * (1 - fator)) : base;
-  const max = sentido === 'baixo' ? base : base * (1 + fator);
-  const labelSentido = sentido === 'baixo' ? 'para baixo' : 'para cima';
+  const sentido = ['baixo', 'cima', 'ambos'].includes(filtros.variacaoSentido) ? filtros.variacaoSentido : 'ambos';
+  const min = sentido === 'baixo' ? Math.max(0, base * (1 - fator)) : (sentido === 'cima' ? base : Math.max(0, base * (1 - fator)));
+  const max = sentido === 'baixo' ? base : (sentido === 'cima' ? base * (1 + fator) : base * (1 + fator));
+  const labelSentido = sentido === 'baixo' ? 'para baixo' : (sentido === 'cima' ? 'para cima' : 'para baixo/cima');
   return `${formatCurrency(min)} até ${formatCurrency(max)} (${perc}% ${labelSentido})`;
 });
 const selectedUfLabel = computed(() => {
@@ -405,9 +406,13 @@ const resultadosFiltradosOrdenados = computed(() => {
   let filtrados = base;
   if (valorBase != null && valorBase > 0) {
     const fator = variacaoValida / 100;
-    const sentido = filtros.variacaoSentido === 'baixo' ? 'baixo' : 'cima';
-    const min = sentido === 'baixo' ? Math.max(0, valorBase * (1 - fator)) : valorBase;
-    const max = sentido === 'baixo' ? valorBase : valorBase * (1 + fator);
+    const sentido = ['baixo', 'cima', 'ambos'].includes(filtros.variacaoSentido) ? filtros.variacaoSentido : 'ambos';
+    const min = sentido === 'baixo'
+      ? Math.max(0, valorBase * (1 - fator))
+      : (sentido === 'cima' ? valorBase : Math.max(0, valorBase * (1 - fator)));
+    const max = sentido === 'baixo'
+      ? valorBase
+      : (sentido === 'cima' ? valorBase * (1 + fator) : valorBase * (1 + fator));
     filtrados = base.filter((item) => {
       // Usa valor numérico bruto do item para evitar ruído de formatação.
       const vBruto = item.valorUnitario ?? item.valorTotal ?? parseMoeda(item.valor);
@@ -892,7 +897,7 @@ onMounted(async () => {
         filtros.variacao = String(Math.round(variacaoGlobalDaSessao.value));
       }
       const sentidoRaw = String(filtrosSessao.variacao_sentido_global || '').trim().toLowerCase();
-      filtros.variacaoSentido = sentidoRaw === 'baixo' ? 'baixo' : 'cima';
+      filtros.variacaoSentido = ['cima', 'baixo', 'ambos'].includes(sentidoRaw) ? sentidoRaw : 'ambos';
       const itens = Array.isArray(data?.itens) ? data.itens : [];
       const target = itemId.value
         ? itens.find((x) => Number(x?.id) === Number(itemId.value))

@@ -84,22 +84,23 @@
 
       <section class="cot-global-variacao">
         <div class="cot-global-variacao__text">
-          <div class="cot-global-variacao__title">Variação global da cotação</div>
-          <div class="cot-global-variacao__subtitle">Aplicada para todos os itens da sessão</div>
+          <span class="cot-global-variacao__title">Variação global da cotação</span>
+          <span class="cot-global-variacao__sep" aria-hidden="true">·</span>
+          <span class="cot-global-variacao__subtitle">Aplicada para todos os itens da sessão</span>
         </div>
         <div class="cot-global-variacao__actions">
           <input
             :value="variacaoGlobalPercentual"
             type="text"
             inputmode="numeric"
-            class="cot-sheet-inline-input"
+            class="cot-sheet-inline-input cot-sheet-inline-input--variacao-global"
             placeholder="0%"
             :disabled="isSessaoFechada || isSavingVariacaoGlobal"
             @input="onVariacaoGlobalInput"
           />
           <button
             type="button"
-            class="cot-btn cot-btn--primary"
+            class="cot-btn cot-btn--primary cot-global-variacao__submit"
             :disabled="isSessaoFechada || isSavingVariacaoGlobal"
             @click="salvarVariacaoGlobal"
           >
@@ -1530,34 +1531,79 @@ async function saveTituloNoBackend() {
   border: 1px solid #d6dde8;
   border-radius: 10px;
   background: #fff;
-  padding: 10px;
+  padding: 10px 12px;
   display: flex;
+  flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 12px;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .cot-global-variacao__text {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-direction: row;
+  align-items: baseline;
+  flex-wrap: nowrap;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+  line-height: 1.25;
 }
 
 .cot-global-variacao__title {
   font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cot-global-variacao__sep {
+  font-size: 13px;
+  color: #94a3b8;
+  flex-shrink: 0;
+  user-select: none;
 }
 
 .cot-global-variacao__subtitle {
   font-size: 12px;
   color: var(--color-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .cot-global-variacao__actions {
   display: inline-flex;
+  flex-direction: row;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+}
+
+.cot-sheet-inline-input--variacao-global {
+  width: 4.5rem;
+  min-width: 4.5rem;
+  flex-shrink: 0;
+}
+
+.cot-global-variacao__submit {
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .cot-global-variacao {
+    flex-wrap: wrap;
+  }
+  .cot-global-variacao__text {
+    flex-basis: 100%;
+  }
+  .cot-global-variacao__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 
 .cot-actions { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -2108,6 +2154,7 @@ a.pncp-modal__link-btn {
 :deep(.dm-dark) .cot-title-editor__field span,
 :deep(.dm-dark) .cot-formula__subtitle,
 :deep(.dm-dark) .cot-global-variacao__subtitle,
+:deep(.dm-dark) .cot-global-variacao__sep,
 :deep(.dm-dark) .cot-fornecedor-field__label,
 :deep(.dm-dark) .cot-new-item-block__text p,
 :deep(.dm-dark) .cot-sheet-table thead th,

@@ -36,7 +36,9 @@
               :class="{ 'dm-top-tab--active': isMainTabActive(tab.key) }"
               @click="onMainTabClick(tab)"
             >
-              <i class="fa-solid" :class="tab.icon" aria-hidden="true"></i>
+              <span class="dm-top-tab__icon">
+                <i class="fa-solid" :class="tab.icon" aria-hidden="true"></i>
+              </span>
               <span>{{ tab.label }}</span>
             </button>
           </div>
@@ -109,13 +111,7 @@
                 </router-link>
               </template>
 
-              <template v-else>
-                <div class="dm-nav-item dm-nav-item--active">
-                  <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
-                  {{ activeSectionLabel }}
-                </div>
-                <div class="dm-subsubnav__empty">Módulo em preparação.</div>
-              </template>
+              <template v-else></template>
             </nav>
           </aside>
 
@@ -441,6 +437,12 @@ watch(
   object-fit: contain;
 }
 
+.dm-brand-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .dm-brand-text h1 {
   margin: 0;
   font-size: 18px;
@@ -450,7 +452,6 @@ watch(
 
 .dm-brand-text span {
   display: inline-flex;
-  margin-top: 4px;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -470,9 +471,10 @@ watch(
 .dm-chip-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
   font-size: 12px;
@@ -481,7 +483,7 @@ watch(
   cursor: pointer;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.1);
   backdrop-filter: blur(6px);
-  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
 .dm-chip-btn:hover {
@@ -498,40 +500,77 @@ watch(
 }
 
 .dm-top-tab {
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.95);
   border-radius: 12px;
-  padding: 7px 12px;
+  padding: 6px 12px 6px 10px;
   font-size: 13px;
   font-weight: 600;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .dm-top-tab:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.28);
   background: rgba(255, 255, 255, 0.15);
+  color: #fff;
 }
 
 .dm-top-tab--active {
   background: #fff;
   color: #254e78;
   border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.14);
+}
+
+.dm-top-tab__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  transition: all 0.2s ease;
+}
+
+.dm-top-tab:hover .dm-top-tab__icon {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.dm-top-tab--active .dm-top-tab__icon {
+  background: #e8eef5;
+  color: #254e78;
 }
 .dm-dark .dm-top-tab {
-  border-color: rgba(148, 163, 184, 0.25);
-  background: rgba(15, 23, 42, 0.8);
+  border-color: rgba(51, 65, 85, 0.8);
+  background: rgba(15, 23, 42, 0.7);
   color: #e2e8f0;
 }
 .dm-dark .dm-top-tab:hover {
-  background: rgba(30, 41, 59, 0.95);
+  border-color: #64748b;
+  background: #1e293b;
 }
 .dm-dark .dm-top-tab--active {
+  border-color: #64748b;
   background: #1e293b;
   color: #f8fafc;
-  border-color: #475569;
+  box-shadow: 0 10px 22px rgba(2, 6, 23, 0.26);
+}
+.dm-dark .dm-top-tab__icon {
+  background: #0f172a;
+  color: #cbd5e1;
+}
+.dm-dark .dm-top-tab:hover .dm-top-tab__icon,
+.dm-dark .dm-top-tab--active .dm-top-tab__icon {
+  background: #334155;
+  color: #f8fafc;
 }
 
 .dm-body {

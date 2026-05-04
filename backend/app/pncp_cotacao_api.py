@@ -14,7 +14,7 @@ import re
 import csv
 import io
 import unicodedata
-from collections import Counter, defaultdict
+from collections import defaultdict
 from datetime import timezone as dt_timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -925,13 +925,10 @@ def _itens_refletidos_for_session(sessao_id: int, formula_id: str) -> Dict[int, 
             b["valores"].append(val)
 
     for item_id, b in bucket.items():
-        quantidades = [float(v) for v in b["quantidades"] if isinstance(v, (int, float)) and v > 0]
         qtd_item = quantidade_item_map.get(item_id)
+        # Quantidade é fixa no item (definida na inclusão/importação); não deriva das cotações.
         if qtd_item is not None and qtd_item > 0:
             qtd_refletida = qtd_item
-        elif quantidades:
-            # Evita inflar quantidade ao repetir a mesma qtd em múltiplas cotações.
-            qtd_refletida = Counter(quantidades).most_common(1)[0][0]
         else:
             qtd_refletida = None
         valores = [float(v) for v in b["valores"] if isinstance(v, (int, float))]

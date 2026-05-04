@@ -89,15 +89,18 @@
           <span class="cot-global-variacao__subtitle">Aplicada para todos os itens da sessão</span>
         </div>
         <div class="cot-global-variacao__actions">
-          <input
-            :value="variacaoGlobalPercentual"
-            type="text"
-            inputmode="numeric"
-            class="cot-sheet-inline-input cot-sheet-inline-input--variacao-global"
-            placeholder="0%"
-            :disabled="isSessaoFechada || isSavingVariacaoGlobal"
-            @input="onVariacaoGlobalInput"
-          />
+          <div class="cot-global-variacao__percent-wrap">
+            <input
+              :value="variacaoGlobalPercentual"
+              type="text"
+              inputmode="numeric"
+              class="cot-sheet-inline-input cot-sheet-inline-input--variacao-global"
+              placeholder="0"
+              :disabled="isSessaoFechada || isSavingVariacaoGlobal"
+              @input="onVariacaoGlobalInput"
+            />
+            <span class="cot-global-variacao__suffix" aria-hidden="true">%</span>
+          </div>
           <button
             type="button"
             class="cot-btn cot-btn--primary cot-global-variacao__submit"
@@ -1278,7 +1281,12 @@ async function loadSessionFromBackend() {
             notasFiscais: Number(fontesContagem.notasFiscais || 0),
             similaridadeEncontrada: Number(fontesContagem.similaridadeEncontrada || 0),
           },
-          qtd: Number.isFinite(Number(it.quantidade_refletida)) ? Number(it.quantidade_refletida) : (it.quantidade ?? '-'),
+          qtd: (() => {
+            const raw = it?.quantidade;
+            if (raw === null || raw === undefined || raw === '') return '—';
+            const n = Number(raw);
+            return Number.isFinite(n) ? n : '—';
+          })(),
           und: String(it.unidade_medida_refletida || '').trim() || it.unidade_medida || '-',
           precoTotal: formatCurrency(
             it.valor_total_refletido ?? it.valor_total ?? it.valor_unitario ?? 0,
@@ -1666,11 +1674,27 @@ async function saveTituloNoBackend() {
   justify-self: end;
 }
 
+.cot-global-variacao__percent-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 .cot-sheet-inline-input--variacao-global {
-  width: 4.5rem;
-  min-width: 4.5rem;
+  width: 3.25rem;
+  min-width: 2.5rem;
   max-width: 100%;
   box-sizing: border-box;
+  text-align: right;
+}
+
+.cot-global-variacao__suffix {
+  font-size: 14px;
+  font-weight: 700;
+  color: #334155;
+  line-height: 1;
+  user-select: none;
 }
 
 .cot-global-variacao__submit {
@@ -2298,6 +2322,10 @@ a.pncp-modal__link-btn {
 :deep(.dm-dark) .cot-formula__subtitle,
 :deep(.dm-dark) .cot-global-variacao__subtitle,
 :deep(.dm-dark) .cot-global-variacao__sep,
+:deep(.dm-dark) .cot-global-variacao__suffix {
+  color: #f8fafc !important;
+}
+
 :deep(.dm-dark) .cot-fornecedor-field__label,
 :deep(.dm-dark) .cot-new-item-block__text p,
 :deep(.dm-dark) .cot-sheet-table thead th,

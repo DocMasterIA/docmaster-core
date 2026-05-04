@@ -111,6 +111,16 @@
                 </router-link>
               </template>
 
+              <template v-else-if="PLACEHOLDER_TAB_KEYS.includes(activeMainTabKey)">
+                <div class="dm-nav-item dm-nav-item--static dm-nav-item--active" aria-current="page">
+                  <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                  {{ activeSectionLabel }}
+                </div>
+                <p class="dm-sidebar-placeholder-note">
+                  Módulo reservado; em breve haverá fluxos e formulários aqui. A URL já pode ser usada em links e favoritos.
+                </p>
+              </template>
+
               <template v-else></template>
             </nav>
           </aside>
@@ -220,19 +230,29 @@ const generationRouteNames = new Set(
   generationPages.flatMap((page) => [page.name, ...(page.children || []).map((child) => child.name)]),
 );
 
+const PLACEHOLDER_TAB_KEYS = [
+  'dispensa_eletronica',
+  'pregao',
+  'pregao_eletronico',
+  'contratos',
+  'controle_interno',
+  'impugnacao',
+  'recurso',
+];
+
 const mainTabs = [
   { key: 'dispensa', label: 'Dispensa', icon: 'fa-file-lines', to: '/geracao/dispensa-art-75-i/obras-servicos-engenharia' },
-  { key: 'dispensa_eletronica', label: 'Dispensa Eletrônica', icon: 'fa-file-lines' },
-  { key: 'pregao', label: 'Pregão', icon: 'fa-file-lines' },
-  { key: 'pregao_eletronico', label: 'Pregão Eletrônico', icon: 'fa-file-lines' },
+  { key: 'dispensa_eletronica', label: 'Dispensa Eletrônica', icon: 'fa-file-lines', to: '/dispensa-eletronica' },
+  { key: 'pregao', label: 'Pregão', icon: 'fa-file-lines', to: '/pregao' },
+  { key: 'pregao_eletronico', label: 'Pregão Eletrônico', icon: 'fa-file-lines', to: '/pregao-eletronico' },
   { key: 'inexigibilidade', label: 'Inexigibilidade', icon: 'fa-file-lines', to: '/geracao/inexigibilidade-art-74-i/show-artistico' },
   { key: 'etp', label: 'ETP', icon: 'fa-file-lines', to: '/geracao/etp-livre' },
   { key: 'analisador', label: 'Analisador de Documentos', icon: 'fa-magnifying-glass-chart', to: '/analisador' },
   { key: 'pesquisa', label: 'Pesquisa de Preços Inteligente', icon: 'fa-database', to: '/pesquisador-pncp' },
-  { key: 'contratos', label: 'Contratos', icon: 'fa-file-lines' },
-  { key: 'controle_interno', label: 'Controle Interno', icon: 'fa-file-lines' },
-  { key: 'impugnacao', label: 'Impugnação', icon: 'fa-file-lines' },
-  { key: 'recurso', label: 'Recurso Processo Licitatório', icon: 'fa-file-lines' },
+  { key: 'contratos', label: 'Contratos', icon: 'fa-file-lines', to: '/contratos' },
+  { key: 'controle_interno', label: 'Controle Interno', icon: 'fa-file-lines', to: '/controle-interno' },
+  { key: 'impugnacao', label: 'Impugnação', icon: 'fa-file-lines', to: '/impugnacao' },
+  { key: 'recurso', label: 'Recurso Processo Licitatório', icon: 'fa-file-lines', to: '/recurso-processo-licitatorio' },
   { key: 'usuario', label: 'Área do Usuário', icon: 'fa-user', to: '/area-do-usuario' },
 ];
 
@@ -243,6 +263,13 @@ const isGenerationSectionActive = computed(() => {
 function inferMainTabFromRoute() {
   const rname = String(route.name || '');
   const rpath = String(route.path || '');
+  if (rname === 'ModuleDispensaEletronica' || rpath.startsWith('/dispensa-eletronica')) return 'dispensa_eletronica';
+  if (rname === 'ModulePregao' || rpath === '/pregao') return 'pregao';
+  if (rname === 'ModulePregaoEletronico' || rpath.startsWith('/pregao-eletronico')) return 'pregao_eletronico';
+  if (rname === 'ModuleContratos' || rpath.startsWith('/contratos')) return 'contratos';
+  if (rname === 'ModuleControleInterno' || rpath.startsWith('/controle-interno')) return 'controle_interno';
+  if (rname === 'ModuleImpugnacao' || rpath.startsWith('/impugnacao')) return 'impugnacao';
+  if (rname === 'ModuleRecursoLicitatorio' || rpath.startsWith('/recurso-processo-licitatorio')) return 'recurso';
   if (rname.startsWith('DispensaArt75')) return 'dispensa';
   if (rname.startsWith('InexigibilidadeArt74')) return 'inexigibilidade';
   if (rname === 'EtpLivre' || rpath.startsWith('/geracao/etp-livre')) return 'etp';
@@ -699,6 +726,23 @@ watch(
   border-color: #64748b;
   color: #f8fafc;
   background: #1e293b;
+}
+
+.dm-nav-item--static {
+  cursor: default;
+  pointer-events: none;
+}
+
+.dm-sidebar-placeholder-note {
+  margin: 8px 0 0;
+  padding: 0 4px 0 2px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.dm-dark .dm-sidebar-placeholder-note {
+  color: #94a3b8;
 }
 
 .dm-subnav {

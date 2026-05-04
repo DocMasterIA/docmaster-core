@@ -167,6 +167,49 @@ const routes = [
     component: () => import('../views/AreaDoUsuario.vue'),
     meta: { title: 'Área do Usuário' },
   },
+  /* Módulos sem implementação ainda: rota ativa + página reservada */
+  {
+    path: '/dispensa-eletronica',
+    name: 'ModuleDispensaEletronica',
+    component: () => import('../views/ModulePlaceholder.vue'),
+    meta: { title: 'Dispensa Eletrônica', subtitle: 'Fluxo em desenvolvimento.' },
+  },
+  {
+    path: '/pregao',
+    name: 'ModulePregao',
+    component: () => import('../views/ModulePlaceholder.vue'),
+    meta: { title: 'Pregão', subtitle: 'Fluxo em desenvolvimento.' },
+  },
+  {
+    path: '/pregao-eletronico',
+    name: 'ModulePregaoEletronico',
+    component: () => import('../views/ModulePlaceholder.vue'),
+    meta: { title: 'Pregão Eletrônico', subtitle: 'Fluxo em desenvolvimento.' },
+  },
+  {
+    path: '/contratos',
+    name: 'ModuleContratos',
+    component: () => import('../views/ModulePlaceholder.vue'),
+    meta: { title: 'Contratos', subtitle: 'Fluxo em desenvolvimento.' },
+  },
+  {
+    path: '/controle-interno',
+    name: 'ModuleControleInterno',
+    component: () => import('../views/ModulePlaceholder.vue'),
+    meta: { title: 'Controle Interno', subtitle: 'Fluxo em desenvolvimento.' },
+  },
+  {
+    path: '/impugnacao',
+    name: 'ModuleImpugnacao',
+    component: () => import('../views/ModulePlaceholder.vue'),
+    meta: { title: 'Impugnação', subtitle: 'Fluxo em desenvolvimento.' },
+  },
+  {
+    path: '/recurso-processo-licitatorio',
+    name: 'ModuleRecursoLicitatorio',
+    component: () => import('../views/ModulePlaceholder.vue'),
+    meta: { title: 'Recurso — Processo Licitatório', subtitle: 'Fluxo em desenvolvimento.' },
+  },
 ];
 
 const router = createRouter({

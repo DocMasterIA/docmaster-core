@@ -287,10 +287,10 @@ const faixaVariacaoFmt = computed(() => {
 });
 
 const quantidadeRefletida = computed(() => {
-  if (Number.isFinite(Number(item.value?.quantidade))) return Number(item.value.quantidade);
-  const first = itemCotacoes.value.find((x) => Number.isFinite(Number(x?.quantidade)));
-  if (first) return Number(first.quantidade);
-  return null;
+  const raw = item.value?.quantidade;
+  if (raw === null || raw === undefined || raw === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
 });
 
 const unidadeRefletida = computed(() => {

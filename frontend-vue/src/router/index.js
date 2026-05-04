@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import { firstAllowedPath, normalizeAllowedModules, resolveModuleKey } from '../moduleAccess';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br';
 
@@ -219,33 +220,37 @@ const router = createRouter({
 
 /** Verifica autenticação: rotas sem meta.public exigem login. */
 router.beforeEach(async (to) => {
+  const me = await fetchMePayload();
   if (to.meta?.public) {
-    const isLoggedIn = await checkAuth();
-    if (isLoggedIn && to.name === 'Login') {
+    if (me && to.name === 'Login') {
       return to.query?.redirect ? { path: to.query.redirect } : { path: '/' };
     }
     return;
   }
-  const isLoggedIn = await checkAuth();
-  if (!isLoggedIn) {
+  if (!me) {
     return { path: '/login', query: { redirect: to.fullPath } };
+  }
+  const allowed = new Set(normalizeAllowedModules(me.allowed_modules, !!me.is_superuser));
+  const moduleKey = resolveModuleKey(to);
+  if (moduleKey && !allowed.has(moduleKey)) {
+    return { path: firstAllowedPath(allowed) };
   }
 });
 
-function checkAuth() {
+function fetchMePayload() {
   return fetch(`${API_BASE}/api/me/`, { method: 'GET', credentials: 'include' })
     .then(async (res) => {
-      if (res.status !== 200) return false;
+      if (res.status !== 200) return null;
       const ctype = (res.headers.get('content-type') || '').toLowerCase();
-      if (!ctype.includes('application/json')) return false;
+      if (!ctype.includes('application/json')) return null;
       try {
         const data = await res.json();
-        return !!data && typeof data === 'object';
+        return data && typeof data === 'object' ? data : null;
       } catch (_) {
-        return false;
+        return null;
       }
     })
-    .catch(() => false);
+    .catch(() => null);
 }
 
 router.afterEach((to) => {

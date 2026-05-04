@@ -60,6 +60,27 @@ from django.core.files.storage import default_storage
 from django.db import transaction
 from django.core.files.uploadedfile import UploadedFile
 
+MODULE_ACCESS_CHOICES = (
+    "dispensa",
+    "dispensa_eletronica",
+    "pregao",
+    "pregao_eletronico",
+    "inexigibilidade",
+    "etp",
+    "analisador",
+    "pesquisa",
+    "contratos",
+    "controle_interno",
+    "impugnacao",
+    "recurso",
+    "usuario",
+)
+
+
+def default_allowed_modules() -> list[str]:
+    return list(MODULE_ACCESS_CHOICES)
+
+
 class User(AbstractBaseUser, PermissionsMixin):
 
     class RolePrefeitura(models.TextChoices):
@@ -97,6 +118,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     date_joined = models.DateTimeField(_("Data de Cadastro"), default=timezone.now)
 
     profile_photo = models.ImageField(_("Foto de Perfil"), upload_to="profile_photos/", null=True, blank=True, default='defaults/default_photo.png')
+    allowed_modules = models.JSONField(_("Módulos permitidos"), default=default_allowed_modules, blank=True)
     objects = UserManager()
 
     USERNAME_FIELD = "email"
@@ -108,6 +130,17 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
+
+    def get_allowed_modules(self) -> list[str]:
+        raw = self.allowed_modules
+        if self.is_superuser:
+            return list(MODULE_ACCESS_CHOICES)
+        if not isinstance(raw, list):
+            return list(MODULE_ACCESS_CHOICES)
+        allowed = [str(x).strip() for x in raw if str(x).strip() in MODULE_ACCESS_CHOICES]
+        if not allowed:
+            return list(MODULE_ACCESS_CHOICES)
+        return list(dict.fromkeys(allowed))
     
     @transaction.atomic
     def save(self, *args, **kwargs):

@@ -17,11 +17,20 @@ from django.contrib.auth import get_user_model
 import logging
 from django import forms
 from dal import autocomplete
+from backend.app.models.usuario import MODULE_ACCESS_CHOICES
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
 class UserAdminForm(forms.ModelForm):
+    allowed_modules = forms.MultipleChoiceField(
+        label="Módulos permitidos",
+        required=False,
+        choices=[(k, k.replace("_", " ").title()) for k in MODULE_ACCESS_CHOICES],
+        widget=forms.CheckboxSelectMultiple,
+        help_text="Selecione os módulos liberados para este usuário.",
+    )
+
     class Meta:
         model = User
         fields = "__all__"
@@ -35,12 +44,19 @@ class UserAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if hasattr(self.instance, "get_allowed_modules"):
+            self.fields["allowed_modules"].initial = self.instance.get_allowed_modules()
         # se já existe uma prefeitura selecionada no form (edit)
         if self.instance and self.instance.prefeitura:
             self.fields["secretaria"].queryset = Secretaria.objects.filter(prefeitura=self.instance.prefeitura)
         else:
             # se não, nenhum disponível
             self.fields["secretaria"].queryset = Secretaria.objects.none()
+
+    def clean_allowed_modules(self):
+        vals = self.cleaned_data.get("allowed_modules") or []
+        normalized = [v for v in vals if v in MODULE_ACCESS_CHOICES]
+        return normalized or list(MODULE_ACCESS_CHOICES)
 
 # Admin de usuários customizados, com autocomplete de secretaria e inline de leitura.
 @admin.register(User)
@@ -53,7 +69,7 @@ class UserAdmin(BaseUserAdmin):
 
     fieldsets = (
         (None, {"fields": ("email", "password")}),
-        (_("Informações pessoais"), {"fields": ("first_name", "last_name", "prefeitura", "secretaria", "role")}),
+        (_("Informações pessoais"), {"fields": ("first_name", "last_name", "prefeitura", "secretaria", "role", "allowed_modules")}),
         (_("Perfil"), {"fields": ("profile_photo",)}),  # tupla de um elemento
         (_("Permissões"), {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
         (_("Datas importantes"), {"fields": ("last_login", "date_joined")}),
@@ -61,7 +77,7 @@ class UserAdmin(BaseUserAdmin):
     add_fieldsets = (
         (None, {
             "classes": ("wide",),
-            "fields": ("first_name", "last_name", "email", "profile_photo","password1", "password2", "role", "prefeitura", "secretaria", "is_staff", "is_active"),
+            "fields": ("first_name", "last_name", "email", "profile_photo","password1", "password2", "role", "prefeitura", "secretaria", "allowed_modules", "is_staff", "is_active"),
         }),
     )
 from django.contrib import admin, messages

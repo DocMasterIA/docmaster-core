@@ -1015,6 +1015,7 @@ def api_me(request):
             ),
             "is_staff": user.is_staff,
             "is_superuser": user.is_superuser,
+            "allowed_modules": user.get_allowed_modules() if hasattr(user, "get_allowed_modules") else [],
         }
         if user.profile_photo and user.profile_photo.name:
             data["profile_photo"] = user.profile_photo.url

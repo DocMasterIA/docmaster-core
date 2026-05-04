@@ -29,7 +29,7 @@
           </div>
           <div class="dm-top-tabs">
             <button
-              v-for="tab in mainTabs"
+              v-for="tab in visibleMainTabs"
               :key="tab.key"
               type="button"
               class="dm-top-tab"
@@ -137,6 +137,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { firstAllowedPath, normalizeAllowedModules, resolveModuleKey } from './moduleAccess';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br';
 const DARK_MODE_KEY = 'docmaster.ui.darkmode';
@@ -256,6 +257,10 @@ const mainTabs = [
   { key: 'usuario', label: 'Área do Usuário', icon: 'fa-user', to: '/area-do-usuario' },
 ];
 
+const allowedModules = computed(() => normalizeAllowedModules(user.value?.allowed_modules, !!user.value?.is_superuser));
+const allowedModuleSet = computed(() => new Set(allowedModules.value));
+const visibleMainTabs = computed(() => mainTabs.filter((tab) => allowedModuleSet.value.has(tab.key)));
+
 const isGenerationSectionActive = computed(() => {
   return route.name === 'DocumentGenerator' || generationRouteNames.has(route.name);
 });
@@ -317,6 +322,7 @@ function isMainTabActive(key) {
 }
 
 function onMainTabClick(tab) {
+  if (!allowedModuleSet.value.has(tab.key)) return;
   selectedMainTabKey.value = tab.key;
   if (['dispensa', 'inexigibilidade', 'etp'].includes(tab.key)) {
     generationMenuOpen.value = true;
@@ -383,7 +389,16 @@ onMounted(() => {
     darkMode.value = false;
   }
   syncDarkModeRootClass(darkMode.value);
-  fetchMe();
+  fetchMe().then(() => {
+    const currentModule = resolveModuleKey(route);
+    if (currentModule && !allowedModuleSet.value.has(currentModule)) {
+      router.replace(firstAllowedPath(allowedModuleSet.value));
+      return;
+    }
+    if (visibleMainTabs.value.length && !allowedModuleSet.value.has(activeMainTabKey.value)) {
+      selectedMainTabKey.value = visibleMainTabs.value[0].key;
+    }
+  });
   if (['dispensa', 'inexigibilidade', 'etp'].includes(activeMainTabKey.value)) generationMenuOpen.value = true;
 });
 
@@ -397,6 +412,11 @@ watch(
 watch(
   () => route.fullPath,
   () => {
+    const currentModule = resolveModuleKey(route);
+    if (currentModule && !allowedModuleSet.value.has(currentModule)) {
+      router.replace(firstAllowedPath(allowedModuleSet.value));
+      return;
+    }
     selectedMainTabKey.value = inferMainTabFromRoute();
   }
 );

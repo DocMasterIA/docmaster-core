@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { firstAllowedPath, normalizeAllowedModules, resolveModuleKey } from '../moduleAccess';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br';
+const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 
 const routes = [
   {

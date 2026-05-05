@@ -181,7 +181,7 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
     if not c:
         return JsonResponse({"ok": False, "error": "Cotação não encontrada."}, status=404)
 
-    itens_qs = c.itens.all()
+    itens_qs = c.itens.prefetch_related("cotacoes")
     if not itens_qs.exists():
         return JsonResponse(
             {"detail": "Esta cotação ainda não possui itens. Adicione ao menos 1 item para gerar o PDF."},
@@ -225,11 +225,16 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
                     pass
 
     try:
-        # Auto-enriquecimento para cotações legadas que ficaram sem fornecedor/CNPJ.
-        try:
-            enrich_missing_supplier_fields_for_cotacao(c.id, max_lookups=10)
-        except Exception:
-            pass
+        # Best-effort: enriquecer sem bloquear PDF em cotações grandes (cache por CNPJ + teto de chamadas).
+        if not settings.PNCP_RELATORIO_PDF_SKIP_ENRICH:
+            try:
+                enrich_missing_supplier_fields_for_cotacao(
+                    c.id,
+                    max_lookups=settings.PNCP_RELATORIO_PDF_MAX_PNCP_LOOKUPS,
+                    max_brasilapi_lookups=settings.PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS,
+                )
+            except Exception:
+                pass
 
         pdf_bytes = gerar_pdf_relatorio_cotacao(
             cotacao=c,

@@ -288,7 +288,12 @@ def get_contract_supplier_snapshot_sync(cnpj_orgao: str, ano_compra: Any, sequen
     return {"cnpj_fornecedor": "", "fornecedor": "", "fornecedor_cadastro": {}}
 
 
-def enrich_missing_supplier_fields_for_cotacao(cotacao_id: int, *, max_lookups: int = 12) -> int:
+def enrich_missing_supplier_fields_for_cotacao(
+    cotacao_id: int,
+    *,
+    max_lookups: int = 12,
+    max_brasilapi_lookups: int = 48,
+) -> int:
     rows = list(
         PncpCotacaoItemCotacao.objects.filter(cotacao_id=cotacao_id).only(
             "id", "numero_pncp", "ano_compra", "sequencial_compra", "source"
@@ -300,6 +305,9 @@ def enrich_missing_supplier_fields_for_cotacao(cotacao_id: int, *, max_lookups: 
     updated: List[PncpCotacaoItemCotacao] = []
     cache: Dict[Tuple[str, int, int], Dict[str, Any]] = {}
     lookups = 0
+    # Cache BrasilAPI por CNPJ (evita N requisições iguais em cotações com muitas linhas).
+    brasil_cache: Dict[str, tuple[str, Dict[str, Any]]] = {}
+    brasil_fetches = 0
     for row in rows:
         src = row.source if isinstance(row.source, dict) else {}
         has_cnpj = bool(str(src.get("cnpj_fornecedor") or "").strip())
@@ -316,7 +324,19 @@ def enrich_missing_supplier_fields_for_cotacao(cotacao_id: int, *, max_lookups: 
                 cnpj_para_api = _normalize_cnpj(_cnpj_digits(display))
 
         if cnpj_para_api and not tem_nome_util:
-            nome_br, cad_br = fetch_brasilapi_fornecedor_por_cnpj(cnpj_para_api)
+            ck_key = _cnpj_digits(cnpj_para_api)
+            if len(ck_key) != 14:
+                ck_key = ""
+            if ck_key and ck_key in brasil_cache:
+                nome_br, cad_br = brasil_cache[ck_key]
+            elif ck_key and brasil_fetches >= max_brasilapi_lookups:
+                nome_br, cad_br = "", {}
+            elif ck_key:
+                nome_br, cad_br = fetch_brasilapi_fornecedor_por_cnpj(cnpj_para_api)
+                brasil_cache[ck_key] = (nome_br, cad_br)
+                brasil_fetches += 1
+            else:
+                nome_br, cad_br = fetch_brasilapi_fornecedor_por_cnpj(cnpj_para_api)
             if nome_br or cad_br:
                 new_src = dict(src)
                 if not has_cnpj:

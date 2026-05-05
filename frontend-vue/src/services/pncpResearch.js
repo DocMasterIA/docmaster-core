@@ -233,8 +233,23 @@ export function backfillLocalIndex(payload, signal) {
   return researchRequest('local-index/backfill', { method: 'POST', body: payload, signal });
 }
 
+const PDF_FETCH_TIMEOUT_MS = 600000; // 10 min — geração pode demorar em cotações com muitos itens
+
+function mergePdfFetchSignal(userSignal) {
+  if (typeof AbortSignal === 'undefined' || typeof AbortSignal.timeout !== 'function') {
+    return userSignal;
+  }
+  const deadline = AbortSignal.timeout(PDF_FETCH_TIMEOUT_MS);
+  if (!userSignal) return deadline;
+  if (typeof AbortSignal.any === 'function') {
+    return AbortSignal.any([userSignal, deadline]);
+  }
+  return userSignal;
+}
+
 /** PDF do relatório institucional da cotação (WeasyPrint no Django). */
 export async function downloadCotacaoRelatorioPdf(sessaoId, tituloRelatorio, signal) {
+  const fetchSignal = mergePdfFetchSignal(signal);
   let res;
   try {
     res = await fetch(
@@ -247,7 +262,7 @@ export async function downloadCotacaoRelatorioPdf(sessaoId, tituloRelatorio, sig
           titulo_relatorio: tituloRelatorio,
           incluir_anexos_fornecedor: false,
         }),
-        signal,
+        signal: fetchSignal,
       },
     );
   } catch (err) {

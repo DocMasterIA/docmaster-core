@@ -451,6 +451,10 @@ PNCP_RELATORIO_QR_FRONTEND_BASE_URL = os.environ.get(
     "PNCP_RELATORIO_QR_FRONTEND_BASE_URL",
     "https://docmasteria.com.br",
 ).strip().rstrip("/") or "https://docmasteria.com.br"
+# Antes do PDF: enriquecer fornecedor/CNPJ faltante (HTTP). Em cotações muito grandes pode estourar timeout de proxy.
+PNCP_RELATORIO_PDF_SKIP_ENRICH = os.environ.get("PNCP_RELATORIO_PDF_SKIP_ENRICH", "").lower() in ("1", "true", "yes")
+PNCP_RELATORIO_PDF_MAX_PNCP_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_PNCP_LOOKUPS", "10"))
+PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS", "28"))
 
 # Serviço RAG (geração de documentos com IA)
 RAG_SERVICE_URL = os.environ.get("RAG_SERVICE_URL", "http://127.0.0.1:8004").rstrip("/")

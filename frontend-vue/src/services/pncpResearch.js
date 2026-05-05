@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br';
+// Em desenvolvimento, usa proxy do Vite (/api -> backend local) para evitar bater na API remota.
+const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 
 function extractErrorMessage(payload, status) {
   const raw =

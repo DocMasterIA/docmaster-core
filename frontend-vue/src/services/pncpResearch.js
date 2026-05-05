@@ -233,52 +233,31 @@ export function backfillLocalIndex(payload, signal) {
   return researchRequest('local-index/backfill', { method: 'POST', body: payload, signal });
 }
 
-/** PDF do relatório institucional da cotação (WeasyPrint no Django). Sem timeout artificial no cliente. */
-export async function downloadCotacaoRelatorioPdf(sessaoId, tituloRelatorio, signal) {
-  const fetchOpts = {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      titulo_relatorio: tituloRelatorio,
-      incluir_anexos_fornecedor: false,
-    }),
-  };
-  if (signal) fetchOpts.signal = signal;
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-  let res;
-  try {
-    res = await fetch(
-      `${API_BASE}/api/pncp/cotacoes/research/sessions/${encodeURIComponent(sessaoId)}/relatorio/pdf`,
-      fetchOpts,
+function mapNetworkError(err, context) {
+  const msg = String(err?.message || err || '');
+  if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+    if (context === 'start') {
+      return new Error(
+        'Não foi possível iniciar a geração do PDF (rede ou servidor indisponível). Tente novamente em instantes.',
+      );
+    }
+    if (context === 'poll') {
+      return new Error(
+        'A conexão caiu ao aguardar o PDF. O servidor pode ainda estar a gerar — feche e abra o relatório e tente «Gerar e baixar» outra vez.',
+      );
+    }
+    return new Error(
+      'O download do PDF foi interrompido (rede). Tente novamente; se o relatório for muito grande, aguarde e volte a gerar.',
     );
-  } catch (err) {
-    const msg = String(err?.message || err || '');
-    if (/failed to fetch|networkerror|load failed/i.test(msg)) {
-      throw new Error(
-        'A conexão com o servidor caiu ou o tempo esgotou ao gerar o PDF. Tente novamente em instantes; se persistir, o servidor pode estar sobrecarregado.',
-      );
-    }
-    throw err;
   }
-  const ctype = (res.headers.get('content-type') || '').toLowerCase();
-  if (!res.ok) {
-    const payload = ctype.includes('application/json') ? await res.json() : await res.text();
-    throw new Error(extractErrorMessage(payload, res.status));
-  }
-  let blob;
-  try {
-    blob = await res.blob();
-  } catch (err) {
-    const msg = String(err?.message || err || '');
-    if (/failed to fetch|networkerror|load failed/i.test(msg)) {
-      throw new Error(
-        'O download do PDF foi interrompido (rede ou tempo esgotado). Tente novamente; se o relatório for muito grande, aguarde alguns segundos e gere de novo.',
-      );
-    }
-    throw err;
-  }
-  const cd = res.headers.get('content-disposition') || '';
+  return err;
+}
+
+function parseFilenameFromContentDisposition(cd) {
   let filename = '';
   const utf8Match = cd.match(/filename\*=UTF-8''([^;]+)/i);
   if (utf8Match?.[1]) {
@@ -287,5 +266,99 @@ export async function downloadCotacaoRelatorioPdf(sessaoId, tituloRelatorio, sig
     const plainMatch = cd.match(/filename="?([^";]+)"?/i);
     if (plainMatch?.[1]) filename = plainMatch[1];
   }
-  return { blob, filename };
+  return filename;
+}
+
+/**
+ * PDF do relatório (WeasyPrint no Django).
+ * Usa POST …/relatorio/pdf/start (202) e polling em …/pdf/jobs/<id> para evitar timeout de proxy na geração longa.
+ */
+export async function downloadCotacaoRelatorioPdf(
+  sessaoId,
+  tituloRelatorio,
+  signal,
+  incluirAnexosFornecedor = false,
+) {
+  const bodyJson = {
+    titulo_relatorio: tituloRelatorio,
+    incluir_anexos_fornecedor: Boolean(incluirAnexosFornecedor),
+  };
+
+  const startOpts = {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(bodyJson),
+  };
+  if (signal) startOpts.signal = signal;
+
+  let startRes;
+  try {
+    startRes = await fetch(
+      `${API_BASE}/api/pncp/cotacoes/research/sessions/${encodeURIComponent(sessaoId)}/relatorio/pdf/start`,
+      startOpts,
+    );
+  } catch (err) {
+    throw mapNetworkError(err, 'start');
+  }
+
+  let startPayload;
+  const startCtype = (startRes.headers.get('content-type') || '').toLowerCase();
+  try {
+    startPayload = startCtype.includes('application/json') ? await startRes.json() : await startRes.text();
+  } catch (err) {
+    throw mapNetworkError(err, 'start');
+  }
+  if (!startRes.ok) {
+    throw new Error(extractErrorMessage(startPayload, startRes.status));
+  }
+  if (startRes.status !== 202 || !startPayload?.poll_path || !startPayload?.job_id) {
+    throw new Error('Resposta inesperada ao iniciar geração do PDF.');
+  }
+
+  const pollUrl = `${API_BASE}${startPayload.poll_path}`;
+  const POLL_MS = 1500;
+  const MAX_WAIT_MS = 40 * 60 * 1000;
+  const t0 = Date.now();
+
+  while (Date.now() - t0 < MAX_WAIT_MS) {
+    if (signal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
+    }
+    let pollRes;
+    try {
+      pollRes = await fetch(pollUrl, { credentials: 'include', signal });
+    } catch (err) {
+      throw mapNetworkError(err, 'poll');
+    }
+    const pollCtype = (pollRes.headers.get('content-type') || '').toLowerCase();
+
+    if (pollRes.status === 202) {
+      await sleep(POLL_MS);
+      continue;
+    }
+    if (!pollRes.ok) {
+      const payload = pollCtype.includes('application/json') ? await pollRes.json() : await pollRes.text();
+      throw new Error(extractErrorMessage(payload, pollRes.status));
+    }
+
+    if (!pollCtype.includes('application/pdf') && !pollCtype.includes('octet-stream')) {
+      const payload = pollCtype.includes('application/json') ? await pollRes.json() : await pollRes.text();
+      throw new Error(extractErrorMessage(payload, pollRes.status));
+    }
+
+    let blob;
+    try {
+      blob = await pollRes.blob();
+    } catch (err) {
+      throw mapNetworkError(err, 'blob');
+    }
+    const cd = pollRes.headers.get('content-disposition') || '';
+    const filename = parseFilenameFromContentDisposition(cd);
+    return { blob, filename };
+  }
+
+  throw new Error(
+    'O relatório demorou mais do que o esperado a ficar pronto. Tente gerar de novo; se for uma cotação muito grande, contacte o suporte.',
+  );
 }

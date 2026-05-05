@@ -37,7 +37,12 @@ from .pncp_cotacao_api import (
     pncp_research_sessions_upload_supplier_pdf,
     pncp_research_sessions_update,
 )
-from .pncp_relatorio_api import pncp_cotacao_relatorio_pdf, pncp_cotacao_relatorio_verificar
+from .pncp_relatorio_api import (
+    pncp_cotacao_relatorio_pdf,
+    pncp_cotacao_relatorio_pdf_job_poll,
+    pncp_cotacao_relatorio_pdf_start,
+    pncp_cotacao_relatorio_verificar,
+)
 from .ajax import area_do_usuario_ajax
 from django.conf import settings
 from django.conf.urls.static import static
@@ -128,6 +133,16 @@ urlpatterns = [
         'api/pncp/cotacoes/research/sessions/<int:sessao_id>/items/<int:item_id>/cotacoes/<int:cotacao_id>/update',
         pncp_research_sessions_item_cotacoes_update,
         name='api_pncp_cotacoes_session_item_cotacao_update',
+    ),
+    path(
+        'api/pncp/cotacoes/research/sessions/<int:sessao_id>/relatorio/pdf/jobs/<uuid:job_id>',
+        pncp_cotacao_relatorio_pdf_job_poll,
+        name='api_pncp_cotacao_relatorio_pdf_job_poll',
+    ),
+    path(
+        'api/pncp/cotacoes/research/sessions/<int:sessao_id>/relatorio/pdf/start',
+        pncp_cotacao_relatorio_pdf_start,
+        name='api_pncp_cotacao_relatorio_pdf_start',
     ),
     path(
         'api/pncp/cotacoes/research/sessions/<int:sessao_id>/relatorio/pdf',

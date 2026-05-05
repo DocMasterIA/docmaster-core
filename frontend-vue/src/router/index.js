@@ -75,6 +75,24 @@ const routes = [
     meta: { title: 'Inexigibilidade - Art. 74, I - Show Artístico' },
   },
   {
+    path: '/geracao/inexigibilidade-art-74-i/manutencao-veiculos-preview',
+    name: 'InexigibilidadeArt74IManutencaoVeiculosPreview',
+    component: () => import('../views/ExternalJsxPreview.vue'),
+    meta: {
+      title: 'Inexigibilidade - Art. 74, I - Manutenção de Veículos (Preview)',
+      sourcePath: '/home/adryan/docmaster-core/1-INEXIGIBILIDADE MANUTENÇÃO VEICULOS ART 74 I.jsx',
+    },
+  },
+  {
+    path: '/geracao/inexigibilidade-art-74-i/fornecedor-exclusivo-preview',
+    name: 'InexigibilidadeArt74IFornecedorExclusivoPreview',
+    component: () => import('../views/ExternalJsxPreview.vue'),
+    meta: {
+      title: 'Inexigibilidade - Art. 74, I - Fornecedor Exclusivo (Preview)',
+      sourcePath: '/home/adryan/docmaster-core/2-FORNECEDOR EXCLUIVO ART 74 I.jsx',
+    },
+  },
+  {
     path: '/geracao/etp-livre',
     name: 'EtpLivre',
     component: () => import('../views/DocumentGenerator.vue'),

@@ -143,35 +143,75 @@
                     <span class="rpp-mini-card__value">{{ g.unidade }}</span>
                   </div>
                 </div>
-                <div class="rpp-table-wrap">
-                  <table class="rpp-table rpp-table--fontes">
-                    <thead>
-                      <tr>
-                        <th>Fonte</th>
-                        <th>Fornecedor</th>
-                        <th>CNPJ</th>
-                        <th>Data</th>
-                        <th>Valor</th>
-                        <th>Órgão</th>
-                        <th>Município/UF</th>
-                        <th>Processo</th>
-                        <th>Ajuste</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="(f, fi) in g.fontes" :key="fi">
-                        <td>{{ f.tipo }}</td>
-                        <td>{{ f.fornecedor }}</td>
-                        <td>{{ f.cnpj }}</td>
-                        <td>{{ f.data }}</td>
-                        <td>{{ f.valor }}</td>
-                        <td>{{ f.orgao }}</td>
-                        <td>{{ f.municipio_uf }}</td>
-                        <td>{{ f.processo }}</td>
-                        <td>{{ f.ajuste }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div class="rpp-fontes-cards">
+                  <div v-for="(f, fi) in g.fontes" :key="fi" class="rpp-fonte-card">
+                    <div class="rpp-fonte-card__index">{{ fi + 1 }}</div>
+                    <div class="rpp-fonte-card__content">
+                      <div class="rpp-fonte-row rpp-fonte-row--3">
+                        <div class="rpp-mini-compact rpp-mini-compact--featured">
+                          <span class="rpp-mini-compact__label">Fornecedor</span>
+                          <span class="rpp-mini-compact__value rpp-mini-compact__value--strong">{{ f.fornecedor }}</span>
+                        </div>
+                        <div class="rpp-mini-compact">
+                          <span class="rpp-mini-compact__label">CNPJ</span>
+                          <span class="rpp-mini-compact__value">{{ f.cnpj }}</span>
+                        </div>
+                        <div class="rpp-mini-compact rpp-mini-compact--featured">
+                          <span class="rpp-mini-compact__label">Valor</span>
+                          <span class="rpp-mini-compact__value rpp-mini-compact__value--strong">{{ f.valor }}</span>
+                        </div>
+                      </div>
+
+                      <div class="rpp-fonte-row rpp-fonte-row--3">
+                        <div class="rpp-mini-compact">
+                          <span class="rpp-mini-compact__label">Órgão</span>
+                          <span class="rpp-mini-compact__value">{{ f.orgao }}</span>
+                        </div>
+                        <div class="rpp-mini-compact">
+                          <span class="rpp-mini-compact__label">Modalidade</span>
+                          <span class="rpp-mini-compact__value">{{ f.tipo }}</span>
+                        </div>
+                        <div class="rpp-mini-compact">
+                          <span class="rpp-mini-compact__label">Data</span>
+                          <span class="rpp-mini-compact__value">{{ f.data }}</span>
+                        </div>
+                      </div>
+
+                      <div class="rpp-fonte-row rpp-fonte-row--5">
+                        <div class="rpp-mini-compact rpp-mini-compact--wide">
+                          <span class="rpp-mini-compact__label">ID / Processo</span>
+                          <span class="rpp-mini-compact__value">{{ fi + 1 }} / {{ f.processo || 'N/D' }}</span>
+                        </div>
+                        <div class="rpp-mini-compact">
+                          <span class="rpp-mini-compact__label">Qtd.</span>
+                          <span class="rpp-mini-compact__value">{{ g.quantidade_fmt }}</span>
+                        </div>
+                        <div class="rpp-mini-compact">
+                          <span class="rpp-mini-compact__label">Unid.</span>
+                          <span class="rpp-mini-compact__value">{{ g.unidade }}</span>
+                        </div>
+                        <div class="rpp-mini-compact">
+                          <span class="rpp-mini-compact__label">Fonte</span>
+                          <span class="rpp-mini-compact__value">{{ f.tipo }}</span>
+                        </div>
+                        <div class="rpp-mini-compact">
+                          <span class="rpp-mini-compact__label">UF</span>
+                          <span class="rpp-mini-compact__value">{{ ufFromMunicipio(g, f) }}</span>
+                        </div>
+                      </div>
+
+                      <div class="rpp-fonte-row rpp-fonte-row--2">
+                        <div class="rpp-mini-compact rpp-mini-compact--wide">
+                          <span class="rpp-mini-compact__label">Descrição do item</span>
+                          <span class="rpp-mini-compact__value">{{ g.nome }}</span>
+                        </div>
+                        <div class="rpp-mini-compact rpp-mini-compact--wide">
+                          <span class="rpp-mini-compact__label">Ajuste</span>
+                          <span class="rpp-mini-compact__value">{{ f.ajuste }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </template>
@@ -397,6 +437,14 @@ function montarGruposFromItens(itens) {
       fontes: members.map(itemToFonte),
     };
   });
+}
+
+function ufFromMunicipio(g, f) {
+  const raw = String(f?.municipio_uf || '').trim();
+  if (!raw) return '—';
+  const parts = raw.split('/');
+  if (parts.length >= 2) return String(parts[parts.length - 1] || '').trim() || '—';
+  return String(g?.unidade || '').trim() || '—';
 }
 
 function aplicarDemo() {

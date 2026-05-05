@@ -514,6 +514,111 @@
   text-align: center;
 }
 
+/* Novo layout do detalhamento (cards compactos por fonte) */
+.rpp-fontes-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+
+.rpp-fonte-card {
+  position: relative;
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: rgba(248, 250, 252, 0.9);
+  padding-left: 30px;
+}
+
+.rpp-fonte-card__index {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #5f7f9a;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rpp-fonte-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+}
+
+.rpp-fonte-row {
+  display: grid;
+  gap: 4px;
+}
+
+.rpp-fonte-row--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.rpp-fonte-row--5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.rpp-fonte-row--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rpp-mini-compact {
+  border: 1px solid #d6dde8;
+  border-radius: 8px;
+  background: #fff;
+  padding: 6px 8px;
+  min-height: 34px;
+}
+
+.rpp-mini-compact--featured {
+  background: #f8fafc;
+}
+
+.rpp-mini-compact--wide {
+  min-height: 38px;
+}
+
+.rpp-mini-compact__label {
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: #64748b;
+}
+
+.rpp-mini-compact__value {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: #1e293b;
+  word-break: break-word;
+}
+
+.rpp-mini-compact__value--strong {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+@media (max-width: 900px) {
+  .rpp-fonte-row--3,
+  .rpp-fonte-row--5,
+  .rpp-fonte-row--2 {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Utilitário: nota sobre seção omitida (só tela / doc interno) */
 .rpp-omit-note {
   display: none;

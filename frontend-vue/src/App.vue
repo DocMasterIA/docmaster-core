@@ -54,6 +54,7 @@
             <nav class="dm-sidebar-nav">
               <template v-if="['dispensa', 'inexigibilidade', 'etp'].includes(activeMainTabKey)">
                 <button
+                  v-if="activeMainTabKey !== 'dispensa'"
                   type="button"
                   class="dm-nav-item dm-nav-item--expandable"
                   :class="{ 'dm-nav-item--active': isGenerationSectionActive }"
@@ -63,7 +64,7 @@
                   <i class="fa-solid" :class="generationMenuOpen ? 'fa-chevron-up' : 'fa-chevron-down'" aria-hidden="true"></i>
                 </button>
 
-                <div v-if="generationMenuOpen" class="dm-subnav">
+                <div v-if="activeMainTabKey === 'dispensa' || generationMenuOpen" class="dm-subnav">
                   <div v-for="page in visibleGenerationPages" :key="page.name" class="dm-subnav-item">
                     <button
                       type="button"
@@ -204,6 +205,18 @@ const generationPages = [
     label: 'Inexigibilidade - Art. 74, I',
     icon: 'fa-file-circle-check',
     children: [
+      {
+        name: 'InexigibilidadeArt74IManutencaoVeiculosPreview',
+        label: 'Manutenção de veículos (preview)',
+        icon: 'fa-car-side',
+        to: '/geracao/inexigibilidade-art-74-i/manutencao-veiculos-preview',
+      },
+      {
+        name: 'InexigibilidadeArt74IFornecedorExclusivoPreview',
+        label: 'Fornecedor exclusivo (preview)',
+        icon: 'fa-industry',
+        to: '/geracao/inexigibilidade-art-74-i/fornecedor-exclusivo-preview',
+      },
       {
         name: 'InexigibilidadeArt74IShowArtistico',
         label: 'Show artístico',

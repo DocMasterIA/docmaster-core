@@ -10,7 +10,15 @@ export default defineConfig({
       name: 'transform-pagina-inicial-docmaster',
       enforce: 'pre',
       async transform(code, id) {
-        if (!id.endsWith('pagina_inicial_docmaster_final (2) (1).jsx')) {
+        const tsxLikeExternalFiles = [
+          'pagina_inicial_docmaster_final (2) (1).jsx',
+          'relatorio_final_pesquisa_precos_preview.jsx',
+          'copia_de_relatorio_final_pesquisa_precos_preview (1).jsx',
+          '1-INEXIGIBILIDADE MANUTENÇÃO VEICULOS ART 74 I.jsx',
+          '2-FORNECEDOR EXCLUIVO ART 74 I.jsx',
+        ]
+        const shouldTransform = tsxLikeExternalFiles.some((file) => id.endsWith(file))
+        if (!shouldTransform) {
           return null
         }
         return transformWithEsbuild(code, id, {
@@ -26,6 +34,7 @@ export default defineConfig({
       'react/jsx-runtime': path.resolve(__dirname, 'node_modules/react/jsx-runtime.js'),
       'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
       'react-dom/client': path.resolve(__dirname, 'node_modules/react-dom/client.js'),
+      'lucide-react': path.resolve(__dirname, 'node_modules/lucide-react'),
     },
   },
   optimizeDeps: {
@@ -33,6 +42,12 @@ export default defineConfig({
       loader: {
         '.jsx': 'tsx',
       },
+    },
+  },
+  server: {
+    fs: {
+      // Permite previews via /@fs de arquivos no diretório pai (docmaster-core).
+      allow: [path.resolve(__dirname, '..')],
     },
   },
 })

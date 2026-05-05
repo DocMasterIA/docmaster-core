@@ -176,6 +176,37 @@ def _parse_qtd_br(v: Any) -> float:
         return 0.0
 
 
+def _obter_modalidade(tipo: Any) -> str:
+    raw = str(tipo or "").strip()
+    if not raw:
+        return "N/D"
+    m = {
+        "PNCP": "Pregão Eletrônico",
+        "BBMNET": "Dispensa",
+        "CMED": "Pregão Eletrônico",
+        "Cotação Direta": "Dispensa",
+        "ComprasGov": "Pregão",
+    }
+    return m.get(raw, raw)
+
+
+def _obter_fonte(tipo: Any) -> str:
+    raw = str(tipo or "").strip()
+    if not raw:
+        return "N/D"
+    return "PNCP" if raw in {"Cotação Direta", "BBMNET", "ComprasGov", "CMED"} else raw
+
+
+def _obter_uf(municipio_uf: Any) -> str:
+    raw = str(municipio_uf or "").strip()
+    if not raw:
+        return "—"
+    parts = raw.split("/")
+    if len(parts) >= 2:
+        return str(parts[-1] or "").strip() or "—"
+    return "—"
+
+
 def montar_contexto_relatorio(
     *,
     cotacao,
@@ -217,6 +248,13 @@ def montar_contexto_relatorio(
                 break
     valor_total_estimado = 0.0
     for g in grupos:
+        fontes = g.get("fontes") or []
+        for f in fontes:
+            if not isinstance(f, dict):
+                continue
+            f["modalidade_label"] = _obter_modalidade(f.get("tipo"))
+            f["fonte_label"] = _obter_fonte(f.get("tipo"))
+            f["uf_label"] = _obter_uf(f.get("municipio_uf"))
         qtd = _parse_qtd_br(g.get("quantidade_fmt"))
         try:
             media = float(g.get("media_valor")) if g.get("media_valor") is not None else 0.0
@@ -470,7 +508,7 @@ _HTML_TEMPLATE = _ENV.from_string(
                 </div>
                 <div class="rpp-mini-compact">
                   <span class="rpp-mini-compact__label">Modalidade</span>
-                  <span class="rpp-mini-compact__value">{{ f.tipo }}</span>
+                  <span class="rpp-mini-compact__value">{{ f.modalidade_label }}</span>
                 </div>
                 <div class="rpp-mini-compact">
                   <span class="rpp-mini-compact__label">Data</span>
@@ -493,11 +531,11 @@ _HTML_TEMPLATE = _ENV.from_string(
                 </div>
                 <div class="rpp-mini-compact">
                   <span class="rpp-mini-compact__label">Fonte</span>
-                  <span class="rpp-mini-compact__value">{{ f.tipo }}</span>
+                  <span class="rpp-mini-compact__value">{{ f.fonte_label }}</span>
                 </div>
                 <div class="rpp-mini-compact">
                   <span class="rpp-mini-compact__label">UF</span>
-                  <span class="rpp-mini-compact__value">{{ (f.municipio_uf or '—').split('/')[-1] }}</span>
+                  <span class="rpp-mini-compact__value">{{ f.uf_label }}</span>
                 </div>
               </div>
 

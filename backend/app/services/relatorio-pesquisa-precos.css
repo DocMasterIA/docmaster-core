@@ -580,41 +580,49 @@
   padding-top: 2.5mm;
 }
 
-/* Fontes por item (layout em cards compacto igual preview aprovado) */
+/* Novo layout do detalhamento (cards compactos por fonte) */
 .rpp-fontes-cards {
-  display: grid;
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
 }
 
 .rpp-fonte-card {
+  position: relative;
   border: 1px solid #d6dde8;
   border-radius: 10px;
-  background: #fff;
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  overflow: hidden;
+  background: rgba(248, 250, 252, 0.9);
+  padding-left: 30px;
 }
 
 .rpp-fonte-card__index {
-  background: #f1f5f9;
-  border-right: 1px solid #d6dde8;
-  display: flex;
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #5f7f9a;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
-  color: #334155;
 }
 
 .rpp-fonte-card__content {
-  padding: 10px;
-  display: grid;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
 }
 
 .rpp-fonte-row {
   display: grid;
-  gap: 8px;
+  gap: 4px;
 }
 
 .rpp-fonte-row--3 {
@@ -622,7 +630,7 @@
 }
 
 .rpp-fonte-row--5 {
-  grid-template-columns: 1.3fr repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .rpp-fonte-row--2 {
@@ -630,22 +638,19 @@
 }
 
 .rpp-mini-compact {
-  border: 1px solid #dbe3ef;
+  border: 1px solid #d6dde8;
   border-radius: 8px;
-  background: #f8fafc;
-  min-height: 60px;
-  padding: 9px 10px;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
+  background: #fff;
+  padding: 6px 8px;
+  min-height: 34px;
 }
 
 .rpp-mini-compact--featured {
-  background: #f5f8fc;
+  background: #f8fafc;
 }
 
 .rpp-mini-compact--wide {
-  min-height: 64px;
+  min-height: 38px;
 }
 
 .rpp-mini-compact__label {
@@ -654,58 +659,22 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  line-height: 1;
   color: #64748b;
-  line-height: 1.3;
 }
 
 .rpp-mini-compact__value {
   display: block;
-  margin-top: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.35;
-  color: #1f2937;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: #1e293b;
   word-break: break-word;
-  overflow-wrap: break-word;
 }
 
 .rpp-mini-compact__value--strong {
   font-weight: 700;
-}
-
-.rpp--pdf .rpp-fonte-card {
-  grid-template-columns: 8mm minmax(0, 1fr);
-}
-
-.rpp--pdf .rpp-fonte-card__index {
-  font-size: 8pt;
-}
-
-.rpp--pdf .rpp-fonte-card__content {
-  padding: 2.5mm;
-  gap: 1.8mm;
-}
-
-.rpp--pdf .rpp-fonte-row {
-  gap: 1.8mm;
-}
-
-.rpp--pdf .rpp-mini-compact {
-  min-height: 13mm;
-  padding: 2.1mm 2.2mm;
-}
-
-.rpp--pdf .rpp-mini-compact--wide {
-  min-height: 14mm;
-}
-
-.rpp--pdf .rpp-mini-compact__label {
-  font-size: 6.6pt;
-}
-
-.rpp--pdf .rpp-mini-compact__value {
-  margin-top: 1.4mm;
-  font-size: 8.3pt;
+  color: #0f172a;
 }
 
 @media (max-width: 900px) {

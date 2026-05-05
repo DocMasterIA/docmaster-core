@@ -169,7 +169,7 @@
                         </div>
                         <div class="rpp-mini-compact">
                           <span class="rpp-mini-compact__label">Modalidade</span>
-                          <span class="rpp-mini-compact__value">{{ f.tipo }}</span>
+                          <span class="rpp-mini-compact__value">{{ obterModalidade(f.tipo) }}</span>
                         </div>
                         <div class="rpp-mini-compact">
                           <span class="rpp-mini-compact__label">Data</span>
@@ -192,7 +192,7 @@
                         </div>
                         <div class="rpp-mini-compact">
                           <span class="rpp-mini-compact__label">Fonte</span>
-                          <span class="rpp-mini-compact__value">{{ f.tipo }}</span>
+                          <span class="rpp-mini-compact__value">{{ obterFonte(f.tipo) }}</span>
                         </div>
                         <div class="rpp-mini-compact">
                           <span class="rpp-mini-compact__label">UF</span>
@@ -445,6 +445,25 @@ function ufFromMunicipio(g, f) {
   const parts = raw.split('/');
   if (parts.length >= 2) return String(parts[parts.length - 1] || '').trim() || '—';
   return String(g?.unidade || '').trim() || '—';
+}
+
+function obterModalidade(tipo) {
+  const map = {
+    PNCP: 'Pregão Eletrônico',
+    BBMNET: 'Dispensa',
+    CMED: 'Pregão Eletrônico',
+    'Cotação Direta': 'Dispensa',
+    ComprasGov: 'Pregão',
+  };
+  const raw = String(tipo || '').trim();
+  return map[raw] || raw || 'N/D';
+}
+
+function obterFonte(tipo) {
+  const fontesConvertidas = new Set(['Cotação Direta', 'BBMNET', 'ComprasGov', 'CMED']);
+  const raw = String(tipo || '').trim();
+  if (!raw) return 'N/D';
+  return fontesConvertidas.has(raw) ? 'PNCP' : raw;
 }
 
 function aplicarDemo() {

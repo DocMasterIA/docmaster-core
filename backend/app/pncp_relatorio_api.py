@@ -21,7 +21,7 @@ import json
 import threading
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 from uuid import UUID
 
 from django.conf import settings
@@ -316,7 +316,8 @@ def _forbidden_job_owner() -> JsonResponse:
 
 
 def _assert_relatorio_job_owner(meta: Dict[str, Any], user, sessao_id: int) -> JsonResponse | None:
-    if _meta_sessao_id_int(meta) != sessao_id or meta.get("user_id") != user.id:
+    # user.id é UUIDField — meta vem de JSON, user_id é sempre string no ficheiro.
+    if _meta_sessao_id_int(meta) != sessao_id or str(meta.get("user_id", "")) != str(user.id):
         return _forbidden_job_owner()
     return None
 
@@ -324,7 +325,7 @@ def _assert_relatorio_job_owner(meta: Dict[str, Any], user, sessao_id: int) -> J
 def _run_relatorio_pdf_job(
     *,
     job_id: str,
-    user_id: int,
+    user_id: Union[int, str, UUID],
     is_superuser: bool,
     sessao_id: int,
     titulo_rel: str,
@@ -435,7 +436,7 @@ def pncp_cotacao_relatorio_pdf_start(request, sessao_id: int):
     _prune_stale_relatorio_pdf_jobs(jobs_dir)
     job_id = str(uuid.uuid4())
     meta = {
-        "user_id": request.user.id,
+        "user_id": str(request.user.id),
         "sessao_id": sessao_id,
         "status": "pending",
         "created": timezone.now().isoformat(),

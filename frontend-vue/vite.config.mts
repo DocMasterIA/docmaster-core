@@ -15,10 +15,15 @@ export default defineConfig({
       "/api": {
         target: "http://127.0.0.1:8001",
         changeOrigin: true,
+        // Sem teto prático: geração de PDF pode ultrapassar o default (~2 min) do http-proxy.
+        timeout: 86_400_000,
+        proxyTimeout: 86_400_000,
       },
       "/media": {
         target: "http://127.0.0.1:8001",
         changeOrigin: true,
+        timeout: 86_400_000,
+        proxyTimeout: 86_400_000,
       },
     },
   },

@@ -37,5 +37,7 @@ RUN python manage.py collectstatic --noinput --clear
 
 EXPOSE 8000
 
-# Migrações executadas na inicialização; em seguida, Gunicorn
-CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn backend.mdlicitatech.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --access-logfile - --error-logfile -"]
+# Migrações na subida; Gunicorn. --timeout 0 = sem limite de tempo por requisição (PDF/WeasyPrint pode demorar muito).
+# Ajuste com env GUNICORN_TIMEOUT (segundos) se quiser um teto, ex.: 3600.
+ENV GUNICORN_TIMEOUT=0
+CMD ["sh", "-c", "python manage.py migrate --noinput && exec gunicorn backend.mdlicitatech.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --timeout ${GUNICORN_TIMEOUT:-0} --graceful-timeout 600 --access-logfile - --error-logfile -"]

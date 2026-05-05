@@ -274,6 +274,9 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
     resp = FileResponse(buf, as_attachment=True, filename=fname, content_type="application/pdf")
     # Permite ao frontend ler o nome do arquivo via Content-Disposition em cenários CORS.
     resp["Access-Control-Expose-Headers"] = "Content-Disposition"
+    # Sinaliza explicitamente o layout aplicado no PDF para depuração de ambiente/versionamento.
+    resp["X-Relatorio-Layout-Version"] = "fontes-cards-v1"
+    resp["Access-Control-Expose-Headers"] = "Content-Disposition, X-Relatorio-Layout-Version"
     return resp
 
 

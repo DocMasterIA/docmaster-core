@@ -1,97 +1,200 @@
 <template>
-  <section class="rpv-page">
-    <header class="rpv-top">
-      <div>
-        <h1 class="rpv-top__title">Relatório de pesquisa de preços</h1>
-        <p class="rpv-top__subtitle">Modelo oficial alinhado ao preview aprovado</p>
+  <div class="rpv-shell">
+    <RouterLink
+      v-if="cotacaoIdQuery"
+      :to="`/pesquisador-pncp/cotacoes/${cotacaoIdQuery}`"
+      class="rpv-shell__back"
+    >
+      Voltar à cotação
+    </RouterLink>
+    <RouterLink v-else to="/pesquisador-pncp" class="rpv-shell__back">Pesquisador PNCP</RouterLink>
+
+    <p v-if="loadError" class="rpv-shell__status rpv-shell__status--error">{{ loadError }}</p>
+    <p v-else-if="isLoading" class="rpv-shell__status">Carregando dados da cotação…</p>
+
+    <div class="rpv-inner">
+      <header class="rpv-header-card">
+        <div class="rpv-header-card__body">
+          <h1 class="rpv-header-card__title">Relatório de pesquisa de preços</h1>
+          <p class="rpv-header-card__lead">{{ tituloCotacao }}</p>
+          <p class="rpv-header-card__muted">{{ DOCUMENTO_TECNICO_LEAD }}</p>
+        </div>
+      </header>
+
+      <div class="rpv-info-grid">
+        <article class="rpv-info-card">
+          <div class="rpv-info-card__row">
+            <span class="rpv-info-card__icon" aria-hidden="true">{{ icon('building') }}</span>
+            <span class="rpv-info-card__label">Órgão</span>
+          </div>
+          <p class="rpv-info-card__value">{{ orgaoExibicao }}</p>
+        </article>
+        <article class="rpv-info-card">
+          <div class="rpv-info-card__row">
+            <span class="rpv-info-card__icon" aria-hidden="true">{{ icon('user') }}</span>
+            <span class="rpv-info-card__label">Responsável</span>
+          </div>
+          <p class="rpv-info-card__value">{{ criadoPor }}</p>
+        </article>
+        <article class="rpv-info-card">
+          <div class="rpv-info-card__row">
+            <span class="rpv-info-card__icon" aria-hidden="true">{{ icon('calendar') }}</span>
+            <span class="rpv-info-card__label">Data da pesquisa</span>
+          </div>
+          <p class="rpv-info-card__value">{{ dataPesquisa }}</p>
+        </article>
+        <article class="rpv-info-card">
+          <div class="rpv-info-card__row">
+            <span class="rpv-info-card__icon" aria-hidden="true">{{ icon('sigma') }}</span>
+            <span class="rpv-info-card__label">Método aplicado</span>
+          </div>
+          <p class="rpv-info-card__value">{{ metodoAplicadoExibicao }}</p>
+        </article>
+        <article class="rpv-info-card rpv-info-card--strong">
+          <div class="rpv-info-card__row">
+            <span class="rpv-info-card__icon" aria-hidden="true">{{ icon('badge') }}</span>
+            <span class="rpv-info-card__label">Valor total estimado</span>
+          </div>
+          <p class="rpv-info-card__value rpv-info-card__value--strong">{{ valorTotalEstimadoFmt }}</p>
+        </article>
       </div>
-      <RouterLink v-if="cotacaoIdQuery" :to="`/pesquisador-pncp/cotacoes/${cotacaoIdQuery}`" class="rpv-back">Voltar à cotação</RouterLink>
-      <RouterLink v-else to="/pesquisador-pncp" class="rpv-back">Pesquisador PNCP</RouterLink>
-    </header>
-    <p v-if="loadError" class="rpv-status rpv-status--error">{{ loadError }}</p>
-    <p v-else-if="isLoading" class="rpv-status">Carregando dados da cotação...</p>
 
-    <div class="rpv-wrap">
-      <section class="rpv-hero">
-        <div class="rpv-hero__logo-wrap">
-          <img class="rpv-hero__logo" :src="logoBrancaUrl" alt="DocMaster" />
+      <section class="rpv-panel rpv-panel--padded">
+        <div class="rpv-panel__head">
+          <div>
+            <h2 class="rpv-panel__title">Metodologia aplicada</h2>
+            <p class="rpv-panel__subtitle">Base legal, método matemático e critérios técnicos adotados</p>
+          </div>
+          <span class="rpv-chip">IN 65/2021 · Lei 14.133</span>
         </div>
-        <div>
-          <p class="rpv-kicker">Relatório institucional</p>
-          <h2 class="rpv-hero__title">{{ tituloRelatorio }}</h2>
-          <p class="rpv-hero__subtitle">Pesquisa de preços com rastreabilidade completa das fontes</p>
+        <div class="rpv-prose">
+          <p>A pesquisa foi realizada com base na Lei nº 14.133/2021 e na IN nº 65/2021.</p>
+          <p>
+            As cotações selecionadas foram obtidas por meio de consultas ao Portal Nacional de Contratações Públicas – PNCP,
+            bancos de dados públicos e pesquisa direta de mercado, observando-se a compatibilidade da descrição do objeto,
+            a unidade de medida, a recência das informações, a natureza da contratação e a consistência dos dados utilizados
+            para formação do preço estimado.
+          </p>
+          <p>Os valores estimados mostram-se compatíveis com o mercado e adequados para subsidiar a contratação.</p>
+        </div>
+        <div class="rpv-metrics">
+          <div class="rpv-metric">
+            <div class="rpv-metric__title">Critério</div>
+            <div class="rpv-metric__value">Compatibilidade</div>
+          </div>
+          <div class="rpv-metric">
+            <div class="rpv-metric__title">Recência</div>
+            <div class="rpv-metric__value">Até 12 meses</div>
+          </div>
+          <div class="rpv-metric">
+            <div class="rpv-metric__title">Rastreabilidade</div>
+            <div class="rpv-metric__value">CNPJ, fonte e data</div>
+          </div>
         </div>
       </section>
 
-      <section class="rpv-grid">
-        <article class="rpv-info-card rpv-info-card--strong"><p class="rpv-label">Cotação</p><p class="rpv-value">{{ tituloCotacao }}</p></article>
-        <article class="rpv-info-card"><p class="rpv-label">Data da pesquisa</p><p class="rpv-value">{{ dataPesquisa }}</p></article>
-        <article class="rpv-info-card"><p class="rpv-label">Emitido em</p><p class="rpv-value">{{ emitidoEm }}</p></article>
-        <article class="rpv-info-card"><p class="rpv-label">Responsável</p><p class="rpv-value">{{ criadoPor }}</p></article>
-        <article class="rpv-info-card"><p class="rpv-label">Itens</p><p class="rpv-value">{{ grupos.length }}</p></article>
-        <article class="rpv-info-card"><p class="rpv-label">Valor total estimado</p><p class="rpv-value">{{ valorTotalEstimado }}</p></article>
-      </section>
-
-      <section class="rpv-block">
-        <h3 class="rpv-block__title">Resultado consolidado</h3>
-        <div class="rpv-table-wrap">
+      <section class="rpv-panel rpv-panel--flush">
+        <div class="rpv-panel__bar">
+          <div>
+            <h2 class="rpv-panel__title">Resultado consolidado</h2>
+            <p class="rpv-panel__subtitle">Resumo dos itens com média definida e situação da pesquisa</p>
+          </div>
+        </div>
+        <div class="rpv-table-scroll">
           <table class="rpv-table">
             <thead>
               <tr>
-                <th>Item</th>
-                <th>Descrição</th>
-                <th>Quantidade</th>
-                <th>Cotações válidas</th>
-                <th>Média</th>
-                <th>Valor total</th>
+                <th class="rpv-table__th rpv-table__th--narrow">Item</th>
+                <th class="rpv-table__th rpv-table__th--wide">Descrição</th>
+                <th class="rpv-table__th">Quantidade</th>
+                <th class="rpv-table__th">Cotações válidas</th>
+                <th class="rpv-table__th">Média</th>
+                <th class="rpv-table__th rpv-table__th--accent">Valor total</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="g in grupos" :key="'c-' + g.ordem">
-                <td>{{ g.ordem }}</td>
-                <td>{{ g.nome }}</td>
-                <td>{{ g.quantidade_fmt }} {{ g.unidade }}</td>
-                <td>{{ g.n_cotacoes }}</td>
-                <td>{{ g.media_fmt }}</td>
-                <td>{{ valorTotalItem(g) }}</td>
+              <tr v-for="g in grupos" :key="'c-' + g.ordem" class="rpv-table__tr">
+                <td class="rpv-table__td rpv-table__td--num">{{ g.ordem }}</td>
+                <td class="rpv-table__td">
+                  <div class="rpv-table__name">{{ g.nome }}</div>
+                </td>
+                <td class="rpv-table__td">{{ quantidadeExibicao(g) }}</td>
+                <td class="rpv-table__td">{{ g.n_cotacoes }}</td>
+                <td class="rpv-table__td rpv-table__td--medium">{{ g.media_fmt }}</td>
+                <td class="rpv-table__td rpv-table__td--accent">{{ formatarMoedaPtBr(calcularTotalItemNum(g)) }}</td>
               </tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      <section class="rpv-block">
-        <h3 class="rpv-block__title">Detalhamento dos itens</h3>
-        <div class="rpv-items">
-          <article v-for="g in grupos" :key="'d-' + g.ordem" class="rpv-item">
-            <header class="rpv-item__head">
-              <span class="rpv-item__kicker">Item {{ g.ordem }}</span>
-              <strong class="rpv-item__name">{{ g.nome }}</strong>
+      <section class="rpv-panel rpv-panel--flush">
+        <div class="rpv-panel__bar rpv-panel__bar--simple">
+          <div>
+            <h2 class="rpv-panel__title">Detalhamento dos itens</h2>
+            <p class="rpv-panel__subtitle">Ficha técnica do item e fontes utilizadas na composição do preço</p>
+          </div>
+        </div>
+        <div class="rpv-detail-list">
+          <article v-for="g in grupos" :key="'d-' + g.ordem" class="rpv-detail-item">
+            <header class="rpv-detail-item__head">
+              <span class="rpv-detail-item__kicker">Item {{ g.ordem }}</span>
+              <div class="rpv-detail-item__name">{{ g.nome }}</div>
             </header>
-            <div class="rpv-sources">
+            <div class="rpv-detail-item__body">
               <div v-for="(f, fi) in g.fontes" :key="fi" class="rpv-source">
-                <span class="rpv-source__index">{{ fi + 1 }}</span>
-                <div class="rpv-source__content">
-                  <div class="rpv-row rpv-row--3">
-                    <div class="rpv-mini rpv-mini--featured"><span>Fornecedor</span><b>{{ f.fornecedor }}</b></div>
-                    <div class="rpv-mini"><span>CNPJ</span><b>{{ f.cnpj }}</b></div>
-                    <div class="rpv-mini rpv-mini--featured"><span>Valor</span><b>{{ f.valor }}</b></div>
+                <span class="rpv-source__badge">{{ fi + 1 }}</span>
+                <div class="rpv-source__inner">
+                  <div class="rpv-mini-grid rpv-mini-grid--3">
+                    <div class="rpv-dcard rpv-dcard--featured">
+                      <span class="rpv-dcard__label">Fornecedor</span>
+                      <span class="rpv-dcard__value rpv-dcard__value--strong">{{ f.fornecedor }}</span>
+                    </div>
+                    <div class="rpv-dcard"><span class="rpv-dcard__label">CNPJ</span><span class="rpv-dcard__value">{{ f.cnpj }}</span></div>
+                    <div class="rpv-dcard rpv-dcard--featured">
+                      <span class="rpv-dcard__label">Valor</span>
+                      <span class="rpv-dcard__value rpv-dcard__value--strong">{{ f.valor }}</span>
+                    </div>
                   </div>
-                  <div class="rpv-row rpv-row--3">
-                    <div class="rpv-mini"><span>Órgão</span><b>{{ f.orgao }}</b></div>
-                    <div class="rpv-mini"><span>Modalidade</span><b>{{ obterModalidade(f.tipo) }}</b></div>
-                    <div class="rpv-mini"><span>Data</span><b>{{ f.data }}</b></div>
+                  <div class="rpv-mini-grid rpv-mini-grid--3">
+                    <div class="rpv-dcard"><span class="rpv-dcard__label">Órgão</span><span class="rpv-dcard__value">{{ f.orgao }}</span></div>
+                    <div class="rpv-dcard">
+                      <span class="rpv-dcard__label">Modalidade</span>
+                      <span class="rpv-dcard__value">{{ obterModalidade(f.tipo) }}</span>
+                    </div>
+                    <div class="rpv-dcard"><span class="rpv-dcard__label">Data</span><span class="rpv-dcard__value">{{ f.data }}</span></div>
                   </div>
-                  <div class="rpv-row rpv-row--5">
-                    <div class="rpv-mini"><span>ID / Processo</span><b>{{ fi + 1 }} / {{ f.processo || 'N/D' }}</b></div>
-                    <div class="rpv-mini"><span>Qtd.</span><b>{{ g.quantidade_fmt }}</b></div>
-                    <div class="rpv-mini"><span>Unid.</span><b>{{ g.unidade }}</b></div>
-                    <div class="rpv-mini"><span>Fonte</span><b>{{ obterFonte(f.tipo) }}</b></div>
-                    <div class="rpv-mini"><span>UF</span><b>{{ ufFromMunicipio(g, f) }}</b></div>
+                  <div class="rpv-mini-grid rpv-mini-grid--5">
+                    <div class="rpv-dcard rpv-dcard--wide">
+                      <span class="rpv-dcard__label">ID / Processo</span>
+                      <span class="rpv-dcard__value">{{ fi + 1 }} / {{ f.processo || 'N/D' }}</span>
+                    </div>
+                    <div class="rpv-dcard">
+                      <span class="rpv-dcard__label">Qtd.</span>
+                      <span class="rpv-dcard__value">{{ parseQuantidadeStr(quantidadeExibicao(g)).valor }}</span>
+                    </div>
+                    <div class="rpv-dcard">
+                      <span class="rpv-dcard__label">Unid.</span>
+                      <span class="rpv-dcard__value">{{ parseQuantidadeStr(quantidadeExibicao(g)).unidade }}</span>
+                    </div>
+                    <div class="rpv-dcard">
+                      <span class="rpv-dcard__label">Fonte</span>
+                      <span class="rpv-dcard__value">{{ obterFonte(f.tipo) }}</span>
+                    </div>
+                    <div class="rpv-dcard">
+                      <span class="rpv-dcard__label">UF</span>
+                      <span class="rpv-dcard__value">{{ ufFromMunicipio(g, f) }}</span>
+                    </div>
                   </div>
-                  <div class="rpv-row rpv-row--2">
-                    <div class="rpv-mini"><span>Descrição do item</span><b>{{ g.nome }}</b></div>
-                    <div class="rpv-mini"><span>Ajuste</span><b>{{ f.ajuste }}</b></div>
+                  <div class="rpv-mini-grid rpv-mini-grid--2">
+                    <div class="rpv-dcard rpv-dcard--wide">
+                      <span class="rpv-dcard__label">Descrição do item</span>
+                      <span class="rpv-dcard__value">{{ g.nome }}</span>
+                    </div>
+                    <div class="rpv-dcard rpv-dcard--wide">
+                      <span class="rpv-dcard__label">Ajuste</span>
+                      <span class="rpv-dcard__value">{{ f.ajuste }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -100,33 +203,84 @@
         </div>
       </section>
 
-      <section class="rpv-block">
-        <h3 class="rpv-block__title">Informações dos fornecedores</h3>
-        <div class="rpv-suppliers">
-          <article v-for="(f, idx) in fornecedoresUnicos" :key="`${f.cnpj}-${idx}`" class="rpv-supplier">
-            <strong>{{ f.fornecedor }}</strong>
-            <p><b>CNPJ:</b> {{ f.cnpj }}</p>
-            <p><b>Telefone:</b> {{ f.telefone || 'Não informado' }}</p>
-            <p><b>Email:</b> {{ f.email || 'Não informado' }}</p>
-            <p><b>Endereço:</b> {{ f.endereco || 'Não informado' }}</p>
+      <section class="rpv-panel rpv-panel--padded">
+        <div class="rpv-icon-title">
+          <div class="rpv-icon-title__bubble">{{ icon('check') }}</div>
+          <div>
+            <h2 class="rpv-panel__title">Conclusão técnica</h2>
+            <p class="rpv-panel__subtitle">Síntese conclusiva da pesquisa de preços</p>
+          </div>
+        </div>
+        <div class="rpv-quote">
+          <p>
+            Com base nas cotações obtidas, na metodologia aplicada e na análise técnica dos dados, conclui-se que os valores
+            estimados refletem adequadamente os preços praticados no mercado, estando aptos a subsidiar a contratação pública
+            pretendida, com observância aos princípios da economicidade, razoabilidade e eficiência.
+          </p>
+        </div>
+      </section>
+
+      <section class="rpv-panel rpv-panel--padded">
+        <div class="rpv-icon-title">
+          <div class="rpv-icon-title__bubble rpv-icon-title__bubble--alt">{{ icon('shield') }}</div>
+          <div>
+            <h2 class="rpv-panel__title">Responsabilidade sobre as informações</h2>
+            <p class="rpv-panel__subtitle">Esclarecimento quanto ao uso da plataforma</p>
+          </div>
+        </div>
+        <div class="rpv-quote rpv-quote--stack">
+          <p>
+            A plataforma disponibiliza um ambiente digital de apoio à pesquisa de preços, no qual são consolidadas informações
+            oriundas de diferentes origens, tais como bases públicas, sistemas oficiais e registros de mercado, com o objetivo
+            de auxiliar na formação de referência de valores.
+          </p>
+          <p>
+            Compete exclusivamente ao servidor público responsável pela pesquisa a análise crítica, validação, seleção e
+            utilização dos preços, em conformidade com a legislação vigente, especialmente a Lei nº 14.133/2021, normativos
+            aplicáveis e orientações dos órgãos de controle.
+          </p>
+          <p>
+            Dessa forma, a plataforma atua como ferramenta de apoio à tomada de decisão, não substituindo o dever de diligência,
+            responsabilidade técnica e julgamento administrativo do agente público.
+          </p>
+        </div>
+      </section>
+
+      <section class="rpv-panel rpv-panel--padded">
+        <div class="rpv-icon-title">
+          <div class="rpv-icon-title__bubble rpv-icon-title__bubble--alt">{{ icon('building') }}</div>
+          <div>
+            <h2 class="rpv-panel__title">Informações dos fornecedores</h2>
+            <p class="rpv-panel__subtitle">Dados cadastrais e de contato</p>
+          </div>
+        </div>
+        <div class="rpv-supplier-grid">
+          <article v-for="(f, idx) in fornecedoresUnicos" :key="`${f.cnpj}-${idx}`" class="rpv-supplier-card">
+            <div class="rpv-supplier-card__name">{{ f.fornecedor }}</div>
+            <div class="rpv-supplier-card__lines">
+              <div><span class="rpv-supplier-card__k">CNPJ:</span> {{ f.cnpj }}</div>
+              <div><span class="rpv-supplier-card__k">Telefone:</span> {{ f.telefone || 'Não informado' }}</div>
+              <div><span class="rpv-supplier-card__k">Email:</span> {{ f.email || 'Não informado' }}</div>
+              <div><span class="rpv-supplier-card__k">Endereço:</span> {{ f.endereco || 'Não informado' }}</div>
+            </div>
           </article>
         </div>
       </section>
     </div>
-  </section>
+  </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { getResearchSession } from '../services/pncpResearch';
-import logoBrancaUrl from '../assets/logo_branca.png';
+
+const DOCUMENTO_TECNICO_LEAD =
+  'Documento técnico consolidado com metodologia, análise técnica, rastreabilidade das cotações e conclusão para suporte à contratação.';
 
 const MIN_FONTES = 3;
 
 const route = useRoute();
-
-const marcaAgua = 'DocMaster — Pesquisador PNCP';
 
 const isLoading = ref(false);
 const loadError = ref('');
@@ -137,9 +291,10 @@ const dataPesquisa = ref('—');
 const criadoPor = ref('—');
 const criadoPorEmail = ref('');
 const termoPncp = ref('—');
+const formulaCalculo = ref('');
+const formulaCalculoId = ref('');
 const grupos = ref([]);
 const totalLinhasCotacao = ref(0);
-const cnpjs = ref([]);
 
 const cotacaoIdQuery = computed(() => {
   const raw = route.query.cotacaoId;
@@ -147,16 +302,41 @@ const cotacaoIdQuery = computed(() => {
   return String(raw);
 });
 
-const emitidoEm = computed(() => formatDataHora(new Date()));
-const valorTotalEstimado = computed(() => {
+const orgaoExibicao = computed(() => {
+  for (const g of grupos.value) {
+    const fontes = g?.fontes || [];
+    for (const f of fontes) {
+      const o = String(f?.orgao || '').trim();
+      if (o && o !== '—') return o;
+    }
+  }
+  return '—';
+});
+
+const metodoAplicadoExibicao = computed(() => {
+  const id = String(formulaCalculoId.value || '').trim();
+  const short = {
+    media_aritmetica_precos_obtidos: 'Média Aritmética',
+    mediana_precos_obtidos: 'Mediana',
+    menor_preco: 'Menor preço',
+    media_saneada: 'Média saneada',
+    media_ponderada: 'Média ponderada',
+    media_relativa_25_50: 'Média relativa 25%–50%',
+  };
+  if (id && short[id]) return short[id];
+  const lbl = String(formulaCalculo.value || '').trim();
+  if (lbl.includes('aritmética')) return 'Média Aritmética';
+  return lbl || '—';
+});
+
+const valorTotalEstimadoFmt = computed(() => {
   let total = 0;
   for (const g of grupos.value) {
-    const qtd = Number(String(g.quantidade_fmt || '').replace('.', '').replace(',', '.')) || 0;
-    const media = Number(String(g.media_fmt || '').replace(/[^\d,]/g, '').replace('.', '').replace(',', '.')) || 0;
-    total += qtd * media;
+    total += calcularTotalItemNum(g);
   }
-  return `R$ ${formatarMoedaBr(total)}`;
+  return formatarMoedaPtBr(total);
 });
+
 const fornecedoresUnicos = computed(() => {
   const out = [];
   const seen = new Set();
@@ -177,7 +357,6 @@ const fornecedoresUnicos = computed(() => {
   return out;
 });
 
-/** Demo alinhada a `DocMasterRelatorioPesquisaPrecos.jsx` (3 fontes por item). */
 const DEMO_GRUPOS = [
   {
     ordem: 1,
@@ -225,6 +404,55 @@ const DEMO_GRUPOS = [
   },
 ];
 
+function icon(name) {
+  const icons = {
+    building: '🏛️',
+    user: '👤',
+    calendar: '📅',
+    sigma: 'Σ',
+    check: '✓',
+    shield: '🛡️',
+    badge: '✓',
+  };
+  return icons[name] || '•';
+}
+
+function parseQuantidadeStr(quantidade) {
+  if (quantidade == null || String(quantidade).trim() === '') {
+    return { valor: 'N/D', unidade: 'N/D' };
+  }
+  const texto = String(quantidade).trim().replace(/\s+/g, ' ');
+  const match = texto.match(/^([\d.,]+)\s*(.*)$/);
+  if (!match) {
+    return { valor: texto, unidade: 'N/D' };
+  }
+  const valor = (match[1] || '').trim() || 'N/D';
+  const unidade = (match[2] || '').trim() || 'N/D';
+  return { valor, unidade };
+}
+
+function moedaParaNumero(valor) {
+  if (!valor) return 0;
+  const n = parseFloat(
+    String(valor)
+      .replace('R$', '')
+      .trim()
+      .replace(/\./g, '')
+      .replace(',', '.'),
+  );
+  return Number.isFinite(n) ? n : 0;
+}
+
+function quantidadeParaNumero(quantidade) {
+  const parsed = parseQuantidadeStr(quantidade);
+  const v = parseFloat(String(parsed.valor).replace(/\./g, '').replace(',', '.'));
+  return Number.isFinite(v) ? v : 0;
+}
+
+function formatarMoedaPtBr(valor) {
+  return Number(valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
 function formatarMoedaBr(v) {
   if (v == null || v === '') return '—';
   const n = Number(v);
@@ -244,6 +472,17 @@ function formatDataHoraIso(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
   return formatDataHora(d);
+}
+
+function quantidadeExibicao(g) {
+  const q = String(g?.quantidade_fmt || '').trim();
+  const u = String(g?.unidade || '').trim();
+  if (q && u) return `${q} ${u}`.trim();
+  return q || u || '—';
+}
+
+function calcularTotalItemNum(g) {
+  return quantidadeParaNumero(quantidadeExibicao(g)) * moedaParaNumero(g?.media_fmt);
 }
 
 function chaveGrupo(it) {
@@ -335,8 +574,7 @@ function montarGruposFromItens(itens) {
     const mediaFmt =
       vals.length > 0 ? `R$ ${formatarMoedaBr(vals.reduce((a, b) => a + b, 0) / vals.length)}` : '—';
     const n = members.length;
-    const situacao =
-      n >= MIN_FONTES ? 'Válido' : `Insuficiente (${n} de ${MIN_FONTES} fontes)`;
+    const situacao = n >= MIN_FONTES ? 'Válido' : `Insuficiente (${n} de ${MIN_FONTES} fontes)`;
     return {
       ordem: i + 1,
       nome,
@@ -377,21 +615,17 @@ function obterFonte(tipo) {
   return fontesConvertidas.has(raw) ? 'PNCP' : raw;
 }
 
-function valorTotalItem(g) {
-  const qtd = Number(String(g?.quantidade_fmt || '').replace('.', '').replace(',', '.')) || 0;
-  const media = Number(String(g?.media_fmt || '').replace(/[^\d,]/g, '').replace('.', '').replace(',', '.')) || 0;
-  return `R$ ${formatarMoedaBr(qtd * media)}`;
-}
-
 function aplicarDemo() {
-  tituloCotacao.value = 'Cotação de exemplo';
-  dataPesquisa.value = '—';
-  criadoPor.value = '—';
+  tituloCotacao.value =
+    'Aquisição de medicamentos específicos para atender doações a pacientes em situação de vulnerabilidade social e risco à saúde';
+  dataPesquisa.value = '01/04/2026 08:59';
+  criadoPor.value = 'Edislene Ferreira da Silva';
   criadoPorEmail.value = '';
   termoPncp.value = '—';
+  formulaCalculo.value = 'Média aritmética dos preços obtidos';
+  formulaCalculoId.value = 'media_aritmetica_precos_obtidos';
   grupos.value = DEMO_GRUPOS;
   totalLinhasCotacao.value = DEMO_GRUPOS.reduce((s, g) => s + g.n_cotacoes, 0);
-  cnpjs.value = [];
 }
 
 async function carregar() {
@@ -429,15 +663,15 @@ async function carregar() {
     criadoPor.value = s.criado_por || '—';
     criadoPorEmail.value = (s.criado_por_email || '').trim();
     termoPncp.value = s.termo_busca || '—';
+    formulaCalculo.value = String(s.formula_calculo || '').trim();
+    formulaCalculoId.value = String(s.formula_calculo_id || '').trim();
 
     const itens = Array.isArray(data.itens) ? [...data.itens].sort((a, b) => (a.id ?? 0) - (b.id ?? 0)) : [];
 
     if (Array.isArray(data.grupos_relatorio) && data.grupos_relatorio.length > 0) {
       grupos.value = data.grupos_relatorio;
       totalLinhasCotacao.value =
-        typeof data.total_linhas_cotacao === 'number'
-          ? data.total_linhas_cotacao
-          : itens.length;
+        typeof data.total_linhas_cotacao === 'number' ? data.total_linhas_cotacao : itens.length;
     } else if (itens.length) {
       grupos.value = montarGruposFromItens(itens);
       totalLinhasCotacao.value = itens.length;
@@ -445,8 +679,6 @@ async function carregar() {
       grupos.value = [];
       totalLinhasCotacao.value = 0;
     }
-
-    cnpjs.value = Array.isArray(data.cnpjs_fontes) ? data.cnpjs_fontes : [];
   } catch (err) {
     loadError.value = err?.message || 'Falha ao carregar a cotação.';
     aplicarDemo();
@@ -468,56 +700,478 @@ watch(
 </script>
 
 <style scoped>
-.rpv-page { padding: 16px; background: #f1f5f9; min-height: 100vh; }
-.rpv-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
-.rpv-top__title { margin: 0; font-size: 24px; color: #0f172a; }
-.rpv-top__subtitle { margin: 4px 0 0; color: #64748b; font-size: 13px; }
-.rpv-back { border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; color: #1e293b; text-decoration: none; padding: 8px 12px; font-size: 12px; }
-.rpv-status { margin: 6px 0 12px; font-size: 12px; color: #64748b; }
-.rpv-status--error { color: #b91c1c; }
-.rpv-wrap { max-width: 1200px; margin: 0 auto; display: grid; gap: 14px; }
-.rpv-hero { border-radius: 20px; background: linear-gradient(135deg, #1f4e79 0%, #5f7f9a 100%); color: #fff; padding: 18px; display: grid; grid-template-columns: 140px minmax(0,1fr); gap: 14px; align-items: center; }
-.rpv-hero__logo-wrap { background: #ffffff14; border: 1px solid #ffffff33; border-radius: 14px; padding: 10px; text-align: center; }
-.rpv-hero__logo { width: 100%; max-width: 110px; object-fit: contain; }
-.rpv-kicker { margin: 0; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; opacity: .9; }
-.rpv-hero__title { margin: 4px 0 0; font-size: 24px; }
-.rpv-hero__subtitle { margin: 6px 0 0; font-size: 13px; opacity: .95; }
-.rpv-grid { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 8px; }
-.rpv-info-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 10px; }
-.rpv-info-card--strong { background: #eff6ff; border-color: #bfdbfe; }
-.rpv-label { margin: 0; font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: .04em; }
-.rpv-value { margin: 6px 0 0; font-size: 13px; font-weight: 700; color: #0f172a; line-height: 1.25; }
-.rpv-block { border: 1px solid #e2e8f0; border-radius: 20px; background: #fff; padding: 14px; }
-.rpv-block__title { margin: 0 0 10px; font-size: 18px; color: #0f172a; }
-.rpv-table-wrap { overflow: auto; border: 1px solid #e2e8f0; border-radius: 12px; }
-.rpv-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.rpv-table th { background: #f1f5f9; text-align: left; font-size: 11px; color: #334155; padding: 8px; border-bottom: 1px solid #e2e8f0; }
-.rpv-table td { padding: 8px; border-top: 1px solid #e2e8f0; color: #334155; }
-.rpv-items { display: grid; gap: 10px; }
-.rpv-item { border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; }
-.rpv-item__head { background: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 8px 10px; }
-.rpv-item__kicker { display: block; font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: .05em; }
-.rpv-item__name { display: block; margin-top: 2px; font-size: 13px; color: #0f172a; }
-.rpv-sources { padding: 8px; display: grid; gap: 8px; }
-.rpv-source { position: relative; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafcb3; padding-left: 30px; }
-.rpv-source__index { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; border-radius: 999px; background: #5f7f9a; color: #fff; font-size: 9px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
-.rpv-source__content { padding: 6px; display: grid; gap: 4px; }
-.rpv-row { display: grid; gap: 4px; }
-.rpv-row--3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
-.rpv-row--5 { grid-template-columns: repeat(5, minmax(0,1fr)); }
-.rpv-row--2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
-.rpv-mini { border: 1px solid #d6dde8; border-radius: 8px; background: #fff; padding: 6px 8px; min-height: 34px; }
-.rpv-mini--featured { background: #f8fafc; }
-.rpv-mini span { display: block; font-size: 9px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: .04em; line-height: 1; }
-.rpv-mini b { display: block; margin-top: 4px; font-size: 11px; color: #1e293b; line-height: 1.2; word-break: break-word; }
-.rpv-suppliers { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
-.rpv-supplier { border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; padding: 10px; }
-.rpv-supplier strong { font-size: 13px; color: #0f172a; display: block; margin-bottom: 6px; }
-.rpv-supplier p { margin: 2px 0; font-size: 12px; color: #334155; }
-@media (max-width: 1100px) { .rpv-grid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
-@media (max-width: 900px) {
-  .rpv-hero { grid-template-columns: 1fr; }
-  .rpv-row--3, .rpv-row--5, .rpv-row--2, .rpv-suppliers { grid-template-columns: 1fr; }
-  .rpv-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+.rpv-shell {
+  position: relative;
+  min-height: 100vh;
+  background: linear-gradient(to bottom right, #f1f5f9, #fafafa, #f4f4f5);
+  padding: 16px;
+}
+@media (min-width: 768px) {
+  .rpv-shell {
+    padding: 24px;
+  }
+}
+.rpv-shell__back {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  font-size: 12px;
+  color: #334155;
+  text-decoration: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  padding: 6px 10px;
+}
+.rpv-shell__status {
+  max-width: 1200px;
+  margin: 0 auto 8px;
+  font-size: 12px;
+  color: #64748b;
+}
+.rpv-shell__status--error {
+  color: #b91c1c;
+}
+.rpv-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.rpv-header-card {
+  border-radius: 24px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  padding: 20px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+.rpv-header-card__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #0f172a;
+}
+.rpv-header-card__lead {
+  margin: 8px 0 0;
+  max-width: 42rem;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #334155;
+}
+.rpv-header-card__muted {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #64748b;
+}
+.rpv-info-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+@media (min-width: 768px) {
+  .rpv-info-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1280px) {
+  .rpv-info-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+.rpv-info-card {
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  padding: 8px 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+.rpv-info-card--strong .rpv-info-card__value--strong {
+  font-weight: 700;
+  color: #0f172a;
+}
+.rpv-info-card__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #64748b;
+}
+.rpv-info-card__icon {
+  font-size: 13px;
+  line-height: 1;
+}
+.rpv-info-card__label {
+  font-size: 10px;
+  line-height: 1;
+}
+.rpv-info-card__value {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 500;
+  color: #334155;
+}
+.rpv-panel {
+  width: 100%;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  overflow: hidden;
+}
+.rpv-panel--padded {
+  padding: 24px;
+}
+.rpv-panel--flush {
+  padding: 0;
+}
+.rpv-panel__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.rpv-panel__bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 16px;
+}
+@media (min-width: 1024px) {
+  .rpv-panel__bar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+.rpv-panel__bar--simple {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.rpv-panel__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #0f172a;
+}
+.rpv-panel__subtitle {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+.rpv-chip {
+  border-radius: 999px;
+  background: #edf4ff;
+  padding: 2px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #5f7f9a;
+  white-space: nowrap;
+}
+.rpv-prose {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #334155;
+}
+.rpv-prose p {
+  margin: 0;
+}
+.rpv-metrics {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+@media (min-width: 768px) {
+  .rpv-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.rpv-metric {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 4px 8px;
+}
+.rpv-metric__title {
+  font-size: 11px;
+  color: #64748b;
+}
+.rpv-metric__value {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+.rpv-table-scroll {
+  overflow-x: auto;
+}
+.rpv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.rpv-table thead {
+  background: #f8fafc;
+  color: #475569;
+}
+.rpv-table__th {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.rpv-table__th--narrow {
+  width: 5%;
+}
+.rpv-table__th--wide {
+  width: 45%;
+}
+.rpv-table__th--accent {
+  width: 13%;
+}
+.rpv-table__tr {
+  border-top: 1px solid #e2e8f0;
+}
+.rpv-table__tr:hover {
+  background: rgba(248, 250, 252, 0.7);
+}
+.rpv-table__td {
+  padding: 8px 10px;
+  color: #334155;
+  vertical-align: top;
+}
+.rpv-table__td--num {
+  font-weight: 600;
+  color: #334155;
+}
+.rpv-table__name {
+  font-weight: 600;
+  color: #0f172a;
+}
+.rpv-table__td--medium {
+  font-weight: 500;
+  color: #0f172a;
+}
+.rpv-table__td--accent {
+  font-weight: 600;
+  color: #5f7f9a;
+}
+.rpv-detail-list {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rpv-detail-item {
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+.rpv-detail-item__head {
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 8px 12px;
+}
+.rpv-detail-item__kicker {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+}
+.rpv-detail-item__name {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #0f172a;
+}
+.rpv-detail-item__body {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rpv-source {
+  position: relative;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: rgba(248, 250, 252, 0.65);
+  padding-left: 28px;
+}
+.rpv-source__badge {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #5f7f9a;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+.rpv-source__inner {
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rpv-mini-grid {
+  display: grid;
+  gap: 4px;
+}
+.rpv-mini-grid--3 {
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+  .rpv-mini-grid--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.rpv-mini-grid--5 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 768px) {
+  .rpv-mini-grid--5 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+.rpv-mini-grid--2 {
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+  .rpv-mini-grid--2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.rpv-dcard {
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  padding: 6px 8px;
+  min-height: 34px;
+}
+.rpv-dcard--wide {
+  min-height: 38px;
+}
+.rpv-dcard--featured {
+  background: #f8fafc;
+}
+.rpv-dcard__label {
+  display: block;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: #64748b;
+}
+.rpv-dcard__value {
+  display: block;
+  margin-top: 4px;
+  font-size: 10.5px;
+  line-height: 1.2;
+  font-weight: 500;
+  color: #1e293b;
+  word-break: break-word;
+}
+.rpv-dcard--wide .rpv-dcard__value {
+  font-size: 11px;
+}
+.rpv-dcard__value--strong {
+  font-weight: 700;
+  color: #0f172a;
+}
+.rpv-icon-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.rpv-icon-title__bubble {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #edf4ff;
+  color: #5f7f9a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+.rpv-icon-title__bubble--alt {
+  color: #2f6f86;
+}
+.rpv-quote {
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 16px;
+}
+.rpv-quote p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #334155;
+}
+.rpv-quote--stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rpv-supplier-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+@media (min-width: 768px) {
+  .rpv-supplier-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.rpv-supplier-card {
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 16px;
+}
+.rpv-supplier-card__name {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #0f172a;
+}
+.rpv-supplier-card__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #334155;
+}
+.rpv-supplier-card__k {
+  font-weight: 600;
+  color: #475569;
 }
 </style>

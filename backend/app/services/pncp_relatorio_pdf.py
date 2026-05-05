@@ -6,7 +6,6 @@ Objetivo do módulo (especificação institucional):
   organizada e padronizada para uso institucional.
 - Estrutura clara: título personalizado (definido na geração), data da pesquisa,
   itens consolidados, CNPJs extraídos das fontes quando disponíveis.
-- Marca d’água com identificação do sistema.
 - QR Code com URL do SPA para abrir a cotação no sistema (utilizador autenticado).
 - Padronização visual base (tipografia, margens, tabela de itens) — evolução
   futura: templates institucionais, assinatura digital, versionamento.
@@ -31,6 +30,80 @@ from backend.app.services.pncp_relatorio_itens import (
     agrupar_cotacoes_por_item_relatorio_pesquisa_precos,
     agrupar_itens_relatorio_pesquisa_precos,
 )
+
+DOCUMENTO_TECNICO_LEAD = (
+    "Documento técnico consolidado com metodologia, análise técnica, rastreabilidade das cotações e "
+    "conclusão para suporte à contratação."
+)
+
+_FORMULA_SHORT_LABELS: Dict[str, str] = {
+    "media_aritmetica_precos_obtidos": "Média Aritmética",
+    "mediana_precos_obtidos": "Mediana",
+    "menor_preco": "Menor preço",
+    "media_saneada": "Média saneada",
+    "media_ponderada": "Média ponderada",
+    "media_relativa_25_50": "Média relativa 25%–50%",
+}
+
+
+def _formula_label_short(formula_id: str) -> str:
+    if formula_id in _FORMULA_SHORT_LABELS:
+        return _FORMULA_SHORT_LABELS[formula_id]
+    lab = FORMULA_LABELS.get(formula_id, "") or ""
+    if len(lab) <= 28:
+        return lab or _FORMULA_SHORT_LABELS["media_aritmetica_precos_obtidos"]
+    return lab[:25].rstrip() + "…"
+
+
+def _cnpj_digits_key(raw: str) -> str:
+    return re.sub(r"\D", "", raw or "")
+
+
+def _fornecedores_capa_from_grupos(grupos: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+    by_key: Dict[str, Dict[str, str]] = {}
+    order: List[str] = []
+    for g in grupos or []:
+        for f in g.get("fontes") or []:
+            if not isinstance(f, dict):
+                continue
+            raw_cnpj = str(f.get("cnpj") or "").strip()
+            key = _cnpj_digits_key(raw_cnpj)
+            if len(key) != 14:
+                continue
+            cnpj_fmt = _normalize_cnpj(raw_cnpj)
+            if key not in by_key:
+                by_key[key] = {
+                    "fornecedor": (str(f.get("fornecedor") or "").strip() or "—")[:400],
+                    "cnpj": cnpj_fmt,
+                    "telefone": str(f.get("telefone") or "").strip()[:64],
+                    "email": str(f.get("email") or "").strip()[:255],
+                    "endereco": str(f.get("endereco") or "").strip()[:400],
+                }
+                order.append(key)
+                continue
+            ex = by_key[key]
+            nv = (str(f.get("fornecedor") or "").strip() or "")[:400]
+            if nv and (not ex["fornecedor"] or ex["fornecedor"] in {"—", "Não informado"}):
+                ex["fornecedor"] = nv
+            for fld, mx in (("telefone", 64), ("email", 255), ("endereco", 400)):
+                v2 = str(f.get(fld) or "").strip()[:mx]
+                if v2 and not ex.get(fld, ""):
+                    ex[fld] = v2
+
+    def _ni(v: str) -> str:
+        return v if v else "Não informado"
+
+    return [
+        {
+            "fornecedor": by_key[k]["fornecedor"],
+            "cnpj": by_key[k]["cnpj"],
+            "telefone": _ni(by_key[k].get("telefone", "")),
+            "email": _ni(by_key[k].get("email", "")),
+            "endereco": _ni(by_key[k].get("endereco", "")),
+        }
+        for k in order
+    ]
+
 
 _SERVICES_DIR = Path(__file__).resolve().parent
 
@@ -141,8 +214,11 @@ class RelatorioCotacaoContext:
     anexo_fornecedor_url: str
     formula_calculo_id: str
     formula_calculo_label: str
+    formula_calculo_label_short: str
     orgao_exibicao: str
     valor_total_estimado_fmt: str
+    fornecedores_capa: List[Dict[str, str]]
+    documento_tecnico_lead: str
 
 
 def _formatar_moeda_br(v: Any) -> str:
@@ -282,8 +358,11 @@ def montar_contexto_relatorio(
         anexo_fornecedor_url=(anexo_fornecedor_url or "").strip(),
         formula_calculo_id=formula_id,
         formula_calculo_label=FORMULA_LABELS.get(formula_id, FORMULA_LABELS["media_aritmetica_precos_obtidos"]),
+        formula_calculo_label_short=_formula_label_short(formula_id),
         orgao_exibicao=orgao_exibicao,
         valor_total_estimado_fmt=f"R$ {_formatar_moeda_br(valor_total_estimado)}",
+        fornecedores_capa=_fornecedores_capa_from_grupos(grupos),
+        documento_tecnico_lead=DOCUMENTO_TECNICO_LEAD,
     )
 
 
@@ -294,293 +373,7 @@ _ENV = Environment(
 
 
 _HTML_TEMPLATE = _ENV.from_string(
-    """
-<!DOCTYPE html>
-<html lang="pt-BR" class="rpp rpp--pdf">
-<head>
-  <meta charset="utf-8" />
-  <style>{{ rpp_css | safe }}</style>
-</head>
-<body class="rpp-body rpp--pdf">
-  <div class="rpp-page">
-    <div class="rpp-watermark">{{ ctx.marca_agua_texto }}</div>
-
-    <header id="rpp-head-main" class="rpp-head-main">
-      <div class="rpp-head-main__col rpp-head-main__col--logo">
-        <img class="rpp-head-main__logo" src="logo_branca.png" alt="DocMaster" />
-      </div>
-      <div class="rpp-head-main__col rpp-head-main__col--main">
-        <p class="rpp-kicker">Relatório institucional</p>
-        <h1 class="rpp-title">{{ ctx.titulo_relatorio }}</h1>
-        <p class="rpp-subtitle">Pesquisa de preços (PNCP)</p>
-        <p class="rpp-subtitle rpp-subtitle--detail">
-          Documento técnico consolidado com metodologia, rastreabilidade das cotações e conclusão para suporte à contratação.
-        </p>
-      </div>
-      <div class="rpp-head-main__col rpp-head-main__col--qr">
-        <img class="rpp-head-main__qr" src="{{ ctx.qr_data_url }}" alt="" />
-      </div>
-    </header>
-
-    <div class="rpp-meta-grid">
-      <div class="rpp-card">
-        <span class="rpp-card__label">Órgão</span>
-        <span class="rpp-card__value">{{ ctx.orgao_exibicao }}</span>
-      </div>
-      <div class="rpp-card">
-        <span class="rpp-card__label">Responsável</span>
-        <span class="rpp-card__value">{{ ctx.criado_por }}</span>
-      </div>
-      <div class="rpp-card">
-        <span class="rpp-card__label">Data da pesquisa</span>
-        <span class="rpp-card__value">{{ ctx.data_pesquisa_exibicao }}</span>
-      </div>
-      <div class="rpp-card">
-        <span class="rpp-card__label">Método aplicado</span>
-        <span class="rpp-card__value">{{ ctx.formula_calculo_label }}</span>
-      </div>
-      <div class="rpp-card rpp-card--accent">
-        <span class="rpp-card__label">Valor total estimado</span>
-        <span class="rpp-card__value">{{ ctx.valor_total_estimado_fmt }}</span>
-      </div>
-    </div>
-
-    <section class="rpp-block">
-      <h2 class="rpp-section-title">Metodologia Aplicada</h2>
-      <p class="rpp-section-lead">Base legal, método matemático e critérios de seleção das cotações</p>
-      <div class="rpp-metodologia">
-        <h3 class="rpp-metodologia__title">IN 65/2021 · Lei 14.133</h3>
-        <p>
-          A presente pesquisa de preços foi materializada com base na Lei nº 14.133/2021 e na Instrução Normativa nº 65/2021,
-          adotando como método matemático {{ ctx.formula_calculo_label|lower }}, em conformidade com os parâmetros definidos para esta cotação.
-        </p>
-        <p>
-          Para composição do valor estimado, foram consideradas cotações provenientes de contratação direta, PNCP, CMED,
-          ComprasGov e plataformas eletrônicas, observando compatibilidade do objeto, unidade de medida, recência da contratação,
-          identificação do fornecedor e consistência dos dados.
-        </p>
-        <table class="rpp-table rpp-table--metodologia">
-          <thead>
-            <tr>
-              <th>Critério de seleção</th>
-              <th>Parâmetro aplicado</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Compatibilidade do objeto</td>
-              <td>Descrição, unidade e quantidade equivalentes ao item pesquisado.</td>
-            </tr>
-            <tr>
-              <td>Recência observada</td>
-              <td>Até 12 meses.</td>
-            </tr>
-            <tr>
-              <td>Rastreabilidade</td>
-              <td>CNPJ, fonte e data.</td>
-            </tr>
-          </tbody>
-        </table>
-        <div class="rpp-mini-metrics">
-          <div class="rpp-mini-metric">
-            <span class="rpp-mini-metric__label">Critério</span>
-            <strong class="rpp-mini-metric__value">Compatibilidade</strong>
-          </div>
-          <div class="rpp-mini-metric">
-            <span class="rpp-mini-metric__label">Recência</span>
-            <strong class="rpp-mini-metric__value">Até 12 meses</strong>
-          </div>
-          <div class="rpp-mini-metric">
-            <span class="rpp-mini-metric__label">Rastreabilidade</span>
-            <strong class="rpp-mini-metric__value">CNPJ, fonte e data</strong>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="rpp-block">
-      <h2 class="rpp-section-title">Conclusão Técnica</h2>
-      <p class="rpp-conclusao">
-        Com base nas cotações obtidas, na metodologia aplicada e na análise técnica dos dados, conclui-se que os valores
-        estimados refletem adequadamente os preços praticados no mercado, estando aptos a subsidiar a contratação pública
-        pretendida, com observância aos princípios da economicidade, razoabilidade e eficiência.
-      </p>
-    </section>
-
-    <section class="rpp-block">
-      <h2 class="rpp-section-title">Responsabilidade sobre as informações</h2>
-      <p class="rpp-conclusao">
-        A plataforma disponibiliza um ambiente digital de apoio à pesquisa de preços, consolidando informações
-        de bases públicas e registros de mercado para auxiliar a formação de referência.
-      </p>
-      <p class="rpp-conclusao">
-        Compete exclusivamente ao servidor público responsável a análise crítica, validação, seleção e utilização
-        dos preços, em conformidade com a Lei nº 14.133/2021 e normativos aplicáveis.
-      </p>
-      <p class="rpp-conclusao">
-        Assim, a plataforma atua como ferramenta de apoio à decisão, não substituindo o dever de diligência e
-        responsabilidade técnica do agente público.
-      </p>
-    </section>
-
-    <section class="rpp-block">
-      <h2 class="rpp-section-title">Resultado consolidado</h2>
-      <p class="rpp-section-lead">Resumo dos itens com média definida e situação da pesquisa.</p>
-      <div class="rpp-table-wrap">
-        <table class="rpp-table rpp-table--consolidado">
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>Descrição</th>
-              <th>Quantidade</th>
-              <th>Cotações válidas</th>
-              <th>Média</th>
-              <th>Valor total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for g in ctx.grupos %}
-            <tr>
-              <td>{{ g.ordem }}</td>
-              <td>{{ g.nome }}</td>
-              <td>{{ g.quantidade_fmt }} {{ g.unidade }}</td>
-              <td>{{ g.n_cotacoes }}</td>
-              <td>{{ g.media_fmt }}</td>
-              <td>{{ g.valor_total_item_fmt }}</td>
-            </tr>
-            {% else %}
-            <tr>
-              <td colspan="6" class="rpp-cnpj-empty">Nenhum item agrupado nesta cotação.</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="rpp-block">
-      <h2 class="rpp-section-title">Detalhamento dos itens</h2>
-      <p class="rpp-section-lead">Ficha técnica do item e fontes utilizadas na composição do preço (cada linha importada é uma fonte; o mesmo produto agrupa 3 ou mais cotações).</p>
-      {% for g in ctx.grupos %}
-      <div class="rpp-detalhe-item">
-        <div class="rpp-detalhe-item__head">
-          <span class="rpp-detalhe-item__kicker">Item {{ g.ordem }}</span>
-          <div class="rpp-detalhe-item__nome">{{ g.nome }}</div>
-        </div>
-        <div class="rpp-detalhe-item__meta">
-          <div class="rpp-mini-card">
-            <span class="rpp-mini-card__label">Identificação (ID do item)</span>
-            <span class="rpp-mini-card__value">ID {{ g.ordem }}</span>
-          </div>
-          <div class="rpp-mini-card">
-            <span class="rpp-mini-card__label">Quantidade</span>
-            <span class="rpp-mini-card__value">{{ g.quantidade_fmt }}</span>
-          </div>
-          <div class="rpp-mini-card">
-            <span class="rpp-mini-card__label">Unidade</span>
-            <span class="rpp-mini-card__value">{{ g.unidade }}</span>
-          </div>
-        </div>
-        <div class="rpp-fontes-cards">
-          {% for f in g.fontes %}
-          <div class="rpp-fonte-card">
-            <div class="rpp-fonte-card__index">{{ loop.index }}</div>
-            <div class="rpp-fonte-card__content">
-              <div class="rpp-fonte-row rpp-fonte-row--3">
-                <div class="rpp-mini-compact rpp-mini-compact--featured">
-                  <span class="rpp-mini-compact__label">Fornecedor</span>
-                  <span class="rpp-mini-compact__value rpp-mini-compact__value--strong">{{ f.fornecedor }}</span>
-                </div>
-                <div class="rpp-mini-compact">
-                  <span class="rpp-mini-compact__label">CNPJ</span>
-                  <span class="rpp-mini-compact__value">{{ f.cnpj }}</span>
-                </div>
-                <div class="rpp-mini-compact rpp-mini-compact--featured">
-                  <span class="rpp-mini-compact__label">Valor</span>
-                  <span class="rpp-mini-compact__value rpp-mini-compact__value--strong">{{ f.valor }}</span>
-                </div>
-              </div>
-
-              <div class="rpp-fonte-row rpp-fonte-row--3">
-                <div class="rpp-mini-compact">
-                  <span class="rpp-mini-compact__label">Órgão</span>
-                  <span class="rpp-mini-compact__value">{{ f.orgao }}</span>
-                </div>
-                <div class="rpp-mini-compact">
-                  <span class="rpp-mini-compact__label">Modalidade</span>
-                  <span class="rpp-mini-compact__value">{{ f.modalidade_label }}</span>
-                </div>
-                <div class="rpp-mini-compact">
-                  <span class="rpp-mini-compact__label">Data</span>
-                  <span class="rpp-mini-compact__value">{{ f.data }}</span>
-                </div>
-              </div>
-
-              <div class="rpp-fonte-row rpp-fonte-row--5">
-                <div class="rpp-mini-compact rpp-mini-compact--wide">
-                  <span class="rpp-mini-compact__label">ID / Processo</span>
-                  <span class="rpp-mini-compact__value">{{ loop.index }} / {{ f.processo or 'N/D' }}</span>
-                </div>
-                <div class="rpp-mini-compact">
-                  <span class="rpp-mini-compact__label">Qtd.</span>
-                  <span class="rpp-mini-compact__value">{{ g.quantidade_fmt }}</span>
-                </div>
-                <div class="rpp-mini-compact">
-                  <span class="rpp-mini-compact__label">Unid.</span>
-                  <span class="rpp-mini-compact__value">{{ g.unidade }}</span>
-                </div>
-                <div class="rpp-mini-compact">
-                  <span class="rpp-mini-compact__label">Fonte</span>
-                  <span class="rpp-mini-compact__value">{{ f.fonte_label }}</span>
-                </div>
-                <div class="rpp-mini-compact">
-                  <span class="rpp-mini-compact__label">UF</span>
-                  <span class="rpp-mini-compact__value">{{ f.uf_label }}</span>
-                </div>
-              </div>
-
-              <div class="rpp-fonte-row rpp-fonte-row--2">
-                <div class="rpp-mini-compact rpp-mini-compact--wide">
-                  <span class="rpp-mini-compact__label">Descrição do item</span>
-                  <span class="rpp-mini-compact__value">{{ g.nome }}</span>
-                </div>
-                <div class="rpp-mini-compact rpp-mini-compact--wide">
-                  <span class="rpp-mini-compact__label">Ajuste</span>
-                  <span class="rpp-mini-compact__value">{{ f.ajuste }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      {% endfor %}
-    </section>
-
-    <section class="rpp-block">
-      <h2 class="rpp-section-title">Informações dos fornecedores</h2>
-      <p class="rpp-section-lead">Dados cadastrais identificados nas fontes da pesquisa</p>
-      {% if ctx.cnpjs_fontes %}
-      <div class="rpp-fornecedores-grid">
-        {% for c in ctx.cnpjs_fontes %}
-        <div class="rpp-fornecedor-card">
-          <div class="rpp-fornecedor-card__title">Fornecedor {{ loop.index }}</div>
-          <div class="rpp-fornecedor-card__line"><strong>CNPJ:</strong> {{ c }}</div>
-          <div class="rpp-fornecedor-card__line"><strong>Telefone:</strong> Não informado</div>
-          <div class="rpp-fornecedor-card__line"><strong>Email:</strong> Não informado</div>
-          <div class="rpp-fornecedor-card__line"><strong>Endereço:</strong> Não informado</div>
-        </div>
-        {% endfor %}
-      </div>
-      {% else %}
-      <p class="rpp-cnpj-empty">Nenhum CNPJ estruturado foi localizado nos metadados salvos dos itens.</p>
-      {% endif %}
-    </section>
-
-  </div>
-</body>
-</html>
-"""
+'<!DOCTYPE html>\n<html lang="pt-BR" class="rpp rpp--pdf">\n<head>\n  <meta charset="utf-8" />\n  <style>{{ rpp_css | safe }}</style>\n</head>\n<body class="rpp-body rpp--pdf">\n  <header id="rpp-head-main" class="rpp-head-main rpp-head-main--jsx">\n    <div class="rpp-head-main__col rpp-head-main__col--brand">\n      <span class="rpp-brand-mark">DocMaster</span>\n    </div>\n    <div class="rpp-head-main__col rpp-head-main__col--runtitle">\n      <span class="rpp-head-run-title">Relatório de pesquisa de preços</span>\n    </div>\n    <div class="rpp-head-main__col rpp-head-main__col--qr">\n      <img class="rpp-head-main__qr" src="{{ ctx.qr_data_url }}" alt="" />\n    </div>\n  </header>\n\n  <div class="rpp-page">\n    <header class="rpp-hero">\n      <h1 class="rpp-hero__title">Relatório de pesquisa de preços</h1>\n      <p class="rpp-hero__lead">{{ ctx.titulo_cotacao }}</p>\n      <p class="rpp-hero__muted">{{ ctx.documento_tecnico_lead }}</p>\n    </header>\n\n    <div class="rpp-info-grid">\n      <div class="rpp-info-card">\n        <div class="rpp-info-card__row">\n          <span class="rpp-emo" aria-hidden="true">🏛️</span>\n          <span class="rpp-info-card__label">Órgão</span>\n        </div>\n        <p class="rpp-info-card__value">{{ ctx.orgao_exibicao }}</p>\n      </div>\n      <div class="rpp-info-card">\n        <div class="rpp-info-card__row">\n          <span class="rpp-emo" aria-hidden="true">👤</span>\n          <span class="rpp-info-card__label">Responsável</span>\n        </div>\n        <p class="rpp-info-card__value">{{ ctx.criado_por }}</p>\n      </div>\n      <div class="rpp-info-card">\n        <div class="rpp-info-card__row">\n          <span class="rpp-emo" aria-hidden="true">📅</span>\n          <span class="rpp-info-card__label">Data da pesquisa</span>\n        </div>\n        <p class="rpp-info-card__value">{{ ctx.data_pesquisa_exibicao }}</p>\n      </div>\n      <div class="rpp-info-card">\n        <div class="rpp-info-card__row">\n          <span class="rpp-emo" aria-hidden="true">Σ</span>\n          <span class="rpp-info-card__label">Método aplicado</span>\n        </div>\n        <p class="rpp-info-card__value">{{ ctx.formula_calculo_label_short }}</p>\n      </div>\n      <div class="rpp-info-card rpp-info-card--strong">\n        <div class="rpp-info-card__row">\n          <span class="rpp-emo" aria-hidden="true">✓</span>\n          <span class="rpp-info-card__label">Valor total estimado</span>\n        </div>\n        <p class="rpp-info-card__value rpp-info-card__value--money">{{ ctx.valor_total_estimado_fmt }}</p>\n      </div>\n    </div>\n\n    <section class="rpp-panel rpp-panel--padded">\n      <div class="rpp-panel__head">\n        <div>\n          <h2 class="rpp-panel__title">Metodologia aplicada</h2>\n          <p class="rpp-panel__subtitle">Base legal, método matemático e critérios técnicos adotados</p>\n        </div>\n        <span class="rpp-chip">IN 65/2021 · Lei 14.133</span>\n      </div>\n      <div class="rpp-prose">\n        <p>A pesquisa foi realizada com base na Lei nº 14.133/2021 e na IN nº 65/2021.</p>\n        <p>\n          As cotações selecionadas foram obtidas por meio de consultas ao Portal Nacional de Contratações Públicas – PNCP,\n          bancos de dados públicos e pesquisa direta de mercado, observando-se a compatibilidade da descrição do objeto,\n          a unidade de medida, a recência das informações, a natureza da contratação e a consistência dos dados utilizados\n          para formação do preço estimado.\n        </p>\n        <p>Os valores estimados mostram-se compatíveis com o mercado e adequados para subsidiar a contratação.</p>\n      </div>\n      <div class="rpp-mini-metrics">\n        <div class="rpp-mini-metric">\n          <div class="rpp-mini-metric__label">Critério</div>\n          <strong class="rpp-mini-metric__value">Compatibilidade</strong>\n        </div>\n        <div class="rpp-mini-metric">\n          <div class="rpp-mini-metric__label">Recência</div>\n          <strong class="rpp-mini-metric__value">Até 12 meses</strong>\n        </div>\n        <div class="rpp-mini-metric">\n          <div class="rpp-mini-metric__label">Rastreabilidade</div>\n          <strong class="rpp-mini-metric__value">CNPJ, fonte e data</strong>\n        </div>\n      </div>\n    </section>\n\n    <section class="rpp-panel rpp-panel--flush">\n      <div class="rpp-panel__bar">\n        <div>\n          <h2 class="rpp-panel__title">Resultado consolidado</h2>\n          <p class="rpp-panel__subtitle">Resumo dos itens com média definida e situação da pesquisa</p>\n        </div>\n      </div>\n      <div class="rpp-table-scroll">\n        <table class="rpp-table rpp-table--consolidado">\n          <thead>\n            <tr>\n              <th class="rpp-th rpp-th--narrow">Item</th>\n              <th class="rpp-th rpp-th--wide">Descrição</th>\n              <th class="rpp-th">Quantidade</th>\n              <th class="rpp-th">Cotações válidas</th>\n              <th class="rpp-th">Média</th>\n              <th class="rpp-th rpp-th--accent">Valor total</th>\n            </tr>\n          </thead>\n          <tbody>\n            {% for g in ctx.grupos %}\n            <tr>\n              <td class="rpp-td rpp-td--num">{{ g.ordem }}</td>\n              <td class="rpp-td"><div class="rpp-td-name">{{ g.nome }}</div></td>\n              <td class="rpp-td">{{ g.quantidade_fmt }} {{ g.unidade }}</td>\n              <td class="rpp-td">{{ g.n_cotacoes }}</td>\n              <td class="rpp-td rpp-td--medium">{{ g.media_fmt }}</td>\n              <td class="rpp-td rpp-td--money">{{ g.valor_total_item_fmt }}</td>\n            </tr>\n            {% else %}\n            <tr>\n              <td colspan="6" class="rpp-cnpj-empty">Nenhum item agrupado nesta cotação.</td>\n            </tr>\n            {% endfor %}\n          </tbody>\n        </table>\n      </div>\n    </section>\n\n    <section class="rpp-panel rpp-panel--flush">\n      <div class="rpp-panel__bar rpp-panel__bar--simple">\n        <div>\n          <h2 class="rpp-panel__title">Detalhamento dos itens</h2>\n          <p class="rpp-panel__subtitle">Ficha técnica do item e fontes utilizadas na composição do preço</p>\n        </div>\n      </div>\n      <div class="rpp-detail-list">\n        {% for g in ctx.grupos %}\n        <article class="rpp-detalhe-item">\n          <header class="rpp-detalhe-item__head">\n            <span class="rpp-detalhe-item__kicker">Item {{ g.ordem }}</span>\n            <div class="rpp-detalhe-item__nome">{{ g.nome }}</div>\n          </header>\n          <div class="rpp-fontes-cards">\n            {% for f in g.fontes %}\n            <div class="rpp-fonte-card">\n              <div class="rpp-fonte-card__index">{{ loop.index }}</div>\n              <div class="rpp-fonte-card__content">\n                <div class="rpp-fonte-row rpp-fonte-row--3">\n                  <div class="rpp-mini-compact rpp-mini-compact--featured">\n                    <span class="rpp-mini-compact__label">Fornecedor</span>\n                    <span class="rpp-mini-compact__value rpp-mini-compact__value--strong">{{ f.fornecedor }}</span>\n                  </div>\n                  <div class="rpp-mini-compact">\n                    <span class="rpp-mini-compact__label">CNPJ</span>\n                    <span class="rpp-mini-compact__value">{{ f.cnpj }}</span>\n                  </div>\n                  <div class="rpp-mini-compact rpp-mini-compact--featured">\n                    <span class="rpp-mini-compact__label">Valor</span>\n                    <span class="rpp-mini-compact__value rpp-mini-compact__value--strong">{{ f.valor }}</span>\n                  </div>\n                </div>\n                <div class="rpp-fonte-row rpp-fonte-row--3">\n                  <div class="rpp-mini-compact">\n                    <span class="rpp-mini-compact__label">Órgão</span>\n                    <span class="rpp-mini-compact__value">{{ f.orgao }}</span>\n                  </div>\n                  <div class="rpp-mini-compact">\n                    <span class="rpp-mini-compact__label">Modalidade</span>\n                    <span class="rpp-mini-compact__value">{{ f.modalidade_label }}</span>\n                  </div>\n                  <div class="rpp-mini-compact">\n                    <span class="rpp-mini-compact__label">Data</span>\n                    <span class="rpp-mini-compact__value">{{ f.data }}</span>\n                  </div>\n                </div>\n                <div class="rpp-fonte-row rpp-fonte-row--5">\n                  <div class="rpp-mini-compact rpp-mini-compact--wide">\n                    <span class="rpp-mini-compact__label">ID / Processo</span>\n                    <span class="rpp-mini-compact__value">{{ loop.index }} / {{ f.processo or \'N/D\' }}</span>\n                  </div>\n                  <div class="rpp-mini-compact">\n                    <span class="rpp-mini-compact__label">Qtd.</span>\n                    <span class="rpp-mini-compact__value">{{ g.quantidade_fmt }}</span>\n                  </div>\n                  <div class="rpp-mini-compact">\n                    <span class="rpp-mini-compact__label">Unid.</span>\n                    <span class="rpp-mini-compact__value">{{ g.unidade }}</span>\n                  </div>\n                  <div class="rpp-mini-compact">\n                    <span class="rpp-mini-compact__label">Fonte</span>\n                    <span class="rpp-mini-compact__value">{{ f.fonte_label }}</span>\n                  </div>\n                  <div class="rpp-mini-compact">\n                    <span class="rpp-mini-compact__label">UF</span>\n                    <span class="rpp-mini-compact__value">{{ f.uf_label }}</span>\n                  </div>\n                </div>\n                <div class="rpp-fonte-row rpp-fonte-row--2">\n                  <div class="rpp-mini-compact rpp-mini-compact--wide">\n                    <span class="rpp-mini-compact__label">Descrição do item</span>\n                    <span class="rpp-mini-compact__value">{{ g.nome }}</span>\n                  </div>\n                  <div class="rpp-mini-compact rpp-mini-compact--wide">\n                    <span class="rpp-mini-compact__label">Ajuste</span>\n                    <span class="rpp-mini-compact__value">{{ f.ajuste }}</span>\n                  </div>\n                </div>\n              </div>\n            </div>\n            {% endfor %}\n          </div>\n        </article>\n        {% endfor %}\n      </div>\n    </section>\n\n    <section class="rpp-panel rpp-panel--padded">\n      <div class="rpp-icon-title">\n        <div class="rpp-icon-title__bubble">✓</div>\n        <div>\n          <h2 class="rpp-panel__title">Conclusão técnica</h2>\n          <p class="rpp-panel__subtitle">Síntese conclusiva da pesquisa de preços</p>\n        </div>\n      </div>\n      <div class="rpp-quote">\n        <p>\n          Com base nas cotações obtidas, na metodologia aplicada e na análise técnica dos dados, conclui-se que os valores\n          estimados refletem adequadamente os preços praticados no mercado, estando aptos a subsidiar a contratação pública\n          pretendida, com observância aos princípios da economicidade, razoabilidade e eficiência.\n        </p>\n      </div>\n    </section>\n\n    <section class="rpp-panel rpp-panel--padded">\n      <div class="rpp-icon-title">\n        <div class="rpp-icon-title__bubble rpp-icon-title__bubble--alt">🛡️</div>\n        <div>\n          <h2 class="rpp-panel__title">Responsabilidade sobre as informações</h2>\n          <p class="rpp-panel__subtitle">Esclarecimento quanto ao uso da plataforma</p>\n        </div>\n      </div>\n      <div class="rpp-quote rpp-quote--stack">\n        <p>\n          A plataforma disponibiliza um ambiente digital de apoio à pesquisa de preços, no qual são consolidadas informações\n          oriundas de diferentes origens, tais como bases públicas, sistemas oficiais e registros de mercado, com o objetivo\n          de auxiliar na formação de referência de valores.\n        </p>\n        <p>\n          Compete exclusivamente ao servidor público responsável pela pesquisa a análise crítica, validação, seleção e\n          utilização dos preços, em conformidade com a legislação vigente, especialmente a Lei nº 14.133/2021, normativos\n          aplicáveis e orientações dos órgãos de controle.\n        </p>\n        <p>\n          Dessa forma, a plataforma atua como ferramenta de apoio à tomada de decisão, não substituindo o dever de diligência,\n          responsabilidade técnica e julgamento administrativo do agente público.\n        </p>\n      </div>\n    </section>\n\n    <section class="rpp-panel rpp-panel--padded">\n      <div class="rpp-icon-title">\n        <div class="rpp-icon-title__bubble rpp-icon-title__bubble--alt">🏛️</div>\n        <div>\n          <h2 class="rpp-panel__title">Informações dos fornecedores</h2>\n          <p class="rpp-panel__subtitle">Dados cadastrais e de contato</p>\n        </div>\n      </div>\n      {% if ctx.fornecedores_capa %}\n      <div class="rpp-fornecedores-grid">\n        {% for fo in ctx.fornecedores_capa %}\n        <article class="rpp-fornecedor-card">\n          <div class="rpp-fornecedor-card__name">{{ fo.fornecedor }}</div>\n          <div class="rpp-fornecedor-card__lines">\n            <div><span class="rpp-fornecedor-card__k">CNPJ:</span> {{ fo.cnpj }}</div>\n            <div><span class="rpp-fornecedor-card__k">Telefone:</span> {{ fo.telefone }}</div>\n            <div><span class="rpp-fornecedor-card__k">Email:</span> {{ fo.email }}</div>\n            <div><span class="rpp-fornecedor-card__k">Endereço:</span> {{ fo.endereco }}</div>\n          </div>\n        </article>\n        {% endfor %}\n      </div>\n      {% else %}\n      <p class="rpp-cnpj-empty">Nenhum CNPJ estruturado foi localizado nas fontes desta pesquisa.</p>\n      {% endif %}\n    </section>\n  </div>\n</body>\n</html>\n'
 )
 
 

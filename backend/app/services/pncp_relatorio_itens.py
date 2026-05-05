@@ -235,14 +235,28 @@ def _build_supplier_name_index(rows: List[Any]) -> Dict[str, str]:
     return idx
 
 
+def _endereco_de_source(src: Dict[str, Any]) -> str:
+    partes: List[str] = []
+    for k in ("logradouro", "numero", "complemento", "bairro", "municipio", "uf", "cep"):
+        v = str(src.get(k) or "").strip()
+        if v:
+            partes.append(v)
+    if partes:
+        return ", ".join(partes)[:400]
+    v = _pick_source(src, "endereco", "enderecoCompleto", "endereco_completo", default="")
+    return (v or "")[:400]
+
+
 def fonte_dict_de_item(it: Any, *, tz, supplier_name_by_cnpj: Optional[Dict[str, str]] = None) -> Dict[str, str]:
     """Uma linha ORM → uma linha da tabela «fontes» do detalhamento."""
     src: Dict[str, Any] = getattr(it, "source", None) or {}
     if not isinstance(src, dict):
         src = {}
 
-    # Regra de negócio: no relatório final, a fonte deve ser exibida como PNCP.
-    tipo = "PNCP"
+    tipo = (getattr(it, "modalidade", None) or "").strip()
+    if not tipo:
+        tipo = _pick_source(src, "tipo", "fonte", "origem", "tipoFonte", default="")
+    tipo = (tipo or "PNCP")[:120]
 
     cnpj_fornecedor = _pick_supplier_cnpj_from_source(src)
     fornecedor = _pick_supplier_name_from_source(src)
@@ -278,6 +292,18 @@ def fonte_dict_de_item(it: Any, *, tz, supplier_name_by_cnpj: Optional[Dict[str,
 
     ajuste = _pick_source(src, "ajuste", "observacao_frete", "frete", default="Sem frete")
 
+    telefone = _pick_source(
+        src,
+        "telefone",
+        "ddd_telefone_1",
+        "ddd_telefone_2",
+        "telefone1",
+        "telefone2",
+        default="",
+    )
+    email = _pick_source(src, "email", "emailFornecedor", "email_fornecedor", default="")
+    endereco = _endereco_de_source(src)
+
     return {
         "tipo": tipo[:120],
         "fornecedor": fornecedor[:400],
@@ -289,6 +315,9 @@ def fonte_dict_de_item(it: Any, *, tz, supplier_name_by_cnpj: Optional[Dict[str,
         "municipio_uf": municipio_uf[:120],
         "processo": str(processo)[:120],
         "ajuste": ajuste[:120],
+        "telefone": telefone[:64],
+        "email": email[:255],
+        "endereco": endereco,
     }
 
 

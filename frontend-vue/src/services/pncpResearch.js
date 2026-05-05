@@ -2,15 +2,30 @@
 const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 
 function extractErrorMessage(payload, status) {
+  let p = payload;
+  if (typeof p === 'string') {
+    const t = p.trim();
+    if (t.startsWith('{') || t.startsWith('[')) {
+      try {
+        p = JSON.parse(t);
+      } catch {
+        /* manter string */
+      }
+    }
+  }
   const raw =
-    typeof payload === 'object' && payload !== null ? payload?.detail || payload?.error : payload;
+    typeof p === 'object' && p !== null ? p?.detail || p?.error : p;
   const msg = String(raw || '').trim();
   const looksLikeHtml =
     /^<!doctype html/i.test(msg) || /^<html/i.test(msg) || /<body[\s>]/i.test(msg.slice(0, 400));
   // Gateway/Django HTML error page — não há JSON com detalhe.
   if (looksLikeHtml) {
-    if (status >= 500)
+    if (status >= 500) {
+      if (status === 502 || status === 504) {
+        return 'O proxy ou o gateway encerrou a ligação (502/504). Se estiver a gerar um PDF grande, peça ao administrador para desativar buffering no nginx (proxy_buffering off) ou aumentar timeouts para /api/.';
+      }
       return 'Servidor ou proxy retornou erro temporário (sem detalhe). Tente novamente em instantes.';
+    }
     return `Erro HTTP ${status}`;
   }
   if (status >= 500 && !msg) {
@@ -337,24 +352,58 @@ export async function downloadCotacaoRelatorioPdf(
       await sleep(POLL_MS);
       continue;
     }
+
     if (!pollRes.ok) {
-      const payload = pollCtype.includes('application/json') ? await pollRes.json() : await pollRes.text();
+      const payload = pollCtype.includes('application/json')
+        ? await pollRes.json()
+        : await pollRes.text();
       throw new Error(extractErrorMessage(payload, pollRes.status));
     }
 
-    if (!pollCtype.includes('application/pdf') && !pollCtype.includes('octet-stream')) {
-      const payload = pollCtype.includes('application/json') ? await pollRes.json() : await pollRes.text();
+    if (!pollCtype.includes('application/json')) {
+      const payload = await pollRes.text();
       throw new Error(extractErrorMessage(payload, pollRes.status));
+    }
+
+    const pollData = await pollRes.json();
+    if (pollData?.status === 'pending') {
+      await sleep(POLL_MS);
+      continue;
+    }
+    if (pollData?.status !== 'done' || !pollData?.file_url) {
+      throw new Error('Resposta inesperada ao consultar o estado do PDF.');
+    }
+
+    const fileUrl = `${API_BASE}${pollData.file_url}`;
+    let fileRes;
+    try {
+      fileRes = await fetch(fileUrl, { credentials: 'include', signal });
+    } catch (err) {
+      throw mapNetworkError(err, 'blob');
+    }
+    const fileCtype = (fileRes.headers.get('content-type') || '').toLowerCase();
+    if (!fileRes.ok) {
+      const payload = fileCtype.includes('application/json')
+        ? await fileRes.json()
+        : await fileRes.text();
+      throw new Error(extractErrorMessage(payload, fileRes.status));
+    }
+    if (!fileCtype.includes('application/pdf') && !fileCtype.includes('octet-stream')) {
+      const payload = fileCtype.includes('application/json')
+        ? await fileRes.json()
+        : await fileRes.text();
+      throw new Error(extractErrorMessage(payload, fileRes.status));
     }
 
     let blob;
     try {
-      blob = await pollRes.blob();
+      blob = await fileRes.blob();
     } catch (err) {
       throw mapNetworkError(err, 'blob');
     }
-    const cd = pollRes.headers.get('content-disposition') || '';
-    const filename = parseFilenameFromContentDisposition(cd);
+    const cd = fileRes.headers.get('content-disposition') || '';
+    const headerName = parseFilenameFromContentDisposition(cd);
+    const filename = headerName || String(pollData.filename || '').trim() || '';
     return { blob, filename };
   }
 

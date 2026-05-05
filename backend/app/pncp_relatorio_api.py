@@ -5,7 +5,9 @@ POST …/relatorio/pdf — gera PDF de forma síncrona (legado).
 
 POST …/relatorio/pdf/start — enfileira geração e devolve 202 + job_id (evita timeout de proxy).
 
-GET  …/relatorio/pdf/jobs/<uuid> — enquanto pendente devolve 202 JSON; quando pronto devolve o PDF.
+GET  …/relatorio/pdf/jobs/<uuid> — enquanto pendente devolve 202 JSON; quando pronto devolve 200 JSON com file_url.
+
+GET  …/relatorio/pdf/jobs/<uuid>/file — devolve o PDF (evita misturar JSON e binário no mesmo URL, o que confunde proxies).
 
 O QR codifica a URL do SPA para abrir a cotação com usuário autenticado
 (/pesquisador-pncp/cotacoes/<id>). Base fixa: PNCP_RELATORIO_QR_FRONTEND_BASE_URL (default docmasteria.com.br).
@@ -292,6 +294,33 @@ def _write_job_meta_error(meta_path: Path, message: str) -> None:
         pass
 
 
+def _meta_sessao_id_int(meta: Dict[str, Any]) -> int:
+    try:
+        return int(meta.get("sessao_id", -1))
+    except (TypeError, ValueError):
+        return -1
+
+
+def _load_relatorio_job_meta(job_key: str) -> Tuple[Dict[str, Any] | None, JsonResponse | None]:
+    meta_path = _relatorio_pdf_jobs_dir() / f"{job_key}.meta.json"
+    if not meta_path.is_file():
+        return None, JsonResponse({"detail": "Job não encontrado."}, status=404)
+    try:
+        return json.loads(meta_path.read_text(encoding="utf-8")), None
+    except json.JSONDecodeError:
+        return None, JsonResponse({"detail": "Metadados do job inválidos."}, status=500)
+
+
+def _forbidden_job_owner() -> JsonResponse:
+    return JsonResponse({"detail": "Não autorizado."}, status=403)
+
+
+def _assert_relatorio_job_owner(meta: Dict[str, Any], user, sessao_id: int) -> JsonResponse | None:
+    if _meta_sessao_id_int(meta) != sessao_id or meta.get("user_id") != user.id:
+        return _forbidden_job_owner()
+    return None
+
+
 def _run_relatorio_pdf_job(
     *,
     job_id: str,
@@ -444,40 +473,82 @@ def pncp_cotacao_relatorio_pdf_start(request, sessao_id: int):
 def pncp_cotacao_relatorio_pdf_job_poll(request, sessao_id: int, job_id: UUID):
     if request.method == "OPTIONS":
         return JsonResponse({}, status=204)
-
-    job_key = str(job_id)
-    meta_path = _relatorio_pdf_jobs_dir() / f"{job_key}.meta.json"
-    if not meta_path.is_file():
-        return JsonResponse({"detail": "Job não encontrado."}, status=404)
     try:
-        meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return JsonResponse({"detail": "Metadados do job inválidos."}, status=500)
+        job_key = str(job_id)
+        meta, err = _load_relatorio_job_meta(job_key)
+        if err:
+            return err
+        assert meta is not None
+        owner_err = _assert_relatorio_job_owner(meta, request.user, sessao_id)
+        if owner_err:
+            return owner_err
 
-    if int(meta.get("sessao_id", -1)) != sessao_id or meta.get("user_id") != request.user.id:
-        return JsonResponse({"detail": "Não autorizado."}, status=403)
+        status = meta.get("status")
+        if status == "pending":
+            return JsonResponse({"status": "pending"}, status=202)
+        if status == "error":
+            return JsonResponse(
+                {
+                    "status": "error",
+                    "detail": meta.get("error", "Erro ao gerar PDF."),
+                },
+                status=422,
+            )
+        if status != "done":
+            return JsonResponse({"detail": "Estado do job desconhecido.", "status": str(status)}, status=500)
 
-    status = meta.get("status")
-    if status == "pending":
-        return JsonResponse({"status": "pending"}, status=202)
-    if status == "error":
-        return JsonResponse({"detail": meta.get("error", "Erro ao gerar PDF.")}, status=500)
-    if status != "done":
-        return JsonResponse({"detail": "Estado do job desconhecido."}, status=500)
+        pdf_path = _relatorio_pdf_jobs_dir() / f"{job_key}.pdf"
+        if not pdf_path.is_file():
+            return JsonResponse({"detail": "Arquivo PDF não encontrado."}, status=500)
 
-    pdf_path = _relatorio_pdf_jobs_dir() / f"{job_key}.pdf"
-    if not pdf_path.is_file():
-        return JsonResponse({"detail": "Arquivo PDF não encontrado."}, status=500)
+        fname = str(meta.get("filename") or "relatorio.pdf")
+        file_url = (
+            f"/api/pncp/cotacoes/research/sessions/{sessao_id}/relatorio/pdf/jobs/{job_key}/file"
+        )
+        return JsonResponse(
+            {
+                "status": "done",
+                "filename": fname,
+                "file_url": file_url,
+            }
+        )
+    except Exception as e:
+        return JsonResponse({"detail": f"Erro ao consultar o job ({e})."}, status=500)
 
-    fname = str(meta.get("filename") or "relatorio.pdf")
-    fh = pdf_path.open("rb")
-    resp = FileResponse(fh, as_attachment=True, filename=fname, content_type="application/pdf")
-    resp["Access-Control-Expose-Headers"] = "Content-Disposition, X-Relatorio-Layout-Version"
-    resp["X-Relatorio-Layout-Version"] = "fontes-cards-v1"
-    resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-    resp["Pragma"] = "no-cache"
-    resp["Expires"] = "0"
-    return resp
+
+@api_login_required
+@csrf_exempt
+@require_http_methods(["GET", "OPTIONS"])
+def pncp_cotacao_relatorio_pdf_job_file(request, sessao_id: int, job_id: UUID):
+    if request.method == "OPTIONS":
+        return JsonResponse({}, status=204)
+    try:
+        job_key = str(job_id)
+        meta, err = _load_relatorio_job_meta(job_key)
+        if err:
+            return err
+        assert meta is not None
+        owner_err = _assert_relatorio_job_owner(meta, request.user, sessao_id)
+        if owner_err:
+            return owner_err
+        if meta.get("status") != "done":
+            return JsonResponse({"detail": "O PDF ainda não está pronto."}, status=409)
+
+        pdf_path = _relatorio_pdf_jobs_dir() / f"{job_key}.pdf"
+        if not pdf_path.is_file():
+            return JsonResponse({"detail": "Arquivo PDF não encontrado."}, status=500)
+
+        fname = str(meta.get("filename") or "relatorio.pdf")
+        fh = pdf_path.open("rb")
+        resp = FileResponse(fh, as_attachment=True, filename=fname, content_type="application/pdf")
+        resp["Access-Control-Expose-Headers"] = "Content-Disposition, X-Relatorio-Layout-Version"
+        resp["X-Relatorio-Layout-Version"] = "fontes-cards-v1"
+        resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        resp["Pragma"] = "no-cache"
+        resp["Expires"] = "0"
+        return resp
+    except Exception as e:
+        return JsonResponse({"detail": f"Erro ao transferir o PDF ({e})."}, status=500)
 
 
 @api_login_required

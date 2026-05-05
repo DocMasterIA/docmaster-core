@@ -451,8 +451,13 @@ PNCP_RELATORIO_QR_FRONTEND_BASE_URL = os.environ.get(
     "PNCP_RELATORIO_QR_FRONTEND_BASE_URL",
     "https://docmasteria.com.br",
 ).strip().rstrip("/") or "https://docmasteria.com.br"
-# Antes do PDF: enriquecer fornecedor/CNPJ faltante (HTTP). Em cotações muito grandes pode estourar timeout de proxy.
-PNCP_RELATORIO_PDF_SKIP_ENRICH = os.environ.get("PNCP_RELATORIO_PDF_SKIP_ENRICH", "").lower() in ("1", "true", "yes")
+# Antes do PDF: enriquecer fornecedor/CNPJ faltante (HTTP). Por padrão fica desligado — evita timeout em cotações grandes.
+# Para ligar: PNCP_RELATORIO_PDF_SKIP_ENRICH=0  (ou false/no).
+PNCP_RELATORIO_PDF_SKIP_ENRICH = os.environ.get("PNCP_RELATORIO_PDF_SKIP_ENRICH", "true").strip().lower() not in (
+    "0",
+    "false",
+    "no",
+)
 PNCP_RELATORIO_PDF_MAX_PNCP_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_PNCP_LOOKUPS", "10"))
 PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS", "28"))
 

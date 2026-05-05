@@ -234,71 +234,115 @@ export function backfillLocalIndex(payload, signal) {
 }
 
 const PDF_FETCH_TIMEOUT_MS = 600000; // 10 min — geração pode demorar em cotações com muitos itens
+const PDF_MAX_ATTEMPTS = 2;
+const PDF_RETRY_BASE_MS = 2500;
 
 function mergePdfFetchSignal(userSignal) {
   if (typeof AbortSignal === 'undefined' || typeof AbortSignal.timeout !== 'function') {
     return userSignal;
   }
-  const deadline = AbortSignal.timeout(PDF_FETCH_TIMEOUT_MS);
-  if (!userSignal) return deadline;
-  if (typeof AbortSignal.any === 'function') {
-    return AbortSignal.any([userSignal, deadline]);
+  try {
+    const deadline = AbortSignal.timeout(PDF_FETCH_TIMEOUT_MS);
+    if (!userSignal) return deadline;
+    if (typeof AbortSignal.any === 'function') {
+      return AbortSignal.any([userSignal, deadline]);
+    }
+  } catch {
+    return userSignal;
   }
   return userSignal;
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function isPdfNetworkFailureMessage(msg) {
+  return /failed to fetch|networkerror|load failed|aborted|tempo esgotou|sobrecarregado|interrompido/i.test(
+    String(msg || ''),
+  );
+}
+
 /** PDF do relatório institucional da cotação (WeasyPrint no Django). */
 export async function downloadCotacaoRelatorioPdf(sessaoId, tituloRelatorio, signal) {
-  const fetchSignal = mergePdfFetchSignal(signal);
-  let res;
-  try {
-    res = await fetch(
-      `${API_BASE}/api/pncp/cotacoes/research/sessions/${encodeURIComponent(sessaoId)}/relatorio/pdf`,
-      {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          titulo_relatorio: tituloRelatorio,
-          incluir_anexos_fornecedor: false,
-        }),
-        signal: fetchSignal,
-      },
-    );
-  } catch (err) {
-    const msg = String(err?.message || err || '');
-    if (/failed to fetch|networkerror|load failed/i.test(msg)) {
-      throw new Error(
-        'A conexão com o servidor caiu ou o tempo esgotou ao gerar o PDF. Tente novamente em instantes; se persistir, o servidor pode estar sobrecarregado.',
-      );
+  let lastErr;
+  for (let attempt = 1; attempt <= PDF_MAX_ATTEMPTS; attempt += 1) {
+    if (signal?.aborted) {
+      const e = new Error('Operação cancelada.');
+      e.name = 'AbortError';
+      throw e;
     }
-    throw err;
-  }
-  const ctype = (res.headers.get('content-type') || '').toLowerCase();
-  if (!res.ok) {
-    const payload = ctype.includes('application/json') ? await res.json() : await res.text();
-    throw new Error(extractErrorMessage(payload, res.status));
-  }
-  let blob;
-  try {
-    blob = await res.blob();
-  } catch (err) {
-    const msg = String(err?.message || err || '');
-    if (/failed to fetch|networkerror|load failed/i.test(msg)) {
-      throw new Error(
-        'O download do PDF foi interrompido (rede ou tempo esgotado). Tente novamente; se o relatório for muito grande, aguarde alguns segundos e gere de novo.',
+    const fetchSignal = mergePdfFetchSignal(signal);
+    const fetchOpts = {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo_relatorio: tituloRelatorio,
+        incluir_anexos_fornecedor: false,
+      }),
+    };
+    if (fetchSignal) fetchOpts.signal = fetchSignal;
+
+    let res;
+    try {
+      res = await fetch(
+        `${API_BASE}/api/pncp/cotacoes/research/sessions/${encodeURIComponent(sessaoId)}/relatorio/pdf`,
+        fetchOpts,
       );
+    } catch (err) {
+      lastErr = err;
+      const msg = String(err?.message || err || '');
+      const retryable = isPdfNetworkFailureMessage(msg) && attempt < PDF_MAX_ATTEMPTS && !signal?.aborted;
+      if (retryable) {
+        await sleep(PDF_RETRY_BASE_MS * attempt);
+        continue;
+      }
+      if (/failed to fetch|networkerror|load failed|aborted/i.test(msg)) {
+        throw new Error(
+          'A conexão com o servidor caiu ou o tempo esgotou ao gerar o PDF. Tente novamente em instantes; se persistir, o servidor pode estar sobrecarregado.',
+        );
+      }
+      throw err;
     }
-    throw err;
+
+    const ctype = (res.headers.get('content-type') || '').toLowerCase();
+    if (!res.ok) {
+      const payload = ctype.includes('application/json') ? await res.json() : await res.text();
+      throw new Error(extractErrorMessage(payload, res.status));
+    }
+
+    let blob;
+    try {
+      blob = await res.blob();
+    } catch (err) {
+      lastErr = err;
+      const msg = String(err?.message || err || '');
+      const retryable = isPdfNetworkFailureMessage(msg) && attempt < PDF_MAX_ATTEMPTS && !signal?.aborted;
+      if (retryable) {
+        await sleep(PDF_RETRY_BASE_MS * attempt);
+        continue;
+      }
+      if (/failed to fetch|networkerror|load failed|aborted/i.test(msg)) {
+        throw new Error(
+          'O download do PDF foi interrompido (rede ou tempo esgotado). Tente novamente; se o relatório for muito grande, aguarde alguns segundos e gere de novo.',
+        );
+      }
+      throw err;
+    }
+
+    const cd = res.headers.get('content-disposition') || '';
+    let filename = '';
+    const utf8Match = cd.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf8Match?.[1]) {
+      filename = decodeURIComponent(utf8Match[1]);
+    } else {
+      const plainMatch = cd.match(/filename="?([^";]+)"?/i);
+      if (plainMatch?.[1]) filename = plainMatch[1];
+    }
+    return { blob, filename };
   }
-  const cd = res.headers.get('content-disposition') || '';
-  let filename = '';
-  const utf8Match = cd.match(/filename\*=UTF-8''([^;]+)/i);
-  if (utf8Match?.[1]) {
-    filename = decodeURIComponent(utf8Match[1]);
-  } else {
-    const plainMatch = cd.match(/filename="?([^";]+)"?/i);
-    if (plainMatch?.[1]) filename = plainMatch[1];
-  }
-  return { blob, filename };
+  throw lastErr || new Error('Falha ao gerar o PDF.');
 }

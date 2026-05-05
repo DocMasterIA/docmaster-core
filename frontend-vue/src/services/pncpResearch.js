@@ -243,7 +243,10 @@ export async function downloadCotacaoRelatorioPdf(sessaoId, tituloRelatorio, sig
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ titulo_relatorio: tituloRelatorio }),
+        body: JSON.stringify({
+          titulo_relatorio: tituloRelatorio,
+          incluir_anexos_fornecedor: false,
+        }),
         signal,
       },
     );

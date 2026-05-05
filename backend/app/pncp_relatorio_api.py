@@ -166,6 +166,7 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
 
     body = _parse_json(request)
     titulo_rel = str(body.get("titulo_relatorio") or "").strip()
+    incluir_anexos = bool(body.get("incluir_anexos_fornecedor", False))
     if not titulo_rel:
         return JsonResponse({"detail": "titulo_relatorio é obrigatório."}, status=422)
     if len(titulo_rel) > 500:
@@ -192,35 +193,36 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
 
     anexos_merge: List[Tuple[str, bytes]] = []
     anexo_url = ""
-    anexos = list(PncpCotacaoAnexoArquivo.objects.filter(cotacao_id=c.id).order_by("id"))
-    for an in anexos:
-        if not an.arquivo_pdf:
-            continue
-        nome = (an.nome_original or "").strip() or "cotacao-fornecedor.pdf"
-        try:
-            an.arquivo_pdf.open("rb")
-            body = an.arquivo_pdf.read()
-            if body:
-                anexos_merge.append((nome, body))
-        finally:
+    if incluir_anexos:
+        anexos = list(PncpCotacaoAnexoArquivo.objects.filter(cotacao_id=c.id).order_by("id"))
+        for an in anexos:
+            if not an.arquivo_pdf:
+                continue
+            nome = (an.nome_original or "").strip() or "cotacao-fornecedor.pdf"
             try:
-                an.arquivo_pdf.close()
-            except Exception:
-                pass
-    anexo_legacy = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
-    if anexo_legacy and anexo_legacy.arquivo_pdf:
-        anexo_url = _url_download_anexo_fornecedor(request, sessao_id)
-        nome = (anexo_legacy.nome_original or "").strip() or "cotacao-fornecedor.pdf"
-        try:
-            anexo_legacy.arquivo_pdf.open("rb")
-            body = anexo_legacy.arquivo_pdf.read()
-            if body:
-                anexos_merge.append((nome, body))
-        finally:
+                an.arquivo_pdf.open("rb")
+                body = an.arquivo_pdf.read()
+                if body:
+                    anexos_merge.append((nome, body))
+            finally:
+                try:
+                    an.arquivo_pdf.close()
+                except Exception:
+                    pass
+        anexo_legacy = PncpCotacaoAnexo.objects.filter(cotacao_id=c.id).first()
+        if anexo_legacy and anexo_legacy.arquivo_pdf:
+            anexo_url = _url_download_anexo_fornecedor(request, sessao_id)
+            nome = (anexo_legacy.nome_original or "").strip() or "cotacao-fornecedor.pdf"
             try:
-                anexo_legacy.arquivo_pdf.close()
-            except Exception:
-                pass
+                anexo_legacy.arquivo_pdf.open("rb")
+                body = anexo_legacy.arquivo_pdf.read()
+                if body:
+                    anexos_merge.append((nome, body))
+            finally:
+                try:
+                    anexo_legacy.arquivo_pdf.close()
+                except Exception:
+                    pass
 
     try:
         # Auto-enriquecimento para cotações legadas que ficaram sem fornecedor/CNPJ.
@@ -277,6 +279,9 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
     # Sinaliza explicitamente o layout aplicado no PDF para depuração de ambiente/versionamento.
     resp["X-Relatorio-Layout-Version"] = "fontes-cards-v1"
     resp["Access-Control-Expose-Headers"] = "Content-Disposition, X-Relatorio-Layout-Version"
+    resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp["Pragma"] = "no-cache"
+    resp["Expires"] = "0"
     return resp
 
 

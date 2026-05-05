@@ -234,8 +234,9 @@ export function backfillLocalIndex(payload, signal) {
 
 /** PDF do relatório institucional da cotação (WeasyPrint no Django). */
 export async function downloadCotacaoRelatorioPdf(sessaoId, tituloRelatorio, signal) {
-  const requestPdf = () =>
-    fetch(
+  let res;
+  try {
+    res = await fetch(
       `${API_BASE}/api/pncp/cotacoes/research/sessions/${encodeURIComponent(sessaoId)}/relatorio/pdf`,
       {
         method: 'POST',
@@ -245,28 +246,14 @@ export async function downloadCotacaoRelatorioPdf(sessaoId, tituloRelatorio, sig
         signal,
       },
     );
-
-  let res;
-  try {
-    res = await requestPdf();
   } catch (err) {
     const msg = String(err?.message || err || '');
     if (/failed to fetch|networkerror|load failed/i.test(msg)) {
-      // Retry único para picos transitórios no serviço de PDF.
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      try {
-        res = await requestPdf();
-      } catch (retryErr) {
-        const retryMsg = String(retryErr?.message || retryErr || '');
-        if (/failed to fetch|networkerror|load failed/i.test(retryMsg)) {
-          throw new Error(
-            'A conexão com o servidor caiu ou o tempo esgotou ao gerar o PDF. Tente novamente em instantes; se persistir, o servidor pode estar sobrecarregado.',
-          );
-        }
-        throw retryErr;
-      }
+      throw new Error(
+        'A conexão com o servidor caiu ou o tempo esgotou ao gerar o PDF. Tente novamente em instantes; se persistir, o servidor pode estar sobrecarregado.',
+      );
     }
-    if (!res) throw err;
+    throw err;
   }
   const ctype = (res.headers.get('content-type') || '').toLowerCase();
   if (!res.ok) {

@@ -443,6 +443,42 @@ _HTML_TEMPLATE = _ENV.from_string(
             <span class="rpp-mini-card__value">{{ g.unidade }}</span>
           </div>
         </div>
+        {% if ctx.total_linhas_cotacao > 120 %}
+        <div class="rpp-table-wrap">
+          <table class="rpp-table rpp-table--fontes">
+            <thead>
+              <tr>
+                <th>Fonte</th>
+                <th>Fornecedor</th>
+                <th>CNPJ</th>
+                <th>Data</th>
+                <th>Valor</th>
+                <th>QTD.</th>
+                <th>Órgão</th>
+                <th>Município/UF</th>
+                <th>ID / Processo</th>
+                <th>Ajuste</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for f in g.fontes %}
+              <tr>
+                <td>{{ f.tipo }}</td>
+                <td>{{ f.fornecedor }}</td>
+                <td>{{ f.cnpj }}</td>
+                <td>{{ f.data }}</td>
+                <td>{{ f.valor }}</td>
+                <td>{{ f.quantidade }}</td>
+                <td>{{ f.orgao }}</td>
+                <td>{{ f.municipio_uf }}</td>
+                <td>{{ f.processo }}</td>
+                <td>{{ f.ajuste }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
         <div class="rpp-fontes-cards">
           {% for f in g.fontes %}
           <div class="rpp-fonte-card">
@@ -515,6 +551,7 @@ _HTML_TEMPLATE = _ENV.from_string(
           </div>
           {% endfor %}
         </div>
+        {% endif %}
       </div>
       {% endfor %}
     </section>

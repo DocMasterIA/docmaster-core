@@ -233,6 +233,21 @@
             </div>
           </div>
           <div class="doc-gen__variables-body">
+            <section class="doc-gen__live-summary">
+              <div class="doc-gen__live-summary-head">
+                <div>
+                  <div class="doc-gen__live-summary-kicker">Resumo em tempo real</div>
+                  <h3 class="doc-gen__live-summary-title">Painel do documento</h3>
+                </div>
+                <div class="doc-gen__live-summary-pill">{{ liveSummary.percent }}%</div>
+              </div>
+              <div class="doc-gen__live-summary-bar">
+                <span class="doc-gen__live-summary-bar-fill" :style="{ width: `${liveSummary.percent}%` }"></span>
+              </div>
+              <p class="gov-text-soft gov-mt-sm">
+                {{ liveSummary.filledFields }} de {{ liveSummary.totalFields }} campos preenchidos
+              </p>
+            </section>
             <p class="gov-text-soft doc-gen__variables-desc">
               Preencha os campos com os valores que devem constar no documento (texto livre, lista sugerida ou registro na hora).
               Eles são enviados à IA e aos placeholders do modelo oficial quando aplicável.
@@ -672,6 +687,54 @@ const FLOW_CONFIG = {
       },
     ],
   },
+  InexigibilidadeArt74IFornecedorExclusivoPreview: {
+    title: 'Fornecedor Exclusivo Geral — Bens, Serviços e Soluções (Art. 74, I)',
+    sections: [
+      {
+        key: 'dados_fixos',
+        title: 'Dados fixos',
+        fields: [
+          { id: 'numero_processo', label: 'Informar número do processo (opcional)', input: 'text' },
+          { id: 'orgao_unidade', label: 'Órgão/Unidade responsável pelo equipamento', input: 'text' },
+          { id: 'objeto_especifico', label: 'Selecione o objeto específico da contratação', input: 'text' },
+          { id: 'equipamento', label: 'Equipamento', input: 'text' },
+          { id: 'marca', label: 'Marca', input: 'text' },
+          { id: 'modelo', label: 'Modelo', input: 'text' },
+        ],
+      },
+      {
+        key: 'fornecedor',
+        title: 'Fornecedor exclusivo',
+        fields: [
+          { id: 'fornecedor_nome', label: 'Razão social / Nome do fornecedor', input: 'text' },
+          { id: 'fornecedor_cnpj', label: 'CNPJ', input: 'text' },
+          { id: 'dotacao_orcamentaria', label: 'Dotação orçamentária', input: 'textarea', fullWidth: true },
+        ],
+      },
+      {
+        key: 'itens',
+        title: 'Itens e valores',
+        fields: [
+          { id: 'item_descricao', label: 'Descrição', input: 'text' },
+          { id: 'item_quantidade', label: 'Quantidade', input: 'text' },
+          { id: 'item_unidade', label: 'Unidade medida', input: 'text' },
+          { id: 'item_valor_unitario', label: 'Valor unitário', input: 'text' },
+          { id: 'item_valor_total', label: 'Valor total', input: 'text' },
+          { id: 'valor_total_processo', label: 'Valor total do processo', input: 'text', fullWidth: true },
+        ],
+      },
+      {
+        key: 'fiscalizacao',
+        title: 'Fiscalização',
+        fields: [
+          { id: 'fiscal_nome', label: 'Nome do fiscal de contratos', input: 'text' },
+          { id: 'responsavel_tr_nome', label: 'Nome do responsável', input: 'text' },
+          { id: 'responsavel_tr_cargo', label: 'Cargo/Função', input: 'text' },
+          { id: 'modo_data', label: 'Modo da data', input: 'text' },
+        ],
+      },
+    ],
+  },
 };
 
 const TR_DFD_SLOTS_FLOW = FLOW_CONFIG.DispensaArt75IManutencaoVeiculos;
@@ -721,7 +784,29 @@ const isEtpLivreRoute = computed(() => route.name === 'EtpLivre');
 const documentTypeHint = computed(() => (isEtpLivreRoute.value ? 'etp' : null));
 const showSlotsCard = computed(() => !isEtpLivreRoute.value);
 
-const selectedFlow = computed(() => TR_DFD_SLOTS_FLOW);
+const selectedFlow = computed(() => {
+  const logical = dispensaLogicalRouteName.value;
+  return FLOW_CONFIG[logical] || FLOW_CONFIG[route.name] || TR_DFD_SLOTS_FLOW;
+});
+
+const liveSummary = computed(() => {
+  const sections = selectedFlow.value.sections || [];
+  const normalized = sections.map((section) => {
+    const fields = (section.fields || []).filter((f) => f.input !== 'heading');
+    const total = fields.length;
+    const filled = fields.reduce((acc, field) => {
+      const value = slotForm[field.id];
+      if (field.input === 'checkbox') return acc + (value ? 1 : 0);
+      const text = typeof value === 'string' ? value.trim() : value != null ? String(value).trim() : '';
+      return acc + (text ? 1 : 0);
+    }, 0);
+    return { title: section.title, filled, total };
+  });
+  const totalFields = normalized.reduce((acc, sec) => acc + sec.total, 0);
+  const filledFields = normalized.reduce((acc, sec) => acc + sec.filled, 0);
+  const percent = totalFields ? Math.round((filledFields / totalFields) * 100) : 0;
+  return { sections: normalized, totalFields, filledFields, percent };
+});
 
 const slotCardFlowTitle = computed(() => {
   const logical = dispensaLogicalRouteName.value;
@@ -741,6 +826,8 @@ const SLOT_PACKAGE_BY_ROUTE = {
   DispensaArt75IIServicos: 'dispensa_75_ii_servicos',
   DispensaArt75IIComprasServicosInclusos: 'dispensa_75_ii_compras_servicos_inclusos',
   InexigibilidadeArt74IShowArtistico: 'inexigibilidade_74_i_show_artistico',
+  InexigibilidadeArt74IFornecedorExclusivoPreview: 'inexigibilidade_74_i_fornecedor_exclusivo',
+  InexigibilidadeArt74IManutencaoVeiculosPreview: 'inexigibilidade_74_i_manutencao_veiculos',
 };
 
 const SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE = {
@@ -2315,6 +2402,57 @@ function goToPage() {
 }
 .doc-gen__thumb:hover {
   border-color: var(--color-primary);
+}
+.doc-gen__live-summary {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+  margin-bottom: 12px;
+}
+.doc-gen__live-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.doc-gen__live-summary-kicker {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  font-weight: 600;
+}
+.doc-gen__live-summary-title {
+  margin: 2px 0 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.doc-gen__live-summary-pill {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  color: #0369a1;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+.doc-gen__live-summary-bar {
+  margin-top: 10px;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  overflow: hidden;
+}
+.doc-gen__live-summary-bar-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: #0ea5e9;
+  transition: width .2s ease;
 }
 
 /* UI de dispensa isolada do tema legado */

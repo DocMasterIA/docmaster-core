@@ -573,9 +573,7 @@ async function onGenerateClauses() {
       generateError.value = 'Preencha o Prompt de Inteligencia Artificial para gerar clausulas.';
       return;
     }
-    const prompt = [
-      userPrompt,
-      '',
+    const contextLines = [
       'Contexto estruturado para apoiar a geracao das clausulas:',
       'Retorne APENAS texto com secoes nesta ordem e com esses titulos:',
       'Objeto:',
@@ -590,16 +588,38 @@ async function onGenerateClauses() {
       `Tipo manutencao: ${tipoManutencao.value || 'Nao informado'}`,
       `Fornecedor: ${fornecedor.value || 'Nao informado'} / CNPJ: ${cnpj.value || 'Nao informado'}`,
       `Valor global: ${valorGlobal.value || 'Nao informado'}`,
+    ];
+    const prompt = [
+      userPrompt,
+      '',
+      ...contextLines,
     ].join('\n');
-    const res = await fetch(`${API_BASE}/api/documentos/gerar-via-llm`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ user_prompt: prompt, output: 'json', slot_package_key: slotPackageKey.value }),
-    });
-    const data = await res.json().catch(() => ({}));
+    async function requestClauses(promptText) {
+      const res = await fetch(`${API_BASE}/api/documentos/gerar-via-llm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ user_prompt: promptText, output: 'json', slot_package_key: slotPackageKey.value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      return { res, data };
+    }
+    let { res, data } = await requestClauses(prompt);
+    if (res.status === 504) {
+      const compactPrompt = [
+        userPrompt,
+        '',
+        'Retorne somente as secoes: Objeto, Justificativa, Escopo, Entregas e Resultados esperados.',
+        `Dados-chave: ${orgao.value || 'Orgao nao informado'}; ${marca.value || '-'} ${modelo.value || '-'}; fornecedor ${fornecedor.value || 'nao informado'}; valor ${valorGlobal.value || 'nao informado'}.`,
+      ].join('\n');
+      ({ res, data } = await requestClauses(compactPrompt));
+    }
     if (!res.ok || !data.ok) {
-      generateError.value = data.error || data.detail || `Erro ${res.status} ao gerar clausulas`;
+      if (res.status === 504) {
+        generateError.value = 'A IA demorou para responder (504 Gateway Timeout). Tente um prompt mais objetivo ou gere novamente em alguns instantes.';
+      } else {
+        generateError.value = data.error || data.detail || `Erro ${res.status} ao gerar clausulas`;
+      }
       return;
     }
     const bySections = extractClausesFromSectionTexts(data.section_texts || {});

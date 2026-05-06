@@ -21,7 +21,7 @@
           <form class="doc-gen__form" @submit.prevent="onSubmit">
             <div class="doc-gen__fields">
               <!-- Escolha do documento base: template ou arquivo -->
-              <div class="gov-field doc-gen__field-template">
+              <div v-if="!isInexigibilidadePreviewRoute" class="gov-field doc-gen__field-template">
                 <label class="gov-label">Documento Base</label>
                 <div class="doc-gen__llm-hint">
                   <p class="gov-text-soft">
@@ -76,7 +76,7 @@
               </div>
 
               <!-- Prompt IA -->
-              <div class="gov-field">
+              <div v-if="!isInexigibilidadePreviewRoute" class="gov-field">
                 <label class="gov-label" for="ia-prompt">
                   Prompt de Inteligência Artificial
                   <span class="gov-label__hint">(IA contextual inteligente)</span>
@@ -95,14 +95,48 @@
                 </p>
               </div>
 
+              <!-- Layout copiado dos previews funcionais -->
+              <div v-if="isInexigibilidadePreviewRoute" class="doc-gen__preview-form">
+                <div
+                  v-for="section in selectedFlow.sections"
+                  :key="`preview-${section.key}`"
+                  class="doc-gen__var-section"
+                >
+                  <h3 class="doc-gen__var-heading">{{ section.title }}</h3>
+                  <div class="doc-gen__slot-grid">
+                    <template v-for="field in section.fields" :key="`preview-${field.id}`">
+                      <h4 v-if="field.input === 'heading'" class="doc-gen__slot-subheading">{{ field.label }}</h4>
+                      <div v-else-if="field.input === 'textarea'" class="gov-field doc-gen__slot-field" :class="{ 'doc-gen__slot-field--full': field.fullWidth }">
+                        <label class="gov-label">{{ field.label }}</label>
+                        <textarea v-model="slotForm[field.id]" class="gov-textarea" rows="3"></textarea>
+                      </div>
+                      <div v-else-if="field.input === 'checkbox'" class="gov-field doc-gen__slot-field" :class="{ 'doc-gen__slot-field--full': field.fullWidth }">
+                        <label class="gov-label">
+                          <input v-model="slotForm[field.id]" type="checkbox" />
+                          {{ field.label }}
+                        </label>
+                      </div>
+                      <div v-else class="gov-field doc-gen__slot-field" :class="{ 'doc-gen__slot-field--full': field.fullWidth }">
+                        <label class="gov-label">{{ field.label }}</label>
+                        <input
+                          v-model="slotForm[field.id]"
+                          :type="field.input === 'email' ? 'email' : (field.input === 'date' ? 'date' : 'text')"
+                          class="gov-input"
+                        />
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+
               <!-- Botões -->
               <div class="doc-gen__actions">
                 <button
                   type="submit"
                   class="gov-btn gov-btn--primary"
-                  :disabled="isSubmitting || !hasDocumentBase || !iaPrompt.trim()"
+                  :disabled="isSubmitting || (!isInexigibilidadePreviewRoute && (!hasDocumentBase || !iaPrompt.trim()))"
                 >
-                  <span v-if="!isSubmitting"><i class="fa-solid fa-robot" aria-hidden="true"></i> Gerar com IA Contextual</span>
+                  <span v-if="!isSubmitting"><i class="fa-solid fa-robot" aria-hidden="true"></i> {{ isInexigibilidadePreviewRoute ? 'Gerar Documento com IA' : 'Gerar com IA Contextual' }}</span>
                   <span v-else class="doc-gen__spinner">Processando com IA...</span>
                 </button>
                 <template v-if="documentReady">
@@ -248,11 +282,12 @@
                 {{ liveSummary.filledFields }} de {{ liveSummary.totalFields }} campos preenchidos
               </p>
             </section>
-            <p class="gov-text-soft doc-gen__variables-desc">
+            <p v-if="!isInexigibilidadePreviewRoute" class="gov-text-soft doc-gen__variables-desc">
               Preencha os campos com os valores que devem constar no documento (texto livre, lista sugerida ou registro na hora).
               Eles são enviados à IA e aos placeholders do modelo oficial quando aplicável.
             </p>
             <div
+              v-if="!isInexigibilidadePreviewRoute"
               v-for="section in selectedFlow.sections"
               :key="section.key"
               class="doc-gen__var-section"
@@ -464,6 +499,10 @@ const isDispensaNewUi = computed(() => {
     || path.startsWith('/geracao/dispensa-rapida')
   );
 });
+
+const isInexigibilidadePreviewRoute = computed(
+  () => route.name === 'InexigibilidadeArt74IManutencaoVeiculosPreview' || route.name === 'InexigibilidadeArt74IFornecedorExclusivoPreview',
+);
 
 const useOwnFile = ref(false);
 const selectedDocxFile = ref(null);
@@ -694,9 +733,12 @@ const FLOW_CONFIG = {
         key: 'dados_fixos',
         title: 'Dados fixos',
         fields: [
+          { id: '_h_dados_basicos', label: 'Dados básicos', input: 'heading', fullWidth: true },
           { id: 'numero_processo', label: 'Informar número do processo (opcional)', input: 'text' },
           { id: 'orgao_unidade', label: 'Órgão/Unidade responsável pelo equipamento', input: 'text' },
+          { id: '_h_objeto_especifico', label: 'Objeto específico', input: 'heading', fullWidth: true },
           { id: 'objeto_especifico', label: 'Selecione o objeto específico da contratação', input: 'text' },
+          { id: '_h_dados_equipamento', label: 'Dados do equipamento', input: 'heading', fullWidth: true },
           { id: 'equipamento', label: 'Equipamento', input: 'text' },
           { id: 'marca', label: 'Marca', input: 'text' },
           { id: 'modelo', label: 'Modelo', input: 'text' },
@@ -708,7 +750,7 @@ const FLOW_CONFIG = {
         fields: [
           { id: 'fornecedor_nome', label: 'Razão social / Nome do fornecedor', input: 'text' },
           { id: 'fornecedor_cnpj', label: 'CNPJ', input: 'text' },
-          { id: 'dotacao_orcamentaria', label: 'Dotação orçamentária', input: 'textarea', fullWidth: true },
+          { id: 'dotacao_orcamentaria', label: 'Informar dotação orçamentária (opcional)', input: 'textarea', fullWidth: true },
         ],
       },
       {
@@ -1318,6 +1360,9 @@ function clearDocxFile() {
 }
 
 async function onSubmit() {
+  if (isInexigibilidadePreviewRoute.value && !iaPrompt.value.trim()) {
+    iaPrompt.value = `Gerar documento com base nos dados preenchidos para ${slotCardFlowTitle.value}.`;
+  }
   if (!iaPrompt.value.trim()) return;
   if (docTypeMode.value === 'tr_modelo' && dispensaLogicalRouteName.value === 'DispensaArt75IObrasEngenharia') {
     const manualObject = String(slotForm.tr_objeto_manual || '').trim();

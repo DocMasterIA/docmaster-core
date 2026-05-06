@@ -587,16 +587,19 @@ async function onGenerateClauses() {
       return;
     }
     const prompt = [
-      'Com base nos dados abaixo, gere APENAS duas secoes:',
+      'Com base EXCLUSIVAMENTE nos dados abaixo, gere APENAS duas secoes:',
       'Objeto:',
       'Justificativa:',
+      '',
+      'REGRAS OBRIGATORIAS:',
+      '- Nao inventar orgao, secretaria, tipo de objeto, localidade, frota, veiculos, alunos ou professores se nao estiver explicitamente informado.',
+      '- Nao reutilizar contexto de mensagens anteriores.',
+      '- Usar apenas os tres campos fornecidos pelo usuario.',
+      '- Se faltar informacao, escrever de forma generica sem adicionar fatos novos.',
       '',
       `O que sera contratado: ${contratado}`,
       `Setor/secretaria atendido: ${setor}`,
       `Caracteristicas minimas (opcional): ${caracteristicas || 'nao informado'}`,
-      `Processo: ${processoAtivo.value ? (processo.value || 'Nao informado') : 'Nao se aplica'}`,
-      `Orgao: ${orgao.value || 'Nao informado'}`,
-      `Cabecalho: ${cabecalhoDocumento.value || 'Nao informado'}`,
     ].join('\n');
     async function requestClausesFast(promptText) {
       const fastPrompt = [
@@ -605,9 +608,8 @@ async function onGenerateClauses() {
         'Formato obrigatorio de resposta:',
         'Objeto: <texto>',
         'Justificativa: <texto>',
-        'Escopo: <texto>',
-        'Entregas: <texto>',
-        'Resultados esperados: <texto>',
+        '',
+        'Nao inclua nenhuma secao extra.',
       ].join('\n');
       const res = await fetch(`${API_BASE}/api/llm/generate`, {
         method: 'POST',

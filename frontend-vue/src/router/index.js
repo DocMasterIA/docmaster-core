@@ -23,43 +23,43 @@ const routes = [
   {
     path: '/geracao/dispensa-art-75-i',
     name: 'DispensaArt75I',
-    component: () => import('../views/DocumentGenerator.vue'),
+    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
     meta: { title: 'Dispensa - Art. 75, I' },
   },
   {
     path: '/geracao/dispensa-art-75-i/obras-servicos-engenharia',
     name: 'DispensaArt75IObrasEngenharia',
-    component: () => import('../views/DocumentGenerator.vue'),
+    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
     meta: { title: 'Dispensa - Art. 75, I - Obras e Serviços de Engenharia' },
   },
   {
     path: '/geracao/dispensa-art-75-i/manutencao-veiculos',
     name: 'DispensaArt75IManutencaoVeiculos',
-    component: () => import('../views/DocumentGenerator.vue'),
+    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
     meta: { title: 'Dispensa - Art. 75, I - Manutenção de Veículos' },
   },
   {
     path: '/geracao/dispensa-art-75-ii',
     name: 'DispensaArt75II',
-    component: () => import('../views/DocumentGenerator.vue'),
+    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
     meta: { title: 'Dispensa - Art. 75, II' },
   },
   {
     path: '/geracao/dispensa-art-75-ii/compras',
     name: 'DispensaArt75IICompras',
-    component: () => import('../views/DocumentGenerator.vue'),
+    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
     meta: { title: 'Dispensa - Art. 75, II - Compras' },
   },
   {
     path: '/geracao/dispensa-art-75-ii/servicos',
     name: 'DispensaArt75IIServicos',
-    component: () => import('../views/DocumentGenerator.vue'),
+    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
     meta: { title: 'Dispensa - Art. 75, II - Serviços' },
   },
   {
     path: '/geracao/dispensa-art-75-ii/compras-servicos-inclusos',
     name: 'DispensaArt75IIComprasServicosInclusos',
-    component: () => import('../views/DocumentGenerator.vue'),
+    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
     meta: { title: 'Dispensa - Art. 75, II - Compras com Serviços Inclusos' },
   },
   {
@@ -69,7 +69,7 @@ const routes = [
   {
     path: '/geracao/dispensa-rapida/art-75-i/obras-servicos-engenharia',
     name: 'DispensaRapidaArt75IObrasEngenharia',
-    component: () => import('../views/DocumentGenerator.vue'),
+    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
     meta: {
       title: 'Dispensa - Art. 75, I - Obras e Serviços de Engenharia',
       dispensaRapidaUi: true,
@@ -78,7 +78,7 @@ const routes = [
   {
     path: '/geracao/dispensa-rapida/art-75-i/manutencao-veiculos',
     name: 'DispensaRapidaArt75IManutencaoVeiculos',
-    component: () => import('../views/DocumentGenerator.vue'),
+    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
     meta: {
       title: 'Dispensa - Art. 75, I - Manutenção de Veículos',
       dispensaRapidaUi: true,
@@ -87,19 +87,19 @@ const routes = [
   {
     path: '/geracao/dispensa-rapida/art-75-ii/compras',
     name: 'DispensaRapidaArt75IICompras',
-    component: () => import('../views/DocumentGenerator.vue'),
+    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
     meta: { title: 'Dispensa - Art. 75, II - Compras', dispensaRapidaUi: true },
   },
   {
     path: '/geracao/dispensa-rapida/art-75-ii/servicos',
     name: 'DispensaRapidaArt75IIServicos',
-    component: () => import('../views/DocumentGenerator.vue'),
+    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
     meta: { title: 'Dispensa - Art. 75, II - Serviços', dispensaRapidaUi: true },
   },
   {
     path: '/geracao/dispensa-rapida/art-75-ii/compras-servicos-inclusos',
     name: 'DispensaRapidaArt75IIComprasServicosInclusos',
-    component: () => import('../views/DocumentGenerator.vue'),
+    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
     meta: {
       title: 'Dispensa - Art. 75, II - Compras com Serviços Inclusos',
       dispensaRapidaUi: true,
@@ -108,19 +108,19 @@ const routes = [
   {
     path: '/geracao/inexigibilidade-art-74-i',
     name: 'InexigibilidadeArt74I',
-    component: () => import('../views/DocumentGenerator.vue'),
+    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
     meta: { title: 'Inexigibilidade - Art. 74, I' },
   },
   {
     path: '/geracao/inexigibilidade-art-74-i/show-artistico',
     name: 'InexigibilidadeArt74IShowArtistico',
-    component: () => import('../views/DocumentGenerator.vue'),
+    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
     meta: { title: 'Inexigibilidade - Art. 74, I - Show Artístico' },
   },
   {
     path: '/geracao/inexigibilidade-art-74-i/manutencao-veiculos-preview',
     name: 'InexigibilidadeArt74IManutencaoVeiculosPreview',
-    component: () => import('../views/DocumentGenerator.vue'),
+    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
     meta: {
       title: 'Inexigibilidade - Art. 74, I - Manutenção de Veículos (Preview)',
     },
@@ -128,7 +128,7 @@ const routes = [
   {
     path: '/geracao/inexigibilidade-art-74-i/fornecedor-exclusivo-preview',
     name: 'InexigibilidadeArt74IFornecedorExclusivoPreview',
-    component: () => import('../views/DocumentGenerator.vue'),
+    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
     meta: {
       title: 'Inexigibilidade - Art. 74, I - Fornecedor Exclusivo (Preview)',
     },

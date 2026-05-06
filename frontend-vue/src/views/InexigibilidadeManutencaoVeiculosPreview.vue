@@ -1,11 +1,6 @@
 <template>
   <div class="ixp-page">
     <div class="ixp-wrap">
-      <header class="ixp-header">
-        <h1>Gerador de Documentos</h1>
-        <p>Tela simplificada para teste: somente Inexigibilidade.</p>
-      </header>
-
       <div class="ixp-grid">
         <section class="ixp-main">
           <div class="ixp-main-head">
@@ -350,7 +345,7 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .ixp-wrap { max-width: 1280px; margin: 0 auto; }
 .ixp-header h1 { margin: 0; font-size: 20px; color: #0f172a; }
 .ixp-header p { margin: 4px 0 0; font-size: 13px; color: #64748b; }
-.ixp-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; margin-top: 14px; }
+.ixp-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; }
 .ixp-main { border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; overflow: hidden; }
 .ixp-main-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; border-bottom: 1px solid #e2e8f0; padding: 16px; }
 .ixp-main-title { display: flex; gap: 12px; }
@@ -412,4 +407,48 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .ixp-drawer-foot .ixp-btn-primary { width: 100%; }
 @media (max-width: 1200px) { .ixp-grid { grid-template-columns: 1fr; } .ixp-summary { position: static; } }
 @media (max-width: 900px) { .ixp-grid-2, .ixp-grid-3, .ixp-grid-item { grid-template-columns: 1fr; } .ixp-col-2 { grid-column: auto; } }
+@media (prefers-color-scheme: dark) {
+  .ixp-page { background: #020617; }
+  .ixp-main,
+  .ixp-card,
+  .ixp-summary,
+  .ixp-drawer,
+  .ixp-item,
+  .ixp-summary-card { background: #0f172a; border-color: #334155; }
+  .ixp-main-head,
+  .ixp-drawer-head,
+  .ixp-drawer-foot { border-color: #334155; }
+  .ixp-main-title h2,
+  .ixp-main-title p,
+  .ixp-card h3,
+  .ixp-summary-head h3,
+  .ixp-summary-card header,
+  .ixp-line b,
+  .ixp-choice strong { color: #e2e8f0; }
+  .ixp-main-title small,
+  .ixp-field label,
+  .ixp-check,
+  .ixp-item-head span,
+  .ixp-summary > p,
+  .ixp-choice span,
+  .ixp-summary-head small,
+  .ixp-drawer-head small { color: #94a3b8; }
+  .ixp-field input,
+  .ixp-field textarea,
+  .ixp-field select,
+  .ixp-btn-secondary,
+  .ixp-choice { background: #0b1222; border-color: #334155; color: #e2e8f0; }
+  .ixp-field input::placeholder,
+  .ixp-field textarea::placeholder { color: #64748b; }
+  .ixp-field input:focus,
+  .ixp-field textarea:focus,
+  .ixp-field select:focus { border-color: #0ea5e9; }
+  .ixp-btn-secondary { color: #cbd5e1; }
+  .ixp-choice.is-active { border-color: #38bdf8; background: #082f49; }
+  .ixp-progress { background: #1e293b; }
+  .ixp-summary-head span { background: #082f49; color: #7dd3fc; }
+  .ixp-line.is-ok { background: #052e16; border-color: #166534; }
+  .ixp-line.is-warn { background: #3f1d2e; border-color: #9f1239; }
+  .ixp-overlay { background: rgba(2, 6, 23, 0.72); }
+}
 </style>

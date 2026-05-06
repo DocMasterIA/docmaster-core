@@ -1,11 +1,11 @@
 <template>
-  <div class="doc-gen" :class="{ 'doc-gen--rapida': isDispensaRapidaUi }">
+  <div class="doc-gen" :class="{ 'doc-gen--rapida': isDispensaNewUi }">
     <header class="gov-page-header">
       <h1 class="gov-page-title">Gerador de Documentos</h1>
       <p class="gov-page-subtitle">
         Crie documentos profissionais com conformidade governamental
       </p>
-      <span v-if="isDispensaRapidaUi" class="doc-gen__rapida-badge">Dispensa Rapida</span>
+      <span v-if="isDispensaNewUi" class="doc-gen__rapida-badge">Novo design de Dispensa</span>
     </header>
 
     <div class="doc-gen__grid" :class="{ 'doc-gen__grid--single': !showSlotsCard }">
@@ -440,7 +440,16 @@ const dispensaLogicalRouteName = computed(
   () => DISPENSA_RAPIDA_TO_LOGICAL[route.name] || route.name,
 );
 
-const isDispensaRapidaUi = computed(() => !!route.meta?.dispensaRapidaUi);
+const isDispensaNewUi = computed(() => {
+  const name = String(route.name || '');
+  const path = String(route.path || '');
+  return (
+    name.startsWith('DispensaArt75')
+    || name.startsWith('DispensaRapida')
+    || path.startsWith('/geracao/dispensa-art-75')
+    || path.startsWith('/geracao/dispensa-rapida')
+  );
+});
 
 const useOwnFile = ref(false);
 const selectedDocxFile = ref(null);

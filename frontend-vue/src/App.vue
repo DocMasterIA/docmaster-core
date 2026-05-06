@@ -199,6 +199,18 @@ const generationPages = [
     icon: 'fa-scale-balanced',
     children: [
       {
+        name: 'DispensaArt75IObrasEngenharia',
+        label: 'Obras e serviços de engenharia',
+        icon: 'fa-compass-drafting',
+        to: '/geracao/dispensa-art-75-i/obras-servicos-engenharia',
+      },
+      {
+        name: 'DispensaArt75IManutencaoVeiculos',
+        label: 'Manutenção de veículos',
+        icon: 'fa-car-side',
+        to: '/geracao/dispensa-art-75-i/manutencao-veiculos',
+      },
+      {
         name: 'DispensaArt75IICompras',
         label: 'Compras',
         icon: 'fa-cart-shopping',

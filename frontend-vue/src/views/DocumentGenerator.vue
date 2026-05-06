@@ -5,6 +5,7 @@
       <p class="gov-page-subtitle">
         Crie documentos profissionais com conformidade governamental
       </p>
+      <span v-if="isDispensaRapidaUi" class="doc-gen__rapida-badge">Dispensa Rapida</span>
     </header>
 
     <div class="doc-gen__grid" :class="{ 'doc-gen__grid--single': !showSlotsCard }">
@@ -2312,6 +2313,20 @@ function goToPage() {
 .doc-gen.doc-gen--rapida {
   padding-bottom: 8px;
 }
+.doc-gen__rapida-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #bae6fd;
+  background: #f0f9ff;
+  color: #0369a1;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
 .doc-gen.doc-gen--rapida :deep(.gov-page-header) {
   background: #fff;
   border: 1px solid #e2e8f0;
@@ -2438,6 +2453,30 @@ function goToPage() {
 .doc-gen.doc-gen--rapida :deep(.doc-gen__variables-card) {
   position: sticky;
   top: 12px;
+}
+/* Reforço de prioridade para evitar que o tema gov sobreponha em runtime. */
+.doc-gen.doc-gen--rapida .gov-page-header,
+.doc-gen.doc-gen--rapida .gov-surface {
+  border-radius: 16px !important;
+  border-color: #e2e8f0 !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+}
+.doc-gen.doc-gen--rapida .gov-input,
+.doc-gen.doc-gen--rapida .gov-textarea {
+  border-radius: 12px !important;
+  border-color: #cbd5e1 !important;
+}
+.doc-gen.doc-gen--rapida .gov-btn--primary {
+  background: #0f172a !important;
+  border-color: #0f172a !important;
+  color: #ffffff !important;
+}
+.doc-gen.doc-gen--rapida .gov-btn--secondary,
+.doc-gen.doc-gen--rapida .gov-btn--outline {
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+  background: #ffffff !important;
 }
 .dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-page-header),
 .dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-surface) {

@@ -576,3 +576,39 @@
   color: #64748b;
   font-style: italic;
 }
+
+/* Micro horizontal (PDF rpp-*): label+valor em linha, sem quebra */
+.rpp-fonte-row--5 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.rpp-mini-compact {
+  border-radius: 3px;
+  padding: 0.6mm 0.8mm;
+  min-height: 6mm;
+  display: flex;
+  align-items: center;
+  gap: 0.8mm;
+}
+.rpp-mini-compact--wide {
+  min-height: 6.5mm;
+}
+.rpp-mini-compact__label {
+  font-size: 5.4pt;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.rpp-mini-compact__value {
+  margin-top: 0;
+  font-size: 6.2pt;
+  line-height: 1.06;
+  font-weight: 600;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

@@ -292,7 +292,7 @@ export async function downloadCotacaoRelatorioPdf(
   sessaoId,
   tituloRelatorio,
   signal,
-  incluirAnexosFornecedor = false,
+  incluirAnexosFornecedor = true,
 ) {
   const bodyJson = {
     titulo_relatorio: tituloRelatorio,

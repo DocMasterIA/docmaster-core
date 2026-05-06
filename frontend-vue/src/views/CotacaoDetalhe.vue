@@ -574,6 +574,10 @@
             o ficheiro é produzido no servidor e o <strong>download começa automaticamente</strong>. Inclui título
             personalizado, resumo, detalhamento por fontes, CNPJs quando existirem, marca d’água e QR para abrir esta
             mesma cotação no site (com sessão iniciada).
+            <template v-if="hasSupplierPdfAttachment || supplierPdfFilenames.length">
+              Os <strong>PDFs de cotação do fornecedor</strong> anexados a esta sessão são
+              <strong>fundidos no final</strong> do relatório (capa + documento por ficheiro).
+            </template>
           </p>
           <label class="cot-relatorio-field">
             <span>Título do relatório <abbr title="obrigatório">*</abbr></span>

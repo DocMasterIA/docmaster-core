@@ -596,20 +596,23 @@
   font-size: 5.4pt;
   line-height: 1;
   letter-spacing: 0.02em;
-  white-space: nowrap;
-  flex: 0 0 auto;
+  white-space: nowrap !important;
+  flex: 0 1 45% !important;
+  max-width: 45% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 .rpp-mini-compact__value {
   margin-top: 0;
   font-size: 6.2pt;
   line-height: 1.12;
   font-weight: 600;
-  white-space: normal;
-  word-break: normal;
-  overflow-wrap: break-word;
-  hyphens: none;
-  flex: 1 1 auto;
-  min-width: 0;
+  white-space: normal !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  hyphens: none !important;
+  flex: 1 1 55% !important;
+  min-width: 55% !important;
   overflow: visible;
   text-overflow: clip;
 }

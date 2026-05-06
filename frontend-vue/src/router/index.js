@@ -41,25 +41,25 @@ const routes = [
   {
     path: '/geracao/dispensa-art-75-ii',
     name: 'DispensaArt75II',
-    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
+    component: () => import('../views/DispensaArt75IINormalReactPreview.vue'),
     meta: { title: 'Dispensa - Art. 75, II' },
   },
   {
     path: '/geracao/dispensa-art-75-ii/compras',
     name: 'DispensaArt75IICompras',
-    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
+    component: () => import('../views/DispensaArt75IINormalReactPreview.vue'),
     meta: { title: 'Dispensa - Art. 75, II - Compras' },
   },
   {
     path: '/geracao/dispensa-art-75-ii/servicos',
     name: 'DispensaArt75IIServicos',
-    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
+    component: () => import('../views/DispensaArt75IINormalReactPreview.vue'),
     meta: { title: 'Dispensa - Art. 75, II - Serviços' },
   },
   {
     path: '/geracao/dispensa-art-75-ii/compras-servicos-inclusos',
     name: 'DispensaArt75IIComprasServicosInclusos',
-    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
+    component: () => import('../views/DispensaArt75IINormalReactPreview.vue'),
     meta: { title: 'Dispensa - Art. 75, II - Compras com Serviços Inclusos' },
   },
   {
@@ -87,19 +87,19 @@ const routes = [
   {
     path: '/geracao/dispensa-rapida/art-75-ii/compras',
     name: 'DispensaRapidaArt75IICompras',
-    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
+    component: () => import('../views/DispensaArt75IIRapidaReactPreview.vue'),
     meta: { title: 'Dispensa - Art. 75, II - Compras', dispensaRapidaUi: true },
   },
   {
     path: '/geracao/dispensa-rapida/art-75-ii/servicos',
     name: 'DispensaRapidaArt75IIServicos',
-    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
+    component: () => import('../views/DispensaArt75IIRapidaReactPreview.vue'),
     meta: { title: 'Dispensa - Art. 75, II - Serviços', dispensaRapidaUi: true },
   },
   {
     path: '/geracao/dispensa-rapida/art-75-ii/compras-servicos-inclusos',
     name: 'DispensaRapidaArt75IIComprasServicosInclusos',
-    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
+    component: () => import('../views/DispensaArt75IIRapidaReactPreview.vue'),
     meta: {
       title: 'Dispensa - Art. 75, II - Compras com Serviços Inclusos',
       dispensaRapidaUi: true,

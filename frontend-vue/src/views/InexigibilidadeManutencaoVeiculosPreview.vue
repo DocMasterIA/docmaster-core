@@ -33,11 +33,11 @@
                 <div class="ixp-grid-2">
                   <div v-if="processoAtivo" class="ixp-field">
                     <label>Processo</label>
-                    <input v-model="processo" placeholder="Ex: 123/2026" />
+                    <input v-model="processo" list="dl-processo-numero" placeholder="Ex: 123/2026" />
                   </div>
                   <div class="ixp-field">
                     <label>Orgao/Unidade responsavel pelo veiculo</label>
-                    <input v-model="orgao" placeholder="Digite o orgao" />
+                    <input v-model="orgao" list="dl-orgao" placeholder="Digite o orgao" />
                   </div>
                 </div>
               </div>
@@ -75,7 +75,7 @@
             <article class="ixp-card">
               <h3>Fornecedor exclusivo</h3>
               <div class="ixp-body ixp-grid-2">
-                <div class="ixp-field"><label>Razao social / Nome do fornecedor</label><input v-model="fornecedor" placeholder="Digite a razao social" /></div>
+                <div class="ixp-field"><label>Razao social / Nome do fornecedor</label><input v-model="fornecedor" list="dl-fornecedor" placeholder="Digite a razao social" /></div>
                 <div class="ixp-field"><label>CNPJ</label><input :value="cnpj" placeholder="00.000.000/0001-00" @input="cnpj = formatarCNPJ(String($event.target.value || ''))" /></div>
               </div>
             </article>
@@ -122,15 +122,15 @@
             <article class="ixp-card">
               <h3>Fiscalizacao</h3>
               <div class="ixp-body">
-                <div class="ixp-field"><label>Nome do fiscal de contratos</label><input v-model="fiscal" /></div>
+                <div class="ixp-field"><label>Nome do fiscal de contratos</label><input v-model="fiscal" list="dl-fiscal" /></div>
               </div>
             </article>
 
             <article class="ixp-card">
               <h3>Responsavel pelo Termo de Referencia</h3>
               <div class="ixp-body ixp-grid-2">
-                <div class="ixp-field"><label>Nome do responsavel</label><input v-model="responsavel" /></div>
-                <div class="ixp-field"><label>Cargo/Funcao</label><input v-model="responsavelCargo" /></div>
+                <div class="ixp-field"><label>Nome do responsavel</label><input v-model="responsavel" list="dl-tr-nome-assinante" /></div>
+                <div class="ixp-field"><label>Cargo/Funcao</label><input v-model="responsavelCargo" list="dl-tr-cargo-assinante" /></div>
               </div>
             </article>
 
@@ -158,7 +158,7 @@
                   Gere e revise as clausulas antes do documento final. Esse fluxo vale apenas para Dispensa normal.
                 </p>
                 <div class="ixp-field"><label>O que sera contratado?</label><textarea v-model="clausulaContratado" rows="3" placeholder="Ex: Aquisicao de material de expediente" /></div>
-                <div class="ixp-field"><label>Qual setor/secretaria sera atendido?</label><input v-model="clausulaSetor" placeholder="Ex: Secretaria de Administracao" /></div>
+                <div class="ixp-field"><label>Qual setor/secretaria sera atendido?</label><input v-model="clausulaSetor" list="dl-clausula-setor" placeholder="Ex: Secretaria de Administracao" /></div>
                 <div class="ixp-field"><label>Caracteristicas minimas obrigatorias (opcional)</label><textarea v-model="clausulaCaracteristicas" rows="3" placeholder="Ex: Itens de primeira linha, entrega fracionada e suporte tecnico" /></div>
                 <button class="ixp-btn-secondary" type="button" :disabled="isGeneratingClauses" @click="onGenerateClauses">
                   {{ isGeneratingClauses ? 'Gerando objeto e justificativa...' : 'Gerar objeto e justificativa' }}
@@ -224,29 +224,29 @@
           <div class="ixp-body">
             <div class="ixp-grid-3">
               <div class="ixp-field"><label>Tratamento</label><select v-model="fixoTratNome"><option value="">Selecione</option><option v-for="op in tratamentoNome" :key="op" :value="op">{{ op }}</option></select></div>
-              <div class="ixp-field ixp-col-2"><label>1.1 A quem e direcionada a solicitacao — Nome</label><input v-model="fixoNome" placeholder="Digite o nome" /></div>
+              <div class="ixp-field ixp-col-2"><label>1.1 A quem e direcionada a solicitacao — Nome</label><input v-model="fixoNome" list="dl-solicitacao-destinatario-nome" placeholder="Digite o nome" /></div>
             </div>
             <div class="ixp-grid-3">
               <div class="ixp-field"><label>Tratamento</label><select v-model="fixoTratCargo"><option value="">Selecione</option><option v-for="op in tratamentoCargo" :key="op" :value="op">{{ op }}</option></select></div>
-              <div class="ixp-field ixp-col-2"><label>1.2 A quem e direcionada a solicitacao — Funcao / Cargo</label><input v-model="fixoCargo" placeholder="Digite a funcao ou cargo" /></div>
+              <div class="ixp-field ixp-col-2"><label>1.2 A quem e direcionada a solicitacao — Funcao / Cargo</label><input v-model="fixoCargo" list="dl-solicitacao-destinatario-cargo" placeholder="Digite a funcao ou cargo" /></div>
             </div>
             <div class="ixp-grid-2">
-              <div class="ixp-field"><label>Nome do responsavel</label><input v-model="fixoResponsavel" placeholder="Digite o nome do responsavel" /></div>
-              <div class="ixp-field"><label>Funcao / Cargo</label><input v-model="fixoResponsavelCargo" placeholder="Digite o cargo" /></div>
+              <div class="ixp-field"><label>Nome do responsavel</label><input v-model="fixoResponsavel" list="dl-solicitacao-responsavel-nome" placeholder="Digite o nome do responsavel" /></div>
+              <div class="ixp-field"><label>Funcao / Cargo</label><input v-model="fixoResponsavelCargo" list="dl-solicitacao-responsavel-cargo" placeholder="Digite o cargo" /></div>
             </div>
           </div>
         </article>
         <article class="ixp-card">
           <h3>2. DFD - Documento de Formalizacao da Demanda</h3>
           <div class="ixp-body ixp-grid-1">
-            <div class="ixp-field"><label>2.1 Setor requisitante (Unidade / Setor / Departamento)</label><input v-model="fixoSetor" /></div>
-            <div class="ixp-field"><label>2.2 Responsavel pela demanda</label><input v-model="fixoDemanda" /></div>
-            <div class="ixp-field"><label>2.3 E-mail</label><input v-model="fixoEmail" /></div>
-            <div class="ixp-field"><label>2.4 Nome do(a) gestor(a) de contratos</label><input v-model="fixoGestor" /></div>
-            <div class="ixp-field"><label>2.5 Nome do(a) fiscal de contratos</label><input v-model="fixoFiscal" /></div>
+            <div class="ixp-field"><label>2.1 Setor requisitante (Unidade / Setor / Departamento)</label><input v-model="fixoSetor" list="dl-dfd-setor-requisitante" /></div>
+            <div class="ixp-field"><label>2.2 Responsavel pela demanda</label><input v-model="fixoDemanda" list="dl-dfd-responsavel-demanda" /></div>
+            <div class="ixp-field"><label>2.3 E-mail</label><input v-model="fixoEmail" list="dl-dfd-email" /></div>
+            <div class="ixp-field"><label>2.4 Nome do(a) gestor(a) de contratos</label><input v-model="fixoGestor" list="dl-dfd-gestor-contratos" /></div>
+            <div class="ixp-field"><label>2.5 Nome do(a) fiscal de contratos</label><input v-model="fixoFiscal" list="dl-dfd-fiscal-contratos" /></div>
             <div class="ixp-grid-2">
-              <div class="ixp-field"><label>Nome do responsavel</label><input v-model="fixoAssinatura" placeholder="Digite o nome do responsavel" /></div>
-              <div class="ixp-field"><label>Funcao / Cargo</label><input v-model="fixoAssinaturaCargo" placeholder="Digite o cargo" /></div>
+              <div class="ixp-field"><label>Nome do responsavel</label><input v-model="fixoAssinatura" list="dl-dfd-assinatura-nome" placeholder="Digite o nome do responsavel" /></div>
+              <div class="ixp-field"><label>Funcao / Cargo</label><input v-model="fixoAssinaturaCargo" list="dl-dfd-assinatura-cargo" placeholder="Digite o cargo" /></div>
             </div>
           </div>
         </article>
@@ -255,24 +255,37 @@
         <button type="button" class="ixp-btn-primary" @click="onApplyFixedData">Aplicar dados fixos</button>
       </div>
     </aside>
+
+    <datalist id="dl-processo-numero"><option v-for="v in (slotFieldOptions.processo_numero || [])" :key="`p-${v}`" :value="v" /></datalist>
+    <datalist id="dl-orgao"><option v-for="v in (slotFieldOptions.orgao || [])" :key="`o-${v}`" :value="v" /></datalist>
+    <datalist id="dl-fornecedor"><option v-for="v in (slotFieldOptions.fornecedor || [])" :key="`f-${v}`" :value="v" /></datalist>
+    <datalist id="dl-fiscal"><option v-for="v in (slotFieldOptions.fiscal || [])" :key="`fi-${v}`" :value="v" /></datalist>
+    <datalist id="dl-tr-nome-assinante"><option v-for="v in (slotFieldOptions.tr_nome_assinante || [])" :key="`na-${v}`" :value="v" /></datalist>
+    <datalist id="dl-tr-cargo-assinante"><option v-for="v in (slotFieldOptions.tr_cargo_assinante || [])" :key="`ca-${v}`" :value="v" /></datalist>
+    <datalist id="dl-clausula-setor"><option v-for="v in (slotFieldOptions.clausula_setor || [])" :key="`cs-${v}`" :value="v" /></datalist>
+    <datalist id="dl-solicitacao-destinatario-nome"><option v-for="v in (slotFieldOptions.solicitacao_destinatario_nome || [])" :key="`sdn-${v}`" :value="v" /></datalist>
+    <datalist id="dl-solicitacao-destinatario-cargo"><option v-for="v in (slotFieldOptions.solicitacao_destinatario_cargo || [])" :key="`sdc-${v}`" :value="v" /></datalist>
+    <datalist id="dl-solicitacao-responsavel-nome"><option v-for="v in (slotFieldOptions.solicitacao_responsavel_nome || [])" :key="`srn-${v}`" :value="v" /></datalist>
+    <datalist id="dl-solicitacao-responsavel-cargo"><option v-for="v in (slotFieldOptions.solicitacao_responsavel_cargo || [])" :key="`src-${v}`" :value="v" /></datalist>
+    <datalist id="dl-dfd-setor-requisitante"><option v-for="v in (slotFieldOptions.dfd_setor_requisitante || [])" :key="`dsr-${v}`" :value="v" /></datalist>
+    <datalist id="dl-dfd-responsavel-demanda"><option v-for="v in (slotFieldOptions.dfd_responsavel_demanda || [])" :key="`drd-${v}`" :value="v" /></datalist>
+    <datalist id="dl-dfd-email"><option v-for="v in (slotFieldOptions.dfd_email || [])" :key="`de-${v}`" :value="v" /></datalist>
+    <datalist id="dl-dfd-gestor-contratos"><option v-for="v in (slotFieldOptions.dfd_gestor_contratos || [])" :key="`dgc-${v}`" :value="v" /></datalist>
+    <datalist id="dl-dfd-fiscal-contratos"><option v-for="v in (slotFieldOptions.dfd_fiscal_contratos || [])" :key="`dfc-${v}`" :value="v" /></datalist>
+    <datalist id="dl-dfd-assinatura-nome"><option v-for="v in (slotFieldOptions.dfd_assinatura_nome || [])" :key="`dan-${v}`" :value="v" /></datalist>
+    <datalist id="dl-dfd-assinatura-cargo"><option v-for="v in (slotFieldOptions.dfd_assinatura_cargo || [])" :key="`dac-${v}`" :value="v" /></datalist>
   </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
 
 const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 const route = useRoute();
 const dataOptions = ['Data automatica', 'Datado e assinado digitalmente', 'Data manual'];
 const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
-const cabecalhoOptions = [
-  'Cabecalho padrao do municipio',
-  'Cabecalho do Fundo Municipal de Saude',
-  'Cabecalho da Assistencia Social',
-  'Cabecalho da Secretaria de Educacao',
-  'Cabecalho sem brasao',
-];
+const cabecalhoOptions = ref([]);
 const tratamentoNome = ['Ao senhor', 'A senhora'];
 const tratamentoCargo = ['Senhor', 'Senhora'];
 const emptyItem = { descricao: '', quantidade: '', unidade: '', valorUnitario: '', valorTotal: '' };
@@ -360,6 +373,30 @@ const clausulaJustificativa = ref('');
 const logicalRouteName = computed(() => DISPENSA_RAPIDA_TO_LOGICAL[route.name] || route.name);
 const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[logicalRouteName.value] || 'tr_dfd_generico');
 const isDispensaNormalRoute = computed(() => String(route.name || '').startsWith('DispensaArt75'));
+const slotFieldOptions = reactive({});
+const CATALOG_KEYS = [
+  'cabecalho_documento',
+  'processo_numero',
+  'orgao',
+  'fornecedor',
+  'fiscal',
+  'tr_nome_assinante',
+  'tr_cargo_assinante',
+  'solicitacao_destinatario_nome',
+  'solicitacao_destinatario_cargo',
+  'solicitacao_responsavel_nome',
+  'solicitacao_responsavel_cargo',
+  'dfd_setor_requisitante',
+  'dfd_responsavel_demanda',
+  'dfd_email',
+  'dfd_gestor_contratos',
+  'dfd_fiscal_contratos',
+  'dfd_assinatura_nome',
+  'dfd_assinatura_cargo',
+  'clausula_contratado',
+  'clausula_setor',
+  'clausula_caracteristicas',
+];
 
 function collectGlobalFormStatePayload() {
   return {
@@ -425,6 +462,78 @@ async function saveUserGlobalPreset() {
         data: collectGlobalFormStatePayload(),
       }),
     });
+    await persistSlotEntries(buildCatalogEntries());
+  } catch (_e) {
+    // silencioso
+  }
+}
+
+function buildCatalogEntries() {
+  const pairs = [
+    ['cabecalho_documento', cabecalhoDocumento.value],
+    ['processo_numero', processo.value],
+    ['orgao', orgao.value],
+    ['fornecedor', fornecedor.value],
+    ['fiscal', fiscal.value],
+    ['tr_nome_assinante', responsavel.value],
+    ['tr_cargo_assinante', responsavelCargo.value],
+    ['solicitacao_destinatario_nome', fixoNome.value],
+    ['solicitacao_destinatario_cargo', fixoCargo.value],
+    ['solicitacao_responsavel_nome', fixoResponsavel.value],
+    ['solicitacao_responsavel_cargo', fixoResponsavelCargo.value],
+    ['dfd_setor_requisitante', fixoSetor.value],
+    ['dfd_responsavel_demanda', fixoDemanda.value],
+    ['dfd_email', fixoEmail.value],
+    ['dfd_gestor_contratos', fixoGestor.value],
+    ['dfd_fiscal_contratos', fixoFiscal.value],
+    ['dfd_assinatura_nome', fixoAssinatura.value],
+    ['dfd_assinatura_cargo', fixoAssinaturaCargo.value],
+    ['clausula_contratado', clausulaContratado.value],
+    ['clausula_setor', clausulaSetor.value],
+    ['clausula_caracteristicas', clausulaCaracteristicas.value],
+  ];
+  return pairs
+    .map(([field_key, value]) => ({ field_key, value: String(value || '').trim() }))
+    .filter((e) => e.value);
+}
+
+async function persistSlotEntries(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) return;
+  try {
+    await fetch(`${API_BASE}/api/slots/catalog/upsert`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ entries }),
+    });
+  } catch (_e) {
+    // silencioso
+  }
+}
+
+async function loadSlotCatalogSuggestions() {
+  try {
+    const url = `${API_BASE}/api/slots/catalog/batch?fields=${encodeURIComponent(CATALOG_KEYS.join(','))}&limit=25`;
+    const res = await fetch(url, { credentials: 'include' });
+    if (!res.ok) return;
+    const payload = await res.json().catch(() => ({}));
+    const map = payload?.items || {};
+    CATALOG_KEYS.forEach((key) => {
+      const incoming = Array.isArray(map[key]) ? map[key] : [];
+      slotFieldOptions[key] = [...new Set(incoming.map((x) => String(x || '').trim()).filter(Boolean))];
+    });
+  } catch (_e) {
+    // silencioso
+  }
+}
+async function loadCabecalhoOptions() {
+  try {
+    const res = await fetch(`${API_BASE}/api/documentos_modelos/`, { credentials: 'include' });
+    if (!res.ok) return;
+    const payload = await res.json().catch(() => ({}));
+    const templates = Array.isArray(payload?.templates) ? payload.templates : [];
+    const names = [...new Set(templates.map((t) => String(t?.name || '').trim()).filter(Boolean))];
+    cabecalhoOptions.value = names;
   } catch (_e) {
     // silencioso
   }
@@ -813,6 +922,8 @@ async function onApplyFixedData() {
 }
 onMounted(async () => {
   await loadUserGlobalPreset();
+  await loadCabecalhoOptions();
+  await loadSlotCatalogSuggestions();
 });
 onBeforeUnmount(() => {
   revokeDocumentUrls();

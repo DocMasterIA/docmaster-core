@@ -604,11 +604,11 @@
   font-size: 6.2pt;
   line-height: 1.06;
   font-weight: 600;
-  white-space: nowrap;
-  word-break: normal;
-  overflow-wrap: normal;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
 }

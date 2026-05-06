@@ -95,42 +95,16 @@
                 </p>
               </div>
 
-              <!-- Layout copiado dos previews funcionais -->
-              <div v-if="isInexigibilidadePreviewRoute" class="doc-gen__preview-form">
-                <div
-                  v-for="section in selectedFlow.sections"
-                  :key="`preview-${section.key}`"
-                  class="doc-gen__var-section"
-                >
-                  <h3 class="doc-gen__var-heading">{{ section.title }}</h3>
-                  <div class="doc-gen__slot-grid">
-                    <template v-for="field in section.fields" :key="`preview-${field.id}`">
-                      <h4 v-if="field.input === 'heading'" class="doc-gen__slot-subheading">{{ field.label }}</h4>
-                      <div v-else-if="field.input === 'textarea'" class="gov-field doc-gen__slot-field" :class="{ 'doc-gen__slot-field--full': field.fullWidth }">
-                        <label class="gov-label">{{ field.label }}</label>
-                        <textarea v-model="slotForm[field.id]" class="gov-textarea" rows="3"></textarea>
-                      </div>
-                      <div v-else-if="field.input === 'checkbox'" class="gov-field doc-gen__slot-field" :class="{ 'doc-gen__slot-field--full': field.fullWidth }">
-                        <label class="gov-label">
-                          <input v-model="slotForm[field.id]" type="checkbox" />
-                          {{ field.label }}
-                        </label>
-                      </div>
-                      <div v-else class="gov-field doc-gen__slot-field" :class="{ 'doc-gen__slot-field--full': field.fullWidth }">
-                        <label class="gov-label">{{ field.label }}</label>
-                        <input
-                          v-model="slotForm[field.id]"
-                          :type="field.input === 'email' ? 'email' : (field.input === 'date' ? 'date' : 'text')"
-                          class="gov-input"
-                        />
-                      </div>
-                    </template>
-                  </div>
-                </div>
-              </div>
-
               <!-- Botões -->
               <div class="doc-gen__actions">
+                <button
+                  v-if="showSlotsCard"
+                  type="button"
+                  class="gov-btn gov-btn--outline"
+                  @click="slotDrawerOpen = true"
+                >
+                  Dados fixos
+                </button>
                 <button
                   type="submit"
                   class="gov-btn gov-btn--primary"
@@ -286,144 +260,164 @@
               Preencha os campos com os valores que devem constar no documento (texto livre, lista sugerida ou registro na hora).
               Eles são enviados à IA e aos placeholders do modelo oficial quando aplicável.
             </p>
-            <div
-              v-if="!isInexigibilidadePreviewRoute"
-              v-for="section in selectedFlow.sections"
-              :key="section.key"
-              class="doc-gen__var-section"
-            >
-              <h3 class="doc-gen__var-heading">{{ section.title }}</h3>
-              <div class="doc-gen__slot-grid">
-                <template v-for="field in section.fields" :key="field.id">
-                  <h4 v-if="field.input === 'heading' && shouldRenderField(field)" class="doc-gen__slot-subheading">
-                    {{ field.label }}
-                  </h4>
-                  <div
-                    v-else-if="shouldRenderField(field)"
-                    class="gov-field doc-gen__slot-field"
-                    :class="{ 'doc-gen__slot-field--full': field.fullWidth }"
-                  >
-                    <label class="gov-label" :for="'slot-' + field.id">
-                      {{ field.label }}
-                      <span v-if="field.required" class="doc-gen__required" aria-hidden="true">*</span>
-                    </label>
-                    <textarea
-                      v-if="field.input === 'textarea'"
-                      :id="'slot-' + field.id"
-                      v-model="slotForm[field.id]"
-                      class="gov-textarea doc-gen__slot-input"
-                      rows="3"
-                    />
-                    <input
-                      v-else-if="field.input === 'date'"
-                      :id="'slot-' + field.id"
-                      v-model="slotForm[field.id]"
-                      type="date"
-                      class="gov-input doc-gen__slot-input"
-                      :disabled="isSlotFieldDisabled(field)"
-                    />
-                    <div v-else-if="field.input === 'email' || field.input === 'text'" class="doc-gen__combo-wrap">
-                      <input
-                        :id="'slot-' + field.id"
-                        v-model="slotForm[field.id]"
-                        :type="field.input === 'email' ? 'email' : 'text'"
-                        class="gov-input doc-gen__slot-input"
-                        :autocomplete="field.input === 'email' ? 'email' : 'off'"
-                        :placeholder="field.placeholder || 'Selecione, digite ou adicione novo valor'"
-                        @focus="openFieldSuggestions(field.id)"
-                        @input="openFieldSuggestions(field.id)"
-                      />
-                      <button
-                        type="button"
-                        class="gov-btn gov-btn--outline gov-btn--sm doc-gen__combo-add"
-                        @click="addFieldOption(field.id)"
-                      >
-                        + Adicionar
-                      </button>
-                      <div
-                        v-if="isFieldSuggestionsOpen(field.id)"
-                        class="doc-gen__slot-suggestions"
-                      >
-                        <button
-                          v-for="opt in getFieldSuggestions(field.id)"
-                          :key="field.id + '-opt-' + opt"
-                          type="button"
-                          class="doc-gen__slot-suggestion-item"
-                          @click="selectFieldSuggestion(field.id, opt)"
-                        >
-                          <span class="doc-gen__slot-suggestion-label">{{ opt }}</span>
-                          <span
-                            class="doc-gen__slot-suggestion-remove"
-                            title="Excluir valor"
-                            @click.stop="removeFieldOption(field.id, opt)"
-                          >×</span>
-                        </button>
-                      </div>
-                    </div>
-                    <div v-else-if="field.input === 'datalist'" class="doc-gen__combo-wrap">
-                      <input
-                        :id="'slot-' + field.id"
-                        v-model="slotForm[field.id]"
-                        class="gov-input doc-gen__slot-input"
-                        :placeholder="field.placeholder || 'Escolha ou digite o cargo'"
-                        @focus="openFieldSuggestions(field.id)"
-                        @input="openFieldSuggestions(field.id)"
-                      />
-                      <button
-                        type="button"
-                        class="gov-btn gov-btn--outline gov-btn--sm doc-gen__combo-add"
-                        @click="addFieldOption(field.id)"
-                      >
-                        + Adicionar
-                      </button>
-                      <div
-                        v-if="isFieldSuggestionsOpen(field.id)"
-                        class="doc-gen__slot-suggestions"
-                      >
-                        <button
-                          v-for="opt in getFieldSuggestions(field.id)"
-                          :key="field.id + '-opt-' + opt"
-                          type="button"
-                          class="doc-gen__slot-suggestion-item"
-                          @click="selectFieldSuggestion(field.id, opt)"
-                        >
-                          <span class="doc-gen__slot-suggestion-label">{{ opt }}</span>
-                          <span
-                            class="doc-gen__slot-suggestion-remove"
-                            title="Excluir valor"
-                            @click.stop="removeFieldOption(field.id, opt)"
-                          >×</span>
-                        </button>
-                      </div>
-                    </div>
-                    <label
-                      v-else-if="field.input === 'checkbox'"
-                      class="doc-gen__slot-checkbox-label"
-                      :for="'slot-' + field.id"
-                    >
-                      <input
-                        :id="'slot-' + field.id"
-                        v-model="slotForm[field.id]"
-                        type="checkbox"
-                        class="doc-gen__slot-checkbox"
-                      />
-                      <span>{{ field.checkboxHint || field.label }}</span>
-                    </label>
-                    <input
-                      v-else
-                      :id="'slot-' + field.id"
-                      v-model="slotForm[field.id]"
-                      type="text"
-                      class="gov-input doc-gen__slot-input"
-                    />
-                  </div>
-                </template>
-              </div>
-            </div>
+            <p class="gov-text-soft">
+              Acesse os campos completos no botão <strong>Dados fixos</strong>.
+            </p>
           </div>
         </section>
       </aside>
     </div>
+
+    <div v-if="showSlotsCard && slotDrawerOpen" class="doc-gen__drawer-backdrop" @click="slotDrawerOpen = false"></div>
+    <aside :class="['doc-gen__drawer', { 'doc-gen__drawer--open': showSlotsCard && slotDrawerOpen }]">
+      <div class="doc-gen__drawer-head">
+        <div>
+          <div class="doc-gen__drawer-kicker">Configuração oculta</div>
+          <h3 class="doc-gen__drawer-title">Dados fixos</h3>
+        </div>
+        <button type="button" class="doc-gen__drawer-close" @click="slotDrawerOpen = false">×</button>
+      </div>
+      <div class="doc-gen__drawer-body">
+        <div
+          v-for="section in selectedFlow.sections"
+          :key="`drawer-${section.key}`"
+          class="doc-gen__var-section"
+        >
+          <h3 class="doc-gen__var-heading">{{ section.title }}</h3>
+          <div class="doc-gen__slot-grid">
+            <template v-for="field in section.fields" :key="`drawer-${field.id}`">
+              <h4 v-if="field.input === 'heading' && shouldRenderField(field)" class="doc-gen__slot-subheading">
+                {{ field.label }}
+              </h4>
+              <div
+                v-else-if="shouldRenderField(field)"
+                class="gov-field doc-gen__slot-field"
+                :class="{ 'doc-gen__slot-field--full': field.fullWidth }"
+              >
+                <label class="gov-label" :for="'drawer-slot-' + field.id">
+                  {{ field.label }}
+                  <span v-if="field.required" class="doc-gen__required" aria-hidden="true">*</span>
+                </label>
+                <textarea
+                  v-if="field.input === 'textarea'"
+                  :id="'drawer-slot-' + field.id"
+                  v-model="slotForm[field.id]"
+                  class="gov-textarea doc-gen__slot-input"
+                  rows="3"
+                />
+                <input
+                  v-else-if="field.input === 'date'"
+                  :id="'drawer-slot-' + field.id"
+                  v-model="slotForm[field.id]"
+                  type="date"
+                  class="gov-input doc-gen__slot-input"
+                  :disabled="isSlotFieldDisabled(field)"
+                />
+                <div v-else-if="field.input === 'email' || field.input === 'text'" class="doc-gen__combo-wrap">
+                  <input
+                    :id="'drawer-slot-' + field.id"
+                    v-model="slotForm[field.id]"
+                    :type="field.input === 'email' ? 'email' : 'text'"
+                    class="gov-input doc-gen__slot-input"
+                    :autocomplete="field.input === 'email' ? 'email' : 'off'"
+                    :placeholder="field.placeholder || 'Selecione, digite ou adicione novo valor'"
+                    @focus="openFieldSuggestions(field.id)"
+                    @input="openFieldSuggestions(field.id)"
+                  />
+                  <button
+                    type="button"
+                    class="gov-btn gov-btn--outline gov-btn--sm doc-gen__combo-add"
+                    @click="addFieldOption(field.id)"
+                  >
+                    + Adicionar
+                  </button>
+                  <div
+                    v-if="isFieldSuggestionsOpen(field.id)"
+                    class="doc-gen__slot-suggestions"
+                  >
+                    <button
+                      v-for="opt in getFieldSuggestions(field.id)"
+                      :key="'drawer-' + field.id + '-opt-' + opt"
+                      type="button"
+                      class="doc-gen__slot-suggestion-item"
+                      @click="selectFieldSuggestion(field.id, opt)"
+                    >
+                      <span class="doc-gen__slot-suggestion-label">{{ opt }}</span>
+                      <span
+                        class="doc-gen__slot-suggestion-remove"
+                        title="Excluir valor"
+                        @click.stop="removeFieldOption(field.id, opt)"
+                      >×</span>
+                    </button>
+                  </div>
+                </div>
+                <div v-else-if="field.input === 'datalist'" class="doc-gen__combo-wrap">
+                  <input
+                    :id="'drawer-slot-' + field.id"
+                    v-model="slotForm[field.id]"
+                    class="gov-input doc-gen__slot-input"
+                    :placeholder="field.placeholder || 'Escolha ou digite o cargo'"
+                    @focus="openFieldSuggestions(field.id)"
+                    @input="openFieldSuggestions(field.id)"
+                  />
+                  <button
+                    type="button"
+                    class="gov-btn gov-btn--outline gov-btn--sm doc-gen__combo-add"
+                    @click="addFieldOption(field.id)"
+                  >
+                    + Adicionar
+                  </button>
+                  <div
+                    v-if="isFieldSuggestionsOpen(field.id)"
+                    class="doc-gen__slot-suggestions"
+                  >
+                    <button
+                      v-for="opt in getFieldSuggestions(field.id)"
+                      :key="'drawer-' + field.id + '-opt-' + opt"
+                      type="button"
+                      class="doc-gen__slot-suggestion-item"
+                      @click="selectFieldSuggestion(field.id, opt)"
+                    >
+                      <span class="doc-gen__slot-suggestion-label">{{ opt }}</span>
+                      <span
+                        class="doc-gen__slot-suggestion-remove"
+                        title="Excluir valor"
+                        @click.stop="removeFieldOption(field.id, opt)"
+                      >×</span>
+                    </button>
+                  </div>
+                </div>
+                <label
+                  v-else-if="field.input === 'checkbox'"
+                  class="doc-gen__slot-checkbox-label"
+                  :for="'drawer-slot-' + field.id"
+                >
+                  <input
+                    :id="'drawer-slot-' + field.id"
+                    v-model="slotForm[field.id]"
+                    type="checkbox"
+                    class="doc-gen__slot-checkbox"
+                  />
+                  <span>{{ field.checkboxHint || field.label }}</span>
+                </label>
+                <input
+                  v-else
+                  :id="'drawer-slot-' + field.id"
+                  v-model="slotForm[field.id]"
+                  type="text"
+                  class="gov-input doc-gen__slot-input"
+                />
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+      <div class="doc-gen__drawer-foot">
+        <button type="button" class="gov-btn gov-btn--primary" @click="slotDrawerOpen = false">
+          Aplicar dados fixos
+        </button>
+      </div>
+    </aside>
 
     <!-- Modal PDF -->
     <div
@@ -570,6 +564,7 @@ const pdfPage = ref(1);
 const pdfTotalPages = ref(0);
 const pdfGotoPage = ref(1);
 const suggestionOpenField = ref('');
+const slotDrawerOpen = ref(false);
 const slotStateSaveDebounce = ref(null);
 const templatePresetSaveDebounce = ref(null);
 const isHydratingSlotState = ref(false);
@@ -1686,6 +1681,7 @@ onUnmounted(() => {
 watch(
   () => route.name,
   async () => {
+    slotDrawerOpen.value = false;
     docTypeMode.value = isEtpLivreRoute.value ? 'auto' : 'tr_modelo';
     resetSlotFormAndSections();
     loadSlotCatalogSuggestions();
@@ -2498,6 +2494,79 @@ function goToPage() {
   border-radius: 999px;
   background: #0ea5e9;
   transition: width .2s ease;
+}
+
+.doc-gen__drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(15, 23, 42, 0.2);
+}
+.doc-gen__drawer {
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 50;
+  height: 100%;
+  width: 100%;
+  max-width: 960px;
+  transform: translateX(100%);
+  transition: transform .3s ease;
+  border-left: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: -8px 0 28px rgba(15, 23, 42, 0.2);
+  display: flex;
+  flex-direction: column;
+}
+.doc-gen__drawer--open {
+  transform: translateX(0);
+}
+.doc-gen__drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 16px 20px;
+}
+.doc-gen__drawer-kicker {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+}
+.doc-gen__drawer-title {
+  margin: 2px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.doc-gen__drawer-close {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #64748b;
+  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.doc-gen__drawer-close:hover {
+  background: #f8fafc;
+}
+.doc-gen__drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 20px;
+}
+.doc-gen__drawer-foot {
+  border-top: 1px solid #e2e8f0;
+  padding: 14px 20px;
+}
+.doc-gen__drawer-foot .gov-btn {
+  width: 100%;
 }
 
 /* UI de dispensa isolada do tema legado */

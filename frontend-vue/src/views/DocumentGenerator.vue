@@ -1,5 +1,5 @@
 <template>
-  <div class="doc-gen">
+  <div class="doc-gen" :class="{ 'doc-gen--rapida': isDispensaRapidaUi }">
     <header class="gov-page-header">
       <h1 class="gov-page-title">Gerador de Documentos</h1>
       <p class="gov-page-subtitle">
@@ -426,6 +426,21 @@ import { useRoute } from 'vue-router';
 const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 const route = useRoute();
 
+/** Rotas `/geracao/dispensa-rapida/...` reutilizam pacotes e regras das rotas `DispensaArt75*`. */
+const DISPENSA_RAPIDA_TO_LOGICAL = {
+  DispensaRapidaArt75IObrasEngenharia: 'DispensaArt75IObrasEngenharia',
+  DispensaRapidaArt75IManutencaoVeiculos: 'DispensaArt75IManutencaoVeiculos',
+  DispensaRapidaArt75IICompras: 'DispensaArt75IICompras',
+  DispensaRapidaArt75IIServicos: 'DispensaArt75IIServicos',
+  DispensaRapidaArt75IIComprasServicosInclusos: 'DispensaArt75IIComprasServicosInclusos',
+};
+
+const dispensaLogicalRouteName = computed(
+  () => DISPENSA_RAPIDA_TO_LOGICAL[route.name] || route.name,
+);
+
+const isDispensaRapidaUi = computed(() => !!route.meta?.dispensaRapidaUi);
+
 const useOwnFile = ref(false);
 const selectedDocxFile = ref(null);
 const docxFileInput = ref(null);
@@ -700,7 +715,8 @@ const showSlotsCard = computed(() => !isEtpLivreRoute.value);
 const selectedFlow = computed(() => TR_DFD_SLOTS_FLOW);
 
 const slotCardFlowTitle = computed(() => {
-  const routeFlowTitle = FLOW_CONFIG[route.name]?.title;
+  const logical = dispensaLogicalRouteName.value;
+  const routeFlowTitle = FLOW_CONFIG[logical]?.title;
   if (routeFlowTitle) return routeFlowTitle;
 
   const routeMetaTitle = typeof route.meta?.title === 'string' ? route.meta.title : '';
@@ -729,7 +745,7 @@ const SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE = {
 
 const slotPackageKey = computed(() => {
   if (isEtpLivreRoute.value) return 'etp_livre';
-  return SLOT_PACKAGE_BY_ROUTE[route.name] || 'tr_dfd_generico';
+  return SLOT_PACKAGE_BY_ROUTE[dispensaLogicalRouteName.value] || 'tr_dfd_generico';
 });
 
 /** Valores do formulário lateral (TR/DFD com slots). */
@@ -959,7 +975,7 @@ function isSlotFieldDisabled(field) {
 function shouldRenderField(field) {
   if (!field) return true;
   // Campo exclusivo da rota de Obras e Serviços de Engenharia.
-  if (field.id === 'tr_objeto_manual') return route.name === 'DispensaArt75IObrasEngenharia';
+  if (field.id === 'tr_objeto_manual') return dispensaLogicalRouteName.value === 'DispensaArt75IObrasEngenharia';
   return true;
 }
 
@@ -1034,7 +1050,7 @@ function buildTrSlotsOverride() {
   const objetoEscopo = (f.tr_objeto_escopo || '').trim();
   const objetoEntregas = (f.tr_objeto_entregas || '').trim();
   const objetoResultados = (f.tr_objeto_resultados || '').trim();
-  if (route.name === 'DispensaArt75IObrasEngenharia') {
+  if (dispensaLogicalRouteName.value === 'DispensaArt75IObrasEngenharia') {
     // Nesta rota o objeto é sempre manual (sem geração por IA).
     if (objetoManualTR) o.objeto = objetoManualTR;
   } else {
@@ -1051,7 +1067,7 @@ function buildTrSlotsOverride() {
   const setorResp = (f.setor_responsavel || '').trim();
   if (setorResp && !o.secretaria_usuario) o.secretaria_usuario = setorResp;
 
-  const fundamentoLegal = SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE[route.name];
+  const fundamentoLegal = SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE[dispensaLogicalRouteName.value];
   if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;
 
   return Object.keys(o).length ? o : null;
@@ -1207,7 +1223,7 @@ function clearDocxFile() {
 
 async function onSubmit() {
   if (!iaPrompt.value.trim()) return;
-  if (docTypeMode.value === 'tr_modelo' && route.name === 'DispensaArt75IObrasEngenharia') {
+  if (docTypeMode.value === 'tr_modelo' && dispensaLogicalRouteName.value === 'DispensaArt75IObrasEngenharia') {
     const manualObject = String(slotForm.tr_objeto_manual || '').trim();
     if (!manualObject) {
       generateError.value = 'Preencha o campo "Objeto do TR (manual, sem geração por IA)" para gerar nesta página.';
@@ -2290,5 +2306,166 @@ function goToPage() {
 }
 .doc-gen__thumb:hover {
   border-color: var(--color-primary);
+}
+
+/* Dispensa rápida: visual alinhado ao formulário Tailwind do preview Art. 74, I (manutenção veículos). */
+.doc-gen.doc-gen--rapida {
+  padding-bottom: 8px;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-page-header) {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  margin-bottom: 4px;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-page-title) {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-page-subtitle) {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-top: 0.35rem;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-surface) {
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+.doc-gen.doc-gen--rapida :deep(.gov-surface__header) {
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-surface__title) {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-surface__subtitle) {
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-label) {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #475569;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-label__hint) {
+  font-weight: 400;
+  color: #94a3b8;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-input),
+.doc-gen.doc-gen--rapida :deep(.gov-textarea),
+.doc-gen.doc-gen--rapida :deep(.doc-gen__search-input) {
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-input:focus),
+.doc-gen.doc-gen--rapida :deep(.gov-textarea:focus),
+.doc-gen.doc-gen--rapida :deep(.doc-gen__search-input:focus) {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+  outline: none;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-btn) {
+  border-radius: 12px;
+  font-weight: 600;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-btn--primary) {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #fff;
+  box-shadow: none;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-btn--primary:hover:not(:disabled)) {
+  background: #1e293b;
+  border-color: #1e293b;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-btn--secondary),
+.doc-gen.doc-gen--rapida :deep(.gov-btn--outline) {
+  border-color: #cbd5e1;
+  color: #334155;
+  background: #fff;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-btn--secondary:hover:not(:disabled)),
+.doc-gen.doc-gen--rapida :deep(.gov-btn--outline:hover:not(:disabled)) {
+  background: #f8fafc;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-text-soft) {
+  color: #64748b;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-link) {
+  color: #0369a1;
+  font-weight: 500;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__llm-hint) {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 12px;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__llm-hint .fa-wand-magic-sparkles) {
+  color: #0284c7;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__results) {
+  border-radius: 12px;
+  border-color: #e2e8f0;
+  box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08);
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__result-item:hover),
+.doc-gen.doc-gen--rapida :deep(.doc-gen__result-item--focused) {
+  background: #f0f9ff;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__var-heading) {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__slot-subheading) {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__variables-card) {
+  position: sticky;
+  top: 12px;
+}
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-page-header),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-surface) {
+  background: #0f172a;
+  border-color: #334155;
+}
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-page-title),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-surface__title) {
+  color: #f1f5f9;
+}
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-page-subtitle),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-surface__subtitle),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-text-soft) {
+  color: #94a3b8;
+}
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-input),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-textarea),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__search-input) {
+  background: #020617;
+  border-color: #475569;
+  color: #e2e8f0;
+}
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-btn--primary) {
+  background: #e2e8f0;
+  border-color: #e2e8f0;
+  color: #0f172a;
+}
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-btn--primary:hover:not(:disabled)) {
+  background: #f8fafc;
 }
 </style>

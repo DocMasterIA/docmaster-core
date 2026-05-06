@@ -35,7 +35,14 @@ export function resolveModuleKey(to) {
   if (name === 'ModuleDispensaEletronica' || path.startsWith('/dispensa-eletronica')) return 'dispensa_eletronica';
   if (name === 'ModulePregao' || path === '/pregao') return 'pregao';
   if (name === 'ModulePregaoEletronico' || path.startsWith('/pregao-eletronico')) return 'pregao_eletronico';
-  if (name.startsWith('DispensaArt75') || path.startsWith('/geracao/dispensa-art-75')) return 'dispensa';
+  if (
+    name.startsWith('DispensaArt75')
+    || name.startsWith('DispensaRapida')
+    || path.startsWith('/geracao/dispensa-art-75')
+    || path.startsWith('/geracao/dispensa-rapida')
+  ) {
+    return 'dispensa';
+  }
   if (name.startsWith('InexigibilidadeArt74') || path.startsWith('/geracao/inexigibilidade-art-74')) return 'inexigibilidade';
   if (name === 'EtpLivre' || path.startsWith('/geracao/etp-livre')) return 'etp';
   return null;
@@ -43,7 +50,7 @@ export function resolveModuleKey(to) {
 
 export function firstAllowedPath(allowedSet) {
   const order = [
-    ['dispensa', '/geracao/dispensa-art-75-i/obras-servicos-engenharia'],
+    ['dispensa', '/geracao/dispensa-rapida/art-75-i/obras-servicos-engenharia'],
     ['dispensa_eletronica', '/dispensa-eletronica'],
     ['pregao', '/pregao'],
     ['pregao_eletronico', '/pregao-eletronico'],

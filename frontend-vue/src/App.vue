@@ -149,7 +149,7 @@ const user = ref(null);
 const darkMode = ref(false);
 const generationMenuOpen = ref(false);
 const groupOpenState = ref({
-  DispensaArt75I: false,
+  DispensaRapidaGroup: false,
   DispensaArt75II: false,
   InexigibilidadeArt74I: false,
   EtpLivreGroup: false,
@@ -157,21 +157,39 @@ const groupOpenState = ref({
 
 const generationPages = [
   {
-    name: 'DispensaArt75I',
+    name: 'DispensaRapidaGroup',
     label: 'Dispensa rápida',
     icon: 'fa-gavel',
     children: [
       {
-        name: 'DispensaArt75IObrasEngenharia',
+        name: 'DispensaRapidaArt75IObrasEngenharia',
         label: 'Obras e serviços de engenharia',
         icon: 'fa-compass-drafting',
-        to: '/geracao/dispensa-art-75-i/obras-servicos-engenharia',
+        to: '/geracao/dispensa-rapida/art-75-i/obras-servicos-engenharia',
       },
       {
-        name: 'DispensaArt75IManutencaoVeiculos',
+        name: 'DispensaRapidaArt75IManutencaoVeiculos',
         label: 'Manutenção de veículos',
         icon: 'fa-car-side',
-        to: '/geracao/dispensa-art-75-i/manutencao-veiculos',
+        to: '/geracao/dispensa-rapida/art-75-i/manutencao-veiculos',
+      },
+      {
+        name: 'DispensaRapidaArt75IICompras',
+        label: 'Compras',
+        icon: 'fa-cart-shopping',
+        to: '/geracao/dispensa-rapida/art-75-ii/compras',
+      },
+      {
+        name: 'DispensaRapidaArt75IIServicos',
+        label: 'Serviços',
+        icon: 'fa-screwdriver-wrench',
+        to: '/geracao/dispensa-rapida/art-75-ii/servicos',
+      },
+      {
+        name: 'DispensaRapidaArt75IIComprasServicosInclusos',
+        label: 'Compras com serviços inclusos',
+        icon: 'fa-boxes-stacked',
+        to: '/geracao/dispensa-rapida/art-75-ii/compras-servicos-inclusos',
       },
     ],
   },
@@ -255,7 +273,7 @@ const PLACEHOLDER_TAB_KEYS = [
 ];
 
 const mainTabs = [
-  { key: 'dispensa', label: 'Dispensa', icon: 'fa-file-lines', to: '/geracao/dispensa-art-75-i/obras-servicos-engenharia' },
+  { key: 'dispensa', label: 'Dispensa', icon: 'fa-file-lines', to: '/geracao/dispensa-rapida/art-75-i/obras-servicos-engenharia' },
   { key: 'dispensa_eletronica', label: 'Dispensa Eletrônica', icon: 'fa-file-lines', to: '/dispensa-eletronica' },
   { key: 'pregao', label: 'Pregão', icon: 'fa-file-lines', to: '/pregao' },
   { key: 'pregao_eletronico', label: 'Pregão Eletrônico', icon: 'fa-file-lines', to: '/pregao-eletronico' },
@@ -288,7 +306,13 @@ function inferMainTabFromRoute() {
   if (rname === 'ModuleControleInterno' || rpath.startsWith('/controle-interno')) return 'controle_interno';
   if (rname === 'ModuleImpugnacao' || rpath.startsWith('/impugnacao')) return 'impugnacao';
   if (rname === 'ModuleRecursoLicitatorio' || rpath.startsWith('/recurso-processo-licitatorio')) return 'recurso';
-  if (rname.startsWith('DispensaArt75')) return 'dispensa';
+  if (
+    rname.startsWith('DispensaArt75')
+    || rname.startsWith('DispensaRapida')
+    || rpath.startsWith('/geracao/dispensa-rapida')
+  ) {
+    return 'dispensa';
+  }
   if (rname.startsWith('InexigibilidadeArt74')) return 'inexigibilidade';
   if (rname === 'EtpLivre' || rpath.startsWith('/geracao/etp-livre')) return 'etp';
   if (rname === 'DocumentAnalyzer') return 'analisador';
@@ -302,7 +326,7 @@ const activeMainTabKey = computed(() => selectedMainTabKey.value);
 
 const visibleGenerationPages = computed(() => {
   if (activeMainTabKey.value === 'dispensa') {
-    return generationPages.filter((p) => p.name === 'DispensaArt75I' || p.name === 'DispensaArt75II');
+    return generationPages.filter((p) => p.name === 'DispensaRapidaGroup' || p.name === 'DispensaArt75II');
   }
   if (activeMainTabKey.value === 'inexigibilidade') {
     return generationPages.filter((p) => p.name === 'InexigibilidadeArt74I');

@@ -23,21 +23,8 @@
                   <label>Cabecalho do documento</label>
                   <select v-model="cabecalhoDocumento">
                     <option value="">Selecione</option>
-                    <option v-for="op in mergedCabecalhoOptions" :key="op" :value="op">{{ op }}</option>
+                    <option v-for="op in cabecalhoOptions" :key="op" :value="op">{{ op }}</option>
                   </select>
-                  <div class="ixp-inline-actions">
-                    <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addCabecalhoToHistory">
-                      Adicionar novo
-                    </button>
-                    <button
-                      type="button"
-                      class="ixp-btn-secondary ixp-btn-xs"
-                      :disabled="!canDeleteCabecalho"
-                      @click="removeCabecalhoFromHistory"
-                    >
-                      Excluir salvo
-                    </button>
-                  </div>
                 </div>
                 <label class="ixp-check">
                   <input v-model="processoAtivo" type="checkbox" />
@@ -65,7 +52,7 @@
               </div>
             </article>
 
-            <article class="ixp-card">
+            <article v-if="isDispensaManutencaoRoute" class="ixp-card">
               <h3>Tipo de manutencao</h3>
               <div class="ixp-body">
                 <div class="ixp-grid-2">
@@ -449,17 +436,7 @@ const clausulaJustificativa = ref('');
 const logicalRouteName = computed(() => DISPENSA_RAPIDA_TO_LOGICAL[route.name] || route.name);
 const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[logicalRouteName.value] || 'tr_dfd_generico');
 const isDispensaNormalRoute = computed(() => String(route.name || '').startsWith('DispensaArt75'));
-const mergedCabecalhoOptions = computed(() => {
-  const fromTemplates = Array.isArray(cabecalhoOptions.value) ? cabecalhoOptions.value : [];
-  const fromHistory = Array.isArray(slotFieldOptions.cabecalho_documento) ? slotFieldOptions.cabecalho_documento : [];
-  return [...new Set([...fromTemplates, ...fromHistory].map((x) => String(x || '').trim()).filter(Boolean))];
-});
-const canDeleteCabecalho = computed(() => {
-  const selected = String(cabecalhoDocumento.value || '').trim();
-  if (!selected) return false;
-  const history = Array.isArray(slotFieldOptions.cabecalho_documento) ? slotFieldOptions.cabecalho_documento : [];
-  return history.includes(selected);
-});
+const isDispensaManutencaoRoute = computed(() => logicalRouteName.value === 'DispensaArt75IManutencaoVeiculos');
 const slotFieldOptions = reactive({});
 const CATALOG_KEYS = [
   'cabecalho_documento',
@@ -613,22 +590,6 @@ async function removeCatalogEntry(fieldKey, value) {
   }
 }
 
-async function addCabecalhoToHistory() {
-  const value = String(cabecalhoDocumento.value || '').trim();
-  if (!value) return;
-  const current = Array.isArray(slotFieldOptions.cabecalho_documento) ? slotFieldOptions.cabecalho_documento : [];
-  if (!current.includes(value)) slotFieldOptions.cabecalho_documento = [...current, value];
-  await persistSlotEntries([{ field_key: 'cabecalho_documento', value }]);
-}
-
-async function removeCabecalhoFromHistory() {
-  const value = String(cabecalhoDocumento.value || '').trim();
-  if (!value) return;
-  const current = Array.isArray(slotFieldOptions.cabecalho_documento) ? slotFieldOptions.cabecalho_documento : [];
-  slotFieldOptions.cabecalho_documento = current.filter((v) => v !== value);
-  await removeCatalogEntry('cabecalho_documento', value);
-}
-
 async function addFieldHistory(fieldKey, rawValue) {
   const value = String(rawValue || '').trim();
   if (!value) return;
@@ -675,6 +636,9 @@ async function loadCabecalhoOptions() {
     const templates = Array.isArray(payload?.templates) ? payload.templates : [];
     const names = [...new Set(templates.map((t) => String(t?.name || '').trim()).filter(Boolean))];
     cabecalhoOptions.value = names;
+    if (cabecalhoDocumento.value && !names.includes(cabecalhoDocumento.value)) {
+      cabecalhoDocumento.value = '';
+    }
   } catch (_e) {
     // silencioso
   }
@@ -990,10 +954,12 @@ function buildUserPrompt() {
     `Processo: ${processoAtivo.value ? (processo.value || 'Nao informado') : 'Nao se aplica'}`,
     `Orgao: ${orgao.value || 'Nao informado'}`,
     `Veiculo: ${marca.value || '-'} ${modelo.value || '-'} / Placa ${placa.value || '-'}`,
-    `Tipo manutencao: ${tipoManutencao.value || 'Nao informado'}`,
     `Fornecedor: ${fornecedor.value || 'Nao informado'} / CNPJ: ${cnpj.value || 'Nao informado'}`,
     `Valor global: ${valorGlobal.value || 'Nao informado'}`,
   ];
+  if (isDispensaManutencaoRoute.value) {
+    lines.splice(5, 0, `Tipo manutencao: ${tipoManutencao.value || 'Nao informado'}`);
+  }
   return lines.join('\n');
 }
 async function onSubmit() {
@@ -1075,7 +1041,14 @@ const secoes = computed(() => {
   return [
     { titulo: 'Dados basicos', completo: isFilled(cabecalhoDocumento.value) && (!processoAtivo.value || isFilled(processo.value)) && isFilled(orgao.value), linhas: [['Cabecalho', cabecalhoDocumento.value || 'Nao informado', isFilled(cabecalhoDocumento.value)], ['Processo', processoAtivo.value ? processo.value || 'Nao informado' : 'Nao se aplica', !processoAtivo.value || isFilled(processo.value)], ['Orgao', orgao.value || 'Nao informado', isFilled(orgao.value)]] },
     { titulo: 'Veiculo', completo: isFilled(marca.value) && isFilled(modelo.value) && isFilled(placa.value), linhas: [['Marca', marca.value || 'Nao informado', isFilled(marca.value)], ['Modelo', modelo.value || 'Nao informado', isFilled(modelo.value)], ['Placa', placa.value || 'Nao informado', isFilled(placa.value)]] },
-    { titulo: 'Manutencao', completo: isFilled(tipoManutencao.value) && (tipoManutencao.value !== 'Preventiva' || isFilled(revisaoKm.value)), linhas: [['Tipo', tipoManutencao.value || 'Nao informado', isFilled(tipoManutencao.value)], ['Revisao/KM', tipoManutencao.value === 'Preventiva' ? revisaoKm.value || 'Nao informado' : 'Nao se aplica', tipoManutencao.value !== 'Preventiva' || isFilled(revisaoKm.value)]] },
+    ...(isDispensaManutencaoRoute.value ? [{
+      titulo: 'Manutencao',
+      completo: isFilled(tipoManutencao.value) && (tipoManutencao.value !== 'Preventiva' || isFilled(revisaoKm.value)),
+      linhas: [
+        ['Tipo', tipoManutencao.value || 'Nao informado', isFilled(tipoManutencao.value)],
+        ['Revisao/KM', tipoManutencao.value === 'Preventiva' ? revisaoKm.value || 'Nao informado' : 'Nao se aplica', tipoManutencao.value !== 'Preventiva' || isFilled(revisaoKm.value)],
+      ],
+    }] : []),
     { titulo: 'Fornecedor', completo: isFilled(fornecedor.value) && isFilled(cnpj.value), linhas: [['Razao social', fornecedor.value || 'Nao informado', isFilled(fornecedor.value)], ['CNPJ', cnpj.value || 'Nao informado', isFilled(cnpj.value)]] },
     { titulo: 'Dotacao orcamentaria', completo: !dotacaoAtiva.value || isFilled(dotacao.value), linhas: [['Situacao', dotacaoAtiva.value ? 'Informar dotacao' : 'Nao informada', true], ['Dotacao', dotacaoAtiva.value ? dotacao.value || 'Nao informada' : 'Nao se aplica', !dotacaoAtiva.value || isFilled(dotacao.value)]] },
     { titulo: 'Itens', completo: itensValidos.length > 0 && isFilled(valorGlobal.value), linhas: [['Itens lancados', String(itensValidos.length), itensValidos.length > 0], ['Valor global', valorGlobal.value || 'Nao informado', isFilled(valorGlobal.value)]] },

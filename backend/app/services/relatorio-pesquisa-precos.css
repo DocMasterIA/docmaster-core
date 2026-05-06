@@ -605,10 +605,11 @@
   line-height: 1.06;
   font-weight: 600;
   white-space: normal;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-  flex: 1 1 auto;
-  min-width: 0;
+  word-break: normal;
+  overflow-wrap: normal;
+  hyphens: none;
+  flex: 1 1 0;
+  min-width: 12mm;
   overflow: visible;
   text-overflow: clip;
 }

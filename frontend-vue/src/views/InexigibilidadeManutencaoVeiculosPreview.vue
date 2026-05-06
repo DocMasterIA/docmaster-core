@@ -144,7 +144,19 @@
               </div>
             </article>
 
-            <button class="ixp-btn-primary" type="button">Gerar Documento com IA</button>
+            <div class="ixp-actions">
+              <button class="ixp-btn-primary" type="button" :disabled="isSubmitting" @click="onSubmit">
+                {{ isSubmitting ? 'Processando com IA...' : 'Gerar Documento com IA' }}
+              </button>
+              <template v-if="documentReady">
+                <a v-if="documentTrUrl" :href="documentTrUrl" :download="documentTrFilename" class="ixp-btn-secondary">Download TR (DOCX)</a>
+                <a v-if="documentDfdUrl" :href="documentDfdUrl" :download="documentDfdFilename" class="ixp-btn-secondary">Download DFD (DOCX)</a>
+                <a v-if="documentOficioUrl" :href="documentOficioUrl" :download="documentOficioFilename" class="ixp-btn-secondary">Download Solicitacao/Oficio (DOCX)</a>
+                <a v-if="documentZipUrl" :href="documentZipUrl" :download="documentZipFilename" class="ixp-btn-secondary">Download TR+DFD+Oficio (ZIP)</a>
+              </template>
+            </div>
+            <p v-if="generateError" class="ixp-error">{{ generateError }}</p>
+            <p v-if="documentReady && successMessage" class="ixp-success">{{ successMessage }}</p>
           </div>
         </section>
 
@@ -215,13 +227,41 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
+import { useRoute } from 'vue-router';
 
+const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
+const route = useRoute();
 const dataOptions = ['Data automatica', 'Datado e assinado digitalmente', 'Data manual'];
 const tratamentoNome = ['Ao senhor', 'A senhora'];
 const tratamentoCargo = ['Senhor', 'Senhora'];
 const emptyItem = { descricao: '', quantidade: '', unidade: '', valorUnitario: '', valorTotal: '' };
 const placeholderDotacao = ['Ex:', 'Orgao: 02', 'Unidade: 05', 'Projeto/Atividade: 2.045', 'Elemento de despesa: 3.3.90.39.00', 'Fonte: 1.500'].join('\n');
+const DISPENSA_RAPIDA_TO_LOGICAL = {
+  DispensaRapidaArt75IObrasEngenharia: 'DispensaArt75IObrasEngenharia',
+  DispensaRapidaArt75IManutencaoVeiculos: 'DispensaArt75IManutencaoVeiculos',
+  DispensaRapidaArt75IICompras: 'DispensaArt75IICompras',
+  DispensaRapidaArt75IIServicos: 'DispensaArt75IIServicos',
+  DispensaRapidaArt75IIComprasServicosInclusos: 'DispensaArt75IIComprasServicosInclusos',
+};
+const SLOT_PACKAGE_BY_ROUTE = {
+  DispensaArt75IManutencaoVeiculos: 'dispensa_75_i_manutencao_veiculos',
+  DispensaArt75IObrasEngenharia: 'dispensa_75_i_obras_engenharia',
+  DispensaArt75IICompras: 'dispensa_75_ii_compras',
+  DispensaArt75IIServicos: 'dispensa_75_ii_servicos',
+  DispensaArt75IIComprasServicosInclusos: 'dispensa_75_ii_compras_servicos_inclusos',
+  InexigibilidadeArt74IShowArtistico: 'inexigibilidade_74_i_show_artistico',
+  InexigibilidadeArt74IFornecedorExclusivoPreview: 'inexigibilidade_74_i_fornecedor_exclusivo',
+  InexigibilidadeArt74IManutencaoVeiculosPreview: 'inexigibilidade_74_i_manutencao_veiculos',
+};
+const SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE = {
+  DispensaArt75IManutencaoVeiculos: 'Art. 75, Inciso I, da Lei no 14.133/2021',
+  DispensaArt75IObrasEngenharia: 'Art. 75, Inciso I, da Lei no 14.133/2021',
+  DispensaArt75IICompras: 'Art. 75, Inciso II, da Lei no 14.133/2021',
+  DispensaArt75IIServicos: 'Art. 75, Inciso II, da Lei no 14.133/2021',
+  DispensaArt75IIComprasServicosInclusos: 'Art. 75, Inciso II, da Lei no 14.133/2021',
+  InexigibilidadeArt74IShowArtistico: 'Art. 74, Inciso I, da Lei no 14.133/2021',
+};
 
 const drawerOpen = ref(false);
 const processoAtivo = ref(false);
@@ -257,6 +297,21 @@ const fixoGestor = ref('');
 const fixoFiscal = ref('');
 const fixoAssinatura = ref('');
 const fixoAssinaturaCargo = ref('');
+const isSubmitting = ref(false);
+const generateError = ref('');
+const successMessage = ref('');
+const documentReady = ref(false);
+const documentTrUrl = ref('');
+const documentDfdUrl = ref('');
+const documentOficioUrl = ref('');
+const documentZipUrl = ref('');
+const documentTrFilename = ref('termo_referencia.docx');
+const documentDfdFilename = ref('dfd.docx');
+const documentOficioFilename = ref('oficio.docx');
+const documentZipFilename = ref('tr_dfd_oficio.zip');
+
+const logicalRouteName = computed(() => DISPENSA_RAPIDA_TO_LOGICAL[route.name] || route.name);
+const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[logicalRouteName.value] || 'tr_dfd_generico');
 
 function apenasNumeros(v) {
   return String(v || '').replace(/\D/g, '');
@@ -320,6 +375,157 @@ function atualizarItem(index, campo, event) {
   itens.value = next;
   valorGlobal.value = calcularValorGlobal(next);
 }
+function revokeDocumentUrls() {
+  [documentTrUrl, documentDfdUrl, documentOficioUrl, documentZipUrl].forEach((urlRef) => {
+    if (urlRef.value) URL.revokeObjectURL(urlRef.value);
+    urlRef.value = '';
+  });
+}
+function toBlobUrl(base64, mimeType) {
+  if (!base64) return '';
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i += 1) bytes[i] = binary.charCodeAt(i);
+  return URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+}
+function toBrDate(iso) {
+  const v = String(iso || '').trim();
+  if (!v) return '';
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return v;
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+function buildSlotsOverride() {
+  const o = {};
+  const solDestNome = fixoNome.value.trim();
+  const solDestCargo = fixoCargo.value.trim();
+  const solRespNome = fixoResponsavel.value.trim();
+  const solRespCargo = fixoResponsavelCargo.value.trim();
+  if (solDestNome) o.sol_oficio_destinatario_nome = solDestNome;
+  if (solDestCargo) o.sol_oficio_destinatario_cargo = solDestCargo;
+  if (solRespNome) o.sol_oficio_responsavel_nome = solRespNome;
+  if (solRespCargo) o.sol_oficio_responsavel_cargo = solRespCargo;
+
+  const setor = (fixoSetor.value || orgao.value).trim();
+  if (setor) {
+    o.secretaria_usuario = setor;
+    o.dfd_setor_requisitante = setor;
+  }
+  const demanda = fixoDemanda.value.trim();
+  if (demanda) {
+    o.nome_usuario = demanda;
+    o.dfd_responsavel_demanda = demanda;
+  }
+  if (fixoEmail.value.trim()) o.dfd_email = fixoEmail.value.trim();
+  if (fixoGestor.value.trim()) o.dfd_gestor_contratos = fixoGestor.value.trim();
+  const fiscalNome = (fixoFiscal.value || fiscal.value).trim();
+  if (fiscalNome) {
+    o.fiscal = { nome: fiscalNome };
+    o.dfd_fiscal_contratos = fiscalNome;
+  }
+  if (fixoAssinatura.value.trim()) o.dfd_assinatura_nome = fixoAssinatura.value.trim();
+  if (fixoAssinaturaCargo.value.trim()) o.dfd_assinatura_cargo = fixoAssinaturaCargo.value.trim();
+
+  const dataManualFmt = toBrDate(dataManual.value);
+  let dataTermo = '';
+  if (modoData.value === 'Data automatica') {
+    const now = new Date();
+    dataTermo = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+  } else if (modoData.value === 'Data manual' && dataManualFmt) {
+    dataTermo = dataManualFmt;
+  }
+  if (modoData.value === 'Datado e assinado digitalmente') {
+    dataTermo = dataTermo ? `${dataTermo}, datado e assinado digitalmente` : 'datado e assinado digitalmente';
+  }
+  if (dataTermo) o.data_termo = dataTermo;
+
+  if (responsavel.value.trim()) o.nome_assinante_termo = responsavel.value.trim();
+  if (responsavelCargo.value.trim()) o.cargo_assinante_termo = responsavelCargo.value.trim();
+
+  const objeto = [
+    tipoManutencao.value ? `Tipo: ${tipoManutencao.value}` : '',
+    marca.value ? `Marca: ${marca.value}` : '',
+    modelo.value ? `Modelo: ${modelo.value}` : '',
+    placa.value ? `Placa: ${placa.value}` : '',
+    revisaoKm.value ? `Revisao/KM: ${revisaoKm.value}` : '',
+  ].filter(Boolean).join(' | ');
+  if (objeto) o.objeto = objeto;
+  if (fornecedor.value.trim()) o.justificativa = `Fornecedor exclusivo: ${fornecedor.value.trim()} (CNPJ: ${cnpj.value.trim() || 'nao informado'})`;
+  if (dotacaoAtiva.value && dotacao.value.trim()) o.objeto_resultados = `Dotacao orcamentaria: ${dotacao.value.trim()}`;
+  if (valorGlobal.value.trim()) o.objeto_entregas = `Valor total estimado: ${valorGlobal.value.trim()}`;
+
+  const fundamentoLegal = SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE[logicalRouteName.value];
+  if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;
+  return Object.keys(o).length ? o : null;
+}
+function buildUserPrompt() {
+  const lines = [
+    `Gerar documento com base nos dados preenchidos para ${String(route.meta?.title || 'a rota atual')}.`,
+    `Processo: ${processoAtivo.value ? (processo.value || 'Nao informado') : 'Nao se aplica'}`,
+    `Orgao: ${orgao.value || 'Nao informado'}`,
+    `Veiculo: ${marca.value || '-'} ${modelo.value || '-'} / Placa ${placa.value || '-'}`,
+    `Tipo manutencao: ${tipoManutencao.value || 'Nao informado'}`,
+    `Fornecedor: ${fornecedor.value || 'Nao informado'} / CNPJ: ${cnpj.value || 'Nao informado'}`,
+    `Valor global: ${valorGlobal.value || 'Nao informado'}`,
+  ];
+  return lines.join('\n');
+}
+async function onSubmit() {
+  isSubmitting.value = true;
+  generateError.value = '';
+  successMessage.value = '';
+  documentReady.value = false;
+  revokeDocumentUrls();
+  try {
+    const payload = {
+      user_prompt: buildUserPrompt(),
+      slots_override: buildSlotsOverride(),
+      slot_package_key: slotPackageKey.value,
+    };
+    const res = await fetch(`${API_BASE}/api/documentos/gerar-tr-e-dfd`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+    const rawText = await res.text();
+    let data = {};
+    try {
+      data = rawText ? JSON.parse(rawText) : {};
+    } catch (_e) {
+      generateError.value = `Resposta invalida do servidor (nao e JSON). Status: ${res.status}.`;
+      return;
+    }
+    if (!res.ok || !data.ok) {
+      generateError.value = res.status === 500
+        ? (data.error || data.detail || 'Erro 500 no servidor. Veja logs do backend.')
+        : (data.error || data.detail || `Erro ${res.status}`);
+      return;
+    }
+    if (!data.tr?.docx_base64 || !data.dfd?.docx_base64 || !data.oficio?.docx_base64) {
+      generateError.value = data.error || 'TR, DFD ou Solicitacao/Oficio nao vieram na resposta.';
+      return;
+    }
+    documentTrUrl.value = toBlobUrl(data.tr.docx_base64, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    documentDfdUrl.value = toBlobUrl(data.dfd.docx_base64, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    documentOficioUrl.value = toBlobUrl(data.oficio.docx_base64, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    documentZipUrl.value = data.zip?.zip_base64 ? toBlobUrl(data.zip.zip_base64, 'application/zip') : '';
+    documentTrFilename.value = data.tr?.filename || 'termo_referencia.docx';
+    documentDfdFilename.value = data.dfd?.filename || 'dfd.docx';
+    documentOficioFilename.value = data.oficio?.filename || 'oficio.docx';
+    documentZipFilename.value = data.zip?.filename || 'tr_dfd_oficio.zip';
+    documentReady.value = true;
+    successMessage.value = 'Termo de Referencia, DFD e Solicitacao/Oficio gerados com sucesso. Baixe os arquivos abaixo.';
+  } catch (e) {
+    generateError.value = e?.message || 'Erro ao gerar documento';
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+onBeforeUnmount(() => {
+  revokeDocumentUrls();
+});
 
 const secoes = computed(() => {
   const itensValidos = itens.value.filter((i) => Object.values(i).some(isFilled));
@@ -380,6 +586,9 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .ixp-half { max-width: 400px; }
 .ixp-btn-secondary { border: 1px solid #cbd5e1; background: #fff; color: #334155; border-radius: 12px; padding: 9px 12px; font-size: 13px; font-weight: 600; }
 .ixp-btn-primary { border: 0; background: #2563eb; color: #fff; border-radius: 12px; padding: 10px 14px; font-size: 13px; font-weight: 700; width: fit-content; }
+.ixp-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ixp-error { margin: 0; border: 1px solid #fecaca; background: #fff1f2; color: #b91c1c; border-radius: 12px; padding: 9px 11px; font-size: 13px; }
+.ixp-success { margin: 0; border: 1px solid #bbf7d0; background: #f0fdf4; color: #166534; border-radius: 12px; padding: 9px 11px; font-size: 13px; }
 .ixp-summary { position: sticky; top: 16px; align-self: start; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; padding: 14px; }
 .ixp-summary-head small { font-size: 11px; text-transform: uppercase; color: #64748b; letter-spacing: .08em; }
 .ixp-summary-head h3 { margin: 4px 0 0; font-size: 16px; color: #0f172a; }
@@ -437,4 +646,8 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .dm-dark-theme .ixp-line.is-warn { background: #3f1d2e; border-color: #9f1239; }
 .dm-dark .ixp-overlay,
 .dm-dark-theme .ixp-overlay { background: rgba(2, 6, 23, 0.72); }
+.dm-dark .ixp-error,
+.dm-dark-theme .ixp-error { border-color: #9f1239; background: #3f1d2e; color: #fecdd3; }
+.dm-dark .ixp-success,
+.dm-dark-theme .ixp-success { border-color: #166534; background: #052e16; color: #bbf7d0; }
 </style>

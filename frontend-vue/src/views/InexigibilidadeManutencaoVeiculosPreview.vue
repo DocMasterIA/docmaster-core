@@ -604,6 +604,28 @@ async function onGenerateClauses() {
       const data = await res.json().catch(() => ({}));
       return { res, data };
     }
+    async function requestClausesFast(promptText) {
+      const fastPrompt = [
+        promptText,
+        '',
+        'Formato obrigatorio de resposta:',
+        'Objeto: <texto>',
+        'Justificativa: <texto>',
+        'Escopo: <texto>',
+        'Entregas: <texto>',
+        'Resultados esperados: <texto>',
+      ].join('\n');
+      const res = await fetch(`${API_BASE}/api/llm/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ prompt: fastPrompt, stream: false }),
+      });
+      const data = await res.json().catch(() => ({}));
+      // Normaliza para o mesmo contrato usado abaixo.
+      const text = data?.data?.response || data?.data?.text || data?.response || data?.text || '';
+      return { res, data: { ok: !!data?.ok, response: text } };
+    }
     let { res, data } = await requestClauses(prompt);
     if (res.status === 504) {
       const compactPrompt = [
@@ -613,6 +635,9 @@ async function onGenerateClauses() {
         `Dados-chave: ${orgao.value || 'Orgao nao informado'}; ${marca.value || '-'} ${modelo.value || '-'}; fornecedor ${fornecedor.value || 'nao informado'}; valor ${valorGlobal.value || 'nao informado'}.`,
       ].join('\n');
       ({ res, data } = await requestClauses(compactPrompt));
+      if (res.status === 504) {
+        ({ res, data } = await requestClausesFast(compactPrompt));
+      }
     }
     if (!res.ok || !data.ok) {
       if (res.status === 504) {

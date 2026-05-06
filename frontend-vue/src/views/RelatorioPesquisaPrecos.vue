@@ -1311,4 +1311,77 @@ watch(
   margin-bottom: 4px !important;
   font-size: 10px !important;
 }
+
+/* Micro-denso: detalhamento de fontes em cards ultra compactos */
+.rpv-detail-list {
+  padding: 2px !important;
+  gap: 3px !important;
+}
+.rpv-detail-item {
+  border-radius: 6px !important;
+}
+.rpv-detail-item__head {
+  padding: 3px 5px !important;
+}
+.rpv-detail-item__kicker {
+  font-size: 7px !important;
+  letter-spacing: 0.04em !important;
+}
+.rpv-detail-item__name {
+  margin-top: 1px !important;
+  font-size: 9px !important;
+  line-height: 1.1 !important;
+}
+.rpv-detail-item__body {
+  padding: 3px !important;
+  gap: 2px !important;
+}
+.rpv-source {
+  border-radius: 4px !important;
+  padding-left: 16px !important;
+}
+.rpv-source__badge {
+  left: 4px !important;
+  width: 10px !important;
+  height: 10px !important;
+  font-size: 5px !important;
+}
+.rpv-source__inner {
+  padding: 2px !important;
+  gap: 2px !important;
+}
+.rpv-mini-grid {
+  gap: 1px !important;
+}
+/* A grade de 5 colunas estava esmagando muito os campos; reduz para 3 colunas */
+.rpv-mini-grid--5 {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+.rpv-dcard {
+  border-radius: 3px !important;
+  padding: 2px 3px !important;
+  min-height: 18px !important;
+}
+.rpv-dcard--wide {
+  min-height: 20px !important;
+}
+.rpv-dcard__label {
+  font-size: 6px !important;
+  letter-spacing: 0.02em !important;
+  line-height: 1 !important;
+}
+.rpv-dcard__value,
+.rpv-dcard--wide .rpv-dcard__value {
+  margin-top: 1px !important;
+  font-size: 7px !important;
+  line-height: 1.08 !important;
+  font-weight: 600 !important;
+  word-break: normal !important;
+  overflow-wrap: anywhere !important;
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 3 !important;
+  line-clamp: 3 !important;
+  overflow: hidden !important;
+}
 </style>

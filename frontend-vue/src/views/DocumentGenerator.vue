@@ -2317,184 +2317,179 @@ function goToPage() {
   border-color: var(--color-primary);
 }
 
-/* UI copiada do preview /geracao/inexigibilidade-art-74-i/manutencao-veiculos-preview */
+/* UI de dispensa isolada do tema legado */
+.doc-gen.doc-gen--rapida,
+.doc-gen.doc-gen--rapida * {
+  box-sizing: border-box;
+}
 .doc-gen.doc-gen--rapida {
-  padding-bottom: 8px;
   color: #0f172a;
 }
-.doc-gen.doc-gen--rapida :deep(.doc-gen__grid) {
-  gap: 1rem;
+.doc-gen.doc-gen--rapida :deep(.gov-page-header),
+.doc-gen.doc-gen--rapida :deep(.gov-page-title),
+.doc-gen.doc-gen--rapida :deep(.gov-page-subtitle),
+.doc-gen.doc-gen--rapida :deep(.gov-surface),
+.doc-gen.doc-gen--rapida :deep(.gov-surface__header),
+.doc-gen.doc-gen--rapida :deep(.gov-surface__title),
+.doc-gen.doc-gen--rapida :deep(.gov-surface__subtitle),
+.doc-gen.doc-gen--rapida :deep(.gov-label),
+.doc-gen.doc-gen--rapida :deep(.gov-label__hint),
+.doc-gen.doc-gen--rapida :deep(.gov-input),
+.doc-gen.doc-gen--rapida :deep(.gov-textarea),
+.doc-gen.doc-gen--rapida :deep(.gov-btn),
+.doc-gen.doc-gen--rapida :deep(.gov-btn--primary),
+.doc-gen.doc-gen--rapida :deep(.gov-btn--secondary),
+.doc-gen.doc-gen--rapida :deep(.gov-btn--outline),
+.doc-gen.doc-gen--rapida :deep(.gov-text-soft),
+.doc-gen.doc-gen--rapida :deep(.gov-link) {
+  all: unset;
 }
-.doc-gen.doc-gen--rapida :deep(.doc-gen__wizard) {
-  border-radius: 1rem !important; /* rounded-2xl */
-  border: 1px solid #e2e8f0 !important; /* border-slate-200 */
-  background: #ffffff !important;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important; /* shadow-sm */
-  padding: 1rem !important;
+.doc-gen.doc-gen--rapida :deep(.gov-page-header) {
+  display: block;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+.doc-gen.doc-gen--rapida :deep(.gov-page-title) {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.35;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-page-subtitle) {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #64748b;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__grid) {
+  gap: 16px;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__wizard),
+.doc-gen.doc-gen--rapida :deep(.doc-gen__variables-card) {
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 .doc-gen.doc-gen--rapida :deep(.doc-gen__variables-card) {
-  border-radius: 1rem !important;
-  border: 1px solid #e2e8f0 !important;
-  background: #ffffff !important;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
   position: sticky;
   top: 12px;
 }
-.doc-gen.doc-gen--rapida :deep(.gov-page-header) {
-  background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
-  border-radius: 1rem !important;
-  padding: 1rem !important;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
-  margin-bottom: 0.25rem;
-}
-.doc-gen.doc-gen--rapida :deep(.gov-page-title) {
-  font-size: 1rem !important;
-  font-weight: 600 !important;
-  color: #0f172a !important;
-}
-.doc-gen.doc-gen--rapida :deep(.gov-page-subtitle) {
-  font-size: 0.75rem !important;
-  color: #64748b !important;
-  margin-top: 0.25rem;
-}
-.doc-gen.doc-gen--rapida :deep(.gov-surface) {
-  border-radius: 1rem !important;
-  border: 1px solid #e2e8f0 !important;
-  background: #ffffff !important;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
-}
 .doc-gen.doc-gen--rapida :deep(.gov-surface__header) {
-  border-bottom: 1px solid #e2e8f0 !important;
-  padding-bottom: 0.75rem !important;
-  margin-bottom: 0.25rem !important;
+  display: block;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 8px;
+  padding-bottom: 12px;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-surface__title) {
-  font-size: 0.875rem !important; /* text-sm */
-  font-weight: 600 !important;
-  color: #1e293b !important; /* text-slate-800 */
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-surface__subtitle) {
-  font-size: 0.75rem !important;
-  color: #94a3b8 !important; /* text-slate-400 */
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #94a3b8;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-label) {
-  font-size: 0.75rem !important; /* text-xs */
-  font-weight: 500 !important; /* font-medium */
-  color: #475569 !important; /* text-slate-600 */
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-label__hint) {
-  font-size: 11px !important;
-  color: #94a3b8 !important;
+  font-size: 11px;
+  color: #94a3b8;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-input),
 .doc-gen.doc-gen--rapida :deep(.gov-textarea),
 .doc-gen.doc-gen--rapida :deep(.doc-gen__search-input) {
-  margin-top: 0.25rem !important;
-  width: 100% !important;
-  border-radius: 0.75rem !important; /* rounded-xl */
-  border: 1px solid #cbd5e1 !important; /* border-slate-300 */
-  background: #ffffff !important;
-  padding: 0.625rem 0.75rem !important; /* px-3 py-2.5 */
-  font-size: 0.875rem !important; /* text-sm */
-  color: #1e293b !important; /* text-slate-800 */
-  outline: none !important;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #1e293b;
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-input:focus),
 .doc-gen.doc-gen--rapida :deep(.gov-textarea:focus),
 .doc-gen.doc-gen--rapida :deep(.doc-gen__search-input:focus) {
-  border-color: #38bdf8 !important; /* focus:border-sky-400 */
-  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.35) !important;
-  outline: none !important;
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, .35);
 }
-.doc-gen.doc-gen--rapida :deep(.gov-btn) {
-  border-radius: 0.75rem !important;
-  font-weight: 600 !important;
+.doc-gen.doc-gen--rapida :deep(.gov-btn),
+.doc-gen.doc-gen--rapida :deep(.gov-btn--primary),
+.doc-gen.doc-gen--rapida :deep(.gov-btn--secondary),
+.doc-gen.doc-gen--rapida :deep(.gov-btn--outline) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-btn--primary) {
-  background: #0f172a !important; /* bg-slate-900 */
-  border-color: #0f172a !important;
-  color: #ffffff !important;
-  box-shadow: none !important;
+  background: #0f172a;
+  color: #fff;
+  border-color: #0f172a;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-btn--primary:hover:not(:disabled)) {
-  background: #1e293b !important; /* hover:bg-slate-800 */
-  border-color: #1e293b !important;
+  background: #1e293b;
+  border-color: #1e293b;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-btn--secondary),
 .doc-gen.doc-gen--rapida :deep(.gov-btn--outline) {
-  border-color: #cbd5e1 !important;
-  color: #334155 !important;
-  background: #ffffff !important;
+  background: #fff;
+  color: #334155;
+  border-color: #cbd5e1;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-btn--secondary:hover:not(:disabled)),
 .doc-gen.doc-gen--rapida :deep(.gov-btn--outline:hover:not(:disabled)) {
-  background: #f8fafc !important; /* hover:bg-slate-50 */
+  background: #f8fafc;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-text-soft) {
-  color: #94a3b8 !important;
+  display: block;
+  font-size: 12px;
+  color: #94a3b8;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-link) {
-  color: #0f172a !important;
-  font-weight: 600 !important;
+  color: #0f172a;
+  font-weight: 600;
+  text-decoration: none;
 }
 .doc-gen.doc-gen--rapida :deep(.doc-gen__llm-hint) {
-  background: #f8fafc !important;
-  border: 1px solid #e2e8f0 !important;
-  border-radius: 0.75rem !important;
-}
-.doc-gen.doc-gen--rapida :deep(.doc-gen__llm-hint .fa-wand-magic-sparkles) {
-  color: #475569 !important;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
 }
 .doc-gen.doc-gen--rapida :deep(.doc-gen__results) {
-  border-radius: 0.75rem !important;
-  border: 1px solid #e2e8f0 !important;
-  box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08) !important;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(15, 23, 42, .08);
 }
 .doc-gen.doc-gen--rapida :deep(.doc-gen__result-item:hover),
 .doc-gen.doc-gen--rapida :deep(.doc-gen__result-item--focused) {
-  background: #f8fafc !important;
-}
-.doc-gen.doc-gen--rapida :deep(.doc-gen__var-heading) {
-  font-size: 0.75rem !important;
-  font-weight: 600 !important;
-  color: #334155 !important;
-}
-.doc-gen.doc-gen--rapida :deep(.doc-gen__slot-subheading) {
-  font-size: 0.75rem !important;
-  font-weight: 600 !important;
-  color: #334155 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.08em !important;
-}
-.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-page-header),
-.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-surface) {
-  background: #0f172a;
-  border-color: #334155;
-}
-.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-page-title),
-.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-surface__title) {
-  color: #f1f5f9;
-}
-.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-page-subtitle),
-.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-surface__subtitle),
-.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-text-soft) {
-  color: #94a3b8;
-}
-.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-input),
-.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-textarea),
-.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__search-input) {
-  background: #020617;
-  border-color: #475569;
-  color: #e2e8f0;
-}
-.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-btn--primary) {
-  background: #e2e8f0;
-  border-color: #e2e8f0;
-  color: #0f172a;
-}
-.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-btn--primary:hover:not(:disabled)) {
   background: #f8fafc;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__var-heading),
+.doc-gen.doc-gen--rapida :deep(.doc-gen__slot-subheading) {
+  color: #334155;
 }
 </style>

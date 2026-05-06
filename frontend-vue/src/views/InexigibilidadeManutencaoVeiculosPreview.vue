@@ -19,6 +19,13 @@
             <article class="ixp-card">
               <h3>Dados basicos</h3>
               <div class="ixp-body">
+                <div class="ixp-field">
+                  <label>Cabecalho do documento</label>
+                  <select v-model="cabecalhoDocumento">
+                    <option value="">Selecione</option>
+                    <option v-for="op in cabecalhoOptions" :key="op" :value="op">{{ op }}</option>
+                  </select>
+                </div>
                 <label class="ixp-check">
                   <input v-model="processoAtivo" type="checkbox" />
                   Informar numero do processo (opcional)
@@ -150,37 +157,20 @@
                 <p class="ixp-hint">
                   Gere e revise as clausulas antes do documento final. Esse fluxo vale apenas para Dispensa normal.
                 </p>
-                <div class="ixp-field">
-                  <label>Prompt de Inteligencia Artificial</label>
-                  <textarea
-                    v-model="clausulasPrompt"
-                    rows="4"
-                    placeholder="Ex: Gere clausulas para dispensa de manutencao veicular, com foco em justificativa tecnica, escopo objetivo e entregas mensuraveis."
-                  />
-                </div>
+                <div class="ixp-field"><label>O que sera contratado?</label><textarea v-model="clausulaContratado" rows="3" placeholder="Ex: Aquisicao de material de expediente" /></div>
+                <div class="ixp-field"><label>Qual setor/secretaria sera atendido?</label><input v-model="clausulaSetor" placeholder="Ex: Secretaria de Administracao" /></div>
+                <div class="ixp-field"><label>Caracteristicas minimas obrigatorias (opcional)</label><textarea v-model="clausulaCaracteristicas" rows="3" placeholder="Ex: Itens de primeira linha, entrega fracionada e suporte tecnico" /></div>
                 <button class="ixp-btn-secondary" type="button" :disabled="isGeneratingClauses" @click="onGenerateClauses">
-                  {{ isGeneratingClauses ? 'Gerando clausulas...' : 'Gerar clausulas' }}
+                  {{ isGeneratingClauses ? 'Gerando objeto e justificativa...' : 'Gerar objeto e justificativa' }}
                 </button>
                 <div class="ixp-grid-1">
                   <div class="ixp-field">
-                    <label>Objeto</label>
+                    <label>Objeto gerado pela IA</label>
                     <textarea v-model="clausulaObjeto" rows="3" placeholder="Objeto do TR (gerado por IA ou manual)" />
                   </div>
                   <div class="ixp-field">
-                    <label>Justificativa</label>
+                    <label>Justificativa da contratacao</label>
                     <textarea v-model="clausulaJustificativa" rows="4" placeholder="Justificativa da necessidade" />
-                  </div>
-                  <div class="ixp-field">
-                    <label>Escopo</label>
-                    <textarea v-model="clausulaEscopo" rows="3" placeholder="Escopo detalhado" />
-                  </div>
-                  <div class="ixp-field">
-                    <label>Entregas</label>
-                    <textarea v-model="clausulaEntregas" rows="3" placeholder="Entregas e itens principais" />
-                  </div>
-                  <div class="ixp-field">
-                    <label>Resultados esperados</label>
-                    <textarea v-model="clausulaResultados" rows="3" placeholder="Resultados esperados da contratacao" />
                   </div>
                 </div>
               </div>
@@ -275,6 +265,13 @@ import { useRoute } from 'vue-router';
 const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 const route = useRoute();
 const dataOptions = ['Data automatica', 'Datado e assinado digitalmente', 'Data manual'];
+const cabecalhoOptions = [
+  'Cabecalho padrao do municipio',
+  'Cabecalho do Fundo Municipal de Saude',
+  'Cabecalho da Assistencia Social',
+  'Cabecalho da Secretaria de Educacao',
+  'Cabecalho sem brasao',
+];
 const tratamentoNome = ['Ao senhor', 'A senhora'];
 const tratamentoCargo = ['Senhor', 'Senhora'];
 const emptyItem = { descricao: '', quantidade: '', unidade: '', valorUnitario: '', valorTotal: '' };
@@ -306,6 +303,7 @@ const SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE = {
 };
 
 const drawerOpen = ref(false);
+const cabecalhoDocumento = ref('');
 const processoAtivo = ref(false);
 const processo = ref('');
 const orgao = ref('');
@@ -352,12 +350,11 @@ const documentDfdFilename = ref('dfd.docx');
 const documentOficioFilename = ref('oficio.docx');
 const documentZipFilename = ref('tr_dfd_oficio.zip');
 const isGeneratingClauses = ref(false);
-const clausulasPrompt = ref('');
+const clausulaContratado = ref('');
+const clausulaSetor = ref('');
+const clausulaCaracteristicas = ref('');
 const clausulaObjeto = ref('');
 const clausulaJustificativa = ref('');
-const clausulaEscopo = ref('');
-const clausulaEntregas = ref('');
-const clausulaResultados = ref('');
 
 const logicalRouteName = computed(() => DISPENSA_RAPIDA_TO_LOGICAL[route.name] || route.name);
 const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[logicalRouteName.value] || 'tr_dfd_generico');
@@ -446,6 +443,24 @@ function toBrDate(iso) {
   if (!m) return v;
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
+function primeiraMaiuscula(valor) {
+  const v = String(valor || '');
+  const idx = v.search(/[A-Za-zÀ-ÿ]/);
+  if (idx < 0) return v;
+  return v.slice(0, idx) + v[idx].toUpperCase() + v.slice(idx + 1);
+}
+function gerarObjetoTexto(contratado, setor, caracteristicas) {
+  const objeto = String(contratado || '').trim() || 'objeto nao informado';
+  const destino = String(setor || '').trim() ? `, visando atender as demandas de ${String(setor).trim()}` : '';
+  const detalhes = String(caracteristicas || '').trim() ? `, observadas as seguintes caracteristicas minimas: ${String(caracteristicas).trim()}` : '';
+  return `${primeiraMaiuscula(objeto)}${destino}${detalhes}.`;
+}
+function gerarJustificativaTexto(contratado, setor, caracteristicas) {
+  const objeto = String(contratado || '').trim() || 'o objeto indicado';
+  const destino = String(setor || '').trim() ? ` do(a) ${String(setor).trim()}` : ' da Administracao Publica';
+  const detalhes = String(caracteristicas || '').trim() ? ` A contratacao devera observar as caracteristicas minimas informadas: ${String(caracteristicas).trim()}.` : '';
+  return `A presente contratacao justifica-se pela necessidade de assegurar ${objeto} para atendimento das demandas${destino}, garantindo a continuidade, eficiencia e adequada prestacao dos servicos publicos.${detalhes}`;
+}
 function buildSlotsOverride() {
   const o = {};
   const solDestNome = fixoNome.value.trim();
@@ -507,9 +522,8 @@ function buildSlotsOverride() {
   const resultadosFallback = dotacaoAtiva.value && dotacao.value.trim() ? `Dotacao orcamentaria: ${dotacao.value.trim()}` : '';
   o.objeto = clausulaObjeto.value.trim() || objetoFallback;
   if (clausulaJustificativa.value.trim() || justificativaFallback) o.justificativa = clausulaJustificativa.value.trim() || justificativaFallback;
-  if (clausulaEscopo.value.trim()) o.objeto_escopo = clausulaEscopo.value.trim();
-  if (clausulaEntregas.value.trim() || entregasFallback) o.objeto_entregas = clausulaEntregas.value.trim() || entregasFallback;
-  if (clausulaResultados.value.trim() || resultadosFallback) o.objeto_resultados = clausulaResultados.value.trim() || resultadosFallback;
+  if (entregasFallback) o.objeto_entregas = entregasFallback;
+  if (resultadosFallback) o.objeto_resultados = resultadosFallback;
 
   const fundamentoLegal = SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE[logicalRouteName.value];
   if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;
@@ -559,40 +573,30 @@ function extractClausesFromSectionTexts(sectionTexts) {
   return {
     objeto: get('objeto', 'objeto_licitacao', 'do_objeto'),
     justificativa: get('justificativa', 'necessidade', 'fundamentacao', 'da_necessidade'),
-    escopo: get('objeto_escopo', 'escopo', 'escopo_servicos'),
-    entregas: get('objeto_entregas', 'entregas', 'itens', 'metodologia_execucao'),
-    resultados: get('objeto_resultados', 'resultados_esperados', 'resultados'),
   };
 }
 async function onGenerateClauses() {
   isGeneratingClauses.value = true;
   generateError.value = '';
   try {
-    const userPrompt = String(clausulasPrompt.value || '').trim();
-    if (!userPrompt) {
-      generateError.value = 'Preencha o Prompt de Inteligencia Artificial para gerar clausulas.';
+    const contratado = String(clausulaContratado.value || '').trim();
+    const setor = String(clausulaSetor.value || '').trim();
+    const caracteristicas = String(clausulaCaracteristicas.value || '').trim();
+    if (!contratado || !setor) {
+      generateError.value = 'Preencha "O que sera contratado?" e "Qual setor/secretaria sera atendido?" para gerar objeto e justificativa.';
       return;
     }
-    const contextLines = [
-      'Contexto estruturado para apoiar a geracao das clausulas:',
-      'Retorne APENAS texto com secoes nesta ordem e com esses titulos:',
+    const prompt = [
+      'Com base nos dados abaixo, gere APENAS duas secoes:',
       'Objeto:',
       'Justificativa:',
-      'Escopo:',
-      'Entregas:',
-      'Resultados esperados:',
       '',
+      `O que sera contratado: ${contratado}`,
+      `Setor/secretaria atendido: ${setor}`,
+      `Caracteristicas minimas (opcional): ${caracteristicas || 'nao informado'}`,
       `Processo: ${processoAtivo.value ? (processo.value || 'Nao informado') : 'Nao se aplica'}`,
       `Orgao: ${orgao.value || 'Nao informado'}`,
-      `Veiculo: ${marca.value || '-'} ${modelo.value || '-'} / Placa ${placa.value || '-'}`,
-      `Tipo manutencao: ${tipoManutencao.value || 'Nao informado'}`,
-      `Fornecedor: ${fornecedor.value || 'Nao informado'} / CNPJ: ${cnpj.value || 'Nao informado'}`,
-      `Valor global: ${valorGlobal.value || 'Nao informado'}`,
-    ];
-    const prompt = [
-      userPrompt,
-      '',
-      ...contextLines,
+      `Cabecalho: ${cabecalhoDocumento.value || 'Nao informado'}`,
     ].join('\n');
     async function requestClausesFast(promptText) {
       const fastPrompt = [
@@ -616,13 +620,7 @@ async function onGenerateClauses() {
       const text = data?.data?.response || data?.data?.text || data?.response || data?.text || '';
       return { res, data: { ok: !!data?.ok, response: text } };
     }
-    const compactPrompt = [
-      userPrompt,
-      '',
-      'Retorne somente as secoes: Objeto, Justificativa, Escopo, Entregas e Resultados esperados.',
-      `Dados-chave: ${orgao.value || 'Orgao nao informado'}; ${marca.value || '-'} ${modelo.value || '-'}; fornecedor ${fornecedor.value || 'nao informado'}; valor ${valorGlobal.value || 'nao informado'}.`,
-    ].join('\n');
-    const { res, data } = await requestClausesFast(compactPrompt);
+    const { res, data } = await requestClausesFast(prompt);
     if (!res.ok || !data.ok) {
       generateError.value = res.status === 504
         ? 'A IA demorou para responder (504 Gateway Timeout). Tente um prompt mais objetivo ou gere novamente em alguns instantes.'
@@ -631,23 +629,20 @@ async function onGenerateClauses() {
     }
     const bySections = extractClausesFromSectionTexts(data.section_texts || {});
     const text = data.generated_text || data.text || data.content || data.response || '';
-    const parsed = (bySections.objeto || bySections.justificativa || bySections.escopo || bySections.entregas || bySections.resultados)
+    const parsed = (bySections.objeto || bySections.justificativa)
       ? bySections
       : parseClauseSections(text);
-    if (!parsed.objeto && !parsed.justificativa && !parsed.escopo && !parsed.entregas && !parsed.resultados && !String(text).trim()) {
-      generateError.value = 'A IA nao retornou conteudo de clausulas.';
+    if (!parsed.objeto && !parsed.justificativa && !String(text).trim()) {
+      clausulaObjeto.value = gerarObjetoTexto(contratado, setor, caracteristicas);
+      clausulaJustificativa.value = gerarJustificativaTexto(contratado, setor, caracteristicas);
       return;
     }
-    clausulaObjeto.value = parsed.objeto || clausulaObjeto.value;
-    clausulaJustificativa.value = parsed.justificativa || clausulaJustificativa.value;
-    clausulaEscopo.value = parsed.escopo || clausulaEscopo.value;
-    clausulaEntregas.value = parsed.entregas || clausulaEntregas.value;
-    clausulaResultados.value = parsed.resultados || clausulaResultados.value;
-    if (!parsed.objeto && !parsed.justificativa && !parsed.escopo && !parsed.entregas && !parsed.resultados) {
-      clausulaJustificativa.value = String(text).trim();
-    }
+    clausulaObjeto.value = parsed.objeto || gerarObjetoTexto(contratado, setor, caracteristicas);
+    clausulaJustificativa.value = parsed.justificativa || gerarJustificativaTexto(contratado, setor, caracteristicas);
   } catch (e) {
-    generateError.value = e?.message || 'Erro ao gerar clausulas com IA';
+    clausulaObjeto.value = gerarObjetoTexto(clausulaContratado.value, clausulaSetor.value, clausulaCaracteristicas.value);
+    clausulaJustificativa.value = gerarJustificativaTexto(clausulaContratado.value, clausulaSetor.value, clausulaCaracteristicas.value);
+    generateError.value = e?.message || 'Nao foi possivel gerar via IA; aplicamos a versao padrao local.';
   } finally {
     isGeneratingClauses.value = false;
   }
@@ -655,6 +650,7 @@ async function onGenerateClauses() {
 function buildUserPrompt() {
   const lines = [
     `Gerar documento com base nos dados preenchidos para ${String(route.meta?.title || 'a rota atual')}.`,
+    `Cabecalho do documento: ${cabecalhoDocumento.value || 'Nao informado'}`,
     `Processo: ${processoAtivo.value ? (processo.value || 'Nao informado') : 'Nao se aplica'}`,
     `Orgao: ${orgao.value || 'Nao informado'}`,
     `Veiculo: ${marca.value || '-'} ${modelo.value || '-'} / Placa ${placa.value || '-'}`,
@@ -731,7 +727,7 @@ onBeforeUnmount(() => {
 const secoes = computed(() => {
   const itensValidos = itens.value.filter((i) => Object.values(i).some(isFilled));
   return [
-    { titulo: 'Dados basicos', completo: (!processoAtivo.value || isFilled(processo.value)) && isFilled(orgao.value), linhas: [['Processo', processoAtivo.value ? processo.value || 'Nao informado' : 'Nao se aplica', !processoAtivo.value || isFilled(processo.value)], ['Orgao', orgao.value || 'Nao informado', isFilled(orgao.value)]] },
+    { titulo: 'Dados basicos', completo: isFilled(cabecalhoDocumento.value) && (!processoAtivo.value || isFilled(processo.value)) && isFilled(orgao.value), linhas: [['Cabecalho', cabecalhoDocumento.value || 'Nao informado', isFilled(cabecalhoDocumento.value)], ['Processo', processoAtivo.value ? processo.value || 'Nao informado' : 'Nao se aplica', !processoAtivo.value || isFilled(processo.value)], ['Orgao', orgao.value || 'Nao informado', isFilled(orgao.value)]] },
     { titulo: 'Veiculo', completo: isFilled(marca.value) && isFilled(modelo.value) && isFilled(placa.value), linhas: [['Marca', marca.value || 'Nao informado', isFilled(marca.value)], ['Modelo', modelo.value || 'Nao informado', isFilled(modelo.value)], ['Placa', placa.value || 'Nao informado', isFilled(placa.value)]] },
     { titulo: 'Manutencao', completo: isFilled(tipoManutencao.value) && (tipoManutencao.value !== 'Preventiva' || isFilled(revisaoKm.value)), linhas: [['Tipo', tipoManutencao.value || 'Nao informado', isFilled(tipoManutencao.value)], ['Revisao/KM', tipoManutencao.value === 'Preventiva' ? revisaoKm.value || 'Nao informado' : 'Nao se aplica', tipoManutencao.value !== 'Preventiva' || isFilled(revisaoKm.value)]] },
     { titulo: 'Fornecedor', completo: isFilled(fornecedor.value) && isFilled(cnpj.value), linhas: [['Razao social', fornecedor.value || 'Nao informado', isFilled(fornecedor.value)], ['CNPJ', cnpj.value || 'Nao informado', isFilled(cnpj.value)]] },

@@ -244,22 +244,85 @@
               <div class="ixp-field ixp-col-2"><label>1.2 A quem e direcionada a solicitacao — Funcao / Cargo</label><input v-model="fixoCargo" list="dl-solicitacao-destinatario-cargo" placeholder="Digite a funcao ou cargo" /></div>
             </div>
             <div class="ixp-grid-2">
-              <div class="ixp-field"><label>Nome do responsavel</label><input v-model="fixoResponsavel" list="dl-solicitacao-responsavel-nome" placeholder="Digite o nome do responsavel" /></div>
-              <div class="ixp-field"><label>Funcao / Cargo</label><input v-model="fixoResponsavelCargo" list="dl-solicitacao-responsavel-cargo" placeholder="Digite o cargo" /></div>
+              <div class="ixp-field">
+                <label>Nome do responsavel</label>
+                <input v-model="fixoResponsavel" list="dl-solicitacao-responsavel-nome" placeholder="Digite o nome do responsavel" />
+                <div class="ixp-inline-actions">
+                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('solicitacao_responsavel_nome', fixoResponsavel)">Adicionar</button>
+                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('solicitacao_responsavel_nome', fixoResponsavel)" @click="removeFieldHistory('solicitacao_responsavel_nome', fixoResponsavel)">Excluir</button>
+                </div>
+              </div>
+              <div class="ixp-field">
+                <label>Funcao / Cargo</label>
+                <input v-model="fixoResponsavelCargo" list="dl-solicitacao-responsavel-cargo" placeholder="Digite o cargo" />
+                <div class="ixp-inline-actions">
+                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('solicitacao_responsavel_cargo', fixoResponsavelCargo)">Adicionar</button>
+                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('solicitacao_responsavel_cargo', fixoResponsavelCargo)" @click="removeFieldHistory('solicitacao_responsavel_cargo', fixoResponsavelCargo)">Excluir</button>
+                </div>
+              </div>
             </div>
           </div>
         </article>
         <article class="ixp-card">
           <h3>2. DFD - Documento de Formalizacao da Demanda</h3>
           <div class="ixp-body ixp-grid-1">
-            <div class="ixp-field"><label>2.1 Setor requisitante (Unidade / Setor / Departamento)</label><input v-model="fixoSetor" list="dl-dfd-setor-requisitante" /></div>
-            <div class="ixp-field"><label>2.2 Responsavel pela demanda</label><input v-model="fixoDemanda" list="dl-dfd-responsavel-demanda" /></div>
-            <div class="ixp-field"><label>2.3 E-mail</label><input v-model="fixoEmail" list="dl-dfd-email" /></div>
-            <div class="ixp-field"><label>2.4 Nome do(a) gestor(a) de contratos</label><input v-model="fixoGestor" list="dl-dfd-gestor-contratos" /></div>
-            <div class="ixp-field"><label>2.5 Nome do(a) fiscal de contratos</label><input v-model="fixoFiscal" list="dl-dfd-fiscal-contratos" /></div>
+            <div class="ixp-field">
+              <label>2.1 Setor requisitante (Unidade / Setor / Departamento)</label>
+              <input v-model="fixoSetor" list="dl-dfd-setor-requisitante" />
+              <div class="ixp-inline-actions">
+                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_setor_requisitante', fixoSetor)">Adicionar</button>
+                <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('dfd_setor_requisitante', fixoSetor)" @click="removeFieldHistory('dfd_setor_requisitante', fixoSetor)">Excluir</button>
+              </div>
+            </div>
+            <div class="ixp-field">
+              <label>2.2 Responsavel pela demanda</label>
+              <input v-model="fixoDemanda" list="dl-dfd-responsavel-demanda" />
+              <div class="ixp-inline-actions">
+                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_responsavel_demanda', fixoDemanda)">Adicionar</button>
+                <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('dfd_responsavel_demanda', fixoDemanda)" @click="removeFieldHistory('dfd_responsavel_demanda', fixoDemanda)">Excluir</button>
+              </div>
+            </div>
+            <div class="ixp-field">
+              <label>2.3 E-mail</label>
+              <input v-model="fixoEmail" list="dl-dfd-email" />
+              <div class="ixp-inline-actions">
+                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_email', fixoEmail)">Adicionar</button>
+                <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('dfd_email', fixoEmail)" @click="removeFieldHistory('dfd_email', fixoEmail)">Excluir</button>
+              </div>
+            </div>
+            <div class="ixp-field">
+              <label>2.4 Nome do(a) gestor(a) de contratos</label>
+              <input v-model="fixoGestor" list="dl-dfd-gestor-contratos" />
+              <div class="ixp-inline-actions">
+                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_gestor_contratos', fixoGestor)">Adicionar</button>
+                <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('dfd_gestor_contratos', fixoGestor)" @click="removeFieldHistory('dfd_gestor_contratos', fixoGestor)">Excluir</button>
+              </div>
+            </div>
+            <div class="ixp-field">
+              <label>2.5 Nome do(a) fiscal de contratos</label>
+              <input v-model="fixoFiscal" list="dl-dfd-fiscal-contratos" />
+              <div class="ixp-inline-actions">
+                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_fiscal_contratos', fixoFiscal)">Adicionar</button>
+                <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('dfd_fiscal_contratos', fixoFiscal)" @click="removeFieldHistory('dfd_fiscal_contratos', fixoFiscal)">Excluir</button>
+              </div>
+            </div>
             <div class="ixp-grid-2">
-              <div class="ixp-field"><label>Nome do responsavel</label><input v-model="fixoAssinatura" list="dl-dfd-assinatura-nome" placeholder="Digite o nome do responsavel" /></div>
-              <div class="ixp-field"><label>Funcao / Cargo</label><input v-model="fixoAssinaturaCargo" list="dl-dfd-assinatura-cargo" placeholder="Digite o cargo" /></div>
+              <div class="ixp-field">
+                <label>Nome do responsavel</label>
+                <input v-model="fixoAssinatura" list="dl-dfd-assinatura-nome" placeholder="Digite o nome do responsavel" />
+                <div class="ixp-inline-actions">
+                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_assinatura_nome', fixoAssinatura)">Adicionar</button>
+                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('dfd_assinatura_nome', fixoAssinatura)" @click="removeFieldHistory('dfd_assinatura_nome', fixoAssinatura)">Excluir</button>
+                </div>
+              </div>
+              <div class="ixp-field">
+                <label>Funcao / Cargo</label>
+                <input v-model="fixoAssinaturaCargo" list="dl-dfd-assinatura-cargo" placeholder="Digite o cargo" />
+                <div class="ixp-inline-actions">
+                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_assinatura_cargo', fixoAssinaturaCargo)">Adicionar</button>
+                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('dfd_assinatura_cargo', fixoAssinaturaCargo)" @click="removeFieldHistory('dfd_assinatura_cargo', fixoAssinaturaCargo)">Excluir</button>
+                </div>
+              </div>
             </div>
           </div>
         </article>
@@ -564,6 +627,29 @@ async function removeCabecalhoFromHistory() {
   const current = Array.isArray(slotFieldOptions.cabecalho_documento) ? slotFieldOptions.cabecalho_documento : [];
   slotFieldOptions.cabecalho_documento = current.filter((v) => v !== value);
   await removeCatalogEntry('cabecalho_documento', value);
+}
+
+async function addFieldHistory(fieldKey, rawValue) {
+  const value = String(rawValue || '').trim();
+  if (!value) return;
+  const current = Array.isArray(slotFieldOptions[fieldKey]) ? slotFieldOptions[fieldKey] : [];
+  if (!current.includes(value)) slotFieldOptions[fieldKey] = [...current, value];
+  await persistSlotEntries([{ field_key: fieldKey, value }]);
+}
+
+function canDeleteFieldHistory(fieldKey, rawValue) {
+  const value = String(rawValue || '').trim();
+  if (!value) return false;
+  const current = Array.isArray(slotFieldOptions[fieldKey]) ? slotFieldOptions[fieldKey] : [];
+  return current.includes(value);
+}
+
+async function removeFieldHistory(fieldKey, rawValue) {
+  const value = String(rawValue || '').trim();
+  if (!value) return;
+  const current = Array.isArray(slotFieldOptions[fieldKey]) ? slotFieldOptions[fieldKey] : [];
+  slotFieldOptions[fieldKey] = current.filter((v) => v !== value);
+  await removeCatalogEntry(fieldKey, value);
 }
 
 async function loadSlotCatalogSuggestions() {

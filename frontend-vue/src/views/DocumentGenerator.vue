@@ -5,7 +5,6 @@
       <p class="gov-page-subtitle">
         Crie documentos profissionais com conformidade governamental
       </p>
-      <span v-if="isDispensaNewUi" class="doc-gen__rapida-badge">Novo design de Dispensa</span>
     </header>
 
     <div class="doc-gen__grid" :class="{ 'doc-gen__grid--single': !showSlotsCard }">
@@ -2318,174 +2317,156 @@ function goToPage() {
   border-color: var(--color-primary);
 }
 
-/* Dispensa rápida: visual alinhado ao formulário Tailwind do preview Art. 74, I (manutenção veículos). */
+/* UI copiada do preview /geracao/inexigibilidade-art-74-i/manutencao-veiculos-preview */
 .doc-gen.doc-gen--rapida {
   padding-bottom: 8px;
+  color: #0f172a;
 }
-.doc-gen__rapida-badge {
-  display: inline-flex;
-  align-items: center;
-  margin-top: 10px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid #bae6fd;
-  background: #f0f9ff;
-  color: #0369a1;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.doc-gen.doc-gen--rapida :deep(.doc-gen__grid) {
+  gap: 1rem;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__wizard) {
+  border-radius: 1rem !important; /* rounded-2xl */
+  border: 1px solid #e2e8f0 !important; /* border-slate-200 */
+  background: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important; /* shadow-sm */
+  padding: 1rem !important;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__variables-card) {
+  border-radius: 1rem !important;
+  border: 1px solid #e2e8f0 !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+  position: sticky;
+  top: 12px;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-page-header) {
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 1.25rem 1.5rem;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
-  margin-bottom: 4px;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 1rem !important;
+  padding: 1rem !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+  margin-bottom: 0.25rem;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-page-title) {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #0f172a;
-  letter-spacing: -0.02em;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  color: #0f172a !important;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-page-subtitle) {
-  font-size: 0.875rem;
-  color: #64748b;
-  margin-top: 0.35rem;
+  font-size: 0.75rem !important;
+  color: #64748b !important;
+  margin-top: 0.25rem;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-surface) {
-  border-radius: 16px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  border-radius: 1rem !important;
+  border: 1px solid #e2e8f0 !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-surface__header) {
-  border-bottom: 1px solid #e2e8f0;
-  padding-bottom: 12px;
-  margin-bottom: 4px;
+  border-bottom: 1px solid #e2e8f0 !important;
+  padding-bottom: 0.75rem !important;
+  margin-bottom: 0.25rem !important;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-surface__title) {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: #0f172a;
+  font-size: 0.875rem !important; /* text-sm */
+  font-weight: 600 !important;
+  color: #1e293b !important; /* text-slate-800 */
 }
 .doc-gen.doc-gen--rapida :deep(.gov-surface__subtitle) {
-  font-size: 0.8125rem;
-  color: #64748b;
+  font-size: 0.75rem !important;
+  color: #94a3b8 !important; /* text-slate-400 */
 }
 .doc-gen.doc-gen--rapida :deep(.gov-label) {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: #475569;
+  font-size: 0.75rem !important; /* text-xs */
+  font-weight: 500 !important; /* font-medium */
+  color: #475569 !important; /* text-slate-600 */
 }
 .doc-gen.doc-gen--rapida :deep(.gov-label__hint) {
-  font-weight: 400;
-  color: #94a3b8;
+  font-size: 11px !important;
+  color: #94a3b8 !important;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-input),
 .doc-gen.doc-gen--rapida :deep(.gov-textarea),
 .doc-gen.doc-gen--rapida :deep(.doc-gen__search-input) {
-  border-radius: 12px;
-  border: 1px solid #cbd5e1;
-  background: #fff;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  margin-top: 0.25rem !important;
+  width: 100% !important;
+  border-radius: 0.75rem !important; /* rounded-xl */
+  border: 1px solid #cbd5e1 !important; /* border-slate-300 */
+  background: #ffffff !important;
+  padding: 0.625rem 0.75rem !important; /* px-3 py-2.5 */
+  font-size: 0.875rem !important; /* text-sm */
+  color: #1e293b !important; /* text-slate-800 */
+  outline: none !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-input:focus),
 .doc-gen.doc-gen--rapida :deep(.gov-textarea:focus),
 .doc-gen.doc-gen--rapida :deep(.doc-gen__search-input:focus) {
-  border-color: #38bdf8;
-  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
-  outline: none;
+  border-color: #38bdf8 !important; /* focus:border-sky-400 */
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.35) !important;
+  outline: none !important;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-btn) {
-  border-radius: 12px;
-  font-weight: 600;
+  border-radius: 0.75rem !important;
+  font-weight: 600 !important;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-btn--primary) {
-  background: #0f172a;
-  border-color: #0f172a;
-  color: #fff;
-  box-shadow: none;
+  background: #0f172a !important; /* bg-slate-900 */
+  border-color: #0f172a !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-btn--primary:hover:not(:disabled)) {
-  background: #1e293b;
-  border-color: #1e293b;
+  background: #1e293b !important; /* hover:bg-slate-800 */
+  border-color: #1e293b !important;
 }
 .doc-gen.doc-gen--rapida :deep(.gov-btn--secondary),
 .doc-gen.doc-gen--rapida :deep(.gov-btn--outline) {
-  border-color: #cbd5e1;
-  color: #334155;
-  background: #fff;
-}
-.doc-gen.doc-gen--rapida :deep(.gov-btn--secondary:hover:not(:disabled)),
-.doc-gen.doc-gen--rapida :deep(.gov-btn--outline:hover:not(:disabled)) {
-  background: #f8fafc;
-}
-.doc-gen.doc-gen--rapida :deep(.gov-text-soft) {
-  color: #64748b;
-}
-.doc-gen.doc-gen--rapida :deep(.gov-link) {
-  color: #0369a1;
-  font-weight: 500;
-}
-.doc-gen.doc-gen--rapida :deep(.doc-gen__llm-hint) {
-  background: #f0f9ff;
-  border: 1px solid #bae6fd;
-  border-radius: 12px;
-}
-.doc-gen.doc-gen--rapida :deep(.doc-gen__llm-hint .fa-wand-magic-sparkles) {
-  color: #0284c7;
-}
-.doc-gen.doc-gen--rapida :deep(.doc-gen__results) {
-  border-radius: 12px;
-  border-color: #e2e8f0;
-  box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08);
-}
-.doc-gen.doc-gen--rapida :deep(.doc-gen__result-item:hover),
-.doc-gen.doc-gen--rapida :deep(.doc-gen__result-item--focused) {
-  background: #f0f9ff;
-}
-.doc-gen.doc-gen--rapida :deep(.doc-gen__var-heading) {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #0f172a;
-}
-.doc-gen.doc-gen--rapida :deep(.doc-gen__slot-subheading) {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #475569;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-.doc-gen.doc-gen--rapida :deep(.doc-gen__variables-card) {
-  position: sticky;
-  top: 12px;
-}
-/* Reforço de prioridade para evitar que o tema gov sobreponha em runtime. */
-.doc-gen.doc-gen--rapida .gov-page-header,
-.doc-gen.doc-gen--rapida .gov-surface {
-  border-radius: 16px !important;
-  border-color: #e2e8f0 !important;
-  background: #ffffff !important;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
-}
-.doc-gen.doc-gen--rapida .gov-input,
-.doc-gen.doc-gen--rapida .gov-textarea {
-  border-radius: 12px !important;
-  border-color: #cbd5e1 !important;
-}
-.doc-gen.doc-gen--rapida .gov-btn--primary {
-  background: #0f172a !important;
-  border-color: #0f172a !important;
-  color: #ffffff !important;
-}
-.doc-gen.doc-gen--rapida .gov-btn--secondary,
-.doc-gen.doc-gen--rapida .gov-btn--outline {
   border-color: #cbd5e1 !important;
   color: #334155 !important;
   background: #ffffff !important;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-btn--secondary:hover:not(:disabled)),
+.doc-gen.doc-gen--rapida :deep(.gov-btn--outline:hover:not(:disabled)) {
+  background: #f8fafc !important; /* hover:bg-slate-50 */
+}
+.doc-gen.doc-gen--rapida :deep(.gov-text-soft) {
+  color: #94a3b8 !important;
+}
+.doc-gen.doc-gen--rapida :deep(.gov-link) {
+  color: #0f172a !important;
+  font-weight: 600 !important;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__llm-hint) {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.75rem !important;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__llm-hint .fa-wand-magic-sparkles) {
+  color: #475569 !important;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__results) {
+  border-radius: 0.75rem !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08) !important;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__result-item:hover),
+.doc-gen.doc-gen--rapida :deep(.doc-gen__result-item--focused) {
+  background: #f8fafc !important;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__var-heading) {
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  color: #334155 !important;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__slot-subheading) {
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  color: #334155 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
 }
 .dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-page-header),
 .dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-surface) {

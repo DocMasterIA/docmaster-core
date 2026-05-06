@@ -599,15 +599,17 @@
   line-height: 1;
   letter-spacing: 0.02em;
   white-space: nowrap !important;
-  max-width: 38% !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
+  max-width: none !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
 }
 .rpp-mini-compact__value {
   margin-top: 0;
   font-size: 6.2pt;
   line-height: 1.12;
   font-weight: 600;
+  display: block !important;
+  width: 100% !important;
   white-space: normal !important;
   word-break: normal !important;
   overflow-wrap: normal !important;

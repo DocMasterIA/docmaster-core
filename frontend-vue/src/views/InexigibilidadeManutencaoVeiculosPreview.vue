@@ -763,17 +763,25 @@ function primeiraMaiuscula(valor) {
   if (idx < 0) return v;
   return v.slice(0, idx) + v[idx].toUpperCase() + v.slice(idx + 1);
 }
-function gerarObjetoTexto(contratado, setor, caracteristicas) {
+function gerarObjetoTexto(contratado, setor, caracteristicas, tipoManutencaoValue = '', revisaoKmValue = '') {
   const objeto = String(contratado || '').trim() || 'objeto nao informado';
   const destino = String(setor || '').trim() ? `, visando atender as demandas de ${String(setor).trim()}` : '';
+  const manutencao = String(tipoManutencaoValue || '').trim()
+    ? `, no escopo de manutencao ${String(tipoManutencaoValue).trim().toLowerCase()}`
+    : '';
+  const revisao = String(revisaoKmValue || '').trim() ? ` (referencia: ${String(revisaoKmValue).trim()})` : '';
   const detalhes = String(caracteristicas || '').trim() ? `, observadas as seguintes caracteristicas minimas: ${String(caracteristicas).trim()}` : '';
-  return `${primeiraMaiuscula(objeto)}${destino}${detalhes}.`;
+  return `${primeiraMaiuscula(objeto)}${destino}${manutencao}${revisao}${detalhes}.`;
 }
-function gerarJustificativaTexto(contratado, setor, caracteristicas) {
+function gerarJustificativaTexto(contratado, setor, caracteristicas, tipoManutencaoValue = '', revisaoKmValue = '') {
   const objeto = String(contratado || '').trim() || 'o objeto indicado';
   const destino = String(setor || '').trim() ? ` do(a) ${String(setor).trim()}` : ' da Administracao Publica';
+  const manutencao = String(tipoManutencaoValue || '').trim()
+    ? ` Considera-se a manutencao ${String(tipoManutencaoValue).trim().toLowerCase()} como eixo da contratacao.`
+    : '';
+  const revisao = String(revisaoKmValue || '').trim() ? ` Foi indicada a referencia de revisao/quilometragem: ${String(revisaoKmValue).trim()}.` : '';
   const detalhes = String(caracteristicas || '').trim() ? ` A contratacao devera observar as caracteristicas minimas informadas: ${String(caracteristicas).trim()}.` : '';
-  return `A presente contratacao justifica-se pela necessidade de assegurar ${objeto} para atendimento das demandas${destino}, garantindo a continuidade, eficiencia e adequada prestacao dos servicos publicos.${detalhes}`;
+  return `A presente contratacao justifica-se pela necessidade de assegurar ${objeto} para atendimento das demandas${destino}, garantindo a continuidade, eficiencia e adequada prestacao dos servicos publicos.${manutencao}${revisao}${detalhes}`;
 }
 function buildSlotsOverride() {
   const o = {};
@@ -914,6 +922,8 @@ async function onGenerateClauses() {
       `O que sera contratado: ${contratado}`,
       `Setor/secretaria atendido: ${setor}`,
       `Caracteristicas minimas (opcional): ${caracteristicas || 'nao informado'}`,
+      `Tipo de manutencao: ${isDispensaManutencaoRoute.value ? (tipoManutencao.value || 'nao informado') : 'nao se aplica'}`,
+      `Revisao/KM: ${isDispensaManutencaoRoute.value ? (revisaoKm.value || 'nao informado') : 'nao se aplica'}`,
     ].join('\n');
     async function requestClausesFast(promptText) {
       const fastPrompt = [
@@ -949,16 +959,16 @@ async function onGenerateClauses() {
       ? bySections
       : parseClauseSections(text);
     if (!parsed.objeto && !parsed.justificativa && !String(text).trim()) {
-      clausulaObjeto.value = gerarObjetoTexto(contratado, setor, caracteristicas);
-      clausulaJustificativa.value = gerarJustificativaTexto(contratado, setor, caracteristicas);
+      clausulaObjeto.value = gerarObjetoTexto(contratado, setor, caracteristicas, tipoManutencao.value, revisaoKm.value);
+      clausulaJustificativa.value = gerarJustificativaTexto(contratado, setor, caracteristicas, tipoManutencao.value, revisaoKm.value);
       return;
     }
-    clausulaObjeto.value = parsed.objeto || gerarObjetoTexto(contratado, setor, caracteristicas);
-    clausulaJustificativa.value = parsed.justificativa || gerarJustificativaTexto(contratado, setor, caracteristicas);
+    clausulaObjeto.value = parsed.objeto || gerarObjetoTexto(contratado, setor, caracteristicas, tipoManutencao.value, revisaoKm.value);
+    clausulaJustificativa.value = parsed.justificativa || gerarJustificativaTexto(contratado, setor, caracteristicas, tipoManutencao.value, revisaoKm.value);
     await saveUserGlobalPreset();
   } catch (e) {
-    clausulaObjeto.value = gerarObjetoTexto(clausulaContratado.value, clausulaSetor.value, clausulaCaracteristicas.value);
-    clausulaJustificativa.value = gerarJustificativaTexto(clausulaContratado.value, clausulaSetor.value, clausulaCaracteristicas.value);
+    clausulaObjeto.value = gerarObjetoTexto(clausulaContratado.value, clausulaSetor.value, clausulaCaracteristicas.value, tipoManutencao.value, revisaoKm.value);
+    clausulaJustificativa.value = gerarJustificativaTexto(clausulaContratado.value, clausulaSetor.value, clausulaCaracteristicas.value, tipoManutencao.value, revisaoKm.value);
     generateError.value = e?.message || 'Nao foi possivel gerar via IA; aplicamos a versao padrao local.';
     await saveUserGlobalPreset();
   } finally {

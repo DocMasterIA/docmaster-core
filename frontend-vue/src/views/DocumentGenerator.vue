@@ -305,6 +305,17 @@
                   class="gov-textarea doc-gen__slot-input"
                   rows="3"
                 />
+                <select
+                  v-else-if="field.input === 'select'"
+                  :id="'drawer-slot-' + field.id"
+                  v-model="slotForm[field.id]"
+                  class="gov-input doc-gen__slot-input"
+                >
+                  <option value="">Selecione</option>
+                  <option v-for="opt in field.options || []" :key="'drawer-select-' + field.id + '-' + opt" :value="opt">
+                    {{ opt }}
+                  </option>
+                </select>
                 <input
                   v-else-if="field.input === 'date'"
                   :id="'drawer-slot-' + field.id"
@@ -594,16 +605,29 @@ const FLOW_CONFIG = {
         key: 'solicitacao',
         title: '1. Solicitação / Ofício',
         fields: [
+          {
+            id: 'solicitacao_destinatario_tratamento_nome',
+            label: 'Tratamento',
+            input: 'select',
+            options: ['Ao senhor', 'A senhora'],
+          },
           { id: 'solicitacao_destinatario_nome', label: '1.1 A quem é direcionada a solicitação — Nome', input: 'text' },
           {
+            id: 'solicitacao_destinatario_tratamento_cargo',
+            label: 'Tratamento',
+            input: 'select',
+            options: ['Senhor', 'Senhora'],
+          },
+          {
             id: 'solicitacao_destinatario_cargo',
-            label: '1.1 A quem é direcionada a solicitação — Função / Cargo',
+            label: '1.2 A quem é direcionada a solicitação — Função / Cargo',
             input: 'datalist',
           },
-          { id: 'solicitacao_responsavel_nome', label: '1.2 Responsável pela solicitação — Nome', input: 'text' },
+          { id: '_h_solicitacao_responsavel', label: '1.3 Responsável pela solicitação', input: 'heading', fullWidth: true },
+          { id: 'solicitacao_responsavel_nome', label: 'Nome do responsável', input: 'text' },
           {
             id: 'solicitacao_responsavel_cargo',
-            label: '1.2 Responsável pela solicitação — Função / Cargo',
+            label: 'Função / Cargo',
             input: 'datalist',
           },
         ],
@@ -622,72 +646,18 @@ const FLOW_CONFIG = {
           { id: 'dfd_email', label: 'E-mail', input: 'email', required: true },
           { id: 'dfd_gestor_contratos', label: 'Nome do(a) gestor(a) de contratos', input: 'text', required: true },
           { id: 'dfd_fiscal_contratos', label: 'Nome do(a) fiscal de contratos', input: 'text', required: true },
+          { id: '_h_dfd_assinatura', label: '2.6 Responsável pela assinatura da DFD', input: 'heading', fullWidth: true },
           {
-            id: 'dfd_assinatura_cargo',
-            label: 'Função / cargo do responsável pela assinatura da DFD',
+            id: 'dfd_assinatura_nome',
+            label: 'Nome do responsável',
             input: 'text',
             required: true,
           },
-        ],
-      },
-      {
-        key: 'tr',
-        title: '3. Termo de Referência',
-        fields: [
           {
-            id: 'tr_objeto_manual',
-            label: 'Objeto do TR (manual, sem geração por IA)',
-            input: 'textarea',
-            fullWidth: true,
-          },
-          {
-            id: 'tr_objeto_escopo',
-            label: 'Objeto - escopo técnico/operacional',
-            input: 'textarea',
-            fullWidth: true,
-          },
-          {
-            id: 'tr_objeto_entregas',
-            label: 'Objeto - entregas principais',
-            input: 'textarea',
-            fullWidth: true,
-          },
-          {
-            id: 'tr_objeto_resultados',
-            label: 'Objeto - resultados esperados',
-            input: 'textarea',
-            fullWidth: true,
-          },
-          {
-            id: 'tr_endereco_propostas',
-            label: 'Endereço presencial para envio ou entrega de propostas',
+            id: 'dfd_assinatura_cargo',
+            label: 'Função / Cargo',
             input: 'text',
-            fullWidth: true,
-          },
-          { id: 'tr_data_termo', label: 'Data do termo', input: 'date' },
-          { id: 'tr_email_propostas', label: 'E-mail para recebimento de propostas', input: 'email' },
-          {
-            id: 'tr_assinatura_digital',
-            label: 'Datado e assinado digitalmente',
-            input: 'checkbox',
-            checkboxHint: 'Datado e assinado digitalmente.',
-          },
-          {
-            id: 'tr_data_automatica',
-            label: 'Data automática',
-            input: 'checkbox',
-            checkboxHint: 'Inserir data atual automaticamente.',
-          },
-          { id: '_h_tr_assin', label: 'Assinatura do termo', input: 'heading', fullWidth: true },
-          {
-            id: 'tr_nome_assinante',
-            label: 'Nome de quem assinará o Termo de Referência',
-            input: 'text',
-          },
-          {
-            id: 'tr_cargo_assinante',
-            label: 'Função / cargo de quem assina o termo',
-            input: 'datalist',
+            required: true,
           },
         ],
       },
@@ -821,10 +791,7 @@ const isEtpLivreRoute = computed(() => route.name === 'EtpLivre');
 const documentTypeHint = computed(() => (isEtpLivreRoute.value ? 'etp' : null));
 const showSlotsCard = computed(() => !isEtpLivreRoute.value);
 
-const selectedFlow = computed(() => {
-  const logical = dispensaLogicalRouteName.value;
-  return FLOW_CONFIG[logical] || FLOW_CONFIG[route.name] || TR_DFD_SLOTS_FLOW;
-});
+const selectedFlow = computed(() => TR_DFD_SLOTS_FLOW);
 
 const liveSummary = computed(() => {
   const sections = selectedFlow.value.sections || [];
@@ -1153,6 +1120,8 @@ function buildTrSlotsOverride() {
 
   const dfdAssCargo = (f.dfd_assinatura_cargo || '').trim();
   if (dfdAssCargo) o.dfd_assinatura_cargo = dfdAssCargo;
+  const dfdAssNome = (f.dfd_assinatura_nome || '').trim();
+  if (dfdAssNome) o.dfd_assinatura_nome = dfdAssNome;
 
   const end = (f.tr_endereco_propostas || '').trim();
   const em = (f.tr_email_propostas || '').trim();
@@ -1360,6 +1329,11 @@ async function onSubmit() {
   }
   if (!iaPrompt.value.trim()) return;
   if (docTypeMode.value === 'tr_modelo' && dispensaLogicalRouteName.value === 'DispensaArt75IObrasEngenharia') {
+    if (!Object.prototype.hasOwnProperty.call(slotForm, 'tr_objeto_manual')) {
+      isSubmitting.value = false;
+      generateError.value = 'Preencha os dados fixos no modal para gerar o documento.';
+      return;
+    }
     const manualObject = String(slotForm.tr_objeto_manual || '').trim();
     if (!manualObject) {
       generateError.value = 'Preencha o campo "Objeto do TR (manual, sem geração por IA)" para gerar nesta página.';

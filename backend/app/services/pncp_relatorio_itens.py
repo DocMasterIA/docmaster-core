@@ -84,6 +84,54 @@ def _fmt_quantidade(q: Any) -> str:
     return f"{f:.2f}".replace(".", ",")
 
 
+def preco_unitario_cotacao_fonte(it: Any, *, quantidade_item: Optional[float] = None) -> Optional[float]:
+    """
+    Preço unitário na fonte/inciso para um registro de cotação (ORM ou dict).
+    Prioriza valor_unitario; senão valor_total / quantidade (item da sessão, depois quantidade da linha).
+    Retorna None quando não há como inferir (na agregação por item, tratar como 0 na média).
+    """
+
+    def _get(key: str) -> Any:
+        if isinstance(it, dict):
+            return it.get(key)
+        return getattr(it, key, None)
+
+    vu = _get("valor_unitario")
+    try:
+        fvu = float(vu) if vu is not None else None
+    except (TypeError, ValueError):
+        fvu = None
+    if fvu is not None and fvu > 0 and not (math.isnan(fvu) or math.isinf(fvu)):
+        return fvu
+
+    vt = _get("valor_total")
+    try:
+        fvt = float(vt) if vt is not None else None
+    except (TypeError, ValueError):
+        fvt = None
+    if fvt is None or fvt <= 0 or math.isnan(fvt) or math.isinf(fvt):
+        return None
+
+    if quantidade_item is not None:
+        try:
+            fq = float(quantidade_item)
+            if fq > 0 and not math.isnan(fq) and not math.isinf(fq):
+                return fvt / fq
+        except (TypeError, ValueError):
+            pass
+
+    q_line = _get("quantidade")
+    if q_line is not None:
+        try:
+            fq = float(q_line)
+            if fq > 0 and not math.isnan(fq) and not math.isinf(fq):
+                return fvt / fq
+        except (TypeError, ValueError):
+            pass
+
+    return None
+
+
 def _valor_numerico_item(it: Any, *, quantidade_base: Optional[float] = None) -> Optional[float]:
     vt = getattr(it, "valor_total", None)
     if vt is not None:
@@ -247,7 +295,13 @@ def _endereco_de_source(src: Dict[str, Any]) -> str:
     return (v or "")[:400]
 
 
-def fonte_dict_de_item(it: Any, *, tz, supplier_name_by_cnpj: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+def fonte_dict_de_item(
+    it: Any,
+    *,
+    tz,
+    supplier_name_by_cnpj: Optional[Dict[str, str]] = None,
+    quantidade_item_base: Optional[float] = None,
+) -> Dict[str, str]:
     """Uma linha ORM → uma linha da tabela «fontes» do detalhamento."""
     src: Dict[str, Any] = getattr(it, "source", None) or {}
     if not isinstance(src, dict):
@@ -271,8 +325,8 @@ def fonte_dict_de_item(it: Any, *, tz, supplier_name_by_cnpj: Optional[Dict[str,
     if created is not None:
         data_str = timezone.localtime(created, tz).strftime("%d/%m/%Y")
 
-    vn = _valor_numerico_item(it)
-    valor = f"R$ {_formatar_moeda_br(vn)}" if vn is not None else "—"
+    pu = preco_unitario_cotacao_fonte(it, quantidade_item=quantidade_item_base)
+    valor = f"R$ {_formatar_moeda_br(pu)}" if pu is not None else "—"
 
     orgao = (getattr(it, "orgao", None) or "—")[:200]
     mun = (getattr(it, "municipio", None) or "").strip()
@@ -354,13 +408,21 @@ def agrupar_itens_relatorio_pesquisa_precos(itens: List[Any]) -> Tuple[List[Dict
         q_fmt = _fmt_quantidade(getattr(first, "quantidade", None))
         und = (getattr(first, "unidade_medida", None) or "—")[:64]
 
-        vals = [v for v in (_valor_numerico_item(x) for x in members) if v is not None]
-        media_valor: Optional[float] = None
-        if vals:
-            media_valor = sum(vals) / len(vals)
-            media_fmt = f"R$ {_formatar_moeda_br(media_valor)}"
-        else:
-            media_fmt = "—"
+        try:
+            q_first = float(getattr(first, "quantidade", None)) if getattr(first, "quantidade", None) is not None else None
+            if q_first is not None and (math.isnan(q_first) or math.isinf(q_first) or q_first <= 0):
+                q_first = None
+        except (TypeError, ValueError):
+            q_first = None
+
+        n_fontes = len(members)
+        unit_slots: List[float] = []
+        for x in members:
+            pu = preco_unitario_cotacao_fonte(x, quantidade_item=q_first)
+            unit_slots.append(0.0 if pu is None else float(pu))
+        vals = unit_slots
+        media_valor: Optional[float] = (sum(unit_slots) / n_fontes) if n_fontes else None
+        media_fmt = f"R$ {_formatar_moeda_br(media_valor)}" if media_valor is not None else "—"
 
         n_cot = len(members)
         if n_cot >= MIN_FONTES_SITUACAO_VALIDA:
@@ -368,7 +430,10 @@ def agrupar_itens_relatorio_pesquisa_precos(itens: List[Any]) -> Tuple[List[Dict
         else:
             situacao = f"Insuficiente ({n_cot} de {MIN_FONTES_SITUACAO_VALIDA} fontes)"
 
-        fontes = [fonte_dict_de_item(m, tz=tz, supplier_name_by_cnpj=supplier_name_idx) for m in members]
+        fontes = [
+            fonte_dict_de_item(m, tz=tz, supplier_name_by_cnpj=supplier_name_idx, quantidade_item_base=q_first)
+            for m in members
+        ]
 
         grupos.append(
             {
@@ -391,13 +456,15 @@ def agrupar_itens_relatorio_pesquisa_precos(itens: List[Any]) -> Tuple[List[Dict
 def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
     itens: List[Any],
     cotacoes: List[Any],
-    formula_id: str,
 ) -> Tuple[List[Dict[str, Any]], int]:
     """
     Novo fluxo: item manual + múltiplas cotações vinculadas.
 
     - `itens`: linhas de PncpCotacaoItem (ordem/base visual do relatório).
     - `cotacoes`: linhas de PncpCotacaoItemCotacao vinculadas aos itens.
+
+    Por item: valor médio = média aritmética dos preços unitários por fonte (fonte sem preço conta 0).
+    A «Fórmula de Cálculo» da sessão aplica-se no resumo entre itens (resumo_calculo_precos), não dentro da linha.
     """
     if not itens:
         return [], 0
@@ -428,8 +495,13 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
         except (TypeError, ValueError):
             qtd_item_f = None
 
-        vals = [v for v in (_valor_numerico_item(x, quantidade_base=qtd_item_f) for x in members) if v is not None]
-        valor_calc = _valor_formula_em_lista(vals, formula_id)
+        n_fontes = len(members)
+        unit_slots: List[float] = []
+        for x in members:
+            pu = preco_unitario_cotacao_fonte(x, quantidade_item=qtd_item_f)
+            unit_slots.append(0.0 if pu is None else float(pu))
+        vals = unit_slots
+        valor_calc = (sum(unit_slots) / n_fontes) if n_fontes else None
         valor_fmt = f"R$ {_formatar_moeda_br(valor_calc)}" if valor_calc is not None else "—"
 
         quantidades: List[float] = []
@@ -461,7 +533,10 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
         else:
             situacao = f"Insuficiente ({n_cot} de {MIN_FONTES_SITUACAO_VALIDA} fontes)"
 
-        fontes = [fonte_dict_de_item(m, tz=tz, supplier_name_by_cnpj=supplier_name_idx) for m in members]
+        fontes = [
+            fonte_dict_de_item(m, tz=tz, supplier_name_by_cnpj=supplier_name_idx, quantidade_item_base=qtd_item_f)
+            for m in members
+        ]
         grupos.append(
             {
                 "ordem": ordem,
@@ -579,33 +654,21 @@ def _valor_formula_em_lista(values: List[float], formula_id: str) -> Optional[fl
 
 
 def resumo_calculo_precos(grupos: List[Dict[str, Any]], formula_id: str) -> Dict[str, Any]:
+    """
+    Agrega com a fórmula selecionada a lista de **médias de preço unitário por item**
+    (cada `media_valor` já é média aritmética dos unitários por fonte, com ausência=0).
+    """
     medias: List[float] = []
     pesos: List[float] = []
     for g in grupos or []:
-        valores_fontes: List[float] = []
-        raw_vals = g.get("valores_fontes")
-        if isinstance(raw_vals, list):
-            for rv in raw_vals:
-                try:
-                    fv = float(rv)
-                except (TypeError, ValueError):
-                    continue
-                if math.isnan(fv) or math.isinf(fv):
-                    continue
-                valores_fontes.append(fv)
-        if not valores_fontes:
-            mv = g.get("media_valor")
-            try:
-                f = float(mv)
-            except (TypeError, ValueError):
-                continue
-            if math.isnan(f) or math.isinf(f):
-                continue
-            valores_fontes = [f]
-        valor_item = _valor_formula_em_lista(valores_fontes, formula_id)
-        if valor_item is None:
+        mv = g.get("media_valor")
+        try:
+            f = float(mv)
+        except (TypeError, ValueError):
             continue
-        medias.append(valor_item)
+        if math.isnan(f) or math.isinf(f):
+            continue
+        medias.append(f)
         nc = g.get("n_cotacoes")
         try:
             p = float(nc)
@@ -618,17 +681,9 @@ def resumo_calculo_precos(grupos: List[Dict[str, Any]], formula_id: str) -> Dict
     if not medias:
         return _resumo_from_values([], formula_id=formula_id, valor_calculado=None)
 
-    if formula_id == "mediana_precos_obtidos":
-        s = sorted(medias)
-        n = len(s)
-        if n % 2 == 1:
-            val = s[n // 2]
-        else:
-            val = (s[n // 2 - 1] + s[n // 2]) / 2
-        return _resumo_from_values(medias, formula_id=formula_id, valor_calculado=val)
-
-    if formula_id == "menor_preco":
-        val = min(medias)
+    if formula_id == "media_ponderada":
+        total_peso = sum(pesos) or 1.0
+        val = sum(v * w for v, w in zip(medias, pesos)) / total_peso
         return _resumo_from_values(medias, formula_id=formula_id, valor_calculado=val)
 
     if formula_id == "media_saneada":
@@ -643,18 +698,13 @@ def resumo_calculo_precos(grupos: List[Dict[str, Any]], formula_id: str) -> Dict
             extra={"itens_saneados_utilizados": len(saneados)},
         )
 
-    if formula_id == "media_ponderada":
-        total_peso = sum(pesos) or 1.0
-        val = sum(v * w for v, w in zip(medias, pesos)) / total_peso
-        return _resumo_from_values(medias, formula_id=formula_id, valor_calculado=val)
-
     if formula_id == "media_relativa_25_50":
         s = sorted(medias)
         p25 = _percentile(s, 0.25)
         p50 = _percentile(s, 0.50)
         if p25 is None or p50 is None:
             val = None
-            faixa = []
+            faixa: List[float] = []
         else:
             faixa = [x for x in s if p25 <= x <= p50]
             if not faixa:
@@ -671,5 +721,5 @@ def resumo_calculo_precos(grupos: List[Dict[str, Any]], formula_id: str) -> Dict
             },
         )
 
-    val = sum(medias) / len(medias)
-    return _resumo_from_values(medias, formula_id="media_aritmetica_precos_obtidos", valor_calculado=val)
+    val = _valor_formula_em_lista(medias, formula_id)
+    return _resumo_from_values(medias, formula_id=formula_id, valor_calculado=val)

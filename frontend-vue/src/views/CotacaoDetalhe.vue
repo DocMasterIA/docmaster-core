@@ -1315,7 +1315,10 @@ async function loadSessionFromBackend() {
           })(),
           und: String(it.unidade_medida_refletida || '').trim() || it.unidade_medida || '-',
           precoMedio: formatCurrency(
-            it.valor_unitario ?? (Number(it?.quantidade) > 0 ? Number(it?.valor_total) / Number(it?.quantidade) : null) ?? 0,
+            it.valor_unitario_refletido
+              ?? it.valor_unitario
+              ?? (Number(it?.quantidade) > 0 ? Number(it?.valor_total) / Number(it?.quantidade) : null)
+              ?? 0,
           ),
           precoTotal: formatCurrency(
             it.valor_total_refletido ?? it.valor_total ?? it.valor_unitario ?? 0,

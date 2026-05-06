@@ -296,7 +296,7 @@ def montar_contexto_relatorio(
     cotacoes_qs = getattr(cotacao, "cotacoes_itens", None)
     cotacoes = list(cotacoes_qs.select_related("item").order_by("item_id", "id")) if cotacoes_qs is not None else []
     if cotacoes:
-        grupos, total_linhas = agrupar_cotacoes_por_item_relatorio_pesquisa_precos(itens, cotacoes, formula_id)
+        grupos, total_linhas = agrupar_cotacoes_por_item_relatorio_pesquisa_precos(itens, cotacoes)
     else:
         grupos, total_linhas = agrupar_itens_relatorio_pesquisa_precos(itens)
     # Prioriza CNPJs presentes nas fontes (cotações reais exibidas no relatório).

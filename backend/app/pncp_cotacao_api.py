@@ -38,7 +38,9 @@ from backend.app.models import (
     Prefeitura,
 )
 from backend.app.services.pncp_relatorio_itens import (
+    agrupar_cotacoes_por_item_relatorio_pesquisa_precos,
     agrupar_itens_relatorio_pesquisa_precos,
+    preco_unitario_cotacao_fonte,
     resumo_calculo_precos,
 )
 from backend.app.services.pncp_relatorio_pdf import extrair_cnpjs_dos_itens
@@ -792,74 +794,13 @@ def _fontes_counts_for_session(sessao_id: int) -> Dict[int, Dict[str, int]]:
 
 
 def _itens_refletidos_for_session(sessao_id: int, formula_id: str) -> Dict[int, Dict[str, Any]]:
-    def _percentile(sorted_vals: List[float], p: float) -> Optional[float]:
-        if not sorted_vals:
-            return None
-        if p <= 0:
-            return sorted_vals[0]
-        if p >= 1:
-            return sorted_vals[-1]
-        idx = (len(sorted_vals) - 1) * p
-        lo = int(math.floor(idx))
-        hi = int(math.ceil(idx))
-        if lo == hi:
-            return sorted_vals[lo]
-        frac = idx - lo
-        return sorted_vals[lo] * (1 - frac) + sorted_vals[hi] * frac
-
-    def _valor_formula_em_lista(values: List[float], formula_id: str) -> Optional[float]:
-        if not values:
-            return None
-        s = sorted(values)
-        if formula_id == "mediana_precos_obtidos":
-            n = len(s)
-            if n % 2 == 1:
-                return s[n // 2]
-            return (s[n // 2 - 1] + s[n // 2]) / 2
-        if formula_id == "menor_preco":
-            return min(s)
-        if formula_id == "media_saneada":
-            cut = int(len(s) * 0.2)
-            saneados = s[cut : len(s) - cut] if len(s) - (2 * cut) >= 1 else s
-            return sum(saneados) / len(saneados)
-        if formula_id == "media_relativa_25_50":
-            p25 = _percentile(s, 0.25)
-            p50 = _percentile(s, 0.50)
-            if p25 is None or p50 is None:
-                return None
-            faixa = [x for x in s if p25 <= x <= p50]
-            if not faixa:
-                faixa = [p25, p50]
-            return sum(faixa) / len(faixa)
-        # media_aritmetica_precos_obtidos e media_ponderada (peso uniforme por fonte).
-        return sum(s) / len(s)
-
-    def _extract_numeric_quantity(v: Any) -> Optional[float]:
-        if v is None:
-            return None
-        if isinstance(v, (int, float)):
-            n = float(v)
-            return n if n > 0 else None
-        s = str(v).strip()
-        if not s:
-            return None
-        # Extrai o primeiro número válido do texto:
-        # "54 PEÇAS (PÇ)" -> 54 ; "1 UN" -> 1 ; "1.200,50 KG" -> 1200.50
-        m = re.search(r"\d[\d\.,]*", s)
-        if not m:
-            return None
-        num = m.group(0)
-        # Se houver vírgula, assume padrão pt-BR: "." milhar e "," decimal.
-        if "," in num:
-            num = num.replace(".", "").replace(",", ".")
-        else:
-            # Sem vírgula, remove separadores de milhar redundantes.
-            num = num.replace(",", "")
-        try:
-            n = float(num)
-            return n if n > 0 else None
-        except Exception:
-            return None
+    """
+    Por item: média aritmética dos preços unitários por fonte (ausência = 0),
+    peso igual entre fontes; total = média × quantidade do item.
+    O parâmetro formula_id está reservado para compatibilidade; a fórmula da sessão
+    aplica-se em calculo_precos (entre itens), não neste payload.
+    """
+    _ = formula_id
 
     def _norm_unidade(v: Any) -> str:
         s = str(v or "").strip().lower()
@@ -867,7 +808,6 @@ def _itens_refletidos_for_session(sessao_id: int, formula_id: str) -> Dict[int, 
             return ""
         s = "".join(ch for ch in unicodedata.normalize("NFD", s) if unicodedata.category(ch) != "Mn")
         s = re.sub(r"[^a-z0-9]+", " ", s).strip()
-        # Regra de negócio: peça/peças é unidade.
         if s in {"un", "und", "unid", "unidade", "unidades", "peca", "pecas", "pc", "pcs"}:
             return "UN"
         return s.upper()
@@ -884,60 +824,26 @@ def _itens_refletidos_for_session(sessao_id: int, formula_id: str) -> Dict[int, 
         quantidade_item_map[iid] = q_item if q_item is not None and q_item > 0 else None
         unidade_item_map[iid] = _norm_unidade(it.get("unidade_medida"))
 
-    rows = PncpCotacaoItemCotacao.objects.filter(cotacao_id=sessao_id).values(
-        "item_id",
-        "quantidade",
-        "unidade_medida",
-        "valor_total",
-        "valor_unitario",
-    )
-    bucket: Dict[int, Dict[str, Any]] = defaultdict(
-        lambda: {"quantidades": [], "unidade": "", "valores": []}
-    )
-    for r in rows:
-        item_id = int(r.get("item_id"))
-        q = _extract_numeric_quantity(r.get("quantidade"))
-        u_raw = r.get("unidade_medida")
-        # Alguns fornecedores enviam "54 PEÇAS (PÇ)" no campo de unidade.
-        # Se quantidade vier vazia, tentamos extrair do texto da unidade.
-        if q is None:
-            q = _extract_numeric_quantity(u_raw)
-        u = _norm_unidade(u_raw)
-        vt = _safe_float(r.get("valor_total"))
-        vu = _safe_float(r.get("valor_unitario"))
-        b = bucket[item_id]
-        if q is not None and q > 0:
-            b["quantidades"].append(float(q))
-        if not b["unidade"] and u:
-            b["unidade"] = u
-        # Fórmula de preço deve operar sobre total por cotação:
-        # 1) usa valor_total quando disponível;
-        # 2) fallback para valor_unitario * quantidade.
-        val = None
+    bucket: Dict[int, List[float]] = defaultdict(list)
+    for row in PncpCotacaoItemCotacao.objects.filter(cotacao_id=sessao_id).order_by("item_id", "id"):
+        item_id = int(row.item_id)
         q_item = quantidade_item_map.get(item_id)
-        q_base = q_item if q_item is not None and q_item > 0 else q
-        if vt is not None and vt > 0:
-            val = vt
-        elif vu is not None and vu > 0 and q_base is not None and q_base > 0:
-            # Mantém comparabilidade entre cotações usando a quantidade do item quando disponível.
-            val = vu * q_base
-        if val is not None:
-            b["valores"].append(val)
+        u = preco_unitario_cotacao_fonte(row, quantidade_item=q_item)
+        bucket[item_id].append(0.0 if u is None else float(u))
 
-    for item_id, b in bucket.items():
-        qtd_item = quantidade_item_map.get(item_id)
-        # Quantidade é fixa no item (definida na inclusão/importação); não deriva das cotações.
-        if qtd_item is not None and qtd_item > 0:
-            qtd_refletida = qtd_item
-        else:
-            qtd_refletida = None
-        valores = [float(v) for v in b["valores"] if isinstance(v, (int, float))]
-        valor_formula = _valor_formula_em_lista(valores, formula_id)
+    for item_id, units in bucket.items():
+        n = len(units)
+        mean_u = (sum(units) / n) if n else None
+        qtd_ref = quantidade_item_map.get(item_id)
+        total_ref = None
+        if mean_u is not None and qtd_ref is not None and qtd_ref > 0:
+            total_ref = mean_u * qtd_ref
+        uref = (unidade_item_map.get(item_id) or "").strip()
         out[item_id] = {
-            "quantidade_refletida": qtd_refletida,
-            # Unidade definida no item é soberana; cotações não devem sobrescrever.
-            "unidade_medida_refletida": unidade_item_map.get(item_id) or b["unidade"] or ("UN" if quantidades else None),
-            "valor_total_refletido": valor_formula,
+            "quantidade_refletida": qtd_ref,
+            "unidade_medida_refletida": uref or ("UN" if qtd_ref else None),
+            "valor_unitario_refletido": mean_u,
+            "valor_total_refletido": total_ref,
         }
     return out
 
@@ -1173,10 +1079,18 @@ def pncp_research_sessions_detail(request, sessao_id: int):
 
     itens_asc = list(c.itens.all().order_by("id"))
     itens_visual = sorted(itens_asc, key=_item_order_key_by_numero_item)
-    grupos_relatorio, total_linhas_cotacao = agrupar_itens_relatorio_pesquisa_precos(itens_asc)
+    cotacoes_sessao = list(
+        PncpCotacaoItemCotacao.objects.filter(cotacao_id=c.id).select_related("item").order_by("item_id", "id")
+    )
     fontes_counts = _fontes_counts_for_session(c.id)
     formula_id = _resolve_formula_calculo_id(c.filtros or {})
     refletidos = _itens_refletidos_for_session(c.id, formula_id)
+    if cotacoes_sessao:
+        grupos_relatorio, total_linhas_cotacao = agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
+            itens_asc, cotacoes_sessao
+        )
+    else:
+        grupos_relatorio, total_linhas_cotacao = agrupar_itens_relatorio_pesquisa_precos(itens_asc)
     formula_label = FORMULA_LABELS.get(formula_id, FORMULA_LABELS[DEFAULT_FORMULA_CALCULO])
     anexos = list(
         PncpCotacaoAnexoArquivo.objects.filter(cotacao_id=c.id)

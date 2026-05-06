@@ -407,48 +407,46 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .ixp-drawer-foot .ixp-btn-primary { width: 100%; }
 @media (max-width: 1200px) { .ixp-grid { grid-template-columns: 1fr; } .ixp-summary { position: static; } }
 @media (max-width: 900px) { .ixp-grid-2, .ixp-grid-3, .ixp-grid-item { grid-template-columns: 1fr; } .ixp-col-2 { grid-column: auto; } }
-@media (prefers-color-scheme: dark) {
-  .ixp-page { background: #020617; }
-  .ixp-main,
-  .ixp-card,
-  .ixp-summary,
-  .ixp-drawer,
-  .ixp-item,
-  .ixp-summary-card { background: #0f172a; border-color: #334155; }
-  .ixp-main-head,
-  .ixp-drawer-head,
-  .ixp-drawer-foot { border-color: #334155; }
-  .ixp-main-title h2,
-  .ixp-main-title p,
-  .ixp-card h3,
-  .ixp-summary-head h3,
-  .ixp-summary-card header,
-  .ixp-line b,
-  .ixp-choice strong { color: #e2e8f0; }
-  .ixp-main-title small,
-  .ixp-field label,
-  .ixp-check,
-  .ixp-item-head span,
-  .ixp-summary > p,
-  .ixp-choice span,
-  .ixp-summary-head small,
-  .ixp-drawer-head small { color: #94a3b8; }
-  .ixp-field input,
-  .ixp-field textarea,
-  .ixp-field select,
-  .ixp-btn-secondary,
-  .ixp-choice { background: #0b1222; border-color: #334155; color: #e2e8f0; }
-  .ixp-field input::placeholder,
-  .ixp-field textarea::placeholder { color: #64748b; }
-  .ixp-field input:focus,
-  .ixp-field textarea:focus,
-  .ixp-field select:focus { border-color: #0ea5e9; }
-  .ixp-btn-secondary { color: #cbd5e1; }
-  .ixp-choice.is-active { border-color: #38bdf8; background: #082f49; }
-  .ixp-progress { background: #1e293b; }
-  .ixp-summary-head span { background: #082f49; color: #7dd3fc; }
-  .ixp-line.is-ok { background: #052e16; border-color: #166534; }
-  .ixp-line.is-warn { background: #3f1d2e; border-color: #9f1239; }
-  .ixp-overlay { background: rgba(2, 6, 23, 0.72); }
-}
+:deep(.dm-dark) .ixp-page { background: #020617; }
+:deep(.dm-dark) .ixp-main,
+:deep(.dm-dark) .ixp-card,
+:deep(.dm-dark) .ixp-summary,
+:deep(.dm-dark) .ixp-drawer,
+:deep(.dm-dark) .ixp-item,
+:deep(.dm-dark) .ixp-summary-card { background: #0f172a; border-color: #334155; }
+:deep(.dm-dark) .ixp-main-head,
+:deep(.dm-dark) .ixp-drawer-head,
+:deep(.dm-dark) .ixp-drawer-foot { border-color: #334155; }
+:deep(.dm-dark) .ixp-main-title h2,
+:deep(.dm-dark) .ixp-main-title p,
+:deep(.dm-dark) .ixp-card h3,
+:deep(.dm-dark) .ixp-summary-head h3,
+:deep(.dm-dark) .ixp-summary-card header,
+:deep(.dm-dark) .ixp-line b,
+:deep(.dm-dark) .ixp-choice strong { color: #e2e8f0; }
+:deep(.dm-dark) .ixp-main-title small,
+:deep(.dm-dark) .ixp-field label,
+:deep(.dm-dark) .ixp-check,
+:deep(.dm-dark) .ixp-item-head span,
+:deep(.dm-dark) .ixp-summary > p,
+:deep(.dm-dark) .ixp-choice span,
+:deep(.dm-dark) .ixp-summary-head small,
+:deep(.dm-dark) .ixp-drawer-head small { color: #94a3b8; }
+:deep(.dm-dark) .ixp-field input,
+:deep(.dm-dark) .ixp-field textarea,
+:deep(.dm-dark) .ixp-field select,
+:deep(.dm-dark) .ixp-btn-secondary,
+:deep(.dm-dark) .ixp-choice { background: #0b1222; border-color: #334155; color: #e2e8f0; }
+:deep(.dm-dark) .ixp-field input::placeholder,
+:deep(.dm-dark) .ixp-field textarea::placeholder { color: #64748b; }
+:deep(.dm-dark) .ixp-field input:focus,
+:deep(.dm-dark) .ixp-field textarea:focus,
+:deep(.dm-dark) .ixp-field select:focus { border-color: #0ea5e9; }
+:deep(.dm-dark) .ixp-btn-secondary { color: #cbd5e1; }
+:deep(.dm-dark) .ixp-choice.is-active { border-color: #38bdf8; background: #082f49; }
+:deep(.dm-dark) .ixp-progress { background: #1e293b; }
+:deep(.dm-dark) .ixp-summary-head span { background: #082f49; color: #7dd3fc; }
+:deep(.dm-dark) .ixp-line.is-ok { background: #052e16; border-color: #166534; }
+:deep(.dm-dark) .ixp-line.is-warn { background: #3f1d2e; border-color: #9f1239; }
+:deep(.dm-dark) .ixp-overlay { background: rgba(2, 6, 23, 0.72); }
 </style>

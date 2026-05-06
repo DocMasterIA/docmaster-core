@@ -579,11 +579,11 @@
 
 /* Micro horizontal (PDF rpp-*): label+valor em linha, sem quebra */
 .rpp-fonte-row--5 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .rpp-mini-compact {
   border-radius: 3px;
-  padding: 0.6mm 0.8mm;
+  padding: 0.7mm 1mm;
   min-height: 6mm;
   display: flex;
   align-items: center;
@@ -602,14 +602,14 @@
 .rpp-mini-compact__value {
   margin-top: 0;
   font-size: 6.2pt;
-  line-height: 1.06;
+  line-height: 1.12;
   font-weight: 600;
   white-space: normal;
   word-break: normal;
-  overflow-wrap: normal;
+  overflow-wrap: break-word;
   hyphens: none;
-  flex: 1 1 0;
-  min-width: 12mm;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: visible;
   text-overflow: clip;
 }

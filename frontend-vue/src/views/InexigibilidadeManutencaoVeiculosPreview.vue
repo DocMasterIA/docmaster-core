@@ -252,19 +252,20 @@
         </article>
       </div>
       <div class="ixp-drawer-foot">
-        <button type="button" class="ixp-btn-primary" @click="drawerOpen = false">Aplicar dados fixos</button>
+        <button type="button" class="ixp-btn-primary" @click="onApplyFixedData">Aplicar dados fixos</button>
       </div>
     </aside>
   </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 
 const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 const route = useRoute();
 const dataOptions = ['Data automatica', 'Datado e assinado digitalmente', 'Data manual'];
+const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
 const cabecalhoOptions = [
   'Cabecalho padrao do municipio',
   'Cabecalho do Fundo Municipal de Saude',
@@ -359,6 +360,87 @@ const clausulaJustificativa = ref('');
 const logicalRouteName = computed(() => DISPENSA_RAPIDA_TO_LOGICAL[route.name] || route.name);
 const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[logicalRouteName.value] || 'tr_dfd_generico');
 const isDispensaNormalRoute = computed(() => String(route.name || '').startsWith('DispensaArt75'));
+
+function collectGlobalFormStatePayload() {
+  return {
+    cabecalho_documento: cabecalhoDocumento.value,
+    processo_ativo: !!processoAtivo.value,
+    processo_numero: processo.value,
+    orgao: orgao.value,
+    solicitacao_destinatario_nome: fixoNome.value,
+    solicitacao_destinatario_cargo: fixoCargo.value,
+    solicitacao_responsavel_nome: fixoResponsavel.value,
+    solicitacao_responsavel_cargo: fixoResponsavelCargo.value,
+    dfd_setor_requisitante: fixoSetor.value,
+    dfd_responsavel_demanda: fixoDemanda.value,
+    dfd_email: fixoEmail.value,
+    dfd_gestor_contratos: fixoGestor.value,
+    dfd_fiscal_contratos: fixoFiscal.value,
+    dfd_assinatura_nome: fixoAssinatura.value,
+    dfd_assinatura_cargo: fixoAssinaturaCargo.value,
+    tr_nome_assinante: responsavel.value,
+    tr_cargo_assinante: responsavelCargo.value,
+    clausula_contratado: clausulaContratado.value,
+    clausula_setor: clausulaSetor.value,
+    clausula_caracteristicas: clausulaCaracteristicas.value,
+    clausula_objeto: clausulaObjeto.value,
+    clausula_justificativa: clausulaJustificativa.value,
+  };
+}
+
+function applyGlobalFormStatePayload(data) {
+  if (!data || typeof data !== 'object') return;
+  if ('cabecalho_documento' in data) cabecalhoDocumento.value = String(data.cabecalho_documento || '');
+  if ('processo_ativo' in data) processoAtivo.value = !!data.processo_ativo;
+  if ('processo_numero' in data) processo.value = String(data.processo_numero || '');
+  if ('orgao' in data) orgao.value = String(data.orgao || '');
+  if ('solicitacao_destinatario_nome' in data) fixoNome.value = String(data.solicitacao_destinatario_nome || '');
+  if ('solicitacao_destinatario_cargo' in data) fixoCargo.value = String(data.solicitacao_destinatario_cargo || '');
+  if ('solicitacao_responsavel_nome' in data) fixoResponsavel.value = String(data.solicitacao_responsavel_nome || '');
+  if ('solicitacao_responsavel_cargo' in data) fixoResponsavelCargo.value = String(data.solicitacao_responsavel_cargo || '');
+  if ('dfd_setor_requisitante' in data) fixoSetor.value = String(data.dfd_setor_requisitante || '');
+  if ('dfd_responsavel_demanda' in data) fixoDemanda.value = String(data.dfd_responsavel_demanda || '');
+  if ('dfd_email' in data) fixoEmail.value = String(data.dfd_email || '');
+  if ('dfd_gestor_contratos' in data) fixoGestor.value = String(data.dfd_gestor_contratos || '');
+  if ('dfd_fiscal_contratos' in data) fixoFiscal.value = String(data.dfd_fiscal_contratos || '');
+  if ('dfd_assinatura_nome' in data) fixoAssinatura.value = String(data.dfd_assinatura_nome || '');
+  if ('dfd_assinatura_cargo' in data) fixoAssinaturaCargo.value = String(data.dfd_assinatura_cargo || '');
+  if ('tr_nome_assinante' in data) responsavel.value = String(data.tr_nome_assinante || '');
+  if ('tr_cargo_assinante' in data) responsavelCargo.value = String(data.tr_cargo_assinante || '');
+  if ('clausula_contratado' in data) clausulaContratado.value = String(data.clausula_contratado || '');
+  if ('clausula_setor' in data) clausulaSetor.value = String(data.clausula_setor || '');
+  if ('clausula_caracteristicas' in data) clausulaCaracteristicas.value = String(data.clausula_caracteristicas || '');
+  if ('clausula_objeto' in data) clausulaObjeto.value = String(data.clausula_objeto || '');
+  if ('clausula_justificativa' in data) clausulaJustificativa.value = String(data.clausula_justificativa || '');
+}
+
+async function saveUserGlobalPreset() {
+  try {
+    await fetch(`${API_BASE}/api/slots/form-state/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        slot_package_key: GLOBAL_SLOT_FORM_PRESET_KEY,
+        data: collectGlobalFormStatePayload(),
+      }),
+    });
+  } catch (_e) {
+    // silencioso
+  }
+}
+
+async function loadUserGlobalPreset() {
+  try {
+    const url = `${API_BASE}/api/slots/form-state?slot_package_key=${encodeURIComponent(GLOBAL_SLOT_FORM_PRESET_KEY)}`;
+    const res = await fetch(url, { credentials: 'include' });
+    if (!res.ok) return;
+    const payload = await res.json().catch(() => ({}));
+    applyGlobalFormStatePayload(payload?.data || {});
+  } catch (_e) {
+    // silencioso
+  }
+}
 
 function apenasNumeros(v) {
   return String(v || '').replace(/\D/g, '');
@@ -641,10 +723,12 @@ async function onGenerateClauses() {
     }
     clausulaObjeto.value = parsed.objeto || gerarObjetoTexto(contratado, setor, caracteristicas);
     clausulaJustificativa.value = parsed.justificativa || gerarJustificativaTexto(contratado, setor, caracteristicas);
+    await saveUserGlobalPreset();
   } catch (e) {
     clausulaObjeto.value = gerarObjetoTexto(clausulaContratado.value, clausulaSetor.value, clausulaCaracteristicas.value);
     clausulaJustificativa.value = gerarJustificativaTexto(clausulaContratado.value, clausulaSetor.value, clausulaCaracteristicas.value);
     generateError.value = e?.message || 'Nao foi possivel gerar via IA; aplicamos a versao padrao local.';
+    await saveUserGlobalPreset();
   } finally {
     isGeneratingClauses.value = false;
   }
@@ -716,12 +800,20 @@ async function onSubmit() {
     documentZipFilename.value = data.zip?.filename || 'tr_dfd_oficio.zip';
     documentReady.value = true;
     successMessage.value = 'Termo de Referencia, DFD e Solicitacao/Oficio gerados com sucesso. Baixe os arquivos abaixo.';
+    await saveUserGlobalPreset();
   } catch (e) {
     generateError.value = e?.message || 'Erro ao gerar documento';
   } finally {
     isSubmitting.value = false;
   }
 }
+async function onApplyFixedData() {
+  await saveUserGlobalPreset();
+  drawerOpen.value = false;
+}
+onMounted(async () => {
+  await loadUserGlobalPreset();
+});
 onBeforeUnmount(() => {
   revokeDocumentUrls();
 });

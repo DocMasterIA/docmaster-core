@@ -585,9 +585,11 @@
   border-radius: 3px;
   padding: 0.7mm 1mm;
   min-height: 6mm;
-  display: flex;
-  align-items: center;
-  gap: 0.8mm;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: start;
+  column-gap: 0.8mm;
+  row-gap: 0;
 }
 .rpp-mini-compact--wide {
   min-height: 6.5mm;
@@ -597,8 +599,7 @@
   line-height: 1;
   letter-spacing: 0.02em;
   white-space: nowrap !important;
-  flex: 0 1 45% !important;
-  max-width: 45% !important;
+  max-width: 38% !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
 }
@@ -608,11 +609,10 @@
   line-height: 1.12;
   font-weight: 600;
   white-space: normal !important;
-  word-break: keep-all !important;
+  word-break: normal !important;
   overflow-wrap: normal !important;
   hyphens: none !important;
-  flex: 1 1 55% !important;
-  min-width: 55% !important;
+  min-width: 0 !important;
   overflow: visible;
   text-overflow: clip;
 }

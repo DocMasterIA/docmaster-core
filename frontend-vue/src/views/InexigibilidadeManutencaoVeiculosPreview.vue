@@ -349,6 +349,7 @@ const route = useRoute();
 const dataOptions = ['Data automatica', 'Datado e assinado digitalmente', 'Data manual'];
 const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
 const cabecalhoOptions = ref([]);
+const userPrefeituraId = ref(null);
 const tratamentoNome = ['Ao senhor', 'A senhora'];
 const tratamentoCargo = ['Senhor', 'Senhora'];
 const emptyItem = { descricao: '', quantidade: '', unidade: '', valorUnitario: '', valorTotal: '' };
@@ -630,11 +631,28 @@ async function loadSlotCatalogSuggestions() {
 }
 async function loadCabecalhoOptions() {
   try {
+    try {
+      const meRes = await fetch(`${API_BASE}/api/me/`, { credentials: 'include' });
+      if (meRes.ok) {
+        const me = await meRes.json().catch(() => ({}));
+        userPrefeituraId.value = me?.prefeitura_id ? String(me.prefeitura_id) : null;
+      } else {
+        userPrefeituraId.value = null;
+      }
+    } catch (_e) {
+      userPrefeituraId.value = null;
+    }
+
     const res = await fetch(`${API_BASE}/api/documentos_modelos/`, { credentials: 'include' });
     if (!res.ok) return;
     const payload = await res.json().catch(() => ({}));
     const templates = Array.isArray(payload?.templates) ? payload.templates : [];
-    const names = [...new Set(templates.map((t) => String(t?.name || '').trim()).filter(Boolean))];
+    const filtered = templates.filter((t) => {
+      const tplPrefId = t?.prefeitura?.id != null ? String(t.prefeitura.id) : null;
+      // Regra solicitada: apenas cabeçalhos vinculados à prefeitura do usuário.
+      return !!userPrefeituraId.value && !!tplPrefId && tplPrefId === userPrefeituraId.value;
+    });
+    const names = [...new Set(filtered.map((t) => String(t?.name || '').trim()).filter(Boolean))];
     cabecalhoOptions.value = names;
     if (cabecalhoDocumento.value && !names.includes(cabecalhoDocumento.value)) {
       cabecalhoDocumento.value = '';

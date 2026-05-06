@@ -548,6 +548,22 @@ function parseClauseSections(text) {
   });
   return sections;
 }
+function extractClausesFromSectionTexts(sectionTexts) {
+  const get = (...keys) => {
+    for (const key of keys) {
+      const value = sectionTexts?.[key];
+      if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    return '';
+  };
+  return {
+    objeto: get('objeto', 'objeto_licitacao', 'do_objeto'),
+    justificativa: get('justificativa', 'necessidade', 'fundamentacao', 'da_necessidade'),
+    escopo: get('objeto_escopo', 'escopo', 'escopo_servicos'),
+    entregas: get('objeto_entregas', 'entregas', 'itens', 'metodologia_execucao'),
+    resultados: get('objeto_resultados', 'resultados_esperados', 'resultados'),
+  };
+}
 async function onGenerateClauses() {
   isGeneratingClauses.value = true;
   generateError.value = '';
@@ -586,12 +602,15 @@ async function onGenerateClauses() {
       generateError.value = data.error || data.detail || `Erro ${res.status} ao gerar clausulas`;
       return;
     }
+    const bySections = extractClausesFromSectionTexts(data.section_texts || {});
     const text = data.generated_text || data.text || data.content || data.response || '';
-    if (!String(text).trim()) {
+    const parsed = (bySections.objeto || bySections.justificativa || bySections.escopo || bySections.entregas || bySections.resultados)
+      ? bySections
+      : parseClauseSections(text);
+    if (!parsed.objeto && !parsed.justificativa && !parsed.escopo && !parsed.entregas && !parsed.resultados && !String(text).trim()) {
       generateError.value = 'A IA nao retornou conteudo de clausulas.';
       return;
     }
-    const parsed = parseClauseSections(text);
     clausulaObjeto.value = parsed.objeto || clausulaObjeto.value;
     clausulaJustificativa.value = parsed.justificativa || clausulaJustificativa.value;
     clausulaEscopo.value = parsed.escopo || clausulaEscopo.value;

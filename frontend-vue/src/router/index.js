@@ -69,7 +69,7 @@ const routes = [
   {
     path: '/geracao/dispensa-rapida/art-75-i/obras-servicos-engenharia',
     name: 'DispensaRapidaArt75IObrasEngenharia',
-    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
+    component: () => import('../views/DispensaArt75IIRapidaReactPreview.vue'),
     meta: {
       title: 'Dispensa - Art. 75, I - Obras e Serviços de Engenharia',
       dispensaRapidaUi: true,
@@ -78,7 +78,7 @@ const routes = [
   {
     path: '/geracao/dispensa-rapida/art-75-i/manutencao-veiculos',
     name: 'DispensaRapidaArt75IManutencaoVeiculos',
-    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
+    component: () => import('../views/DispensaArt75IIRapidaReactPreview.vue'),
     meta: {
       title: 'Dispensa - Art. 75, I - Manutenção de Veículos',
       dispensaRapidaUi: true,

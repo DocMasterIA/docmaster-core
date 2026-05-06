@@ -150,6 +150,14 @@
                 <p class="ixp-hint">
                   Gere e revise as clausulas antes do documento final. Esse fluxo vale apenas para Dispensa normal.
                 </p>
+                <div class="ixp-field">
+                  <label>Prompt de Inteligencia Artificial</label>
+                  <textarea
+                    v-model="clausulasPrompt"
+                    rows="4"
+                    placeholder="Ex: Gere clausulas para dispensa de manutencao veicular, com foco em justificativa tecnica, escopo objetivo e entregas mensuraveis."
+                  />
+                </div>
                 <button class="ixp-btn-secondary" type="button" :disabled="isGeneratingClauses" @click="onGenerateClauses">
                   {{ isGeneratingClauses ? 'Gerando clausulas...' : 'Gerar clausulas' }}
                 </button>
@@ -344,6 +352,7 @@ const documentDfdFilename = ref('dfd.docx');
 const documentOficioFilename = ref('oficio.docx');
 const documentZipFilename = ref('tr_dfd_oficio.zip');
 const isGeneratingClauses = ref(false);
+const clausulasPrompt = ref('');
 const clausulaObjeto = ref('');
 const clausulaJustificativa = ref('');
 const clausulaEscopo = ref('');
@@ -543,8 +552,15 @@ async function onGenerateClauses() {
   isGeneratingClauses.value = true;
   generateError.value = '';
   try {
+    const userPrompt = String(clausulasPrompt.value || '').trim();
+    if (!userPrompt) {
+      generateError.value = 'Preencha o Prompt de Inteligencia Artificial para gerar clausulas.';
+      return;
+    }
     const prompt = [
-      'Gere clausulas tecnicas para uma dispensa de licitacao.',
+      userPrompt,
+      '',
+      'Contexto estruturado para apoiar a geracao das clausulas:',
       'Retorne APENAS texto com secoes nesta ordem e com esses titulos:',
       'Objeto:',
       'Justificativa:',

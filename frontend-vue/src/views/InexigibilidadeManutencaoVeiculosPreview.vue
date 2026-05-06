@@ -144,6 +144,40 @@
               </div>
             </article>
 
+            <article v-if="isDispensaNormalRoute" class="ixp-card">
+              <h3>Gerar clausulas (IA)</h3>
+              <div class="ixp-body">
+                <p class="ixp-hint">
+                  Gere e revise as clausulas antes do documento final. Esse fluxo vale apenas para Dispensa normal.
+                </p>
+                <button class="ixp-btn-secondary" type="button" :disabled="isGeneratingClauses" @click="onGenerateClauses">
+                  {{ isGeneratingClauses ? 'Gerando clausulas...' : 'Gerar clausulas' }}
+                </button>
+                <div class="ixp-grid-1">
+                  <div class="ixp-field">
+                    <label>Objeto</label>
+                    <textarea v-model="clausulaObjeto" rows="3" placeholder="Objeto do TR (gerado por IA ou manual)" />
+                  </div>
+                  <div class="ixp-field">
+                    <label>Justificativa</label>
+                    <textarea v-model="clausulaJustificativa" rows="4" placeholder="Justificativa da necessidade" />
+                  </div>
+                  <div class="ixp-field">
+                    <label>Escopo</label>
+                    <textarea v-model="clausulaEscopo" rows="3" placeholder="Escopo detalhado" />
+                  </div>
+                  <div class="ixp-field">
+                    <label>Entregas</label>
+                    <textarea v-model="clausulaEntregas" rows="3" placeholder="Entregas e itens principais" />
+                  </div>
+                  <div class="ixp-field">
+                    <label>Resultados esperados</label>
+                    <textarea v-model="clausulaResultados" rows="3" placeholder="Resultados esperados da contratacao" />
+                  </div>
+                </div>
+              </div>
+            </article>
+
             <div class="ixp-actions">
               <button class="ixp-btn-primary" type="button" :disabled="isSubmitting" @click="onSubmit">
                 {{ isSubmitting ? 'Processando com IA...' : 'Gerar Documento com IA' }}
@@ -309,9 +343,16 @@ const documentTrFilename = ref('termo_referencia.docx');
 const documentDfdFilename = ref('dfd.docx');
 const documentOficioFilename = ref('oficio.docx');
 const documentZipFilename = ref('tr_dfd_oficio.zip');
+const isGeneratingClauses = ref(false);
+const clausulaObjeto = ref('');
+const clausulaJustificativa = ref('');
+const clausulaEscopo = ref('');
+const clausulaEntregas = ref('');
+const clausulaResultados = ref('');
 
 const logicalRouteName = computed(() => DISPENSA_RAPIDA_TO_LOGICAL[route.name] || route.name);
 const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[logicalRouteName.value] || 'tr_dfd_generico');
+const isDispensaNormalRoute = computed(() => String(route.name || '').startsWith('DispensaArt75'));
 
 function apenasNumeros(v) {
   return String(v || '').replace(/\D/g, '');
@@ -443,21 +484,111 @@ function buildSlotsOverride() {
   if (responsavel.value.trim()) o.nome_assinante_termo = responsavel.value.trim();
   if (responsavelCargo.value.trim()) o.cargo_assinante_termo = responsavelCargo.value.trim();
 
-  const objeto = [
+  const objetoFallback = [
     tipoManutencao.value ? `Tipo: ${tipoManutencao.value}` : '',
     marca.value ? `Marca: ${marca.value}` : '',
     modelo.value ? `Modelo: ${modelo.value}` : '',
     placa.value ? `Placa: ${placa.value}` : '',
     revisaoKm.value ? `Revisao/KM: ${revisaoKm.value}` : '',
   ].filter(Boolean).join(' | ');
-  if (objeto) o.objeto = objeto;
-  if (fornecedor.value.trim()) o.justificativa = `Fornecedor exclusivo: ${fornecedor.value.trim()} (CNPJ: ${cnpj.value.trim() || 'nao informado'})`;
-  if (dotacaoAtiva.value && dotacao.value.trim()) o.objeto_resultados = `Dotacao orcamentaria: ${dotacao.value.trim()}`;
-  if (valorGlobal.value.trim()) o.objeto_entregas = `Valor total estimado: ${valorGlobal.value.trim()}`;
+  const justificativaFallback = fornecedor.value.trim()
+    ? `Fornecedor exclusivo: ${fornecedor.value.trim()} (CNPJ: ${cnpj.value.trim() || 'nao informado'})`
+    : '';
+  const entregasFallback = valorGlobal.value.trim() ? `Valor total estimado: ${valorGlobal.value.trim()}` : '';
+  const resultadosFallback = dotacaoAtiva.value && dotacao.value.trim() ? `Dotacao orcamentaria: ${dotacao.value.trim()}` : '';
+  o.objeto = clausulaObjeto.value.trim() || objetoFallback;
+  if (clausulaJustificativa.value.trim() || justificativaFallback) o.justificativa = clausulaJustificativa.value.trim() || justificativaFallback;
+  if (clausulaEscopo.value.trim()) o.objeto_escopo = clausulaEscopo.value.trim();
+  if (clausulaEntregas.value.trim() || entregasFallback) o.objeto_entregas = clausulaEntregas.value.trim() || entregasFallback;
+  if (clausulaResultados.value.trim() || resultadosFallback) o.objeto_resultados = clausulaResultados.value.trim() || resultadosFallback;
 
   const fundamentoLegal = SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE[logicalRouteName.value];
   if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;
   return Object.keys(o).length ? o : null;
+}
+function parseClauseSections(text) {
+  const normalized = String(text || '').replace(/\r/g, '');
+  const sections = {
+    objeto: '',
+    justificativa: '',
+    escopo: '',
+    entregas: '',
+    resultados: '',
+  };
+  const lines = normalized.split('\n');
+  let current = '';
+  const keyByHeader = {
+    objeto: 'objeto',
+    justificativa: 'justificativa',
+    escopo: 'escopo',
+    entregas: 'entregas',
+    'resultados esperados': 'resultados',
+    resultados: 'resultados',
+  };
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    const low = trimmed.toLowerCase().replace(/[*:#-]/g, '').trim();
+    const headerMatch = Object.keys(keyByHeader).find((k) => low.startsWith(k));
+    if (headerMatch) {
+      current = keyByHeader[headerMatch];
+      const content = trimmed.replace(/^.*?:\s*/, '');
+      if (content && content !== trimmed) sections[current] += (sections[current] ? '\n' : '') + content;
+      return;
+    }
+    if (current) sections[current] += (sections[current] ? '\n' : '') + trimmed;
+  });
+  return sections;
+}
+async function onGenerateClauses() {
+  isGeneratingClauses.value = true;
+  generateError.value = '';
+  try {
+    const prompt = [
+      'Gere clausulas tecnicas para uma dispensa de licitacao.',
+      'Retorne APENAS texto com secoes nesta ordem e com esses titulos:',
+      'Objeto:',
+      'Justificativa:',
+      'Escopo:',
+      'Entregas:',
+      'Resultados esperados:',
+      '',
+      `Processo: ${processoAtivo.value ? (processo.value || 'Nao informado') : 'Nao se aplica'}`,
+      `Orgao: ${orgao.value || 'Nao informado'}`,
+      `Veiculo: ${marca.value || '-'} ${modelo.value || '-'} / Placa ${placa.value || '-'}`,
+      `Tipo manutencao: ${tipoManutencao.value || 'Nao informado'}`,
+      `Fornecedor: ${fornecedor.value || 'Nao informado'} / CNPJ: ${cnpj.value || 'Nao informado'}`,
+      `Valor global: ${valorGlobal.value || 'Nao informado'}`,
+    ].join('\n');
+    const res = await fetch(`${API_BASE}/api/documentos/gerar-via-llm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ user_prompt: prompt, output: 'json', slot_package_key: slotPackageKey.value }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      generateError.value = data.error || data.detail || `Erro ${res.status} ao gerar clausulas`;
+      return;
+    }
+    const text = data.generated_text || data.text || data.content || data.response || '';
+    if (!String(text).trim()) {
+      generateError.value = 'A IA nao retornou conteudo de clausulas.';
+      return;
+    }
+    const parsed = parseClauseSections(text);
+    clausulaObjeto.value = parsed.objeto || clausulaObjeto.value;
+    clausulaJustificativa.value = parsed.justificativa || clausulaJustificativa.value;
+    clausulaEscopo.value = parsed.escopo || clausulaEscopo.value;
+    clausulaEntregas.value = parsed.entregas || clausulaEntregas.value;
+    clausulaResultados.value = parsed.resultados || clausulaResultados.value;
+    if (!parsed.objeto && !parsed.justificativa && !parsed.escopo && !parsed.entregas && !parsed.resultados) {
+      clausulaJustificativa.value = String(text).trim();
+    }
+  } catch (e) {
+    generateError.value = e?.message || 'Erro ao gerar clausulas com IA';
+  } finally {
+    isGeneratingClauses.value = false;
+  }
 }
 function buildUserPrompt() {
   const lines = [
@@ -478,6 +609,14 @@ async function onSubmit() {
   documentReady.value = false;
   revokeDocumentUrls();
   try {
+    if (isDispensaNormalRoute.value) {
+      const hasObjeto = !!clausulaObjeto.value.trim();
+      const hasJustificativa = !!clausulaJustificativa.value.trim();
+      if (!hasObjeto || !hasJustificativa) {
+        generateError.value = 'Para Dispensa normal, gere as clausulas com IA (ou preencha Objeto e Justificativa manualmente) antes de gerar o documento.';
+        return;
+      }
+    }
     const payload = {
       user_prompt: buildUserPrompt(),
       slots_override: buildSlotsOverride(),
@@ -587,6 +726,7 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .ixp-btn-secondary { border: 1px solid #cbd5e1; background: #fff; color: #334155; border-radius: 12px; padding: 9px 12px; font-size: 13px; font-weight: 600; }
 .ixp-btn-primary { border: 0; background: #2563eb; color: #fff; border-radius: 12px; padding: 10px 14px; font-size: 13px; font-weight: 700; width: fit-content; }
 .ixp-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ixp-hint { margin: 0; font-size: 12px; color: #64748b; }
 .ixp-error { margin: 0; border: 1px solid #fecaca; background: #fff1f2; color: #b91c1c; border-radius: 12px; padding: 9px 11px; font-size: 13px; }
 .ixp-success { margin: 0; border: 1px solid #bbf7d0; background: #f0fdf4; color: #166534; border-radius: 12px; padding: 9px 11px; font-size: 13px; }
 .ixp-summary { position: sticky; top: 16px; align-self: start; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; padding: 14px; }
@@ -650,4 +790,6 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .dm-dark-theme .ixp-error { border-color: #9f1239; background: #3f1d2e; color: #fecdd3; }
 .dm-dark .ixp-success,
 .dm-dark-theme .ixp-success { border-color: #166534; background: #052e16; color: #bbf7d0; }
+.dm-dark .ixp-hint,
+.dm-dark-theme .ixp-hint { color: #94a3b8; }
 </style>

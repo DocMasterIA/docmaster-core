@@ -576,3 +576,70 @@
   color: #64748b;
   font-style: italic;
 }
+
+/* Modo micro (principalmente cards de detalhamento/fonte) */
+.rpp-detail-list {
+  padding: 0.8mm;
+}
+.rpp-detalhe-item {
+  border-radius: 6px;
+  margin-bottom: 1mm;
+}
+.rpp-detalhe-item__head {
+  padding: 1.2mm 1.5mm;
+}
+.rpp-detalhe-item__kicker {
+  font-size: 6pt;
+  letter-spacing: 0.04em;
+}
+.rpp-detalhe-item__nome {
+  margin-top: 0.4mm;
+  font-size: 7.5pt;
+  line-height: 1.1;
+}
+.rpp-fontes-cards {
+  gap: 0.8mm;
+  padding: 0.8mm;
+}
+.rpp-fonte-card {
+  border-radius: 4px;
+  padding-left: 4.5mm;
+}
+.rpp-fonte-card__index {
+  left: 1.2mm;
+  top: 2mm;
+  width: 3mm;
+  height: 3mm;
+  font-size: 4.8pt;
+  line-height: 3mm;
+}
+.rpp-fonte-card__content {
+  gap: 0.7mm;
+  padding: 0.8mm 0.8mm 0.8mm 0.2mm;
+}
+.rpp-fonte-row {
+  gap: 0.7mm;
+}
+.rpp-fonte-row--5 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.rpp-mini-compact {
+  border-radius: 3px;
+  padding: 0.6mm 0.9mm;
+  min-height: 6.5mm;
+}
+.rpp-mini-compact--wide {
+  min-height: 7mm;
+}
+.rpp-mini-compact__label {
+  font-size: 5.5pt;
+  letter-spacing: 0.02em;
+}
+.rpp-mini-compact__value {
+  margin-top: 0.5mm;
+  font-size: 6.4pt;
+  line-height: 1.08;
+  font-weight: 600;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}

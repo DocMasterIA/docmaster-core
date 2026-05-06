@@ -1174,4 +1174,141 @@ watch(
   font-weight: 600;
   color: #475569;
 }
+
+/* Modo denso: compactacao agressiva para leitura em tabelas */
+.rpv-shell {
+  font-size: 10px !important;
+}
+.rpv-inner {
+  gap: 6px !important;
+}
+.rpv-header-card,
+.rpv-panel,
+.rpv-supplier-card,
+.rpv-quote {
+  border-radius: 8px !important;
+}
+.rpv-header-card {
+  padding: 8px !important;
+}
+.rpv-header-card__title {
+  font-size: 14px !important;
+}
+.rpv-header-card__lead,
+.rpv-header-card__muted,
+.rpv-panel__subtitle,
+.rpv-prose,
+.rpv-quote p,
+.rpv-supplier-card__lines {
+  font-size: 9px !important;
+  line-height: 1.25 !important;
+}
+.rpv-info-card {
+  padding: 4px 6px !important;
+  border-radius: 8px !important;
+}
+.rpv-info-card__value {
+  font-size: 9px !important;
+  margin-top: 3px !important;
+}
+.rpv-panel--padded {
+  padding: 8px !important;
+}
+.rpv-panel__bar {
+  padding: 6px 8px !important;
+}
+.rpv-panel__title {
+  font-size: 12px !important;
+}
+.rpv-chip {
+  font-size: 8px !important;
+  padding: 1px 6px !important;
+}
+.rpv-metric {
+  padding: 2px 5px !important;
+}
+.rpv-metric__title {
+  font-size: 8px !important;
+}
+.rpv-metric__value {
+  font-size: 9px !important;
+}
+.rpv-table {
+  font-size: 9px !important;
+}
+.rpv-table__th,
+.rpv-table__td {
+  padding: 3px 5px !important;
+  font-size: 9px !important;
+  line-height: 1.2 !important;
+}
+.rpv-table__name {
+  font-size: 9px !important;
+  line-height: 1.2 !important;
+}
+.rpv-detail-list {
+  padding: 4px !important;
+  gap: 4px !important;
+}
+.rpv-detail-item__head {
+  padding: 4px 6px !important;
+}
+.rpv-detail-item__kicker {
+  font-size: 8px !important;
+}
+.rpv-detail-item__name {
+  font-size: 10px !important;
+}
+.rpv-detail-item__body {
+  padding: 4px !important;
+  gap: 3px !important;
+}
+.rpv-source {
+  border-radius: 6px !important;
+  padding-left: 20px !important;
+}
+.rpv-source__badge {
+  width: 14px !important;
+  height: 14px !important;
+  font-size: 6px !important;
+}
+.rpv-source__inner {
+  padding: 3px !important;
+}
+.rpv-mini-grid {
+  gap: 2px !important;
+}
+.rpv-dcard {
+  border-radius: 4px !important;
+  padding: 3px 4px !important;
+  min-height: 24px !important;
+}
+.rpv-dcard__label {
+  font-size: 7px !important;
+}
+.rpv-dcard__value,
+.rpv-dcard--wide .rpv-dcard__value {
+  margin-top: 1px !important;
+  font-size: 8px !important;
+  line-height: 1.1 !important;
+}
+.rpv-icon-title {
+  gap: 4px !important;
+  margin-bottom: 6px !important;
+}
+.rpv-icon-title__bubble {
+  width: 18px !important;
+  height: 18px !important;
+  font-size: 9px !important;
+}
+.rpv-supplier-grid {
+  gap: 6px !important;
+}
+.rpv-supplier-card {
+  padding: 8px !important;
+}
+.rpv-supplier-card__name {
+  margin-bottom: 4px !important;
+  font-size: 10px !important;
+}
 </style>

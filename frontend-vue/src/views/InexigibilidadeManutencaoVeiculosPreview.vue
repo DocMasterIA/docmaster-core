@@ -23,8 +23,21 @@
                   <label>Cabecalho do documento</label>
                   <select v-model="cabecalhoDocumento">
                     <option value="">Selecione</option>
-                    <option v-for="op in cabecalhoOptions" :key="op" :value="op">{{ op }}</option>
+                    <option v-for="op in mergedCabecalhoOptions" :key="op" :value="op">{{ op }}</option>
                   </select>
+                  <div class="ixp-inline-actions">
+                    <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addCabecalhoToHistory">
+                      Adicionar novo
+                    </button>
+                    <button
+                      type="button"
+                      class="ixp-btn-secondary ixp-btn-xs"
+                      :disabled="!canDeleteCabecalho"
+                      @click="removeCabecalhoFromHistory"
+                    >
+                      Excluir salvo
+                    </button>
+                  </div>
                 </div>
                 <label class="ixp-check">
                   <input v-model="processoAtivo" type="checkbox" />
@@ -373,6 +386,17 @@ const clausulaJustificativa = ref('');
 const logicalRouteName = computed(() => DISPENSA_RAPIDA_TO_LOGICAL[route.name] || route.name);
 const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[logicalRouteName.value] || 'tr_dfd_generico');
 const isDispensaNormalRoute = computed(() => String(route.name || '').startsWith('DispensaArt75'));
+const mergedCabecalhoOptions = computed(() => {
+  const fromTemplates = Array.isArray(cabecalhoOptions.value) ? cabecalhoOptions.value : [];
+  const fromHistory = Array.isArray(slotFieldOptions.cabecalho_documento) ? slotFieldOptions.cabecalho_documento : [];
+  return [...new Set([...fromTemplates, ...fromHistory].map((x) => String(x || '').trim()).filter(Boolean))];
+});
+const canDeleteCabecalho = computed(() => {
+  const selected = String(cabecalhoDocumento.value || '').trim();
+  if (!selected) return false;
+  const history = Array.isArray(slotFieldOptions.cabecalho_documento) ? slotFieldOptions.cabecalho_documento : [];
+  return history.includes(selected);
+});
 const slotFieldOptions = reactive({});
 const CATALOG_KEYS = [
   'cabecalho_documento',
@@ -509,6 +533,37 @@ async function persistSlotEntries(entries) {
   } catch (_e) {
     // silencioso
   }
+}
+
+async function removeCatalogEntry(fieldKey, value) {
+  const v = String(value || '').trim();
+  if (!v) return;
+  try {
+    await fetch(`${API_BASE}/api/slots/catalog/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ field_key: fieldKey, value: v }),
+    });
+  } catch (_e) {
+    // silencioso
+  }
+}
+
+async function addCabecalhoToHistory() {
+  const value = String(cabecalhoDocumento.value || '').trim();
+  if (!value) return;
+  const current = Array.isArray(slotFieldOptions.cabecalho_documento) ? slotFieldOptions.cabecalho_documento : [];
+  if (!current.includes(value)) slotFieldOptions.cabecalho_documento = [...current, value];
+  await persistSlotEntries([{ field_key: 'cabecalho_documento', value }]);
+}
+
+async function removeCabecalhoFromHistory() {
+  const value = String(cabecalhoDocumento.value || '').trim();
+  if (!value) return;
+  const current = Array.isArray(slotFieldOptions.cabecalho_documento) ? slotFieldOptions.cabecalho_documento : [];
+  slotFieldOptions.cabecalho_documento = current.filter((v) => v !== value);
+  await removeCatalogEntry('cabecalho_documento', value);
 }
 
 async function loadSlotCatalogSuggestions() {
@@ -987,6 +1042,8 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .ixp-link-danger { border: 0; background: transparent; color: #dc2626; font-size: 12px; font-weight: 600; }
 .ixp-half { max-width: 400px; }
 .ixp-btn-secondary { border: 1px solid #cbd5e1; background: #fff; color: #334155; border-radius: 12px; padding: 9px 12px; font-size: 13px; font-weight: 600; }
+.ixp-btn-xs { padding: 6px 10px; font-size: 12px; border-radius: 10px; }
+.ixp-inline-actions { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 .ixp-btn-primary { border: 0; background: #2563eb; color: #fff; border-radius: 12px; padding: 10px 14px; font-size: 13px; font-weight: 700; width: fit-content; }
 .ixp-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .ixp-hint { margin: 0; font-size: 12px; color: #64748b; }

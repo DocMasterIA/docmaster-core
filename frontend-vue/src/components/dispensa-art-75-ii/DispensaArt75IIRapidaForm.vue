@@ -59,16 +59,62 @@
             </section>
 
             <section class="da75-block">
-              <h3>Objeto da contratação</h3>
+              <h3>Objeto da contratação e justificativa</h3>
               <div class="da75-block__body">
-                <label class="da75-label">O que será contratado?</label>
-                <textarea
-                  class="da75-textarea"
-                  rows="4"
-                  :value="objetoContratado"
-                  :placeholder="rapidaObjPlaceholder"
-                  @input="objetoContratado = primeiraMaiuscula(($event.target).value)"
-                />
+                <div class="da75-two-col">
+                  <div class="da75-stack">
+                    <div class="da75-field">
+                      <label class="da75-label">O que será contratado?</label>
+                      <textarea
+                        class="da75-textarea"
+                        :value="objetoContratado"
+                        :placeholder="rapidaObjPlaceholder"
+                        @input="objetoContratado = primeiraMaiuscula(($event.target).value)"
+                      />
+                    </div>
+                    <div class="da75-field">
+                      <label class="da75-label">Qual setor/secretaria será atendido?</label>
+                      <input
+                        class="da75-input"
+                        :value="objetoSetor"
+                        placeholder="Ex: Secretaria de Administração"
+                        @input="objetoSetor = primeiraMaiuscula(($event.target).value)"
+                      />
+                    </div>
+                    <div class="da75-field">
+                      <label class="da75-label">Características mínimas obrigatórias (opcional)</label>
+                      <textarea
+                        class="da75-textarea"
+                        :value="objetoCaracteristicas"
+                        placeholder="Ex: Para uso contínuo das unidades administrativas"
+                        @input="objetoCaracteristicas = primeiraMaiuscula(($event.target).value)"
+                      />
+                    </div>
+                    <button type="button" class="da75-btn da75-btn--primary da75-btn--block" @click="gerar">
+                      Gerar objeto e justificativa
+                    </button>
+                  </div>
+                  <div class="da75-stack">
+                    <div class="da75-field">
+                      <label class="da75-label">Objeto gerado pela IA</label>
+                      <textarea
+                        class="da75-textarea"
+                        rows="5"
+                        :value="objetoGerado"
+                        @input="objetoGerado = primeiraMaiuscula(($event.target).value)"
+                      />
+                    </div>
+                    <div class="da75-field">
+                      <label class="da75-label">Justificativa da contratação</label>
+                      <textarea
+                        class="da75-textarea"
+                        rows="5"
+                        :value="justificativa"
+                        @input="justificativa = primeiraMaiuscula(($event.target).value)"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </section>
 
@@ -118,7 +164,19 @@
               </div>
             </section>
 
-            <button type="button" class="da75-btn da75-btn--primary">Gerar documento com IA</button>
+            <div class="da75-space-y">
+              <button type="button" class="da75-btn da75-btn--primary" :disabled="isSubmitting" @click="onSubmit">
+                {{ isSubmitting ? 'Gerando...' : 'Gerar documento com IA' }}
+              </button>
+              <p v-if="generateError" class="da75-helper">{{ generateError }}</p>
+              <p v-if="successMessage" class="da75-helper">{{ successMessage }}</p>
+              <div v-if="documentReady" class="da75-inline-actions">
+                <a v-if="documentTrUrl" :href="documentTrUrl" :download="documentTrFilename" class="da75-btn">Download TR</a>
+                <a v-if="documentDfdUrl" :href="documentDfdUrl" :download="documentDfdFilename" class="da75-btn">Download DFD</a>
+                <a v-if="documentOficioUrl" :href="documentOficioUrl" :download="documentOficioFilename" class="da75-btn">Download Ofício</a>
+                <a v-if="documentZipUrl" :href="documentZipUrl" :download="documentZipFilename" class="da75-btn">Download ZIP</a>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -176,12 +234,15 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import {
   DATA_OPTIONS,
   PLACEHOLDER_DOTACAO,
   campoPreenchido,
   formatarData,
+  gerarJustificativaTexto,
+  gerarObjetoTexto,
   primeiraMaiuscula,
 } from './dispensaArt75iiShared.js';
 import './dispensaArt75ii.css';
@@ -190,6 +251,7 @@ import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js'
 import { useDispensaArt75IIDadosFixos } from '@/composables/useDispensaArt75IIDadosFixos.js';
 
 const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
+const route = useRoute();
 
 const drawerAberto = ref(false);
 const cabecalhoOptions = ref([]);
@@ -200,13 +262,37 @@ const processo = ref('');
 const orgao = ref('');
 const dadosFixos = useDispensaArt75IIDadosFixos(API_BASE, { cabecalho, processoAtivo, processo, orgao });
 const objetoContratado = ref('');
+const objetoSetor = ref('');
+const objetoCaracteristicas = ref('');
+const objetoGerado = ref('');
+const justificativa = ref('');
 const dotacaoAtiva = ref(false);
 const dotacao = ref('');
 const modoData = ref('');
 const dataManual = ref('');
+const isSubmitting = ref(false);
+const generateError = ref('');
+const successMessage = ref('');
+const documentReady = ref(false);
+const documentTrUrl = ref('');
+const documentDfdUrl = ref('');
+const documentOficioUrl = ref('');
+const documentZipUrl = ref('');
+const documentTrFilename = ref('termo_referencia.docx');
+const documentDfdFilename = ref('dfd.docx');
+const documentOficioFilename = ref('oficio.docx');
+const documentZipFilename = ref('tr_dfd_oficio.zip');
 
 const rapidaObjPlaceholder = `Ex: Aquisição de material de expediente para Secretaria da Administração
 10 canetas azul, 2 grampeadores, 10 resmas de papel A4`;
+
+const SLOT_PACKAGE_BY_ROUTE = {
+  DispensaRapidaArt75IObrasEngenharia: 'dispensa_75_i_obras_engenharia',
+  DispensaRapidaArt75IManutencaoVeiculos: 'dispensa_75_i_manutencao_veiculos',
+  DispensaRapidaArt75IICompras: 'dispensa_75_ii_compras',
+  DispensaRapidaArt75IIServicos: 'dispensa_75_ii_servicos',
+  DispensaRapidaArt75IIComprasServicosInclusos: 'dispensa_75_ii_compras_servicos_inclusos',
+};
 
 watch(dotacaoAtiva, (v) => {
   if (!v) dotacao.value = '';
@@ -231,6 +317,7 @@ function onApplyDadosFixos() {
 }
 
 const dataResumo = computed(() => (modoData.value === 'Data manual' ? dataManual.value : modoData.value));
+const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[String(route.name || '')] || 'tr_dfd_generico');
 
 const secoes = computed(() => {
   const orgaoLabel = orgao.value || '';
@@ -252,9 +339,18 @@ const secoes = computed(() => {
       ],
     },
     {
-      titulo: 'Objeto da contratação',
-      completo: campoPreenchido(objetoContratado.value),
-      linhas: [['O que será contratado', objetoContratado.value || 'Não informado', campoPreenchido(objetoContratado.value)]],
+      titulo: 'Objeto e justificativa',
+      completo:
+        campoPreenchido(objetoContratado.value) &&
+        campoPreenchido(objetoSetor.value) &&
+        campoPreenchido(objetoGerado.value) &&
+        campoPreenchido(justificativa.value),
+      linhas: [
+        ['O que será contratado', objetoContratado.value || 'Não informado', campoPreenchido(objetoContratado.value)],
+        ['Setor atendido', objetoSetor.value || 'Não informado', campoPreenchido(objetoSetor.value)],
+        ['Objeto gerado', objetoGerado.value || 'Não informado', campoPreenchido(objetoGerado.value)],
+        ['Justificativa', justificativa.value || 'Não informada', campoPreenchido(justificativa.value)],
+      ],
     },
     {
       titulo: 'Dotação orçamentária',
@@ -283,4 +379,126 @@ function onModoData(valor) {
   modoData.value = valor;
   if (valor !== 'Data manual') dataManual.value = '';
 }
+
+function gerar() {
+  objetoGerado.value = gerarObjetoTexto(objetoContratado.value, objetoSetor.value, objetoCaracteristicas.value);
+  justificativa.value = gerarJustificativaTexto(
+    objetoContratado.value,
+    objetoSetor.value,
+    objetoCaracteristicas.value,
+  );
+}
+
+function toBlobUrl(base64, mimeType) {
+  if (!base64) return '';
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i += 1) bytes[i] = binary.charCodeAt(i);
+  return URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+}
+
+function revokeDocumentUrls() {
+  if (documentTrUrl.value) URL.revokeObjectURL(documentTrUrl.value);
+  if (documentDfdUrl.value) URL.revokeObjectURL(documentDfdUrl.value);
+  if (documentOficioUrl.value) URL.revokeObjectURL(documentOficioUrl.value);
+  if (documentZipUrl.value) URL.revokeObjectURL(documentZipUrl.value);
+  documentTrUrl.value = '';
+  documentDfdUrl.value = '';
+  documentOficioUrl.value = '';
+  documentZipUrl.value = '';
+}
+
+function buildSlotsOverride() {
+  const o = {};
+  const destNome = String(dadosFixos.fixoNome || '').trim();
+  const destCargo = String(dadosFixos.fixoCargo || '').trim();
+  const respNome = String(dadosFixos.fixoResponsavel || '').trim();
+  const respCargo = String(dadosFixos.fixoResponsavelCargo || '').trim();
+  if (destNome) o.sol_oficio_destinatario_nome = destNome;
+  if (destCargo) o.sol_oficio_destinatario_cargo = destCargo;
+  if (respNome) o.sol_oficio_responsavel_nome = respNome;
+  if (respCargo) o.sol_oficio_responsavel_cargo = respCargo;
+  if (String(dadosFixos.fixoSetor || '').trim()) o.dfd_setor_requisitante = String(dadosFixos.fixoSetor).trim();
+  if (String(dadosFixos.fixoDemanda || '').trim()) o.dfd_responsavel_demanda = String(dadosFixos.fixoDemanda).trim();
+  if (String(dadosFixos.fixoEmail || '').trim()) o.dfd_email = String(dadosFixos.fixoEmail).trim();
+  if (String(dadosFixos.fixoGestor || '').trim()) o.dfd_gestor_contratos = String(dadosFixos.fixoGestor).trim();
+  if (String(dadosFixos.fixoFiscal || '').trim()) o.dfd_fiscal_contratos = String(dadosFixos.fixoFiscal).trim();
+  if (String(dadosFixos.fixoAssinatura || '').trim()) o.dfd_assinatura_nome = String(dadosFixos.fixoAssinatura).trim();
+  if (String(dadosFixos.fixoAssinaturaCargo || '').trim()) o.dfd_assinatura_cargo = String(dadosFixos.fixoAssinaturaCargo).trim();
+  if (String(dadosFixos.fixoEnderecoEntrega || '').trim()) o.endereco_entrega = String(dadosFixos.fixoEnderecoEntrega).trim();
+  if (String(dadosFixos.fixoEmailPropostas || '').trim()) o.email_envio_propostas = String(dadosFixos.fixoEmailPropostas).trim();
+  if (String(dadosFixos.fixoTrResponsavelNome || '').trim()) o.nome_assinante_termo = String(dadosFixos.fixoTrResponsavelNome).trim();
+  if (String(dadosFixos.fixoTrResponsavelCargo || '').trim()) o.cargo_assinante_termo = String(dadosFixos.fixoTrResponsavelCargo).trim();
+  const objetoFinal = String(objetoGerado.value || objetoContratado.value || '').trim();
+  if (objetoFinal) o.objeto = objetoFinal;
+  if (String(justificativa.value || '').trim()) o.justificativa = String(justificativa.value).trim();
+  if (dotacaoAtiva.value && String(dotacao.value || '').trim()) o.objeto_resultados = `Dotação orçamentária: ${String(dotacao.value).trim()}`;
+  return Object.keys(o).length ? o : null;
+}
+
+function buildUserPrompt() {
+  return [
+    `Gerar documento com base nos dados preenchidos para ${String(route.meta?.title || 'dispensa rapida')}.`,
+    `Cabeçalho do documento: ${cabecalho.value || 'Não informado'}`,
+    `Órgão: ${orgao.value || 'Não informado'}`,
+    `Processo: ${processoAtivo.value ? (processo.value || 'Não informado') : 'Não se aplica'}`,
+    `Objeto base: ${objetoContratado.value || 'Não informado'}`,
+    `Setor atendido: ${objetoSetor.value || 'Não informado'}`,
+    `Características mínimas: ${objetoCaracteristicas.value || 'Não informado'}`,
+  ].join('\n');
+}
+
+async function onSubmit() {
+  isSubmitting.value = true;
+  generateError.value = '';
+  successMessage.value = '';
+  documentReady.value = false;
+  revokeDocumentUrls();
+  try {
+    if (!objetoGerado.value.trim() || !justificativa.value.trim()) {
+      generateError.value = 'Gere (ou preencha) Objeto e Justificativa antes de gerar o documento.';
+      return;
+    }
+    const payload = {
+      user_prompt: buildUserPrompt(),
+      slots_override: buildSlotsOverride(),
+      slot_package_key: slotPackageKey.value,
+    };
+    const res = await fetch(`${API_BASE}/api/documentos/gerar-tr-e-dfd`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      generateError.value = data.error || data.detail || `Erro ${res.status}`;
+      return;
+    }
+    if (!data.tr?.docx_base64 || !data.dfd?.docx_base64 || !data.oficio?.docx_base64) {
+      generateError.value = data.error || 'TR, DFD ou Ofício não vieram na resposta.';
+      return;
+    }
+    documentTrUrl.value = toBlobUrl(data.tr.docx_base64, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    documentDfdUrl.value = toBlobUrl(data.dfd.docx_base64, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    documentOficioUrl.value = toBlobUrl(data.oficio.docx_base64, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    documentZipUrl.value = data.zip?.zip_base64 ? toBlobUrl(data.zip.zip_base64, 'application/zip') : '';
+    documentTrFilename.value = data.tr?.filename || 'termo_referencia.docx';
+    documentDfdFilename.value = data.dfd?.filename || 'dfd.docx';
+    documentOficioFilename.value = data.oficio?.filename || 'oficio.docx';
+    documentZipFilename.value = data.zip?.filename || 'tr_dfd_oficio.zip';
+    documentReady.value = true;
+    successMessage.value = 'Documentos gerados com sucesso.';
+    await dadosFixos.saveUserGlobalPreset();
+  } catch (e) {
+    generateError.value = e?.message || 'Erro ao gerar documento';
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+
+onBeforeUnmount(() => {
+  revokeDocumentUrls();
+});
 </script>

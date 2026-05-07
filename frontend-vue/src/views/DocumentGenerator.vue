@@ -50,7 +50,7 @@
                     v-model="searchQuery"
                     type="text"
                     autocomplete="off"
-                    placeholder="Selecione um documento base..."
+                    placeholder="Selecionar base..."
                     class="gov-input doc-gen__search-input"
                     @focus="showTemplateDropdown = true; fetchTemplates('')"
                     @input="onSearchInput"
@@ -77,7 +77,7 @@
                     </li>
                   </ul>
                   <p class="gov-text-soft gov-mt-sm">
-                    <router-link to="/biblioteca" class="gov-link">Ver Biblioteca de Documentos</router-link>
+                    <router-link to="/biblioteca" class="gov-link">Abrir biblioteca</router-link>
                   </p>
                 </div>
 
@@ -1217,7 +1217,7 @@ function buildFormPromptAppendix() {
 }
 
 async function fetchTemplates(q) {
-  const url = `${API_BASE}/api/documentos_modelos/lista_10?q=${encodeURIComponent(q || '')}`;
+  const url = `${API_BASE}/api/documentos_modelos/lista_10?q=${encodeURIComponent(q || '')}&only_user_prefeitura=1`;
   try {
     const res = await fetch(url, { credentials: 'include' });
     if (!res.ok) return;

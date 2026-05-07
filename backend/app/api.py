@@ -872,8 +872,16 @@ def template_list_api(request):
     Se `q` vazio => retorna 10 templates mais recentes (do usuário ou todos, ajustar).
     """
     q = request.GET.get("q", "").strip()
+    only_user_prefeitura = str(request.GET.get("only_user_prefeitura", "")).strip().lower() in ("1", "true", "yes")
     # Se quiser limitar a templates do usuário: use owner=request.user
     base_qs = _templates_queryset_for_user(request.user).order_by("-created_at")
+
+    if only_user_prefeitura and not request.user.is_superuser:
+        user_pref_id = getattr(request.user, "prefeitura_id", None)
+        if user_pref_id is None:
+            base_qs = base_qs.none()
+        else:
+            base_qs = base_qs.filter(prefeitura_id=user_pref_id)
 
     if q:
         qs = base_qs.filter(name__icontains=q)[:10]

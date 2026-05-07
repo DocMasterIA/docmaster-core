@@ -480,6 +480,21 @@ function buildSlotsOverride() {
   if (String(dadosFixos.fixoEmailPropostas || '').trim()) o.email_envio_propostas = String(dadosFixos.fixoEmailPropostas).trim();
   if (String(dadosFixos.fixoTrResponsavelNome || '').trim()) o.nome_assinante_termo = String(dadosFixos.fixoTrResponsavelNome).trim();
   if (String(dadosFixos.fixoTrResponsavelCargo || '').trim()) o.cargo_assinante_termo = String(dadosFixos.fixoTrResponsavelCargo).trim();
+  const modoNormalizado = String(modoData.value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+  let dataTermo = '';
+  if (modoNormalizado === 'data automatica') {
+    const now = new Date();
+    dataTermo = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+  } else if (modoNormalizado === 'data manual') {
+    dataTermo = String(dataManual.value || '').trim();
+  } else if (modoNormalizado === 'datado e assinado digitalmente') {
+    dataTermo = 'datado e assinado digitalmente';
+  }
+  if (dataTermo) o.data_termo = dataTermo;
   const objetoFinal = String(objetoGerado.value || objetoContratado.value || '').trim();
   if (objetoFinal) o.objeto = objetoFinal;
   if (String(justificativa.value || '').trim()) o.justificativa = String(justificativa.value).trim();

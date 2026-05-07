@@ -811,13 +811,18 @@ function buildSlotsOverride() {
 
   const dataManualFmt = toBrDate(dataManual.value);
   let dataTermo = '';
-  if (modoData.value === 'Data automatica') {
+  const modoDataNormalizado = String(modoData.value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+  if (modoDataNormalizado === 'data automatica') {
     const now = new Date();
     dataTermo = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
-  } else if (modoData.value === 'Data manual' && dataManualFmt) {
+  } else if (modoDataNormalizado === 'data manual' && dataManualFmt) {
     dataTermo = dataManualFmt;
   }
-  if (modoData.value === 'Datado e assinado digitalmente') {
+  if (modoDataNormalizado === 'datado e assinado digitalmente') {
     dataTermo = dataTermo ? `${dataTermo}, datado e assinado digitalmente` : 'datado e assinado digitalmente';
   }
   if (dataTermo) o.data_termo = dataTermo;

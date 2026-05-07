@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { firstAllowedPath, normalizeAllowedModules, resolveModuleKey } from '../moduleAccess';
+/** Import estático: evita chunk lazy `DispensaArt75IIRapidaReactPreview-*.js` (falha com index.html ou CDN em cache após deploy). */
+import DispensaArt75IIRapidaReactPreview from '../views/DispensaArt75IIRapidaReactPreview.vue';
 
 const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 
@@ -69,7 +71,7 @@ const routes = [
   {
     path: '/geracao/dispensa-rapida/art-75-i/obras-servicos-engenharia',
     name: 'DispensaRapidaArt75IObrasEngenharia',
-    component: () => import('../views/DispensaArt75IIRapidaReactPreview.vue'),
+    component: DispensaArt75IIRapidaReactPreview,
     meta: {
       title: 'Dispensa - Art. 75, I - Obras e Serviços de Engenharia',
       dispensaRapidaUi: true,
@@ -78,7 +80,7 @@ const routes = [
   {
     path: '/geracao/dispensa-rapida/art-75-i/manutencao-veiculos',
     name: 'DispensaRapidaArt75IManutencaoVeiculos',
-    component: () => import('../views/DispensaArt75IIRapidaReactPreview.vue'),
+    component: DispensaArt75IIRapidaReactPreview,
     meta: {
       title: 'Dispensa - Art. 75, I - Manutenção de Veículos',
       dispensaRapidaUi: true,
@@ -87,19 +89,19 @@ const routes = [
   {
     path: '/geracao/dispensa-rapida/art-75-ii/compras',
     name: 'DispensaRapidaArt75IICompras',
-    component: () => import('../views/DispensaArt75IIRapidaReactPreview.vue'),
+    component: DispensaArt75IIRapidaReactPreview,
     meta: { title: 'Dispensa - Art. 75, II - Compras', dispensaRapidaUi: true },
   },
   {
     path: '/geracao/dispensa-rapida/art-75-ii/servicos',
     name: 'DispensaRapidaArt75IIServicos',
-    component: () => import('../views/DispensaArt75IIRapidaReactPreview.vue'),
+    component: DispensaArt75IIRapidaReactPreview,
     meta: { title: 'Dispensa - Art. 75, II - Serviços', dispensaRapidaUi: true },
   },
   {
     path: '/geracao/dispensa-rapida/art-75-ii/compras-servicos-inclusos',
     name: 'DispensaRapidaArt75IIComprasServicosInclusos',
-    component: () => import('../views/DispensaArt75IIRapidaReactPreview.vue'),
+    component: DispensaArt75IIRapidaReactPreview,
     meta: {
       title: 'Dispensa - Art. 75, II - Compras com Serviços Inclusos',
       dispensaRapidaUi: true,

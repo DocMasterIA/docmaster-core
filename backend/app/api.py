@@ -876,7 +876,7 @@ def template_list_api(request):
     # Se quiser limitar a templates do usuário: use owner=request.user
     base_qs = _templates_queryset_for_user(request.user).order_by("-created_at")
 
-    if only_user_prefeitura and not request.user.is_superuser:
+    if only_user_prefeitura:
         user_pref_id = getattr(request.user, "prefeitura_id", None)
         if user_pref_id is None:
             base_qs = base_qs.none()

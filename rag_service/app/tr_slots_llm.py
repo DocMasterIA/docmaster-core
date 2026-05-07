@@ -1154,6 +1154,8 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
                     descricao=str(elem.get("descricao", "")).strip(),
                     unidade=str(elem.get("unidade", "")).strip(),
                     quantidade=elem.get("quantidade"),
+                    valor_unitario=elem.get("valor_unitario", ""),
+                    valor_total=elem.get("valor_total", ""),
                 )
             )
         elif isinstance(elem, (list, tuple)) and len(elem) >= 3:
@@ -1162,6 +1164,8 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
                     descricao=str(elem[0]).strip(),
                     unidade=str(elem[1]).strip(),
                     quantidade=elem[2],
+                    valor_unitario=elem[3] if len(elem) > 3 else "",
+                    valor_total=elem[4] if len(elem) > 4 else "",
                 )
             )
 
@@ -1501,6 +1505,8 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
                         descricao=str(elem.get("descricao", "")).strip(),
                         unidade=str(elem.get("unidade", "")).strip(),
                         quantidade=elem.get("quantidade"),
+                        valor_unitario=elem.get("valor_unitario", ""),
+                        valor_total=elem.get("valor_total", ""),
                     )
                 )
         if itens:
@@ -1558,7 +1564,11 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
                 ao_senhor_genero=ao_senhor_genero,
                 senhor_senhora_genero=senhor_senhora_genero,
             )
-    itens = llm_slots.itens
+    force_manual_items = bool(override.get("force_manual_items"))
+    if force_manual_items:
+        itens = []
+    else:
+        itens = llm_slots.itens
 
     return TRTemplateSlots(
         objeto=objeto,

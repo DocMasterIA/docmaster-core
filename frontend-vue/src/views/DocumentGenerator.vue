@@ -1115,6 +1115,7 @@ function shouldRenderField(field) {
 function buildTrSlotsOverride() {
   const f = slotForm;
   const o = {};
+  const isDispensaNormalRoute = String(route.name || '').startsWith('DispensaArt75');
   const toBrDate = (iso) => {
     const v = String(iso || '').trim();
     if (!v) return '';
@@ -1139,6 +1140,23 @@ function buildTrSlotsOverride() {
   if (solDestTratCargo) o.senhor_senhora_genero = solDestTratCargo;
   if (solRespNome) o.sol_oficio_responsavel_nome = solRespNome;
   if (solRespCargo) o.sol_oficio_responsavel_cargo = solRespCargo;
+
+  const itemDescricao = (f.item_descricao || '').trim();
+  const itemQuantidade = (f.item_quantidade || '').trim();
+  const itemUnidade = (f.item_unidade || '').trim();
+  const itemValorUnitario = (f.item_valor_unitario || '').trim();
+  const itemValorTotal = (f.item_valor_total || '').trim();
+  const hasManualItem = [itemDescricao, itemQuantidade, itemUnidade, itemValorUnitario, itemValorTotal].some(Boolean);
+  if (hasManualItem) {
+    o.itens = [{
+      descricao: itemDescricao,
+      quantidade: itemQuantidade,
+      unidade: itemUnidade,
+      valor_unitario: itemValorUnitario,
+      valor_total: itemValorTotal,
+    }];
+  }
+  if (isDispensaNormalRoute) o.force_manual_items = true;
 
   const setor = (f.dfd_setor_requisitante || '').trim();
   if (setor) o.secretaria_usuario = setor;
@@ -1373,6 +1391,19 @@ async function onSubmit() {
     const manualObject = String(slotForm.tr_objeto_manual || '').trim();
     if (!manualObject) {
       generateError.value = 'Preencha o campo "Objeto do TR (manual, sem geração por IA)" para gerar nesta página.';
+      return;
+    }
+  }
+  if (docTypeMode.value === 'tr_modelo' && String(route.name || '').startsWith('DispensaArt75')) {
+    const hasAnyItem = [
+      slotForm.item_descricao,
+      slotForm.item_quantidade,
+      slotForm.item_unidade,
+      slotForm.item_valor_unitario,
+      slotForm.item_valor_total,
+    ].some((v) => String(v || '').trim());
+    if (!hasAnyItem) {
+      generateError.value = 'Na dispensa normal, adicione os itens manualmente antes de gerar o documento.';
       return;
     }
   }

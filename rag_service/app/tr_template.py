@@ -66,6 +66,8 @@ class ItemSlot:
     descricao: str
     unidade: str
     quantidade: Any  # pode ser int/str; será convertido para str
+    valor_unitario: Any = ""
+    valor_total: Any = ""
 
 
 @dataclass
@@ -160,7 +162,7 @@ def _style_items_table(table) -> None:
     tblPr.append(tblBorders)
 
 
-def _configure_items_table_columns(table, doc: Document) -> None:
+def _configure_items_table_columns(table, doc: Document, use_price_layout: bool = False) -> None:
     """
     Mantém colunas curtas compactas, mas largas o suficiente
     para não quebrar títulos como "Item" e "Quantidade".
@@ -169,9 +171,16 @@ def _configure_items_table_columns(table, doc: Document) -> None:
         return
 
     # Ajuste fino: continua priorizando "Descrição", sem esmagar cabeçalhos.
-    item_w = Cm(1.3)
-    unidade_w = Cm(1.9)
-    quantidade_w = Cm(2.5)
+    if use_price_layout:
+        item_w = Cm(1.2)
+        quantidade_w = Cm(1.8)
+        unidade_w = Cm(1.6)
+        valor_unit_w = Cm(2.4)
+        valor_total_w = Cm(2.4)
+    else:
+        item_w = Cm(1.3)
+        unidade_w = Cm(1.9)
+        quantidade_w = Cm(2.5)
 
     section = doc.sections[0] if doc.sections else None
     if section is not None:
@@ -180,7 +189,10 @@ def _configure_items_table_columns(table, doc: Document) -> None:
         # fallback seguro caso não haja metadados de seção
         content_w = Cm(16.0)
 
-    descricao_w = content_w - (item_w + unidade_w + quantidade_w)
+    if use_price_layout:
+        descricao_w = content_w - (item_w + quantidade_w + unidade_w + valor_unit_w + valor_total_w)
+    else:
+        descricao_w = content_w - (item_w + unidade_w + quantidade_w)
     if descricao_w < Cm(6.0):
         descricao_w = Cm(6.0)
 
@@ -192,7 +204,11 @@ def _configure_items_table_columns(table, doc: Document) -> None:
         tbl_layout = OxmlElement("w:tblLayout")
         tbl_pr.append(tbl_layout)
     tbl_layout.set(qn("w:type"), "fixed")
-    widths = [item_w, descricao_w, unidade_w, quantidade_w]
+    widths = (
+        [item_w, quantidade_w, unidade_w, descricao_w, valor_unit_w, valor_total_w]
+        if use_price_layout
+        else [item_w, descricao_w, unidade_w, quantidade_w]
+    )
     for idx, width in enumerate(widths):
         if idx < len(table.columns):
             table.columns[idx].width = width
@@ -311,18 +327,29 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
     if target_table is None:
         return
 
+    existing_cols_count = len(target_table.rows[0].cells) if target_table.rows else 0
+    has_price_values = any(
+        str(getattr(item, "valor_unitario", "") or "").strip() or str(getattr(item, "valor_total", "") or "").strip()
+        for item in itens
+    )
+    use_price_layout = existing_cols_count >= 6 or has_price_values
+
     # Remove todas as linhas existentes para reconstruir a tabela do zero
     for row in list(target_table.rows):
         target_table._tbl.remove(row._tr)
 
     # Aplica estilo e bordas fixas à tabela
     _style_items_table(target_table)
-    _configure_items_table_columns(target_table, doc)
+    _configure_items_table_columns(target_table, doc, use_price_layout=use_price_layout)
 
     # Cria cabeçalho padronizado
     header_row = target_table.add_row()
     header_cells = header_row.cells
-    header_labels = ["Item", "Descrição", "Unidade", "Quantidade"]
+    header_labels = (
+        ["ITEM", "QUANT", "UNID", "DESCRIÇÃO DO OBJETO", "VALOR UNITÁRIO", "VALOR TOTAL"]
+        if use_price_layout
+        else ["Item", "Descrição", "Unidade", "Quantidade"]
+    )
     for idx, label in enumerate(header_labels):
         if idx < len(header_cells):
             cell = header_cells[idx]
@@ -343,27 +370,88 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
             para.paragraph_format.line_spacing = 1.0
             _apply_times_new_roman(para)
 
+    def _to_float_br(value: Any) -> float:
+        raw = str(value or "").strip()
+        if not raw:
+            return 0.0
+        cleaned = raw.replace("R$", "").replace(" ", "")
+        if "," in cleaned:
+            cleaned = cleaned.replace(".", "").replace(",", ".")
+        try:
+            return float(cleaned)
+        except Exception:
+            return 0.0
+
+    def _to_currency_br(value: Any) -> str:
+        n = _to_float_br(value)
+        s = f"{n:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+        return f"R$ {s}"
+
+    total_geral = 0.0
     for i, item in enumerate(itens):
         row = target_table.add_row()
         cells = row.cells
-        # Coluna 0: número do item (01, 02, 03...)
-        if len(cells) > 0:
-            _set_cell(cells[0], f"{i+1:02d}")
-            if cells[0].paragraphs:
-                cells[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-        # Coluna 1: descrição (sempre escreve o valor do slot, ignorando texto anterior)
-        if len(cells) > 1:
-            _set_cell(cells[1], str(item.descricao) or "")
-        # Coluna 2: unidade
-        if len(cells) > 2:
-            _set_cell(cells[2], str(item.unidade) or "")
-            if cells[2].paragraphs:
-                cells[2].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-        # Coluna 3: quantidade
-        if len(cells) > 3:
-            _set_cell(cells[3], str(item.quantidade) or "")
-            if cells[3].paragraphs:
-                cells[3].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        if use_price_layout:
+            if len(cells) > 0:
+                _set_cell(cells[0], f"{i+1:02d}")
+                if cells[0].paragraphs:
+                    cells[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            if len(cells) > 1:
+                _set_cell(cells[1], str(item.quantidade) or "")
+                if cells[1].paragraphs:
+                    cells[1].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            if len(cells) > 2:
+                _set_cell(cells[2], str(item.unidade) or "")
+                if cells[2].paragraphs:
+                    cells[2].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            if len(cells) > 3:
+                _set_cell(cells[3], str(item.descricao) or "")
+            if len(cells) > 4:
+                unit_txt = str(getattr(item, "valor_unitario", "") or "").strip()
+                _set_cell(cells[4], unit_txt if unit_txt else "")
+                if cells[4].paragraphs:
+                    cells[4].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            if len(cells) > 5:
+                item_total_txt = str(getattr(item, "valor_total", "") or "").strip()
+                _set_cell(cells[5], item_total_txt if item_total_txt else "")
+                if cells[5].paragraphs:
+                    cells[5].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            total_geral += _to_float_br(getattr(item, "valor_total", ""))
+        else:
+            # Coluna 0: número do item (01, 02, 03...)
+            if len(cells) > 0:
+                _set_cell(cells[0], f"{i+1:02d}")
+                if cells[0].paragraphs:
+                    cells[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            # Coluna 1: descrição
+            if len(cells) > 1:
+                _set_cell(cells[1], str(item.descricao) or "")
+            # Coluna 2: unidade
+            if len(cells) > 2:
+                _set_cell(cells[2], str(item.unidade) or "")
+                if cells[2].paragraphs:
+                    cells[2].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            # Coluna 3: quantidade
+            if len(cells) > 3:
+                _set_cell(cells[3], str(item.quantidade) or "")
+                if cells[3].paragraphs:
+                    cells[3].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+    if use_price_layout:
+        total_row = target_table.add_row()
+        total_cells = total_row.cells
+        if len(total_cells) > 0:
+            _set_cell(total_cells[0], "VALOR TOTAL")
+            if total_cells[0].paragraphs:
+                total_cells[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.LEFT
+                for run in total_cells[0].paragraphs[0].runs:
+                    run.bold = True
+        if len(total_cells) > 5:
+            _set_cell(total_cells[5], _to_currency_br(total_geral))
+            if total_cells[5].paragraphs:
+                total_cells[5].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                for run in total_cells[5].paragraphs[0].runs:
+                    run.bold = True
 
 
 def _clear_headers(doc: Document) -> None:

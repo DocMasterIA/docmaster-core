@@ -105,7 +105,6 @@
               <input v-model="ctx.fixoSetor" list="da75-dl-dfd-setor-requisitante" />
               <div class="ixp-inline-actions">
                 <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('dfd_setor_requisitante', ctx.fixoSetor)">Adicionar</button>
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!ctx.canDeleteFieldHistory('dfd_setor_requisitante', ctx.fixoSetor)" @click="ctx.removeFieldHistory('dfd_setor_requisitante', ctx.fixoSetor)">Excluir</button>
               </div>
             </div>
             <div class="ixp-field">
@@ -113,7 +112,6 @@
               <input v-model="ctx.fixoDemanda" list="da75-dl-dfd-responsavel-demanda" />
               <div class="ixp-inline-actions">
                 <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('dfd_responsavel_demanda', ctx.fixoDemanda)">Adicionar</button>
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!ctx.canDeleteFieldHistory('dfd_responsavel_demanda', ctx.fixoDemanda)" @click="ctx.removeFieldHistory('dfd_responsavel_demanda', ctx.fixoDemanda)">Excluir</button>
               </div>
             </div>
             <div class="ixp-field">
@@ -121,7 +119,6 @@
               <input v-model="ctx.fixoEmail" list="da75-dl-dfd-email" />
               <div class="ixp-inline-actions">
                 <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('dfd_email', ctx.fixoEmail)">Adicionar</button>
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!ctx.canDeleteFieldHistory('dfd_email', ctx.fixoEmail)" @click="ctx.removeFieldHistory('dfd_email', ctx.fixoEmail)">Excluir</button>
               </div>
             </div>
             <div class="ixp-field">
@@ -129,7 +126,6 @@
               <input v-model="ctx.fixoGestor" list="da75-dl-dfd-gestor-contratos" />
               <div class="ixp-inline-actions">
                 <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('dfd_gestor_contratos', ctx.fixoGestor)">Adicionar</button>
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!ctx.canDeleteFieldHistory('dfd_gestor_contratos', ctx.fixoGestor)" @click="ctx.removeFieldHistory('dfd_gestor_contratos', ctx.fixoGestor)">Excluir</button>
               </div>
             </div>
             <div class="ixp-field">
@@ -137,7 +133,6 @@
               <input v-model="ctx.fixoFiscal" list="da75-dl-dfd-fiscal-contratos" />
               <div class="ixp-inline-actions">
                 <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('dfd_fiscal_contratos', ctx.fixoFiscal)">Adicionar</button>
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!ctx.canDeleteFieldHistory('dfd_fiscal_contratos', ctx.fixoFiscal)" @click="ctx.removeFieldHistory('dfd_fiscal_contratos', ctx.fixoFiscal)">Excluir</button>
               </div>
             </div>
             <div class="ixp-grid-2">
@@ -146,7 +141,6 @@
                 <input v-model="ctx.fixoAssinatura" list="da75-dl-dfd-assinatura-nome" placeholder="Digite o nome do responsável" />
                 <div class="ixp-inline-actions">
                   <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('dfd_assinatura_nome', ctx.fixoAssinatura)">Adicionar</button>
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!ctx.canDeleteFieldHistory('dfd_assinatura_nome', ctx.fixoAssinatura)" @click="ctx.removeFieldHistory('dfd_assinatura_nome', ctx.fixoAssinatura)">Excluir</button>
                 </div>
               </div>
               <div class="ixp-field">
@@ -154,7 +148,6 @@
                 <input v-model="ctx.fixoAssinaturaCargo" list="da75-dl-dfd-assinatura-cargo" placeholder="Digite o cargo" />
                 <div class="ixp-inline-actions">
                   <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('dfd_assinatura_cargo', ctx.fixoAssinaturaCargo)">Adicionar</button>
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!ctx.canDeleteFieldHistory('dfd_assinatura_cargo', ctx.fixoAssinaturaCargo)" @click="ctx.removeFieldHistory('dfd_assinatura_cargo', ctx.fixoAssinaturaCargo)">Excluir</button>
                 </div>
               </div>
             </div>
@@ -170,7 +163,6 @@
               <p class="ixp-hint">Texto pré-preenchido e editável. Ajuste município, UF, endereço e horário conforme o órgão.</p>
               <div class="ixp-inline-actions">
                 <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('tr_endereco_entrega_propostas', ctx.fixoEnderecoEntrega)">Adicionar</button>
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!ctx.canDeleteFieldHistory('tr_endereco_entrega_propostas', ctx.fixoEnderecoEntrega)" @click="ctx.removeFieldHistory('tr_endereco_entrega_propostas', ctx.fixoEnderecoEntrega)">Excluir</button>
               </div>
             </div>
             <div class="ixp-field">
@@ -178,7 +170,6 @@
               <input v-model="ctx.fixoEmailPropostas" list="da75-dl-tr-email-propostas" placeholder="Ex: propostas@municipio.go.gov.br" />
               <div class="ixp-inline-actions">
                 <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('tr_email_recebimento_propostas', ctx.fixoEmailPropostas)">Adicionar</button>
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!ctx.canDeleteFieldHistory('tr_email_recebimento_propostas', ctx.fixoEmailPropostas)" @click="ctx.removeFieldHistory('tr_email_recebimento_propostas', ctx.fixoEmailPropostas)">Excluir</button>
               </div>
             </div>
             <div class="ixp-grid-2">
@@ -187,7 +178,6 @@
                 <input v-model="ctx.fixoTrResponsavelNome" list="da75-dl-tr-resp-nome" />
                 <div class="ixp-inline-actions">
                   <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('tr_termo_responsavel_nome', ctx.fixoTrResponsavelNome)">Adicionar</button>
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!ctx.canDeleteFieldHistory('tr_termo_responsavel_nome', ctx.fixoTrResponsavelNome)" @click="ctx.removeFieldHistory('tr_termo_responsavel_nome', ctx.fixoTrResponsavelNome)">Excluir</button>
                 </div>
               </div>
               <div class="ixp-field">
@@ -195,7 +185,6 @@
                 <input v-model="ctx.fixoTrResponsavelCargo" list="da75-dl-tr-resp-cargo" />
                 <div class="ixp-inline-actions">
                   <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('tr_termo_responsavel_cargo', ctx.fixoTrResponsavelCargo)">Adicionar</button>
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!ctx.canDeleteFieldHistory('tr_termo_responsavel_cargo', ctx.fixoTrResponsavelCargo)" @click="ctx.removeFieldHistory('tr_termo_responsavel_cargo', ctx.fixoTrResponsavelCargo)">Excluir</button>
                 </div>
               </div>
             </div>

@@ -43,7 +43,7 @@
               </div>
             </article>
 
-            <article v-if="isDispensaNormalManutencaoVeiculosRoute" class="ixp-card">
+            <article v-if="isManutencaoVeiculosRoute" class="ixp-card">
               <h3>Dados do veiculo</h3>
               <div class="ixp-body ixp-grid-3">
                 <div class="ixp-field"><label>Marca</label><input v-model="marca" placeholder="Ex: Chevrolet" /></div>
@@ -151,7 +151,7 @@
               </div>
             </article>
 
-            <article v-if="showAiClauseSection" class="ixp-card">
+            <article v-if="isDispensaNormalRoute" class="ixp-card">
               <h3>Gerar clausulas (IA)</h3>
               <div class="ixp-body">
                 <p class="ixp-hint">
@@ -172,6 +172,20 @@
                     <label>Justificativa da contratacao</label>
                     <textarea v-model="clausulaJustificativa" rows="4" placeholder="Justificativa da necessidade" />
                   </div>
+                </div>
+              </div>
+            </article>
+
+            <article v-else-if="isInexigibilidadeArt74Route" class="ixp-card">
+              <h3>Objeto da contratacao</h3>
+              <div class="ixp-body">
+                <div class="ixp-field">
+                  <label>O que sera contratado?</label>
+                  <textarea
+                    v-model="clausulaContratado"
+                    rows="3"
+                    placeholder="Ex: Aquisicao de material de expediente para Secretaria da Administracao&#10;10 canetas azul, 2 grampeadores, 10 resmas de papel A4"
+                  />
                 </div>
               </div>
             </article>
@@ -229,7 +243,6 @@
                 <input v-model="fixoNome" list="dl-solicitacao-destinatario-nome" placeholder="Digite o nome" />
                 <div class="ixp-inline-actions">
                   <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('solicitacao_destinatario_nome', fixoNome)">Adicionar</button>
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('solicitacao_destinatario_nome', fixoNome)" @click="removeFieldHistory('solicitacao_destinatario_nome', fixoNome)">Excluir</button>
                 </div>
               </div>
             </div>
@@ -240,17 +253,16 @@
                 <input v-model="fixoCargo" list="dl-solicitacao-destinatario-cargo" placeholder="Digite a funcao ou cargo" />
                 <div class="ixp-inline-actions">
                   <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('solicitacao_destinatario_cargo', fixoCargo)">Adicionar</button>
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('solicitacao_destinatario_cargo', fixoCargo)" @click="removeFieldHistory('solicitacao_destinatario_cargo', fixoCargo)">Excluir</button>
                 </div>
               </div>
             </div>
+            <h4 class="ixp-subsection-title">1.3 Responsável pela solicitação</h4>
             <div class="ixp-grid-2">
               <div class="ixp-field">
                 <label>Nome do responsavel</label>
                 <input v-model="fixoResponsavel" list="dl-solicitacao-responsavel-nome" placeholder="Digite o nome do responsavel" />
                 <div class="ixp-inline-actions">
                   <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('solicitacao_responsavel_nome', fixoResponsavel)">Adicionar</button>
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('solicitacao_responsavel_nome', fixoResponsavel)" @click="removeFieldHistory('solicitacao_responsavel_nome', fixoResponsavel)">Excluir</button>
                 </div>
               </div>
               <div class="ixp-field">
@@ -258,7 +270,6 @@
                 <input v-model="fixoResponsavelCargo" list="dl-solicitacao-responsavel-cargo" placeholder="Digite o cargo" />
                 <div class="ixp-inline-actions">
                   <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('solicitacao_responsavel_cargo', fixoResponsavelCargo)">Adicionar</button>
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('solicitacao_responsavel_cargo', fixoResponsavelCargo)" @click="removeFieldHistory('solicitacao_responsavel_cargo', fixoResponsavelCargo)">Excluir</button>
                 </div>
               </div>
             </div>
@@ -272,7 +283,6 @@
               <input v-model="fixoSetor" list="dl-dfd-setor-requisitante" />
               <div class="ixp-inline-actions">
                 <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_setor_requisitante', fixoSetor)">Adicionar</button>
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('dfd_setor_requisitante', fixoSetor)" @click="removeFieldHistory('dfd_setor_requisitante', fixoSetor)">Excluir</button>
               </div>
             </div>
             <div class="ixp-field">
@@ -280,7 +290,6 @@
               <input v-model="fixoDemanda" list="dl-dfd-responsavel-demanda" />
               <div class="ixp-inline-actions">
                 <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_responsavel_demanda', fixoDemanda)">Adicionar</button>
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('dfd_responsavel_demanda', fixoDemanda)" @click="removeFieldHistory('dfd_responsavel_demanda', fixoDemanda)">Excluir</button>
               </div>
             </div>
             <div class="ixp-field">
@@ -288,7 +297,6 @@
               <input v-model="fixoEmail" list="dl-dfd-email" />
               <div class="ixp-inline-actions">
                 <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_email', fixoEmail)">Adicionar</button>
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('dfd_email', fixoEmail)" @click="removeFieldHistory('dfd_email', fixoEmail)">Excluir</button>
               </div>
             </div>
             <div class="ixp-field">
@@ -296,7 +304,6 @@
               <input v-model="fixoGestor" list="dl-dfd-gestor-contratos" />
               <div class="ixp-inline-actions">
                 <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_gestor_contratos', fixoGestor)">Adicionar</button>
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('dfd_gestor_contratos', fixoGestor)" @click="removeFieldHistory('dfd_gestor_contratos', fixoGestor)">Excluir</button>
               </div>
             </div>
             <div class="ixp-field">
@@ -304,16 +311,15 @@
               <input v-model="fixoFiscal" list="dl-dfd-fiscal-contratos" />
               <div class="ixp-inline-actions">
                 <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_fiscal_contratos', fixoFiscal)">Adicionar</button>
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('dfd_fiscal_contratos', fixoFiscal)" @click="removeFieldHistory('dfd_fiscal_contratos', fixoFiscal)">Excluir</button>
               </div>
             </div>
+            <h4 class="ixp-subsection-title">2.6 Responsável pela assinatura do DFD</h4>
             <div class="ixp-grid-2">
               <div class="ixp-field">
                 <label>Nome do responsavel</label>
                 <input v-model="fixoAssinatura" list="dl-dfd-assinatura-nome" placeholder="Digite o nome do responsavel" />
                 <div class="ixp-inline-actions">
                   <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_assinatura_nome', fixoAssinatura)">Adicionar</button>
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('dfd_assinatura_nome', fixoAssinatura)" @click="removeFieldHistory('dfd_assinatura_nome', fixoAssinatura)">Excluir</button>
                 </div>
               </div>
               <div class="ixp-field">
@@ -321,7 +327,6 @@
                 <input v-model="fixoAssinaturaCargo" list="dl-dfd-assinatura-cargo" placeholder="Digite o cargo" />
                 <div class="ixp-inline-actions">
                   <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_assinatura_cargo', fixoAssinaturaCargo)">Adicionar</button>
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('dfd_assinatura_cargo', fixoAssinaturaCargo)" @click="removeFieldHistory('dfd_assinatura_cargo', fixoAssinaturaCargo)">Excluir</button>
                 </div>
               </div>
             </div>
@@ -452,14 +457,17 @@ const logicalRouteName = computed(() => DISPENSA_RAPIDA_TO_LOGICAL[route.name] |
 const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[logicalRouteName.value] || 'tr_dfd_generico');
 const isDispensaNormalRoute = computed(() => String(route.name || '').startsWith('DispensaArt75'));
 const isInexigibilidadeArt74Route = computed(() => String(route.name || '').startsWith('InexigibilidadeArt74I'));
-const showAiClauseSection = computed(() => isDispensaNormalRoute.value || isInexigibilidadeArt74Route.value);
 const isDispensaManutencaoRoute = computed(() =>
   logicalRouteName.value === 'DispensaArt75IManutencaoVeiculos'
   || logicalRouteName.value === 'InexigibilidadeArt74IManutencaoVeiculosPreview'
   || logicalRouteName.value === 'InexigibilidadeArt74IManutencaoVeiculos',
 );
-/** Card marca/modelo/placa e slots de veículo: somente dispensa normal Art. 75 I manutenção (não inexigibilidade, obras, etc.). */
-const isDispensaNormalManutencaoVeiculosRoute = computed(() => route.name === 'DispensaArt75IManutencaoVeiculos');
+/** Card marca/modelo/placa para rotas de manutenção de veículos (dispensa e inexigibilidade). */
+const isManutencaoVeiculosRoute = computed(() =>
+  logicalRouteName.value === 'DispensaArt75IManutencaoVeiculos'
+  || logicalRouteName.value === 'InexigibilidadeArt74IManutencaoVeiculosPreview'
+  || logicalRouteName.value === 'InexigibilidadeArt74IManutencaoVeiculos',
+);
 const slotFieldOptions = reactive({});
 const CATALOG_KEYS = [
   'cabecalho_documento',
@@ -842,7 +850,7 @@ function buildSlotsOverride() {
         revisaoKm.value ? `Revisao/KM: ${revisaoKm.value}` : '',
       ]
     : [];
-  const veiculoFallbackParts = isDispensaNormalManutencaoVeiculosRoute.value
+  const veiculoFallbackParts = isManutencaoVeiculosRoute.value
     ? [
         marca.value ? `Marca: ${marca.value}` : '',
         modelo.value ? `Modelo: ${modelo.value}` : '',
@@ -860,7 +868,11 @@ function buildSlotsOverride() {
    * fill_tr_slots_with_llm, _merge_slots() da prioridade ao override sobre a IA (tr_slots_llm.py).
    * tr_template / dfd_template / oficio_template substituem placeholders a partir dos mesmos slots.
    */
-  const objetoFinal = clausulaObjeto.value.trim() || objetoFallback;
+  const objetoFinal = (
+    isInexigibilidadeArt74Route.value
+      ? (clausulaContratado.value.trim() || clausulaObjeto.value.trim() || objetoFallback)
+      : (clausulaObjeto.value.trim() || objetoFallback)
+  );
   o.objeto = objetoFinal;
   const justificativaFinal = (clausulaJustificativa.value.trim() || justificativaFallback) || '';
   if (justificativaFinal) o.justificativa = justificativaFinal;
@@ -1020,14 +1032,14 @@ function buildUserPrompt() {
     `Cabecalho do documento: ${cabecalhoDocumento.value || 'Nao informado'}`,
     `Processo: ${processoAtivo.value ? (processo.value || 'Nao informado') : 'Nao se aplica'}`,
     `Orgao: ${orgao.value || 'Nao informado'}`,
-    ...(isDispensaNormalManutencaoVeiculosRoute.value
+    ...(isManutencaoVeiculosRoute.value
       ? [`Veiculo: ${marca.value || '-'} ${modelo.value || '-'} / Placa ${placa.value || '-'}`]
       : []),
     `Fornecedor: ${fornecedor.value || 'Nao informado'} / CNPJ: ${cnpj.value || 'Nao informado'}`,
     `Valor global: ${valorGlobal.value || 'Nao informado'}`,
   ];
   if (isDispensaManutencaoRoute.value) {
-    const idx = isDispensaNormalManutencaoVeiculosRoute.value ? 5 : 4;
+    const idx = isManutencaoVeiculosRoute.value ? 5 : 4;
     lines.splice(idx, 0, `Tipo manutencao: ${tipoManutencao.value || 'Nao informado'}`);
   }
   return lines.join('\n');
@@ -1110,7 +1122,7 @@ const secoes = computed(() => {
   const itensValidos = itens.value.filter((i) => Object.values(i).some(isFilled));
   return [
     { titulo: 'Dados basicos', completo: isFilled(cabecalhoDocumento.value) && (!processoAtivo.value || isFilled(processo.value)) && isFilled(orgao.value), linhas: [['Cabecalho', cabecalhoDocumento.value || 'Nao informado', isFilled(cabecalhoDocumento.value)], ['Processo', processoAtivo.value ? processo.value || 'Nao informado' : 'Nao se aplica', !processoAtivo.value || isFilled(processo.value)], ['Orgao', orgao.value || 'Nao informado', isFilled(orgao.value)]] },
-    ...(isDispensaNormalManutencaoVeiculosRoute.value ? [{ titulo: 'Veiculo', completo: isFilled(marca.value) && isFilled(modelo.value) && isFilled(placa.value), linhas: [['Marca', marca.value || 'Nao informado', isFilled(marca.value)], ['Modelo', modelo.value || 'Nao informado', isFilled(modelo.value)], ['Placa', placa.value || 'Nao informado', isFilled(placa.value)]] }] : []),
+    ...(isManutencaoVeiculosRoute.value ? [{ titulo: 'Veiculo', completo: isFilled(marca.value) && isFilled(modelo.value) && isFilled(placa.value), linhas: [['Marca', marca.value || 'Nao informado', isFilled(marca.value)], ['Modelo', modelo.value || 'Nao informado', isFilled(modelo.value)], ['Placa', placa.value || 'Nao informado', isFilled(placa.value)]] }] : []),
     ...(isDispensaManutencaoRoute.value ? [{
       titulo: 'Manutencao',
       completo: isFilled(tipoManutencao.value) && (tipoManutencao.value !== 'Preventiva' || isFilled(revisaoKm.value)),
@@ -1173,6 +1185,7 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .ixp-btn-secondary { border: 1px solid #cbd5e1; background: #fff; color: #334155; border-radius: 12px; padding: 9px 12px; font-size: 13px; font-weight: 600; }
 .ixp-btn-xs { padding: 6px 10px; font-size: 12px; border-radius: 10px; }
 .ixp-inline-actions { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.ixp-subsection-title { margin: 6px 0 0; font-size: 13px; color: #334155; }
 .ixp-btn-primary { border: 0; background: #2563eb; color: #fff; border-radius: 12px; padding: 10px 14px; font-size: 13px; font-weight: 700; width: fit-content; }
 .ixp-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .ixp-hint { margin: 0; font-size: 12px; color: #64748b; }
@@ -1241,4 +1254,6 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .dm-dark-theme .ixp-success { border-color: #166534; background: #052e16; color: #bbf7d0; }
 .dm-dark .ixp-hint,
 .dm-dark-theme .ixp-hint { color: #94a3b8; }
+.dm-dark .ixp-subsection-title,
+.dm-dark-theme .ixp-subsection-title { color: #cbd5e1; }
 </style>

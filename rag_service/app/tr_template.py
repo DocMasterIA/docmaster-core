@@ -600,6 +600,7 @@ def render_tr_from_slots(
         # Dotação: não é preenchida pela IA; sempre deixar em branco aqui.
         # O backend/sistema pode sobrescrever via slots_override.dotacao no futuro.
         "(Inserir Dotação)": slots.dotacao or "",
+        "(Inserir Dotação)(Feito direto pelo usuário)": slots.dotacao or "",
         "(Feito direto pelo usuário)": "",
         "(SECRETARIA DO USUARIO)": slots.secretaria_usuario or "",
         "(Nome do USUARIO)": slots.nome_usuario or "",

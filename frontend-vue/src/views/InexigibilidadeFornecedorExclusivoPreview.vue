@@ -239,7 +239,6 @@
                 <input v-model="nome" list="dl-solicitacao-destinatario-nome" />
                 <div class="fe-inline-actions">
                   <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('solicitacao_destinatario_nome', nome)">Adicionar</button>
-                  <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('solicitacao_destinatario_nome', nome)" @click="removeFieldHistory('solicitacao_destinatario_nome', nome)">Excluir</button>
                 </div>
               </div>
             </div>
@@ -253,7 +252,6 @@
                 <input v-model="cargo" list="dl-solicitacao-destinatario-cargo" />
                 <div class="fe-inline-actions">
                   <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('solicitacao_destinatario_cargo', cargo)">Adicionar</button>
-                  <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('solicitacao_destinatario_cargo', cargo)" @click="removeFieldHistory('solicitacao_destinatario_cargo', cargo)">Excluir</button>
                 </div>
               </div>
             </div>
@@ -263,7 +261,6 @@
                 <input v-model="fixoResponsavel" list="dl-solicitacao-responsavel-nome" placeholder="Digite o nome do responsável" />
                 <div class="fe-inline-actions">
                   <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('solicitacao_responsavel_nome', fixoResponsavel)">Adicionar</button>
-                  <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('solicitacao_responsavel_nome', fixoResponsavel)" @click="removeFieldHistory('solicitacao_responsavel_nome', fixoResponsavel)">Excluir</button>
                 </div>
               </div>
               <div class="fe-field">
@@ -271,7 +268,6 @@
                 <input v-model="fixoResponsavelCargo" list="dl-solicitacao-responsavel-cargo" placeholder="Digite a função ou cargo" />
                 <div class="fe-inline-actions">
                   <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('solicitacao_responsavel_cargo', fixoResponsavelCargo)">Adicionar</button>
-                  <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('solicitacao_responsavel_cargo', fixoResponsavelCargo)" @click="removeFieldHistory('solicitacao_responsavel_cargo', fixoResponsavelCargo)">Excluir</button>
                 </div>
               </div>
             </div>
@@ -285,7 +281,6 @@
               <input v-model="fixoSetor" list="dl-dfd-setor-requisitante" />
               <div class="fe-inline-actions">
                 <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_setor_requisitante', fixoSetor)">Adicionar</button>
-                <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('dfd_setor_requisitante', fixoSetor)" @click="removeFieldHistory('dfd_setor_requisitante', fixoSetor)">Excluir</button>
               </div>
             </div>
             <div class="fe-field">
@@ -293,7 +288,6 @@
               <input v-model="fixoDemanda" list="dl-dfd-responsavel-demanda" />
               <div class="fe-inline-actions">
                 <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_responsavel_demanda', fixoDemanda)">Adicionar</button>
-                <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('dfd_responsavel_demanda', fixoDemanda)" @click="removeFieldHistory('dfd_responsavel_demanda', fixoDemanda)">Excluir</button>
               </div>
             </div>
             <div class="fe-field">
@@ -301,7 +295,6 @@
               <input v-model="fixoEmail" list="dl-dfd-email" />
               <div class="fe-inline-actions">
                 <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_email', fixoEmail)">Adicionar</button>
-                <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('dfd_email', fixoEmail)" @click="removeFieldHistory('dfd_email', fixoEmail)">Excluir</button>
               </div>
             </div>
             <div class="fe-field">
@@ -309,7 +302,6 @@
               <input v-model="fixoGestor" list="dl-dfd-gestor-contratos" />
               <div class="fe-inline-actions">
                 <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_gestor_contratos', fixoGestor)">Adicionar</button>
-                <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('dfd_gestor_contratos', fixoGestor)" @click="removeFieldHistory('dfd_gestor_contratos', fixoGestor)">Excluir</button>
               </div>
             </div>
             <div class="fe-field">
@@ -317,7 +309,6 @@
               <input v-model="fixoFiscal" list="dl-dfd-fiscal-contratos" />
               <div class="fe-inline-actions">
                 <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_fiscal_contratos', fixoFiscal)">Adicionar</button>
-                <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('dfd_fiscal_contratos', fixoFiscal)" @click="removeFieldHistory('dfd_fiscal_contratos', fixoFiscal)">Excluir</button>
               </div>
             </div>
             <div class="fe-grid-2">
@@ -326,7 +317,6 @@
                 <input v-model="fixoAssinatura" list="dl-dfd-assinatura-nome" placeholder="Digite o nome do responsável" />
                 <div class="fe-inline-actions">
                   <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_assinatura_nome', fixoAssinatura)">Adicionar</button>
-                  <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('dfd_assinatura_nome', fixoAssinatura)" @click="removeFieldHistory('dfd_assinatura_nome', fixoAssinatura)">Excluir</button>
                 </div>
               </div>
               <div class="fe-field">
@@ -334,7 +324,6 @@
                 <input v-model="fixoAssinaturaCargo" list="dl-dfd-assinatura-cargo" placeholder="Digite a função ou cargo" />
                 <div class="fe-inline-actions">
                   <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_assinatura_cargo', fixoAssinaturaCargo)">Adicionar</button>
-                  <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('dfd_assinatura_cargo', fixoAssinaturaCargo)" @click="removeFieldHistory('dfd_assinatura_cargo', fixoAssinaturaCargo)">Excluir</button>
                 </div>
               </div>
             </div>

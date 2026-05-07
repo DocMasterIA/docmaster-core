@@ -36,10 +36,36 @@
                     <input v-model="processo" list="dl-processo-numero" placeholder="Ex: 123/2026" />
                   </div>
                   <div class="ixp-field">
-                    <label>Orgao/Unidade responsavel pelo veiculo</label>
+                    <label>Orgao / unidade</label>
                     <input v-model="orgao" list="dl-orgao" placeholder="Digite o orgao" />
                   </div>
                 </div>
+              </div>
+            </article>
+
+            <article v-if="isFornecedorExclusivoRoute" class="ixp-card">
+              <h3>Objeto especifico</h3>
+              <div class="ixp-body">
+                <div class="ixp-field">
+                  <label>Selecione o objeto especifico da contratacao</label>
+                  <select v-model="objetoEspecifico">
+                    <option value="">Selecione</option>
+                    <option v-for="op in objetoEspecificoOptions" :key="op" :value="op">{{ op }}</option>
+                  </select>
+                </div>
+                <div v-if="objetoEspecifico === 'Outro'" class="ixp-field">
+                  <label>Descreva o objeto especifico da contratacao</label>
+                  <input v-model="outroObjetoEspecifico" placeholder="Ex: Fornecimento de kit de manutencao original" />
+                </div>
+              </div>
+            </article>
+
+            <article v-if="isFornecedorExclusivoRoute" class="ixp-card">
+              <h3>Dados do equipamento</h3>
+              <div class="ixp-body ixp-grid-3">
+                <div class="ixp-field"><label>Equipamento</label><input v-model="equipamento" placeholder="Ex: Aparelho de raio-X" /></div>
+                <div class="ixp-field"><label>Marca</label><input v-model="marca" placeholder="Ex: Siemens" /></div>
+                <div class="ixp-field"><label>Modelo</label><input v-model="modelo" placeholder="Ex: Multix Select DR" /></div>
               </div>
             </article>
 
@@ -371,6 +397,18 @@ const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
 const cabecalhoOptions = ref([]);
 const tratamentoNome = ['Ao senhor', 'A senhora'];
 const tratamentoCargo = ['Senhor', 'Senhora'];
+const objetoEspecificoOptions = [
+  'Aquisicao de bens/produtos',
+  'Fornecimento de pecas',
+  'Pecas originais',
+  'Pecas de reposicao',
+  'Componentes e acessorios',
+  'Insumos e materiais',
+  'Prestacao de servicos',
+  'Assistencia tecnica autorizada',
+  'Suporte tecnico especializado',
+  'Outro',
+];
 const emptyItem = { descricao: '', quantidade: '', unidade: '', valorUnitario: '', valorTotal: '' };
 const placeholderDotacao = ['Ex:', 'Orgao: 02', 'Unidade: 05', 'Projeto/Atividade: 2.045', 'Elemento de despesa: 3.3.90.39.00', 'Fonte: 1.500'].join('\n');
 const DISPENSA_RAPIDA_TO_LOGICAL = {
@@ -404,6 +442,9 @@ const cabecalhoDocumento = ref('');
 const processoAtivo = ref(false);
 const processo = ref('');
 const orgao = ref('');
+const objetoEspecifico = ref('');
+const outroObjetoEspecifico = ref('');
+const equipamento = ref('');
 const marca = ref('');
 const modelo = ref('');
 const placa = ref('');
@@ -457,6 +498,10 @@ const logicalRouteName = computed(() => DISPENSA_RAPIDA_TO_LOGICAL[route.name] |
 const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[logicalRouteName.value] || 'tr_dfd_generico');
 const isDispensaNormalRoute = computed(() => String(route.name || '').startsWith('DispensaArt75'));
 const isInexigibilidadeArt74Route = computed(() => String(route.name || '').startsWith('InexigibilidadeArt74I'));
+const isFornecedorExclusivoRoute = computed(() =>
+  logicalRouteName.value === 'InexigibilidadeArt74IFornecedorExclusivoPreview'
+  || logicalRouteName.value === 'InexigibilidadeArt74IFornecedorExclusivo',
+);
 const isDispensaManutencaoRoute = computed(() =>
   logicalRouteName.value === 'DispensaArt75IManutencaoVeiculos'
   || logicalRouteName.value === 'InexigibilidadeArt74IManutencaoVeiculosPreview'
@@ -887,6 +932,13 @@ function buildSlotsOverride() {
     o.dfd_numero_processo = numeroProcesso;
   }
   if (orgao.value.trim()) o.orgao = orgao.value.trim();
+  const objetoEspecificoFinal = (
+    objetoEspecifico.value === 'Outro'
+      ? outroObjetoEspecifico.value.trim()
+      : objetoEspecifico.value.trim()
+  );
+  if (objetoEspecificoFinal) o.objeto_especifico = objetoEspecificoFinal;
+  if (equipamento.value.trim()) o.equipamento = equipamento.value.trim();
   if (marca.value.trim()) o.marca = marca.value.trim();
   if (modelo.value.trim()) o.modelo = modelo.value.trim();
   if (placa.value.trim()) o.numero_placa = placa.value.trim();
@@ -1123,6 +1175,23 @@ const secoes = computed(() => {
   return [
     { titulo: 'Dados basicos', completo: isFilled(cabecalhoDocumento.value) && (!processoAtivo.value || isFilled(processo.value)) && isFilled(orgao.value), linhas: [['Cabecalho', cabecalhoDocumento.value || 'Nao informado', isFilled(cabecalhoDocumento.value)], ['Processo', processoAtivo.value ? processo.value || 'Nao informado' : 'Nao se aplica', !processoAtivo.value || isFilled(processo.value)], ['Orgao', orgao.value || 'Nao informado', isFilled(orgao.value)]] },
     ...(isManutencaoVeiculosRoute.value ? [{ titulo: 'Veiculo', completo: isFilled(marca.value) && isFilled(modelo.value) && isFilled(placa.value), linhas: [['Marca', marca.value || 'Nao informado', isFilled(marca.value)], ['Modelo', modelo.value || 'Nao informado', isFilled(modelo.value)], ['Placa', placa.value || 'Nao informado', isFilled(placa.value)]] }] : []),
+    ...(isFornecedorExclusivoRoute.value ? [{
+      titulo: 'Objeto especifico',
+      completo: isFilled(objetoEspecifico.value) && (objetoEspecifico.value !== 'Outro' || isFilled(outroObjetoEspecifico.value)),
+      linhas: [
+        ['Objeto especifico', objetoEspecifico.value || 'Nao informado', isFilled(objetoEspecifico.value)],
+        ['Descricao', objetoEspecifico.value === 'Outro' ? (outroObjetoEspecifico.value || 'Nao informada') : 'Nao se aplica', objetoEspecifico.value !== 'Outro' || isFilled(outroObjetoEspecifico.value)],
+      ],
+    }] : []),
+    ...(isFornecedorExclusivoRoute.value ? [{
+      titulo: 'Equipamento',
+      completo: isFilled(equipamento.value) && isFilled(marca.value) && isFilled(modelo.value),
+      linhas: [
+        ['Equipamento', equipamento.value || 'Nao informado', isFilled(equipamento.value)],
+        ['Marca', marca.value || 'Nao informado', isFilled(marca.value)],
+        ['Modelo', modelo.value || 'Nao informado', isFilled(modelo.value)],
+      ],
+    }] : []),
     ...(isDispensaManutencaoRoute.value ? [{
       titulo: 'Manutencao',
       completo: isFilled(tipoManutencao.value) && (tipoManutencao.value !== 'Preventiva' || isFilled(revisaoKm.value)),

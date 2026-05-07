@@ -36,8 +36,16 @@
                     <input v-model="processo" list="dl-processo-numero" placeholder="Ex: 123/2026" />
                   </div>
                   <div class="ixp-field">
-                    <label>Orgao / unidade</label>
-                    <input v-model="orgao" list="dl-orgao" placeholder="Digite o orgao" />
+                    <label>{{ isFornecedorExclusivoRoute ? 'Orgao/Unidade responsavel pelo equipamento' : 'Orgao / unidade' }}</label>
+                    <input
+                      v-model="orgao"
+                      list="dl-orgao"
+                      :placeholder="isFornecedorExclusivoRoute ? 'Digite o orgao/unidade responsavel pelo equipamento' : 'Digite o orgao'"
+                    />
+                  </div>
+                  <div v-if="isInexigibilidadeManutencaoRoute" class="ixp-field">
+                    <label>Orgao / Unidade do veiculo</label>
+                    <input v-model="orgaoUnidadeVeiculo" placeholder="Digite o orgao/unidade do veiculo" />
                   </div>
                 </div>
               </div>
@@ -442,6 +450,7 @@ const cabecalhoDocumento = ref('');
 const processoAtivo = ref(false);
 const processo = ref('');
 const orgao = ref('');
+const orgaoUnidadeVeiculo = ref('');
 const objetoEspecifico = ref('');
 const outroObjetoEspecifico = ref('');
 const equipamento = ref('');
@@ -505,6 +514,10 @@ const isFornecedorExclusivoRoute = computed(() =>
 const isDispensaManutencaoRoute = computed(() =>
   logicalRouteName.value === 'DispensaArt75IManutencaoVeiculos'
   || logicalRouteName.value === 'InexigibilidadeArt74IManutencaoVeiculosPreview'
+  || logicalRouteName.value === 'InexigibilidadeArt74IManutencaoVeiculos',
+);
+const isInexigibilidadeManutencaoRoute = computed(() =>
+  logicalRouteName.value === 'InexigibilidadeArt74IManutencaoVeiculosPreview'
   || logicalRouteName.value === 'InexigibilidadeArt74IManutencaoVeiculos',
 );
 /** Card marca/modelo/placa para rotas de manutenção de veículos (dispensa e inexigibilidade). */
@@ -931,7 +944,13 @@ function buildSlotsOverride() {
     o.numero_processo = numeroProcesso;
     o.dfd_numero_processo = numeroProcesso;
   }
-  if (orgao.value.trim()) o.orgao = orgao.value.trim();
+  if (isInexigibilidadeManutencaoRoute.value) {
+    if (orgaoUnidadeVeiculo.value.trim()) o.orgao = orgaoUnidadeVeiculo.value.trim();
+  } else if (isFornecedorExclusivoRoute.value) {
+    if (orgao.value.trim()) o.orgao = orgao.value.trim();
+  } else if (orgao.value.trim()) {
+    o.orgao = orgao.value.trim();
+  }
   const objetoEspecificoFinal = (
     objetoEspecifico.value === 'Outro'
       ? outroObjetoEspecifico.value.trim()
@@ -1173,7 +1192,23 @@ onBeforeUnmount(() => {
 const secoes = computed(() => {
   const itensValidos = itens.value.filter((i) => Object.values(i).some(isFilled));
   return [
-    { titulo: 'Dados basicos', completo: isFilled(cabecalhoDocumento.value) && (!processoAtivo.value || isFilled(processo.value)) && isFilled(orgao.value), linhas: [['Cabecalho', cabecalhoDocumento.value || 'Nao informado', isFilled(cabecalhoDocumento.value)], ['Processo', processoAtivo.value ? processo.value || 'Nao informado' : 'Nao se aplica', !processoAtivo.value || isFilled(processo.value)], ['Orgao', orgao.value || 'Nao informado', isFilled(orgao.value)]] },
+    {
+      titulo: 'Dados basicos',
+      completo: (
+        isFilled(cabecalhoDocumento.value)
+        && (!processoAtivo.value || isFilled(processo.value))
+        && isFilled(orgao.value)
+        && (!isInexigibilidadeManutencaoRoute.value || isFilled(orgaoUnidadeVeiculo.value))
+      ),
+      linhas: [
+        ['Cabecalho', cabecalhoDocumento.value || 'Nao informado', isFilled(cabecalhoDocumento.value)],
+        ['Processo', processoAtivo.value ? processo.value || 'Nao informado' : 'Nao se aplica', !processoAtivo.value || isFilled(processo.value)],
+        ['Orgao', orgao.value || 'Nao informado', isFilled(orgao.value)],
+        ...(isInexigibilidadeManutencaoRoute.value
+          ? [['Orgao / Unidade do veiculo', orgaoUnidadeVeiculo.value || 'Nao informado', isFilled(orgaoUnidadeVeiculo.value)]]
+          : []),
+      ],
+    },
     ...(isManutencaoVeiculosRoute.value ? [{ titulo: 'Veiculo', completo: isFilled(marca.value) && isFilled(modelo.value) && isFilled(placa.value), linhas: [['Marca', marca.value || 'Nao informado', isFilled(marca.value)], ['Modelo', modelo.value || 'Nao informado', isFilled(modelo.value)], ['Placa', placa.value || 'Nao informado', isFilled(placa.value)]] }] : []),
     ...(isFornecedorExclusivoRoute.value ? [{
       titulo: 'Objeto especifico',

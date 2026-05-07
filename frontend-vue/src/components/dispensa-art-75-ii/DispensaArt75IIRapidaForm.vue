@@ -25,7 +25,7 @@
                     <label class="da75-label da75-label--compact">Cabeçalho do documento</label>
                     <select v-model="cabecalho" class="da75-select da75-select--sm" :disabled="cabecalhosLoading">
                       <option value="">{{ cabecalhosLoading ? 'Carregando…' : 'Selecione' }}</option>
-                      <option v-for="op in cabecalhoOptions" :key="op" :value="op">{{ op }}</option>
+                      <option v-for="op in cabecalhoOptions" :key="op.id" :value="op.name">{{ op.name }}</option>
                     </select>
                     <p v-if="!cabecalhosLoading && cabecalhoOptions.length === 0" class="da75-helper da75-mt-sm">
                       Nenhum modelo na biblioteca para a sua prefeitura.
@@ -327,9 +327,9 @@ onMounted(async () => {
   await dadosFixos.loadSlotCatalogSuggestions();
   cabecalhosLoading.value = true;
   try {
-    const names = await fetchCabecalhosPrefeitura(API_BASE);
-    cabecalhoOptions.value = names;
-    if (cabecalho.value && !names.includes(cabecalho.value)) cabecalho.value = '';
+    const opts = await fetchCabecalhosPrefeitura(API_BASE);
+    cabecalhoOptions.value = opts;
+    if (cabecalho.value && !opts.some((o) => o.name === cabecalho.value)) cabecalho.value = '';
   } finally {
     cabecalhosLoading.value = false;
   }
@@ -342,6 +342,13 @@ function onApplyDadosFixos() {
 
 const dataResumo = computed(() => (modoData.value === 'Data manual' ? dataManual.value : modoData.value));
 const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[String(route.name || '')] || 'tr_dfd_generico');
+
+const cabecalhoMergeTemplateId = computed(() => {
+  const n = String(cabecalho.value || '').trim();
+  if (!n) return null;
+  const hit = cabecalhoOptions.value.find((o) => o.name === n);
+  return hit?.id ? String(hit.id) : null;
+});
 
 const secoes = computed(() => {
   const orgaoLabel = orgao.value || '';
@@ -562,6 +569,7 @@ async function onSubmit() {
       slots_override: buildSlotsOverride(),
       slot_package_key: slotPackageKey.value,
     };
+    if (cabecalhoMergeTemplateId.value) payload.template_id = cabecalhoMergeTemplateId.value;
     const res = await fetch(`${API_BASE}/api/documentos/gerar-tr-e-dfd`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

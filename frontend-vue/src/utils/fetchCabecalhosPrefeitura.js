@@ -1,9 +1,9 @@
 /**
- * Nomes de modelos DOCX da biblioteca (`/api/documentos_modelos/`) filtrados
- * pela prefeitura do usuário logado — mesma regra da dispensa normal (InexigibilidadeManutencaoVeiculosPreview).
+ * Modelos DOCX da biblioteca (`/api/documentos_modelos/`) da prefeitura do utilizador,
+ * com id para merge de cabeçalho/rodapé em `gerar-tr-e-dfd` (`template_id`).
  *
  * @param {string} apiBase ex.: import.meta.env.DEV ? '' : VITE_API_URL
- * @returns {Promise<string[]>}
+ * @returns {Promise<Array<{ id: string; name: string }>>}
  */
 export async function fetchCabecalhosPrefeitura(apiBase) {
   let userPrefeituraId = null;
@@ -26,7 +26,17 @@ export async function fetchCabecalhosPrefeitura(apiBase) {
       const tplPrefId = t?.prefeitura?.id != null ? String(t.prefeitura.id) : null;
       return !!userPrefeituraId && !!tplPrefId && tplPrefId === userPrefeituraId;
     });
-    return [...new Set(filtered.map((t) => String(t?.name || '').trim()).filter(Boolean))];
+    const seen = new Set();
+    const out = [];
+    for (const t of filtered) {
+      const name = String(t?.name || '').trim();
+      const id = t?.id != null ? String(t.id).trim() : '';
+      if (!name || !id || seen.has(id)) continue;
+      seen.add(id);
+      out.push({ id, name });
+    }
+    out.sort((a, b) => a.name.localeCompare(b.name, 'pt', { sensitivity: 'base' }));
+    return out;
   } catch {
     return [];
   }

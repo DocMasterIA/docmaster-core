@@ -23,7 +23,7 @@
                   <label>Cabecalho do documento</label>
                   <select v-model="cabecalhoDocumento">
                     <option value="">Selecione</option>
-                    <option v-for="op in cabecalhoOptions" :key="op" :value="op">{{ op }}</option>
+                    <option v-for="op in cabecalhoOptions" :key="op.id" :value="op.name">{{ op.name }}</option>
                   </select>
                 </div>
                 <label class="ixp-check">
@@ -505,6 +505,12 @@ const clausulaJustificativa = ref('');
 
 const logicalRouteName = computed(() => DISPENSA_RAPIDA_TO_LOGICAL[route.name] || route.name);
 const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[logicalRouteName.value] || 'tr_dfd_generico');
+const cabecalhoMergeTemplateId = computed(() => {
+  const n = String(cabecalhoDocumento.value || '').trim();
+  if (!n) return null;
+  const hit = cabecalhoOptions.value.find((o) => o.name === n);
+  return hit?.id ? String(hit.id) : null;
+});
 const isDispensaNormalRoute = computed(() => String(route.name || '').startsWith('DispensaArt75'));
 const isInexigibilidadeArt74Route = computed(() => String(route.name || '').startsWith('InexigibilidadeArt74I'));
 const isFornecedorExclusivoRoute = computed(() =>
@@ -719,9 +725,9 @@ async function loadSlotCatalogSuggestions() {
 }
 async function loadCabecalhoOptions() {
   try {
-    const names = await fetchCabecalhosPrefeitura(API_BASE);
-    cabecalhoOptions.value = names;
-    if (cabecalhoDocumento.value && !names.includes(cabecalhoDocumento.value)) {
+    const opts = await fetchCabecalhosPrefeitura(API_BASE);
+    cabecalhoOptions.value = opts;
+    if (cabecalhoDocumento.value && !opts.some((o) => o.name === cabecalhoDocumento.value)) {
       cabecalhoDocumento.value = '';
     }
   } catch (_e) {
@@ -1134,6 +1140,7 @@ async function onSubmit() {
       slots_override: buildSlotsOverride(),
       slot_package_key: slotPackageKey.value,
     };
+    if (cabecalhoMergeTemplateId.value) payload.template_id = cabecalhoMergeTemplateId.value;
     const res = await fetch(`${API_BASE}/api/documentos/gerar-tr-e-dfd`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

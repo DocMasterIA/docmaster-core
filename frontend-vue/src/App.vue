@@ -168,7 +168,7 @@ const generationPages = [
         name: 'DispensaRapidaArt75IObrasEngenharia',
         label: 'Obras e serviços de engenharia',
         icon: 'fa-compass-drafting',
-        subsection: 'Art. 75, I',
+        subsection: 'Art. 75, II',
         to: '/geracao/dispensa-rapida/art-75-i/obras-servicos-engenharia',
       },
       {
@@ -210,7 +210,7 @@ const generationPages = [
         name: 'DispensaArt75IObrasEngenharia',
         label: 'Obras e serviços de engenharia',
         icon: 'fa-compass-drafting',
-        subsection: 'Art. 75, I',
+        subsection: 'Art. 75, II',
         to: '/geracao/dispensa-art-75-i/obras-servicos-engenharia',
       },
       {

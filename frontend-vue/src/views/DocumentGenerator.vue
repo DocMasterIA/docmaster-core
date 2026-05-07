@@ -1,15 +1,15 @@
 <template>
   <div class="doc-gen" :class="{ 'doc-gen--rapida': isDispensaNewUi || isEtpLivreRoute }">
-    <header class="gov-page-header">
+    <header class="doc-gen__page-header">
       <template v-if="isEtpLivreRoute">
-        <h1 class="gov-page-title">ETP Livre</h1>
-        <p class="gov-page-subtitle">
+        <h1 class="doc-gen__page-title">ETP Livre</h1>
+        <p class="doc-gen__page-subtitle">
           Estudo Técnico Preliminar com IA contextual: documento base opcional da biblioteca e prompt livre para o objeto da contratação.
         </p>
       </template>
       <template v-else>
-        <h1 class="gov-page-title">Gerador de Documentos</h1>
-        <p class="gov-page-subtitle">
+        <h1 class="doc-gen__page-title">Gerador de Documentos</h1>
+        <p class="doc-gen__page-subtitle">
           Crie documentos profissionais com conformidade governamental
         </p>
       </template>
@@ -1794,6 +1794,45 @@ function goToPage() {
   .doc-gen__grid {
     grid-template-columns: 1fr;
   }
+}
+.doc-gen__page-header {
+  display: block;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+.doc-gen__page-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.35;
+}
+.doc-gen__page-subtitle {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+/* O shell já mostra contexto global; no modo dispensa/ETP o cabeçalho local é oculto para evitar card vazio/duplicado. */
+.doc-gen.doc-gen--rapida .doc-gen__page-header {
+  display: none;
+}
+.dm-dark .doc-gen__page-header,
+.dm-dark-theme .doc-gen__page-header {
+  background: #0f172a;
+  border-color: #334155;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.dm-dark .doc-gen__page-title,
+.dm-dark-theme .doc-gen__page-title {
+  color: #f1f5f9;
+}
+.dm-dark .doc-gen__page-subtitle,
+.dm-dark-theme .doc-gen__page-subtitle {
+  color: #94a3b8;
 }
 .doc-gen__main {
   min-width: 0;

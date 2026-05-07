@@ -25,6 +25,17 @@
               <div class="ixp-field ixp-col-2">
                 <label>1.1 A quem é direcionada a solicitação — Nome</label>
                 <input v-model="ctx.fixoNome" list="da75-dl-solicitacao-destinatario-nome" placeholder="Digite o nome" />
+                <div class="ixp-inline-actions">
+                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('solicitacao_destinatario_nome', ctx.fixoNome)">Adicionar</button>
+                  <button
+                    type="button"
+                    class="ixp-btn-secondary ixp-btn-xs"
+                    :disabled="!ctx.canDeleteFieldHistory('solicitacao_destinatario_nome', ctx.fixoNome)"
+                    @click="ctx.removeFieldHistory('solicitacao_destinatario_nome', ctx.fixoNome)"
+                  >
+                    Excluir
+                  </button>
+                </div>
               </div>
             </div>
             <div class="ixp-grid-3">
@@ -38,6 +49,17 @@
               <div class="ixp-field ixp-col-2">
                 <label>1.2 A quem é direcionada a solicitação — Função / Cargo</label>
                 <input v-model="ctx.fixoCargo" list="da75-dl-solicitacao-destinatario-cargo" placeholder="Digite a função ou cargo" />
+                <div class="ixp-inline-actions">
+                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('solicitacao_destinatario_cargo', ctx.fixoCargo)">Adicionar</button>
+                  <button
+                    type="button"
+                    class="ixp-btn-secondary ixp-btn-xs"
+                    :disabled="!ctx.canDeleteFieldHistory('solicitacao_destinatario_cargo', ctx.fixoCargo)"
+                    @click="ctx.removeFieldHistory('solicitacao_destinatario_cargo', ctx.fixoCargo)"
+                  >
+                    Excluir
+                  </button>
+                </div>
               </div>
             </div>
             <div class="ixp-grid-2">

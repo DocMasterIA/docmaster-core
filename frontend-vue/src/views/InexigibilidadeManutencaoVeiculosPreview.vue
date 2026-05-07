@@ -43,7 +43,7 @@
               </div>
             </article>
 
-            <article class="ixp-card">
+            <article v-if="isDispensaNormalManutencaoVeiculosRoute" class="ixp-card">
               <h3>Dados do veiculo</h3>
               <div class="ixp-body ixp-grid-3">
                 <div class="ixp-field"><label>Marca</label><input v-model="marca" placeholder="Ex: Chevrolet" /></div>
@@ -438,6 +438,8 @@ const logicalRouteName = computed(() => DISPENSA_RAPIDA_TO_LOGICAL[route.name] |
 const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[logicalRouteName.value] || 'tr_dfd_generico');
 const isDispensaNormalRoute = computed(() => String(route.name || '').startsWith('DispensaArt75'));
 const isDispensaManutencaoRoute = computed(() => logicalRouteName.value === 'DispensaArt75IManutencaoVeiculos');
+/** Card marca/modelo/placa e slots de veículo: somente dispensa normal Art. 75 I manutenção (não inexigibilidade, obras, etc.). */
+const isDispensaNormalManutencaoVeiculosRoute = computed(() => route.name === 'DispensaArt75IManutencaoVeiculos');
 const slotFieldOptions = reactive({});
 const CATALOG_KEYS = [
   'cabecalho_documento',
@@ -830,22 +832,38 @@ function buildSlotsOverride() {
   if (responsavel.value.trim()) o.nome_assinante_termo = responsavel.value.trim();
   if (responsavelCargo.value.trim()) o.cargo_assinante_termo = responsavelCargo.value.trim();
 
-  const objetoFallback = [
-    tipoManutencao.value ? `Tipo: ${tipoManutencao.value}` : '',
-    marca.value ? `Marca: ${marca.value}` : '',
-    modelo.value ? `Modelo: ${modelo.value}` : '',
-    placa.value ? `Placa: ${placa.value}` : '',
-    revisaoKm.value ? `Revisao/KM: ${revisaoKm.value}` : '',
-  ].filter(Boolean).join(' | ');
+  const manutencaoFallbackParts = isDispensaManutencaoRoute.value
+    ? [
+        tipoManutencao.value ? `Tipo: ${tipoManutencao.value}` : '',
+        revisaoKm.value ? `Revisao/KM: ${revisaoKm.value}` : '',
+      ]
+    : [];
+  const veiculoFallbackParts = isDispensaNormalManutencaoVeiculosRoute.value
+    ? [
+        marca.value ? `Marca: ${marca.value}` : '',
+        modelo.value ? `Modelo: ${modelo.value}` : '',
+        placa.value ? `Placa: ${placa.value}` : '',
+      ]
+    : [];
+  const objetoFallback = [...manutencaoFallbackParts, ...veiculoFallbackParts].filter(Boolean).join(' | ');
   const justificativaFallback = fornecedor.value.trim()
     ? `Fornecedor exclusivo: ${fornecedor.value.trim()} (CNPJ: ${cnpj.value.trim() || 'nao informado'})`
     : '';
   const entregasFallback = valorGlobal.value.trim() ? `Valor total estimado: ${valorGlobal.value.trim()}` : '';
   const resultadosFallback = dotacaoAtiva.value && dotacao.value.trim() ? `Dotacao orcamentaria: ${dotacao.value.trim()}` : '';
-  o.objeto = clausulaObjeto.value.trim() || objetoFallback;
-  if (clausulaJustificativa.value.trim() || justificativaFallback) o.justificativa = clausulaJustificativa.value.trim() || justificativaFallback;
+  /*
+   * TR + DFD + Solicitacao/Oficio (rag_service): estes campos entram em slots_override e, apos
+   * fill_tr_slots_with_llm, _merge_slots() da prioridade ao override sobre a IA (tr_slots_llm.py).
+   * tr_template / dfd_template / oficio_template substituem placeholders a partir dos mesmos slots.
+   */
+  const objetoFinal = clausulaObjeto.value.trim() || objetoFallback;
+  o.objeto = objetoFinal;
+  const justificativaFinal = (clausulaJustificativa.value.trim() || justificativaFallback) || '';
+  if (justificativaFinal) o.justificativa = justificativaFinal;
   if (entregasFallback) o.objeto_entregas = entregasFallback;
   if (resultadosFallback) o.objeto_resultados = resultadosFallback;
+  if (objetoFinal.trim()) o.sol_oficio_objeto = objetoFinal.trim();
+  if (justificativaFinal.trim()) o.sol_oficio_justificativa = justificativaFinal.trim();
 
   const fundamentoLegal = SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE[logicalRouteName.value];
   if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;
@@ -981,12 +999,15 @@ function buildUserPrompt() {
     `Cabecalho do documento: ${cabecalhoDocumento.value || 'Nao informado'}`,
     `Processo: ${processoAtivo.value ? (processo.value || 'Nao informado') : 'Nao se aplica'}`,
     `Orgao: ${orgao.value || 'Nao informado'}`,
-    `Veiculo: ${marca.value || '-'} ${modelo.value || '-'} / Placa ${placa.value || '-'}`,
+    ...(isDispensaNormalManutencaoVeiculosRoute.value
+      ? [`Veiculo: ${marca.value || '-'} ${modelo.value || '-'} / Placa ${placa.value || '-'}`]
+      : []),
     `Fornecedor: ${fornecedor.value || 'Nao informado'} / CNPJ: ${cnpj.value || 'Nao informado'}`,
     `Valor global: ${valorGlobal.value || 'Nao informado'}`,
   ];
   if (isDispensaManutencaoRoute.value) {
-    lines.splice(5, 0, `Tipo manutencao: ${tipoManutencao.value || 'Nao informado'}`);
+    const idx = isDispensaNormalManutencaoVeiculosRoute.value ? 5 : 4;
+    lines.splice(idx, 0, `Tipo manutencao: ${tipoManutencao.value || 'Nao informado'}`);
   }
   return lines.join('\n');
 }
@@ -1068,7 +1089,7 @@ const secoes = computed(() => {
   const itensValidos = itens.value.filter((i) => Object.values(i).some(isFilled));
   return [
     { titulo: 'Dados basicos', completo: isFilled(cabecalhoDocumento.value) && (!processoAtivo.value || isFilled(processo.value)) && isFilled(orgao.value), linhas: [['Cabecalho', cabecalhoDocumento.value || 'Nao informado', isFilled(cabecalhoDocumento.value)], ['Processo', processoAtivo.value ? processo.value || 'Nao informado' : 'Nao se aplica', !processoAtivo.value || isFilled(processo.value)], ['Orgao', orgao.value || 'Nao informado', isFilled(orgao.value)]] },
-    { titulo: 'Veiculo', completo: isFilled(marca.value) && isFilled(modelo.value) && isFilled(placa.value), linhas: [['Marca', marca.value || 'Nao informado', isFilled(marca.value)], ['Modelo', modelo.value || 'Nao informado', isFilled(modelo.value)], ['Placa', placa.value || 'Nao informado', isFilled(placa.value)]] },
+    ...(isDispensaNormalManutencaoVeiculosRoute.value ? [{ titulo: 'Veiculo', completo: isFilled(marca.value) && isFilled(modelo.value) && isFilled(placa.value), linhas: [['Marca', marca.value || 'Nao informado', isFilled(marca.value)], ['Modelo', modelo.value || 'Nao informado', isFilled(modelo.value)], ['Placa', placa.value || 'Nao informado', isFilled(placa.value)]] }] : []),
     ...(isDispensaManutencaoRoute.value ? [{
       titulo: 'Manutencao',
       completo: isFilled(tipoManutencao.value) && (tipoManutencao.value !== 'Preventiva' || isFilled(revisaoKm.value)),

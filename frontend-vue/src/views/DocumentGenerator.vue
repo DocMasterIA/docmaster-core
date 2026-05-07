@@ -1,20 +1,34 @@
 <template>
-  <div class="doc-gen" :class="{ 'doc-gen--rapida': isDispensaNewUi }">
+  <div class="doc-gen" :class="{ 'doc-gen--rapida': isDispensaNewUi || isEtpLivreRoute }">
     <header class="gov-page-header">
-      <h1 class="gov-page-title">Gerador de Documentos</h1>
-      <p class="gov-page-subtitle">
-        Crie documentos profissionais com conformidade governamental
-      </p>
+      <template v-if="isEtpLivreRoute">
+        <h1 class="gov-page-title">ETP Livre</h1>
+        <p class="gov-page-subtitle">
+          Estudo Técnico Preliminar com IA contextual: documento base opcional da biblioteca e prompt livre para o objeto da contratação.
+        </p>
+      </template>
+      <template v-else>
+        <h1 class="gov-page-title">Gerador de Documentos</h1>
+        <p class="gov-page-subtitle">
+          Crie documentos profissionais com conformidade governamental
+        </p>
+      </template>
     </header>
 
     <div class="doc-gen__grid" :class="{ 'doc-gen__grid--single': !showSlotsCard }">
       <!-- Coluna esquerda: wizard -->
       <div class="doc-gen__main">
-        <section class="gov-surface doc-gen__wizard">
+        <section class="gov-surface doc-gen__wizard" :class="{ 'doc-gen__wizard--etp': isEtpLivreRoute }">
           <div class="gov-surface__header">
             <div>
-              <h2 class="gov-surface__title">Assistente de Criação</h2>
-              <p class="gov-surface__subtitle">Guia executivo para documentação profissional</p>
+              <template v-if="isEtpLivreRoute">
+                <h2 class="gov-surface__title">Assistente de ETP</h2>
+                <p class="gov-surface__subtitle">Selecione um modelo da biblioteca (opcional), descreva o objeto e gere DOCX ou PDF.</p>
+              </template>
+              <template v-else>
+                <h2 class="gov-surface__title">Assistente de Criação</h2>
+                <p class="gov-surface__subtitle">Guia executivo para documentação profissional</p>
+              </template>
             </div>
           </div>
 
@@ -787,6 +801,7 @@ const previewImageUrl = computed(() => {
   return img.startsWith('http') ? img : `${API_BASE}${img}`;
 });
 
+/** Rota `/geracao/etp-livre` — mesma UI nova que dispensa rápida (`doc-gen--rapida`) + tema escuro. */
 const isEtpLivreRoute = computed(() => route.name === 'EtpLivre');
 const documentTypeHint = computed(() => (isEtpLivreRoute.value ? 'etp' : null));
 const showSlotsCard = computed(() => !isEtpLivreRoute.value);
@@ -2602,6 +2617,11 @@ function goToPage() {
   background: #fff;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
+.doc-gen.doc-gen--rapida :deep(.doc-gen__wizard.doc-gen__wizard--etp) {
+  max-height: none;
+  height: auto;
+  min-height: min(72vh, 720px);
+}
 .doc-gen.doc-gen--rapida :deep(.doc-gen__variables-card) {
   position: sticky;
   top: 12px;
@@ -2714,8 +2734,243 @@ function goToPage() {
 .doc-gen.doc-gen--rapida :deep(.doc-gen__result-item--focused) {
   background: #f8fafc;
 }
+.doc-gen.doc-gen--rapida :deep(.doc-gen__result-name) {
+  color: #0f172a;
+  font-weight: 600;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__result-item--empty) {
+  color: #94a3b8;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__error) {
+  display: block;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__error-text) {
+  display: block;
+  margin: 0;
+  font-size: 13px;
+  color: #b91c1c;
+  line-height: 1.45;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__success) {
+  display: block;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #86efac;
+  background: #f0fdf4;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__success-title) {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #166534;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__loader-wrap) {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+.doc-gen.doc-gen--rapida :deep(.doc-gen__loader-text) {
+  color: #334155;
+}
 .doc-gen.doc-gen--rapida :deep(.doc-gen__var-heading),
 .doc-gen.doc-gen--rapida :deep(.doc-gen__slot-subheading) {
   color: #334155;
+}
+
+/* Tema escuro: UI nova (dispensa rápida + ETP livre) */
+.dm-dark .doc-gen.doc-gen--rapida,
+.dm-dark-theme .doc-gen.doc-gen--rapida {
+  color: #e2e8f0;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-page-header),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-page-header) {
+  background: #0f172a;
+  border-color: #334155;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-page-title),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-page-title) {
+  color: #f1f5f9;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-page-subtitle),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-page-subtitle) {
+  color: #94a3b8;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__wizard),
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__variables-card),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__wizard),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__variables-card) {
+  background: #0f172a;
+  border-color: #334155;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-surface__header),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-surface__header) {
+  border-color: #334155;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-surface__title),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-surface__title) {
+  color: #e2e8f0;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-surface__subtitle),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-surface__subtitle) {
+  color: #94a3b8;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-label),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-label) {
+  color: #cbd5e1;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-label__hint),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-label__hint) {
+  color: #94a3b8;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-input),
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-textarea),
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__search-input),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-input),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-textarea),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__search-input) {
+  background: #0b1222;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-input::placeholder),
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-textarea::placeholder),
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__search-input::placeholder),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-input::placeholder),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-textarea::placeholder),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__search-input::placeholder) {
+  color: #64748b;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-input:focus),
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-textarea:focus),
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__search-input:focus),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-input:focus),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-textarea:focus),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__search-input:focus) {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.22);
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-btn--primary),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-btn--primary) {
+  background: #38bdf8;
+  color: #0f172a;
+  border-color: #38bdf8;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-btn--primary:hover:not(:disabled)),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-btn--primary:hover:not(:disabled)) {
+  background: #7dd3fc;
+  border-color: #7dd3fc;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-btn--secondary),
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-btn--outline),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-btn--secondary),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-btn--outline) {
+  background: #0b1222;
+  color: #e2e8f0;
+  border-color: #334155;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-btn--secondary:hover:not(:disabled)),
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-btn--outline:hover:not(:disabled)),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-btn--secondary:hover:not(:disabled)),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-btn--outline:hover:not(:disabled)) {
+  background: #1e293b;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-text-soft),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-text-soft) {
+  color: #94a3b8;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.gov-link),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.gov-link) {
+  color: #7dd3fc;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__llm-hint),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__llm-hint) {
+  background: #082f49;
+  border-color: #0ea5e9;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__llm-hint strong),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__llm-hint strong) {
+  color: #e2e8f0;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__results),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__results) {
+  background: #0f172a;
+  border-color: #334155;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__result-item:hover),
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__result-item--focused),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__result-item:hover),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__result-item--focused) {
+  background: #1e293b;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__result-name),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__result-name) {
+  color: #e2e8f0;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__result-item--empty),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__result-item--empty) {
+  color: #64748b;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__result-icon),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__result-icon) {
+  color: #38bdf8;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__error),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__error) {
+  border-color: #9f1239;
+  background: #3f1d2e;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__error-text),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__error-text) {
+  color: #fecdd3;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__success),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__success) {
+  border-color: #166534;
+  background: #052e16;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__success-title),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__success-title) {
+  color: #bbf7d0;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__loader-wrap),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__loader-wrap) {
+  background: #082f49;
+  border-color: #0ea5e9;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__loader-text),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__loader-text) {
+  color: #bae6fd;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__pl-ring--a),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__pl-ring--a) {
+  stroke: #38bdf8;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__pl-ring--b),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__pl-ring--b) {
+  stroke: #7dd3fc;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__pl-ring--c),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__pl-ring--c) {
+  stroke: #0ea5e9;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__pl-ring--d),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__pl-ring--d) {
+  stroke: #bae6fd;
+}
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__var-heading),
+.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__slot-subheading),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__var-heading),
+.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__slot-subheading) {
+  color: #cbd5e1;
 }
 </style>

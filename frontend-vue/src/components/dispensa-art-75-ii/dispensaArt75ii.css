@@ -161,6 +161,16 @@
   color: #94a3b8;
 }
 
+.da75-inline-link {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.da75-inline-link:hover {
+  color: #1d4ed8;
+}
+
 .da75-input,
 .da75-select,
 .da75-textarea {
@@ -986,4 +996,14 @@
 .dm-dark .da75-title,
 .dm-dark-theme .da75-title {
   color: #f8fafc;
+}
+
+.dm-dark .da75-inline-link,
+.dm-dark-theme .da75-inline-link {
+  color: #7dd3fc;
+}
+
+.dm-dark .da75-inline-link:hover,
+.dm-dark-theme .da75-inline-link:hover {
+  color: #bae6fd;
 }

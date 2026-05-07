@@ -23,10 +23,14 @@
                 <div class="da75-row da75-row--basic">
                   <div class="da75-field">
                     <label class="da75-label da75-label--compact">Cabeçalho do documento</label>
-                    <select class="da75-select da75-select--sm" :value="cabecalho" @change="cabecalho = ($event.target).value">
-                      <option value="">Selecione</option>
-                      <option v-for="o in CABECALHOS_DOCUMENTO" :key="o" :value="o">{{ o }}</option>
+                    <select v-model="cabecalho" class="da75-select da75-select--sm" :disabled="cabecalhosLoading">
+                      <option value="">{{ cabecalhosLoading ? 'Carregando…' : 'Selecione' }}</option>
+                      <option v-for="op in cabecalhoOptions" :key="op" :value="op">{{ op }}</option>
                     </select>
+                    <p v-if="!cabecalhosLoading && cabecalhoOptions.length === 0" class="da75-helper da75-mt-sm">
+                      Nenhum modelo na biblioteca para a sua prefeitura.
+                      <router-link to="/biblioteca" class="da75-inline-link">Abrir biblioteca</router-link>
+                    </p>
                   </div>
                   <div class="da75-field">
                     <label class="da75-label da75-label--compact">Órgão / dados fixos</label>
@@ -168,9 +172,8 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import {
-  CABECALHOS_DOCUMENTO,
   DATA_OPTIONS,
   PLACEHOLDER_DOTACAO,
   campoPreenchido,
@@ -179,8 +182,13 @@ import {
 } from './dispensaArt75iiShared.js';
 import './dispensaArt75ii.css';
 import DispensaArt75IIDrawer from './DispensaArt75IIDrawer.vue';
+import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
+
+const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 
 const drawerAberto = ref(false);
+const cabecalhoOptions = ref([]);
+const cabecalhosLoading = ref(false);
 const perfis = ref([]);
 const perfilSelecionadoId = ref('');
 const cabecalho = ref('');
@@ -197,6 +205,17 @@ const rapidaObjPlaceholder = `Ex: Aquisição de material de expediente para Sec
 
 watch(dotacaoAtiva, (v) => {
   if (!v) dotacao.value = '';
+});
+
+onMounted(async () => {
+  cabecalhosLoading.value = true;
+  try {
+    const names = await fetchCabecalhosPrefeitura(API_BASE);
+    cabecalhoOptions.value = names;
+    if (cabecalho.value && !names.includes(cabecalho.value)) cabecalho.value = '';
+  } finally {
+    cabecalhosLoading.value = false;
+  }
 });
 
 const perfilSelecionado = computed(() => perfis.value.find((p) => p.id === perfilSelecionadoId.value));

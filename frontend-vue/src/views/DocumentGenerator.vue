@@ -350,6 +350,14 @@
                   >
                     + Adicionar
                   </button>
+                  <button
+                    type="button"
+                    class="gov-btn gov-btn--outline gov-btn--sm doc-gen__combo-add"
+                    :disabled="!canRemoveFieldOption(field.id)"
+                    @click="removeFieldOption(field.id, slotForm[field.id])"
+                  >
+                    Excluir
+                  </button>
                   <div
                     v-if="isFieldSuggestionsOpen(field.id)"
                     class="doc-gen__slot-suggestions"
@@ -385,6 +393,14 @@
                     @click="addFieldOption(field.id)"
                   >
                     + Adicionar
+                  </button>
+                  <button
+                    type="button"
+                    class="gov-btn gov-btn--outline gov-btn--sm doc-gen__combo-add"
+                    :disabled="!canRemoveFieldOption(field.id)"
+                    @click="removeFieldOption(field.id, slotForm[field.id])"
+                  >
+                    Excluir
                   </button>
                   <div
                     v-if="isFieldSuggestionsOpen(field.id)"
@@ -880,6 +896,13 @@ function getFieldSuggestions(fieldId) {
   const q = String(slotForm[fieldId] || '').trim().toLowerCase();
   if (!q) return all;
   return all.filter((x) => String(x).toLowerCase().includes(q));
+}
+
+function canRemoveFieldOption(fieldId) {
+  const current = String(slotForm[fieldId] || '').trim();
+  if (!current) return false;
+  const list = Array.isArray(slotFieldOptions[fieldId]) ? slotFieldOptions[fieldId] : [];
+  return list.includes(current);
 }
 
 function openFieldSuggestions(fieldId) {

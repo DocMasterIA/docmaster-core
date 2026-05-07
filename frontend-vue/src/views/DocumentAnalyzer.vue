@@ -443,7 +443,8 @@ onUnmounted(() => {
   border-radius: var(--radius-lg);
   padding: 32px 24px;
   text-align: center;
-  background: var(--color-bg-soft);
+  /* Nao usar --color-bg-soft no dropzone: no dark o :root mantem o valor claro e o card fica “branco”. */
+  background: #f1f5f9;
   transition: border-color 0.2s, background 0.2s;
 }
 .doc-analyzer__dropzone:hover,
@@ -488,7 +489,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  background: var(--color-bg-soft);
+  background: #f8fafc;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-size: 13px;
@@ -777,5 +778,50 @@ onUnmounted(() => {
 :global(.dm-dark) .doc-analyzer .doc-analyzer__resumo-executivo,
 :global(.dm-dark-theme) .doc-analyzer .doc-analyzer__resumo-executivo {
   color: #cbd5e1;
+}
+</style>
+
+<!-- Sem scoped: vence :root/--color-bg-soft e regras globais do App; html/body levam dm-dark-theme -->
+<style>
+html.dm-dark-theme .doc-analyzer .doc-analyzer__dropzone,
+body.dm-dark-theme .doc-analyzer .doc-analyzer__dropzone,
+.dm-layout-bg.dm-dark .doc-analyzer .doc-analyzer__dropzone {
+  background: #0b1222 !important;
+  border-color: #475569 !important;
+}
+
+html.dm-dark-theme .doc-analyzer .doc-analyzer__dropzone:hover,
+html.dm-dark-theme .doc-analyzer .doc-analyzer__dropzone--active,
+body.dm-dark-theme .doc-analyzer .doc-analyzer__dropzone:hover,
+body.dm-dark-theme .doc-analyzer .doc-analyzer__dropzone--active,
+.dm-layout-bg.dm-dark .doc-analyzer .doc-analyzer__dropzone:hover,
+.dm-layout-bg.dm-dark .doc-analyzer .doc-analyzer__dropzone--active {
+  background: #082f49 !important;
+  border-color: #38bdf8 !important;
+}
+
+html.dm-dark-theme .doc-analyzer .doc-analyzer__dropzone-text,
+body.dm-dark-theme .doc-analyzer .doc-analyzer__dropzone-text,
+.dm-layout-bg.dm-dark .doc-analyzer .doc-analyzer__dropzone-text {
+  color: #e2e8f0 !important;
+}
+
+html.dm-dark-theme .doc-analyzer .doc-analyzer__dropzone-content .gov-text-soft,
+body.dm-dark-theme .doc-analyzer .doc-analyzer__dropzone-content .gov-text-soft,
+.dm-layout-bg.dm-dark .doc-analyzer .doc-analyzer__dropzone-content .gov-text-soft {
+  color: #94a3b8 !important;
+}
+
+html.dm-dark-theme .doc-analyzer .doc-analyzer__dropzone-icon,
+body.dm-dark-theme .doc-analyzer .doc-analyzer__dropzone-icon,
+.dm-layout-bg.dm-dark .doc-analyzer .doc-analyzer__dropzone-icon {
+  color: #38bdf8 !important;
+}
+
+html.dm-dark-theme .doc-analyzer .doc-analyzer__file-item,
+body.dm-dark-theme .doc-analyzer .doc-analyzer__file-item,
+.dm-layout-bg.dm-dark .doc-analyzer .doc-analyzer__file-item {
+  background: #0b1222 !important;
+  border-color: #334155 !important;
 }
 </style>

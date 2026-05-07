@@ -54,40 +54,15 @@
             </section>
 
             <section class="da75-block">
-              <h3>Objeto da contratação e justificativa</h3>
+              <h3>O que será contratado?</h3>
               <div class="da75-block__body">
-                <div class="da75-stack">
-                  <div class="da75-field">
-                    <label class="da75-label">O que será contratado?</label>
-                    <textarea
-                      class="da75-textarea"
-                      :value="objetoContratado"
-                      :placeholder="rapidaObjPlaceholder"
-                      @input="objetoContratado = primeiraMaiuscula(($event.target).value)"
-                    />
-                  </div>
-                  <button type="button" class="da75-btn da75-btn--primary da75-btn--block" :disabled="isGerandoClausulas" @click="gerar">
-                    {{ isGerandoClausulas ? 'Gerando objeto e justificativa...' : 'Gerar objeto e justificativa' }}
-                  </button>
-                  <p v-if="erroGeracaoClausulas" class="da75-helper">{{ erroGeracaoClausulas }}</p>
-                  <div class="da75-field">
-                    <label class="da75-label">Objeto gerado pela IA</label>
-                    <textarea
-                      class="da75-textarea"
-                      rows="5"
-                      :value="objetoGerado"
-                      @input="objetoGerado = primeiraMaiuscula(($event.target).value)"
-                    />
-                  </div>
-                  <div class="da75-field">
-                    <label class="da75-label">Justificativa da contratação</label>
-                    <textarea
-                      class="da75-textarea"
-                      rows="5"
-                      :value="justificativa"
-                      @input="justificativa = primeiraMaiuscula(($event.target).value)"
-                    />
-                  </div>
+                <div class="da75-field">
+                  <textarea
+                    class="da75-textarea"
+                    :value="objetoContratado"
+                    :placeholder="rapidaObjPlaceholder"
+                    @input="objetoContratado = primeiraMaiuscula(($event.target).value)"
+                  />
                 </div>
               </div>
             </section>
@@ -159,7 +134,7 @@
 
             <div class="da75-space-y">
               <button type="button" class="da75-btn da75-btn--primary" :disabled="isSubmitting" @click="onSubmit">
-                {{ isSubmitting ? 'Gerando...' : 'Gerar documento com IA' }}
+                {{ isSubmitting ? 'Gerando documentos...' : 'Gerar documento com IA' }}
               </button>
               <p v-if="generateError" class="da75-helper">{{ generateError }}</p>
               <p v-if="successMessage" class="da75-helper">{{ successMessage }}</p>
@@ -264,8 +239,6 @@ const dataManual = ref('');
 const cotacaoAtiva = ref(false);
 const numeroCotacao = ref('');
 const isSubmitting = ref(false);
-const isGerandoClausulas = ref(false);
-const erroGeracaoClausulas = ref('');
 const generateError = ref('');
 const successMessage = ref('');
 const documentReady = ref(false);
@@ -341,15 +314,10 @@ const secoes = computed(() => {
       ],
     },
     {
-      titulo: 'Objeto e justificativa',
-      completo:
-        campoPreenchido(objetoContratado.value) &&
-        campoPreenchido(objetoGerado.value) &&
-        campoPreenchido(justificativa.value),
+      titulo: 'Objeto da contratação',
+      completo: campoPreenchido(objetoContratado.value),
       linhas: [
-        ['O que será contratado', objetoContratado.value || 'Não informado', campoPreenchido(objetoContratado.value)],
-        ['Objeto gerado', objetoGerado.value || 'Não informado', campoPreenchido(objetoGerado.value)],
-        ['Justificativa', justificativa.value || 'Não informada', campoPreenchido(justificativa.value)],
+        ['Resumo do objeto', objetoContratado.value || 'Não informado', campoPreenchido(objetoContratado.value)],
       ],
     },
     {
@@ -398,14 +366,11 @@ function slotsOverrideWithoutClauseDraft(raw) {
   return Object.keys(o).length ? o : null;
 }
 
-async function gerar() {
-  erroGeracaoClausulas.value = '';
+/** Preenche objeto e justificativa (RAG + fallback) só em memória, para o merge nos DOCX. */
+async function preencherObjetoEJustificativaInterno() {
   const contratado = String(objetoContratado.value || '').trim();
-  if (!contratado) {
-    erroGeracaoClausulas.value = 'Preencha "O que será contratado?".';
-    return;
-  }
-  isGerandoClausulas.value = true;
+  objetoGerado.value = '';
+  justificativa.value = '';
   try {
     const res = await fetch(`${API_BASE}/api/documentos/fill-tr-slots`, {
       method: 'POST',
@@ -429,9 +394,6 @@ async function gerar() {
   } catch (_e) {
     objetoGerado.value = gerarObjetoTexto(contratado, '', '');
     justificativa.value = gerarJustificativaTexto(contratado, '', '');
-    erroGeracaoClausulas.value = 'Falha na IA; aplicamos versão padrão local.';
-  } finally {
-    isGerandoClausulas.value = false;
   }
 }
 
@@ -525,10 +487,11 @@ async function onSubmit() {
   documentReady.value = false;
   revokeDocumentUrls();
   try {
-    if (!objetoGerado.value.trim() || !justificativa.value.trim()) {
-      generateError.value = 'Gere (ou preencha) Objeto e Justificativa antes de gerar o documento.';
+    if (!String(objetoContratado.value || '').trim()) {
+      generateError.value = 'Preencha o campo «O que será contratado?» antes de gerar o documento.';
       return;
     }
+    await preencherObjetoEJustificativaInterno();
     const payload = {
       user_prompt: buildUserPrompt(),
       slots_override: buildSlotsOverride(),

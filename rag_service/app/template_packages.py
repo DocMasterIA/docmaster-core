@@ -18,13 +18,12 @@ PACKAGE_DIRS: Dict[str, str] = {
     "dispensa_75_ii_compras_servicos_inclusos": "dispensa_75_ii_compras_servicos_inclusos",
     "inexigibilidade_74_i_show_artistico": "inexigibilidade_74_i_show_artistico",
     "inexigibilidade_74_i_fornecedor_exclusivo": "tr_dfd_generico",
-    "inexigibilidade_74_i_manutencao_veiculos": "tr_dfd_generico",
+    "inexigibilidade_74_i_manutencao_veiculos": "inexigibilidade_74_i_manutencao_de_veiculos",
     "tr_dfd_generico": "tr_dfd_generico",
 }
 
 CUSTOM_TR_BASE_BY_PACKAGE: Dict[str, str] = {
     "inexigibilidade_74_i_fornecedor_exclusivo": "TERMO DE REFERENCIA IA - ART 74 I - FORNECEDOR EXCLUSIVO.docx",
-    "inexigibilidade_74_i_manutencao_veiculos": "1-TERMO DE REFERENCIA IA - ART 74 I - MANUTENÇÃO DE VEICULOS.docx",
 }
 
 

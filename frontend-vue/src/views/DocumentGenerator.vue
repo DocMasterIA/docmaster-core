@@ -1129,10 +1129,14 @@ function buildTrSlotsOverride() {
 
   const solDestNome = (f.solicitacao_destinatario_nome || '').trim();
   const solDestCargo = (f.solicitacao_destinatario_cargo || '').trim();
+  const solDestTratNome = (f.solicitacao_destinatario_tratamento_nome || '').trim();
+  const solDestTratCargo = (f.solicitacao_destinatario_tratamento_cargo || '').trim();
   const solRespNome = (f.solicitacao_responsavel_nome || '').trim();
   const solRespCargo = (f.solicitacao_responsavel_cargo || '').trim();
   if (solDestNome) o.sol_oficio_destinatario_nome = solDestNome;
   if (solDestCargo) o.sol_oficio_destinatario_cargo = solDestCargo;
+  if (solDestTratNome) o.ao_senhor_genero = solDestTratNome;
+  if (solDestTratCargo) o.senhor_senhora_genero = solDestTratCargo;
   if (solRespNome) o.sol_oficio_responsavel_nome = solRespNome;
   if (solRespCargo) o.sol_oficio_responsavel_cargo = solRespCargo;
 

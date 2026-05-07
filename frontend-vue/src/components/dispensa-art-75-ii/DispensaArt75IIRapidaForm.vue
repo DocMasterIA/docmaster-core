@@ -465,10 +465,14 @@ function buildSlotsOverride() {
   const destCargo = String(dadosFixos.fixoCargo || '').trim();
   const respNome = String(dadosFixos.fixoResponsavel || '').trim();
   const respCargo = String(dadosFixos.fixoResponsavelCargo || '').trim();
+  const tratNome = String(dadosFixos.fixoTratNome || '').trim();
+  const tratCargo = String(dadosFixos.fixoTratCargo || '').trim();
   if (destNome) o.sol_oficio_destinatario_nome = destNome;
   if (destCargo) o.sol_oficio_destinatario_cargo = destCargo;
   if (respNome) o.sol_oficio_responsavel_nome = respNome;
   if (respCargo) o.sol_oficio_responsavel_cargo = respCargo;
+  if (tratNome) o.ao_senhor_genero = tratNome;
+  if (tratCargo) o.senhor_senhora_genero = tratCargo;
   if (String(dadosFixos.fixoSetor || '').trim()) o.dfd_setor_requisitante = String(dadosFixos.fixoSetor).trim();
   if (String(dadosFixos.fixoDemanda || '').trim()) o.dfd_responsavel_demanda = String(dadosFixos.fixoDemanda).trim();
   if (String(dadosFixos.fixoEmail || '').trim()) o.dfd_email = String(dadosFixos.fixoEmail).trim();

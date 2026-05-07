@@ -120,6 +120,8 @@ class TRTemplateSlots:
     valor_total: str = ""
     fornecedor: str = ""
     cnpj_fornecedor: str = ""
+    ao_senhor_genero: str = ""
+    senhor_senhora_genero: str = ""
 
 
 def _style_items_table(table) -> None:
@@ -490,6 +492,10 @@ def render_tr_from_slots(
         "( FORNECEDOR )": slots.fornecedor or "",
         "(CNPJ FORNECEDOR)": slots.cnpj_fornecedor or "",
         "( CNPJ FORNECEDOR )": slots.cnpj_fornecedor or "",
+        "(AO_SENHOR_GENERO)": slots.ao_senhor_genero or "",
+        "( AO_SENHOR_GENERO )": slots.ao_senhor_genero or "",
+        "(SENHOR_SENHORA_GENERO)": slots.senhor_senhora_genero or "",
+        "( SENHOR_SENHORA_GENERO )": slots.senhor_senhora_genero or "",
         # Compatibilidade entre variantes de pacotes TR_modelo_base
         "(TR_OBJETO_MANUAL)": slots.objeto or "",
         "(TR_BENEFICIO_ESPERADO)": beneficio_text,

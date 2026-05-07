@@ -31,13 +31,13 @@ const routes = [
   {
     path: '/geracao/dispensa-art-75-i/obras-servicos-engenharia',
     name: 'DispensaArt75IObrasEngenharia',
-    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
+    component: () => import('../views/DispensaArt75IINormalReactPreview.vue'),
     meta: { title: 'Dispensa - Art. 75, I - Obras e Serviços de Engenharia' },
   },
   {
     path: '/geracao/dispensa-art-75-i/manutencao-veiculos',
     name: 'DispensaArt75IManutencaoVeiculos',
-    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
+    component: () => import('../views/DispensaArt75IINormalReactPreview.vue'),
     meta: { title: 'Dispensa - Art. 75, I - Manutenção de Veículos' },
   },
   {

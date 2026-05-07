@@ -56,11 +56,45 @@
             </article>
 
             <article class="fe-card">
+              <h3>Gerar objeto e justificativa (IA)</h3>
+              <div class="fe-body">
+                <div class="fe-field">
+                  <label>O que será contratado?</label>
+                  <textarea
+                    v-model="clausulaContratado"
+                    rows="3"
+                    placeholder="Ex: Aquisição de material de expediente para Secretaria da Administração&#10;10 canetas azul, 2 grampeadores, 10 resmas de papel A4"
+                  />
+                </div>
+                <div class="fe-field">
+                  <label>Qual setor/secretaria será atendido?</label>
+                  <input v-model="clausulaSetor" placeholder="Ex: Secretaria de Administração" />
+                </div>
+                <div class="fe-field">
+                  <label>Características mínimas obrigatórias (opcional)</label>
+                  <textarea v-model="clausulaCaracteristicas" rows="3" placeholder="Ex: Para uso contínuo das unidades administrativas" />
+                </div>
+                <button type="button" class="fe-btn-secondary" :disabled="isGeneratingClauses" @click="onGenerateClauses">
+                  {{ isGeneratingClauses ? 'Gerando objeto e justificativa...' : 'Gerar objeto e justificativa' }}
+                </button>
+                <div class="fe-field">
+                  <label>Objeto gerado pela IA</label>
+                  <textarea v-model="clausulaObjeto" rows="3" placeholder="Objeto do TR (gerado por IA ou manual)" />
+                </div>
+                <div class="fe-field">
+                  <label>Justificativa da contratação</label>
+                  <textarea v-model="clausulaJustificativa" rows="4" placeholder="Justificativa da necessidade" />
+                </div>
+                <p v-if="iaError" class="fe-error">{{ iaError }}</p>
+              </div>
+            </article>
+
+            <article class="fe-card">
               <h3>Dados do equipamento</h3>
               <div class="fe-body fe-grid-3">
-                <div class="fe-field"><label>Equipamento</label><input v-model="equipamento" /></div>
-                <div class="fe-field"><label>Marca</label><input v-model="marca" /></div>
-                <div class="fe-field"><label>Modelo</label><input v-model="modelo" /></div>
+                <div class="fe-field"><label>Equipamento</label><input v-model="equipamento" placeholder="Ex: Aparelho de raio-X" /></div>
+                <div class="fe-field"><label>Marca</label><input v-model="marca" placeholder="Ex: Siemens" /></div>
+                <div class="fe-field"><label>Modelo</label><input v-model="modelo" placeholder="Ex: Multix Select DR" /></div>
               </div>
             </article>
 
@@ -69,7 +103,7 @@
               <div class="fe-body fe-grid-2">
                 <div class="fe-field">
                   <label>Razão social / Nome do fornecedor</label>
-                  <input v-model="fornecedor" @input="fornecedor = iniciarComMaiuscula(fornecedor)" />
+                  <input v-model="fornecedor" placeholder="Digite a razão social" @input="fornecedor = iniciarComMaiuscula(fornecedor)" />
                 </div>
                 <div class="fe-field">
                   <label>CNPJ</label>
@@ -101,9 +135,9 @@
                     <button v-if="itens.length > 1" type="button" class="fe-link-danger" @click="removerItem(index)">Remover</button>
                   </div>
                   <div class="fe-grid-item">
-                    <div class="fe-field"><label>Descrição</label><input :value="item.descricao" @input="atualizarItem(index, 'descricao', $event)" /></div>
-                    <div class="fe-field"><label>Quantidade</label><input :value="item.quantidade" @input="atualizarItem(index, 'quantidade', $event)" /></div>
-                    <div class="fe-field"><label>Unidade medida</label><input :value="item.unidade" @input="atualizarItem(index, 'unidade', $event)" /></div>
+                    <div class="fe-field"><label>Descrição</label><input :value="item.descricao" placeholder="Descreva o item" @input="atualizarItem(index, 'descricao', $event)" /></div>
+                    <div class="fe-field"><label>Quantidade</label><input :value="item.quantidade" placeholder="1" @input="atualizarItem(index, 'quantidade', $event)" /></div>
+                    <div class="fe-field"><label>Unidade medida</label><input :value="item.unidade" placeholder="Ex: Unidade" @input="atualizarItem(index, 'unidade', $event)" /></div>
                     <div class="fe-field"><label>Valor unitário</label><input :value="item.valorUnitario" @input="atualizarItem(index, 'valorUnitario', $event)" /></div>
                     <div class="fe-field"><label>Valor total</label><input :value="item.valorTotal" @input="atualizarItem(index, 'valorTotal', $event)" /></div>
                     <button type="button" class="fe-btn-secondary" @click="adicionarItem">+</button>
@@ -118,14 +152,14 @@
 
             <article class="fe-card">
               <h3>Fiscalização</h3>
-              <div class="fe-body"><div class="fe-field"><label>Nome do fiscal de contratos</label><input v-model="fiscal" /></div></div>
+              <div class="fe-body"><div class="fe-field"><label>Nome do fiscal de contratos</label><input v-model="fiscal" placeholder="Digite o nome do fiscal de contratos" /></div></div>
             </article>
 
             <article class="fe-card">
               <h3>Responsável pelo Termo de Referência</h3>
               <div class="fe-body fe-grid-2">
-                <div class="fe-field"><label>Nome do responsável</label><input v-model="responsavel" /></div>
-                <div class="fe-field"><label>Cargo/Função</label><input v-model="responsavelCargo" /></div>
+                <div class="fe-field"><label>Nome do responsável</label><input v-model="responsavel" placeholder="Digite o nome" /></div>
+                <div class="fe-field"><label>Cargo/Função</label><input v-model="responsavelCargo" placeholder="Digite o cargo" /></div>
               </div>
             </article>
 
@@ -143,6 +177,22 @@
                   <label>Data manual</label>
                   <input :value="dataManual" @input="dataManual = formatarData(String($event.target.value || ''))" />
                 </div>
+              </div>
+            </article>
+
+            <article class="fe-card">
+              <div class="fe-actions">
+                <button type="button" class="fe-btn-primary fe-btn-generate" :disabled="isSubmitting" @click="onSubmit">
+                  {{ isSubmitting ? 'Processando com IA...' : 'Gerar Documento com IA' }}
+                </button>
+                <template v-if="documentReady">
+                  <a v-if="documentTrUrl" :href="documentTrUrl" :download="documentTrFilename" class="fe-btn-secondary">Download TR (DOCX)</a>
+                  <a v-if="documentDfdUrl" :href="documentDfdUrl" :download="documentDfdFilename" class="fe-btn-secondary">Download DFD (DOCX)</a>
+                  <a v-if="documentOficioUrl" :href="documentOficioUrl" :download="documentOficioFilename" class="fe-btn-secondary">Download Solicitação/Ofício (DOCX)</a>
+                  <a v-if="documentZipUrl" :href="documentZipUrl" :download="documentZipFilename" class="fe-btn-secondary">Download TR+DFD+Ofício (ZIP)</a>
+                </template>
+                <p v-if="generateError" class="fe-error">{{ generateError }}</p>
+                <p v-if="documentReady && successMessage" class="fe-success">{{ successMessage }}</p>
               </div>
             </article>
           </div>
@@ -164,6 +214,7 @@
               </div>
             </article>
           </div>
+          <p class="fe-hint">{{ itensValidos.length ? `${itensValidos.length} item(ns) preenchido(s).` : 'Nenhum item preenchido ainda.' }}</p>
         </aside>
       </div>
     </div>
@@ -183,28 +234,46 @@
                 <label>Tratamento</label>
                 <select v-model="tratNome"><option value="">Selecione</option><option v-for="o in tratamentoNome" :key="o" :value="o">{{ o }}</option></select>
               </div>
-              <div class="fe-field fe-col-2"><label>1.1 A quem é direcionada a solicitação — Nome</label><input v-model="nome" /></div>
+              <div class="fe-field fe-col-2">
+                <label>1.1 A quem é direcionada a solicitação — Nome</label>
+                <input v-model="nome" list="dl-solicitacao-destinatario-nome" />
+                <div class="fe-inline-actions">
+                  <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('solicitacao_destinatario_nome', nome)">Adicionar</button>
+                  <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('solicitacao_destinatario_nome', nome)" @click="removeFieldHistory('solicitacao_destinatario_nome', nome)">Excluir</button>
+                </div>
+              </div>
             </div>
             <div class="fe-grid-3">
               <div class="fe-field">
                 <label>Tratamento</label>
                 <select v-model="tratCargo"><option value="">Selecione</option><option v-for="o in tratamentoCargo" :key="o" :value="o">{{ o }}</option></select>
               </div>
-              <div class="fe-field fe-col-2"><label>1.2 A quem é direcionada a solicitação — Função/Cargo</label><input v-model="cargo" /></div>
+              <div class="fe-field fe-col-2">
+                <label>1.2 A quem é direcionada a solicitação — Função/Cargo</label>
+                <input v-model="cargo" list="dl-solicitacao-destinatario-cargo" />
+                <div class="fe-inline-actions">
+                  <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('solicitacao_destinatario_cargo', cargo)">Adicionar</button>
+                  <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('solicitacao_destinatario_cargo', cargo)" @click="removeFieldHistory('solicitacao_destinatario_cargo', cargo)">Excluir</button>
+                </div>
+              </div>
             </div>
           </div>
         </article>
       </div>
       <div class="fe-drawer-foot">
-        <button type="button" class="fe-btn-primary" @click="drawerOpen = false">Aplicar dados fixos</button>
+        <button type="button" class="fe-btn-primary" @click="onApplyFixedData">Aplicar dados fixos</button>
       </div>
     </aside>
+
+    <datalist id="dl-solicitacao-destinatario-nome"><option v-for="v in (slotFieldOptions.solicitacao_destinatario_nome || [])" :key="`sdn-${v}`" :value="v" /></datalist>
+    <datalist id="dl-solicitacao-destinatario-cargo"><option v-for="v in (slotFieldOptions.solicitacao_destinatario_cargo || [])" :key="`sdc-${v}`" :value="v" /></datalist>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 
+const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 const dataOptions = ['Data automática', 'Datado e assinado digitalmente', 'Data manual'];
 const tratamentoNome = ['Ao senhor', 'A senhora'];
 const tratamentoCargo = ['Senhor', 'Senhora'];
@@ -229,18 +298,41 @@ const fornecedor = ref('');
 const cnpj = ref('');
 const dotacaoAtiva = ref(false);
 const dotacao = ref('');
-const itens = ref([{ descricao: '', quantidade: '', unidade: '', valorUnitario: '', valorTotal: '' }]);
-const valorGlobal = ref('');
+const itens = ref([{ descricao: '', quantidade: '1', unidade: '', valorUnitario: 'R$ 0,00', valorTotal: 'R$ 0,00' }]);
+const valorGlobal = ref('R$ 0,00');
 const fiscal = ref('');
 const responsavel = ref('');
 const responsavelCargo = ref('');
 const modoData = ref('');
 const dataManual = ref('');
+const isSubmitting = ref(false);
+const generateError = ref('');
+const successMessage = ref('');
+const documentReady = ref(false);
+const documentTrUrl = ref('');
+const documentDfdUrl = ref('');
+const documentOficioUrl = ref('');
+const documentZipUrl = ref('');
+const documentTrFilename = ref('termo_referencia.docx');
+const documentDfdFilename = ref('dfd.docx');
+const documentOficioFilename = ref('oficio.docx');
+const documentZipFilename = ref('tr_dfd_oficio.zip');
+const isGeneratingClauses = ref(false);
+const iaError = ref('');
+const clausulaContratado = ref('');
+const clausulaSetor = ref('');
+const clausulaCaracteristicas = ref('');
+const clausulaObjeto = ref('');
+const clausulaJustificativa = ref('');
 
 const tratNome = ref('');
 const nome = ref('');
 const tratCargo = ref('');
 const cargo = ref('');
+const slotFieldOptions = reactive({});
+const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
+const SLOT_PACKAGE_KEY = 'inexigibilidade_74_i_fornecedor_exclusivo';
+const CATALOG_KEYS = ['solicitacao_destinatario_nome', 'solicitacao_destinatario_cargo'];
 
 function apenasNumeros(valor) { return String(valor || '').replace(/\D/g, ''); }
 function campoPreenchido(valor) { return String(valor || '').trim().length > 0; }
@@ -284,7 +376,9 @@ function formatarCNPJ(v) {
 
 function atualizarItem(index, campo, ev) {
   const valorRaw = String(ev.target?.value || '');
-  const valor = campo === 'valorUnitario' ? formatarMoeda(valorRaw) : iniciarComMaiuscula(valorRaw);
+  const valor = campo === 'valorUnitario' || campo === 'valorTotal'
+    ? formatarMoeda(valorRaw)
+    : (campo === 'quantidade' ? valorRaw : iniciarComMaiuscula(valorRaw));
   itens.value = itens.value.map((it, i) => {
     if (i !== index) return it;
     const next = { ...it, [campo]: valor };
@@ -293,12 +387,319 @@ function atualizarItem(index, campo, ev) {
   });
   valorGlobal.value = calcularValorGlobal();
 }
-function adicionarItem() { itens.value.push({ descricao: '', quantidade: '', unidade: '', valorUnitario: '', valorTotal: '' }); }
+function adicionarItem() { itens.value.push({ descricao: '', quantidade: '1', unidade: '', valorUnitario: 'R$ 0,00', valorTotal: 'R$ 0,00' }); }
 function removerItem(index) {
   itens.value = itens.value.filter((_, i) => i !== index);
-  if (!itens.value.length) itens.value = [{ descricao: '', quantidade: '', unidade: '', valorUnitario: '', valorTotal: '' }];
+  if (!itens.value.length) itens.value = [{ descricao: '', quantidade: '1', unidade: '', valorUnitario: 'R$ 0,00', valorTotal: 'R$ 0,00' }];
   valorGlobal.value = calcularValorGlobal();
 }
+function gerarObjetoTexto(contratado, setor, caracteristicas) {
+  const objeto = String(contratado || '').trim() || 'objeto não informado';
+  const destino = String(setor || '').trim() ? `, visando atender as demandas de ${String(setor).trim()}` : '';
+  const detalhes = String(caracteristicas || '').trim() ? `, observadas as seguintes características mínimas: ${String(caracteristicas).trim()}` : '';
+  return `${iniciarComMaiuscula(objeto)}${destino}${detalhes}.`;
+}
+function gerarJustificativaTexto(contratado, setor, caracteristicas) {
+  const objeto = String(contratado || '').trim() || 'o objeto indicado';
+  const destino = String(setor || '').trim() ? ` do(a) ${String(setor).trim()}` : ' da Administração Pública';
+  const detalhes = String(caracteristicas || '').trim() ? ` A contratação deverá observar as características mínimas informadas: ${String(caracteristicas).trim()}.` : '';
+  return `A presente contratação justifica-se pela necessidade de assegurar ${objeto} para atendimento das demandas${destino}, garantindo a continuidade e a eficiência dos serviços públicos.${detalhes}`;
+}
+function parseClauseSections(text) {
+  const normalized = String(text || '').replace(/\r/g, '');
+  const sections = { objeto: '', justificativa: '' };
+  const lines = normalized.split('\n');
+  let current = '';
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    const low = trimmed.toLowerCase().replace(/[*:#-]/g, '').trim();
+    if (low.startsWith('objeto')) {
+      current = 'objeto';
+      const content = trimmed.replace(/^.*?:\s*/, '');
+      if (content && content !== trimmed) sections.objeto += (sections.objeto ? '\n' : '') + content;
+      return;
+    }
+    if (low.startsWith('justificativa')) {
+      current = 'justificativa';
+      const content = trimmed.replace(/^.*?:\s*/, '');
+      if (content && content !== trimmed) sections.justificativa += (sections.justificativa ? '\n' : '') + content;
+      return;
+    }
+    if (current) sections[current] += (sections[current] ? '\n' : '') + trimmed;
+  });
+  return sections;
+}
+async function onGenerateClauses() {
+  isGeneratingClauses.value = true;
+  iaError.value = '';
+  try {
+    const contratado = String(clausulaContratado.value || '').trim();
+    const setor = String(clausulaSetor.value || '').trim();
+    const caracteristicas = String(clausulaCaracteristicas.value || '').trim();
+    if (!contratado || !setor) {
+      iaError.value = 'Preencha "O que será contratado?" e "Qual setor/secretaria será atendido?".';
+      return;
+    }
+    const prompt = [
+      'Com base EXCLUSIVAMENTE nos dados abaixo, gere APENAS duas seções:',
+      'Objeto:',
+      'Justificativa:',
+      '',
+      `O que será contratado: ${contratado}`,
+      `Setor/secretaria atendido: ${setor}`,
+      `Características mínimas (opcional): ${caracteristicas || 'não informado'}`,
+    ].join('\n');
+    const res = await fetch(`${API_BASE}/api/llm/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ prompt, stream: false }),
+    });
+    const data = await res.json().catch(() => ({}));
+    const text = data?.data?.response || data?.data?.text || data?.response || data?.text || '';
+    if (!res.ok || !data?.ok) {
+      iaError.value = data?.error || data?.detail || `Erro ${res.status} ao gerar objeto e justificativa.`;
+      clausulaObjeto.value = gerarObjetoTexto(contratado, setor, caracteristicas);
+      clausulaJustificativa.value = gerarJustificativaTexto(contratado, setor, caracteristicas);
+      return;
+    }
+    const parsed = parseClauseSections(text);
+    clausulaObjeto.value = parsed.objeto || gerarObjetoTexto(contratado, setor, caracteristicas);
+    clausulaJustificativa.value = parsed.justificativa || gerarJustificativaTexto(contratado, setor, caracteristicas);
+  } catch (e) {
+    clausulaObjeto.value = gerarObjetoTexto(clausulaContratado.value, clausulaSetor.value, clausulaCaracteristicas.value);
+    clausulaJustificativa.value = gerarJustificativaTexto(clausulaContratado.value, clausulaSetor.value, clausulaCaracteristicas.value);
+    iaError.value = e?.message || 'Não foi possível gerar via IA; aplicamos texto base.';
+  } finally {
+    isGeneratingClauses.value = false;
+  }
+}
+function collectGlobalFormStatePayload() {
+  return {
+    solicitacao_destinatario_nome: nome.value,
+    solicitacao_destinatario_cargo: cargo.value,
+    ao_senhor_genero: tratNome.value,
+    senhor_senhora_genero: tratCargo.value,
+  };
+}
+async function saveUserGlobalPreset() {
+  try {
+    await fetch(`${API_BASE}/api/slots/form-state/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        slot_package_key: GLOBAL_SLOT_FORM_PRESET_KEY,
+        data: collectGlobalFormStatePayload(),
+      }),
+    });
+  } catch (_e) {
+    // silencioso
+  }
+}
+function applyGlobalFormStatePayload(data) {
+  if (!data || typeof data !== 'object') return;
+  if ('solicitacao_destinatario_nome' in data) nome.value = String(data.solicitacao_destinatario_nome || '');
+  if ('solicitacao_destinatario_cargo' in data) cargo.value = String(data.solicitacao_destinatario_cargo || '');
+  if ('ao_senhor_genero' in data) tratNome.value = String(data.ao_senhor_genero || '');
+  if ('senhor_senhora_genero' in data) tratCargo.value = String(data.senhor_senhora_genero || '');
+}
+async function loadUserGlobalPreset() {
+  try {
+    const url = `${API_BASE}/api/slots/form-state?slot_package_key=${encodeURIComponent(GLOBAL_SLOT_FORM_PRESET_KEY)}`;
+    const res = await fetch(url, { credentials: 'include' });
+    if (!res.ok) return;
+    const payload = await res.json().catch(() => ({}));
+    applyGlobalFormStatePayload(payload?.data || {});
+  } catch (_e) {
+    // silencioso
+  }
+}
+async function persistSlotEntries(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) return;
+  try {
+    await fetch(`${API_BASE}/api/slots/catalog/upsert`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ entries }),
+    });
+  } catch (_e) {
+    // silencioso
+  }
+}
+async function removeCatalogEntry(fieldKey, value) {
+  const v = String(value || '').trim();
+  if (!v) return;
+  try {
+    await fetch(`${API_BASE}/api/slots/catalog/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ field_key: fieldKey, value: v }),
+    });
+  } catch (_e) {
+    // silencioso
+  }
+}
+async function loadSlotCatalogSuggestions() {
+  try {
+    const url = `${API_BASE}/api/slots/catalog/batch?fields=${encodeURIComponent(CATALOG_KEYS.join(','))}&limit=25`;
+    const res = await fetch(url, { credentials: 'include' });
+    if (!res.ok) return;
+    const payload = await res.json().catch(() => ({}));
+    const map = payload?.items || {};
+    CATALOG_KEYS.forEach((key) => {
+      const incoming = Array.isArray(map[key]) ? map[key] : [];
+      slotFieldOptions[key] = [...new Set(incoming.map((x) => String(x || '').trim()).filter(Boolean))];
+    });
+  } catch (_e) {
+    // silencioso
+  }
+}
+async function addFieldHistory(fieldKey, rawValue) {
+  const value = String(rawValue || '').trim();
+  if (!value) return;
+  const current = Array.isArray(slotFieldOptions[fieldKey]) ? slotFieldOptions[fieldKey] : [];
+  if (!current.includes(value)) slotFieldOptions[fieldKey] = [...current, value];
+  await persistSlotEntries([{ field_key: fieldKey, value }]);
+}
+function canDeleteFieldHistory(fieldKey, rawValue) {
+  const value = String(rawValue || '').trim();
+  if (!value) return false;
+  const current = Array.isArray(slotFieldOptions[fieldKey]) ? slotFieldOptions[fieldKey] : [];
+  return current.includes(value);
+}
+async function removeFieldHistory(fieldKey, rawValue) {
+  const value = String(rawValue || '').trim();
+  if (!value) return;
+  const current = Array.isArray(slotFieldOptions[fieldKey]) ? slotFieldOptions[fieldKey] : [];
+  slotFieldOptions[fieldKey] = current.filter((v) => v !== value);
+  await removeCatalogEntry(fieldKey, value);
+}
+function toBlobUrl(base64, mimeType) {
+  if (!base64) return '';
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i += 1) bytes[i] = binary.charCodeAt(i);
+  return URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+}
+function revokeDocumentUrls() {
+  [documentTrUrl, documentDfdUrl, documentOficioUrl, documentZipUrl].forEach((urlRef) => {
+    if (urlRef.value) URL.revokeObjectURL(urlRef.value);
+    urlRef.value = '';
+  });
+}
+function buildSlotsOverride() {
+  const o = {
+    numero_processo: processoAtivo.value ? String(processo.value || '').trim() : '',
+    orgao: String(orgao.value || '').trim(),
+    objeto_especifico: objetoEspecifico.value === 'Outro' ? String(outroObjetoEspecifico.value || '').trim() : String(objetoEspecifico.value || '').trim(),
+    equipamento: String(equipamento.value || '').trim(),
+    marca: String(marca.value || '').trim(),
+    modelo: String(modelo.value || '').trim(),
+    fornecedor: String(fornecedor.value || '').trim(),
+    cnpj_fornecedor: String(cnpj.value || '').trim(),
+    valor_total: String(valorGlobal.value || '').trim(),
+    ao_senhor_genero: String(tratNome.value || '').trim(),
+    senhor_senhora_genero: String(tratCargo.value || '').trim(),
+    sol_oficio_destinatario_nome: String(nome.value || '').trim(),
+    sol_oficio_destinatario_cargo: String(cargo.value || '').trim(),
+  };
+  if (clausulaObjeto.value.trim()) {
+    o.objeto = clausulaObjeto.value.trim();
+    o.sol_oficio_objeto = clausulaObjeto.value.trim();
+  }
+  if (clausulaJustificativa.value.trim()) {
+    o.justificativa = clausulaJustificativa.value.trim();
+    o.sol_oficio_justificativa = clausulaJustificativa.value.trim();
+  }
+  if (dotacaoAtiva.value && String(dotacao.value || '').trim()) o.dotacao_numero = String(dotacao.value || '').trim();
+  const modo = String(modoData.value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  if (modo === 'data automatica') {
+    const now = new Date();
+    o.data_termo = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+  } else if (modo === 'data manual' && dataManual.value.trim()) {
+    o.data_termo = dataManual.value.trim();
+  } else if (modo === 'datado e assinado digitalmente') {
+    o.data_termo = 'datado e assinado digitalmente';
+  }
+  o.itens = itens.value.filter((x) => Object.values(x).some((v) => String(v || '').trim())).map((item) => ({
+    descricao: String(item.descricao || '').trim(),
+    quantidade: String(item.quantidade || '').trim(),
+    unidade: String(item.unidade || '').trim(),
+    valor_unitario: String(item.valorUnitario || '').trim(),
+    valor_total: String(item.valorTotal || '').trim(),
+  }));
+  o.fiscal = fiscal.value.trim() ? { nome: fiscal.value.trim() } : undefined;
+  o.nome_assinante_termo = String(responsavel.value || '').trim();
+  o.cargo_assinante_termo = String(responsavelCargo.value || '').trim();
+  return o;
+}
+function buildUserPrompt() {
+  return [
+    'Inexigibilidade Art. 74 I - Fornecedor Exclusivo.',
+    `Objeto específico: ${objetoEspecifico.value || 'não informado'}`,
+    `Órgão: ${orgao.value || 'não informado'}`,
+    `Fornecedor: ${fornecedor.value || 'não informado'}`,
+  ].join('\n');
+}
+async function onSubmit() {
+  isSubmitting.value = true;
+  generateError.value = '';
+  successMessage.value = '';
+  documentReady.value = false;
+  revokeDocumentUrls();
+  try {
+    const payload = {
+      user_prompt: buildUserPrompt(),
+      slots_override: buildSlotsOverride(),
+      slot_package_key: SLOT_PACKAGE_KEY,
+    };
+    const res = await fetch(`${API_BASE}/api/documentos/gerar-tr-e-dfd`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      generateError.value = data.error || data.detail || `Erro ${res.status} ao gerar documento.`;
+      return;
+    }
+    if (!data.tr?.docx_base64 || !data.dfd?.docx_base64 || !data.oficio?.docx_base64) {
+      generateError.value = data.error || 'TR, DFD ou Solicitação/Ofício não vieram na resposta.';
+      return;
+    }
+    documentTrUrl.value = toBlobUrl(data.tr.docx_base64, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    documentDfdUrl.value = toBlobUrl(data.dfd.docx_base64, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    documentOficioUrl.value = toBlobUrl(data.oficio.docx_base64, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    documentZipUrl.value = data.zip?.zip_base64 ? toBlobUrl(data.zip.zip_base64, 'application/zip') : '';
+    documentTrFilename.value = data.tr?.filename || 'termo_referencia.docx';
+    documentDfdFilename.value = data.dfd?.filename || 'dfd.docx';
+    documentOficioFilename.value = data.oficio?.filename || 'oficio.docx';
+    documentZipFilename.value = data.zip?.filename || 'tr_dfd_oficio.zip';
+    documentReady.value = true;
+    successMessage.value = 'Termo de Referência, DFD e Solicitação/Ofício gerados com sucesso.';
+    await saveUserGlobalPreset();
+  } catch (e) {
+    generateError.value = e?.message || 'Erro ao gerar documento.';
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+async function onApplyFixedData() {
+  await saveUserGlobalPreset();
+  drawerOpen.value = false;
+}
+onMounted(async () => {
+  await loadUserGlobalPreset();
+  await loadSlotCatalogSuggestions();
+});
+onBeforeUnmount(() => {
+  revokeDocumentUrls();
+});
 
 const itensValidos = computed(() => itens.value.filter((it) => Object.values(it).some(campoPreenchido)));
 const secoes = computed(() => [
@@ -325,6 +726,51 @@ const secoes = computed(() => [
       ['Equipamento', equipamento.value || 'Não informado', campoPreenchido(equipamento.value)],
       ['Marca', marca.value || 'Não informado', campoPreenchido(marca.value)],
       ['Modelo', modelo.value || 'Não informado', campoPreenchido(modelo.value)],
+    ],
+  },
+  {
+    titulo: 'Fornecedor',
+    completo: campoPreenchido(fornecedor.value) && campoPreenchido(cnpj.value),
+    linhas: [
+      ['Razão social', fornecedor.value || 'Não informado', campoPreenchido(fornecedor.value)],
+      ['CNPJ', cnpj.value || 'Não informado', campoPreenchido(cnpj.value)],
+    ],
+  },
+  {
+    titulo: 'Dotação orçamentária',
+    completo: !dotacaoAtiva.value || campoPreenchido(dotacao.value),
+    linhas: [
+      ['Situação', dotacaoAtiva.value ? 'Informada' : 'Não informada', !dotacaoAtiva.value || campoPreenchido(dotacao.value)],
+      ['Dotação', dotacaoAtiva.value ? (dotacao.value || 'Não informada') : 'Não se aplica', !dotacaoAtiva.value || campoPreenchido(dotacao.value)],
+    ],
+  },
+  {
+    titulo: 'Itens',
+    completo: itensValidos.value.length > 0 && campoPreenchido(valorGlobal.value),
+    linhas: [
+      ['Itens lançados', String(itensValidos.value.length), itensValidos.value.length > 0],
+      ['Valor global', valorGlobal.value || 'Não informado', campoPreenchido(valorGlobal.value)],
+    ],
+  },
+  {
+    titulo: 'Fiscalização',
+    completo: campoPreenchido(fiscal.value),
+    linhas: [['Fiscal', fiscal.value || 'Não informado', campoPreenchido(fiscal.value)]],
+  },
+  {
+    titulo: 'Responsável pelo TR',
+    completo: campoPreenchido(responsavel.value) && campoPreenchido(responsavelCargo.value),
+    linhas: [
+      ['Responsável', responsavel.value || 'Não informado', campoPreenchido(responsavel.value)],
+      ['Cargo/Função', responsavelCargo.value || 'Não informado', campoPreenchido(responsavelCargo.value)],
+    ],
+  },
+  {
+    titulo: 'Data',
+    completo: campoPreenchido(modoData.value) && (modoData.value !== 'Data manual' || campoPreenchido(dataManual.value)),
+    linhas: [
+      ['Modo', modoData.value || 'Não informado', campoPreenchido(modoData.value)],
+      ['Data', modoData.value === 'Data manual' ? (dataManual.value || 'Não informada') : (modoData.value ? 'Não se aplica' : 'Não se aplica'), modoData.value !== 'Data manual' || campoPreenchido(dataManual.value)],
     ],
   },
 ]);
@@ -355,6 +801,7 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .fe-item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 12px; color: #64748b; }
 .fe-link-danger { border: 0; background: transparent; color: #dc2626; cursor: pointer; }
 .fe-half { max-width: 360px; }
+.fe-hint { margin-top: 10px; font-size: 12px; color: #64748b; }
 .fe-summary { padding: 12px; position: sticky; top: 10px; height: fit-content; }
 .fe-summary-head small { color: #64748b; text-transform: uppercase; font-size: 11px; }
 .fe-summary-head h3 { margin: 4px 0; font-size: 15px; }
@@ -381,5 +828,118 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .fe-btn-primary, .fe-btn-secondary { border-radius: 8px; border: 1px solid #cbd5e1; padding: 8px 12px; cursor: pointer; }
 .fe-btn-primary { background: #0f172a; color: #fff; border-color: #0f172a; width: 100%; }
 .fe-btn-secondary { background: #fff; color: #334155; }
+.fe-btn-xs { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+.fe-inline-actions { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.fe-actions { display: grid; gap: 8px; }
+.fe-btn-generate { font-weight: 700; letter-spacing: .2px; }
+.fe-error { margin: 0; border: 1px solid #fecaca; background: #fff1f2; color: #b91c1c; border-radius: 8px; padding: 9px 11px; font-size: 13px; }
+.fe-success { margin: 0; border: 1px solid #bbf7d0; background: #f0fdf4; color: #166534; border-radius: 8px; padding: 9px 11px; font-size: 13px; }
+
+.dm-dark .fe-page,
+.dm-dark-theme .fe-page { background: #020617; }
+
+.dm-dark .fe-main,
+.dm-dark .fe-summary,
+.dm-dark .fe-drawer,
+.dm-dark .fe-card,
+.dm-dark .fe-item,
+.dm-dark .fe-summary-card,
+.dm-dark-theme .fe-main,
+.dm-dark-theme .fe-summary,
+.dm-dark-theme .fe-drawer,
+.dm-dark-theme .fe-card,
+.dm-dark-theme .fe-item,
+.dm-dark-theme .fe-summary-card {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+.dm-dark .fe-main-head,
+.dm-dark .fe-drawer-head,
+.dm-dark .fe-drawer-foot,
+.dm-dark-theme .fe-main-head,
+.dm-dark-theme .fe-drawer-head,
+.dm-dark-theme .fe-drawer-foot { border-color: #334155; }
+
+.dm-dark .fe-main-title h2,
+.dm-dark .fe-main-title p,
+.dm-dark .fe-card h3,
+.dm-dark .fe-summary-head h3,
+.dm-dark .fe-summary-card header,
+.dm-dark .fe-line b,
+.dm-dark-theme .fe-main-title h2,
+.dm-dark-theme .fe-main-title p,
+.dm-dark-theme .fe-card h3,
+.dm-dark-theme .fe-summary-head h3,
+.dm-dark-theme .fe-summary-card header,
+.dm-dark-theme .fe-line b { color: #e2e8f0; }
+
+.dm-dark .fe-main-title small,
+.dm-dark .fe-field label,
+.dm-dark .fe-check,
+.dm-dark .fe-item-head span,
+.dm-dark .fe-summary > p,
+.dm-dark .fe-summary-head small,
+.dm-dark .fe-drawer-head small,
+.dm-dark-theme .fe-main-title small,
+.dm-dark-theme .fe-field label,
+.dm-dark-theme .fe-check,
+.dm-dark-theme .fe-item-head span,
+.dm-dark-theme .fe-summary > p,
+.dm-dark-theme .fe-summary-head small,
+.dm-dark-theme .fe-drawer-head small { color: #94a3b8; }
+
+.dm-dark .fe-field input,
+.dm-dark .fe-field textarea,
+.dm-dark .fe-field select,
+.dm-dark .fe-btn-secondary,
+.dm-dark-theme .fe-field input,
+.dm-dark-theme .fe-field textarea,
+.dm-dark-theme .fe-field select,
+.dm-dark-theme .fe-btn-secondary {
+  background: #0b1222;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.dm-dark .fe-field input::placeholder,
+.dm-dark .fe-field textarea::placeholder,
+.dm-dark-theme .fe-field input::placeholder,
+.dm-dark-theme .fe-field textarea::placeholder { color: #64748b; }
+
+.dm-dark .fe-field input:focus,
+.dm-dark .fe-field textarea:focus,
+.dm-dark .fe-field select:focus,
+.dm-dark-theme .fe-field input:focus,
+.dm-dark-theme .fe-field textarea:focus,
+.dm-dark-theme .fe-field select:focus { border-color: #0ea5e9; outline: none; }
+
+.dm-dark .fe-btn-secondary,
+.dm-dark-theme .fe-btn-secondary { color: #cbd5e1; }
+
+.dm-dark .fe-progress,
+.dm-dark-theme .fe-progress { background: #1e293b; }
+
+.dm-dark .fe-summary-head span,
+.dm-dark-theme .fe-summary-head span { color: #7dd3fc; }
+
+.dm-dark .fe-line.is-ok,
+.dm-dark-theme .fe-line.is-ok { background: #052e16; border-color: #166534; }
+
+.dm-dark .fe-line.is-warn,
+.dm-dark-theme .fe-line.is-warn { background: #3f1d2e; border-color: #9f1239; }
+
+.dm-dark .fe-overlay,
+.dm-dark-theme .fe-overlay { background: rgba(2, 6, 23, 0.72); }
+
+.dm-dark .fe-link-danger,
+.dm-dark-theme .fe-link-danger { color: #fb7185; }
+
+.dm-dark .fe-hint,
+.dm-dark-theme .fe-hint { color: #94a3b8; }
+.dm-dark .fe-error,
+.dm-dark-theme .fe-error { border-color: #9f1239; background: #3f1d2e; color: #fecdd3; }
+.dm-dark .fe-success,
+.dm-dark-theme .fe-success { border-color: #166534; background: #052e16; color: #bbf7d0; }
 @media (max-width: 1180px) { .fe-grid { grid-template-columns: 1fr; } .fe-summary { position: static; } }
 </style>

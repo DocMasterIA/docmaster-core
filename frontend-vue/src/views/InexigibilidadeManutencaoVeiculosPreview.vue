@@ -151,7 +151,7 @@
               </div>
             </article>
 
-            <article v-if="isDispensaNormalRoute" class="ixp-card">
+            <article v-if="showAiClauseSection" class="ixp-card">
               <h3>Gerar clausulas (IA)</h3>
               <div class="ixp-body">
                 <p class="ixp-hint">
@@ -451,6 +451,8 @@ const clausulaJustificativa = ref('');
 const logicalRouteName = computed(() => DISPENSA_RAPIDA_TO_LOGICAL[route.name] || route.name);
 const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[logicalRouteName.value] || 'tr_dfd_generico');
 const isDispensaNormalRoute = computed(() => String(route.name || '').startsWith('DispensaArt75'));
+const isInexigibilidadeArt74Route = computed(() => String(route.name || '').startsWith('InexigibilidadeArt74I'));
+const showAiClauseSection = computed(() => isDispensaNormalRoute.value || isInexigibilidadeArt74Route.value);
 const isDispensaManutencaoRoute = computed(() =>
   logicalRouteName.value === 'DispensaArt75IManutencaoVeiculos'
   || logicalRouteName.value === 'InexigibilidadeArt74IManutencaoVeiculosPreview'

@@ -33,15 +33,13 @@
                     </p>
                   </div>
                   <div class="da75-field">
-                    <label class="da75-label da75-label--compact">Órgão / dados fixos</label>
-                    <select
-                      class="da75-select da75-select--sm"
-                      :value="perfilSelecionadoId"
-                      @change="perfilSelecionadoId = ($event.target).value"
-                    >
-                      <option value="">Selecione um órgão cadastrado</option>
-                      <option v-for="p in perfis" :key="p.id" :value="p.id">{{ p.nomeCadastro }}</option>
-                    </select>
+                    <label class="da75-label da75-label--compact">Órgão / unidade</label>
+                    <input
+                      v-model="orgao"
+                      class="da75-input da75-input--sm"
+                      list="da75-dl-orgao"
+                      placeholder="Digite o órgão (use Dados fixos para sugestões)"
+                    />
                   </div>
                   <label class="da75-check da75-check--inline">
                     <input v-model="processoAtivo" type="checkbox" />
@@ -53,6 +51,7 @@
                   <input
                     class="da75-input"
                     :value="processo"
+                    list="da75-dl-processo-numero"
                     @input="processo = primeiraMaiuscula(($event.target).value)"
                   />
                 </div>
@@ -123,14 +122,19 @@
           </div>
         </section>
 
-        <DispensaArt75IIDrawer
+        <DispensaArt75IIDadosFixosDrawer
           :open="drawerAberto"
-          :perfis="perfis"
-          :perfil-selecionado-id="perfilSelecionadoId"
+          :ctx="dadosFixos"
           @close="drawerAberto = false"
-          @update:perfis="perfis = $event"
-          @update:perfil-selecionado-id="perfilSelecionadoId = $event"
+          @apply="onApplyDadosFixos"
         />
+
+        <datalist id="da75-dl-orgao">
+          <option v-for="v in (dadosFixos.slotFieldOptions.orgao || [])" :key="`o-${v}`" :value="v" />
+        </datalist>
+        <datalist id="da75-dl-processo-numero">
+          <option v-for="v in (dadosFixos.slotFieldOptions.processo_numero || [])" :key="`p-${v}`" :value="v" />
+        </datalist>
 
         <aside class="da75-resumo">
           <div class="da75-resumo__head">
@@ -181,19 +185,20 @@ import {
   primeiraMaiuscula,
 } from './dispensaArt75iiShared.js';
 import './dispensaArt75ii.css';
-import DispensaArt75IIDrawer from './DispensaArt75IIDrawer.vue';
+import DispensaArt75IIDadosFixosDrawer from './DispensaArt75IIDadosFixosDrawer.vue';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
+import { useDispensaArt75IIDadosFixos } from '@/composables/useDispensaArt75IIDadosFixos.js';
 
 const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 
 const drawerAberto = ref(false);
 const cabecalhoOptions = ref([]);
 const cabecalhosLoading = ref(false);
-const perfis = ref([]);
-const perfilSelecionadoId = ref('');
 const cabecalho = ref('');
 const processoAtivo = ref(false);
 const processo = ref('');
+const orgao = ref('');
+const dadosFixos = useDispensaArt75IIDadosFixos(API_BASE, { cabecalho, processoAtivo, processo, orgao });
 const objetoContratado = ref('');
 const dotacaoAtiva = ref(false);
 const dotacao = ref('');
@@ -208,6 +213,8 @@ watch(dotacaoAtiva, (v) => {
 });
 
 onMounted(async () => {
+  await dadosFixos.loadUserGlobalPreset();
+  await dadosFixos.loadSlotCatalogSuggestions();
   cabecalhosLoading.value = true;
   try {
     const names = await fetchCabecalhosPrefeitura(API_BASE);
@@ -218,22 +225,25 @@ onMounted(async () => {
   }
 });
 
-const perfilSelecionado = computed(() => perfis.value.find((p) => p.id === perfilSelecionadoId.value));
+function onApplyDadosFixos() {
+  void dadosFixos.saveUserGlobalPreset();
+  drawerAberto.value = false;
+}
 
 const dataResumo = computed(() => (modoData.value === 'Data manual' ? dataManual.value : modoData.value));
 
 const secoes = computed(() => {
-  const orgao = perfilSelecionado.value?.nomeCadastro || '';
+  const orgaoLabel = orgao.value || '';
   return [
     {
       titulo: 'Dados básicos',
       completo:
         campoPreenchido(cabecalho.value) &&
-        campoPreenchido(orgao) &&
+        campoPreenchido(orgaoLabel) &&
         (!processoAtivo.value || campoPreenchido(processo.value)),
       linhas: [
         ['Cabeçalho', cabecalho.value || 'Não informado', campoPreenchido(cabecalho.value)],
-        ['Órgão', orgao || 'Não informado', campoPreenchido(orgao)],
+        ['Órgão', orgaoLabel || 'Não informado', campoPreenchido(orgaoLabel)],
         [
           'Processo',
           processoAtivo.value ? processo.value || 'Não informado' : 'Não se aplica',

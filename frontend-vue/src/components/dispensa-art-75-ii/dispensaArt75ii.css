@@ -171,6 +171,12 @@
   color: #1d4ed8;
 }
 
+.da75-msg-error {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #b91c1c;
+}
+
 .da75-input,
 .da75-select,
 .da75-textarea {
@@ -1006,4 +1012,9 @@
 .dm-dark .da75-inline-link:hover,
 .dm-dark-theme .da75-inline-link:hover {
   color: #bae6fd;
+}
+
+.dm-dark .da75-msg-error,
+.dm-dark-theme .da75-msg-error {
+  color: #fca5a5;
 }

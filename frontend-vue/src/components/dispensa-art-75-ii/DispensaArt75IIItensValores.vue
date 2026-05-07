@@ -54,8 +54,8 @@
       <div class="da75-items-footer">
         <button type="button" class="da75-btn" @click="adicionar">Adicionar item</button>
         <div class="da75-total-box">
-          <span style="font-weight: 500; color: #475569">Valor total estimado: </span>
-          <span style="font-weight: 700; color: #020617">{{ total }}</span>
+          <span class="da75-total-label">Valor total estimado: </span>
+          <span class="da75-total-value">{{ total }}</span>
         </div>
       </div>
     </div>

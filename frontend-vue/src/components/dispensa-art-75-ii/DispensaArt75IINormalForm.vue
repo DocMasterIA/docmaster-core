@@ -87,7 +87,7 @@
                         @input="objetoCaracteristicas = primeiraMaiuscula(($event.target).value)"
                       />
                     </div>
-                    <button type="button" class="da75-btn da75-btn--primary" style="width: 100%" @click="gerar">
+                    <button type="button" class="da75-btn da75-btn--primary da75-btn--block" @click="gerar">
                       Gerar objeto e justificativa
                     </button>
                   </div>
@@ -173,22 +173,20 @@
         />
 
         <aside class="da75-resumo">
-          <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem">
+          <div class="da75-resumo__head">
             <div>
-              <div style="font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b">
-                Resumo em tempo real
-              </div>
-              <h3 style="margin-top: 0.25rem; font-size: 1rem; font-weight: 600; color: #0f172a">Painel do documento</h3>
+              <div class="da75-resumo__kicker">Resumo em tempo real</div>
+              <h3 class="da75-resumo__panel-title">Painel do documento</h3>
             </div>
             <div class="da75-resumo__pct">{{ progresso }}%</div>
           </div>
           <div class="da75-progress">
             <div class="da75-progress__bar" :style="{ width: `${progresso}%` }" />
           </div>
-          <div style="margin-top: 0.5rem; font-size: 0.75rem; color: #64748b">
+          <div class="da75-resumo__meta">
             {{ completos }} de {{ secoes.length }} blocos preenchidos
           </div>
-          <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem">
+          <div class="da75-resumo__secoes">
             <div v-for="secao in secoes" :key="secao.titulo" class="da75-secao">
               <div class="da75-secao__title">
                 <span>{{ secao.titulo }}</span>
@@ -220,7 +218,7 @@
                   <div>Média de valor (opcional): {{ item.mediaValor || '-' }}</div>
                 </div>
               </template>
-              <div v-else style="font-size: 0.75rem; color: #64748b">Nenhum item preenchido ainda.</div>
+              <div v-else class="da75-resumo__empty">Nenhum item preenchido ainda.</div>
             </div>
           </div>
         </aside>

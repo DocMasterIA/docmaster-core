@@ -8,8 +8,8 @@ import TelaRelatorioFinalPesquisaPrecosPreview from '../../relatorio_final_pesqu
 import PaginaInicialDocmaster from '../../pagina_inicial_docmaster_final (2) (1).jsx';
 import InexigibilidadeManutencaoVeiculosArt74I from '../../1-INEXIGIBILIDADE MANUTENÇÃO VEICULOS ART 74 I.jsx';
 import FornecedorExclusivoArt74I from '../../2-FORNECEDOR EXCLUIVO ART 74 I.jsx';
-import ModuloDispensaArt75IINormal from '../../modulo_dispensa_art_75_ii_(DISPENSA NORMAL).jsx';
-import ModuloDispensaArt75IIRapida from '../../modulo_dispensa_art_75_ii_(DISPENSA RAPIDA).jsx';
+import ModuloDispensaArt75IINormal from '../../modulo_dispensa_art_75_ii_dispensa_normal.jsx';
+import ModuloDispensaArt75IIRapida from '../../modulo_dispensa_art_75_ii_dispensa_rapida.jsx';
 
 export default function App() {
   return (

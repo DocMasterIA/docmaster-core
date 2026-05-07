@@ -224,11 +224,25 @@
           <div class="ixp-body">
             <div class="ixp-grid-3">
               <div class="ixp-field"><label>Tratamento</label><select v-model="fixoTratNome"><option value="">Selecione</option><option v-for="op in tratamentoNome" :key="op" :value="op">{{ op }}</option></select></div>
-              <div class="ixp-field ixp-col-2"><label>1.1 A quem e direcionada a solicitacao — Nome</label><input v-model="fixoNome" list="dl-solicitacao-destinatario-nome" placeholder="Digite o nome" /></div>
+              <div class="ixp-field ixp-col-2">
+                <label>1.1 A quem e direcionada a solicitacao — Nome</label>
+                <input v-model="fixoNome" list="dl-solicitacao-destinatario-nome" placeholder="Digite o nome" />
+                <div class="ixp-inline-actions">
+                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('solicitacao_destinatario_nome', fixoNome)">Adicionar</button>
+                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('solicitacao_destinatario_nome', fixoNome)" @click="removeFieldHistory('solicitacao_destinatario_nome', fixoNome)">Excluir</button>
+                </div>
+              </div>
             </div>
             <div class="ixp-grid-3">
               <div class="ixp-field"><label>Tratamento</label><select v-model="fixoTratCargo"><option value="">Selecione</option><option v-for="op in tratamentoCargo" :key="op" :value="op">{{ op }}</option></select></div>
-              <div class="ixp-field ixp-col-2"><label>1.2 A quem e direcionada a solicitacao — Funcao / Cargo</label><input v-model="fixoCargo" list="dl-solicitacao-destinatario-cargo" placeholder="Digite a funcao ou cargo" /></div>
+              <div class="ixp-field ixp-col-2">
+                <label>1.2 A quem e direcionada a solicitacao — Funcao / Cargo</label>
+                <input v-model="fixoCargo" list="dl-solicitacao-destinatario-cargo" placeholder="Digite a funcao ou cargo" />
+                <div class="ixp-inline-actions">
+                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('solicitacao_destinatario_cargo', fixoCargo)">Adicionar</button>
+                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!canDeleteFieldHistory('solicitacao_destinatario_cargo', fixoCargo)" @click="removeFieldHistory('solicitacao_destinatario_cargo', fixoCargo)">Excluir</button>
+                </div>
+              </div>
             </div>
             <div class="ixp-grid-2">
               <div class="ixp-field">

@@ -19,16 +19,10 @@
       <!-- Coluna esquerda: wizard -->
       <div class="doc-gen__main">
         <section class="gov-surface doc-gen__wizard" :class="{ 'doc-gen__wizard--etp': isEtpLivreRoute }">
-          <div class="gov-surface__header">
+          <div v-if="!isEtpLivreRoute" class="gov-surface__header">
             <div>
-              <template v-if="isEtpLivreRoute">
-                <h2 class="gov-surface__title">Assistente de ETP</h2>
-                <p class="gov-surface__subtitle">Selecione um modelo da biblioteca (opcional), descreva o objeto e gere DOCX ou PDF.</p>
-              </template>
-              <template v-else>
-                <h2 class="gov-surface__title">Assistente de Criação</h2>
-                <p class="gov-surface__subtitle">Guia executivo para documentação profissional</p>
-              </template>
+              <h2 class="gov-surface__title">Assistente de Criação</h2>
+              <p class="gov-surface__subtitle">Guia executivo para documentação profissional</p>
             </div>
           </div>
 

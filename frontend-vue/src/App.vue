@@ -250,13 +250,13 @@ const generationPages = [
     children: [
       {
         name: 'InexigibilidadeArt74IManutencaoVeiculosPreview',
-        label: 'Manutenção de veículos (preview)',
+        label: 'Manutenção de veículos',
         icon: 'fa-car-side',
         to: '/geracao/inexigibilidade-art-74-i/manutencao-veiculos-preview',
       },
       {
         name: 'InexigibilidadeArt74IFornecedorExclusivoPreview',
-        label: 'Fornecedor exclusivo (preview)',
+        label: 'Fornecedor exclusivo',
         icon: 'fa-industry',
         to: '/geracao/inexigibilidade-art-74-i/fornecedor-exclusivo-preview',
       },

@@ -451,7 +451,11 @@ const clausulaJustificativa = ref('');
 const logicalRouteName = computed(() => DISPENSA_RAPIDA_TO_LOGICAL[route.name] || route.name);
 const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[logicalRouteName.value] || 'tr_dfd_generico');
 const isDispensaNormalRoute = computed(() => String(route.name || '').startsWith('DispensaArt75'));
-const isDispensaManutencaoRoute = computed(() => logicalRouteName.value === 'DispensaArt75IManutencaoVeiculos');
+const isDispensaManutencaoRoute = computed(() =>
+  logicalRouteName.value === 'DispensaArt75IManutencaoVeiculos'
+  || logicalRouteName.value === 'InexigibilidadeArt74IManutencaoVeiculosPreview'
+  || logicalRouteName.value === 'InexigibilidadeArt74IManutencaoVeiculos',
+);
 /** Card marca/modelo/placa e slots de veículo: somente dispensa normal Art. 75 I manutenção (não inexigibilidade, obras, etc.). */
 const isDispensaNormalManutencaoVeiculosRoute = computed(() => route.name === 'DispensaArt75IManutencaoVeiculos');
 const slotFieldOptions = reactive({});

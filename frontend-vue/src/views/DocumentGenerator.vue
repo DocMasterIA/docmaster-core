@@ -670,7 +670,7 @@ const FLOW_CONFIG = {
           { id: 'dfd_email', label: 'E-mail', input: 'email', required: true },
           { id: 'dfd_gestor_contratos', label: 'Nome do(a) gestor(a) de contratos', input: 'text', required: true },
           { id: 'dfd_fiscal_contratos', label: 'Nome do(a) fiscal de contratos', input: 'text', required: true },
-          { id: '_h_dfd_assinatura', label: '2.6 Responsável pela assinatura da DFD', input: 'heading', fullWidth: true },
+          { id: '_h_dfd_assinatura', label: '2.6 Responsável pela assinatura do DFD', input: 'heading', fullWidth: true },
           {
             id: 'dfd_assinatura_nome',
             label: 'Nome do responsável',

@@ -62,6 +62,7 @@
                 </div>
               </div>
             </div>
+            <h4 class="ixp-subsection-title">1.3 Responsável pela solicitação</h4>
             <div class="ixp-grid-2">
               <div class="ixp-field">
                 <label>Nome do responsável</label>
@@ -135,6 +136,7 @@
                 <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('dfd_fiscal_contratos', ctx.fixoFiscal)">Adicionar</button>
               </div>
             </div>
+            <h4 class="ixp-subsection-title">2.6 Responsável pela assinatura do DFD</h4>
             <div class="ixp-grid-2">
               <div class="ixp-field">
                 <label>Nome do responsável</label>
@@ -319,6 +321,12 @@ defineEmits(['close', 'apply']);
   font-size: 14px;
   color: #1e293b;
 }
+.ixp-subsection-title {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
 .ixp-body {
   margin-top: 10px;
   display: grid;
@@ -437,6 +445,10 @@ defineEmits(['close', 'apply']);
 .dm-dark .ixp-card h3,
 .dm-dark-theme .ixp-card h3 {
   color: #e2e8f0;
+}
+.dm-dark .ixp-subsection-title,
+.dm-dark-theme .ixp-subsection-title {
+  color: #cbd5e1;
 }
 .dm-dark .ixp-field label,
 .dm-dark-theme .ixp-field label {

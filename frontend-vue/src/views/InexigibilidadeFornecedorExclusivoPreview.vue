@@ -255,6 +255,7 @@
                 </div>
               </div>
             </div>
+            <h4 class="fe-subsection-title">1.3 Responsável pela solicitação</h4>
             <div class="fe-grid-2">
               <div class="fe-field">
                 <label>Nome do responsável</label>
@@ -311,6 +312,7 @@
                 <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_fiscal_contratos', fixoFiscal)">Adicionar</button>
               </div>
             </div>
+            <h4 class="fe-subsection-title">2.6 Responsável pela assinatura do DFD</h4>
             <div class="fe-grid-2">
               <div class="fe-field">
                 <label>Nome do responsável</label>
@@ -919,6 +921,12 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .fe-main-body { padding: 14px; display: grid; gap: 12px; }
 .fe-card { padding: 12px; }
 .fe-card h3 { margin: 0 0 8px; font-size: 14px; }
+.fe-subsection-title {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
 .fe-body { display: grid; gap: 8px; }
 .fe-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .fe-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
@@ -1002,6 +1010,9 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .dm-dark-theme .fe-summary-head h3,
 .dm-dark-theme .fe-summary-card header,
 .dm-dark-theme .fe-line b { color: #e2e8f0; }
+
+.dm-dark .fe-subsection-title,
+.dm-dark-theme .fe-subsection-title { color: #cbd5e1; }
 
 .dm-dark .fe-main-title small,
 .dm-dark .fe-field label,

@@ -130,7 +130,7 @@ const routes = [
   {
     path: '/geracao/inexigibilidade-art-74-i/fornecedor-exclusivo',
     name: 'InexigibilidadeArt74IFornecedorExclusivoPreview',
-    component: () => import('../views/InexigibilidadeFornecedorExclusivoPreview.vue'),
+    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
     meta: {
       title: 'Inexigibilidade - Art. 74, I - Fornecedor Exclusivo',
     },

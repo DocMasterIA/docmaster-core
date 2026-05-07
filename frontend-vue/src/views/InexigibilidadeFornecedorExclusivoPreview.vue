@@ -257,6 +257,87 @@
                 </div>
               </div>
             </div>
+            <div class="fe-grid-2">
+              <div class="fe-field">
+                <label>Nome do responsável</label>
+                <input v-model="fixoResponsavel" list="dl-solicitacao-responsavel-nome" placeholder="Digite o nome do responsável" />
+                <div class="fe-inline-actions">
+                  <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('solicitacao_responsavel_nome', fixoResponsavel)">Adicionar</button>
+                  <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('solicitacao_responsavel_nome', fixoResponsavel)" @click="removeFieldHistory('solicitacao_responsavel_nome', fixoResponsavel)">Excluir</button>
+                </div>
+              </div>
+              <div class="fe-field">
+                <label>Função / Cargo</label>
+                <input v-model="fixoResponsavelCargo" list="dl-solicitacao-responsavel-cargo" placeholder="Digite a função ou cargo" />
+                <div class="fe-inline-actions">
+                  <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('solicitacao_responsavel_cargo', fixoResponsavelCargo)">Adicionar</button>
+                  <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('solicitacao_responsavel_cargo', fixoResponsavelCargo)" @click="removeFieldHistory('solicitacao_responsavel_cargo', fixoResponsavelCargo)">Excluir</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+        <article class="fe-card">
+          <h3>2. DFD – Documento de Formalização da Demanda</h3>
+          <div class="fe-body">
+            <div class="fe-field">
+              <label>2.1 Setor requisitante (Unidade / Setor / Departamento)</label>
+              <input v-model="fixoSetor" list="dl-dfd-setor-requisitante" />
+              <div class="fe-inline-actions">
+                <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_setor_requisitante', fixoSetor)">Adicionar</button>
+                <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('dfd_setor_requisitante', fixoSetor)" @click="removeFieldHistory('dfd_setor_requisitante', fixoSetor)">Excluir</button>
+              </div>
+            </div>
+            <div class="fe-field">
+              <label>2.2 Responsável pela demanda</label>
+              <input v-model="fixoDemanda" list="dl-dfd-responsavel-demanda" />
+              <div class="fe-inline-actions">
+                <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_responsavel_demanda', fixoDemanda)">Adicionar</button>
+                <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('dfd_responsavel_demanda', fixoDemanda)" @click="removeFieldHistory('dfd_responsavel_demanda', fixoDemanda)">Excluir</button>
+              </div>
+            </div>
+            <div class="fe-field">
+              <label>2.3 E-mail</label>
+              <input v-model="fixoEmail" list="dl-dfd-email" />
+              <div class="fe-inline-actions">
+                <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_email', fixoEmail)">Adicionar</button>
+                <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('dfd_email', fixoEmail)" @click="removeFieldHistory('dfd_email', fixoEmail)">Excluir</button>
+              </div>
+            </div>
+            <div class="fe-field">
+              <label>2.4 Nome do(a) gestor(a) de contratos</label>
+              <input v-model="fixoGestor" list="dl-dfd-gestor-contratos" />
+              <div class="fe-inline-actions">
+                <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_gestor_contratos', fixoGestor)">Adicionar</button>
+                <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('dfd_gestor_contratos', fixoGestor)" @click="removeFieldHistory('dfd_gestor_contratos', fixoGestor)">Excluir</button>
+              </div>
+            </div>
+            <div class="fe-field">
+              <label>2.5 Nome do(a) fiscal de contratos</label>
+              <input v-model="fixoFiscal" list="dl-dfd-fiscal-contratos" />
+              <div class="fe-inline-actions">
+                <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_fiscal_contratos', fixoFiscal)">Adicionar</button>
+                <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('dfd_fiscal_contratos', fixoFiscal)" @click="removeFieldHistory('dfd_fiscal_contratos', fixoFiscal)">Excluir</button>
+              </div>
+            </div>
+            <div class="fe-grid-2">
+              <div class="fe-field">
+                <label>Nome do responsável</label>
+                <input v-model="fixoAssinatura" list="dl-dfd-assinatura-nome" placeholder="Digite o nome do responsável" />
+                <div class="fe-inline-actions">
+                  <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_assinatura_nome', fixoAssinatura)">Adicionar</button>
+                  <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('dfd_assinatura_nome', fixoAssinatura)" @click="removeFieldHistory('dfd_assinatura_nome', fixoAssinatura)">Excluir</button>
+                </div>
+              </div>
+              <div class="fe-field">
+                <label>Função / Cargo</label>
+                <input v-model="fixoAssinaturaCargo" list="dl-dfd-assinatura-cargo" placeholder="Digite a função ou cargo" />
+                <div class="fe-inline-actions">
+                  <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_assinatura_cargo', fixoAssinaturaCargo)">Adicionar</button>
+                  <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!canDeleteFieldHistory('dfd_assinatura_cargo', fixoAssinaturaCargo)" @click="removeFieldHistory('dfd_assinatura_cargo', fixoAssinaturaCargo)">Excluir</button>
+                </div>
+              </div>
+            </div>
           </div>
         </article>
       </div>
@@ -267,6 +348,15 @@
 
     <datalist id="dl-solicitacao-destinatario-nome"><option v-for="v in (slotFieldOptions.solicitacao_destinatario_nome || [])" :key="`sdn-${v}`" :value="v" /></datalist>
     <datalist id="dl-solicitacao-destinatario-cargo"><option v-for="v in (slotFieldOptions.solicitacao_destinatario_cargo || [])" :key="`sdc-${v}`" :value="v" /></datalist>
+    <datalist id="dl-solicitacao-responsavel-nome"><option v-for="v in (slotFieldOptions.solicitacao_responsavel_nome || [])" :key="`srn-${v}`" :value="v" /></datalist>
+    <datalist id="dl-solicitacao-responsavel-cargo"><option v-for="v in (slotFieldOptions.solicitacao_responsavel_cargo || [])" :key="`src-${v}`" :value="v" /></datalist>
+    <datalist id="dl-dfd-setor-requisitante"><option v-for="v in (slotFieldOptions.dfd_setor_requisitante || [])" :key="`dsr-${v}`" :value="v" /></datalist>
+    <datalist id="dl-dfd-responsavel-demanda"><option v-for="v in (slotFieldOptions.dfd_responsavel_demanda || [])" :key="`drd-${v}`" :value="v" /></datalist>
+    <datalist id="dl-dfd-email"><option v-for="v in (slotFieldOptions.dfd_email || [])" :key="`de-${v}`" :value="v" /></datalist>
+    <datalist id="dl-dfd-gestor-contratos"><option v-for="v in (slotFieldOptions.dfd_gestor_contratos || [])" :key="`dgc-${v}`" :value="v" /></datalist>
+    <datalist id="dl-dfd-fiscal-contratos"><option v-for="v in (slotFieldOptions.dfd_fiscal_contratos || [])" :key="`dfc-${v}`" :value="v" /></datalist>
+    <datalist id="dl-dfd-assinatura-nome"><option v-for="v in (slotFieldOptions.dfd_assinatura_nome || [])" :key="`dan-${v}`" :value="v" /></datalist>
+    <datalist id="dl-dfd-assinatura-cargo"><option v-for="v in (slotFieldOptions.dfd_assinatura_cargo || [])" :key="`dac-${v}`" :value="v" /></datalist>
   </div>
 </template>
 
@@ -329,10 +419,31 @@ const tratNome = ref('');
 const nome = ref('');
 const tratCargo = ref('');
 const cargo = ref('');
+const fixoResponsavel = ref('');
+const fixoResponsavelCargo = ref('');
+const fixoSetor = ref('');
+const fixoDemanda = ref('');
+const fixoEmail = ref('');
+const fixoGestor = ref('');
+const fixoFiscal = ref('');
+const fixoAssinatura = ref('');
+const fixoAssinaturaCargo = ref('');
 const slotFieldOptions = reactive({});
 const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
 const SLOT_PACKAGE_KEY = 'inexigibilidade_74_i_fornecedor_exclusivo';
-const CATALOG_KEYS = ['solicitacao_destinatario_nome', 'solicitacao_destinatario_cargo'];
+const CATALOG_KEYS = [
+  'solicitacao_destinatario_nome',
+  'solicitacao_destinatario_cargo',
+  'solicitacao_responsavel_nome',
+  'solicitacao_responsavel_cargo',
+  'dfd_setor_requisitante',
+  'dfd_responsavel_demanda',
+  'dfd_email',
+  'dfd_gestor_contratos',
+  'dfd_fiscal_contratos',
+  'dfd_assinatura_nome',
+  'dfd_assinatura_cargo',
+];
 
 function apenasNumeros(valor) { return String(valor || '').replace(/\D/g, ''); }
 function campoPreenchido(valor) { return String(valor || '').trim().length > 0; }
@@ -478,6 +589,15 @@ function collectGlobalFormStatePayload() {
   return {
     solicitacao_destinatario_nome: nome.value,
     solicitacao_destinatario_cargo: cargo.value,
+    solicitacao_responsavel_nome: fixoResponsavel.value,
+    solicitacao_responsavel_cargo: fixoResponsavelCargo.value,
+    dfd_setor_requisitante: fixoSetor.value,
+    dfd_responsavel_demanda: fixoDemanda.value,
+    dfd_email: fixoEmail.value,
+    dfd_gestor_contratos: fixoGestor.value,
+    dfd_fiscal_contratos: fixoFiscal.value,
+    dfd_assinatura_nome: fixoAssinatura.value,
+    dfd_assinatura_cargo: fixoAssinaturaCargo.value,
     ao_senhor_genero: tratNome.value,
     senhor_senhora_genero: tratCargo.value,
   };
@@ -501,6 +621,15 @@ function applyGlobalFormStatePayload(data) {
   if (!data || typeof data !== 'object') return;
   if ('solicitacao_destinatario_nome' in data) nome.value = String(data.solicitacao_destinatario_nome || '');
   if ('solicitacao_destinatario_cargo' in data) cargo.value = String(data.solicitacao_destinatario_cargo || '');
+  if ('solicitacao_responsavel_nome' in data) fixoResponsavel.value = String(data.solicitacao_responsavel_nome || '');
+  if ('solicitacao_responsavel_cargo' in data) fixoResponsavelCargo.value = String(data.solicitacao_responsavel_cargo || '');
+  if ('dfd_setor_requisitante' in data) fixoSetor.value = String(data.dfd_setor_requisitante || '');
+  if ('dfd_responsavel_demanda' in data) fixoDemanda.value = String(data.dfd_responsavel_demanda || '');
+  if ('dfd_email' in data) fixoEmail.value = String(data.dfd_email || '');
+  if ('dfd_gestor_contratos' in data) fixoGestor.value = String(data.dfd_gestor_contratos || '');
+  if ('dfd_fiscal_contratos' in data) fixoFiscal.value = String(data.dfd_fiscal_contratos || '');
+  if ('dfd_assinatura_nome' in data) fixoAssinatura.value = String(data.dfd_assinatura_nome || '');
+  if ('dfd_assinatura_cargo' in data) fixoAssinaturaCargo.value = String(data.dfd_assinatura_cargo || '');
   if ('ao_senhor_genero' in data) tratNome.value = String(data.ao_senhor_genero || '');
   if ('senhor_senhora_genero' in data) tratCargo.value = String(data.senhor_senhora_genero || '');
 }
@@ -606,6 +735,16 @@ function buildSlotsOverride() {
     senhor_senhora_genero: String(tratCargo.value || '').trim(),
     sol_oficio_destinatario_nome: String(nome.value || '').trim(),
     sol_oficio_destinatario_cargo: String(cargo.value || '').trim(),
+    sol_oficio_responsavel_nome: String(fixoResponsavel.value || '').trim(),
+    sol_oficio_responsavel_cargo: String(fixoResponsavelCargo.value || '').trim(),
+    secretaria_usuario: String((fixoSetor.value || orgao.value || '').trim()),
+    dfd_setor_requisitante: String((fixoSetor.value || orgao.value || '').trim()),
+    dfd_responsavel_demanda: String(fixoDemanda.value || '').trim(),
+    dfd_email: String(fixoEmail.value || '').trim(),
+    dfd_gestor_contratos: String(fixoGestor.value || '').trim(),
+    dfd_fiscal_contratos: String((fixoFiscal.value || fiscal.value || '').trim()),
+    dfd_assinatura_nome: String(fixoAssinatura.value || '').trim(),
+    dfd_assinatura_cargo: String(fixoAssinaturaCargo.value || '').trim(),
   };
   if (clausulaObjeto.value.trim()) {
     o.objeto = clausulaObjeto.value.trim();
@@ -632,7 +771,8 @@ function buildSlotsOverride() {
     valor_unitario: String(item.valorUnitario || '').trim(),
     valor_total: String(item.valorTotal || '').trim(),
   }));
-  o.fiscal = fiscal.value.trim() ? { nome: fiscal.value.trim() } : undefined;
+  const fiscalNome = String((fixoFiscal.value || fiscal.value || '')).trim();
+  o.fiscal = fiscalNome ? { nome: fiscalNome } : undefined;
   o.nome_assinante_termo = String(responsavel.value || '').trim();
   o.cargo_assinante_termo = String(responsavelCargo.value || '').trim();
   return o;

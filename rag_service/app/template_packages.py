@@ -5,6 +5,7 @@ from typing import Dict
 
 
 TEMPLATE_PACKAGES_ROOT = Path(__file__).resolve().parents[2] / "template_packages"
+PROJECT_ROOT = TEMPLATE_PACKAGES_ROOT.parent
 LEGACY_TR_BASE_DIR = TEMPLATE_PACKAGES_ROOT / "tr_base"
 LAW_14133_ROOT = TEMPLATE_PACKAGES_ROOT / "lei_14133"
 
@@ -16,7 +17,14 @@ PACKAGE_DIRS: Dict[str, str] = {
     "dispensa_75_ii_servicos": "dispensa_75_ii_servicos",
     "dispensa_75_ii_compras_servicos_inclusos": "dispensa_75_ii_compras_servicos_inclusos",
     "inexigibilidade_74_i_show_artistico": "inexigibilidade_74_i_show_artistico",
+    "inexigibilidade_74_i_fornecedor_exclusivo": "tr_dfd_generico",
+    "inexigibilidade_74_i_manutencao_veiculos": "tr_dfd_generico",
     "tr_dfd_generico": "tr_dfd_generico",
+}
+
+CUSTOM_TR_BASE_BY_PACKAGE: Dict[str, str] = {
+    "inexigibilidade_74_i_fornecedor_exclusivo": "TERMO DE REFERENCIA IA - ART 74 I - FORNECEDOR EXCLUSIVO.docx",
+    "inexigibilidade_74_i_manutencao_veiculos": "1-TERMO DE REFERENCIA IA - ART 74 I - MANUTENÇÃO DE VEICULOS.docx",
 }
 
 
@@ -28,9 +36,13 @@ def get_package_template_paths(slot_package_key: str | None) -> Dict[str, Path]:
     key = (slot_package_key or "").strip().lower() or "tr_dfd_generico"
     folder = PACKAGE_DIRS.get(key, PACKAGE_DIRS["tr_dfd_generico"])
     base = LAW_14133_ROOT / folder
+    tr_path = base / "TR_modelo_base.docx"
+    custom_tr_filename = CUSTOM_TR_BASE_BY_PACKAGE.get(key)
+    if custom_tr_filename:
+        tr_path = PROJECT_ROOT / custom_tr_filename
     return {
         "base_dir": base,
-        "tr": base / "TR_modelo_base.docx",
+        "tr": tr_path,
         "dfd": base / "DFD_modelo_base.docx",
         "oficio": base / "OFICIO_modelo_base.docx",
     }

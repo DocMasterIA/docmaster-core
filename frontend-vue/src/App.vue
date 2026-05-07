@@ -76,16 +76,19 @@
                       <i class="fa-solid" :class="isGroupOpen(page.name) ? 'fa-chevron-up' : 'fa-chevron-down'" aria-hidden="true"></i>
                     </button>
                     <div v-if="isGroupOpen(page.name) && page.children?.length" class="dm-subsubnav">
-                      <router-link
-                        v-for="child in page.children"
-                        :key="child.name"
-                        :to="child.to"
-                        class="dm-subsubnav-link"
-                        :class="{ 'dm-subsubnav-link--active': isRouteActive(child.name) }"
-                      >
-                        <i class="fa-solid" :class="child.icon" aria-hidden="true"></i>
-                        {{ child.label }}
-                      </router-link>
+                      <template v-for="section in groupedChildren(page)" :key="section.title">
+                        <div class="dm-subsubnav-section-title">{{ section.title }}</div>
+                        <router-link
+                          v-for="child in section.items"
+                          :key="child.name"
+                          :to="child.to"
+                          class="dm-subsubnav-link"
+                          :class="{ 'dm-subsubnav-link--active': isRouteActive(child.name) }"
+                        >
+                          <i class="fa-solid" :class="child.icon" aria-hidden="true"></i>
+                          {{ child.label }}
+                        </router-link>
+                      </template>
                     </div>
                   </div>
                 </div>
@@ -165,30 +168,35 @@ const generationPages = [
         name: 'DispensaRapidaArt75IObrasEngenharia',
         label: 'Obras e serviços de engenharia',
         icon: 'fa-compass-drafting',
+        subsection: 'Art. 75, I',
         to: '/geracao/dispensa-rapida/art-75-i/obras-servicos-engenharia',
       },
       {
         name: 'DispensaRapidaArt75IManutencaoVeiculos',
         label: 'Manutenção de veículos',
         icon: 'fa-car-side',
+        subsection: 'Art. 75, I',
         to: '/geracao/dispensa-rapida/art-75-i/manutencao-veiculos',
       },
       {
         name: 'DispensaRapidaArt75IICompras',
         label: 'Compras',
         icon: 'fa-cart-shopping',
+        subsection: 'Art. 75, II',
         to: '/geracao/dispensa-rapida/art-75-ii/compras',
       },
       {
         name: 'DispensaRapidaArt75IIServicos',
         label: 'Serviços',
         icon: 'fa-screwdriver-wrench',
+        subsection: 'Art. 75, II',
         to: '/geracao/dispensa-rapida/art-75-ii/servicos',
       },
       {
         name: 'DispensaRapidaArt75IIComprasServicosInclusos',
         label: 'Compras com serviços inclusos',
         icon: 'fa-boxes-stacked',
+        subsection: 'Art. 75, II',
         to: '/geracao/dispensa-rapida/art-75-ii/compras-servicos-inclusos',
       },
     ],
@@ -202,30 +210,35 @@ const generationPages = [
         name: 'DispensaArt75IObrasEngenharia',
         label: 'Obras e serviços de engenharia',
         icon: 'fa-compass-drafting',
+        subsection: 'Art. 75, I',
         to: '/geracao/dispensa-art-75-i/obras-servicos-engenharia',
       },
       {
         name: 'DispensaArt75IManutencaoVeiculos',
         label: 'Manutenção de veículos',
         icon: 'fa-car-side',
+        subsection: 'Art. 75, I',
         to: '/geracao/dispensa-art-75-i/manutencao-veiculos',
       },
       {
         name: 'DispensaArt75IICompras',
         label: 'Compras',
         icon: 'fa-cart-shopping',
+        subsection: 'Art. 75, II',
         to: '/geracao/dispensa-art-75-ii/compras',
       },
       {
         name: 'DispensaArt75IIServicos',
         label: 'Serviços',
         icon: 'fa-screwdriver-wrench',
+        subsection: 'Art. 75, II',
         to: '/geracao/dispensa-art-75-ii/servicos',
       },
       {
         name: 'DispensaArt75IIComprasServicosInclusos',
         label: 'Compras com serviços inclusos',
         icon: 'fa-boxes-stacked',
+        subsection: 'Art. 75, II',
         to: '/geracao/dispensa-art-75-ii/compras-servicos-inclusos',
       },
     ],
@@ -393,6 +406,24 @@ function isGroupOpen(name) {
 
 function isGroupActive(page) {
   return page.children?.some((child) => child.name === route.name) || false;
+}
+
+function groupedChildren(page) {
+  const children = Array.isArray(page?.children) ? page.children : [];
+  const sections = [
+    { key: 'Art. 75, I', title: 'Art. 75, I', items: [] },
+    { key: 'Art. 75, II', title: 'Art. 75, II', items: [] },
+  ];
+  const byKey = new Map(sections.map((s) => [s.key, s]));
+  const fallback = [];
+  children.forEach((child) => {
+    const section = byKey.get(child.subsection || '');
+    if (section) section.items.push(child);
+    else fallback.push(child);
+  });
+  const ordered = sections.filter((s) => s.items.length > 0);
+  if (fallback.length > 0) ordered.push({ key: 'Outros', title: 'Outros', items: fallback });
+  return ordered.length > 0 ? ordered : [{ key: 'Itens', title: 'Itens', items: children }];
 }
 
 async function fetchMe() {
@@ -871,6 +902,21 @@ watch(
 }
 .dm-dark .dm-subsubnav {
   border-left-color: #334155;
+}
+
+.dm-subsubnav-section-title {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.dm-subsubnav-section-title:first-child {
+  margin-top: 0;
+}
+.dm-dark .dm-subsubnav-section-title {
+  color: #94a3b8;
 }
 
 .dm-subsubnav-link,

@@ -227,7 +227,7 @@
 <script setup>
 import { ref, reactive, onUnmounted } from 'vue';
 
-const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
+const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const ACCEPT_TYPES = ['.pdf', '.docx', 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];

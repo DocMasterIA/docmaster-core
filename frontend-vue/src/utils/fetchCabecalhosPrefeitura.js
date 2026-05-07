@@ -2,7 +2,7 @@
  * Nomes de modelos DOCX da biblioteca (`/api/documentos_modelos/`) filtrados
  * pela prefeitura do usuário logado — mesma regra da dispensa normal (InexigibilidadeManutencaoVeiculosPreview).
  *
- * @param {string} apiBase ex.: import.meta.dev ? '' : VITE_API_URL
+ * @param {string} apiBase ex.: import.meta.env.DEV ? '' : VITE_API_URL
  * @returns {Promise<string[]>}
  */
 export async function fetchCabecalhosPrefeitura(apiBase) {

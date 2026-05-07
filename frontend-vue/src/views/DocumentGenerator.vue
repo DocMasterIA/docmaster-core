@@ -502,7 +502,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 // Em dev: usar '' para que a requisição passe pelo proxy do Vite (evita 404 por chamar outro host/porta)
-const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
+const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 const route = useRoute();
 
 /** Rotas `/geracao/dispensa-rapida/...` reutilizam pacotes e regras das rotas `DispensaArt75*`. */

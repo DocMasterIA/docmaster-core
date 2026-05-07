@@ -143,7 +143,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { firstAllowedPath, normalizeAllowedModules, resolveModuleKey } from './moduleAccess';
 
-const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
+const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 const DARK_MODE_KEY = 'docmaster.ui.darkmode';
 const router = useRouter();
 const route = useRoute();

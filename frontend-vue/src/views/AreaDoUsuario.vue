@@ -206,7 +206,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 
-const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
+const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 
 const profile = reactive({
   id: '',

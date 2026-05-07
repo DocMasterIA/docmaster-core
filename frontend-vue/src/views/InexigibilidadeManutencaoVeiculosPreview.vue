@@ -398,7 +398,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
 
-const API_BASE = import.meta.dev ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
+const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 const route = useRoute();
 const dataOptions = ['Data automatica', 'Datado e assinado digitalmente', 'Data manual'];
 const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';

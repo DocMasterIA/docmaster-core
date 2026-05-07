@@ -1,11 +1,6 @@
 <template>
   <div class="da75-page">
     <div class="da75-page__inner">
-      <div>
-        <h1 class="da75-title">Gerador de Documentos</h1>
-        <p class="da75-subtitle">Geração de Solicitação, DFD e Termo de Referência.</p>
-      </div>
-
       <div class="da75-grid-main da75-mt">
         <section class="da75-panel">
           <div class="da75-panel__head">
@@ -61,59 +56,37 @@
             <section class="da75-block">
               <h3>Objeto da contratação e justificativa</h3>
               <div class="da75-block__body">
-                <div class="da75-two-col">
-                  <div class="da75-stack">
-                    <div class="da75-field">
-                      <label class="da75-label">O que será contratado?</label>
-                      <textarea
-                        class="da75-textarea"
-                        :value="objetoContratado"
-                        :placeholder="rapidaObjPlaceholder"
-                        @input="objetoContratado = primeiraMaiuscula(($event.target).value)"
-                      />
-                    </div>
-                    <div class="da75-field">
-                      <label class="da75-label">Qual setor/secretaria será atendido?</label>
-                      <input
-                        class="da75-input"
-                        :value="objetoSetor"
-                        placeholder="Ex: Secretaria de Administração"
-                        @input="objetoSetor = primeiraMaiuscula(($event.target).value)"
-                      />
-                    </div>
-                    <div class="da75-field">
-                      <label class="da75-label">Características mínimas obrigatórias (opcional)</label>
-                      <textarea
-                        class="da75-textarea"
-                        :value="objetoCaracteristicas"
-                        placeholder="Ex: Para uso contínuo das unidades administrativas"
-                        @input="objetoCaracteristicas = primeiraMaiuscula(($event.target).value)"
-                      />
-                    </div>
-                    <button type="button" class="da75-btn da75-btn--primary da75-btn--block" :disabled="isGerandoClausulas" @click="gerar">
-                      {{ isGerandoClausulas ? 'Gerando objeto e justificativa...' : 'Gerar objeto e justificativa' }}
-                    </button>
-                    <p v-if="erroGeracaoClausulas" class="da75-helper">{{ erroGeracaoClausulas }}</p>
+                <div class="da75-stack">
+                  <div class="da75-field">
+                    <label class="da75-label">O que será contratado?</label>
+                    <textarea
+                      class="da75-textarea"
+                      :value="objetoContratado"
+                      :placeholder="rapidaObjPlaceholder"
+                      @input="objetoContratado = primeiraMaiuscula(($event.target).value)"
+                    />
                   </div>
-                  <div class="da75-stack">
-                    <div class="da75-field">
-                      <label class="da75-label">Objeto gerado pela IA</label>
-                      <textarea
-                        class="da75-textarea"
-                        rows="5"
-                        :value="objetoGerado"
-                        @input="objetoGerado = primeiraMaiuscula(($event.target).value)"
-                      />
-                    </div>
-                    <div class="da75-field">
-                      <label class="da75-label">Justificativa da contratação</label>
-                      <textarea
-                        class="da75-textarea"
-                        rows="5"
-                        :value="justificativa"
-                        @input="justificativa = primeiraMaiuscula(($event.target).value)"
-                      />
-                    </div>
+                  <button type="button" class="da75-btn da75-btn--primary da75-btn--block" :disabled="isGerandoClausulas" @click="gerar">
+                    {{ isGerandoClausulas ? 'Gerando objeto e justificativa...' : 'Gerar objeto e justificativa' }}
+                  </button>
+                  <p v-if="erroGeracaoClausulas" class="da75-helper">{{ erroGeracaoClausulas }}</p>
+                  <div class="da75-field">
+                    <label class="da75-label">Objeto gerado pela IA</label>
+                    <textarea
+                      class="da75-textarea"
+                      rows="5"
+                      :value="objetoGerado"
+                      @input="objetoGerado = primeiraMaiuscula(($event.target).value)"
+                    />
+                  </div>
+                  <div class="da75-field">
+                    <label class="da75-label">Justificativa da contratação</label>
+                    <textarea
+                      class="da75-textarea"
+                      rows="5"
+                      :value="justificativa"
+                      @input="justificativa = primeiraMaiuscula(($event.target).value)"
+                    />
                   </div>
                 </div>
               </div>
@@ -282,8 +255,6 @@ const processo = ref('');
 const orgao = ref('');
 const dadosFixos = useDispensaArt75IIDadosFixos(API_BASE, { cabecalho, processoAtivo, processo, orgao });
 const objetoContratado = ref('');
-const objetoSetor = ref('');
-const objetoCaracteristicas = ref('');
 const objetoGerado = ref('');
 const justificativa = ref('');
 const dotacaoAtiva = ref(false);
@@ -373,12 +344,10 @@ const secoes = computed(() => {
       titulo: 'Objeto e justificativa',
       completo:
         campoPreenchido(objetoContratado.value) &&
-        campoPreenchido(objetoSetor.value) &&
         campoPreenchido(objetoGerado.value) &&
         campoPreenchido(justificativa.value),
       linhas: [
         ['O que será contratado', objetoContratado.value || 'Não informado', campoPreenchido(objetoContratado.value)],
-        ['Setor atendido', objetoSetor.value || 'Não informado', campoPreenchido(objetoSetor.value)],
         ['Objeto gerado', objetoGerado.value || 'Não informado', campoPreenchido(objetoGerado.value)],
         ['Justificativa', justificativa.value || 'Não informada', campoPreenchido(justificativa.value)],
       ],
@@ -432,10 +401,8 @@ function slotsOverrideWithoutClauseDraft(raw) {
 async function gerar() {
   erroGeracaoClausulas.value = '';
   const contratado = String(objetoContratado.value || '').trim();
-  const setor = String(objetoSetor.value || '').trim();
-  const caracteristicas = String(objetoCaracteristicas.value || '').trim();
-  if (!contratado || !setor) {
-    erroGeracaoClausulas.value = 'Preencha "O que será contratado?" e "Qual setor/secretaria será atendido?".';
+  if (!contratado) {
+    erroGeracaoClausulas.value = 'Preencha "O que será contratado?".';
     return;
   }
   isGerandoClausulas.value = true;
@@ -457,11 +424,11 @@ async function gerar() {
     const slots = data.slots && typeof data.slots === 'object' ? data.slots : {};
     const obj = String(slots.objeto || '').trim();
     const jus = String(slots.justificativa || '').trim();
-    objetoGerado.value = obj || gerarObjetoTexto(contratado, setor, caracteristicas);
-    justificativa.value = jus || gerarJustificativaTexto(contratado, setor, caracteristicas);
+    objetoGerado.value = obj || gerarObjetoTexto(contratado, '', '');
+    justificativa.value = jus || gerarJustificativaTexto(contratado, '', '');
   } catch (_e) {
-    objetoGerado.value = gerarObjetoTexto(contratado, setor, caracteristicas);
-    justificativa.value = gerarJustificativaTexto(contratado, setor, caracteristicas);
+    objetoGerado.value = gerarObjetoTexto(contratado, '', '');
+    justificativa.value = gerarJustificativaTexto(contratado, '', '');
     erroGeracaoClausulas.value = 'Falha na IA; aplicamos versão padrão local.';
   } finally {
     isGerandoClausulas.value = false;
@@ -546,9 +513,7 @@ function buildUserPrompt() {
     `Cabeçalho do documento: ${cabecalho.value || 'Não informado'}`,
     `Órgão: ${orgao.value || 'Não informado'}`,
     `Processo: ${processoAtivo.value ? (processo.value || 'Não informado') : 'Não se aplica'}`,
-    `Objeto base: ${objetoContratado.value || 'Não informado'}`,
-    `Setor atendido: ${objetoSetor.value || 'Não informado'}`,
-    `Características mínimas: ${objetoCaracteristicas.value || 'Não informado'}`,
+    `Objeto (o que será contratado): ${objetoContratado.value || 'Não informado'}`,
     `Cotação: ${cotacaoAtiva.value ? (numeroCotacao.value || 'Não informada') : 'Não se aplica'}`,
   ].join('\n');
 }

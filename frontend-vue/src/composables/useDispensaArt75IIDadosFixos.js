@@ -7,6 +7,17 @@ import {
 
 export const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
 
+function catalogItemToString(x) {
+  if (x == null) return '';
+  if (typeof x === 'string') return x.trim();
+  if (typeof x === 'number' || typeof x === 'boolean') return String(x).trim();
+  if (typeof x === 'object') {
+    if (x.value != null && typeof x.value !== 'object') return String(x.value).trim();
+    if (typeof x.label === 'string') return x.label.trim();
+  }
+  return '';
+}
+
 /** Mesmas chaves do catálogo usadas em dispensa normal + campos do TR (Art. 75 II). */
 export const DA75_FIXOS_CATALOG_KEYS = [
   'cabecalho_documento',
@@ -203,7 +214,7 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
       const map = payload?.items || {};
       DA75_FIXOS_CATALOG_KEYS.forEach((key) => {
         const incoming = Array.isArray(map[key]) ? map[key] : [];
-        slotFieldOptions[key] = [...new Set(incoming.map((x) => String(x || '').trim()).filter(Boolean))];
+        slotFieldOptions[key] = [...new Set(incoming.map(catalogItemToString).filter(Boolean))];
       });
     } catch {
       // silencioso
@@ -239,7 +250,9 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     }
   }
 
-  return {
+  // `reactive` para refs aninhadas serem desempacotadas em templates (ex.: drawer com `:ctx="dadosFixos"`).
+  // Sem isso, `v-model="ctx.fixoNome"` recebe o objeto Ref e o input mostra "[object Object]".
+  return reactive({
     slotFieldOptions,
     tratamentoNome,
     tratamentoCargo,
@@ -266,5 +279,5 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     addFieldHistory,
     removeFieldHistory,
     canDeleteFieldHistory,
-  };
+  });
 }

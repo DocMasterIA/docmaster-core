@@ -277,7 +277,7 @@
     </div>
 
     <div v-if="showSlotsCard && slotDrawerOpen" class="doc-gen__drawer-backdrop" @click="slotDrawerOpen = false"></div>
-    <aside :class="['doc-gen__drawer', { 'doc-gen__drawer--open': showSlotsCard && slotDrawerOpen }]">
+    <aside v-if="showSlotsCard" :class="['doc-gen__drawer', { 'doc-gen__drawer--open': slotDrawerOpen }]">
       <div class="doc-gen__drawer-head">
         <div>
           <div class="doc-gen__drawer-kicker">Configuração oculta</div>
@@ -1781,6 +1781,11 @@ function goToPage() {
 </script>
 
 <style scoped>
+.doc-gen {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
 .doc-gen__grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;

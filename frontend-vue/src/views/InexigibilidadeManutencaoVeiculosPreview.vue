@@ -1064,7 +1064,6 @@ async function onGenerateClauses() {
         body: JSON.stringify({ prompt: fastPrompt, stream: false }),
       });
       const data = await res.json().catch(() => ({}));
-      // Normaliza para o mesmo contrato usado abaixo.
       const text = data?.data?.response || data?.data?.text || data?.response || data?.text || '';
       return { res, data: { ok: !!data?.ok, response: text } };
     }

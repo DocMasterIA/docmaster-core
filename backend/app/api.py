@@ -818,6 +818,7 @@ def gerar_tr_e_dfd_api(request):
         }
     )
 
+
 @csrf_exempt
 @api_login_required
 def analise_documentos_api(request):

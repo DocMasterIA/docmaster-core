@@ -372,8 +372,9 @@ function buildSlotsOverride() {
     dataTermo = 'datado e assinado digitalmente';
   }
   if (dataTermo) o.data_termo = dataTermo;
-  const objetoFinal = String(objetoContratado.value || '').trim();
-  if (objetoFinal) o.objeto = objetoFinal;
+  // Não enviar `objeto` em slots_override: o mesmo fill_tr_slots_with_llm do gerar-tr-e-dfd
+  // deve redigir objeto (e justificativa) a partir do user_prompt. Enviar só o resumo aqui
+  // substituía a cláusula elaborada pela IA e deixava o TR com texto telegráfico.
   return Object.keys(o).length ? o : null;
 }
 

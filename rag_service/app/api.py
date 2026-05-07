@@ -655,6 +655,36 @@ async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@router.post("/fill-tr-slots")
+async def endpoint_fill_tr_slots(body: GenerateTRFromModelRequest):
+    """
+    Executa apenas fill_tr_slots_with_llm (mesmo fluxo de IA da geração TR/DFD/Ofício),
+    sem renderizar DOCX. Retorna os slots em JSON para preencher objeto/justificativa no formulário.
+    """
+    from dataclasses import asdict
+
+    from .tr_slots_llm import fill_tr_slots_with_llm
+
+    slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
+    skip_ctx = bool(getattr(body, "skip_context_in_prompt", False))
+    try:
+        slots = await fill_tr_slots_with_llm(
+            user_prompt=body.user_prompt,
+            slots_override=slots_override,
+            user_context=body.context,
+            skip_context_in_prompt=skip_ctx,
+        )
+        return {"ok": True, "slots": asdict(slots)}
+    except ValueError as e:
+        msg = str(e).strip()
+        if any(x in msg for x in ("Orquestração", "LLM", "Resposta da LLM", "404", "modelo")):
+            raise HTTPException(status_code=502, detail=msg) from e
+        raise HTTPException(status_code=400, detail=msg) from e
+    except Exception as e:
+        logger.exception("Erro em fill-tr-slots: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @router.post("/check-compliance", response_model=CheckComplianceResponse)
 async def endpoint_check_compliance(body: CheckComplianceRequest) -> CheckComplianceResponse:
     """

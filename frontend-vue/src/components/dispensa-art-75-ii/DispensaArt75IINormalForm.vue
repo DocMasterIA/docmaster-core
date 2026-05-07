@@ -395,15 +395,15 @@ const secoes = computed(() => {
 const completos = computed(() => secoes.value.filter((s) => s.completo).length);
 const progresso = computed(() => Math.round((completos.value / secoes.value.length) * 100));
 
-function parseObjetoJustificativa(text) {
-  const raw = String(text || '').replace(/\r/g, '').trim();
-  if (!raw) return { objeto: '', justificativa: '' };
-  const matchObjeto = raw.match(/Objeto:\s*([\s\S]*?)(?:\n+Justificativa:|$)/i);
-  const matchJust = raw.match(/Justificativa:\s*([\s\S]*?)$/i);
-  return {
-    objeto: (matchObjeto?.[1] || '').trim(),
-    justificativa: (matchJust?.[1] || '').trim(),
-  };
+/** Remove rascunho de objeto/justificativa para fill_tr_slots_with_llm (rag_service). */
+function slotsOverrideWithoutClauseDraft(raw) {
+  if (!raw || typeof raw !== 'object') return raw;
+  const o = { ...raw };
+  delete o.objeto;
+  delete o.justificativa;
+  delete o.sol_oficio_objeto;
+  delete o.sol_oficio_justificativa;
+  return Object.keys(o).length ? o : null;
 }
 
 async function gerar() {
@@ -417,31 +417,25 @@ async function gerar() {
   }
   isGerandoClausulas.value = true;
   try {
-    const prompt = [
-      'Gerar APENAS duas seções em português:',
-      'Objeto: <texto>',
-      'Justificativa: <texto>',
-      '',
-      'Regras:',
-      '- Não inventar dados fora do informado.',
-      '- Não incluir seções extras.',
-      '',
-      `O que será contratado: ${contratado}`,
-      `Setor/secretaria atendido: ${setor}`,
-      `Características mínimas (opcional): ${caracteristicas || 'não informado'}`,
-    ].join('\n');
-    const res = await fetch(`${API_BASE}/api/llm/generate`, {
+    const res = await fetch(`${API_BASE}/api/documentos/fill-tr-slots`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ prompt, stream: false }),
+      body: JSON.stringify({
+        user_prompt: buildUserPrompt(),
+        slots_override: slotsOverrideWithoutClauseDraft(buildSlotsOverride()),
+        slot_package_key: slotPackageKey.value,
+      }),
     });
     const data = await res.json().catch(() => ({}));
-    const text = data?.data?.response || data?.data?.text || data?.response || data?.text || '';
-    if (!res.ok || !String(text || '').trim()) throw new Error(data?.error || `Erro ${res.status}`);
-    const parsed = parseObjetoJustificativa(text);
-    objetoGerado.value = parsed.objeto || gerarObjetoTexto(contratado, setor, caracteristicas);
-    justificativa.value = parsed.justificativa || gerarJustificativaTexto(contratado, setor, caracteristicas);
+    if (!res.ok || !data.ok) {
+      throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
+    }
+    const slots = data.slots && typeof data.slots === 'object' ? data.slots : {};
+    const obj = String(slots.objeto || '').trim();
+    const jus = String(slots.justificativa || '').trim();
+    objetoGerado.value = obj || gerarObjetoTexto(contratado, setor, caracteristicas);
+    justificativa.value = jus || gerarJustificativaTexto(contratado, setor, caracteristicas);
   } catch (_e) {
     objetoGerado.value = gerarObjetoTexto(contratado, setor, caracteristicas);
     justificativa.value = gerarJustificativaTexto(contratado, setor, caracteristicas);

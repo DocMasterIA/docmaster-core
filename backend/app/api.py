@@ -821,6 +821,75 @@ def gerar_tr_e_dfd_api(request):
 
 @csrf_exempt
 @api_login_required
+def fill_tr_slots_api(request):
+    """
+    Preenche slots do TR via rag_service (fill_tr_slots_with_llm) — mesmo pipeline da
+    geração TR/DFD/Ofício, sem DOCX. Usado pelo botão «Gerar» objeto/justificativa antes do documento.
+    """
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Use POST"}, status=405)
+
+    try:
+        payload = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({"ok": False, "error": "Corpo JSON inválido"}, status=400)
+
+    user_prompt = (payload.get("user_prompt") or "").strip()
+    slots_override = payload.get("slots_override")
+    slot_package_key = _resolve_slot_package_key(payload, request)
+
+    if not user_prompt:
+        return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
+
+    context = build_llm_context_from_request(request)
+    if slot_package_key:
+        context["slot_package_key"] = slot_package_key
+
+    rag_url = getattr(django_settings, "RAG_SERVICE_URL", "http://127.0.0.1:8004").rstrip("/")
+    url = f"{rag_url}/api/rag/fill-tr-slots"
+    body = {
+        "user_prompt": user_prompt,
+        "slots_override": slots_override or None,
+        "context": context if context else None,
+        "skip_context_in_prompt": True,
+    }
+
+    try:
+        resp = requests.post(url, json=body, timeout=_rag_http_timeout_seconds())
+    except requests.exceptions.ConnectionError:
+        return JsonResponse(
+            {"ok": False, "error": "Serviço de geração indisponível. Verifique se o rag_service está em execução."},
+            status=503,
+        )
+    except requests.exceptions.Timeout:
+        return JsonResponse(
+            {"ok": False, "error": "Tempo limite na geração. O rag_service demorou para responder."},
+            status=504,
+        )
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=502)
+
+    try:
+        out = resp.json()
+    except Exception:
+        return JsonResponse(
+            {"ok": False, "error": f"Resposta inválida do rag_service (status {resp.status_code})."},
+            status=502,
+        )
+
+    if resp.status_code != 200:
+        err = out.get("detail") if isinstance(out, dict) else None
+        if err is None and isinstance(out, dict):
+            err = out.get("error")
+        if err is None:
+            err = str(out)
+        return JsonResponse({"ok": False, "error": err}, status=resp.status_code)
+
+    return JsonResponse(out)
+
+
+@csrf_exempt
+@api_login_required
 def analise_documentos_api(request):
     """
     Recebe um arquivo (PDF/DOCX) e delega a análise para o rag_service (/api/rag/analyze-document).

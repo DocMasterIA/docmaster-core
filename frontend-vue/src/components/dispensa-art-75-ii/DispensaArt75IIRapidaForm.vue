@@ -61,13 +61,97 @@
             <section class="da75-block">
               <h3>Objeto da contratação e justificativa</h3>
               <div class="da75-block__body">
-                <div class="da75-field">
-                  <label class="da75-label">O que será contratado?</label>
+                <div class="da75-two-col">
+                  <div class="da75-stack">
+                    <div class="da75-field">
+                      <label class="da75-label">O que será contratado?</label>
+                      <textarea
+                        class="da75-textarea"
+                        :value="objetoContratado"
+                        :placeholder="rapidaObjPlaceholder"
+                        @input="objetoContratado = primeiraMaiuscula(($event.target).value)"
+                      />
+                    </div>
+                    <div class="da75-field">
+                      <label class="da75-label">Qual setor/secretaria será atendido?</label>
+                      <input
+                        class="da75-input"
+                        :value="objetoSetor"
+                        placeholder="Ex: Secretaria de Administração"
+                        @input="objetoSetor = primeiraMaiuscula(($event.target).value)"
+                      />
+                    </div>
+                    <div class="da75-field">
+                      <label class="da75-label">Características mínimas obrigatórias (opcional)</label>
+                      <textarea
+                        class="da75-textarea"
+                        :value="objetoCaracteristicas"
+                        placeholder="Ex: Para uso contínuo das unidades administrativas"
+                        @input="objetoCaracteristicas = primeiraMaiuscula(($event.target).value)"
+                      />
+                    </div>
+                    <button type="button" class="da75-btn da75-btn--primary da75-btn--block" :disabled="isGerandoClausulas" @click="gerar">
+                      {{ isGerandoClausulas ? 'Gerando objeto e justificativa...' : 'Gerar objeto e justificativa' }}
+                    </button>
+                    <p v-if="erroGeracaoClausulas" class="da75-helper">{{ erroGeracaoClausulas }}</p>
+                  </div>
+                  <div class="da75-stack">
+                    <div class="da75-field">
+                      <label class="da75-label">Objeto gerado pela IA</label>
+                      <textarea
+                        class="da75-textarea"
+                        rows="5"
+                        :value="objetoGerado"
+                        @input="objetoGerado = primeiraMaiuscula(($event.target).value)"
+                      />
+                    </div>
+                    <div class="da75-field">
+                      <label class="da75-label">Justificativa da contratação</label>
+                      <textarea
+                        class="da75-textarea"
+                        rows="5"
+                        :value="justificativa"
+                        @input="justificativa = primeiraMaiuscula(($event.target).value)"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="da75-block">
+              <h3>Dotação orçamentária</h3>
+              <div class="da75-block__body">
+                <label class="da75-check">
+                  <input v-model="dotacaoAtiva" type="checkbox" />
+                  Informar dotação orçamentária (opcional)
+                </label>
+                <div v-if="dotacaoAtiva" class="da75-mt">
+                  <label class="da75-label">Dotação orçamentária</label>
                   <textarea
                     class="da75-textarea"
-                    :value="objetoContratado"
-                    :placeholder="rapidaObjPlaceholder"
-                    @input="objetoContratado = primeiraMaiuscula(($event.target).value)"
+                    :value="dotacao"
+                    :placeholder="PLACEHOLDER_DOTACAO"
+                    @input="dotacao = primeiraMaiuscula(($event.target).value)"
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section class="da75-block">
+              <h3>Cotação</h3>
+              <div class="da75-block__body">
+                <label class="da75-check">
+                  <input v-model="cotacaoAtiva" type="checkbox" />
+                  Incluir número de cotação (opcional)
+                </label>
+                <div v-if="cotacaoAtiva" class="da75-max-xs da75-mt">
+                  <label class="da75-label">Número da cotação</label>
+                  <input
+                    class="da75-input"
+                    :value="numeroCotacao"
+                    placeholder="Ex: COT-2026-00123"
+                    @input="numeroCotacao = primeiraMaiuscula(($event.target).value)"
                   />
                 </div>
               </div>
@@ -96,25 +180,6 @@
                       @input="dataManual = formatarData(($event.target).value)"
                     />
                   </div>
-                </div>
-              </div>
-            </section>
-
-            <section class="da75-block">
-              <h3>Cotação</h3>
-              <div class="da75-block__body">
-                <label class="da75-check">
-                  <input v-model="cotacaoAtiva" type="checkbox" />
-                  Incluir número de cotação (opcional)
-                </label>
-                <div v-if="cotacaoAtiva" class="da75-max-xs da75-mt">
-                  <label class="da75-label">Número da cotação</label>
-                  <input
-                    class="da75-input"
-                    :value="numeroCotacao"
-                    placeholder="Ex: COT-2026-00123"
-                    @input="numeroCotacao = primeiraMaiuscula(($event.target).value)"
-                  />
                 </div>
               </div>
             </section>
@@ -193,8 +258,11 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   DATA_OPTIONS,
+  PLACEHOLDER_DOTACAO,
   campoPreenchido,
   formatarData,
+  gerarJustificativaTexto,
+  gerarObjetoTexto,
   primeiraMaiuscula,
 } from './dispensaArt75iiShared.js';
 import './dispensaArt75ii.css';
@@ -214,11 +282,19 @@ const processo = ref('');
 const orgao = ref('');
 const dadosFixos = useDispensaArt75IIDadosFixos(API_BASE, { cabecalho, processoAtivo, processo, orgao });
 const objetoContratado = ref('');
+const objetoSetor = ref('');
+const objetoCaracteristicas = ref('');
+const objetoGerado = ref('');
+const justificativa = ref('');
+const dotacaoAtiva = ref(false);
+const dotacao = ref('');
 const modoData = ref('');
 const dataManual = ref('');
 const cotacaoAtiva = ref(false);
 const numeroCotacao = ref('');
 const isSubmitting = ref(false);
+const isGerandoClausulas = ref(false);
+const erroGeracaoClausulas = ref('');
 const generateError = ref('');
 const successMessage = ref('');
 const documentReady = ref(false);
@@ -241,6 +317,10 @@ const SLOT_PACKAGE_BY_ROUTE = {
   DispensaRapidaArt75IIServicos: 'dispensa_75_ii_servicos',
   DispensaRapidaArt75IIComprasServicosInclusos: 'dispensa_75_ii_compras_servicos_inclusos',
 };
+
+watch(dotacaoAtiva, (v) => {
+  if (!v) dotacao.value = '';
+});
 
 onMounted(async () => {
   await dadosFixos.loadUserGlobalPreset();
@@ -283,14 +363,30 @@ const secoes = computed(() => {
       ],
     },
     {
-      titulo: 'Objeto da contratação',
-      completo: campoPreenchido(objetoContratado.value),
-      linhas: [['O que será contratado', objetoContratado.value || 'Não informado', campoPreenchido(objetoContratado.value)]],
+      titulo: 'Objeto e justificativa',
+      completo:
+        campoPreenchido(objetoContratado.value) &&
+        campoPreenchido(objetoSetor.value) &&
+        campoPreenchido(objetoGerado.value) &&
+        campoPreenchido(justificativa.value),
+      linhas: [
+        ['O que será contratado', objetoContratado.value || 'Não informado', campoPreenchido(objetoContratado.value)],
+        ['Setor atendido', objetoSetor.value || 'Não informado', campoPreenchido(objetoSetor.value)],
+        ['Objeto gerado', objetoGerado.value || 'Não informado', campoPreenchido(objetoGerado.value)],
+        ['Justificativa', justificativa.value || 'Não informada', campoPreenchido(justificativa.value)],
+      ],
     },
     {
-      titulo: 'Data',
-      completo: campoPreenchido(dataResumo.value),
-      linhas: [['Data / modo', dataResumo.value || 'Não informada', campoPreenchido(dataResumo.value)]],
+      titulo: 'Dotação orçamentária',
+      completo: !dotacaoAtiva.value || campoPreenchido(dotacao.value),
+      linhas: [
+        ['Situação', dotacaoAtiva.value ? 'Informar dotação' : 'Não informada', true],
+        [
+          'Dotação',
+          dotacaoAtiva.value ? dotacao.value || 'Não informada' : 'Não se aplica',
+          !dotacaoAtiva.value || campoPreenchido(dotacao.value),
+        ],
+      ],
     },
     {
       titulo: 'Cotação',
@@ -299,6 +395,11 @@ const secoes = computed(() => {
         ['Situação', cotacaoAtiva.value ? 'Informada' : 'Não informada', true],
         ['Número da cotação', cotacaoAtiva.value ? (numeroCotacao.value || 'Não informado') : 'Não se aplica', !cotacaoAtiva.value || campoPreenchido(numeroCotacao.value)],
       ],
+    },
+    {
+      titulo: 'Data',
+      completo: campoPreenchido(dataResumo.value),
+      linhas: [['Data / modo', dataResumo.value || 'Não informada', campoPreenchido(dataResumo.value)]],
     },
   ];
 });
@@ -309,6 +410,55 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 function onModoData(valor) {
   modoData.value = valor;
   if (valor !== 'Data manual') dataManual.value = '';
+}
+
+function slotsOverrideWithoutClauseDraft(raw) {
+  if (!raw || typeof raw !== 'object') return raw;
+  const o = { ...raw };
+  delete o.objeto;
+  delete o.justificativa;
+  delete o.sol_oficio_objeto;
+  delete o.sol_oficio_justificativa;
+  return Object.keys(o).length ? o : null;
+}
+
+async function gerar() {
+  erroGeracaoClausulas.value = '';
+  const contratado = String(objetoContratado.value || '').trim();
+  const setor = String(objetoSetor.value || '').trim();
+  const caracteristicas = String(objetoCaracteristicas.value || '').trim();
+  if (!contratado || !setor) {
+    erroGeracaoClausulas.value = 'Preencha "O que será contratado?" e "Qual setor/secretaria será atendido?".';
+    return;
+  }
+  isGerandoClausulas.value = true;
+  try {
+    const res = await fetch(`${API_BASE}/api/documentos/fill-tr-slots`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        user_prompt: buildUserPrompt(),
+        slots_override: slotsOverrideWithoutClauseDraft(buildSlotsOverride()),
+        slot_package_key: slotPackageKey.value,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
+    }
+    const slots = data.slots && typeof data.slots === 'object' ? data.slots : {};
+    const obj = String(slots.objeto || '').trim();
+    const jus = String(slots.justificativa || '').trim();
+    objetoGerado.value = obj || gerarObjetoTexto(contratado, setor, caracteristicas);
+    justificativa.value = jus || gerarJustificativaTexto(contratado, setor, caracteristicas);
+  } catch (_e) {
+    objetoGerado.value = gerarObjetoTexto(contratado, setor, caracteristicas);
+    justificativa.value = gerarJustificativaTexto(contratado, setor, caracteristicas);
+    erroGeracaoClausulas.value = 'Falha na IA; aplicamos versão padrão local.';
+  } finally {
+    isGerandoClausulas.value = false;
+  }
 }
 
 function toBlobUrl(base64, mimeType) {
@@ -372,9 +522,14 @@ function buildSlotsOverride() {
     dataTermo = 'datado e assinado digitalmente';
   }
   if (dataTermo) o.data_termo = dataTermo;
-  // Não enviar `objeto` em slots_override: o mesmo fill_tr_slots_with_llm do gerar-tr-e-dfd
-  // deve redigir objeto (e justificativa) a partir do user_prompt. Enviar só o resumo aqui
-  // substituía a cláusula elaborada pela IA e deixava o TR com texto telegráfico.
+  const objetoFinal = String(objetoGerado.value || objetoContratado.value || '').trim();
+  if (objetoFinal) o.objeto = objetoFinal;
+  if (String(justificativa.value || '').trim()) o.justificativa = String(justificativa.value).trim();
+  if (objetoFinal) o.sol_oficio_objeto = objetoFinal;
+  if (String(justificativa.value || '').trim()) o.sol_oficio_justificativa = String(justificativa.value).trim();
+  if (dotacaoAtiva.value && String(dotacao.value || '').trim()) {
+    o.objeto_resultados = `Dotação orçamentária: ${String(dotacao.value).trim()}`;
+  }
   return Object.keys(o).length ? o : null;
 }
 
@@ -385,6 +540,8 @@ function buildUserPrompt() {
     `Órgão: ${orgao.value || 'Não informado'}`,
     `Processo: ${processoAtivo.value ? (processo.value || 'Não informado') : 'Não se aplica'}`,
     `Objeto base: ${objetoContratado.value || 'Não informado'}`,
+    `Setor atendido: ${objetoSetor.value || 'Não informado'}`,
+    `Características mínimas: ${objetoCaracteristicas.value || 'Não informado'}`,
     `Cotação: ${cotacaoAtiva.value ? (numeroCotacao.value || 'Não informada') : 'Não se aplica'}`,
   ].join('\n');
 }
@@ -396,8 +553,8 @@ async function onSubmit() {
   documentReady.value = false;
   revokeDocumentUrls();
   try {
-    if (!objetoContratado.value.trim()) {
-      generateError.value = 'Preencha "O que será contratado?" antes de gerar o documento.';
+    if (!objetoGerado.value.trim() || !justificativa.value.trim()) {
+      generateError.value = 'Gere (ou preencha) Objeto e Justificativa antes de gerar o documento.';
       return;
     }
     const payload = {

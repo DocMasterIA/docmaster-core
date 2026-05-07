@@ -90,9 +90,10 @@
                         @input="objetoCaracteristicas = primeiraMaiuscula(($event.target).value)"
                       />
                     </div>
-                    <button type="button" class="da75-btn da75-btn--primary da75-btn--block" @click="gerar">
-                      Gerar objeto e justificativa
+                    <button type="button" class="da75-btn da75-btn--primary da75-btn--block" :disabled="isGerandoClausulas" @click="gerar">
+                      {{ isGerandoClausulas ? 'Gerando objeto e justificativa...' : 'Gerar objeto e justificativa' }}
                     </button>
+                    <p v-if="erroGeracaoClausulas" class="da75-helper">{{ erroGeracaoClausulas }}</p>
                   </div>
                   <div class="da75-stack">
                     <div class="da75-field">
@@ -271,6 +272,8 @@ const dotacao = ref('');
 const modoData = ref('');
 const dataManual = ref('');
 const isSubmitting = ref(false);
+const isGerandoClausulas = ref(false);
+const erroGeracaoClausulas = ref('');
 const generateError = ref('');
 const successMessage = ref('');
 const documentReady = ref(false);
@@ -380,13 +383,60 @@ function onModoData(valor) {
   if (valor !== 'Data manual') dataManual.value = '';
 }
 
-function gerar() {
-  objetoGerado.value = gerarObjetoTexto(objetoContratado.value, objetoSetor.value, objetoCaracteristicas.value);
-  justificativa.value = gerarJustificativaTexto(
-    objetoContratado.value,
-    objetoSetor.value,
-    objetoCaracteristicas.value,
-  );
+function parseObjetoJustificativa(text) {
+  const raw = String(text || '').replace(/\r/g, '').trim();
+  if (!raw) return { objeto: '', justificativa: '' };
+  const matchObjeto = raw.match(/Objeto:\s*([\s\S]*?)(?:\n+Justificativa:|$)/i);
+  const matchJust = raw.match(/Justificativa:\s*([\s\S]*?)$/i);
+  return {
+    objeto: (matchObjeto?.[1] || '').trim(),
+    justificativa: (matchJust?.[1] || '').trim(),
+  };
+}
+
+async function gerar() {
+  erroGeracaoClausulas.value = '';
+  const contratado = String(objetoContratado.value || '').trim();
+  const setor = String(objetoSetor.value || '').trim();
+  const caracteristicas = String(objetoCaracteristicas.value || '').trim();
+  if (!contratado || !setor) {
+    erroGeracaoClausulas.value = 'Preencha "O que será contratado?" e "Qual setor/secretaria será atendido?".';
+    return;
+  }
+  isGerandoClausulas.value = true;
+  try {
+    const prompt = [
+      'Gerar APENAS duas seções em português:',
+      'Objeto: <texto>',
+      'Justificativa: <texto>',
+      '',
+      'Regras:',
+      '- Não inventar dados fora do informado.',
+      '- Não incluir seções extras.',
+      '',
+      `O que será contratado: ${contratado}`,
+      `Setor/secretaria atendido: ${setor}`,
+      `Características mínimas (opcional): ${caracteristicas || 'não informado'}`,
+    ].join('\n');
+    const res = await fetch(`${API_BASE}/api/llm/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ prompt, stream: false }),
+    });
+    const data = await res.json().catch(() => ({}));
+    const text = data?.data?.response || data?.data?.text || data?.response || data?.text || '';
+    if (!res.ok || !String(text || '').trim()) throw new Error(data?.error || `Erro ${res.status}`);
+    const parsed = parseObjetoJustificativa(text);
+    objetoGerado.value = parsed.objeto || gerarObjetoTexto(contratado, setor, caracteristicas);
+    justificativa.value = parsed.justificativa || gerarJustificativaTexto(contratado, setor, caracteristicas);
+  } catch (_e) {
+    objetoGerado.value = gerarObjetoTexto(contratado, setor, caracteristicas);
+    justificativa.value = gerarJustificativaTexto(contratado, setor, caracteristicas);
+    erroGeracaoClausulas.value = 'Falha na IA; aplicamos versão padrão local.';
+  } finally {
+    isGerandoClausulas.value = false;
+  }
 }
 
 function toBlobUrl(base64, mimeType) {

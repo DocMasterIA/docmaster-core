@@ -863,6 +863,19 @@ function buildSlotsOverride() {
   if (objetoFinal.trim()) o.sol_oficio_objeto = objetoFinal.trim();
   if (justificativaFinal.trim()) o.sol_oficio_justificativa = justificativaFinal.trim();
 
+  const numeroProcesso = processoAtivo.value ? processo.value.trim() : '';
+  if (numeroProcesso) {
+    o.numero_processo = numeroProcesso;
+    o.dfd_numero_processo = numeroProcesso;
+  }
+  if (orgao.value.trim()) o.orgao = orgao.value.trim();
+  if (marca.value.trim()) o.marca = marca.value.trim();
+  if (modelo.value.trim()) o.modelo = modelo.value.trim();
+  if (placa.value.trim()) o.numero_placa = placa.value.trim();
+  if (fornecedor.value.trim()) o.fornecedor = fornecedor.value.trim();
+  if (cnpj.value.trim()) o.cnpj_fornecedor = cnpj.value.trim();
+  if (valorGlobal.value.trim()) o.valor_total = valorGlobal.value.trim();
+
   const fundamentoLegal = SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE[logicalRouteName.value];
   if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;
   return Object.keys(o).length ? o : null;

@@ -1219,6 +1219,14 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
         dfd_assinatura_cargo=str(data.get("dfd_assinatura_cargo", "")).strip(),
         dfd_assinatura_nome=str(data.get("dfd_assinatura_nome", "")).strip(),
         dfd_data=str(data.get("dfd_data", "")).strip(),
+        numero_processo=str(data.get("numero_processo", "")).strip(),
+        marca=str(data.get("marca", "")).strip(),
+        modelo=str(data.get("modelo", "")).strip(),
+        numero_placa=str(data.get("numero_placa", "")).strip(),
+        orgao=str(data.get("orgao", "")).strip(),
+        valor_total=str(data.get("valor_total", "")).strip(),
+        fornecedor=str(data.get("fornecedor", "")).strip(),
+        cnpj_fornecedor=str(data.get("cnpj_fornecedor", "")).strip(),
     )
 
 
@@ -1430,6 +1438,46 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         if override.get("dfd_data") is not None
         else llm_slots.dfd_data
     )
+    numero_processo = (
+        (override.get("numero_processo") or llm_slots.numero_processo)
+        if override.get("numero_processo") is not None
+        else llm_slots.numero_processo
+    )
+    marca = (
+        (override.get("marca") or llm_slots.marca)
+        if override.get("marca") is not None
+        else llm_slots.marca
+    )
+    modelo = (
+        (override.get("modelo") or llm_slots.modelo)
+        if override.get("modelo") is not None
+        else llm_slots.modelo
+    )
+    numero_placa = (
+        (override.get("numero_placa") or llm_slots.numero_placa)
+        if override.get("numero_placa") is not None
+        else llm_slots.numero_placa
+    )
+    orgao = (
+        (override.get("orgao") or llm_slots.orgao)
+        if override.get("orgao") is not None
+        else llm_slots.orgao
+    )
+    valor_total = (
+        (override.get("valor_total") or llm_slots.valor_total)
+        if override.get("valor_total") is not None
+        else llm_slots.valor_total
+    )
+    fornecedor = (
+        (override.get("fornecedor") or llm_slots.fornecedor)
+        if override.get("fornecedor") is not None
+        else llm_slots.fornecedor
+    )
+    cnpj_fornecedor = (
+        (override.get("cnpj_fornecedor") or llm_slots.cnpj_fornecedor)
+        if override.get("cnpj_fornecedor") is not None
+        else llm_slots.cnpj_fornecedor
+    )
 
     itens_override = override.get("itens")
     if isinstance(itens_override, list) and len(itens_override) > 0:
@@ -1487,6 +1535,14 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
                 dfd_assinatura_cargo=dfd_assinatura_cargo,
                 dfd_assinatura_nome=dfd_assinatura_nome,
                 dfd_data=dfd_data,
+                numero_processo=numero_processo,
+                marca=marca,
+                modelo=modelo,
+                numero_placa=numero_placa,
+                orgao=orgao,
+                valor_total=valor_total,
+                fornecedor=fornecedor,
+                cnpj_fornecedor=cnpj_fornecedor,
             )
     itens = llm_slots.itens
 
@@ -1533,6 +1589,14 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         dfd_assinatura_cargo=dfd_assinatura_cargo,
         dfd_assinatura_nome=dfd_assinatura_nome,
         dfd_data=dfd_data,
+        numero_processo=numero_processo,
+        marca=marca,
+        modelo=modelo,
+        numero_placa=numero_placa,
+        orgao=orgao,
+        valor_total=valor_total,
+        fornecedor=fornecedor,
+        cnpj_fornecedor=cnpj_fornecedor,
     )
 
 

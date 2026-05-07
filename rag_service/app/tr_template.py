@@ -112,6 +112,14 @@ class TRTemplateSlots:
     dfd_assinatura_cargo: str = ""
     dfd_assinatura_nome: str = ""
     dfd_data: str = ""
+    numero_processo: str = ""
+    marca: str = ""
+    modelo: str = ""
+    numero_placa: str = ""
+    orgao: str = ""
+    valor_total: str = ""
+    fornecedor: str = ""
+    cnpj_fornecedor: str = ""
 
 
 def _style_items_table(table) -> None:
@@ -375,6 +383,27 @@ def _clear_headers(doc: Document) -> None:
             tbl.getparent().remove(tbl)
 
 
+def _normalize_text_for_match(text: str) -> str:
+    t = str(text or "").strip().lower()
+    return "".join(ch for ch in t if ch.isalnum() or ch.isspace())
+
+
+def _remove_paragraph_if_contains(doc: Document, needle: str) -> None:
+    target = _normalize_text_for_match(needle)
+    if not target:
+        return
+    for para in list(doc.paragraphs):
+        text = _normalize_text_for_match(para.text or "")
+        if target in text:
+            p = para._element
+            p.getparent().remove(p)
+
+
+def _is_manutencao_veiculos_template(template_path: Path) -> bool:
+    name = _normalize_text_for_match(template_path.name)
+    return "manutencao de veiculos" in name
+
+
 def render_tr_from_slots(
     slots: TRTemplateSlots,
     template_path: Optional[Path | str] = None,
@@ -397,6 +426,15 @@ def render_tr_from_slots(
     # Remove cabeçalho padrão do modelo (ex.: timbre de prefeitura),
     # deixando o TR gerado sem esse cabeçalho fixo.
     _clear_headers(doc)
+
+    # Regra de negócio (Art. 74 I - Manutenção de Veículos):
+    # Se houver número de dotação, remove o texto alternativo "dotação própria".
+    # Assim, o documento não apresenta as duas redações ao mesmo tempo.
+    if _is_manutencao_veiculos_template(tpl_path) and str(slots.dotacao or "").strip():
+        _remove_paragraph_if_contains(
+            doc,
+            "correrão à conta de dotação orçamentária própria, prevista no orçamento vigente do órgão contratante",
+        )
 
     def _normalize_slot_block(text: str) -> str:
         t = str(text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
@@ -424,6 +462,8 @@ def render_tr_from_slots(
         "(TR_JUSTIFICATIVA)": justificativa_text,
         "(TR_FISCAL_NOME)": slots.fiscal.nome or "",
         "(TR_DOTACAO)": slots.dotacao or "",
+        "(DOTACAO_NUMERO)": slots.dotacao or "",
+        "( DOTACAO_NUMERO )": slots.dotacao or "",
         "(TR_SECRETARIA_USUARIO)": slots.secretaria_usuario or "",
         "(TR_NOME_USUARIO)": slots.nome_usuario or "",
         "(TR_CIDADE_ESTADO)": slots.cidade_estado or "",
@@ -434,6 +474,22 @@ def render_tr_from_slots(
         "(TR_DATA_TERMO)": slots.data_termo or "",
         "(TR_NOME_ASSINANTE_TERMO)": slots.nome_assinante_termo or "",
         "(TR_CARGO_ASSINANTE_TERMO)": slots.cargo_assinante_termo or "",
+        "(NUMERO_PROCESSO)": slots.numero_processo or "",
+        "( NUMERO_PROCESSO )": slots.numero_processo or "",
+        "(MARCA)": slots.marca or "",
+        "( MARCA )": slots.marca or "",
+        "(MODELO)": slots.modelo or "",
+        "( MODELO )": slots.modelo or "",
+        "(NUMERO_PLACA)": slots.numero_placa or "",
+        "( NUMERO_PLACA )": slots.numero_placa or "",
+        "(ORGAO)": slots.orgao or slots.secretaria_usuario or "",
+        "( ORGAO )": slots.orgao or slots.secretaria_usuario or "",
+        "(VALOR_TOTAL)": slots.valor_total or "",
+        "( VALOR_TOTAL )": slots.valor_total or "",
+        "(FORNECEDOR)": slots.fornecedor or "",
+        "( FORNECEDOR )": slots.fornecedor or "",
+        "(CNPJ FORNECEDOR)": slots.cnpj_fornecedor or "",
+        "( CNPJ FORNECEDOR )": slots.cnpj_fornecedor or "",
         # Compatibilidade entre variantes de pacotes TR_modelo_base
         "(TR_OBJETO_MANUAL)": slots.objeto or "",
         "(TR_BENEFICIO_ESPERADO)": beneficio_text,

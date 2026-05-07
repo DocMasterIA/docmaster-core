@@ -252,13 +252,13 @@ const generationPages = [
         name: 'InexigibilidadeArt74IManutencaoVeiculosPreview',
         label: 'Manutenção de veículos',
         icon: 'fa-car-side',
-        to: '/geracao/inexigibilidade-art-74-i/manutencao-veiculos-preview',
+        to: '/geracao/inexigibilidade-art-74-i/manutencao-veiculos',
       },
       {
         name: 'InexigibilidadeArt74IFornecedorExclusivoPreview',
         label: 'Fornecedor exclusivo',
         icon: 'fa-industry',
-        to: '/geracao/inexigibilidade-art-74-i/fornecedor-exclusivo-preview',
+        to: '/geracao/inexigibilidade-art-74-i/fornecedor-exclusivo',
       },
       {
         name: 'InexigibilidadeArt74IShowArtistico',

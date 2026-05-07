@@ -122,25 +122,6 @@
             <DispensaArt75IIItensValores v-model="itens" />
 
             <section class="da75-block">
-              <h3>Dotação orçamentária</h3>
-              <div class="da75-block__body">
-                <label class="da75-check">
-                  <input v-model="dotacaoAtiva" type="checkbox" />
-                  Informar dotação orçamentária (opcional)
-                </label>
-                <div v-if="dotacaoAtiva" class="da75-mt">
-                  <label class="da75-label">Dotação orçamentária</label>
-                  <textarea
-                    class="da75-textarea"
-                    :value="dotacao"
-                    :placeholder="PLACEHOLDER_DOTACAO"
-                    @input="dotacao = primeiraMaiuscula(($event.target).value)"
-                  />
-                </div>
-              </div>
-            </section>
-
-            <section class="da75-block">
               <h3>Data</h3>
               <div class="da75-block__body">
                 <div class="da75-row da75-row--2">
@@ -241,7 +222,6 @@ import { computed, onMounted, ref, watch } from 'vue';
 import {
   DATA_OPTIONS,
   EMPTY_ITEM,
-  PLACEHOLDER_DOTACAO,
   calcularValorTotalEstimado,
   campoPreenchido,
   formatarData,
@@ -270,17 +250,11 @@ const objetoSetor = ref('');
 const objetoCaracteristicas = ref('');
 const objetoGerado = ref('');
 const justificativa = ref('');
-const dotacaoAtiva = ref(false);
-const dotacao = ref('');
 const itens = ref([{ ...EMPTY_ITEM }]);
 const modoData = ref('');
 const dataManual = ref('');
 const isGerandoClausulas = ref(false);
 const erroGeracaoClausulas = ref('');
-
-watch(dotacaoAtiva, (v) => {
-  if (!v) dotacao.value = '';
-});
 
 onMounted(async () => {
   await dadosFixos.loadUserGlobalPreset();
@@ -347,18 +321,6 @@ const secoes = computed(() => {
       linhas: [
         ['Itens lançados', String(itensValidos.value.length), itensValidos.value.length > 0],
         ['Valor total estimado', calcularValorTotalEstimado(itens.value), itensValidos.value.length > 0],
-      ],
-    },
-    {
-      titulo: 'Dotação orçamentária',
-      completo: !dotacaoAtiva.value || campoPreenchido(dotacao.value),
-      linhas: [
-        ['Situação', dotacaoAtiva.value ? 'Informar dotação' : 'Não informada', true],
-        [
-          'Dotação',
-          dotacaoAtiva.value ? dotacao.value || 'Não informada' : 'Não se aplica',
-          !dotacaoAtiva.value || campoPreenchido(dotacao.value),
-        ],
       ],
     },
     {

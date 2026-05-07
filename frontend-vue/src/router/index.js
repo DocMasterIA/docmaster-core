@@ -120,20 +120,28 @@ const routes = [
     meta: { title: 'Inexigibilidade - Art. 74, I - Show Artístico' },
   },
   {
-    path: '/geracao/inexigibilidade-art-74-i/manutencao-veiculos-preview',
+    path: '/geracao/inexigibilidade-art-74-i/manutencao-veiculos',
     name: 'InexigibilidadeArt74IManutencaoVeiculosPreview',
     component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
     meta: {
-      title: 'Inexigibilidade - Art. 74, I - Manutenção de Veículos (Preview)',
+      title: 'Inexigibilidade - Art. 74, I - Manutenção de Veículos',
     },
   },
   {
-    path: '/geracao/inexigibilidade-art-74-i/fornecedor-exclusivo-preview',
+    path: '/geracao/inexigibilidade-art-74-i/fornecedor-exclusivo',
     name: 'InexigibilidadeArt74IFornecedorExclusivoPreview',
-    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
+    component: () => import('../views/InexigibilidadeFornecedorExclusivoPreview.vue'),
     meta: {
-      title: 'Inexigibilidade - Art. 74, I - Fornecedor Exclusivo (Preview)',
+      title: 'Inexigibilidade - Art. 74, I - Fornecedor Exclusivo',
     },
+  },
+  {
+    path: '/geracao/inexigibilidade-art-74-i/manutencao-veiculos-preview',
+    redirect: '/geracao/inexigibilidade-art-74-i/manutencao-veiculos',
+  },
+  {
+    path: '/geracao/inexigibilidade-art-74-i/fornecedor-exclusivo-preview',
+    redirect: '/geracao/inexigibilidade-art-74-i/fornecedor-exclusivo',
   },
   {
     path: '/geracao/etp-livre',

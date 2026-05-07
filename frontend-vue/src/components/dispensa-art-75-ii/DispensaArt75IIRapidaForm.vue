@@ -120,25 +120,6 @@
             </section>
 
             <section class="da75-block">
-              <h3>Dotação orçamentária</h3>
-              <div class="da75-block__body">
-                <label class="da75-check">
-                  <input v-model="dotacaoAtiva" type="checkbox" />
-                  Informar dotação orçamentária (opcional)
-                </label>
-                <div v-if="dotacaoAtiva" class="da75-mt">
-                  <label class="da75-label">Dotação orçamentária</label>
-                  <textarea
-                    class="da75-textarea"
-                    :value="dotacao"
-                    :placeholder="PLACEHOLDER_DOTACAO"
-                    @input="dotacao = primeiraMaiuscula(($event.target).value)"
-                  />
-                </div>
-              </div>
-            </section>
-
-            <section class="da75-block">
               <h3>Data</h3>
               <div class="da75-block__body">
                 <div class="da75-row da75-row--2">
@@ -239,7 +220,6 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   DATA_OPTIONS,
-  PLACEHOLDER_DOTACAO,
   campoPreenchido,
   formatarData,
   gerarJustificativaTexto,
@@ -267,8 +247,6 @@ const objetoSetor = ref('');
 const objetoCaracteristicas = ref('');
 const objetoGerado = ref('');
 const justificativa = ref('');
-const dotacaoAtiva = ref(false);
-const dotacao = ref('');
 const modoData = ref('');
 const dataManual = ref('');
 const isSubmitting = ref(false);
@@ -296,10 +274,6 @@ const SLOT_PACKAGE_BY_ROUTE = {
   DispensaRapidaArt75IIServicos: 'dispensa_75_ii_servicos',
   DispensaRapidaArt75IIComprasServicosInclusos: 'dispensa_75_ii_compras_servicos_inclusos',
 };
-
-watch(dotacaoAtiva, (v) => {
-  if (!v) dotacao.value = '';
-});
 
 onMounted(async () => {
   await dadosFixos.loadUserGlobalPreset();
@@ -353,18 +327,6 @@ const secoes = computed(() => {
         ['Setor atendido', objetoSetor.value || 'Não informado', campoPreenchido(objetoSetor.value)],
         ['Objeto gerado', objetoGerado.value || 'Não informado', campoPreenchido(objetoGerado.value)],
         ['Justificativa', justificativa.value || 'Não informada', campoPreenchido(justificativa.value)],
-      ],
-    },
-    {
-      titulo: 'Dotação orçamentária',
-      completo: !dotacaoAtiva.value || campoPreenchido(dotacao.value),
-      linhas: [
-        ['Situação', dotacaoAtiva.value ? 'Informar dotação' : 'Não informada', true],
-        [
-          'Dotação',
-          dotacaoAtiva.value ? dotacao.value || 'Não informada' : 'Não se aplica',
-          !dotacaoAtiva.value || campoPreenchido(dotacao.value),
-        ],
       ],
     },
     {
@@ -502,7 +464,6 @@ function buildSlotsOverride() {
   const objetoFinal = String(objetoGerado.value || objetoContratado.value || '').trim();
   if (objetoFinal) o.objeto = objetoFinal;
   if (String(justificativa.value || '').trim()) o.justificativa = String(justificativa.value).trim();
-  if (dotacaoAtiva.value && String(dotacao.value || '').trim()) o.objeto_resultados = `Dotação orçamentária: ${String(dotacao.value).trim()}`;
   return Object.keys(o).length ? o : null;
 }
 

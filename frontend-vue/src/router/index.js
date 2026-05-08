@@ -2,8 +2,9 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { firstAllowedPath, normalizeAllowedModules, resolveModuleKey } from '../moduleAccess';
 /** Import estático: evita chunk lazy `DispensaArt75IIRapidaReactPreview-*.js` (falha com index.html ou CDN em cache após deploy). */
 import DispensaArt75IIRapidaReactPreview from '../views/DispensaArt75IIRapidaReactPreview.vue';
+import { getApiBase } from '../utils/apiBase.js';
 
-const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
+const API_BASE = getApiBase();
 
 const routes = [
   {

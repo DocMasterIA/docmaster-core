@@ -397,8 +397,9 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
+import { getApiBase } from '@/utils/apiBase.js';
 
-const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
+const API_BASE = getApiBase();
 const route = useRoute();
 const dataOptions = ['Data automatica', 'Datado e assinado digitalmente', 'Data manual'];
 const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
@@ -1143,12 +1144,24 @@ async function onSubmit() {
       slot_package_key: slotPackageKey.value,
     };
     if (cabecalhoMergeTemplateId.value) payload.template_id = cabecalhoMergeTemplateId.value;
-    const res = await fetch(`${API_BASE}/api/documentos/gerar-tr-e-dfd`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(payload),
-    });
+    let res;
+    try {
+      res = await fetch(`${API_BASE}/api/documentos/gerar-tr-e-dfd`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+    } catch (networkErr) {
+      const msg = String(networkErr?.message || networkErr || '');
+      const looksNetwork =
+        /fetch|network|failed|load|aborted|timed out|timeout/i.test(msg) ||
+        networkErr?.name === 'TypeError';
+      generateError.value = looksNetwork
+        ? 'Falha de rede ao contactar a API (o navegador não completou o pedido). Confira conexão, VPN/firewall e bloqueadores. Em páginas HTTPS a API deve ser HTTPS — URL incorreta no ambiente causa erro sem resposta do servidor.'
+        : msg;
+      return;
+    }
     const rawText = await res.text();
     let data = {};
     try {

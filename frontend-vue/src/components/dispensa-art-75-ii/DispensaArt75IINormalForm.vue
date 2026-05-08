@@ -262,14 +262,10 @@ import './dispensaArt75ii.css';
 import DispensaArt75IIDadosFixosDrawer from './DispensaArt75IIDadosFixosDrawer.vue';
 import DispensaArt75IIItensValores from './DispensaArt75IIItensValores.vue';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
+import { getApiBase } from '@/utils/apiBase.js';
 import { useDispensaArt75IIDadosFixos } from '@/composables/useDispensaArt75IIDadosFixos.js';
 
-const API_BASE = (() => {
-  const t = String(import.meta.env.VITE_API_URL || '').trim();
-  if (t) return t.replace(/\/$/, '');
-  if (import.meta.env.DEV) return '';
-  return 'https://api.docmasteria.com.br';
-})();
+const API_BASE = getApiBase();
 const route = useRoute();
 
 const drawerAberto = ref(false);

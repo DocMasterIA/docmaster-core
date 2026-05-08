@@ -20,3 +20,14 @@ export function getApiBase() {
   if (import.meta.env.DEV) return '';
   return 'https://api.docmasteria.com.br';
 }
+
+/** URL absoluta usada no POST de geração TR+DFD (útil para mensagens de erro e logs). */
+export function buildGerarTrEDfdUrl(apiBase) {
+  const base = String(apiBase || '').replace(/\/$/, '');
+  const path = '/api/documentos/gerar-tr-e-dfd';
+  if (base) return `${base}${path}`;
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return `${window.location.origin}${path}`;
+  }
+  return path;
+}

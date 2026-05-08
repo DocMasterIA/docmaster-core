@@ -397,7 +397,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
-import { getApiBase } from '@/utils/apiBase.js';
+import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
 
 const API_BASE = getApiBase();
 const route = useRoute();
@@ -1144,9 +1144,10 @@ async function onSubmit() {
       slot_package_key: slotPackageKey.value,
     };
     if (cabecalhoMergeTemplateId.value) payload.template_id = cabecalhoMergeTemplateId.value;
+    const gerarUrl = buildGerarTrEDfdUrl(API_BASE);
     let res;
     try {
-      res = await fetch(`${API_BASE}/api/documentos/gerar-tr-e-dfd`, {
+      res = await fetch(gerarUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -1158,7 +1159,7 @@ async function onSubmit() {
         /fetch|network|failed|load|aborted|timed out|timeout/i.test(msg) ||
         networkErr?.name === 'TypeError';
       generateError.value = looksNetwork
-        ? 'Falha de rede ao contactar a API (o navegador não completou o pedido). Confira conexão, VPN/firewall e bloqueadores. Em páginas HTTPS a API deve ser HTTPS — URL incorreta no ambiente causa erro sem resposta do servidor.'
+        ? `O navegador não completou o pedido para:\n${gerarUrl}\n\nConfira rede, VPN e bloqueadores. No painel Rede (F12), veja se o POST falhou antes de status HTTP — com página em HTTPS a API tem de ser HTTPS (variável VITE_API_URL no build do frontend, ex.: https://api.docmasteria.com.br).`
         : msg;
       return;
     }
@@ -1314,7 +1315,7 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .ixp-btn-primary { border: 0; background: #2563eb; color: #fff; border-radius: 12px; padding: 10px 14px; font-size: 13px; font-weight: 700; width: fit-content; }
 .ixp-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .ixp-hint { margin: 0; font-size: 12px; color: #64748b; }
-.ixp-error { margin: 0; border: 1px solid #fecaca; background: #fff1f2; color: #b91c1c; border-radius: 12px; padding: 9px 11px; font-size: 13px; }
+.ixp-error { margin: 0; border: 1px solid #fecaca; background: #fff1f2; color: #b91c1c; border-radius: 12px; padding: 9px 11px; font-size: 13px; white-space: pre-wrap; }
 .ixp-success { margin: 0; border: 1px solid #bbf7d0; background: #f0fdf4; color: #166534; border-radius: 12px; padding: 9px 11px; font-size: 13px; }
 .ixp-summary { position: sticky; top: 16px; align-self: start; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; padding: 14px; }
 .ixp-summary-head small { font-size: 11px; text-transform: uppercase; color: #64748b; letter-spacing: .08em; }

@@ -35,25 +35,6 @@ def _strip_and_apply_rpr(paragraph: Paragraph, r_pr_clone) -> None:
         r_el.insert(0, deepcopy(r_pr_clone))
 
 
-def _apply_style_font_when_no_rpr(paragraph: Paragraph) -> None:
-    """Se não há rPr no modelo, replica fonte explícita do estilo do parágrafo nos runs."""
-    if not paragraph.runs:
-        return
-    try:
-        stf = paragraph.style.font
-        for run in paragraph.runs:
-            if stf.size is not None:
-                run.font.size = stf.size
-            if stf.name is not None:
-                run.font.name = stf.name
-            if stf.bold is not None:
-                run.font.bold = stf.bold
-            if stf.italic is not None:
-                run.font.italic = stf.italic
-    except Exception:
-        pass
-
-
 def replace_text_in_paragraph_preserving_rpr(paragraph: Paragraph, mapping: Dict[str, str]) -> bool:
     """
     Substitui placeholders no texto do parágrafo e reaplica o primeiro w:rPr existente
@@ -72,8 +53,6 @@ def replace_text_in_paragraph_preserving_rpr(paragraph: Paragraph, mapping: Dict
     paragraph.text = new_text
     if ref_rpr is not None:
         _strip_and_apply_rpr(paragraph, ref_rpr)
-    else:
-        _apply_style_font_when_no_rpr(paragraph)
     return True
 
 
@@ -127,6 +106,3 @@ def _replace_placeholders_in_cell(cell, mapping: Dict[str, str]) -> None:
     if ref_rpr is not None:
         for para in cell.paragraphs:
             _strip_and_apply_rpr(para, ref_rpr)
-    else:
-        for para in cell.paragraphs:
-            _apply_style_font_when_no_rpr(para)

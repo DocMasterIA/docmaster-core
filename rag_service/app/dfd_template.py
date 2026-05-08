@@ -22,35 +22,63 @@ TEMPLATE_DFD_PATH_DEFAULT = (
 )
 
 
+def _replace_placeholder_in_paragraph_runs(paragraph, placeholder: str, replacement: str) -> bool:
+    runs = paragraph.runs
+    if not runs:
+        return False
+    full_text = "".join(run.text or "" for run in runs)
+    start = full_text.find(placeholder)
+    if start < 0:
+        return False
+    end = start + len(placeholder)
+
+    cursor = 0
+    start_idx = start_off = end_idx = end_off = None
+    for idx, run in enumerate(runs):
+        txt = run.text or ""
+        next_cursor = cursor + len(txt)
+        if start_idx is None and start < next_cursor:
+            start_idx = idx
+            start_off = start - cursor
+        if end_idx is None and end <= next_cursor:
+            end_idx = idx
+            end_off = end - cursor
+            break
+        cursor = next_cursor
+
+    if start_idx is None or end_idx is None or start_off is None or end_off is None:
+        return False
+
+    if start_idx == end_idx:
+        txt = runs[start_idx].text or ""
+        runs[start_idx].text = txt[:start_off] + replacement + txt[end_off:]
+    else:
+        prefix = (runs[start_idx].text or "")[:start_off]
+        suffix = (runs[end_idx].text or "")[end_off:]
+        runs[start_idx].text = prefix + replacement + suffix
+        for idx in range(start_idx + 1, end_idx + 1):
+            runs[idx].text = ""
+    return True
+
+
+def _replace_placeholders_in_paragraph(paragraph, mapping: dict[str, str]) -> bool:
+    changed = False
+    for ph, val in mapping.items():
+        while _replace_placeholder_in_paragraph_runs(paragraph, ph, val):
+            changed = True
+    return changed
+
+
 def _replace_placeholders(doc: Document, mapping: dict[str, str]) -> None:
     """Substitui placeholders em parágrafos e células de tabelas."""
-    # Parágrafos
     for p in doc.paragraphs:
-        if not p.text:
-            continue
-        text = p.text
-        changed = False
-        for ph, val in mapping.items():
-            if ph in text:
-                text = text.replace(ph, val)
-                changed = True
-        if changed:
-            p.text = text
+        _replace_placeholders_in_paragraph(p, mapping)
 
-    # Células de tabela
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
-                text = cell.text
-                if not text:
-                    continue
-                changed = False
-                for ph, val in mapping.items():
-                    if ph in text:
-                        text = text.replace(ph, val)
-                        changed = True
-                if changed:
-                    cell.text = text
+                for p in cell.paragraphs:
+                    _replace_placeholders_in_paragraph(p, mapping)
 
 
 def render_dfd_from_tr_slots(

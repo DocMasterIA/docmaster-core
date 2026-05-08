@@ -247,23 +247,57 @@ def _configure_items_table_columns(table, doc: Document, use_price_layout: bool 
 
 
 def _replace_placeholders_in_paragraphs(doc: Document, mapping: Dict[str, str]) -> None:
-    """
-    Substitui textos exatos dos placeholders em todos os parágrafos do documento.
+    def _replace_placeholder_in_paragraph_runs(paragraph, placeholder: str, replacement: str) -> bool:
+        runs = paragraph.runs
+        if not runs:
+            return False
+        full_text = "".join(run.text or "" for run in runs)
+        start = full_text.find(placeholder)
+        if start < 0:
+            return False
+        end = start + len(placeholder)
 
-    Observação: mexer em paragraph.text simplifica os runs, mas é aceitável
-    para este uso (template fixo).
-    """
-    for p in doc.paragraphs:
-        if not p.text:
-            continue
-        text = p.text
-        changed = False
+        cursor = 0
+        start_idx = start_off = end_idx = end_off = None
+        for idx, run in enumerate(runs):
+            txt = run.text or ""
+            next_cursor = cursor + len(txt)
+            if start_idx is None and start < next_cursor:
+                start_idx = idx
+                start_off = start - cursor
+            if end_idx is None and end <= next_cursor:
+                end_idx = idx
+                end_off = end - cursor
+                break
+            cursor = next_cursor
+
+        if start_idx is None or end_idx is None or start_off is None or end_off is None:
+            return False
+
+        if start_idx == end_idx:
+            txt = runs[start_idx].text or ""
+            runs[start_idx].text = txt[:start_off] + replacement + txt[end_off:]
+        else:
+            prefix = (runs[start_idx].text or "")[:start_off]
+            suffix = (runs[end_idx].text or "")[end_off:]
+            runs[start_idx].text = prefix + replacement + suffix
+            for idx in range(start_idx + 1, end_idx + 1):
+                runs[idx].text = ""
+        return True
+
+    def _replace_in_paragraph(paragraph) -> None:
         for ph, val in mapping.items():
-            if ph in text:
-                text = text.replace(ph, val)
-                changed = True
-        if changed:
-            p.text = text
+            while _replace_placeholder_in_paragraph_runs(paragraph, ph, val):
+                pass
+
+    for p in doc.paragraphs:
+        _replace_in_paragraph(p)
+
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for p in cell.paragraphs:
+                    _replace_in_paragraph(p)
 
 
 def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
@@ -658,19 +692,6 @@ def render_tr_from_slots(
     }
 
     _replace_placeholders_in_paragraphs(doc, mapping)
-    # Também substituir placeholders em células de tabelas (fora da linha de itens)
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                text = cell.text
-                changed = False
-                for ph, val in mapping.items():
-                    if ph in text:
-                        text = text.replace(ph, val)
-                        changed = True
-                if changed:
-                    cell.text = text
-
     _fill_items_table(doc, slots.itens)
 
     out_path = Path(output_path) if output_path else None

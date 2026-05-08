@@ -1176,8 +1176,9 @@ function buildTrSlotsOverride() {
   }
   if (isDispensaNormalRoute) o.force_manual_items = true;
 
+  const trCargoAssinante = (f.tr_cargo_assinante || '').trim();
+  if (trCargoAssinante) o.secretaria_usuario = trCargoAssinante;
   const setor = (f.dfd_setor_requisitante || '').trim();
-  if (setor) o.secretaria_usuario = setor;
   if (setor) o.dfd_setor_requisitante = setor;
 
   const respDemanda = (f.dfd_responsavel_demanda || '').trim();
@@ -1240,6 +1241,7 @@ function buildTrSlotsOverride() {
 
   const setorResp = (f.setor_responsavel || '').trim();
   if (setorResp && !o.secretaria_usuario) o.secretaria_usuario = setorResp;
+  if (setor && !o.secretaria_usuario) o.secretaria_usuario = setor;
 
   const fundamentoLegal = resolveSolOficioFundamentoLegal(dispensaLogicalRouteName.value);
   if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;

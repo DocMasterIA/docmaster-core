@@ -452,6 +452,7 @@ function buildSlotsOverride() {
   if (String(dadosFixos.fixoEmailPropostas || '').trim()) o.email_envio_propostas = String(dadosFixos.fixoEmailPropostas).trim();
   if (String(dadosFixos.fixoTrResponsavelNome || '').trim()) o.nome_assinante_termo = String(dadosFixos.fixoTrResponsavelNome).trim();
   if (String(dadosFixos.fixoTrResponsavelCargo || '').trim()) o.cargo_assinante_termo = String(dadosFixos.fixoTrResponsavelCargo).trim();
+  if (String(dadosFixos.fixoTrResponsavelCargo || '').trim()) o.secretaria_usuario = String(dadosFixos.fixoTrResponsavelCargo).trim();
   const modoNormalizado = String(modoData.value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')

@@ -803,7 +803,7 @@ function buildSlotsOverride() {
     sol_oficio_destinatario_cargo: String(cargo.value || '').trim(),
     sol_oficio_responsavel_nome: String(fixoResponsavel.value || '').trim(),
     sol_oficio_responsavel_cargo: String(fixoResponsavelCargo.value || '').trim(),
-    secretaria_usuario: String((fixoSetor.value || orgao.value || '').trim()),
+    secretaria_usuario: String((responsavelCargo.value || '').trim()),
     dfd_setor_requisitante: String((fixoSetor.value || orgao.value || '').trim()),
     dfd_responsavel_demanda: String(fixoDemanda.value || '').trim(),
     dfd_email: String(fixoEmail.value || '').trim(),

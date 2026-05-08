@@ -959,7 +959,6 @@ function buildSlotsOverride() {
 
   const setor = (fixoSetor.value || orgao.value).trim();
   if (setor) {
-    o.secretaria_usuario = setor;
     o.dfd_setor_requisitante = setor;
   }
   const demanda = fixoDemanda.value.trim();
@@ -997,6 +996,7 @@ function buildSlotsOverride() {
 
   if (responsavel.value.trim()) o.nome_assinante_termo = responsavel.value.trim();
   if (responsavelCargo.value.trim()) o.cargo_assinante_termo = responsavelCargo.value.trim();
+  if (responsavelCargo.value.trim()) o.secretaria_usuario = responsavelCargo.value.trim();
 
   const manutencaoFallbackParts = isDispensaManutencaoRoute.value
     ? [

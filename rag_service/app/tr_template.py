@@ -287,8 +287,15 @@ def _replace_placeholders_in_paragraphs(doc: Document, mapping: Dict[str, str]) 
 
     def _replace_in_paragraph(paragraph) -> None:
         for ph, val in mapping.items():
-            while _replace_placeholder_in_paragraph_runs(paragraph, ph, val):
-                pass
+            if not ph:
+                continue
+            replacement = "" if val is None else str(val)
+            max_iters = 100
+            iters = 0
+            while iters < max_iters and _replace_placeholder_in_paragraph_runs(paragraph, ph, replacement):
+                iters += 1
+                if ph and ph in replacement:
+                    break
 
     for p in doc.paragraphs:
         _replace_in_paragraph(p)

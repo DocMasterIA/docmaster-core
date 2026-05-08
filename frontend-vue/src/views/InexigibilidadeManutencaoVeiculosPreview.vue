@@ -36,11 +36,11 @@
                     <input v-model="processo" list="dl-processo-numero" placeholder="Ex: 123/2026" />
                   </div>
                   <div class="ixp-field">
-                    <label>Orgao / Unidade</label>
+                    <label>{{ isFornecedorExclusivoRoute ? 'Orgao / Unidade responsavel pelo equipamento' : 'Orgao / unidade' }}</label>
                     <input
                       v-model="orgao"
                       list="dl-orgao"
-                      placeholder="Digite o orgao/unidade"
+                      :placeholder="isFornecedorExclusivoRoute ? 'Digite o orgao/unidade responsavel pelo equipamento' : 'Digite o orgao'"
                     />
                   </div>
                   <div v-if="isInexigibilidadeManutencaoRoute" class="ixp-field">

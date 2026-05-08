@@ -28,7 +28,7 @@
                     <input v-model="processo" placeholder="Ex: 123/2026" />
                   </div>
                   <div class="fe-field">
-                    <label>Órgão / Unidade</label>
+                    <label>Órgão / Unidade responsável pelo equipamento</label>
                     <input v-model="orgao" placeholder="Digite o órgão" />
                   </div>
                 </div>

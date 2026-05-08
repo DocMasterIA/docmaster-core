@@ -111,8 +111,25 @@ def _remove_processo_visual_block_when_empty(doc: Document) -> None:
         if cleaned != text:
             p.text = cleaned
 
+    # 1) Remove linhas inteiras de tabela que contenham o bloco de processo
+    # (no template de inexigibilidade esse campo vive em uma linha própria).
+    row_tokens = (
+        "DFD_NUMERO_PROCESSO",
+        "NUMERO PROCESSO",
+        "Nº Processo",
+        "N° Processo",
+        "No Processo",
+    )
+    for table in doc.tables:
+        for row in list(table.rows):
+            row_text = " ".join((cell.text or "") for cell in row.cells)
+            if any(token in row_text for token in row_tokens):
+                table._tbl.remove(row._tr)
+
+    # 2) Limpa eventuais parágrafos fora de tabela com o mesmo bloco
     for p in doc.paragraphs:
         _clean_paragraph(p)
+
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:

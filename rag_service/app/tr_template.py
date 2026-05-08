@@ -162,6 +162,47 @@ def _style_items_table(table) -> None:
     tblPr.append(tblBorders)
 
 
+def _table_column_count(table) -> int:
+    """Número de colunas da tabela (funciona mesmo com 0 linhas)."""
+    try:
+        cols = getattr(table, "columns", None)
+        if cols is not None:
+            n = len(cols)
+            if n:
+                return n
+    except Exception:
+        pass
+    if table.rows:
+        return len(table.rows[0].cells)
+    return 0
+
+
+def _ensure_items_table_columns(doc: Document, target_table, required_cols: int):
+    """
+    Substitui a tabela por outra com `required_cols` colunas na mesma posição XML,
+    quando o modelo legado tem 4 colunas mas há valores monetários (6 colunas).
+    """
+    cur = _table_column_count(target_table)
+    if cur == required_cols:
+        return target_table
+    tbl_el = target_table._tbl
+    parent = tbl_el.getparent()
+    if parent is None:
+        return target_table
+    siblings = list(parent)
+    try:
+        idx = siblings.index(tbl_el)
+    except ValueError:
+        return target_table
+    parent.remove(tbl_el)
+    # doc.add_table acrescenta ao documento; movemos o elemento para o sítio original.
+    new_table = doc.add_table(rows=0, cols=required_cols)
+    new_el = new_table._tbl
+    new_el.getparent().remove(new_el)
+    parent.insert(idx, new_el)
+    return new_table
+
+
 def _configure_items_table_columns(table, doc: Document, use_price_layout: bool = False) -> None:
     """
     Mantém colunas curtas compactas, mas largas o suficiente
@@ -199,7 +240,10 @@ def _configure_items_table_columns(table, doc: Document, use_price_layout: bool 
     table.autofit = False
     # Força layout fixo no Word para respeitar larguras definidas.
     tbl_pr = table._tbl.tblPr
-    tbl_layout = tbl_pr.find(qn("w:tblLayout")) if tbl_pr is not None else None
+    if tbl_pr is None:
+        tbl_pr = OxmlElement("w:tblPr")
+        table._tbl.insert(0, tbl_pr)
+    tbl_layout = tbl_pr.find(qn("w:tblLayout"))
     if tbl_layout is None:
         tbl_layout = OxmlElement("w:tblLayout")
         tbl_pr.append(tbl_layout)
@@ -215,17 +259,6 @@ def _configure_items_table_columns(table, doc: Document, use_price_layout: bool 
         for row in table.rows:
             if idx < len(row.cells):
                 row.cells[idx].width = width
-
-
-def _set_cell_no_wrap(cell) -> None:
-    """
-    Impede quebra automática de linha na célula (Word w:noWrap).
-    """
-    tc_pr = cell._tc.get_or_add_tcPr()
-    no_wrap = tc_pr.find(qn("w:noWrap"))
-    if no_wrap is None:
-        no_wrap = OxmlElement("w:noWrap")
-        tc_pr.append(no_wrap)
 
 
 def _replace_placeholders_in_paragraphs(doc: Document, mapping: Dict[str, str]) -> None:
@@ -327,12 +360,18 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
     if target_table is None:
         return
 
-    existing_cols_count = len(target_table.rows[0].cells) if target_table.rows else 0
+    existing_cols_count = _table_column_count(target_table)
     has_price_values = any(
-        str(getattr(item, "valor_unitario", "") or "").strip() or str(getattr(item, "valor_total", "") or "").strip()
+        str(getattr(item, "valor_unitario", "") or "").strip()
+        or str(getattr(item, "valor_total", "") or "").strip()
         for item in itens
     )
-    use_price_layout = existing_cols_count >= 6 or has_price_values
+    # Modelo com 6 colunas já inclui preços; ou o utilizador enviou valores → layout completo.
+    use_price_layout = (existing_cols_count >= 6 and existing_cols_count > 0) or has_price_values
+    required_cols = 6 if use_price_layout else 4
+
+    if existing_cols_count != required_cols:
+        target_table = _ensure_items_table_columns(doc, target_table, required_cols)
 
     # Remove todas as linhas existentes para reconstruir a tabela do zero
     for row in list(target_table.rows):
@@ -346,7 +385,7 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
     header_row = target_table.add_row()
     header_cells = header_row.cells
     header_labels = (
-        ["ITEM", "QUANT", "UNID", "DESCRIÇÃO DO OBJETO", "VALOR UNITÁRIO", "VALOR TOTAL"]
+        ["ITEM", "QTD", "UNID.", "DESCRIÇÃO DO OBJETO", "VALOR UNIT.", "VALOR TOTAL"]
         if use_price_layout
         else ["Item", "Descrição", "Unidade", "Quantidade"]
     )
@@ -354,7 +393,6 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
         if idx < len(header_cells):
             cell = header_cells[idx]
             cell.text = label
-            _set_cell_no_wrap(cell)
             for para in cell.paragraphs:
                 para.paragraph_format.space_before = Pt(0)
                 para.paragraph_format.space_after = Pt(0)
@@ -387,13 +425,30 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
         s = f"{n:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
         return f"R$ {s}"
 
+    def _qty_to_float(value: Any) -> float:
+        raw = str(value or "").strip().replace(",", ".")
+        if not raw:
+            return 0.0
+        try:
+            return float(raw)
+        except Exception:
+            return 0.0
+
     total_geral = 0.0
     for i, item in enumerate(itens):
         row = target_table.add_row()
         cells = row.cells
         if use_price_layout:
+            vu_raw = str(getattr(item, "valor_unitario", "") or "").strip()
+            vt_raw = str(getattr(item, "valor_total", "") or "").strip()
+            qtd_f = _qty_to_float(item.quantidade)
+            vu_f = _to_float_br(vu_raw)
+            vt_f = _to_float_br(vt_raw)
+            if vt_f == 0.0 and qtd_f > 0 and vu_f > 0:
+                vt_f = qtd_f * vu_f
+
             if len(cells) > 0:
-                _set_cell(cells[0], f"{i+1:02d}")
+                _set_cell(cells[0], f"{i + 1:02d}")
                 if cells[0].paragraphs:
                     cells[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
             if len(cells) > 1:
@@ -407,16 +462,15 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
             if len(cells) > 3:
                 _set_cell(cells[3], str(item.descricao) or "")
             if len(cells) > 4:
-                unit_txt = str(getattr(item, "valor_unitario", "") or "").strip()
-                _set_cell(cells[4], unit_txt if unit_txt else "")
+                _set_cell(cells[4], vu_raw if vu_raw else "")
                 if cells[4].paragraphs:
                     cells[4].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
             if len(cells) > 5:
-                item_total_txt = str(getattr(item, "valor_total", "") or "").strip()
-                _set_cell(cells[5], item_total_txt if item_total_txt else "")
+                display_tot = _to_currency_br(vt_f)
+                _set_cell(cells[5], display_tot)
                 if cells[5].paragraphs:
                     cells[5].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            total_geral += _to_float_br(getattr(item, "valor_total", ""))
+            total_geral += vt_f
         else:
             # Coluna 0: número do item (01, 02, 03...)
             if len(cells) > 0:
@@ -440,8 +494,13 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
     if use_price_layout:
         total_row = target_table.add_row()
         total_cells = total_row.cells
+        if len(total_cells) >= 6:
+            try:
+                total_cells[0].merge(total_cells[4])
+            except Exception:
+                pass
         if len(total_cells) > 0:
-            _set_cell(total_cells[0], "VALOR TOTAL")
+            _set_cell(total_cells[0], "VALOR TOTAL GERAL")
             if total_cells[0].paragraphs:
                 total_cells[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.LEFT
                 for run in total_cells[0].paragraphs[0].runs:

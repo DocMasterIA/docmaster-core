@@ -1404,9 +1404,12 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         if override.get("dfd_setor_requisitante") is not None
         else llm_slots.dfd_setor_requisitante
     )
+    _dfd_np_override = override.get("dfd_numero_processo")
+    if _dfd_np_override is None:
+        _dfd_np_override = override.get("processo_numero")
     dfd_numero_processo = (
-        (override.get("dfd_numero_processo") or llm_slots.dfd_numero_processo)
-        if override.get("dfd_numero_processo") is not None
+        (_dfd_np_override or llm_slots.dfd_numero_processo)
+        if _dfd_np_override is not None
         else llm_slots.dfd_numero_processo
     )
     dfd_responsavel_demanda = (
@@ -1444,9 +1447,12 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         if override.get("dfd_data") is not None
         else llm_slots.dfd_data
     )
+    _num_proc_override = override.get("numero_processo")
+    if _num_proc_override is None:
+        _num_proc_override = override.get("processo_numero")
     numero_processo = (
-        (override.get("numero_processo") or llm_slots.numero_processo)
-        if override.get("numero_processo") is not None
+        (_num_proc_override or llm_slots.numero_processo)
+        if _num_proc_override is not None
         else llm_slots.numero_processo
     )
     marca = (

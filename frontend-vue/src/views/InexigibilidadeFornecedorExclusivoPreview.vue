@@ -781,6 +781,7 @@ function saveOrgaoProfile() {
   const name = String(orgaoProfileName.value || '').trim();
   if (!name) return false;
   const data = collectGlobalFormStatePayload();
+  const orgaoValue = String(data?.orgao || '').trim();
   const idx = orgaoProfiles.value.findIndex((p) => String(p.id) === String(selectedOrgaoProfileId.value || ''));
   if (idx >= 0) {
     orgaoProfiles.value[idx] = { ...orgaoProfiles.value[idx], name, data };
@@ -790,6 +791,11 @@ function saveOrgaoProfile() {
     selectedOrgaoProfileId.value = id;
   }
   persistOrgaoProfiles();
+  if (orgaoValue) {
+    const current = Array.isArray(slotFieldOptions.orgao) ? slotFieldOptions.orgao : [];
+    if (!current.includes(orgaoValue)) slotFieldOptions.orgao = [...current, orgaoValue];
+    void persistSlotEntries([{ field_key: 'orgao', value: orgaoValue }]);
+  }
   return true;
 }
 

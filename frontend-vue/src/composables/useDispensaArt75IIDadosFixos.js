@@ -304,6 +304,7 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     const name = String(orgaoProfileName.value || '').trim();
     if (!name) return false;
     const data = createOrgaoProfilePayload();
+    const orgaoValue = String(data?.orgao || '').trim();
     const existingIdx = orgaoProfiles.value.findIndex((p) => String(p.id) === String(selectedOrgaoProfileId.value || ''));
     if (existingIdx >= 0) {
       orgaoProfiles.value[existingIdx] = {
@@ -317,6 +318,11 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
       selectedOrgaoProfileId.value = id;
     }
     persistOrgaoProfiles();
+    if (orgaoValue) {
+      const current = Array.isArray(slotFieldOptions.orgao) ? slotFieldOptions.orgao : [];
+      if (!current.includes(orgaoValue)) slotFieldOptions.orgao = [...current, orgaoValue];
+      void persistSlotEntries([{ field_key: 'orgao', value: orgaoValue }]);
+    }
     return true;
   }
 

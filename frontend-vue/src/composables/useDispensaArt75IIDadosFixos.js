@@ -253,6 +253,8 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
   // `reactive` para refs aninhadas serem desempacotadas em templates (ex.: drawer com `:ctx="dadosFixos"`).
   // Sem isso, `v-model="ctx.fixoNome"` recebe o objeto Ref e o input mostra "[object Object]".
   return reactive({
+    processo,
+    orgao,
     slotFieldOptions,
     tratamentoNome,
     tratamentoCargo,

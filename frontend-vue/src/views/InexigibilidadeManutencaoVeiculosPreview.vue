@@ -268,6 +268,42 @@
       </div>
       <div class="ixp-drawer-body">
         <article class="ixp-card">
+          <h3>Cadastros de órgãos</h3>
+          <div class="ixp-body ixp-grid-2">
+            <div class="ixp-field">
+              <label>Número do processo</label>
+              <input v-model="processo" list="dl-processo-numero" placeholder="Ex: 123/2026" />
+              <div class="ixp-inline-actions">
+                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('processo_numero', processo)">Adicionar</button>
+                <button
+                  type="button"
+                  class="ixp-btn-secondary ixp-btn-xs"
+                  :disabled="!canDeleteFieldHistory('processo_numero', processo)"
+                  @click="removeFieldHistory('processo_numero', processo)"
+                >
+                  Excluir
+                </button>
+              </div>
+            </div>
+            <div class="ixp-field">
+              <label>Órgão / Unidade</label>
+              <input v-model="orgao" list="dl-orgao" placeholder="Digite o órgão ou unidade" />
+              <div class="ixp-inline-actions">
+                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('orgao', orgao)">Adicionar</button>
+                <button
+                  type="button"
+                  class="ixp-btn-secondary ixp-btn-xs"
+                  :disabled="!canDeleteFieldHistory('orgao', orgao)"
+                  @click="removeFieldHistory('orgao', orgao)"
+                >
+                  Excluir
+                </button>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="ixp-card">
           <h3>1. Solicitacao / Oficio</h3>
           <div class="ixp-body">
             <div class="ixp-grid-3">

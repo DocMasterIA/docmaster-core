@@ -402,7 +402,7 @@
     </aside>
 
     <datalist id="dl-processo-numero"><option v-for="v in (slotFieldOptions.processo_numero || [])" :key="`p-${v}`" :value="v" /></datalist>
-    <datalist id="dl-orgao"><option v-for="v in (slotFieldOptions.orgao || [])" :key="`o-${v}`" :value="v" /></datalist>
+    <datalist id="dl-orgao"><option v-for="v in mergedOrgaoOptions" :key="`o-${v}`" :value="v" /></datalist>
     <datalist id="dl-fornecedor"><option v-for="v in (slotFieldOptions.fornecedor || [])" :key="`f-${v}`" :value="v" /></datalist>
     <datalist id="dl-fiscal"><option v-for="v in (slotFieldOptions.fiscal || [])" :key="`fi-${v}`" :value="v" /></datalist>
     <datalist id="dl-tr-nome-assinante"><option v-for="v in (slotFieldOptions.tr_nome_assinante || [])" :key="`na-${v}`" :value="v" /></datalist>
@@ -568,6 +568,16 @@ const slotFieldOptions = reactive({});
 const orgaoProfiles = ref([]);
 const selectedOrgaoProfileId = ref('');
 const orgaoProfileName = ref('');
+const orgaoOptionsFromProfiles = computed(() => {
+  const values = orgaoProfiles.value
+    .map((p) => String(p?.data?.orgao || '').trim())
+    .filter(Boolean);
+  return [...new Set(values)];
+});
+const mergedOrgaoOptions = computed(() => {
+  const catalog = Array.isArray(slotFieldOptions.orgao) ? slotFieldOptions.orgao : [];
+  return [...new Set([...catalog, ...orgaoOptionsFromProfiles.value])];
+});
 const CATALOG_KEYS = [
   'cabecalho_documento',
   'processo_numero',

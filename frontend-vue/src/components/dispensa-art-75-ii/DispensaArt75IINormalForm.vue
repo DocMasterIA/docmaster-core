@@ -264,7 +264,12 @@ import DispensaArt75IIItensValores from './DispensaArt75IIItensValores.vue';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
 import { useDispensaArt75IIDadosFixos } from '@/composables/useDispensaArt75IIDadosFixos.js';
 
-const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
+const API_BASE = (() => {
+  const t = String(import.meta.env.VITE_API_URL || '').trim();
+  if (t) return t.replace(/\/$/, '');
+  if (import.meta.env.DEV) return '';
+  return 'https://api.docmasteria.com.br';
+})();
 const route = useRoute();
 
 const drawerAberto = ref(false);
@@ -555,6 +560,14 @@ function buildUserPrompt() {
   ].join('\n');
 }
 
+function sanitizeJsonBody(obj) {
+  try {
+    return JSON.parse(JSON.stringify(obj));
+  } catch {
+    return null;
+  }
+}
+
 async function onSubmit() {
   isSubmitting.value = true;
   generateError.value = '';
@@ -572,13 +585,37 @@ async function onSubmit() {
       slot_package_key: slotPackageKey.value,
     };
     if (cabecalhoMergeTemplateId.value) payload.template_id = cabecalhoMergeTemplateId.value;
-    const res = await fetch(`${API_BASE}/api/documentos/gerar-tr-e-dfd`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json().catch(() => ({}));
+    const bodyObj = sanitizeJsonBody(payload);
+    if (!bodyObj) {
+      generateError.value = 'Não foi possível preparar os dados para envio. Verifique os campos (especialmente itens e valores).';
+      return;
+    }
+    let res;
+    try {
+      res = await fetch(`${API_BASE}/api/documentos/gerar-tr-e-dfd`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(bodyObj),
+      });
+    } catch (netErr) {
+      const msg = String(netErr?.message || netErr || '');
+      generateError.value =
+        /fetch|network|failed|load|aborted|timed out|timeout/i.test(msg) || netErr?.name === 'TypeError'
+          ? 'Falha de rede ao gerar o documento (ligação interrompida, firewall ou tempo limite no servidor). Com muitos itens na tabela o pedido pode ser maior e demorar mais; tente novamente ou reduza linhas vazias.'
+          : msg || 'Erro de rede ao gerar documento.';
+      return;
+    }
+    const rawText = await res.text();
+    let data = {};
+    try {
+      data = rawText ? JSON.parse(rawText) : {};
+    } catch {
+      generateError.value = rawText && /^</.test(rawText.trim())
+        ? `Servidor devolveu HTML em vez de JSON (proxy ou erro ${res.status}).`
+        : `Resposta inválida do servidor (não é JSON). HTTP ${res.status}.`;
+      return;
+    }
     if (!res.ok || !data.ok) {
       generateError.value = data.error || data.detail || `Erro ${res.status}`;
       return;

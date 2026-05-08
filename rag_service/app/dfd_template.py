@@ -150,6 +150,28 @@ def render_dfd_from_tr_slots(
         "(DATA DFD)": dfd_data_text,
     }
 
+    # Quando o número de processo não for informado, remove também o rótulo textual
+    # para não deixar "Nº Processo:" vazio no DFD.
+    if not str(slots.dfd_numero_processo or "").strip():
+        process_cleanup = {
+            "Nº Processo: (DFD_NUMERO_PROCESSO)": "",
+            "N° Processo: (DFD_NUMERO_PROCESSO)": "",
+            "No Processo: (DFD_NUMERO_PROCESSO)": "",
+            "Nº Processo :(DFD_NUMERO_PROCESSO)": "",
+            "N° Processo :(DFD_NUMERO_PROCESSO)": "",
+            "No Processo :(DFD_NUMERO_PROCESSO)": "",
+            "Nº Processo: (NUMERO PROCESSO)": "",
+            "N° Processo: (NUMERO PROCESSO)": "",
+            "No Processo: (NUMERO PROCESSO)": "",
+            "Nº Processo : (NUMERO PROCESSO)": "",
+            "N° Processo : (NUMERO PROCESSO)": "",
+            "No Processo : (NUMERO PROCESSO)": "",
+            "Nº Processo:": "",
+            "N° Processo:": "",
+            "No Processo:": "",
+        }
+        mapping = {**process_cleanup, **mapping}
+
     _replace_placeholders(doc, mapping)
 
     out_path = Path(output_path) if output_path else None

@@ -1065,6 +1065,9 @@ def _enforce_objeto_semantic_consistency(text: str) -> str:
 
     # Mantém liberdade de redação da IA: aqui só sanidade mínima.
     t = re.sub(r"\s{2,}", " ", t).strip()
+    # Padroniza a abertura da cláusula com inicial maiúscula.
+    t = re.sub(r"(?i)^aquisi(?:ç|c)[aã]o\s+de\s+", "Aquisição de ", t)
+    t = re.sub(r"(?i)^contrata(?:ç|c)[aã]o\s+de\s+", "Contratação de ", t)
     t = re.sub(r"[;:,]+\s*$", "", t).strip()
     if t and not t.endswith("."):
         t = f"{t}."

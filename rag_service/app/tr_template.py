@@ -21,28 +21,14 @@ from docx.shared import Cm, Pt
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
+from .docx_slot_replace import replace_placeholders_in_document
+
 TR_ITEMS_TABLE_ANCHOR = "(TR_TABELA_ITENS)"
-SLOT_TEXT_FONT_FAMILY = "Times New Roman"
 TR_ITEMS_LEGACY_CELL_PLACEHOLDERS = {
     "(Descrever o item de acordo com o solicitado)",
     "(Inserir unidade de medida ex: caixa, litro, unidade etc)",
     "(Inserir quantidade solicitada)",
 }
-
-
-def _apply_times_new_roman(paragraph) -> None:
-    for run in paragraph.runs:
-        run.font.name = SLOT_TEXT_FONT_FAMILY
-        r_pr = run._element.get_or_add_rPr()
-        r_fonts = r_pr.find(qn("w:rFonts"))
-        if r_fonts is None:
-            r_fonts = OxmlElement("w:rFonts")
-            r_pr.append(r_fonts)
-        r_fonts.set(qn("w:ascii"), SLOT_TEXT_FONT_FAMILY)
-        r_fonts.set(qn("w:hAnsi"), SLOT_TEXT_FONT_FAMILY)
-        r_fonts.set(qn("w:cs"), SLOT_TEXT_FONT_FAMILY)
-        r_fonts.set(qn("w:eastAsia"), SLOT_TEXT_FONT_FAMILY)
-
 
 # Template base legado: template_packages/tr_base/TR_modelo_base.docx (raiz do projeto)
 TEMPLATE_PATH_DEFAULT = (
@@ -261,27 +247,6 @@ def _configure_items_table_columns(table, doc: Document, use_price_layout: bool 
                 row.cells[idx].width = width
 
 
-def _replace_placeholders_in_paragraphs(doc: Document, mapping: Dict[str, str]) -> None:
-    """
-    Substitui textos exatos dos placeholders em todos os parágrafos do documento.
-
-    Observação: mexer em paragraph.text simplifica os runs, mas é aceitável
-    para este uso (template fixo).
-    """
-    for p in doc.paragraphs:
-        if not p.text:
-            continue
-        text = p.text
-        changed = False
-        for ph, val in mapping.items():
-            if ph in text:
-                text = text.replace(ph, val)
-                changed = True
-        if changed:
-            p.text = text
-            _apply_times_new_roman(p)
-
-
 def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
     """
     Preenche a tabela de Quantitativo e Descritivo com base em slots.itens.
@@ -406,7 +371,6 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
             para.paragraph_format.space_before = Pt(0)
             para.paragraph_format.space_after = Pt(0)
             para.paragraph_format.line_spacing = 1.0
-            _apply_times_new_roman(para)
 
     def _to_float_br(value: Any) -> float:
         raw = str(value or "").strip()
@@ -674,21 +638,7 @@ def render_tr_from_slots(
         "(CARGO DO ASSINANTE DO TERMO)": slots.cargo_assinante_termo or "",
     }
 
-    _replace_placeholders_in_paragraphs(doc, mapping)
-    # Também substituir placeholders em células de tabelas (fora da linha de itens)
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                text = cell.text
-                changed = False
-                for ph, val in mapping.items():
-                    if ph in text:
-                        text = text.replace(ph, val)
-                        changed = True
-                if changed:
-                    cell.text = text
-                    for para in cell.paragraphs:
-                        _apply_times_new_roman(para)
+    replace_placeholders_in_document(doc, mapping)
 
     _fill_items_table(doc, slots.itens)
 

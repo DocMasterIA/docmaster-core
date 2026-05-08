@@ -9,14 +9,61 @@ from pathlib import Path
 from typing import Optional
 
 from docx import Document
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
-from .docx_slot_replace import replace_placeholders_in_document
 from .tr_template import TRTemplateSlots
 
 
 TEMPLATE_OFICIO_PATH_DEFAULT = (
     Path(__file__).resolve().parents[2] / "template_packages" / "tr_base" / "OFICIO_modelo_base.docx"
 )
+SLOT_TEXT_FONT_FAMILY = "Times New Roman"
+
+
+def _apply_times_new_roman(paragraph) -> None:
+    for run in paragraph.runs:
+        run.font.name = SLOT_TEXT_FONT_FAMILY
+        r_pr = run._element.get_or_add_rPr()
+        r_fonts = r_pr.find(qn("w:rFonts"))
+        if r_fonts is None:
+            r_fonts = OxmlElement("w:rFonts")
+            r_pr.append(r_fonts)
+        r_fonts.set(qn("w:ascii"), SLOT_TEXT_FONT_FAMILY)
+        r_fonts.set(qn("w:hAnsi"), SLOT_TEXT_FONT_FAMILY)
+        r_fonts.set(qn("w:cs"), SLOT_TEXT_FONT_FAMILY)
+        r_fonts.set(qn("w:eastAsia"), SLOT_TEXT_FONT_FAMILY)
+
+
+def _replace_placeholders(doc: Document, mapping: dict[str, str]) -> None:
+    for p in doc.paragraphs:
+        if not p.text:
+            continue
+        text = p.text
+        changed = False
+        for ph, val in mapping.items():
+            if ph in text:
+                text = text.replace(ph, val)
+                changed = True
+        if changed:
+            p.text = text
+            _apply_times_new_roman(p)
+
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                text = cell.text
+                if not text:
+                    continue
+                changed = False
+                for ph, val in mapping.items():
+                    if ph in text:
+                        text = text.replace(ph, val)
+                        changed = True
+                if changed:
+                    cell.text = text
+                    for para in cell.paragraphs:
+                        _apply_times_new_roman(para)
 
 
 def render_oficio_from_slots(
@@ -46,7 +93,7 @@ def render_oficio_from_slots(
         "(SOL_OFICIO_DATA)": slots.data_termo or "",
     }
 
-    replace_placeholders_in_document(doc, mapping)
+    _replace_placeholders(doc, mapping)
 
     out_path = Path(output_path) if output_path else None
     if out_path is None:

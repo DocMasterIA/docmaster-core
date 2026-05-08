@@ -334,6 +334,21 @@
                 />
                 <div v-else-if="field.input === 'email' || field.input === 'text'" class="doc-gen__combo-wrap">
                   <input
+                    v-if="isCnpjSlotField(field)"
+                    :id="'drawer-slot-' + field.id"
+                    :value="slotForm[field.id]"
+                    type="text"
+                    class="gov-input doc-gen__slot-input"
+                    autocomplete="off"
+                    inputmode="numeric"
+                    maxlength="18"
+                    placeholder="00.000.000/0001-00"
+                    @keydown="onCnpjInputKeydown"
+                    @focus="openFieldSuggestions(field.id)"
+                    @input="onCnpjDrawerInput(field, $event)"
+                  />
+                  <input
+                    v-else
                     :id="'drawer-slot-' + field.id"
                     v-model="slotForm[field.id]"
                     :type="field.input === 'email' ? 'email' : 'text'"
@@ -380,6 +395,21 @@
                 </div>
                 <div v-else-if="field.input === 'datalist'" class="doc-gen__combo-wrap">
                   <input
+                    v-if="isCnpjSlotField(field)"
+                    :id="'drawer-slot-' + field.id"
+                    :value="slotForm[field.id]"
+                    type="text"
+                    class="gov-input doc-gen__slot-input"
+                    autocomplete="off"
+                    inputmode="numeric"
+                    maxlength="18"
+                    placeholder="00.000.000/0001-00"
+                    @keydown="onCnpjInputKeydown"
+                    @focus="openFieldSuggestions(field.id)"
+                    @input="onCnpjDrawerInput(field, $event)"
+                  />
+                  <input
+                    v-else
                     :id="'drawer-slot-' + field.id"
                     v-model="slotForm[field.id]"
                     class="gov-input doc-gen__slot-input"
@@ -501,6 +531,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { getApiBase } from '@/utils/apiBase.js';
+import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
 
 // Em dev: '' → proxy Vite `/api`
 const API_BASE = getApiBase();
@@ -921,6 +952,18 @@ function canRemoveFieldOption(fieldId) {
   if (!current) return false;
   const list = Array.isArray(slotFieldOptions[fieldId]) ? slotFieldOptions[fieldId] : [];
   return list.includes(current);
+}
+
+function isCnpjSlotField(field) {
+  const id = String(field?.id || '').toLowerCase();
+  return id === 'fornecedor_cnpj' || id === 'cnpj_fornecedor' || id === 'cnpj' || id.endsWith('_cnpj');
+}
+
+function onCnpjDrawerInput(field, event) {
+  const el = event?.target;
+  if (!el) return;
+  slotForm[field.id] = formatCnpjBr(el.value);
+  openFieldSuggestions(field.id);
 }
 
 function openFieldSuggestions(fieldId) {

@@ -107,7 +107,7 @@
                 </div>
                 <div class="fe-field">
                   <label>CNPJ</label>
-                  <input :value="cnpj" placeholder="00.000.000/0001-00" @input="cnpj = formatarCNPJ(String($event.target.value || ''))" />
+                  <input :value="cnpj" type="text" inputmode="numeric" maxlength="18" autocomplete="off" placeholder="00.000.000/0001-00" @keydown="onCnpjInputKeydown" @input="cnpj = formatCnpjBr(String(($event.target).value || ''))" />
                 </div>
               </div>
             </article>
@@ -345,6 +345,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { getApiBase } from '@/utils/apiBase.js';
+import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
 
 const API_BASE = getApiBase();
 const dataOptions = ['Data automática', 'Datado e assinado digitalmente', 'Data manual'];
@@ -472,15 +473,6 @@ function calcularValorGlobal() {
   const total = itens.value.reduce((acc, item) => acc + moedaParaNumero(item.valorTotal), 0);
   return total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
-function formatarCNPJ(v) {
-  const n = apenasNumeros(v).slice(0, 14);
-  if (n.length <= 2) return n;
-  if (n.length <= 5) return `${n.slice(0, 2)}.${n.slice(2)}`;
-  if (n.length <= 8) return `${n.slice(0, 2)}.${n.slice(2, 5)}.${n.slice(5)}`;
-  if (n.length <= 12) return `${n.slice(0, 2)}.${n.slice(2, 5)}.${n.slice(5, 8)}/${n.slice(8)}`;
-  return `${n.slice(0, 2)}.${n.slice(2, 5)}.${n.slice(5, 8)}/${n.slice(8, 12)}-${n.slice(12)}`;
-}
-
 function atualizarItem(index, campo, ev) {
   const valorRaw = String(ev.target?.value || '');
   const valor = campo === 'valorUnitario' || campo === 'valorTotal'

@@ -113,7 +113,7 @@
               <h3>Fornecedor exclusivo</h3>
               <div class="ixp-body ixp-grid-2">
                 <div class="ixp-field"><label>Razao social / Nome do fornecedor</label><input v-model="fornecedor" list="dl-fornecedor" placeholder="Digite a razao social" /></div>
-                <div class="ixp-field"><label>CNPJ</label><input :value="cnpj" placeholder="00.000.000/0001-00" @input="cnpj = formatarCNPJ(String($event.target.value || ''))" /></div>
+                <div class="ixp-field"><label>CNPJ</label><input :value="cnpj" type="text" inputmode="numeric" maxlength="18" autocomplete="off" placeholder="00.000.000/0001-00" @keydown="onCnpjInputKeydown" @input="cnpj = formatCnpjBr(String(($event.target).value || ''))" /></div>
               </div>
             </article>
 
@@ -407,6 +407,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
 import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
+import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
 import '@/components/dispensa-art-75-ii/dispensaArt75ii.css';
 
 const API_BASE = getApiBase();
@@ -857,14 +858,6 @@ async function loadUserGlobalPreset() {
 
 function apenasNumeros(v) {
   return String(v || '').replace(/\D/g, '');
-}
-function formatarCNPJ(v) {
-  const n = apenasNumeros(v).slice(0, 14);
-  if (n.length <= 2) return n;
-  if (n.length <= 5) return `${n.slice(0, 2)}.${n.slice(2)}`;
-  if (n.length <= 8) return `${n.slice(0, 2)}.${n.slice(2, 5)}.${n.slice(5)}`;
-  if (n.length <= 12) return `${n.slice(0, 2)}.${n.slice(2, 5)}.${n.slice(5, 8)}/${n.slice(8)}`;
-  return `${n.slice(0, 2)}.${n.slice(2, 5)}.${n.slice(5, 8)}/${n.slice(8, 12)}-${n.slice(12)}`;
 }
 function formatarData(v) {
   const n = apenasNumeros(v).slice(0, 8);

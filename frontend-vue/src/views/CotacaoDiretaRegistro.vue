@@ -142,7 +142,16 @@
             <label class="cd-field">
               <span>CNPJ</span>
               <div class="cd-inline-row">
-                <input v-model.trim="fornecedorForm.cnpj" type="text" placeholder="00.000.000/0000-00" />
+                <input
+                  :value="fornecedorForm.cnpj"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="18"
+                  autocomplete="off"
+                  placeholder="00.000.000/0001-00"
+                  @keydown="onCnpjInputKeydown"
+                  @input="fornecedorForm.cnpj = formatCnpj(String(($event.target).value || ''))"
+                />
                 <button
                   type="button"
                   class="cd-btn"
@@ -255,6 +264,7 @@ import {
   saveFornecedorCadastrado,
   updateCotacaoInItemResearchSession,
 } from '../services/pncpResearch';
+import { cnpjDigitsOnly as onlyDigits, formatCnpjBr as formatCnpj, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -342,19 +352,6 @@ function normalizeDateToInput(value) {
   const br = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (br) return `${br[3]}-${br[2]}-${br[1]}`;
   return '';
-}
-
-function onlyDigits(v) {
-  return String(v || '').replace(/\D/g, '');
-}
-
-function formatCnpj(v) {
-  const d = onlyDigits(v).slice(0, 14);
-  if (d.length <= 2) return d;
-  if (d.length <= 5) return `${d.slice(0, 2)}.${d.slice(2)}`;
-  if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`;
-  if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`;
-  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
 }
 
 function formatFornecedorLabel(f) {

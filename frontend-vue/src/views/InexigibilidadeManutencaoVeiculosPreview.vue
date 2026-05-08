@@ -36,11 +36,18 @@
                     <input v-model="processo" list="dl-processo-numero" placeholder="Ex: 123/2026" />
                   </div>
                   <div class="ixp-field">
-                    <label>{{ isFornecedorExclusivoRoute ? 'Orgao / Unidade responsavel pelo equipamento' : 'Orgao / unidade' }}</label>
+                    <label>Orgao / Unidade</label>
                     <input
                       v-model="orgao"
                       list="dl-orgao"
-                      :placeholder="isFornecedorExclusivoRoute ? 'Digite o orgao/unidade responsavel pelo equipamento' : 'Digite o orgao'"
+                      placeholder="Digite o orgao"
+                    />
+                  </div>
+                  <div v-if="isFornecedorExclusivoRoute" class="ixp-field">
+                    <label>Orgao / Unidade responsavel pelo equipamento</label>
+                    <input
+                      v-model="orgaoResponsavelEquipamento"
+                      placeholder="Digite o orgao/unidade responsavel pelo equipamento"
                     />
                   </div>
                   <div v-if="isInexigibilidadeManutencaoRoute" class="ixp-field">
@@ -474,6 +481,7 @@ const cabecalhoDocumento = ref('');
 const processoAtivo = ref(false);
 const processo = ref('');
 const orgao = ref('');
+const orgaoResponsavelEquipamento = ref('');
 const orgaoUnidadeVeiculo = ref('');
 const objetoEspecifico = ref('');
 const outroObjetoEspecifico = ref('');
@@ -1039,7 +1047,8 @@ function buildSlotsOverride() {
   if (isInexigibilidadeManutencaoRoute.value) {
     if (orgaoUnidadeVeiculo.value.trim()) o.orgao = orgaoUnidadeVeiculo.value.trim();
   } else if (isFornecedorExclusivoRoute.value) {
-    if (orgao.value.trim()) o.orgao = orgao.value.trim();
+    if (orgaoResponsavelEquipamento.value.trim()) o.orgao = orgaoResponsavelEquipamento.value.trim();
+    else if (orgao.value.trim()) o.orgao = orgao.value.trim();
   } else if (orgao.value.trim()) {
     o.orgao = orgao.value.trim();
   }
@@ -1314,12 +1323,16 @@ const secoes = computed(() => {
         isFilled(cabecalhoDocumento.value)
         && (!processoAtivo.value || isFilled(processo.value))
         && isFilled(orgao.value)
+        && (!isFornecedorExclusivoRoute.value || isFilled(orgaoResponsavelEquipamento.value))
         && (!isInexigibilidadeManutencaoRoute.value || isFilled(orgaoUnidadeVeiculo.value))
       ),
       linhas: [
         ['Cabecalho', cabecalhoDocumento.value || 'Nao informado', isFilled(cabecalhoDocumento.value)],
         ['Processo', processoAtivo.value ? processo.value || 'Nao informado' : 'Nao se aplica', !processoAtivo.value || isFilled(processo.value)],
         ['Orgao', orgao.value || 'Nao informado', isFilled(orgao.value)],
+        ...(isFornecedorExclusivoRoute.value
+          ? [['Orgao / Unidade responsavel pelo equipamento', orgaoResponsavelEquipamento.value || 'Nao informado', isFilled(orgaoResponsavelEquipamento.value)]]
+          : []),
         ...(isInexigibilidadeManutencaoRoute.value
           ? [['Orgao / Unidade do veiculo', orgaoUnidadeVeiculo.value || 'Nao informado', isFilled(orgaoUnidadeVeiculo.value)]]
           : []),

@@ -1145,15 +1145,25 @@ async function onSubmit() {
     };
     if (cabecalhoMergeTemplateId.value) payload.template_id = cabecalhoMergeTemplateId.value;
     const gerarUrl = buildGerarTrEDfdUrl(API_BASE);
+    const requestInit = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    };
     let res;
-    try {
-      res = await fetch(gerarUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload),
-      });
-    } catch (networkErr) {
+    let networkErr = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        res = await fetch(gerarUrl, requestInit);
+        networkErr = null;
+        break;
+      } catch (err) {
+        networkErr = err;
+        if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 700));
+      }
+    }
+    if (!res && networkErr) {
       const msg = String(networkErr?.message || networkErr || '');
       const looksNetwork =
         /fetch|network|failed|load|aborted|timed out|timeout/i.test(msg) ||

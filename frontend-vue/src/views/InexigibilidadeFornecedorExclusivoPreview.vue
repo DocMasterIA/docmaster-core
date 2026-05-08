@@ -747,14 +747,21 @@ function buildSlotsOverride() {
   }
   if (dotacaoAtiva.value && String(dotacao.value || '').trim()) o.dotacao_numero = String(dotacao.value || '').trim();
   const modo = String(modoData.value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  let dataTermoFornecedor = '';
   if (modo === 'data automatica') {
     const now = new Date();
-    o.data_termo = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+    dataTermoFornecedor = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
   } else if (modo === 'data manual' && dataManual.value.trim()) {
-    o.data_termo = dataManual.value.trim();
-  } else if (modo === 'datado e assinado digitalmente') {
-    o.data_termo = 'datado e assinado digitalmente';
+    dataTermoFornecedor = dataManual.value.trim();
   }
+  if (modo === 'datado e assinado digitalmente') {
+    const now = new Date();
+    const hoje = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+    dataTermoFornecedor = dataTermoFornecedor
+      ? `${dataTermoFornecedor}, datado e assinado digitalmente`
+      : `${hoje}, datado e assinado digitalmente`;
+  }
+  if (dataTermoFornecedor) o.data_termo = dataTermoFornecedor;
   o.itens = itens.value.filter((x) => Object.values(x).some((v) => String(v || '').trim())).map((item) => ({
     descricao: String(item.descricao || '').trim(),
     quantidade: String(item.quantidade || '').trim(),

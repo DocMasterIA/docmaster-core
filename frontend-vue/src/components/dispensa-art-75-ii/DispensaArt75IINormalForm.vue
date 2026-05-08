@@ -518,15 +518,20 @@ function buildSlotsOverride() {
   if (String(dadosFixos.fixoTrResponsavelCargo || '').trim()) o.cargo_assinante_termo = String(dadosFixos.fixoTrResponsavelCargo).trim();
   if (cotacaoAtiva.value && String(numeroCotacao.value || '').trim()) o.dotacao = String(numeroCotacao.value || '').trim();
   const modoNormalizado = String(modoData.value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  let dataTermo = '';
   if (modoNormalizado === 'data automatica') {
     const now = new Date();
-    o.data_termo = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+    dataTermo = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
   } else if (modoNormalizado === 'data manual') {
     const manual = String(dataManual.value || '').trim();
-    if (manual) o.data_termo = manual;
-  } else if (modoNormalizado === 'datado e assinado digitalmente') {
-    o.data_termo = 'datado e assinado digitalmente';
+    if (manual) dataTermo = manual;
   }
+  if (modoNormalizado === 'datado e assinado digitalmente') {
+    const now = new Date();
+    const hoje = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+    dataTermo = dataTermo ? `${dataTermo}, datado e assinado digitalmente` : `${hoje}, datado e assinado digitalmente`;
+  }
+  if (dataTermo) o.data_termo = dataTermo;
   const objetoFinal = String(objetoGerado.value || objetoContratado.value || '').trim();
   if (objetoFinal) o.objeto = objetoFinal;
   if (String(justificativa.value || '').trim()) o.justificativa = String(justificativa.value).trim();

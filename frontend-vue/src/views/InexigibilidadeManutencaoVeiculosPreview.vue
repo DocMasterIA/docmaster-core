@@ -574,10 +574,7 @@ const orgaoOptionsFromProfiles = computed(() => {
     .filter(Boolean);
   return [...new Set(values)];
 });
-const mergedOrgaoOptions = computed(() => {
-  const catalog = Array.isArray(slotFieldOptions.orgao) ? slotFieldOptions.orgao : [];
-  return [...new Set([...catalog, ...orgaoOptionsFromProfiles.value])];
-});
+const mergedOrgaoOptions = computed(() => orgaoOptionsFromProfiles.value);
 const CATALOG_KEYS = [
   'cabecalho_documento',
   'processo_numero',

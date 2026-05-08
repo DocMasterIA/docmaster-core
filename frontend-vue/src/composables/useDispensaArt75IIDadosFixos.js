@@ -58,10 +58,7 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
       .filter(Boolean);
     return [...new Set(values)];
   });
-  const mergedOrgaoOptions = computed(() => {
-    const catalog = Array.isArray(slotFieldOptions.orgao) ? slotFieldOptions.orgao : [];
-    return [...new Set([...catalog, ...orgaoOptionsFromProfiles.value])];
-  });
+  const mergedOrgaoOptions = computed(() => orgaoOptionsFromProfiles.value);
 
   const fixoTratNome = ref('');
   const fixoNome = ref('');

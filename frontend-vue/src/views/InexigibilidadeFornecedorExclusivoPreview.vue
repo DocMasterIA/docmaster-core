@@ -455,10 +455,7 @@ const orgaoOptionsFromProfiles = computed(() => {
     .filter(Boolean);
   return [...new Set(values)];
 });
-const mergedOrgaoOptions = computed(() => {
-  const catalog = Array.isArray(slotFieldOptions.orgao) ? slotFieldOptions.orgao : [];
-  return [...new Set([...catalog, ...orgaoOptionsFromProfiles.value])];
-});
+const mergedOrgaoOptions = computed(() => orgaoOptionsFromProfiles.value);
 const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
 const SLOT_PACKAGE_KEY = 'inexigibilidade_74_i_fornecedor_exclusivo';
 const CATALOG_KEYS = [

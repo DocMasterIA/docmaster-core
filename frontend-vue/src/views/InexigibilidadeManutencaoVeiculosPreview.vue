@@ -74,18 +74,18 @@
             <article v-if="isFornecedorExclusivoRoute" class="ixp-card">
               <h3>Dados do equipamento</h3>
               <div class="ixp-body ixp-grid-3">
-                <div class="ixp-field"><label>Equipamento</label><input v-model="equipamento" placeholder="Ex: Aparelho de raio-X" /></div>
-                <div class="ixp-field"><label>Marca</label><input v-model="marca" placeholder="Ex: Siemens" /></div>
-                <div class="ixp-field"><label>Modelo</label><input v-model="modelo" placeholder="Ex: Multix Select DR" /></div>
+                <div class="ixp-field"><label>Equipamento</label><input :value="equipamento" placeholder="Ex: Aparelho de raio-X" @input="equipamento = primeiraMaiuscula(String(($event.target).value || ''))" /></div>
+                <div class="ixp-field"><label>Marca</label><input :value="marca" placeholder="Ex: Siemens" @input="marca = primeiraMaiuscula(String(($event.target).value || ''))" /></div>
+                <div class="ixp-field"><label>Modelo</label><input :value="modelo" placeholder="Ex: Multix Select DR" @input="modelo = primeiraMaiuscula(String(($event.target).value || ''))" /></div>
               </div>
             </article>
 
             <article v-if="isManutencaoVeiculosRoute" class="ixp-card">
               <h3>Dados do veiculo</h3>
               <div class="ixp-body ixp-grid-3">
-                <div class="ixp-field"><label>Marca</label><input v-model="marca" placeholder="Ex: Chevrolet" /></div>
-                <div class="ixp-field"><label>Modelo</label><input v-model="modelo" placeholder="Ex: S10" /></div>
-                <div class="ixp-field"><label>Placa</label><input :value="placa" placeholder="Ex: ABC-1234" @input="placa = String($event.target.value || '').toUpperCase()" /></div>
+                <div class="ixp-field"><label>Marca</label><input :value="marca" placeholder="Ex: Chevrolet" @input="marca = primeiraMaiuscula(String(($event.target).value || ''))" /></div>
+                <div class="ixp-field"><label>Modelo</label><input :value="modelo" placeholder="Ex: S10" @input="modelo = primeiraMaiuscula(String(($event.target).value || ''))" /></div>
+                <div class="ixp-field"><label>Placa</label><input :value="placa" placeholder="Ex: ABC-1234" @input="placa = String(($event.target).value || '').toUpperCase()" /></div>
               </div>
             </article>
 

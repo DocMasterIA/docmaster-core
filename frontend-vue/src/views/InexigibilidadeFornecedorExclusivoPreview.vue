@@ -92,9 +92,9 @@
             <article class="fe-card">
               <h3>Dados do equipamento</h3>
               <div class="fe-body fe-grid-3">
-                <div class="fe-field"><label>Equipamento</label><input v-model="equipamento" placeholder="Ex: Aparelho de raio-X" /></div>
-                <div class="fe-field"><label>Marca</label><input v-model="marca" placeholder="Ex: Siemens" /></div>
-                <div class="fe-field"><label>Modelo</label><input v-model="modelo" placeholder="Ex: Multix Select DR" /></div>
+                <div class="fe-field"><label>Equipamento</label><input :value="equipamento" placeholder="Ex: Aparelho de raio-X" @input="equipamento = iniciarComMaiuscula(String(($event.target).value || ''))" /></div>
+                <div class="fe-field"><label>Marca</label><input :value="marca" placeholder="Ex: Siemens" @input="marca = iniciarComMaiuscula(String(($event.target).value || ''))" /></div>
+                <div class="fe-field"><label>Modelo</label><input :value="modelo" placeholder="Ex: Multix Select DR" @input="modelo = iniciarComMaiuscula(String(($event.target).value || ''))" /></div>
               </div>
             </article>
 

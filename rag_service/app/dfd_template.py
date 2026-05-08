@@ -9,6 +9,7 @@ Este módulo NÃO chama IA – ele só aplica os dados já gerados para o TR
 em cima do template de DFD.
 """
 
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -87,6 +88,36 @@ def _replace_placeholders(doc: Document, mapping: dict[str, str]) -> None:
             for cell in row.cells:
                 for p in cell.paragraphs:
                     _replace_placeholders_in_paragraph(p, mapping)
+
+
+def _remove_processo_visual_block_when_empty(doc: Document) -> None:
+    """
+    Remove o bloco textual de processo quando não informado, incluindo o rótulo
+    e eventual placeholder, para não sobrar trilha de formatação no DFD.
+    """
+    patterns = [
+        re.compile(r"\s*N[º°o]\s*Processo\s*:\s*\((?:DFD_NUMERO_PROCESSO|NUMERO PROCESSO)\)\s*", re.IGNORECASE),
+        re.compile(r"\s*N[º°o]\s*Processo\s*:\s*", re.IGNORECASE),
+    ]
+
+    def _clean_paragraph(p) -> None:
+        text = p.text or ""
+        if not text:
+            return
+        cleaned = text
+        for pat in patterns:
+            cleaned = pat.sub(" ", cleaned)
+        cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+        if cleaned != text:
+            p.text = cleaned
+
+    for p in doc.paragraphs:
+        _clean_paragraph(p)
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for p in cell.paragraphs:
+                    _clean_paragraph(p)
 
 
 def render_dfd_from_tr_slots(
@@ -173,6 +204,8 @@ def render_dfd_from_tr_slots(
         mapping = {**process_cleanup, **mapping}
 
     _replace_placeholders(doc, mapping)
+    if not str(slots.dfd_numero_processo or "").strip():
+        _remove_processo_visual_block_when_empty(doc)
 
     out_path = Path(output_path) if output_path else None
     if out_path is None:

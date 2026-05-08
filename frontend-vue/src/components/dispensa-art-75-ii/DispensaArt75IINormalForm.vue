@@ -117,6 +117,25 @@
             <DispensaArt75IIItensValores v-model="itens" />
 
             <section class="da75-block">
+              <h3>Dotação orçamentária</h3>
+              <div class="da75-block__body">
+                <label class="da75-check">
+                  <input v-model="dotacaoAtiva" type="checkbox" />
+                  Informar dotação orçamentária (opcional)
+                </label>
+                <div v-if="dotacaoAtiva" class="da75-mt">
+                  <label class="da75-label">Dotação orçamentária</label>
+                  <textarea
+                    class="da75-textarea"
+                    :value="dotacao"
+                    :placeholder="PLACEHOLDER_DOTACAO"
+                    @input="dotacao = primeiraMaiuscula(($event.target).value)"
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section class="da75-block">
               <h3>Data</h3>
               <div class="da75-block__body">
                 <div class="da75-row da75-row--2">
@@ -226,11 +245,12 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   DATA_OPTIONS,
   EMPTY_ITEM,
+  PLACEHOLDER_DOTACAO,
   calcularValorTotalEstimado,
   campoPreenchido,
   formatarData,
@@ -264,6 +284,8 @@ const objetoCaracteristicas = ref('');
 const objetoGerado = ref('');
 const justificativa = ref('');
 const itens = ref([{ ...EMPTY_ITEM }]);
+const dotacaoAtiva = ref(false);
+const dotacao = ref('');
 const modoData = ref('');
 const dataManual = ref('');
 const isGerandoClausulas = ref(false);
@@ -308,6 +330,10 @@ onMounted(async () => {
   } finally {
     cabecalhosLoading.value = false;
   }
+});
+
+watch(dotacaoAtiva, (v) => {
+  if (!v) dotacao.value = '';
 });
 
 function onApplyDadosFixos() {
@@ -362,6 +388,14 @@ const secoes = computed(() => {
       linhas: [
         ['Itens lançados', String(itensValidos.value.length), itensValidos.value.length > 0],
         ['Valor total estimado', calcularValorTotalEstimado(itens.value), itensValidos.value.length > 0],
+      ],
+    },
+    {
+      titulo: 'Dotação orçamentária',
+      completo: !dotacaoAtiva.value || campoPreenchido(dotacao.value),
+      linhas: [
+        ['Situação', dotacaoAtiva.value ? 'Informar dotação' : 'Não informada', true],
+        ['Dotação', dotacaoAtiva.value ? dotacao.value || 'Não informada' : 'Não se aplica', !dotacaoAtiva.value || campoPreenchido(dotacao.value)],
       ],
     },
     {
@@ -484,6 +518,11 @@ function buildSlotsOverride() {
   if (String(dadosFixos.fixoEmailPropostas || '').trim()) o.email_envio_propostas = String(dadosFixos.fixoEmailPropostas).trim();
   if (String(dadosFixos.fixoTrResponsavelNome || '').trim()) o.nome_assinante_termo = String(dadosFixos.fixoTrResponsavelNome).trim();
   if (String(dadosFixos.fixoTrResponsavelCargo || '').trim()) o.cargo_assinante_termo = String(dadosFixos.fixoTrResponsavelCargo).trim();
+  if (dotacaoAtiva.value && String(dotacao.value || '').trim()) {
+    const dotacaoTexto = String(dotacao.value).trim();
+    o.dotacao = dotacaoTexto;
+    o.objeto_resultados = `Dotação orçamentária: ${dotacaoTexto}`;
+  }
   const modoNormalizado = String(modoData.value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   let dataTermo = '';
   if (modoNormalizado === 'data automatica') {

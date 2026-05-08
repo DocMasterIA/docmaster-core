@@ -1,7 +1,7 @@
 <template>
-  <div class="ixp-page">
-    <div class="ixp-wrap">
-      <div class="ixp-grid">
+  <div class="da75-page">
+    <div class="da75-page__inner">
+      <div class="da75-grid-main da75-mt">
         <section class="ixp-main">
           <div class="ixp-main-head">
             <div class="ixp-main-title">
@@ -227,37 +227,54 @@
               </div>
             </article>
 
-            <div class="ixp-actions">
-              <button class="ixp-btn-primary" type="button" :disabled="isSubmitting" @click="onSubmit">
-                {{ isSubmitting ? 'Processando com IA...' : 'Gerar Documento com IA' }}
+            <div class="da75-space-y">
+              <button type="button" class="da75-btn da75-btn--primary" :disabled="isSubmitting" @click="onSubmit">
+                {{ isSubmitting ? 'Gerando documentos...' : 'Gerar documento com IA' }}
               </button>
-              <template v-if="documentReady">
-                <a v-if="documentTrUrl" :href="documentTrUrl" :download="documentTrFilename" class="ixp-btn-secondary">Download TR (DOCX)</a>
-                <a v-if="documentDfdUrl" :href="documentDfdUrl" :download="documentDfdFilename" class="ixp-btn-secondary">Download DFD (DOCX)</a>
-                <a v-if="documentOficioUrl" :href="documentOficioUrl" :download="documentOficioFilename" class="ixp-btn-secondary">Download Solicitacao/Oficio (DOCX)</a>
-                <a v-if="documentZipUrl" :href="documentZipUrl" :download="documentZipFilename" class="ixp-btn-secondary">Download TR+DFD+Oficio (ZIP)</a>
-              </template>
+              <p v-if="generateError" class="da75-helper">{{ generateError }}</p>
+              <p v-if="documentReady && successMessage" class="da75-helper">{{ successMessage }}</p>
+              <div v-if="documentReady" class="da75-inline-actions">
+                <a v-if="documentTrUrl" :href="documentTrUrl" :download="documentTrFilename" class="da75-btn">Download TR</a>
+                <a v-if="documentDfdUrl" :href="documentDfdUrl" :download="documentDfdFilename" class="da75-btn">Download DFD</a>
+                <a v-if="documentOficioUrl" :href="documentOficioUrl" :download="documentOficioFilename" class="da75-btn">Download Ofício</a>
+                <a v-if="documentZipUrl" :href="documentZipUrl" :download="documentZipFilename" class="da75-btn">Download ZIP</a>
+              </div>
             </div>
-            <p v-if="generateError" class="ixp-error">{{ generateError }}</p>
-            <p v-if="documentReady && successMessage" class="ixp-success">{{ successMessage }}</p>
           </div>
         </section>
 
-        <aside class="ixp-summary">
-          <div class="ixp-summary-head">
-            <small>Resumo em tempo real</small>
-            <h3>Painel do documento</h3>
-            <span>{{ progresso }}%</span>
+        <aside class="da75-resumo">
+          <div class="da75-resumo__head">
+            <div>
+              <div class="da75-resumo__kicker">Resumo em tempo real</div>
+              <h3 class="da75-resumo__panel-title">Painel do documento</h3>
+            </div>
+            <div class="da75-resumo__pct">{{ progresso }}%</div>
           </div>
-          <div class="ixp-progress"><div :style="{ width: `${progresso}%` }"></div></div>
-          <p>{{ completos }} de {{ secoes.length }} blocos preenchidos</p>
-          <div class="ixp-summary-list">
-            <article v-for="sec in secoes" :key="sec.titulo" class="ixp-summary-card">
-              <header>{{ sec.titulo }} <strong :class="sec.completo ? 'ok' : 'warn'">{{ sec.completo ? 'OK' : 'Pendente' }}</strong></header>
-              <div v-for="linha in sec.linhas" :key="linha[0]" :class="['ixp-line', linha[2] ? 'is-ok' : 'is-warn']">
-                <span>{{ linha[0] }}</span><b>{{ linha[1] }}</b>
+          <div class="da75-progress">
+            <div class="da75-progress__bar" :style="{ width: `${progresso}%` }" />
+          </div>
+          <div class="da75-resumo__meta">
+            {{ completos }} de {{ secoes.length }} blocos preenchidos
+          </div>
+          <div class="da75-resumo__secoes">
+            <div v-for="secao in secoes" :key="secao.titulo" class="da75-secao">
+              <div class="da75-secao__title">
+                <span>{{ secao.titulo }}</span>
+                <span :class="secao.completo ? 'da75-ok' : 'da75-warn'">{{ secao.completo ? '✓' : '!' }}</span>
               </div>
-            </article>
+              <div class="da75-space-y da75-mt-sm">
+                <div
+                  v-for="[rotulo, valor, preenchido] in secao.linhas"
+                  :key="rotulo"
+                  class="da75-linha"
+                  :class="preenchido ? 'da75-linha--ok' : 'da75-linha--no'"
+                >
+                  <span>{{ rotulo }}</span>
+                  <span>{{ valor }}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </aside>
       </div>
@@ -390,6 +407,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
 import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
+import '@/components/dispensa-art-75-ii/dispensaArt75ii.css';
 
 const API_BASE = getApiBase();
 const route = useRoute();
@@ -1388,11 +1406,8 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 </script>
 
 <style>
-.ixp-page { min-height: 100vh; background: #f1f5f9; padding: 16px; }
-.ixp-wrap { max-width: 1280px; margin: 0 auto; }
 .ixp-header h1 { margin: 0; font-size: 20px; color: #0f172a; }
 .ixp-header p { margin: 4px 0 0; font-size: 13px; color: #64748b; }
-.ixp-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; }
 .ixp-main { border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; overflow: hidden; }
 .ixp-main-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; border-bottom: 1px solid #e2e8f0; padding: 16px; }
 .ixp-main-title { display: flex; gap: 12px; }
@@ -1435,26 +1450,9 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .ixp-orgao-profile-actions > button:disabled { opacity: 0.6; }
 .ixp-subsection-title { margin: 6px 0 0; font-size: 13px; color: #334155; }
 .ixp-btn-primary { border: 0; background: #2563eb; color: #fff; border-radius: 12px; padding: 10px 14px; font-size: 13px; font-weight: 700; width: fit-content; }
-.ixp-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .ixp-hint { margin: 0; font-size: 12px; color: #64748b; }
 .ixp-error { margin: 0; border: 1px solid #fecaca; background: #fff1f2; color: #b91c1c; border-radius: 12px; padding: 9px 11px; font-size: 13px; white-space: pre-wrap; }
 .ixp-success { margin: 0; border: 1px solid #bbf7d0; background: #f0fdf4; color: #166534; border-radius: 12px; padding: 9px 11px; font-size: 13px; }
-.ixp-summary { position: sticky; top: 16px; align-self: start; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; padding: 14px; }
-.ixp-summary-head small { font-size: 11px; text-transform: uppercase; color: #64748b; letter-spacing: .08em; }
-.ixp-summary-head h3 { margin: 4px 0 0; font-size: 16px; color: #0f172a; }
-.ixp-summary-head span { display: inline-block; margin-top: 8px; border-radius: 999px; background: #e0f2fe; color: #0369a1; padding: 4px 10px; font-size: 12px; font-weight: 700; }
-.ixp-progress { margin-top: 10px; height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
-.ixp-progress > div { height: 100%; background: #0ea5e9; }
-.ixp-summary > p { font-size: 12px; color: #64748b; margin: 8px 0 0; }
-.ixp-summary-list { margin-top: 10px; display: grid; gap: 8px; }
-.ixp-summary-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px; }
-.ixp-summary-card header { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 6px; }
-.ixp-summary-card .ok { color: #16a34a; }
-.ixp-summary-card .warn { color: #d97706; }
-.ixp-line { display: flex; justify-content: space-between; gap: 8px; border-radius: 8px; padding: 6px; font-size: 11px; margin-bottom: 5px; }
-.ixp-line b { text-align: right; max-width: 65%; white-space: pre-wrap; color: #0f172a; }
-.ixp-line.is-ok { border: 1px solid #86efac; background: #f0fdf4; }
-.ixp-line.is-warn { border: 1px solid #fda4af; background: #fff1f2; }
 .ixp-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, .2); z-index: 40; }
 .ixp-drawer { position: fixed; right: 0; top: 0; height: 100%; width: 100%; max-width: 880px; transform: translateX(100%); transition: transform .25s ease; background: #fff; border-left: 1px solid #e2e8f0; z-index: 50; display: grid; grid-template-rows: auto 1fr auto; }
 .ixp-drawer.is-open { transform: translateX(0); }
@@ -1464,18 +1462,15 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .ixp-drawer-body { overflow: auto; padding: 16px; display: grid; gap: 12px; }
 .ixp-drawer-foot { border-top: 1px solid #e2e8f0; padding: 14px 16px; }
 .ixp-drawer-foot .ixp-btn-primary { width: 100%; }
-@media (max-width: 1200px) { .ixp-grid { grid-template-columns: 1fr; } .ixp-summary { position: static; } }
 @media (max-width: 900px) { .ixp-grid-2, .ixp-grid-3, .ixp-grid-item { grid-template-columns: 1fr; } .ixp-col-2 { grid-column: auto; } }
-.dm-dark .ixp-page,
-.dm-dark-theme .ixp-page { background: #020617; }
-.dm-dark .ixp-main, .dm-dark .ixp-card, .dm-dark .ixp-summary, .dm-dark .ixp-drawer, .dm-dark .ixp-item, .dm-dark .ixp-summary-card,
-.dm-dark-theme .ixp-main, .dm-dark-theme .ixp-card, .dm-dark-theme .ixp-summary, .dm-dark-theme .ixp-drawer, .dm-dark-theme .ixp-item, .dm-dark-theme .ixp-summary-card { background: #0f172a; border-color: #334155; }
+.dm-dark .ixp-main, .dm-dark .ixp-card, .dm-dark .ixp-drawer, .dm-dark .ixp-item,
+.dm-dark-theme .ixp-main, .dm-dark-theme .ixp-card, .dm-dark-theme .ixp-drawer, .dm-dark-theme .ixp-item { background: #0f172a; border-color: #334155; }
 .dm-dark .ixp-main-head, .dm-dark .ixp-drawer-head, .dm-dark .ixp-drawer-foot,
 .dm-dark-theme .ixp-main-head, .dm-dark-theme .ixp-drawer-head, .dm-dark-theme .ixp-drawer-foot { border-color: #334155; }
-.dm-dark .ixp-main-title h2, .dm-dark .ixp-main-title p, .dm-dark .ixp-card h3, .dm-dark .ixp-summary-head h3, .dm-dark .ixp-summary-card header, .dm-dark .ixp-line b, .dm-dark .ixp-choice strong,
-.dm-dark-theme .ixp-main-title h2, .dm-dark-theme .ixp-main-title p, .dm-dark-theme .ixp-card h3, .dm-dark-theme .ixp-summary-head h3, .dm-dark-theme .ixp-summary-card header, .dm-dark-theme .ixp-line b, .dm-dark-theme .ixp-choice strong { color: #e2e8f0; }
-.dm-dark .ixp-main-title small, .dm-dark .ixp-field label, .dm-dark .ixp-check, .dm-dark .ixp-item-head span, .dm-dark .ixp-summary > p, .dm-dark .ixp-choice span, .dm-dark .ixp-summary-head small, .dm-dark .ixp-drawer-head small,
-.dm-dark-theme .ixp-main-title small, .dm-dark-theme .ixp-field label, .dm-dark-theme .ixp-check, .dm-dark-theme .ixp-item-head span, .dm-dark-theme .ixp-summary > p, .dm-dark-theme .ixp-choice span, .dm-dark-theme .ixp-summary-head small, .dm-dark-theme .ixp-drawer-head small { color: #94a3b8; }
+.dm-dark .ixp-main-title h2, .dm-dark .ixp-main-title p, .dm-dark .ixp-card h3, .dm-dark .ixp-choice strong,
+.dm-dark-theme .ixp-main-title h2, .dm-dark-theme .ixp-main-title p, .dm-dark-theme .ixp-card h3, .dm-dark-theme .ixp-choice strong { color: #e2e8f0; }
+.dm-dark .ixp-main-title small, .dm-dark .ixp-field label, .dm-dark .ixp-check, .dm-dark .ixp-item-head span, .dm-dark .ixp-choice span, .dm-dark .ixp-drawer-head small,
+.dm-dark-theme .ixp-main-title small, .dm-dark-theme .ixp-field label, .dm-dark-theme .ixp-check, .dm-dark-theme .ixp-item-head span, .dm-dark-theme .ixp-choice span, .dm-dark-theme .ixp-drawer-head small { color: #94a3b8; }
 .dm-dark .ixp-field input, .dm-dark .ixp-field textarea, .dm-dark .ixp-field select, .dm-dark .ixp-btn-secondary, .dm-dark .ixp-choice,
 .dm-dark-theme .ixp-field input, .dm-dark-theme .ixp-field textarea, .dm-dark-theme .ixp-field select, .dm-dark-theme .ixp-btn-secondary, .dm-dark-theme .ixp-choice { background: #0b1222; border-color: #334155; color: #e2e8f0; }
 .dm-dark .ixp-field input::placeholder, .dm-dark .ixp-field textarea::placeholder,
@@ -1490,14 +1485,6 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .dm-dark-theme .ixp-orgao-btn-delete { background: #dc2626; border-color: #dc2626; color: #fff; }
 .dm-dark .ixp-choice.is-active,
 .dm-dark-theme .ixp-choice.is-active { border-color: #38bdf8; background: #082f49; }
-.dm-dark .ixp-progress,
-.dm-dark-theme .ixp-progress { background: #1e293b; }
-.dm-dark .ixp-summary-head span,
-.dm-dark-theme .ixp-summary-head span { background: #082f49; color: #7dd3fc; }
-.dm-dark .ixp-line.is-ok,
-.dm-dark-theme .ixp-line.is-ok { background: #052e16; border-color: #166534; }
-.dm-dark .ixp-line.is-warn,
-.dm-dark-theme .ixp-line.is-warn { background: #3f1d2e; border-color: #9f1239; }
 .dm-dark .ixp-overlay,
 .dm-dark-theme .ixp-overlay { background: rgba(2, 6, 23, 0.72); }
 .dm-dark .ixp-error,

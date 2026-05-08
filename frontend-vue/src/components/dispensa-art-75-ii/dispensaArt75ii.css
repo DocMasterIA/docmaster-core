@@ -116,6 +116,13 @@
   color: #b91c1c;
 }
 
+.da75-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .da75-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;

@@ -39,7 +39,6 @@ export const DA75_FIXOS_CATALOG_KEYS = [
   'tr_email_recebimento_propostas',
   'tr_termo_responsavel_nome',
   'tr_termo_responsavel_cargo',
-  'cotacao_numero',
 ];
 
 /**
@@ -78,7 +77,6 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
   const fixoEmailPropostas = ref('');
   const fixoTrResponsavelNome = ref('');
   const fixoTrResponsavelCargo = ref('');
-  const fixoCotacaoNumero = ref('');
 
   const tratamentoNome = TRATAMENTO_NOME;
   const tratamentoCargo = TRATAMENTO_CARGO;
@@ -106,7 +104,6 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
       tr_email_recebimento_propostas: fixoEmailPropostas.value,
       tr_termo_responsavel_nome: fixoTrResponsavelNome.value,
       tr_termo_responsavel_cargo: fixoTrResponsavelCargo.value,
-      cotacao_numero: fixoCotacaoNumero.value,
     };
   }
 
@@ -139,7 +136,6 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     if ('tr_termo_responsavel_cargo' in data) {
       fixoTrResponsavelCargo.value = String(data.tr_termo_responsavel_cargo || '');
     }
-    if ('cotacao_numero' in data) fixoCotacaoNumero.value = String(data.cotacao_numero || '');
   }
 
   function buildCatalogEntries() {
@@ -162,7 +158,6 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
       ['tr_email_recebimento_propostas', fixoEmailPropostas.value],
       ['tr_termo_responsavel_nome', fixoTrResponsavelNome.value],
       ['tr_termo_responsavel_cargo', fixoTrResponsavelCargo.value],
-      ['cotacao_numero', fixoCotacaoNumero.value],
     ];
     return pairs
       .map(([field_key, value]) => ({ field_key, value: String(value || '').trim() }))
@@ -369,7 +364,6 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     fixoEmailPropostas,
     fixoTrResponsavelNome,
     fixoTrResponsavelCargo,
-    fixoCotacaoNumero,
     loadSlotCatalogSuggestions,
     loadUserGlobalPreset,
     saveUserGlobalPreset,

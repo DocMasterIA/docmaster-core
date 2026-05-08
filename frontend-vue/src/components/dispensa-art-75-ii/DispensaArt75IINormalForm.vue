@@ -139,24 +139,6 @@
               </div>
             </section>
 
-            <section class="da75-block">
-              <h3>Cotação</h3>
-              <div class="da75-block__body">
-                <label class="da75-check">
-                  <input v-model="cotacaoAtiva" type="checkbox" />
-                  Incluir número de cotação (opcional)
-                </label>
-                <div v-if="cotacaoAtiva" class="da75-max-xs da75-mt">
-                  <label class="da75-label">Número da cotação</label>
-                  <input
-                    class="da75-input"
-                    :value="numeroCotacao"
-                    placeholder="Ex: COT-2026-00123"
-                    @input="numeroCotacao = primeiraMaiuscula(($event.target).value)"
-                  />
-                </div>
-              </div>
-            </section>
 
             <div class="da75-space-y">
               <button type="button" class="da75-btn da75-btn--primary" :disabled="isSubmitting" @click="onSubmit">
@@ -284,8 +266,6 @@ const justificativa = ref('');
 const itens = ref([{ ...EMPTY_ITEM }]);
 const modoData = ref('');
 const dataManual = ref('');
-const cotacaoAtiva = ref(false);
-const numeroCotacao = ref('');
 const isGerandoClausulas = ref(false);
 const erroGeracaoClausulas = ref('');
 const isSubmitting = ref(false);
@@ -320,8 +300,6 @@ const cabecalhoMergeTemplateId = computed(() => {
 onMounted(async () => {
   await dadosFixos.loadUserGlobalPreset();
   await dadosFixos.loadSlotCatalogSuggestions();
-  numeroCotacao.value = String(dadosFixos.fixoCotacaoNumero || '').trim();
-  cotacaoAtiva.value = !!numeroCotacao.value;
   cabecalhosLoading.value = true;
   try {
     const opts = await fetchCabecalhosPrefeitura(API_BASE);
@@ -334,8 +312,6 @@ onMounted(async () => {
 
 function onApplyDadosFixos() {
   void dadosFixos.saveUserGlobalPreset();
-  numeroCotacao.value = String(dadosFixos.fixoCotacaoNumero || '').trim();
-  cotacaoAtiva.value = !!numeroCotacao.value;
   drawerAberto.value = false;
 }
 
@@ -392,14 +368,6 @@ const secoes = computed(() => {
       titulo: 'Data',
       completo: campoPreenchido(dataResumo.value),
       linhas: [['Data / modo', dataResumo.value || 'Não informada', campoPreenchido(dataResumo.value)]],
-    },
-    {
-      titulo: 'Cotação',
-      completo: !cotacaoAtiva.value || campoPreenchido(numeroCotacao.value),
-      linhas: [
-        ['Situação', cotacaoAtiva.value ? 'Informada' : 'Não informada', true],
-        ['Número da cotação', cotacaoAtiva.value ? (numeroCotacao.value || 'Não informado') : 'Não se aplica', !cotacaoAtiva.value || campoPreenchido(numeroCotacao.value)],
-      ],
     },
   ];
 });
@@ -516,7 +484,6 @@ function buildSlotsOverride() {
   if (String(dadosFixos.fixoEmailPropostas || '').trim()) o.email_envio_propostas = String(dadosFixos.fixoEmailPropostas).trim();
   if (String(dadosFixos.fixoTrResponsavelNome || '').trim()) o.nome_assinante_termo = String(dadosFixos.fixoTrResponsavelNome).trim();
   if (String(dadosFixos.fixoTrResponsavelCargo || '').trim()) o.cargo_assinante_termo = String(dadosFixos.fixoTrResponsavelCargo).trim();
-  if (cotacaoAtiva.value && String(numeroCotacao.value || '').trim()) o.dotacao = String(numeroCotacao.value || '').trim();
   const modoNormalizado = String(modoData.value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   let dataTermo = '';
   if (modoNormalizado === 'data automatica') {
@@ -564,7 +531,6 @@ function buildUserPrompt() {
     `Objeto base: ${objetoContratado.value || 'Não informado'}`,
     `Setor atendido: ${objetoSetor.value || 'Não informado'}`,
     `Características mínimas: ${objetoCaracteristicas.value || 'Não informado'}`,
-    `Cotação: ${cotacaoAtiva.value ? (numeroCotacao.value || 'Não informada') : 'Não se aplica'}`,
   ].join('\n');
 }
 

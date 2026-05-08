@@ -626,9 +626,9 @@ async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
         if not Path(docx_oficio_path).exists():
             raise HTTPException(status_code=500, detail="DOCX da Solicitação/Ofício não foi gerado.")
 
-        # Empacota em ZIP temporário
-        tmp_dir = tempfile.gettempdir()
-        zip_path = os.path.join(tmp_dir, "tr_dfd_oficio_bundle.zip")
+        # Empacota em ZIP temporário único por requisição (evita colisão entre gerações simultâneas).
+        with tempfile.NamedTemporaryFile(prefix="tr_dfd_oficio_bundle_", suffix=".zip", delete=False) as tmp_zip:
+            zip_path = tmp_zip.name
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
             zf.write(docx_tr_path, arcname="termo_referencia.docx")
             zf.write(docx_dfd_path, arcname="dfd.docx")

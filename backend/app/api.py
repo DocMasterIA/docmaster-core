@@ -724,7 +724,22 @@ def gerar_tr_e_dfd_api(request):
         with zipfile.ZipFile(io.BytesIO(zip_bytes_raw), "r") as zf:
             tr_bytes = zf.read("termo_referencia.docx")
             dfd_bytes = zf.read("dfd.docx")
-            oficio_bytes = zf.read("solicitacao_oficio.docx")
+            oficio_bytes = None
+            for oficio_name in ("solicitacao_oficio.docx", "oficio.docx"):
+                try:
+                    oficio_bytes = zf.read(oficio_name)
+                    break
+                except KeyError:
+                    continue
+            if oficio_bytes is None:
+                available = ", ".join(zf.namelist())
+                return JsonResponse(
+                    {
+                        "ok": False,
+                        "error": f"ZIP sem arquivo de Ofício esperado (solicitacao_oficio.docx/oficio.docx). Conteúdo: {available}",
+                    },
+                    status=502,
+                )
     except KeyError as e:
         return JsonResponse({"ok": False, "error": f"ZIP sem arquivo esperado: {e}"}, status=502)
     except Exception as e:
@@ -739,11 +754,11 @@ def gerar_tr_e_dfd_api(request):
         if not tpl:
             return raw, False, "template_id não informado ou template não encontrado"
         try:
-            tmpdir = tempfile.gettempdir()
-            rag_docx_path = os.path.join(tmpdir, f"tr_dfd_{tpl.id}_{name}")
-            out_docx_path = os.path.join(tmpdir, f"tr_dfd_tpl_{tpl.id}_{name}")
-            with open(rag_docx_path, "wb") as fw:
-                fw.write(raw)
+            with tempfile.NamedTemporaryFile(prefix=f"tr_dfd_{tpl.id}_", suffix=f"_{name}", delete=False) as src_tmp:
+                src_tmp.write(raw)
+                rag_docx_path = src_tmp.name
+            with tempfile.NamedTemporaryFile(prefix=f"tr_dfd_tpl_{tpl.id}_", suffix=f"_{name}", delete=False) as out_tmp:
+                out_docx_path = out_tmp.name
             merge_docx_with_template_body(
                 source_docx_path=rag_docx_path,
                 template_docx_path=tpl.file.path,

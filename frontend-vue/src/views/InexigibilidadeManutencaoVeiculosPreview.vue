@@ -431,17 +431,30 @@ const SLOT_PACKAGE_BY_ROUTE = {
   InexigibilidadeArt74IManutencaoVeiculosPreview: 'inexigibilidade_74_i_manutencao_veiculos',
 };
 const SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE = {
+  DispensaArt75I: 'Art. 75, Inciso I, da Lei no 14.133/2021',
   DispensaArt75IManutencaoVeiculos: 'Art. 75, Inciso I, da Lei no 14.133/2021',
   DispensaArt75IObrasEngenharia: 'Art. 75, Inciso I, da Lei no 14.133/2021',
+  DispensaArt75II: 'Art. 75, Inciso II, da Lei no 14.133/2021',
   DispensaArt75IICompras: 'Art. 75, Inciso II, da Lei no 14.133/2021',
   DispensaArt75IIServicos: 'Art. 75, Inciso II, da Lei no 14.133/2021',
   DispensaArt75IIComprasServicosInclusos: 'Art. 75, Inciso II, da Lei no 14.133/2021',
+  InexigibilidadeArt74I: 'Art. 74, Inciso I, da Lei no 14.133/2021',
   InexigibilidadeArt74IShowArtistico: 'Art. 74, Inciso I, da Lei no 14.133/2021',
   InexigibilidadeArt74IManutencaoVeiculosPreview: 'Art. 74, Inciso I, da Lei no 14.133/2021',
   InexigibilidadeArt74IManutencaoVeiculos: 'Art. 74, Inciso I, da Lei no 14.133/2021',
   InexigibilidadeArt74IFornecedorExclusivoPreview: 'Art. 74, Inciso I, da Lei no 14.133/2021',
   InexigibilidadeArt74IFornecedorExclusivo: 'Art. 74, Inciso I, da Lei no 14.133/2021',
 };
+
+function resolveSolOficioFundamentoLegal(routeName) {
+  const name = String(routeName || '').trim();
+  if (!name) return '';
+  if (SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE[name]) return SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE[name];
+  if (name.startsWith('InexigibilidadeArt74I')) return 'Art. 74, Inciso I, da Lei no 14.133/2021';
+  if (name.startsWith('DispensaArt75I')) return 'Art. 75, Inciso I, da Lei no 14.133/2021';
+  if (name.startsWith('DispensaArt75II')) return 'Art. 75, Inciso II, da Lei no 14.133/2021';
+  return '';
+}
 
 const drawerOpen = ref(false);
 const cabecalhoDocumento = ref('');
@@ -1053,7 +1066,7 @@ function buildSlotsOverride() {
   if (fixoTratNome.value.trim()) o.ao_senhor_genero = fixoTratNome.value.trim();
   if (fixoTratCargo.value.trim()) o.senhor_senhora_genero = fixoTratCargo.value.trim();
 
-  const fundamentoLegal = SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE[logicalRouteName.value];
+  const fundamentoLegal = resolveSolOficioFundamentoLegal(logicalRouteName.value);
   if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;
   return Object.keys(o).length ? o : null;
 }

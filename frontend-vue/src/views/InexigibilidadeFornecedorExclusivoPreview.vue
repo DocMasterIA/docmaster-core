@@ -811,6 +811,7 @@ function buildSlotsOverride() {
     dfd_fiscal_contratos: String((fixoFiscal.value || fiscal.value || '').trim()),
     dfd_assinatura_nome: String(fixoAssinatura.value || '').trim(),
     dfd_assinatura_cargo: String(fixoAssinaturaCargo.value || '').trim(),
+    sol_oficio_artigo_inciso: 'Art. 74, Inciso I, da Lei no 14.133/2021',
   };
   if (clausulaObjeto.value.trim()) {
     o.objeto = clausulaObjeto.value.trim();
@@ -871,13 +872,41 @@ async function onSubmit() {
       slots_override: buildSlotsOverride(),
       slot_package_key: SLOT_PACKAGE_KEY,
     };
-    const res = await fetch(`${API_BASE}/api/documentos/gerar-tr-e-dfd`, {
+    const gerarUrl = `${API_BASE}/api/documentos/gerar-tr-e-dfd`;
+    const requestInit = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify(payload),
-    });
-    const data = await res.json().catch(() => ({}));
+    };
+    let res;
+    let networkErr = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        res = await fetch(gerarUrl, requestInit);
+        networkErr = null;
+        break;
+      } catch (err) {
+        networkErr = err;
+        if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 700));
+      }
+    }
+    if (!res && networkErr) {
+      const msg = String(networkErr?.message || networkErr || '');
+      const looksNetwork = /fetch|network|failed|load|aborted|timed out|timeout/i.test(msg) || networkErr?.name === 'TypeError';
+      generateError.value = looksNetwork
+        ? `O navegador não completou o pedido para:\n${gerarUrl}\n\nConfira rede, VPN e bloqueadores.`
+        : msg;
+      return;
+    }
+    const rawText = await res.text();
+    let data = {};
+    try {
+      data = rawText ? JSON.parse(rawText) : {};
+    } catch (_e) {
+      generateError.value = `Resposta inválida do servidor (não é JSON). Status: ${res.status}.`;
+      return;
+    }
     if (!res.ok || !data.ok) {
       generateError.value = data.error || data.detail || `Erro ${res.status} ao gerar documento.`;
       return;

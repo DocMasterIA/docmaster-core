@@ -269,6 +269,24 @@
       <div class="ixp-drawer-body">
         <article class="ixp-card">
           <h3>Cadastros de órgãos</h3>
+          <div class="ixp-body">
+            <div class="ixp-field">
+              <label>Órgão cadastrado</label>
+              <select :value="selectedOrgaoProfileId" @change="loadOrgaoProfile(($event.target).value)">
+                <option value="">Selecione um cadastro salvo</option>
+                <option v-for="p in orgaoProfiles" :key="`org-${p.id}`" :value="p.id">{{ p.name }}</option>
+              </select>
+            </div>
+            <div class="ixp-field">
+              <label>Nome do cadastro</label>
+              <input v-model="orgaoProfileName" placeholder="Ex: Fundo Municipal de Saúde" />
+            </div>
+            <div class="ixp-inline-actions">
+              <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="newOrgaoProfile">Novo cadastro</button>
+              <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="saveOrgaoProfile">Salvar cadastro</button>
+              <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!selectedOrgaoProfileId" @click="deleteOrgaoProfile">Excluir cadastro</button>
+            </div>
+          </div>
           <div class="ixp-body ixp-grid-2">
             <div class="ixp-field">
               <label>Número do processo</label>
@@ -439,6 +457,7 @@ const API_BASE = getApiBase();
 const route = useRoute();
 const dataOptions = ['Data automatica', 'Datado e assinado digitalmente', 'Data manual'];
 const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
+const ORGAO_PROFILES_STORAGE_KEY = 'orgao_profiles_v1';
 const cabecalhoOptions = ref([]);
 const tratamentoNome = ['Ao senhor', 'A senhora'];
 const tratamentoCargo = ['Senhor', 'Senhora'];
@@ -570,6 +589,9 @@ const isManutencaoVeiculosRoute = computed(() =>
   || logicalRouteName.value === 'InexigibilidadeArt74IManutencaoVeiculos',
 );
 const slotFieldOptions = reactive({});
+const orgaoProfiles = ref([]);
+const selectedOrgaoProfileId = ref('');
+const orgaoProfileName = ref('');
 const CATALOG_KEYS = [
   'cabecalho_documento',
   'processo_numero',
@@ -743,6 +765,63 @@ async function removeFieldHistory(fieldKey, rawValue) {
   const current = Array.isArray(slotFieldOptions[fieldKey]) ? slotFieldOptions[fieldKey] : [];
   slotFieldOptions[fieldKey] = current.filter((v) => v !== value);
   await removeCatalogEntry(fieldKey, value);
+}
+
+function loadOrgaoProfiles() {
+  try {
+    const raw = localStorage.getItem(ORGAO_PROFILES_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    orgaoProfiles.value = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    orgaoProfiles.value = [];
+  }
+}
+
+function persistOrgaoProfiles() {
+  try {
+    localStorage.setItem(ORGAO_PROFILES_STORAGE_KEY, JSON.stringify(orgaoProfiles.value));
+  } catch {
+    // silencioso
+  }
+}
+
+function loadOrgaoProfile(profileId) {
+  const id = String(profileId || '');
+  selectedOrgaoProfileId.value = id;
+  const hit = orgaoProfiles.value.find((p) => String(p.id) === id);
+  if (!hit) return;
+  orgaoProfileName.value = String(hit.name || '');
+  applyGlobalFormStatePayload(hit.data || {});
+}
+
+function newOrgaoProfile() {
+  selectedOrgaoProfileId.value = '';
+  orgaoProfileName.value = '';
+}
+
+function saveOrgaoProfile() {
+  const name = String(orgaoProfileName.value || '').trim();
+  if (!name) return false;
+  const data = collectGlobalFormStatePayload();
+  const idx = orgaoProfiles.value.findIndex((p) => String(p.id) === String(selectedOrgaoProfileId.value || ''));
+  if (idx >= 0) {
+    orgaoProfiles.value[idx] = { ...orgaoProfiles.value[idx], name, data };
+  } else {
+    const id = String(Date.now());
+    orgaoProfiles.value.push({ id, name, data });
+    selectedOrgaoProfileId.value = id;
+  }
+  persistOrgaoProfiles();
+  return true;
+}
+
+function deleteOrgaoProfile() {
+  const id = String(selectedOrgaoProfileId.value || '');
+  if (!id) return;
+  orgaoProfiles.value = orgaoProfiles.value.filter((p) => String(p.id) !== id);
+  persistOrgaoProfiles();
+  selectedOrgaoProfileId.value = '';
+  orgaoProfileName.value = '';
 }
 
 async function loadSlotCatalogSuggestions() {
@@ -1249,6 +1328,7 @@ async function onApplyFixedData() {
   drawerOpen.value = false;
 }
 onMounted(async () => {
+  loadOrgaoProfiles();
   await loadUserGlobalPreset();
   await loadCabecalhoOptions();
   await loadSlotCatalogSuggestions();

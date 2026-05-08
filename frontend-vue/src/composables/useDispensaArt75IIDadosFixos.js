@@ -6,6 +6,7 @@ import {
 } from '@/components/dispensa-art-75-ii/dispensaArt75iiShared.js';
 
 export const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
+const ORGAO_PROFILES_STORAGE_KEY = 'orgao_profiles_v1';
 
 function catalogItemToString(x) {
   if (x == null) return '';
@@ -48,6 +49,9 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
   const { cabecalho, processoAtivo, processo, orgao } = parentRefs;
 
   const slotFieldOptions = reactive({});
+  const orgaoProfiles = ref([]);
+  const selectedOrgaoProfileId = ref('');
+  const orgaoProfileName = ref('');
 
   const fixoTratNome = ref('');
   const fixoNome = ref('');
@@ -250,11 +254,81 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     }
   }
 
+  function loadOrgaoProfiles() {
+    try {
+      const raw = localStorage.getItem(ORGAO_PROFILES_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      orgaoProfiles.value = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      orgaoProfiles.value = [];
+    }
+  }
+
+  function persistOrgaoProfiles() {
+    try {
+      localStorage.setItem(ORGAO_PROFILES_STORAGE_KEY, JSON.stringify(orgaoProfiles.value));
+    } catch {
+      // silencioso
+    }
+  }
+
+  function createOrgaoProfilePayload() {
+    return collectPresetPayload();
+  }
+
+  function loadOrgaoProfile(profileId) {
+    const id = String(profileId || '');
+    selectedOrgaoProfileId.value = id;
+    const hit = orgaoProfiles.value.find((p) => String(p.id) === id);
+    if (!hit) return;
+    orgaoProfileName.value = String(hit.name || '');
+    applyPresetPayload(hit.data || {});
+  }
+
+  function newOrgaoProfile() {
+    selectedOrgaoProfileId.value = '';
+    orgaoProfileName.value = '';
+  }
+
+  function saveOrgaoProfile() {
+    const name = String(orgaoProfileName.value || '').trim();
+    if (!name) return false;
+    const data = createOrgaoProfilePayload();
+    const existingIdx = orgaoProfiles.value.findIndex((p) => String(p.id) === String(selectedOrgaoProfileId.value || ''));
+    if (existingIdx >= 0) {
+      orgaoProfiles.value[existingIdx] = {
+        ...orgaoProfiles.value[existingIdx],
+        name,
+        data,
+      };
+    } else {
+      const id = String(Date.now());
+      orgaoProfiles.value.push({ id, name, data });
+      selectedOrgaoProfileId.value = id;
+    }
+    persistOrgaoProfiles();
+    return true;
+  }
+
+  function deleteOrgaoProfile() {
+    const id = String(selectedOrgaoProfileId.value || '');
+    if (!id) return;
+    orgaoProfiles.value = orgaoProfiles.value.filter((p) => String(p.id) !== id);
+    persistOrgaoProfiles();
+    selectedOrgaoProfileId.value = '';
+    orgaoProfileName.value = '';
+  }
+
+  loadOrgaoProfiles();
+
   // `reactive` para refs aninhadas serem desempacotadas em templates (ex.: drawer com `:ctx="dadosFixos"`).
   // Sem isso, `v-model="ctx.fixoNome"` recebe o objeto Ref e o input mostra "[object Object]".
   return reactive({
     processo,
     orgao,
+    orgaoProfiles,
+    selectedOrgaoProfileId,
+    orgaoProfileName,
     slotFieldOptions,
     tratamentoNome,
     tratamentoCargo,
@@ -281,5 +355,9 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     addFieldHistory,
     removeFieldHistory,
     canDeleteFieldHistory,
+    loadOrgaoProfile,
+    newOrgaoProfile,
+    saveOrgaoProfile,
+    deleteOrgaoProfile,
   });
 }

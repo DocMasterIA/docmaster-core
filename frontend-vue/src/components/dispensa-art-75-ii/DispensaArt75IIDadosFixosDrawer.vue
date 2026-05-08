@@ -13,6 +13,31 @@
       <div class="ixp-drawer-body">
         <article class="ixp-card">
           <h3>Cadastros de órgãos</h3>
+          <div class="ixp-body">
+            <div class="ixp-field">
+              <label>Órgão cadastrado</label>
+              <select :value="ctx.selectedOrgaoProfileId" @change="ctx.loadOrgaoProfile(($event.target).value)">
+                <option value="">Selecione um cadastro salvo</option>
+                <option v-for="p in (ctx.orgaoProfiles || [])" :key="`org-${p.id}`" :value="p.id">{{ p.name }}</option>
+              </select>
+            </div>
+            <div class="ixp-field">
+              <label>Nome do cadastro</label>
+              <input v-model="ctx.orgaoProfileName" placeholder="Ex: Fundo Municipal de Saúde" />
+            </div>
+            <div class="ixp-inline-actions">
+              <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.newOrgaoProfile()">Novo cadastro</button>
+              <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.saveOrgaoProfile()">Salvar cadastro</button>
+              <button
+                type="button"
+                class="ixp-btn-secondary ixp-btn-xs"
+                :disabled="!ctx.selectedOrgaoProfileId"
+                @click="ctx.deleteOrgaoProfile()"
+              >
+                Excluir cadastro
+              </button>
+            </div>
+          </div>
           <div class="ixp-body ixp-grid-2">
             <div class="ixp-field">
               <label>Número do processo</label>

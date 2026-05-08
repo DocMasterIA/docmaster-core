@@ -228,6 +228,24 @@
       <div class="fe-drawer-body">
         <article class="fe-card">
           <h3>Cadastros de órgãos</h3>
+          <div class="fe-body">
+            <div class="fe-field">
+              <label>Órgão cadastrado</label>
+              <select :value="selectedOrgaoProfileId" @change="loadOrgaoProfile(($event.target).value)">
+                <option value="">Selecione um cadastro salvo</option>
+                <option v-for="p in orgaoProfiles" :key="`org-${p.id}`" :value="p.id">{{ p.name }}</option>
+              </select>
+            </div>
+            <div class="fe-field">
+              <label>Nome do cadastro</label>
+              <input v-model="orgaoProfileName" placeholder="Ex: Fundo Municipal de Saúde" />
+            </div>
+            <div class="fe-inline-actions">
+              <button type="button" class="fe-btn-secondary fe-btn-xs" @click="newOrgaoProfile">Novo cadastro</button>
+              <button type="button" class="fe-btn-secondary fe-btn-xs" @click="saveOrgaoProfile">Salvar cadastro</button>
+              <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!selectedOrgaoProfileId" @click="deleteOrgaoProfile">Excluir cadastro</button>
+            </div>
+          </div>
           <div class="fe-body fe-grid-2">
             <div class="fe-field">
               <label>Número do processo</label>
@@ -373,6 +391,8 @@
       </div>
     </aside>
 
+    <datalist id="dl-processo-numero"><option v-for="v in (slotFieldOptions.processo_numero || [])" :key="`pn-${v}`" :value="v" /></datalist>
+    <datalist id="dl-orgao"><option v-for="v in (slotFieldOptions.orgao || [])" :key="`org-${v}`" :value="v" /></datalist>
     <datalist id="dl-solicitacao-destinatario-nome"><option v-for="v in (slotFieldOptions.solicitacao_destinatario_nome || [])" :key="`sdn-${v}`" :value="v" /></datalist>
     <datalist id="dl-solicitacao-destinatario-cargo"><option v-for="v in (slotFieldOptions.solicitacao_destinatario_cargo || [])" :key="`sdc-${v}`" :value="v" /></datalist>
     <datalist id="dl-solicitacao-responsavel-nome"><option v-for="v in (slotFieldOptions.solicitacao_responsavel_nome || [])" :key="`srn-${v}`" :value="v" /></datalist>
@@ -393,6 +413,7 @@ import { getApiBase } from '@/utils/apiBase.js';
 
 const API_BASE = getApiBase();
 const dataOptions = ['Data automática', 'Datado e assinado digitalmente', 'Data manual'];
+const ORGAO_PROFILES_STORAGE_KEY = 'orgao_profiles_v1';
 const tratamentoNome = ['Ao senhor', 'A senhora'];
 const tratamentoCargo = ['Senhor', 'Senhora'];
 const objetoOptions = [
@@ -457,9 +478,14 @@ const fixoFiscal = ref('');
 const fixoAssinatura = ref('');
 const fixoAssinaturaCargo = ref('');
 const slotFieldOptions = reactive({});
+const orgaoProfiles = ref([]);
+const selectedOrgaoProfileId = ref('');
+const orgaoProfileName = ref('');
 const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
 const SLOT_PACKAGE_KEY = 'inexigibilidade_74_i_fornecedor_exclusivo';
 const CATALOG_KEYS = [
+  'processo_numero',
+  'orgao',
   'solicitacao_destinatario_nome',
   'solicitacao_destinatario_cargo',
   'solicitacao_responsavel_nome',
@@ -615,6 +641,9 @@ async function onGenerateClauses() {
 }
 function collectGlobalFormStatePayload() {
   return {
+    processo_ativo: !!processoAtivo.value,
+    processo_numero: processo.value,
+    orgao: orgao.value,
     solicitacao_destinatario_nome: nome.value,
     solicitacao_destinatario_cargo: cargo.value,
     solicitacao_responsavel_nome: fixoResponsavel.value,
@@ -647,6 +676,9 @@ async function saveUserGlobalPreset() {
 }
 function applyGlobalFormStatePayload(data) {
   if (!data || typeof data !== 'object') return;
+  if ('processo_ativo' in data) processoAtivo.value = !!data.processo_ativo;
+  if ('processo_numero' in data) processo.value = String(data.processo_numero || '');
+  if ('orgao' in data) orgao.value = String(data.orgao || '');
   if ('solicitacao_destinatario_nome' in data) nome.value = String(data.solicitacao_destinatario_nome || '');
   if ('solicitacao_destinatario_cargo' in data) cargo.value = String(data.solicitacao_destinatario_cargo || '');
   if ('solicitacao_responsavel_nome' in data) fixoResponsavel.value = String(data.solicitacao_responsavel_nome || '');
@@ -733,6 +765,63 @@ async function removeFieldHistory(fieldKey, rawValue) {
   const current = Array.isArray(slotFieldOptions[fieldKey]) ? slotFieldOptions[fieldKey] : [];
   slotFieldOptions[fieldKey] = current.filter((v) => v !== value);
   await removeCatalogEntry(fieldKey, value);
+}
+
+function loadOrgaoProfiles() {
+  try {
+    const raw = localStorage.getItem(ORGAO_PROFILES_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    orgaoProfiles.value = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    orgaoProfiles.value = [];
+  }
+}
+
+function persistOrgaoProfiles() {
+  try {
+    localStorage.setItem(ORGAO_PROFILES_STORAGE_KEY, JSON.stringify(orgaoProfiles.value));
+  } catch {
+    // silencioso
+  }
+}
+
+function loadOrgaoProfile(profileId) {
+  const id = String(profileId || '');
+  selectedOrgaoProfileId.value = id;
+  const hit = orgaoProfiles.value.find((p) => String(p.id) === id);
+  if (!hit) return;
+  orgaoProfileName.value = String(hit.name || '');
+  applyGlobalFormStatePayload(hit.data || {});
+}
+
+function newOrgaoProfile() {
+  selectedOrgaoProfileId.value = '';
+  orgaoProfileName.value = '';
+}
+
+function saveOrgaoProfile() {
+  const name = String(orgaoProfileName.value || '').trim();
+  if (!name) return false;
+  const data = collectGlobalFormStatePayload();
+  const idx = orgaoProfiles.value.findIndex((p) => String(p.id) === String(selectedOrgaoProfileId.value || ''));
+  if (idx >= 0) {
+    orgaoProfiles.value[idx] = { ...orgaoProfiles.value[idx], name, data };
+  } else {
+    const id = String(Date.now());
+    orgaoProfiles.value.push({ id, name, data });
+    selectedOrgaoProfileId.value = id;
+  }
+  persistOrgaoProfiles();
+  return true;
+}
+
+function deleteOrgaoProfile() {
+  const id = String(selectedOrgaoProfileId.value || '');
+  if (!id) return;
+  orgaoProfiles.value = orgaoProfiles.value.filter((p) => String(p.id) !== id);
+  persistOrgaoProfiles();
+  selectedOrgaoProfileId.value = '';
+  orgaoProfileName.value = '';
 }
 function toBlobUrl(base64, mimeType) {
   if (!base64) return '';
@@ -869,6 +958,7 @@ async function onApplyFixedData() {
   drawerOpen.value = false;
 }
 onMounted(async () => {
+  loadOrgaoProfiles();
   await loadUserGlobalPreset();
   await loadSlotCatalogSuggestions();
 });

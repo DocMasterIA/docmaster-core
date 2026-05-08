@@ -331,10 +331,17 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 1rem;
   margin-bottom: 0.5rem;
   font-size: 0.75rem;
   font-weight: 600;
   color: #64748b;
+}
+
+.da75-item-head > span:first-child {
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding-right: 0.25rem;
 }
 
 .da75-link-remove {

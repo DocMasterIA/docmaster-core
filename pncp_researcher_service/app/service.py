@@ -1898,13 +1898,13 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                 else:
                     ref_fit -= 2.0
             row_value = _safe_float(it.get("valor_unitario") or it.get("valor_total") or it.get("valor_global"))
+            # Regra rígida: nunca considerar item com preço zerado/ausente.
+            if row_value <= 0:
+                continue
             if faixa_min is not None and faixa_max is not None:
-                # Regressão evitada: faixa de referência não deve barrar item válido.
-                # Ela orienta o ranking; fora da faixa recebe penalidade.
-                if row_value <= 0:
-                    ref_fit -= 6.0
-                elif row_value < faixa_min or row_value > faixa_max:
-                    ref_fit -= 22.0
+                # Regra de negócio: com valor base + variação informados, faixa é obrigatória.
+                if row_value < faixa_min or row_value > faixa_max:
+                    continue
             if ref_value > 0 and row_value > 0:
                 v_dev = abs(row_value - ref_value) / max(ref_value, 1e-9)
                 if v_dev <= 0.25:
@@ -1945,6 +1945,11 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         fallback_agressivo = _score_candidates(itens, mode="aggressive")
         fallback_agressivo_usado = bool(fallback_agressivo)
         scored = _merge_unique_items(scored, fallback_agressivo)
+
+    # Blindagem final: remove qualquer item sem preço válido e, quando houver faixa, mantém só itens dentro.
+    scored = [x for x in scored if _row_price_for_faixa(x) > 0.0]
+    if faixa_min is not None and faixa_max is not None:
+        scored = [x for x in scored if _preco_dentro_faixa(x, faixa_min, faixa_max)]
 
     # Reescala para ampliar separação entre bons e ruins no conjunto atual.
     if scored:
@@ -2081,6 +2086,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             hi=faixa_max,
             termo_busca=payload.termo_busca,
         )
+        # Segurança extra no retorno final.
+        top3 = [x for x in top3 if _preco_dentro_faixa(x, faixa_min, faixa_max)]
 
     for row in top3:
         apply_item_display_cleanup(row)

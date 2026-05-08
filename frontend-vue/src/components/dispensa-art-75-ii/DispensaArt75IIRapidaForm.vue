@@ -353,35 +353,45 @@ function slotsOverrideWithoutClauseDraft(raw) {
   return Object.keys(o).length ? o : null;
 }
 
-/** Preenche objeto e justificativa (RAG + fallback) só em memória, para o merge nos DOCX. */
+/** Preenche objeto e justificativa via RAG (com retry), para o merge nos DOCX. */
 async function preencherObjetoEJustificativaInterno() {
   const contratado = String(objetoContratado.value || '').trim();
   objetoGerado.value = '';
   justificativa.value = '';
-  try {
-    const res = await fetch(`${API_BASE}/api/documentos/fill-tr-slots`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        user_prompt: buildUserPrompt(),
-        slots_override: slotsOverrideWithoutClauseDraft(buildSlotsOverride()),
-        slot_package_key: slotPackageKey.value,
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.ok) {
-      throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
+  const fillUrl = `${API_BASE}/api/documentos/fill-tr-slots`;
+  const requestInit = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({
+      user_prompt: buildUserPrompt(),
+      slots_override: slotsOverrideWithoutClauseDraft(buildSlotsOverride()),
+      slot_package_key: slotPackageKey.value,
+    }),
+  };
+  let lastErr = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const res = await fetch(fillUrl, requestInit);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
+      }
+      const slots = data.slots && typeof data.slots === 'object' ? data.slots : {};
+      const obj = String(slots.objeto || '').trim();
+      const jus = String(slots.justificativa || '').trim();
+      if (!obj || !jus) {
+        throw new Error('IA não retornou objeto/justificativa completos.');
+      }
+      objetoGerado.value = obj;
+      justificativa.value = jus;
+      return;
+    } catch (err) {
+      lastErr = err;
+      if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 700));
     }
-    const slots = data.slots && typeof data.slots === 'object' ? data.slots : {};
-    const obj = String(slots.objeto || '').trim();
-    const jus = String(slots.justificativa || '').trim();
-    objetoGerado.value = obj || gerarObjetoTexto(contratado, '', '');
-    justificativa.value = jus || gerarJustificativaTexto(contratado, '', '');
-  } catch (_e) {
-    objetoGerado.value = gerarObjetoTexto(contratado, '', '');
-    justificativa.value = gerarJustificativaTexto(contratado, '', '');
   }
+  throw new Error(String(lastErr?.message || 'Falha ao gerar cláusulas via IA.'));
 }
 
 function toBlobUrl(base64, mimeType) {

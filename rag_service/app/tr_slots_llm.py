@@ -929,12 +929,12 @@ def _normalize_objeto(text: str) -> str:
             use_template = True
 
         if use_template and base_for_clause:
-            natureza = "aquisição"
+            natureza = "Aquisição"
             if re.search(r"(?i)\b(servi[çc]o|manuten[çc][aã]o|loca[çc][aã]o|obra|engenharia)\b", base_for_clause):
-                natureza = "contratação"
+                natureza = "Contratação"
             text = (
-                f"O objeto do presente Termo de Referência é a {natureza} de {base_for_clause}, "
-                "para atendimento de necessidade administrativa do órgão requisitante."
+                f"{natureza} de {base_for_clause}, conforme especificações técnicas, "
+                "quantitativos e demais condições estabelecidas neste Termo de Referência."
             )
 
     # Remove reticências/múltiplos pontos e outros sinais fortes no final
@@ -963,8 +963,11 @@ def _expand_objeto_if_too_short(text: str) -> str:
     if not base:
         base = t
 
-    # Reescrita mínima para evitar objeto "quebrado", sem impor template rígido.
-    return f"O objeto do presente Termo de Referência é {base}."
+    # Reescrita mínima, mantendo padrão objetivo do fluxo.
+    return (
+        f"Aquisição de {base}, conforme especificações técnicas, quantitativos e demais "
+        "condições estabelecidas neste Termo de Referência."
+    )
 
 
 def _enforce_objeto_semantic_consistency(text: str) -> str:
@@ -1781,7 +1784,8 @@ async def fill_tr_slots_with_llm(
             llm_slots.objeto = _normalize_objeto(objeto_fallback) or objeto_fallback
         else:
             llm_slots.objeto = _normalize_objeto(
-                f"O objeto do presente Termo de Referência é {objeto_fallback.strip().rstrip('.;')}."
+                f"Aquisição de {objeto_fallback.strip().rstrip('.;')}, conforme especificações técnicas, "
+                "quantitativos e demais condições estabelecidas neste Termo de Referência."
             ) or objeto_fallback
 
     # Etapas de reescrita da cláusula de objeto podem custar múltiplas chamadas LLM;

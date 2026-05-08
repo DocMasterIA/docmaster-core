@@ -431,7 +431,7 @@ const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
 const ORGAO_PROFILES_STORAGE_KEY = 'orgao_profiles_v1';
 const cabecalhoOptions = ref([]);
 const tratamentoNome = ['Ao senhor', 'A senhora'];
-const tratamentoCargo = ['Senhor', 'Senhora'];
+const tratamentoCargo = ['Senhor Gestor', 'Senhora Gestora'];
 const objetoEspecificoOptions = [
   'Aquisicao de bens/produtos',
   'Fornecimento de pecas',
@@ -1084,7 +1084,14 @@ function buildSlotsOverride() {
   if (cnpj.value.trim()) o.cnpj_fornecedor = cnpj.value.trim();
   if (valorGlobal.value.trim()) o.valor_total = valorGlobal.value.trim();
   if (fixoTratNome.value.trim()) o.ao_senhor_genero = fixoTratNome.value.trim();
-  if (fixoTratCargo.value.trim()) o.senhor_senhora_genero = fixoTratCargo.value.trim();
+  const tratamentoCargoOficio = String(fixoTratCargo.value || '').trim();
+  if (tratamentoCargoOficio) {
+    // Compatibilidade com presets antigos que salvavam apenas "Senhor/Senhora".
+    const normalizado = tratamentoCargoOficio === 'Senhor'
+      ? 'Senhor Gestor'
+      : (tratamentoCargoOficio === 'Senhora' ? 'Senhora Gestora' : tratamentoCargoOficio);
+    o.senhor_senhora_genero = normalizado;
+  }
 
   const fundamentoLegal = SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE[logicalRouteName.value];
   if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;

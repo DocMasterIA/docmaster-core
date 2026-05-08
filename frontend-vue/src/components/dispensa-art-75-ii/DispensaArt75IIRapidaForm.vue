@@ -30,10 +30,10 @@
                   <div class="da75-field">
                     <label class="da75-label da75-label--compact">Órgão / unidade</label>
                     <input
-                      v-model="orgao"
+                      :value="orgaoReflexoCadastro"
                       class="da75-input da75-input--sm"
-                      list="da75-dl-orgao"
-                      placeholder="Digite o órgão (use Dados fixos para sugestões)"
+                      placeholder="Selecione um órgão cadastrado nos Dados fixos"
+                      readonly
                     />
                   </div>
                   <label class="da75-check da75-check--inline">
@@ -230,6 +230,12 @@ const processoAtivo = ref(false);
 const processo = ref('');
 const orgao = ref('');
 const dadosFixos = useDispensaArt75IIDadosFixos(API_BASE, { cabecalho, processoAtivo, processo, orgao });
+const orgaoReflexoCadastro = computed(() => {
+  const id = String(dadosFixos.selectedOrgaoProfileId || '');
+  if (!id) return '';
+  const hit = (dadosFixos.orgaoProfiles || []).find((p) => String(p.id) === id);
+  return String(hit?.data?.orgao || '').trim();
+});
 const objetoContratado = ref('');
 const objetoGerado = ref('');
 const justificativa = ref('');
@@ -296,7 +302,7 @@ const cabecalhoMergeTemplateId = computed(() => {
 });
 
 const secoes = computed(() => {
-  const orgaoLabel = orgao.value || '';
+  const orgaoLabel = orgaoReflexoCadastro.value || '';
   return [
     {
       titulo: 'Dados básicos',
@@ -482,7 +488,7 @@ function buildUserPrompt() {
   return [
     `Gerar documento com base nos dados preenchidos para ${String(route.meta?.title || 'dispensa rapida')}.`,
     `Cabeçalho do documento: ${cabecalho.value || 'Não informado'}`,
-    `Órgão: ${orgao.value || 'Não informado'}`,
+    `Órgão: ${orgaoReflexoCadastro.value || 'Não informado'}`,
     `Processo: ${processoAtivo.value ? (processo.value || 'Não informado') : 'Não se aplica'}`,
     `Objeto (o que será contratado): ${objetoContratado.value || 'Não informado'}`,
     `Cotação: ${cotacaoAtiva.value ? (numeroCotacao.value || 'Não informada') : 'Não se aplica'}`,

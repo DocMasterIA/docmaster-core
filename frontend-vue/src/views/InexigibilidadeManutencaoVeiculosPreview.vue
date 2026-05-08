@@ -37,11 +37,7 @@
                   </div>
                   <div class="ixp-field">
                     <label>Orgao / Unidade</label>
-                    <input
-                      v-model="orgao"
-                      list="dl-orgao"
-                      placeholder="Digite o orgao"
-                    />
+                    <input :value="orgaoReflexoCadastro" placeholder="Selecione um orgao cadastrado nos Dados fixos" readonly />
                   </div>
                   <div v-if="isFornecedorExclusivoRoute" class="ixp-field">
                     <label>Orgao / Unidade responsavel pelo equipamento</label>
@@ -568,6 +564,12 @@ const slotFieldOptions = reactive({});
 const orgaoProfiles = ref([]);
 const selectedOrgaoProfileId = ref('');
 const orgaoProfileName = ref('');
+const orgaoReflexoCadastro = computed(() => {
+  const id = String(selectedOrgaoProfileId.value || '');
+  if (!id) return '';
+  const hit = orgaoProfiles.value.find((p) => String(p.id) === id);
+  return String(hit?.data?.orgao || '').trim();
+});
 const orgaoOptionsFromProfiles = computed(() => {
   const values = orgaoProfiles.value
     .map((p) => String(p?.data?.orgao || '').trim())
@@ -972,7 +974,7 @@ function buildSlotsOverride() {
   if (solRespNome) o.sol_oficio_responsavel_nome = solRespNome;
   if (solRespCargo) o.sol_oficio_responsavel_cargo = solRespCargo;
 
-  const setor = (fixoSetor.value || orgao.value).trim();
+  const setor = (fixoSetor.value || orgaoReflexoCadastro.value).trim();
   if (setor) {
     o.secretaria_usuario = setor;
     o.dfd_setor_requisitante = setor;
@@ -1061,9 +1063,9 @@ function buildSlotsOverride() {
     if (orgaoUnidadeVeiculo.value.trim()) o.orgao = orgaoUnidadeVeiculo.value.trim();
   } else if (isFornecedorExclusivoRoute.value) {
     if (orgaoResponsavelEquipamento.value.trim()) o.orgao = orgaoResponsavelEquipamento.value.trim();
-    else if (orgao.value.trim()) o.orgao = orgao.value.trim();
-  } else if (orgao.value.trim()) {
-    o.orgao = orgao.value.trim();
+    else if (orgaoReflexoCadastro.value.trim()) o.orgao = orgaoReflexoCadastro.value.trim();
+  } else if (orgaoReflexoCadastro.value.trim()) {
+    o.orgao = orgaoReflexoCadastro.value.trim();
   }
   const objetoEspecificoFinal = (
     objetoEspecifico.value === 'Outro'
@@ -1335,14 +1337,14 @@ const secoes = computed(() => {
       completo: (
         isFilled(cabecalhoDocumento.value)
         && (!processoAtivo.value || isFilled(processo.value))
-        && isFilled(orgao.value)
+        && isFilled(orgaoReflexoCadastro.value)
         && (!isFornecedorExclusivoRoute.value || isFilled(orgaoResponsavelEquipamento.value))
         && (!isInexigibilidadeManutencaoRoute.value || isFilled(orgaoUnidadeVeiculo.value))
       ),
       linhas: [
         ['Cabecalho', cabecalhoDocumento.value || 'Nao informado', isFilled(cabecalhoDocumento.value)],
         ['Processo', processoAtivo.value ? processo.value || 'Nao informado' : 'Nao se aplica', !processoAtivo.value || isFilled(processo.value)],
-        ['Orgao', orgao.value || 'Nao informado', isFilled(orgao.value)],
+        ['Orgao', orgaoReflexoCadastro.value || 'Nao informado', isFilled(orgaoReflexoCadastro.value)],
         ...(isFornecedorExclusivoRoute.value
           ? [['Orgao / Unidade responsavel pelo equipamento', orgaoResponsavelEquipamento.value || 'Nao informado', isFilled(orgaoResponsavelEquipamento.value)]]
           : []),

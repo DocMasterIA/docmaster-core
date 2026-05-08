@@ -1083,10 +1083,8 @@ function buildSlotsOverride() {
   if (fornecedor.value.trim()) o.fornecedor = fornecedor.value.trim();
   if (cnpj.value.trim()) o.cnpj_fornecedor = cnpj.value.trim();
   if (valorGlobal.value.trim()) o.valor_total = valorGlobal.value.trim();
-  if (logicalRouteName.value === 'InexigibilidadeArt74IManutencaoVeiculosPreview') {
-    if (fixoTratNome.value.trim()) o.ao_senhor_genero = fixoTratNome.value.trim();
-    if (fixoTratCargo.value.trim()) o.senhor_senhora_genero = fixoTratCargo.value.trim();
-  }
+  if (fixoTratNome.value.trim()) o.ao_senhor_genero = fixoTratNome.value.trim();
+  if (fixoTratCargo.value.trim()) o.senhor_senhora_genero = fixoTratCargo.value.trim();
 
   const fundamentoLegal = SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE[logicalRouteName.value];
   if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;
@@ -1320,6 +1318,13 @@ async function onSubmit() {
 }
 async function onApplyFixedData() {
   await saveUserGlobalPreset();
+  {
+    const current = String(orgao.value || '').trim();
+    if (current) {
+      const allowed = new Set((mergedOrgaoOptions.value || []).map((x) => String(x || '').trim()).filter(Boolean));
+      if (!allowed.has(current)) orgao.value = '';
+    }
+  }
   drawerOpen.value = false;
 }
 onMounted(async () => {
@@ -1327,6 +1332,13 @@ onMounted(async () => {
   await loadUserGlobalPreset();
   await loadCabecalhoOptions();
   await loadSlotCatalogSuggestions();
+  {
+    const current = String(orgao.value || '').trim();
+    if (current) {
+      const allowed = new Set((mergedOrgaoOptions.value || []).map((x) => String(x || '').trim()).filter(Boolean));
+      if (!allowed.has(current)) orgao.value = '';
+    }
+  }
 });
 onBeforeUnmount(() => {
   revokeDocumentUrls();

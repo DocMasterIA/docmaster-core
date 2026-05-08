@@ -139,6 +139,10 @@ def render_oficio_from_slots(
     doc = Document(str(tpl_path))
 
     mapping = {
+        "(AO_SENHOR_GENERO)": slots.ao_senhor_genero or "",
+        "( AO_SENHOR_GENERO )": slots.ao_senhor_genero or "",
+        "(SENHOR_SENHORA_GENERO)": slots.senhor_senhora_genero or "",
+        "( SENHOR_SENHORA_GENERO )": slots.senhor_senhora_genero or "",
         "(SOL_OFICIO_ARTIGO_INCISO)": slots.sol_oficio_artigo_inciso or "",
         "(SOL_OFICIO_DESTINATARIO_NOME)": slots.sol_oficio_destinatario_nome or "",
         "(SOL_OFICIO_DESTINATARIO_CARGO)": slots.sol_oficio_destinatario_cargo or "",

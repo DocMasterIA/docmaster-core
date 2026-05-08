@@ -250,6 +250,13 @@ watch(dotacaoAtiva, (v) => {
 onMounted(async () => {
   await dadosFixos.loadUserGlobalPreset();
   await dadosFixos.loadSlotCatalogSuggestions();
+  {
+    const current = String(orgao.value || '').trim();
+    if (current) {
+      const allowed = new Set((dadosFixos.mergedOrgaoOptions || []).map((x) => String(x || '').trim()).filter(Boolean));
+      if (!allowed.has(current)) orgao.value = '';
+    }
+  }
   cabecalhosLoading.value = true;
   try {
     const opts = await fetchCabecalhosPrefeitura(API_BASE);
@@ -262,6 +269,13 @@ onMounted(async () => {
 
 function onApplyDadosFixos() {
   void dadosFixos.saveUserGlobalPreset();
+  {
+    const current = String(orgao.value || '').trim();
+    if (current) {
+      const allowed = new Set((dadosFixos.mergedOrgaoOptions || []).map((x) => String(x || '').trim()).filter(Boolean));
+      if (!allowed.has(current)) orgao.value = '';
+    }
+  }
   drawerAberto.value = false;
 }
 

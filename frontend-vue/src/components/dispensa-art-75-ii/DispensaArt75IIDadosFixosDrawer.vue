@@ -54,17 +54,6 @@
               <div class="ixp-field ixp-col-2">
                 <label>1.1 A quem é direcionada a solicitação — Nome</label>
                 <input v-model="ctx.fixoNome" list="da75-dl-solicitacao-destinatario-nome" placeholder="Digite o nome" />
-                <div class="ixp-inline-actions">
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('solicitacao_destinatario_nome', ctx.fixoNome)">Adicionar</button>
-                  <button
-                    type="button"
-                    class="ixp-btn-secondary ixp-btn-xs"
-                    :disabled="!ctx.canDeleteFieldHistory('solicitacao_destinatario_nome', ctx.fixoNome)"
-                    @click="ctx.removeFieldHistory('solicitacao_destinatario_nome', ctx.fixoNome)"
-                  >
-                    Excluir
-                  </button>
-                </div>
               </div>
             </div>
             <div class="ixp-grid-3">
@@ -78,17 +67,6 @@
               <div class="ixp-field ixp-col-2">
                 <label>1.2 A quem é direcionada a solicitação — Função / Cargo</label>
                 <input v-model="ctx.fixoCargo" list="da75-dl-solicitacao-destinatario-cargo" placeholder="Digite a função ou cargo" />
-                <div class="ixp-inline-actions">
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('solicitacao_destinatario_cargo', ctx.fixoCargo)">Adicionar</button>
-                  <button
-                    type="button"
-                    class="ixp-btn-secondary ixp-btn-xs"
-                    :disabled="!ctx.canDeleteFieldHistory('solicitacao_destinatario_cargo', ctx.fixoCargo)"
-                    @click="ctx.removeFieldHistory('solicitacao_destinatario_cargo', ctx.fixoCargo)"
-                  >
-                    Excluir
-                  </button>
-                </div>
               </div>
             </div>
             <h4 class="ixp-subsection-title">1.3 Responsável pela solicitação</h4>
@@ -96,32 +74,10 @@
               <div class="ixp-field">
                 <label>Nome do responsável</label>
                 <input v-model="ctx.fixoResponsavel" list="da75-dl-solicitacao-responsavel-nome" placeholder="Digite o nome do responsável" />
-                <div class="ixp-inline-actions">
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('solicitacao_responsavel_nome', ctx.fixoResponsavel)">Adicionar</button>
-                  <button
-                    type="button"
-                    class="ixp-btn-secondary ixp-btn-xs"
-                    :disabled="!ctx.canDeleteFieldHistory('solicitacao_responsavel_nome', ctx.fixoResponsavel)"
-                    @click="ctx.removeFieldHistory('solicitacao_responsavel_nome', ctx.fixoResponsavel)"
-                  >
-                    Excluir
-                  </button>
-                </div>
               </div>
               <div class="ixp-field">
                 <label>Função / Cargo</label>
                 <input v-model="ctx.fixoResponsavelCargo" list="da75-dl-solicitacao-responsavel-cargo" placeholder="Digite o cargo" />
-                <div class="ixp-inline-actions">
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('solicitacao_responsavel_cargo', ctx.fixoResponsavelCargo)">Adicionar</button>
-                  <button
-                    type="button"
-                    class="ixp-btn-secondary ixp-btn-xs"
-                    :disabled="!ctx.canDeleteFieldHistory('solicitacao_responsavel_cargo', ctx.fixoResponsavelCargo)"
-                    @click="ctx.removeFieldHistory('solicitacao_responsavel_cargo', ctx.fixoResponsavelCargo)"
-                  >
-                    Excluir
-                  </button>
-                </div>
               </div>
             </div>
           </div>
@@ -133,53 +89,32 @@
             <div class="ixp-field">
               <label>2.1 Setor requisitante (Unidade / Setor / Departamento)</label>
               <input v-model="ctx.fixoSetor" list="da75-dl-dfd-setor-requisitante" />
-              <div class="ixp-inline-actions">
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('dfd_setor_requisitante', ctx.fixoSetor)">Adicionar</button>
-              </div>
             </div>
             <div class="ixp-field">
               <label>2.2 Responsável pela demanda</label>
               <input v-model="ctx.fixoDemanda" list="da75-dl-dfd-responsavel-demanda" />
-              <div class="ixp-inline-actions">
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('dfd_responsavel_demanda', ctx.fixoDemanda)">Adicionar</button>
-              </div>
             </div>
             <div class="ixp-field">
               <label>2.3 E-mail</label>
               <input v-model="ctx.fixoEmail" list="da75-dl-dfd-email" />
-              <div class="ixp-inline-actions">
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('dfd_email', ctx.fixoEmail)">Adicionar</button>
-              </div>
             </div>
             <div class="ixp-field">
               <label>2.4 Nome do(a) gestor(a) de contratos</label>
               <input v-model="ctx.fixoGestor" list="da75-dl-dfd-gestor-contratos" />
-              <div class="ixp-inline-actions">
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('dfd_gestor_contratos', ctx.fixoGestor)">Adicionar</button>
-              </div>
             </div>
             <div class="ixp-field">
               <label>2.5 Nome do(a) fiscal de contratos</label>
               <input v-model="ctx.fixoFiscal" list="da75-dl-dfd-fiscal-contratos" />
-              <div class="ixp-inline-actions">
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('dfd_fiscal_contratos', ctx.fixoFiscal)">Adicionar</button>
-              </div>
             </div>
             <h4 class="ixp-subsection-title">2.6 Responsável pela assinatura do DFD</h4>
             <div class="ixp-grid-2">
               <div class="ixp-field">
                 <label>Nome do responsável</label>
                 <input v-model="ctx.fixoAssinatura" list="da75-dl-dfd-assinatura-nome" placeholder="Digite o nome do responsável" />
-                <div class="ixp-inline-actions">
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('dfd_assinatura_nome', ctx.fixoAssinatura)">Adicionar</button>
-                </div>
               </div>
               <div class="ixp-field">
                 <label>Função / Cargo</label>
                 <input v-model="ctx.fixoAssinaturaCargo" list="da75-dl-dfd-assinatura-cargo" placeholder="Digite o cargo" />
-                <div class="ixp-inline-actions">
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('dfd_assinatura_cargo', ctx.fixoAssinaturaCargo)">Adicionar</button>
-                </div>
               </div>
             </div>
           </div>
@@ -192,31 +127,19 @@
               <label>Endereço presencial para envio ou entrega de propostas</label>
               <textarea v-model="ctx.fixoEnderecoEntrega" rows="3" />
               <p class="ixp-hint">Texto pré-preenchido e editável. Ajuste município, UF, endereço e horário conforme o órgão.</p>
-              <div class="ixp-inline-actions">
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('tr_endereco_entrega_propostas', ctx.fixoEnderecoEntrega)">Adicionar</button>
-              </div>
             </div>
             <div class="ixp-field">
               <label>E-mail para recebimento de propostas</label>
               <input v-model="ctx.fixoEmailPropostas" list="da75-dl-tr-email-propostas" placeholder="Ex: propostas@municipio.go.gov.br" />
-              <div class="ixp-inline-actions">
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('tr_email_recebimento_propostas', ctx.fixoEmailPropostas)">Adicionar</button>
-              </div>
             </div>
             <div class="ixp-grid-2">
               <div class="ixp-field">
                 <label>Responsável pelo Termo de Referência — Nome</label>
                 <input v-model="ctx.fixoTrResponsavelNome" list="da75-dl-tr-resp-nome" />
-                <div class="ixp-inline-actions">
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('tr_termo_responsavel_nome', ctx.fixoTrResponsavelNome)">Adicionar</button>
-                </div>
               </div>
               <div class="ixp-field">
                 <label>Cargo / Função</label>
                 <input v-model="ctx.fixoTrResponsavelCargo" list="da75-dl-tr-resp-cargo" />
-                <div class="ixp-inline-actions">
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('tr_termo_responsavel_cargo', ctx.fixoTrResponsavelCargo)">Adicionar</button>
-                </div>
               </div>
             </div>
           </div>

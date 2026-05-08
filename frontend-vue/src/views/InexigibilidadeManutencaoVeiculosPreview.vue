@@ -300,9 +300,6 @@
               <div class="ixp-field ixp-col-2">
                 <label>1.1 A quem e direcionada a solicitacao — Nome</label>
                 <input v-model="fixoNome" list="dl-solicitacao-destinatario-nome" placeholder="Digite o nome" />
-                <div class="ixp-inline-actions">
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('solicitacao_destinatario_nome', fixoNome)">Adicionar</button>
-                </div>
               </div>
             </div>
             <div class="ixp-grid-3">
@@ -310,9 +307,6 @@
               <div class="ixp-field ixp-col-2">
                 <label>1.2 A quem e direcionada a solicitacao — Funcao / Cargo</label>
                 <input v-model="fixoCargo" list="dl-solicitacao-destinatario-cargo" placeholder="Digite a funcao ou cargo" />
-                <div class="ixp-inline-actions">
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('solicitacao_destinatario_cargo', fixoCargo)">Adicionar</button>
-                </div>
               </div>
             </div>
             <h4 class="ixp-subsection-title">1.3 Responsável pela solicitação</h4>
@@ -320,16 +314,10 @@
               <div class="ixp-field">
                 <label>Nome do responsavel</label>
                 <input v-model="fixoResponsavel" list="dl-solicitacao-responsavel-nome" placeholder="Digite o nome do responsavel" />
-                <div class="ixp-inline-actions">
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('solicitacao_responsavel_nome', fixoResponsavel)">Adicionar</button>
-                </div>
               </div>
               <div class="ixp-field">
                 <label>Funcao / Cargo</label>
                 <input v-model="fixoResponsavelCargo" list="dl-solicitacao-responsavel-cargo" placeholder="Digite o cargo" />
-                <div class="ixp-inline-actions">
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('solicitacao_responsavel_cargo', fixoResponsavelCargo)">Adicionar</button>
-                </div>
               </div>
             </div>
           </div>
@@ -340,53 +328,32 @@
             <div class="ixp-field">
               <label>2.1 Setor requisitante (Unidade / Setor / Departamento)</label>
               <input v-model="fixoSetor" list="dl-dfd-setor-requisitante" />
-              <div class="ixp-inline-actions">
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_setor_requisitante', fixoSetor)">Adicionar</button>
-              </div>
             </div>
             <div class="ixp-field">
               <label>2.2 Responsavel pela demanda</label>
               <input v-model="fixoDemanda" list="dl-dfd-responsavel-demanda" />
-              <div class="ixp-inline-actions">
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_responsavel_demanda', fixoDemanda)">Adicionar</button>
-              </div>
             </div>
             <div class="ixp-field">
               <label>2.3 E-mail</label>
               <input v-model="fixoEmail" list="dl-dfd-email" />
-              <div class="ixp-inline-actions">
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_email', fixoEmail)">Adicionar</button>
-              </div>
             </div>
             <div class="ixp-field">
               <label>2.4 Nome do(a) gestor(a) de contratos</label>
               <input v-model="fixoGestor" list="dl-dfd-gestor-contratos" />
-              <div class="ixp-inline-actions">
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_gestor_contratos', fixoGestor)">Adicionar</button>
-              </div>
             </div>
             <div class="ixp-field">
               <label>2.5 Nome do(a) fiscal de contratos</label>
               <input v-model="fixoFiscal" list="dl-dfd-fiscal-contratos" />
-              <div class="ixp-inline-actions">
-                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_fiscal_contratos', fixoFiscal)">Adicionar</button>
-              </div>
             </div>
             <h4 class="ixp-subsection-title">2.6 Responsável pela assinatura do DFD</h4>
             <div class="ixp-grid-2">
               <div class="ixp-field">
                 <label>Nome do responsavel</label>
                 <input v-model="fixoAssinatura" list="dl-dfd-assinatura-nome" placeholder="Digite o nome do responsavel" />
-                <div class="ixp-inline-actions">
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_assinatura_nome', fixoAssinatura)">Adicionar</button>
-                </div>
               </div>
               <div class="ixp-field">
                 <label>Funcao / Cargo</label>
                 <input v-model="fixoAssinaturaCargo" list="dl-dfd-assinatura-cargo" placeholder="Digite o cargo" />
-                <div class="ixp-inline-actions">
-                  <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="addFieldHistory('dfd_assinatura_cargo', fixoAssinaturaCargo)">Adicionar</button>
-                </div>
               </div>
             </div>
           </div>
@@ -431,7 +398,7 @@ const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
 const ORGAO_PROFILES_STORAGE_KEY = 'orgao_profiles_v1';
 const cabecalhoOptions = ref([]);
 const tratamentoNome = ['Ao senhor', 'A senhora'];
-const tratamentoCargo = ['Senhor Gestor', 'Senhora Gestora'];
+const tratamentoCargo = ['Senhor', 'Senhora'];
 const objetoEspecificoOptions = [
   'Aquisicao de bens/produtos',
   'Fornecimento de pecas',
@@ -1084,14 +1051,7 @@ function buildSlotsOverride() {
   if (cnpj.value.trim()) o.cnpj_fornecedor = cnpj.value.trim();
   if (valorGlobal.value.trim()) o.valor_total = valorGlobal.value.trim();
   if (fixoTratNome.value.trim()) o.ao_senhor_genero = fixoTratNome.value.trim();
-  const tratamentoCargoOficio = String(fixoTratCargo.value || '').trim();
-  if (tratamentoCargoOficio) {
-    // Compatibilidade com presets antigos que salvavam apenas "Senhor/Senhora".
-    const normalizado = tratamentoCargoOficio === 'Senhor'
-      ? 'Senhor Gestor'
-      : (tratamentoCargoOficio === 'Senhora' ? 'Senhora Gestora' : tratamentoCargoOficio);
-    o.senhor_senhora_genero = normalizado;
-  }
+  if (fixoTratCargo.value.trim()) o.senhor_senhora_genero = fixoTratCargo.value.trim();
 
   const fundamentoLegal = SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE[logicalRouteName.value];
   if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;

@@ -259,9 +259,6 @@
               <div class="fe-field fe-col-2">
                 <label>1.1 A quem é direcionada a solicitação — Nome</label>
                 <input v-model="nome" list="dl-solicitacao-destinatario-nome" />
-                <div class="fe-inline-actions">
-                  <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('solicitacao_destinatario_nome', nome)">Adicionar</button>
-                </div>
               </div>
             </div>
             <div class="fe-grid-3">
@@ -272,9 +269,6 @@
               <div class="fe-field fe-col-2">
                 <label>1.2 A quem é direcionada a solicitação — Função/Cargo</label>
                 <input v-model="cargo" list="dl-solicitacao-destinatario-cargo" />
-                <div class="fe-inline-actions">
-                  <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('solicitacao_destinatario_cargo', cargo)">Adicionar</button>
-                </div>
               </div>
             </div>
             <h4 class="fe-subsection-title">1.3 Responsável pela solicitação</h4>
@@ -282,16 +276,10 @@
               <div class="fe-field">
                 <label>Nome do responsável</label>
                 <input v-model="fixoResponsavel" list="dl-solicitacao-responsavel-nome" placeholder="Digite o nome do responsável" />
-                <div class="fe-inline-actions">
-                  <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('solicitacao_responsavel_nome', fixoResponsavel)">Adicionar</button>
-                </div>
               </div>
               <div class="fe-field">
                 <label>Função / Cargo</label>
                 <input v-model="fixoResponsavelCargo" list="dl-solicitacao-responsavel-cargo" placeholder="Digite a função ou cargo" />
-                <div class="fe-inline-actions">
-                  <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('solicitacao_responsavel_cargo', fixoResponsavelCargo)">Adicionar</button>
-                </div>
               </div>
             </div>
           </div>
@@ -302,53 +290,32 @@
             <div class="fe-field">
               <label>2.1 Setor requisitante (Unidade / Setor / Departamento)</label>
               <input v-model="fixoSetor" list="dl-dfd-setor-requisitante" />
-              <div class="fe-inline-actions">
-                <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_setor_requisitante', fixoSetor)">Adicionar</button>
-              </div>
             </div>
             <div class="fe-field">
               <label>2.2 Responsável pela demanda</label>
               <input v-model="fixoDemanda" list="dl-dfd-responsavel-demanda" />
-              <div class="fe-inline-actions">
-                <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_responsavel_demanda', fixoDemanda)">Adicionar</button>
-              </div>
             </div>
             <div class="fe-field">
               <label>2.3 E-mail</label>
               <input v-model="fixoEmail" list="dl-dfd-email" />
-              <div class="fe-inline-actions">
-                <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_email', fixoEmail)">Adicionar</button>
-              </div>
             </div>
             <div class="fe-field">
               <label>2.4 Nome do(a) gestor(a) de contratos</label>
               <input v-model="fixoGestor" list="dl-dfd-gestor-contratos" />
-              <div class="fe-inline-actions">
-                <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_gestor_contratos', fixoGestor)">Adicionar</button>
-              </div>
             </div>
             <div class="fe-field">
               <label>2.5 Nome do(a) fiscal de contratos</label>
               <input v-model="fixoFiscal" list="dl-dfd-fiscal-contratos" />
-              <div class="fe-inline-actions">
-                <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_fiscal_contratos', fixoFiscal)">Adicionar</button>
-              </div>
             </div>
             <h4 class="fe-subsection-title">2.6 Responsável pela assinatura do DFD</h4>
             <div class="fe-grid-2">
               <div class="fe-field">
                 <label>Nome do responsável</label>
                 <input v-model="fixoAssinatura" list="dl-dfd-assinatura-nome" placeholder="Digite o nome do responsável" />
-                <div class="fe-inline-actions">
-                  <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_assinatura_nome', fixoAssinatura)">Adicionar</button>
-                </div>
               </div>
               <div class="fe-field">
                 <label>Função / Cargo</label>
                 <input v-model="fixoAssinaturaCargo" list="dl-dfd-assinatura-cargo" placeholder="Digite a função ou cargo" />
-                <div class="fe-inline-actions">
-                  <button type="button" class="fe-btn-secondary fe-btn-xs" @click="addFieldHistory('dfd_assinatura_cargo', fixoAssinaturaCargo)">Adicionar</button>
-                </div>
               </div>
             </div>
           </div>

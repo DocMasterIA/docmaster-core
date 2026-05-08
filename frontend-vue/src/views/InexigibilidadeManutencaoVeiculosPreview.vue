@@ -568,11 +568,11 @@ const orgaoReflexoCadastro = computed(() => {
   const id = String(selectedOrgaoProfileId.value || '');
   if (!id) return '';
   const hit = orgaoProfiles.value.find((p) => String(p.id) === id);
-  return String(hit?.data?.orgao || '').trim();
+  return String(hit?.name || '').trim();
 });
 const orgaoOptionsFromProfiles = computed(() => {
   const values = orgaoProfiles.value
-    .map((p) => String(p?.data?.orgao || '').trim())
+    .map((p) => String(p?.name || '').trim())
     .filter(Boolean);
   return [...new Set(values)];
 });
@@ -788,6 +788,7 @@ function saveOrgaoProfile() {
   const name = String(orgaoProfileName.value || '').trim();
   if (!name) return false;
   const data = collectGlobalFormStatePayload();
+  data.orgao = name;
   const orgaoValue = String(data?.orgao || '').trim();
   const idx = orgaoProfiles.value.findIndex((p) => String(p.id) === String(selectedOrgaoProfileId.value || ''));
   if (idx >= 0) {

@@ -234,7 +234,7 @@ const orgaoReflexoCadastro = computed(() => {
   const id = String(dadosFixos.selectedOrgaoProfileId || '');
   if (!id) return '';
   const hit = (dadosFixos.orgaoProfiles || []).find((p) => String(p.id) === id);
-  return String(hit?.data?.orgao || '').trim();
+  return String(hit?.name || '').trim();
 });
 const objetoContratado = ref('');
 const objetoGerado = ref('');

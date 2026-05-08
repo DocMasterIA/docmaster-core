@@ -54,7 +54,7 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
   const orgaoProfileName = ref('');
   const orgaoOptionsFromProfiles = computed(() => {
     const values = orgaoProfiles.value
-      .map((p) => String(p?.data?.orgao || '').trim())
+      .map((p) => String(p?.name || '').trim())
       .filter(Boolean);
     return [...new Set(values)];
   });
@@ -301,6 +301,7 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     const name = String(orgaoProfileName.value || '').trim();
     if (!name) return false;
     const data = createOrgaoProfilePayload();
+    data.orgao = name;
     const orgaoValue = String(data?.orgao || '').trim();
     const existingIdx = orgaoProfiles.value.findIndex((p) => String(p.id) === String(selectedOrgaoProfileId.value || ''));
     if (existingIdx >= 0) {

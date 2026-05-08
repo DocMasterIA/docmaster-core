@@ -281,10 +281,10 @@
               <label>Nome do cadastro</label>
               <input v-model="orgaoProfileName" placeholder="Ex: Fundo Municipal de Saúde" />
             </div>
-            <div class="ixp-inline-actions">
-              <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="newOrgaoProfile">Novo cadastro</button>
-              <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="saveOrgaoProfile">Salvar cadastro</button>
-              <button type="button" class="ixp-btn-secondary ixp-btn-xs" :disabled="!selectedOrgaoProfileId" @click="deleteOrgaoProfile">Excluir cadastro</button>
+            <div class="ixp-inline-actions ixp-orgao-profile-actions">
+              <button type="button" class="ixp-btn-secondary ixp-btn-xs ixp-orgao-btn-new" @click="newOrgaoProfile">Novo cadastro</button>
+              <button type="button" class="ixp-btn-secondary ixp-btn-xs ixp-orgao-btn-save" @click="saveOrgaoProfile">Salvar cadastro</button>
+              <button type="button" class="ixp-btn-secondary ixp-btn-xs ixp-orgao-btn-delete" :disabled="!selectedOrgaoProfileId" @click="deleteOrgaoProfile">Excluir cadastro</button>
             </div>
           </div>
         </article>
@@ -1405,6 +1405,11 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .ixp-btn-secondary { border: 1px solid #cbd5e1; background: #fff; color: #334155; border-radius: 12px; padding: 9px 12px; font-size: 13px; font-weight: 600; }
 .ixp-btn-xs { padding: 6px 10px; font-size: 12px; border-radius: 10px; }
 .ixp-inline-actions { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.ixp-orgao-profile-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; }
+.ixp-orgao-profile-actions > button { width: 100%; padding: 10px 12px; font-size: 13px; border-radius: 10px; }
+.ixp-orgao-btn-save { background: #2563eb; border-color: #2563eb; color: #fff; }
+.ixp-orgao-btn-delete { background: #dc2626; border-color: #dc2626; color: #fff; }
+.ixp-orgao-profile-actions > button:disabled { opacity: 0.6; }
 .ixp-subsection-title { margin: 6px 0 0; font-size: 13px; color: #334155; }
 .ixp-btn-primary { border: 0; background: #2563eb; color: #fff; border-radius: 12px; padding: 10px 14px; font-size: 13px; font-weight: 700; width: fit-content; }
 .ixp-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -1456,6 +1461,10 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .dm-dark-theme .ixp-field input:focus, .dm-dark-theme .ixp-field textarea:focus, .dm-dark-theme .ixp-field select:focus { border-color: #0ea5e9; }
 .dm-dark .ixp-btn-secondary,
 .dm-dark-theme .ixp-btn-secondary { color: #cbd5e1; }
+.dm-dark .ixp-orgao-btn-save,
+.dm-dark-theme .ixp-orgao-btn-save { background: #2563eb; border-color: #2563eb; color: #fff; }
+.dm-dark .ixp-orgao-btn-delete,
+.dm-dark-theme .ixp-orgao-btn-delete { background: #dc2626; border-color: #dc2626; color: #fff; }
 .dm-dark .ixp-choice.is-active,
 .dm-dark-theme .ixp-choice.is-active { border-color: #38bdf8; background: #082f49; }
 .dm-dark .ixp-progress,

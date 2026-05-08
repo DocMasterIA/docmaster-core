@@ -25,12 +25,12 @@
               <label>Nome do cadastro</label>
               <input v-model="ctx.orgaoProfileName" placeholder="Ex: Fundo Municipal de Saúde" />
             </div>
-            <div class="ixp-inline-actions">
-              <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.newOrgaoProfile()">Novo cadastro</button>
-              <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.saveOrgaoProfile()">Salvar cadastro</button>
+            <div class="ixp-inline-actions ixp-orgao-profile-actions">
+              <button type="button" class="ixp-btn-secondary ixp-btn-xs ixp-orgao-btn-new" @click="ctx.newOrgaoProfile()">Novo cadastro</button>
+              <button type="button" class="ixp-btn-secondary ixp-btn-xs ixp-orgao-btn-save" @click="ctx.saveOrgaoProfile()">Salvar cadastro</button>
               <button
                 type="button"
-                class="ixp-btn-secondary ixp-btn-xs"
+                class="ixp-btn-secondary ixp-btn-xs ixp-orgao-btn-delete"
                 :disabled="!ctx.selectedOrgaoProfileId"
                 @click="ctx.deleteOrgaoProfile()"
               >
@@ -409,6 +409,31 @@ defineEmits(['close', 'apply']);
   margin-top: 6px;
   flex-wrap: wrap;
 }
+.ixp-orgao-profile-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+.ixp-orgao-profile-actions > button {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 13px;
+  border-radius: 10px;
+}
+.ixp-orgao-btn-save {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+.ixp-orgao-btn-delete {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+.ixp-orgao-profile-actions > button:disabled {
+  opacity: 0.6;
+}
 .ixp-btn-secondary {
   border: 1px solid #cbd5e1;
   background: #fff;
@@ -512,6 +537,18 @@ defineEmits(['close', 'apply']);
 .dm-dark .ixp-btn-secondary,
 .dm-dark-theme .ixp-btn-secondary {
   color: #cbd5e1;
+}
+.dm-dark .ixp-orgao-btn-save,
+.dm-dark-theme .ixp-orgao-btn-save {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+.dm-dark .ixp-orgao-btn-delete,
+.dm-dark-theme .ixp-orgao-btn-delete {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
 }
 .dm-dark .ixp-overlay,
 .dm-dark-theme .ixp-overlay {

@@ -240,10 +240,10 @@
               <label>Nome do cadastro</label>
               <input v-model="orgaoProfileName" placeholder="Ex: Fundo Municipal de Saúde" />
             </div>
-            <div class="fe-inline-actions">
-              <button type="button" class="fe-btn-secondary fe-btn-xs" @click="newOrgaoProfile">Novo cadastro</button>
-              <button type="button" class="fe-btn-secondary fe-btn-xs" @click="saveOrgaoProfile">Salvar cadastro</button>
-              <button type="button" class="fe-btn-secondary fe-btn-xs" :disabled="!selectedOrgaoProfileId" @click="deleteOrgaoProfile">Excluir cadastro</button>
+            <div class="fe-inline-actions fe-orgao-profile-actions">
+              <button type="button" class="fe-btn-secondary fe-btn-xs fe-orgao-btn-new" @click="newOrgaoProfile">Novo cadastro</button>
+              <button type="button" class="fe-btn-secondary fe-btn-xs fe-orgao-btn-save" @click="saveOrgaoProfile">Salvar cadastro</button>
+              <button type="button" class="fe-btn-secondary fe-btn-xs fe-orgao-btn-delete" :disabled="!selectedOrgaoProfileId" @click="deleteOrgaoProfile">Excluir cadastro</button>
             </div>
           </div>
         </article>
@@ -1069,6 +1069,11 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .fe-btn-secondary { background: #fff; color: #334155; }
 .fe-btn-xs { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
 .fe-inline-actions { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.fe-orgao-profile-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; }
+.fe-orgao-profile-actions > button { width: 100%; padding: 10px 12px; font-size: 13px; border-radius: 8px; }
+.fe-orgao-btn-save { background: #2563eb; border-color: #2563eb; color: #fff; }
+.fe-orgao-btn-delete { background: #dc2626; border-color: #dc2626; color: #fff; }
+.fe-orgao-profile-actions > button:disabled { opacity: 0.6; }
 .fe-actions { display: grid; gap: 8px; }
 .fe-btn-generate { font-weight: 700; letter-spacing: .2px; }
 .fe-error { margin: 0; border: 1px solid #fecaca; background: #fff1f2; color: #b91c1c; border-radius: 8px; padding: 9px 11px; font-size: 13px; }
@@ -1158,6 +1163,10 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 
 .dm-dark .fe-btn-secondary,
 .dm-dark-theme .fe-btn-secondary { color: #cbd5e1; }
+.dm-dark .fe-orgao-btn-save,
+.dm-dark-theme .fe-orgao-btn-save { background: #2563eb; border-color: #2563eb; color: #fff; }
+.dm-dark .fe-orgao-btn-delete,
+.dm-dark-theme .fe-orgao-btn-delete { background: #dc2626; border-color: #dc2626; color: #fff; }
 
 .dm-dark .fe-progress,
 .dm-dark-theme .fe-progress { background: #1e293b; }

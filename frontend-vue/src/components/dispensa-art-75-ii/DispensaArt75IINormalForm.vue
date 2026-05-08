@@ -182,7 +182,7 @@
         />
 
         <datalist id="da75-dl-orgao">
-          <option v-for="v in (dadosFixos.slotFieldOptions.orgao || [])" :key="`o-${v}`" :value="v" />
+          <option v-for="v in (dadosFixos.mergedOrgaoOptions || [])" :key="`o-${v}`" :value="v" />
         </datalist>
         <datalist id="da75-dl-processo-numero">
           <option v-for="v in (dadosFixos.slotFieldOptions.processo_numero || [])" :key="`p-${v}`" :value="v" />

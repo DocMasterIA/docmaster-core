@@ -360,7 +360,7 @@
     </aside>
 
     <datalist id="dl-processo-numero"><option v-for="v in (slotFieldOptions.processo_numero || [])" :key="`pn-${v}`" :value="v" /></datalist>
-    <datalist id="dl-orgao"><option v-for="v in (slotFieldOptions.orgao || [])" :key="`org-${v}`" :value="v" /></datalist>
+    <datalist id="dl-orgao"><option v-for="v in mergedOrgaoOptions" :key="`org-${v}`" :value="v" /></datalist>
     <datalist id="dl-solicitacao-destinatario-nome"><option v-for="v in (slotFieldOptions.solicitacao_destinatario_nome || [])" :key="`sdn-${v}`" :value="v" /></datalist>
     <datalist id="dl-solicitacao-destinatario-cargo"><option v-for="v in (slotFieldOptions.solicitacao_destinatario_cargo || [])" :key="`sdc-${v}`" :value="v" /></datalist>
     <datalist id="dl-solicitacao-responsavel-nome"><option v-for="v in (slotFieldOptions.solicitacao_responsavel_nome || [])" :key="`srn-${v}`" :value="v" /></datalist>
@@ -449,6 +449,16 @@ const slotFieldOptions = reactive({});
 const orgaoProfiles = ref([]);
 const selectedOrgaoProfileId = ref('');
 const orgaoProfileName = ref('');
+const orgaoOptionsFromProfiles = computed(() => {
+  const values = orgaoProfiles.value
+    .map((p) => String(p?.data?.orgao || '').trim())
+    .filter(Boolean);
+  return [...new Set(values)];
+});
+const mergedOrgaoOptions = computed(() => {
+  const catalog = Array.isArray(slotFieldOptions.orgao) ? slotFieldOptions.orgao : [];
+  return [...new Set([...catalog, ...orgaoOptionsFromProfiles.value])];
+});
 const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
 const SLOT_PACKAGE_KEY = 'inexigibilidade_74_i_fornecedor_exclusivo';
 const CATALOG_KEYS = [

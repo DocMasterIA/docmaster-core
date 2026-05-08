@@ -1,4 +1,4 @@
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import {
   TEXTO_PADRAO_ENDERECO_PROPOSTAS,
   TRATAMENTO_CARGO,
@@ -52,6 +52,16 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
   const orgaoProfiles = ref([]);
   const selectedOrgaoProfileId = ref('');
   const orgaoProfileName = ref('');
+  const orgaoOptionsFromProfiles = computed(() => {
+    const values = orgaoProfiles.value
+      .map((p) => String(p?.data?.orgao || '').trim())
+      .filter(Boolean);
+    return [...new Set(values)];
+  });
+  const mergedOrgaoOptions = computed(() => {
+    const catalog = Array.isArray(slotFieldOptions.orgao) ? slotFieldOptions.orgao : [];
+    return [...new Set([...catalog, ...orgaoOptionsFromProfiles.value])];
+  });
 
   const fixoTratNome = ref('');
   const fixoNome = ref('');
@@ -329,6 +339,7 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     orgaoProfiles,
     selectedOrgaoProfileId,
     orgaoProfileName,
+    mergedOrgaoOptions,
     slotFieldOptions,
     tratamentoNome,
     tratamentoCargo,

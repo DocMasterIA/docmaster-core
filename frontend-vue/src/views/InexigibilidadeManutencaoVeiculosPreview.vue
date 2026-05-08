@@ -37,7 +37,7 @@
                   </div>
                   <div class="ixp-field">
                     <label>Orgao / Unidade</label>
-                    <input :value="orgaoReflexoCadastro" placeholder="Selecione um orgao cadastrado nos Dados fixos" readonly />
+                    <input v-model="orgao" list="dl-orgao" placeholder="Selecione ou digite o orgao" />
                   </div>
                   <div v-if="isFornecedorExclusivoRoute" class="ixp-field">
                     <label>Orgao / Unidade responsavel pelo equipamento</label>
@@ -470,6 +470,10 @@ const SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE = {
   DispensaArt75IIServicos: 'Art. 75, Inciso II, da Lei no 14.133/2021',
   DispensaArt75IIComprasServicosInclusos: 'Art. 75, Inciso II, da Lei no 14.133/2021',
   InexigibilidadeArt74IShowArtistico: 'Art. 74, Inciso I, da Lei no 14.133/2021',
+  InexigibilidadeArt74IManutencaoVeiculosPreview: 'Art. 74, Inciso I, da Lei no 14.133/2021',
+  InexigibilidadeArt74IManutencaoVeiculos: 'Art. 74, Inciso I, da Lei no 14.133/2021',
+  InexigibilidadeArt74IFornecedorExclusivoPreview: 'Art. 74, Inciso I, da Lei no 14.133/2021',
+  InexigibilidadeArt74IFornecedorExclusivo: 'Art. 74, Inciso I, da Lei no 14.133/2021',
 };
 
 const drawerOpen = ref(false);
@@ -564,12 +568,6 @@ const slotFieldOptions = reactive({});
 const orgaoProfiles = ref([]);
 const selectedOrgaoProfileId = ref('');
 const orgaoProfileName = ref('');
-const orgaoReflexoCadastro = computed(() => {
-  const id = String(selectedOrgaoProfileId.value || '');
-  if (!id) return '';
-  const hit = orgaoProfiles.value.find((p) => String(p.id) === id);
-  return String(hit?.name || '').trim();
-});
 const orgaoOptionsFromProfiles = computed(() => {
   const values = orgaoProfiles.value
     .map((p) => String(p?.name || '').trim())
@@ -625,6 +623,8 @@ function collectGlobalFormStatePayload() {
     clausula_caracteristicas: clausulaCaracteristicas.value,
     clausula_objeto: clausulaObjeto.value,
     clausula_justificativa: clausulaJustificativa.value,
+    ao_senhor_genero: fixoTratNome.value,
+    senhor_senhora_genero: fixoTratCargo.value,
   };
 }
 
@@ -652,6 +652,8 @@ function applyGlobalFormStatePayload(data) {
   if ('clausula_caracteristicas' in data) clausulaCaracteristicas.value = String(data.clausula_caracteristicas || '');
   if ('clausula_objeto' in data) clausulaObjeto.value = String(data.clausula_objeto || '');
   if ('clausula_justificativa' in data) clausulaJustificativa.value = String(data.clausula_justificativa || '');
+  if ('ao_senhor_genero' in data) fixoTratNome.value = String(data.ao_senhor_genero || '');
+  if ('senhor_senhora_genero' in data) fixoTratCargo.value = String(data.senhor_senhora_genero || '');
 }
 
 async function saveUserGlobalPreset() {
@@ -975,7 +977,7 @@ function buildSlotsOverride() {
   if (solRespNome) o.sol_oficio_responsavel_nome = solRespNome;
   if (solRespCargo) o.sol_oficio_responsavel_cargo = solRespCargo;
 
-  const setor = (fixoSetor.value || orgaoReflexoCadastro.value).trim();
+  const setor = (fixoSetor.value || orgao.value).trim();
   if (setor) {
     o.secretaria_usuario = setor;
     o.dfd_setor_requisitante = setor;
@@ -1009,9 +1011,7 @@ function buildSlotsOverride() {
     dataTermo = dataManualFmt;
   }
   if (modoDataNormalizado === 'datado e assinado digitalmente') {
-    const now = new Date();
-    const hoje = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
-    dataTermo = dataTermo ? `${dataTermo}, datado e assinado digitalmente` : `${hoje}, datado e assinado digitalmente`;
+    dataTermo = 'datado e assinado digitalmente';
   }
   if (dataTermo) o.data_termo = dataTermo;
 
@@ -1037,6 +1037,7 @@ function buildSlotsOverride() {
     : '';
   const entregasFallback = valorGlobal.value.trim() ? `Valor total estimado: ${valorGlobal.value.trim()}` : '';
   const resultadosFallback = dotacaoAtiva.value && dotacao.value.trim() ? `Dotacao orcamentaria: ${dotacao.value.trim()}` : '';
+  const dotacaoTexto = dotacaoAtiva.value && dotacao.value.trim() ? dotacao.value.trim() : '';
   /*
    * TR + DFD + Solicitacao/Oficio (rag_service): estes campos entram em slots_override e, apos
    * fill_tr_slots_with_llm, _merge_slots() da prioridade ao override sobre a IA (tr_slots_llm.py).
@@ -1052,6 +1053,7 @@ function buildSlotsOverride() {
   if (justificativaFinal) o.justificativa = justificativaFinal;
   if (entregasFallback) o.objeto_entregas = entregasFallback;
   if (resultadosFallback) o.objeto_resultados = resultadosFallback;
+  if (dotacaoTexto) o.dotacao = dotacaoTexto;
   if (objetoFinal.trim()) o.sol_oficio_objeto = objetoFinal.trim();
   if (justificativaFinal.trim()) o.sol_oficio_justificativa = justificativaFinal.trim();
 
@@ -1064,9 +1066,9 @@ function buildSlotsOverride() {
     if (orgaoUnidadeVeiculo.value.trim()) o.orgao = orgaoUnidadeVeiculo.value.trim();
   } else if (isFornecedorExclusivoRoute.value) {
     if (orgaoResponsavelEquipamento.value.trim()) o.orgao = orgaoResponsavelEquipamento.value.trim();
-    else if (orgaoReflexoCadastro.value.trim()) o.orgao = orgaoReflexoCadastro.value.trim();
-  } else if (orgaoReflexoCadastro.value.trim()) {
-    o.orgao = orgaoReflexoCadastro.value.trim();
+    else if (orgao.value.trim()) o.orgao = orgao.value.trim();
+  } else if (orgao.value.trim()) {
+    o.orgao = orgao.value.trim();
   }
   const objetoEspecificoFinal = (
     objetoEspecifico.value === 'Outro'
@@ -1338,14 +1340,14 @@ const secoes = computed(() => {
       completo: (
         isFilled(cabecalhoDocumento.value)
         && (!processoAtivo.value || isFilled(processo.value))
-        && isFilled(orgaoReflexoCadastro.value)
+        && isFilled(orgao.value)
         && (!isFornecedorExclusivoRoute.value || isFilled(orgaoResponsavelEquipamento.value))
         && (!isInexigibilidadeManutencaoRoute.value || isFilled(orgaoUnidadeVeiculo.value))
       ),
       linhas: [
         ['Cabecalho', cabecalhoDocumento.value || 'Nao informado', isFilled(cabecalhoDocumento.value)],
         ['Processo', processoAtivo.value ? processo.value || 'Nao informado' : 'Nao se aplica', !processoAtivo.value || isFilled(processo.value)],
-        ['Orgao', orgaoReflexoCadastro.value || 'Nao informado', isFilled(orgaoReflexoCadastro.value)],
+        ['Orgao', orgao.value || 'Nao informado', isFilled(orgao.value)],
         ...(isFornecedorExclusivoRoute.value
           ? [['Orgao / Unidade responsavel pelo equipamento', orgaoResponsavelEquipamento.value || 'Nao informado', isFilled(orgaoResponsavelEquipamento.value)]]
           : []),

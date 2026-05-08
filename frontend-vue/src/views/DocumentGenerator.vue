@@ -1192,9 +1192,7 @@ function buildTrSlotsOverride() {
     dataTermo = dataManual;
   }
   if (f.tr_assinatura_digital) {
-    const now = new Date();
-    const hoje = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
-    dataTermo = dataTermo ? `${dataTermo}, datado e assinado digitalmente` : `${hoje}, datado e assinado digitalmente`;
+    dataTermo = 'datado e assinado digitalmente';
   }
   if (dataTermo) {
     o.data_termo = dataTermo;

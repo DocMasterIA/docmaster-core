@@ -30,10 +30,10 @@
                   <div class="da75-field">
                     <label class="da75-label da75-label--compact">Órgão / unidade</label>
                     <input
-                      :value="orgaoReflexoCadastro"
+                      v-model="orgao"
                       class="da75-input da75-input--sm"
-                      placeholder="Selecione um órgão cadastrado nos Dados fixos"
-                      readonly
+                      list="da75-dl-orgao"
+                      placeholder="Selecione ou digite o órgão"
                     />
                   </div>
                   <label class="da75-check da75-check--inline">
@@ -230,12 +230,6 @@ const processoAtivo = ref(false);
 const processo = ref('');
 const orgao = ref('');
 const dadosFixos = useDispensaArt75IIDadosFixos(API_BASE, { cabecalho, processoAtivo, processo, orgao });
-const orgaoReflexoCadastro = computed(() => {
-  const id = String(dadosFixos.selectedOrgaoProfileId || '');
-  if (!id) return '';
-  const hit = (dadosFixos.orgaoProfiles || []).find((p) => String(p.id) === id);
-  return String(hit?.name || '').trim();
-});
 const objetoContratado = ref('');
 const objetoGerado = ref('');
 const justificativa = ref('');
@@ -276,6 +270,8 @@ watch(dotacaoAtiva, (v) => {
 onMounted(async () => {
   await dadosFixos.loadUserGlobalPreset();
   await dadosFixos.loadSlotCatalogSuggestions();
+  numeroCotacao.value = String(dadosFixos.fixoCotacaoNumero || '').trim();
+  cotacaoAtiva.value = !!numeroCotacao.value;
   cabecalhosLoading.value = true;
   try {
     const opts = await fetchCabecalhosPrefeitura(API_BASE);
@@ -288,6 +284,8 @@ onMounted(async () => {
 
 function onApplyDadosFixos() {
   void dadosFixos.saveUserGlobalPreset();
+  numeroCotacao.value = String(dadosFixos.fixoCotacaoNumero || '').trim();
+  cotacaoAtiva.value = !!numeroCotacao.value;
   drawerAberto.value = false;
 }
 
@@ -302,7 +300,7 @@ const cabecalhoMergeTemplateId = computed(() => {
 });
 
 const secoes = computed(() => {
-  const orgaoLabel = orgaoReflexoCadastro.value || '';
+  const orgaoLabel = orgao.value || '';
   return [
     {
       titulo: 'Dados básicos',
@@ -468,9 +466,7 @@ function buildSlotsOverride() {
     dataTermo = String(dataManual.value || '').trim();
   }
   if (modoNormalizado === 'datado e assinado digitalmente') {
-    const now = new Date();
-    const hoje = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
-    dataTermo = dataTermo ? `${dataTermo}, datado e assinado digitalmente` : `${hoje}, datado e assinado digitalmente`;
+    dataTermo = 'datado e assinado digitalmente';
   }
   if (dataTermo) o.data_termo = dataTermo;
   const objetoFinal = String(objetoGerado.value || objetoContratado.value || '').trim();
@@ -479,7 +475,9 @@ function buildSlotsOverride() {
   if (objetoFinal) o.sol_oficio_objeto = objetoFinal;
   if (String(justificativa.value || '').trim()) o.sol_oficio_justificativa = String(justificativa.value).trim();
   if (dotacaoAtiva.value && String(dotacao.value || '').trim()) {
-    o.objeto_resultados = `Dotação orçamentária: ${String(dotacao.value).trim()}`;
+    const dotacaoTexto = String(dotacao.value).trim();
+    o.dotacao = dotacaoTexto;
+    o.objeto_resultados = `Dotação orçamentária: ${dotacaoTexto}`;
   }
   return Object.keys(o).length ? o : null;
 }
@@ -488,7 +486,7 @@ function buildUserPrompt() {
   return [
     `Gerar documento com base nos dados preenchidos para ${String(route.meta?.title || 'dispensa rapida')}.`,
     `Cabeçalho do documento: ${cabecalho.value || 'Não informado'}`,
-    `Órgão: ${orgaoReflexoCadastro.value || 'Não informado'}`,
+    `Órgão: ${orgao.value || 'Não informado'}`,
     `Processo: ${processoAtivo.value ? (processo.value || 'Não informado') : 'Não se aplica'}`,
     `Objeto (o que será contratado): ${objetoContratado.value || 'Não informado'}`,
     `Cotação: ${cotacaoAtiva.value ? (numeroCotacao.value || 'Não informada') : 'Não se aplica'}`,

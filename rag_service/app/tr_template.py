@@ -619,8 +619,8 @@ def render_tr_from_slots(
     problema_text = _normalize_slot_block(slots.problema_administrativo or slots.justificativa or "")
     beneficio_text = _normalize_slot_block(slots.beneficio_esperado or slots.justificativa or "")
 
-    # Entre blocos sequenciais, garante no máximo uma quebra de linha.
-    if justificativa_text and (problema_text or beneficio_text):
+    # Dá um respiro visual após a justificativa no TR.
+    if justificativa_text:
         justificativa_text = f"{justificativa_text}\n"
     if problema_text and beneficio_text:
         problema_text = f"{problema_text}\n"

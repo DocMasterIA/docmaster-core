@@ -221,6 +221,26 @@
             </div>
           </div>
         </article>
+        <article class="ixp-card">
+          <h3>4. Cotação</h3>
+          <div class="ixp-body">
+            <div class="ixp-field">
+              <label>Número da cotação (opcional)</label>
+              <input v-model="ctx.fixoCotacaoNumero" list="da75-dl-cotacao-numero" placeholder="Ex: COT-2026-00123" />
+              <div class="ixp-inline-actions">
+                <button type="button" class="ixp-btn-secondary ixp-btn-xs" @click="ctx.addFieldHistory('cotacao_numero', ctx.fixoCotacaoNumero)">Adicionar</button>
+                <button
+                  type="button"
+                  class="ixp-btn-secondary ixp-btn-xs"
+                  :disabled="!ctx.canDeleteFieldHistory('cotacao_numero', ctx.fixoCotacaoNumero)"
+                  @click="ctx.removeFieldHistory('cotacao_numero', ctx.fixoCotacaoNumero)"
+                >
+                  Excluir
+                </button>
+              </div>
+            </div>
+          </div>
+        </article>
       </div>
 
       <div class="ixp-drawer-foot">
@@ -268,6 +288,9 @@
       </datalist>
       <datalist id="da75-dl-tr-resp-cargo">
         <option v-for="v in (ctx.slotFieldOptions.tr_termo_responsavel_cargo || [])" :key="`trc-${v}`" :value="v" />
+      </datalist>
+      <datalist id="da75-dl-cotacao-numero">
+        <option v-for="v in (ctx.slotFieldOptions.cotacao_numero || [])" :key="`cot-${v}`" :value="v" />
       </datalist>
     </aside>
   </Teleport>

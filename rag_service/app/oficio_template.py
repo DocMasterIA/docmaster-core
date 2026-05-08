@@ -6,6 +6,7 @@ Geração de Solicitação/Ofício a partir do modelo fixo
 """
 
 from pathlib import Path
+from copy import deepcopy
 from typing import Optional
 
 from docx import Document
@@ -48,13 +49,55 @@ def _replace_placeholder_in_paragraph_runs(paragraph, placeholder: str, replacem
     if start_idx == end_idx:
         txt = runs[start_idx].text or ""
         runs[start_idx].text = txt[:start_off] + replacement + txt[end_off:]
+        target_idx = start_idx
     else:
         prefix = (runs[start_idx].text or "")[:start_off]
         suffix = (runs[end_idx].text or "")[end_off:]
         runs[start_idx].text = prefix + replacement + suffix
         for idx in range(start_idx + 1, end_idx + 1):
             runs[idx].text = ""
+        target_idx = start_idx
+
+    if placeholder == "(SOL_OFICIO_DESTINATARIO_NOME)" and replacement.strip():
+        _inherit_neighbor_run_style(paragraph, target_idx)
     return True
+
+
+def _inherit_neighbor_run_style(paragraph, target_idx: int) -> None:
+    runs = paragraph.runs
+    if target_idx < 0 or target_idx >= len(runs):
+        return
+    target = runs[target_idx]
+    if not (target.text or "").strip():
+        return
+
+    source = None
+    for delta in range(1, len(runs)):
+        left = target_idx - delta
+        if left >= 0:
+            candidate = runs[left]
+            if (candidate.text or "").strip():
+                source = candidate
+                break
+        right = target_idx + delta
+        if right < len(runs):
+            candidate = runs[right]
+            if (candidate.text or "").strip():
+                source = candidate
+                break
+
+    if source is None:
+        return
+
+    src_rpr = source._element.rPr
+    if src_rpr is None:
+        return
+
+    tgt_el = target._element
+    old_rpr = tgt_el.rPr
+    if old_rpr is not None:
+        tgt_el.remove(old_rpr)
+    tgt_el.insert(0, deepcopy(src_rpr))
 
 
 def _replace_placeholders_in_paragraph(paragraph, mapping: dict[str, str]) -> bool:

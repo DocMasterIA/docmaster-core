@@ -702,6 +702,15 @@
 }
 .rpp-body.rpp--pdf .rpp-fonte-row--5 .rpp-mini-compact--wide {
   grid-column: 1 / -1;
+  /* WeasyPrint: span em grelha 2-col sem min-width explícito pode colapsar → letra a letra */
+  min-width: 100%;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.rpp-body.rpp--pdf .rpp-fonte-row--5 .rpp-mini-compact--wide .rpp-mini-compact__label {
+  white-space: nowrap;
+  letter-spacing: normal;
 }
 .rpp-body.rpp--pdf .rpp-mini-compact__label {
   display: block;

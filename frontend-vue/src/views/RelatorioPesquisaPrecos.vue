@@ -145,6 +145,7 @@
               <div v-for="(f, fi) in g.fontes" :key="fi" class="rpv-source">
                 <span class="rpv-source__badge">{{ fi + 1 }}</span>
                 <div class="rpv-source__inner">
+                  <div class="rpv-fonte-stack">
                   <div class="rpv-fonte-fields">
                     <div class="rpv-mini-grid rpv-mini-grid--1">
                       <div class="rpv-dcard rpv-dcard--featured">
@@ -201,6 +202,7 @@
                       <span class="rpv-dcard__label">Ajuste</span>
                       <span class="rpv-dcard__value">{{ f.ajuste }}</span>
                     </div>
+                  </div>
                   </div>
                 </div>
               </div>

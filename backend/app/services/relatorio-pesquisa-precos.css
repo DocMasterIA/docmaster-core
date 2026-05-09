@@ -469,11 +469,17 @@
   line-height: 4.5mm;
 }
 
+/* Um único filho (.rpp-fonte-stack): todo o detalhe da fonte colado na vertical */
 .rpp-fonte-card__content {
+  display: block;
+  padding: 0.65mm 0.9mm 0.65mm 0.35mm;
+}
+
+.rpp-fonte-stack {
   display: flex;
   flex-direction: column;
-  gap: 0.15mm;
-  padding: 0.65mm 0.9mm 0.65mm 0.35mm;
+  gap: 0;
+  min-width: 0;
 }
 
 .rpp-fonte-row {
@@ -761,13 +767,42 @@
   padding: 0.45mm;
 }
 .rpp-body.rpp--pdf .rpp-fonte-card__content {
-  /* pt: WeasyPrint trata melhor que mm muito pequenos */
-  gap: 0.35pt;
   padding: 1pt 2pt 1pt 1pt;
 }
 
 .rpp-body.rpp--pdf .rpp-fonte-card__content > * {
   margin: 0;
+}
+
+.rpp-body.rpp--pdf .rpp-fonte-stack {
+  gap: 0;
+  /* Um único bloco visual no PDF (evita «4 ilhas» com borda própria cada uma) */
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.rpp-body.rpp--pdf .rpp-fonte-stack > .rpp-fonte-fields,
+.rpp-body.rpp--pdf .rpp-fonte-stack > .rpp-fonte-processo-line,
+.rpp-body.rpp--pdf .rpp-fonte-stack > .rpp-fonte-row {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.rpp-body.rpp--pdf .rpp-fonte-stack > *:last-child {
+  border-bottom: none;
+}
+
+.rpp-body.rpp--pdf .rpp-fonte-stack .rpp-mini-compact {
+  border: none;
+  border-radius: 0;
+}
+
+.rpp-body.rpp--pdf .rpp-fonte-stack .rpp-processo-tbl {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-top: none;
 }
 
 .rpp-body.rpp--pdf .rpp-fonte-fields {

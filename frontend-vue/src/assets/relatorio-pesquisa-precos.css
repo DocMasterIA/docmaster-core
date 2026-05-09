@@ -469,11 +469,17 @@
   line-height: 4.5mm;
 }
 
+/* Um único filho (.rpp-fonte-stack): todo o detalhe da fonte colado na vertical */
 .rpp-fonte-card__content {
+  display: block;
+  padding: 0.65mm 0.9mm 0.65mm 0.35mm;
+}
+
+.rpp-fonte-stack {
   display: flex;
   flex-direction: column;
-  gap: 0.15mm;
-  padding: 0.65mm 0.9mm 0.65mm 0.35mm;
+  gap: 0;
+  min-width: 0;
 }
 
 .rpp-fonte-row {
@@ -761,13 +767,42 @@
   padding: 0.45mm;
 }
 .rpp-body.rpp--pdf .rpp-fonte-card__content {
-  /* pt: WeasyPrint trata melhor que mm muito pequenos */
-  gap: 0.35pt;
   padding: 1pt 2pt 1pt 1pt;
 }
 
 .rpp-body.rpp--pdf .rpp-fonte-card__content > * {
   margin: 0;
+}
+
+.rpp-body.rpp--pdf .rpp-fonte-stack {
+  gap: 0;
+  /* Um único bloco visual no PDF (evita «4 ilhas» com borda própria cada uma) */
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.rpp-body.rpp--pdf .rpp-fonte-stack > .rpp-fonte-fields,
+.rpp-body.rpp--pdf .rpp-fonte-stack > .rpp-fonte-processo-line,
+.rpp-body.rpp--pdf .rpp-fonte-stack > .rpp-fonte-row {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.rpp-body.rpp--pdf .rpp-fonte-stack > *:last-child {
+  border-bottom: none;
+}
+
+.rpp-body.rpp--pdf .rpp-fonte-stack .rpp-mini-compact {
+  border: none;
+  border-radius: 0;
+}
+
+.rpp-body.rpp--pdf .rpp-fonte-stack .rpp-processo-tbl {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-top: none;
 }
 
 .rpp-body.rpp--pdf .rpp-fonte-fields {
@@ -942,6 +977,7 @@
 .rpv-source{position:relative;border-radius:8px;border:1px solid #e2e8f0;background:rgba(248,250,252,.65);padding-left:24px}
 .rpv-source__badge{position:absolute;left:8px;top:50%;transform:translateY(-50%);width:16px;height:16px;border-radius:999px;background:#5f7f9a;color:#fff;font-size:7px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(15,23,42,.12)}
 .rpv-source__inner{padding:4px;display:flex;flex-direction:column;gap:2px}
+.rpv-fonte-stack{display:flex;flex-direction:column;gap:0;min-width:0}
 .rpv-fonte-fields{display:flex;flex-direction:column;gap:0;min-width:0}
 .rpv-mini-grid{display:grid;gap:3px;align-items:start}
 .rpv-mini-grid--1{grid-template-columns:1fr}
@@ -1000,6 +1036,7 @@
 .rpv-source{border-radius:4px!important;padding-left:16px!important}
 .rpv-source__badge{left:4px!important;width:10px!important;height:10px!important;font-size:5px!important}
 .rpv-source__inner{padding:2px!important;gap:1px!important}
+.rpv-fonte-stack{gap:0!important}
 .rpv-fonte-fields{gap:0!important}
 .rpv-mini-grid{gap:1px!important;align-items:start!important}
 .rpv-mini-grid--1{grid-template-columns:1fr!important}

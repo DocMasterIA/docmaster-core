@@ -81,26 +81,47 @@
                           <button
                             type="button"
                             class="dm-subnav-art-btn"
-                            :class="{ 'dm-subnav-art-btn--open': isArtSectionOpen(page.name, section.key) }"
+                            :class="{
+                              'dm-subnav-art-btn--open': isArtSectionOpen(page.name, section.key),
+                              'dm-subnav-art-btn--selected': isSectionRouteActive(section),
+                            }"
+                            :aria-expanded="isArtSectionOpen(page.name, section.key)"
+                            :aria-controls="`art-dd-${page.name}-${section.key}`"
                             @click="toggleArtSection(page.name, section.key)"
                           >
-                            <span>{{ section.title }}</span>
+                            <span class="dm-subnav-art-btn__label">
+                              {{ section.title }}
+                              <span v-if="isSectionRouteActive(section)" class="dm-subnav-art-btn__dot" aria-hidden="true" />
+                            </span>
                             <i
                               class="fa-solid"
                               :class="isArtSectionOpen(page.name, section.key) ? 'fa-chevron-up' : 'fa-chevron-down'"
                               aria-hidden="true"
                             ></i>
                           </button>
-                          <div v-show="isArtSectionOpen(page.name, section.key)" class="dm-art-dropdown-links">
+                          <div
+                            :id="`art-dd-${page.name}-${section.key}`"
+                            v-show="isArtSectionOpen(page.name, section.key)"
+                            class="dm-art-dropdown-links"
+                            role="region"
+                            :aria-label="`${section.title}: fluxos`"
+                          >
                             <router-link
                               v-for="child in section.items"
                               :key="child.name"
                               :to="child.to"
                               class="dm-subsubnav-link"
                               :class="{ 'dm-subsubnav-link--active': isRouteActive(child.name) }"
+                              :aria-current="isRouteActive(child.name) ? 'page' : undefined"
                             >
                               <i class="fa-solid" :class="child.icon" aria-hidden="true"></i>
-                              {{ child.label }}
+                              <span class="dm-subsubnav-link__text">{{ child.label }}</span>
+                              <span
+                                v-if="isRouteActive(child.name)"
+                                class="dm-subsubnav-link__here"
+                                title="Página atual"
+                                >Atual</span
+                              >
                             </router-link>
                           </div>
                         </template>
@@ -112,9 +133,13 @@
                             :to="child.to"
                             class="dm-subsubnav-link"
                             :class="{ 'dm-subsubnav-link--active': isRouteActive(child.name) }"
+                            :aria-current="isRouteActive(child.name) ? 'page' : undefined"
                           >
                             <i class="fa-solid" :class="child.icon" aria-hidden="true"></i>
-                            {{ child.label }}
+                            <span class="dm-subsubnav-link__text">{{ child.label }}</span>
+                            <span v-if="isRouteActive(child.name)" class="dm-subsubnav-link__here" title="Página atual"
+                              >Atual</span
+                            >
                           </router-link>
                         </template>
                       </template>
@@ -424,6 +449,13 @@ function onMainTabClick(tab) {
 
 function isRouteActive(name) {
   return route.name === name;
+}
+
+/** Algum fluxo desta secção (Art. 75, I / II ou «Outros») corresponde à rota actual. */
+function isSectionRouteActive(section) {
+  const items = section?.items;
+  if (!Array.isArray(items) || !items.length) return false;
+  return items.some((c) => c.name === route.name);
 }
 
 function toggleGroup(name) {
@@ -954,10 +986,12 @@ watch(
 .dm-subnav-btn--active {
   border-color: #254e78;
   color: #254e78;
+  box-shadow: inset 3px 0 0 #254e78;
 }
 .dm-dark .dm-subnav-btn--active {
   border-color: #64748b;
   color: #f8fafc;
+  box-shadow: inset 3px 0 0 #94a3b8;
 }
 
 .dm-subnav-art-btn {
@@ -999,6 +1033,40 @@ watch(
 .dm-dark .dm-subnav-art-btn--open {
   border-color: #64748b;
   color: #f8fafc;
+}
+
+.dm-subnav-art-btn__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.dm-subnav-art-btn__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #16a34a;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.25);
+}
+.dm-dark .dm-subnav-art-btn__dot {
+  background: #4ade80;
+  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.2);
+}
+
+/* Inciso com algum fluxo seleccionado na URL (mesmo com dropdown fechado) */
+.dm-subnav-art-btn--selected {
+  border-color: #1d4ed8;
+  background: linear-gradient(180deg, #eff6ff 0%, #e8f0fe 100%);
+  color: #1e3a5c;
+}
+.dm-dark .dm-subnav-art-btn--selected {
+  border-color: #3b82f6;
+  background: linear-gradient(180deg, #172554 0%, #0f172a 100%);
+  color: #e2e8f0;
+}
+.dm-subnav-art-btn--selected.dm-subnav-art-btn--open {
+  border-color: #254e78;
 }
 
 .dm-art-dropdown-links {
@@ -1052,6 +1120,32 @@ watch(
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  justify-content: flex-start;
+}
+.dm-subsubnav-link__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  line-height: 1.25;
+}
+.dm-subsubnav-link__here {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #15803d;
+  background: #dcfce7;
+  border-radius: 999px;
+  padding: 2px 7px;
+  line-height: 1.2;
+}
+.dm-dark .dm-subsubnav-link__here {
+  color: #bbf7d0;
+  background: rgba(22, 163, 74, 0.28);
 }
 .dm-dark .dm-subsubnav-link,
 .dm-dark .dm-subsubnav-link:visited {
@@ -1061,9 +1155,21 @@ watch(
 }
 
 .dm-subsubnav-link--active {
-  border-color: #254e78;
-  background: #254e78;
+  border-color: #1e3a5c;
+  background: linear-gradient(135deg, #254e78 0%, #1a3652 100%);
   color: #fff;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+  outline: 1px solid rgba(255, 255, 255, 0.12);
+  outline-offset: -1px;
+}
+.dm-subsubnav-link--active .dm-subsubnav-link__here {
+  color: #14532d;
+  background: #ecfccb;
+}
+.dm-dark .dm-subsubnav-link--active .dm-subsubnav-link__here {
+  color: #ecfccb;
+  background: rgba(22, 101, 52, 0.55);
 }
 
 .dm-content {

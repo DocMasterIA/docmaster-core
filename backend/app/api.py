@@ -9,7 +9,7 @@ from backend.app.services.llm_context import build_llm_context_from_request
 from backend.app.services.render import render_docx_by_index, render_docx_with_tokens
 from backend.app.services.preview import generate_docx_preview, generate_docx_preview_pdf
 from django.contrib.auth.decorators import login_required
-import json, tempfile, traceback
+import json, tempfile, traceback, time
 from django.http import JsonResponse, FileResponse, HttpResponse
 from django.core.files.base import ContentFile
 from backend.app.models import Template, TemplateSchema, DocumentInstance, Prefeitura, SubtopicoSecretaria, SlotValueCatalog, SlotFormState
@@ -37,6 +37,34 @@ def _rag_http_timeout_seconds() -> float:
     except Exception:
         val = 95.0
     return max(5.0, val)
+
+
+def _rag_post_json_with_retries(url, body, *, params=None, max_attempts=3):
+    """
+    POST JSON ao rag_service com retries leves para falhas transitórias
+    (timeout, conexão recusada, 502/503/504 do proxy).
+    """
+    params = params if params is not None else {}
+    last_exc = None
+    for attempt in range(max_attempts):
+        try:
+            resp = requests.post(
+                url,
+                json=body,
+                params=params,
+                timeout=_rag_http_timeout_seconds(),
+            )
+            if resp.status_code in (502, 503, 504) and attempt < max_attempts - 1:
+                time.sleep(min(3.0, 0.65 * (2**attempt)))
+                continue
+            return resp
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            last_exc = e
+            if attempt < max_attempts - 1:
+                time.sleep(min(3.0, 0.65 * (2**attempt)))
+                continue
+            raise last_exc from None
+    raise RuntimeError("unreachable rag retry loop")  # pragma: no cover
 
 
 def api_login_required(view_func):
@@ -384,7 +412,7 @@ def gerar_via_llm_api(request):
     }
 
     try:
-        resp = requests.post(url, json=body, params=params, timeout=_rag_http_timeout_seconds())
+        resp = _rag_post_json_with_retries(url, body, params=params)
     except requests.exceptions.ConnectionError:
         return JsonResponse({"ok": False, "error": "Serviço de geração indisponível. Verifique se o rag_service está em execução."}, status=503)
     except requests.exceptions.Timeout:
@@ -545,7 +573,7 @@ def gerar_tr_modelo_api(request):
     }
 
     try:
-        resp = requests.post(url, json=body, timeout=_rag_http_timeout_seconds())
+        resp = _rag_post_json_with_retries(url, body)
     except requests.exceptions.ConnectionError:
         return JsonResponse({"ok": False, "error": "Serviço de geração de TR indisponível. Verifique se o rag_service está em execução."}, status=503)
     except requests.exceptions.Timeout:
@@ -697,7 +725,7 @@ def gerar_tr_e_dfd_api(request):
     }
 
     try:
-        resp = requests.post(url, json=body, timeout=_rag_http_timeout_seconds())
+        resp = _rag_post_json_with_retries(url, body)
     except requests.exceptions.ConnectionError:
         return JsonResponse({"ok": False, "error": "Serviço de geração de TR/DFD indisponível. Verifique se o rag_service está em execução."}, status=503)
     except requests.exceptions.Timeout:
@@ -870,7 +898,7 @@ def fill_tr_slots_api(request):
     }
 
     try:
-        resp = requests.post(url, json=body, timeout=_rag_http_timeout_seconds())
+        resp = _rag_post_json_with_retries(url, body)
     except requests.exceptions.ConnectionError:
         return JsonResponse(
             {"ok": False, "error": "Serviço de geração indisponível. Verifique se o rag_service está em execução."},

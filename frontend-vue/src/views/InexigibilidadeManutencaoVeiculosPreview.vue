@@ -407,6 +407,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
 import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
+import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
 import '@/components/dispensa-art-75-ii/dispensaArt75ii.css';
 
@@ -1244,48 +1245,23 @@ async function onSubmit() {
     };
     if (cabecalhoMergeTemplateId.value) payload.template_id = cabecalhoMergeTemplateId.value;
     const gerarUrl = buildGerarTrEDfdUrl(API_BASE);
-    const requestInit = {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(payload),
-    };
-    let res;
-    let networkErr = null;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        res = await fetch(gerarUrl, requestInit);
-        networkErr = null;
-        break;
-      } catch (err) {
-        networkErr = err;
-        if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 700));
+    const result = await fetchGerarTrEDfdWithRetry(API_BASE, payload);
+    if (!result.ok) {
+      if (result.kind === 'network') {
+        const msg = String(result.errorMessage || '');
+        const looksNetwork = /fetch|network|failed|load|aborted|timed out|timeout/i.test(msg);
+        generateError.value = looksNetwork
+          ? `${describeGerarTrEDfdNetworkFailure(gerarUrl)}\n\nConfira rede, VPN e HTTPS (VITE_API_URL no build, ex.: https://api.docmasteria.com.br).`
+          : msg;
+      } else {
+        generateError.value =
+          result.status === 500
+            ? result.data?.error || result.data?.detail || result.errorMessage || 'Erro 500 no servidor. Veja logs do backend.'
+            : result.errorMessage;
       }
-    }
-    if (!res && networkErr) {
-      const msg = String(networkErr?.message || networkErr || '');
-      const looksNetwork =
-        /fetch|network|failed|load|aborted|timed out|timeout/i.test(msg) ||
-        networkErr?.name === 'TypeError';
-      generateError.value = looksNetwork
-        ? `O navegador não completou o pedido para:\n${gerarUrl}\n\nConfira rede, VPN e bloqueadores. No painel Rede (F12), veja se o POST falhou antes de status HTTP — com página em HTTPS a API tem de ser HTTPS (variável VITE_API_URL no build do frontend, ex.: https://api.docmasteria.com.br).`
-        : msg;
       return;
     }
-    const rawText = await res.text();
-    let data = {};
-    try {
-      data = rawText ? JSON.parse(rawText) : {};
-    } catch (_e) {
-      generateError.value = `Resposta invalida do servidor (nao e JSON). Status: ${res.status}.`;
-      return;
-    }
-    if (!res.ok || !data.ok) {
-      generateError.value = res.status === 500
-        ? (data.error || data.detail || 'Erro 500 no servidor. Veja logs do backend.')
-        : (data.error || data.detail || `Erro ${res.status}`);
-      return;
-    }
+    const { data } = result;
     if (!data.tr?.docx_base64 || !data.dfd?.docx_base64 || !data.oficio?.docx_base64) {
       generateError.value = data.error || 'TR, DFD ou Solicitacao/Oficio nao vieram na resposta.';
       return;

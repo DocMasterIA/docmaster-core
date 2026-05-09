@@ -198,7 +198,8 @@ import {
 import './dispensaArt75ii.css';
 import DispensaArt75IIDadosFixosDrawer from './DispensaArt75IIDadosFixosDrawer.vue';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
-import { getApiBase } from '@/utils/apiBase.js';
+import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
+import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { useDispensaArt75IIDadosFixos } from '@/composables/useDispensaArt75IIDadosFixos.js';
 
 const API_BASE = getApiBase();
@@ -512,45 +513,19 @@ async function onSubmit() {
       slot_package_key: slotPackageKey.value,
     };
     if (cabecalhoMergeTemplateId.value) payload.template_id = cabecalhoMergeTemplateId.value;
-    const gerarUrl = `${API_BASE}/api/documentos/gerar-tr-e-dfd`;
-    const requestInit = {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(payload),
-    };
-    let res;
-    let networkErr = null;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        res = await fetch(gerarUrl, requestInit);
-        networkErr = null;
-        break;
-      } catch (err) {
-        networkErr = err;
-        if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 700));
+    const gerarUrl = buildGerarTrEDfdUrl(API_BASE);
+    const result = await fetchGerarTrEDfdWithRetry(API_BASE, payload);
+    if (!result.ok) {
+      if (result.kind === 'network') {
+        const msg = String(result.errorMessage || '');
+        const looksNetwork = /fetch|network|failed|load|aborted|timed out|timeout/i.test(msg);
+        generateError.value = looksNetwork ? describeGerarTrEDfdNetworkFailure(gerarUrl) : msg || describeGerarTrEDfdNetworkFailure(gerarUrl);
+      } else {
+        generateError.value = result.errorMessage;
       }
-    }
-    if (!res && networkErr) {
-      const msg = String(networkErr?.message || networkErr || '');
-      const looksNetwork = /fetch|network|failed|load|aborted|timed out|timeout/i.test(msg) || networkErr?.name === 'TypeError';
-      generateError.value = looksNetwork
-        ? `O navegador não completou o pedido para:\n${gerarUrl}\n\nConfira rede, VPN e bloqueadores.`
-        : msg;
       return;
     }
-    const rawText = await res.text();
-    let data = {};
-    try {
-      data = rawText ? JSON.parse(rawText) : {};
-    } catch (_e) {
-      generateError.value = `Resposta inválida do servidor (não é JSON). Status: ${res.status}.`;
-      return;
-    }
-    if (!res.ok || !data.ok) {
-      generateError.value = data.error || data.detail || `Erro ${res.status}`;
-      return;
-    }
+    const { data } = result;
     if (!data.tr?.docx_base64 || !data.dfd?.docx_base64 || !data.oficio?.docx_base64) {
       generateError.value = data.error || 'TR, DFD ou Ofício não vieram na resposta.';
       return;

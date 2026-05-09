@@ -530,7 +530,8 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { getApiBase } from '@/utils/apiBase.js';
+import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
+import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
 
 // Em dev: '' → proxy Vite `/api`
@@ -1536,44 +1537,25 @@ async function submitViaLLM() {
     payload.template_id = selectedTemplate.value.id;
   }
 
-  const endpoint = isTrDfd
-    ? `${API_BASE}/api/documentos/gerar-tr-e-dfd`
-    : `${API_BASE}/api/documentos/gerar-via-llm`;
-
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(payload),
-  });
-
-  const contentType = (res.headers.get('content-type') || '').toLowerCase();
-
-  if (res.status === 404) {
-    generateError.value =
-      'Rota não encontrada (404). Confira se o backend está rodando (docker compose up -d backend) e reconstruído com o código atual (docker compose build --no-cache backend). Em dev, o front usa o proxy do Vite para /api.';
-    return;
-  }
-
   // Modo TR/DFD (modelo oficial): resposta é sempre JSON com base64 dos arquivos
-  if (docTypeMode.value === 'tr_modelo') {
-    const rawText = await res.text();
-    let data = {};
-    try {
-      data = rawText ? JSON.parse(rawText) : {};
-    } catch (_e) {
-      generateError.value = `Resposta inválida do servidor (não é JSON). Status: ${res.status}. Verifique se o backend respondeu corretamente.`;
+  if (isTrDfd) {
+    const gerarUrl = buildGerarTrEDfdUrl(API_BASE);
+    const result = await fetchGerarTrEDfdWithRetry(API_BASE, payload);
+    if (!result.ok) {
+      if (result.kind === 'network') {
+        const msg = String(result.errorMessage || '');
+        generateError.value = /fetch|network|failed|load|aborted|timed out|timeout/i.test(msg)
+          ? describeGerarTrEDfdNetworkFailure(gerarUrl)
+          : msg || describeGerarTrEDfdNetworkFailure(gerarUrl);
+      } else {
+        generateError.value =
+          result.status === 500
+            ? result.data?.error || result.data?.detail || result.errorMessage || 'Erro 500 no servidor. Veja os logs do container backend.'
+            : result.errorMessage;
+      }
       return;
     }
-
-    if (!res.ok || !data.ok) {
-      generateError.value =
-        res.status === 500
-          ? (data.error || data.detail || 'Erro 500 no servidor. Veja os logs do container backend.')
-          : (data.error || data.detail || `Erro ${res.status}`);
-      return;
-    }
-
+    const data = result.data;
     if (!data.tr?.docx_base64 || !data.dfd?.docx_base64 || !data.oficio?.docx_base64) {
       generateError.value = data.error || 'TR, DFD ou Solicitação/Ofício não vieram na resposta. Tente novamente.';
       return;
@@ -1627,6 +1609,23 @@ async function submitViaLLM() {
     documentReady.value = true;
     successMessage.value = 'Termo de Referência, DFD e Solicitação/Ofício gerados com sucesso. Baixe os arquivos abaixo.';
     persistSlotEntries(buildSlotEntriesFromForm());
+    return;
+  }
+
+  const endpoint = `${API_BASE}/api/documentos/gerar-via-llm`;
+
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  });
+
+  const contentType = (res.headers.get('content-type') || '').toLowerCase();
+
+  if (res.status === 404) {
+    generateError.value =
+      'Rota não encontrada (404). Confira se o backend está rodando (docker compose up -d backend) e reconstruído com o código atual (docker compose build --no-cache backend). Em dev, o front usa o proxy do Vite para /api.';
     return;
   }
 

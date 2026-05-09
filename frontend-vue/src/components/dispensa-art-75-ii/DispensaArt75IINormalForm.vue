@@ -264,7 +264,8 @@ import './dispensaArt75ii.css';
 import DispensaArt75IIDadosFixosDrawer from './DispensaArt75IIDadosFixosDrawer.vue';
 import DispensaArt75IIItensValores from './DispensaArt75IIItensValores.vue';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
-import { getApiBase } from '@/utils/apiBase.js';
+import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
+import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { useDispensaArt75IIDadosFixos } from '@/composables/useDispensaArt75IIDadosFixos.js';
 
 const API_BASE = getApiBase();
@@ -642,36 +643,21 @@ async function onSubmit() {
       generateError.value = 'Não foi possível preparar os dados para envio. Verifique os campos (especialmente itens e valores).';
       return;
     }
-    let res;
-    try {
-      res = await fetch(`${API_BASE}/api/documentos/gerar-tr-e-dfd`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(bodyObj),
-      });
-    } catch (netErr) {
-      const msg = String(netErr?.message || netErr || '');
-      generateError.value =
-        /fetch|network|failed|load|aborted|timed out|timeout/i.test(msg) || netErr?.name === 'TypeError'
-          ? 'Falha de rede ao gerar o documento (ligação interrompida, firewall ou tempo limite no servidor). Com muitos itens na tabela o pedido pode ser maior e demorar mais; tente novamente ou reduza linhas vazias.'
-          : msg || 'Erro de rede ao gerar documento.';
+    const gerarUrl = buildGerarTrEDfdUrl(API_BASE);
+    const result = await fetchGerarTrEDfdWithRetry(API_BASE, bodyObj);
+    if (!result.ok) {
+      if (result.kind === 'network') {
+        const msg = String(result.errorMessage || '');
+        generateError.value =
+          /fetch|network|failed|load|aborted|timed out|timeout/i.test(msg)
+            ? describeGerarTrEDfdNetworkFailure(gerarUrl)
+            : msg || describeGerarTrEDfdNetworkFailure(gerarUrl);
+      } else {
+        generateError.value = result.errorMessage;
+      }
       return;
     }
-    const rawText = await res.text();
-    let data = {};
-    try {
-      data = rawText ? JSON.parse(rawText) : {};
-    } catch {
-      generateError.value = rawText && /^</.test(rawText.trim())
-        ? `Servidor devolveu HTML em vez de JSON (proxy ou erro ${res.status}).`
-        : `Resposta inválida do servidor (não é JSON). HTTP ${res.status}.`;
-      return;
-    }
-    if (!res.ok || !data.ok) {
-      generateError.value = data.error || data.detail || `Erro ${res.status}`;
-      return;
-    }
+    const { data } = result;
     if (!data.tr?.docx_base64 || !data.dfd?.docx_base64 || !data.oficio?.docx_base64) {
       generateError.value = data.error || 'TR, DFD ou Ofício não vieram na resposta.';
       return;

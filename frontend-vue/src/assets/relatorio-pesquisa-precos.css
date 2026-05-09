@@ -470,15 +470,17 @@
 .rpp-fonte-card__content {
   display: flex;
   flex-direction: column;
-  gap: 0.55mm;
-  padding: 1.1mm 1.3mm 1.1mm 0.45mm;
+  gap: 0.35mm;
+  padding: 0.85mm 1.1mm 0.85mm 0.4mm;
 }
 
 .rpp-fonte-row {
   display: grid;
-  gap: 0.55mm;
+  gap: 0.35mm;
   /* Sem esticar à altura da célula vizinha: cada mini-cartão só o que o texto precisa */
   align-items: start;
+  align-content: start;
+  grid-auto-rows: min-content;
 }
 
 .rpp-fonte-row--3 {
@@ -504,7 +506,7 @@
 
 /* ID / Processo: tabela evita colapso de grelha no WeasyPrint (uma letra por linha) */
 .rpp-fonte-processo-line {
-  margin-bottom: 0.35mm;
+  margin-bottom: 0.2mm;
   width: 100%;
 }
 
@@ -572,9 +574,9 @@
 
 .rpp-mini-compact__value {
   display: block;
-  margin-top: 0.55mm;
+  margin-top: 0.35mm;
   font-size: 7.5pt;
-  line-height: 1.2;
+  line-height: 1.15;
   color: #1e293b;
   word-break: normal;
   overflow-wrap: break-word;
@@ -732,11 +734,14 @@
   padding: 0.65mm;
 }
 .rpp-body.rpp--pdf .rpp-fonte-card__content {
-  gap: 0.35mm;
-  padding: 0.65mm 1mm 0.65mm 0.35mm;
+  gap: 0.2mm;
+  padding: 0.45mm 0.75mm 0.45mm 0.3mm;
 }
 .rpp-body.rpp--pdf .rpp-fonte-row {
-  gap: 0.35mm;
+  gap: 0.2mm;
+  align-items: start;
+  align-content: start;
+  grid-auto-rows: min-content;
 }
 .rpp-body.rpp--pdf .rpp-fonte-row--3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -758,11 +763,13 @@
  */
 .rpp-body.rpp--pdf .rpp-mini-compact {
   display: block;
-  padding: 0.45mm 0.85mm;
+  padding: 0.3mm 0.65mm;
   min-height: 0;
   min-width: 0;
   width: 100%;
   box-sizing: border-box;
+  height: auto;
+  align-self: start;
 }
 .rpp-body.rpp--pdf .rpp-fonte-processo-line {
   width: 100%;
@@ -784,11 +791,13 @@
 
 .rpp-body.rpp--pdf .rpp-processo-tbl__k {
   font-size: var(--rpp-pdf-mini-label);
+  line-height: 1.12;
   white-space: nowrap;
 }
 
 .rpp-body.rpp--pdf .rpp-processo-tbl__v {
   font-size: var(--rpp-pdf-mini-value);
+  line-height: 1.12;
   white-space: normal;
   overflow-wrap: break-word;
   word-break: normal;
@@ -806,7 +815,7 @@
   display: block;
   margin-top: 0;
   font-size: var(--rpp-pdf-mini-value);
-  line-height: 1.28;
+  line-height: 1.12;
   font-weight: 600;
   word-break: normal;
   overflow-wrap: break-word;

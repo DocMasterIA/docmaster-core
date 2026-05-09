@@ -158,8 +158,10 @@
                       <span class="rpv-dcard__value rpv-dcard__value--strong">{{ f.valor }}</span>
                     </div>
                   </div>
-                  <div class="rpv-mini-grid rpv-mini-grid--3">
+                  <div class="rpv-mini-grid rpv-mini-grid--1">
                     <div class="rpv-dcard"><span class="rpv-dcard__label">Órgão</span><span class="rpv-dcard__value">{{ f.orgao }}</span></div>
+                  </div>
+                  <div class="rpv-mini-grid rpv-mini-grid--2">
                     <div class="rpv-dcard">
                       <span class="rpv-dcard__label">Modalidade</span>
                       <span class="rpv-dcard__value">{{ obterModalidade(f.tipo) }}</span>

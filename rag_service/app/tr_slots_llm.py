@@ -1711,6 +1711,18 @@ async def fill_tr_slots_with_llm(
     user_prompt_text = _build_tr_slots_user_prompt(
         user_prompt, context_from_agent, user_context, skip_context_in_prompt, rag_objeto_examples or None
     )
+    force_manual_items = bool((slots_override or {}).get("force_manual_items"))
+    if force_manual_items:
+        # Dispensa normal (tabela de itens no frontend): não puxar linhas de item para objeto/justificativa.
+        user_prompt_text += (
+            "\n\nREGRA OBRIGATÓRIA (contratação com tabela de itens já definida no sistema):\n"
+            "- O pedido acima NÃO substitui a tabela de itens: descrições, quantidades e valores por linha ficam fora deste texto.\n"
+            "- Nos campos \"objeto\" e \"justificativa\" do JSON, NÃO invente enumeração de bens/serviços (listas longas, "
+            "\"incluindo...\", \"abrangendo...\", \"compreendendo...\", bullets ou numeração de itens).\n"
+            "- Use apenas o nível de abstração já indicado pelo usuário; remeta genericamente às especificações técnicas e "
+            "quantitativos estabelecidos neste Termo de Referência.\n"
+            "- No array \"itens\" do JSON, retorne [] (lista vazia); os itens reais serão mesclados depois a partir do formulário."
+        )
     full_prompt = f"<<SYSTEM>>\n{TR_SLOTS_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{user_prompt_text}"
 
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
@@ -1751,6 +1763,9 @@ async def fill_tr_slots_with_llm(
             f"Detalhe do parser: {e.msg} (linha {e.lineno}, coluna {e.colno})."
         ) from e
     llm_slots = _dict_to_tr_slots(parsed)
+    if force_manual_items:
+        # Evita que heurísticas pós-LLM (_polish_objeto_with_itens etc.) injetem descrições de itens no texto do objeto.
+        llm_slots.itens = []
 
     # Se o objeto vier vazio ou praticamente sem conteúdo (ex.: só um "."),
     # tenta recuperar um objeto útil a partir do interpretador (context_from_agent)

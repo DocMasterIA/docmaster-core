@@ -29,7 +29,7 @@
               <input
                 class="da75-input"
                 :value="item.quantidade"
-                @input="atualizar(index, 'quantidade', primeiraMaiuscula(($event.target).value))"
+                @input="atualizar(index, 'quantidade', sanitizeQuantidadeInput(($event.target).value))"
               />
             </div>
             <div class="da75-field da75-col-2">
@@ -45,7 +45,7 @@
               <input
                 class="da75-input"
                 :value="item.mediaValor"
-                @input="atualizar(index, 'mediaValor', ($event.target).value)"
+                @input="atualizar(index, 'mediaValor', String(($event.target).value || ''))"
               />
             </div>
           </div>
@@ -67,9 +67,9 @@ import { computed } from 'vue';
 import {
   EMPTY_ITEM,
   calcularValorTotalEstimado,
-  formatarMoeda,
   primeiraMaiuscula,
 } from './dispensaArt75iiShared.js';
+import { formatMoedaBRLInput, sanitizeQuantidadeInput } from '../../utils/itemValorCampos.js';
 import './dispensaArt75ii.css';
 
 const modelValue = defineModel({ type: Array });
@@ -81,7 +81,7 @@ function emitNext(next) {
 }
 
 function atualizar(index, campo, valor) {
-  const v = campo === 'mediaValor' ? formatarMoeda(valor) : valor;
+  const v = campo === 'mediaValor' ? formatMoedaBRLInput(valor) : valor;
   emitNext(
     modelValue.value.map((row, i) => (i === index ? { ...row, [campo]: v } : row)),
   );

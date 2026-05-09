@@ -51,36 +51,38 @@
           <label class="cd-field cd-field--full">
             <span>Descrição</span>
             <textarea
-              v-model.trim="form.descricao"
+              :value="form.descricao"
               rows="4"
               required
               class="cd-desc-textarea"
               placeholder="Descrição principal da cotação"
+              @input="onDescricaoPrincipalInput"
             />
           </label>
 
           <label class="cd-field cd-field--full">
             <span>Descrição complementar</span>
             <textarea
-              v-model.trim="form.descricao_complementar"
+              :value="form.descricao_complementar"
               rows="3"
               placeholder="Especificações adicionais, marca, modelo, validade etc."
+              @input="onDescricaoComplementarInput"
             />
           </label>
 
           <label class="cd-field">
             <span>Quantidade</span>
-            <input v-model.trim="form.quantidade" type="text" inputmode="decimal" placeholder="Ex.: 300" />
+            <input :value="form.quantidade" type="text" inputmode="decimal" placeholder="Ex.: 300" @input="onQuantidadeInput" />
           </label>
 
           <label class="cd-field">
             <span>Unidade de medida</span>
-            <input v-model.trim="form.unidade_medida" type="text" placeholder="Ex.: UN, KG, TON" />
+            <input :value="form.unidade_medida" type="text" placeholder="Ex.: UN, KG, TON" @input="onUnidadeMedidaInput" />
           </label>
 
           <label class="cd-field">
             <span>Valor médio do item</span>
-            <input v-model.trim="form.valor_unitario" type="text" inputmode="decimal" placeholder="Ex.: 145,00" />
+            <input :value="form.valor_unitario" type="text" inputmode="decimal" placeholder="Ex.: 145,00" @input="onValorUnitarioInput" />
           </label>
 
           <label class="cd-field">
@@ -104,7 +106,7 @@
 
           <label class="cd-field">
             <span>Valor de frete</span>
-            <input v-model.trim="form.valor_frete" type="text" inputmode="decimal" placeholder="Ex.: 500,00" />
+            <input :value="form.valor_frete" type="text" inputmode="decimal" placeholder="Ex.: 500,00" @input="onValorFreteInput" />
           </label>
 
           <label class="cd-field cd-field--full">
@@ -265,6 +267,11 @@ import {
   updateCotacaoInItemResearchSession,
 } from '../services/pncpResearch';
 import { cnpjDigitsOnly as onlyDigits, formatCnpjBr as formatCnpj, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
+import {
+  capitalizeFirstSignificantLetter,
+  formatMoedaBRLInput,
+  sanitizeQuantidadeInput,
+} from '@/utils/itemValorCampos.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -333,6 +340,38 @@ function toNumberBR(value) {
   const normalized = s.replace(/\s+/g, '').replace(/\./g, '').replace(',', '.');
   const n = Number(normalized);
   return Number.isFinite(n) ? n : null;
+}
+
+/** Valor exibido como moeda BRL (só dígitos no backend da máscara) → número em reais. */
+function moedaBRLDisplayToNumber(value) {
+  const digits = String(value ?? '').replace(/\D/g, '');
+  if (!digits) return null;
+  const n = Number(digits) / 100;
+  return Number.isFinite(n) ? n : null;
+}
+
+function onDescricaoPrincipalInput(e) {
+  form.value.descricao = capitalizeFirstSignificantLetter(String(e?.target?.value || ''));
+}
+
+function onDescricaoComplementarInput(e) {
+  form.value.descricao_complementar = capitalizeFirstSignificantLetter(String(e?.target?.value || ''));
+}
+
+function onQuantidadeInput(e) {
+  form.value.quantidade = sanitizeQuantidadeInput(String(e?.target?.value || ''));
+}
+
+function onUnidadeMedidaInput(e) {
+  form.value.unidade_medida = capitalizeFirstSignificantLetter(String(e?.target?.value || ''));
+}
+
+function onValorUnitarioInput(e) {
+  form.value.valor_unitario = formatMoedaBRLInput(String(e?.target?.value || ''));
+}
+
+function onValorFreteInput(e) {
+  form.value.valor_frete = formatMoedaBRLInput(String(e?.target?.value || ''));
 }
 
 function buildDataPublicacaoIso(dataCotacao, horaCotacao) {
@@ -564,7 +603,7 @@ async function salvarCotacaoDireta() {
     return;
   }
 
-  const valorUnitario = toNumberBR(form.value.valor_unitario);
+  const valorUnitario = moedaBRLDisplayToNumber(form.value.valor_unitario);
   if (form.value.valor_unitario && !Number.isFinite(valorUnitario)) {
     saveError.value = 'Valor médio do item inválido.';
     return;
@@ -574,7 +613,7 @@ async function salvarCotacaoDireta() {
     return;
   }
 
-  const valorFrete = toNumberBR(form.value.valor_frete);
+  const valorFrete = moedaBRLDisplayToNumber(form.value.valor_frete);
   if (form.value.valor_frete && !Number.isFinite(valorFrete)) {
     saveError.value = 'Valor de frete inválido.';
     return;

@@ -111,7 +111,11 @@
                 </div>
                 <div class="fe-field fe-half">
                   <label>Valor total do processo</label>
-                  <input v-model="valorGlobal" />
+                  <input
+                    :value="valorGlobal"
+                    placeholder="R$ 0,00"
+                    @input="valorGlobal = formatMoedaBRLInput(String($event.target.value || ''))"
+                  />
                 </div>
               </div>
             </article>
@@ -317,6 +321,11 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
+import {
+  capitalizeFirstSignificantLetter,
+  formatMoedaBRLInput,
+  sanitizeQuantidadeInput,
+} from '@/utils/itemValorCampos.js';
 
 const API_BASE = getApiBase();
 const dataOptions = ['Data automática', 'Datado e assinado digitalmente', 'Data manual'];
@@ -415,14 +424,7 @@ function formatarData(valor) {
   return `${n.slice(0, 2)}/${n.slice(2, 4)}/${n.slice(4)}`;
 }
 function iniciarComMaiuscula(v) {
-  const txt = String(v || '');
-  const idx = txt.search(/[A-Za-zÀ-ÿ]/);
-  if (idx < 0) return txt;
-  return txt.slice(0, idx) + txt[idx].toUpperCase() + txt.slice(idx + 1);
-}
-function formatarMoeda(v) {
-  const n = Number(apenasNumeros(v)) / 100;
-  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  return capitalizeFirstSignificantLetter(v);
 }
 function moedaParaNumero(v) {
   const n = apenasNumeros(v || '');
@@ -439,9 +441,14 @@ function calcularValorGlobal() {
 }
 function atualizarItem(index, campo, ev) {
   const valorRaw = String(ev.target?.value || '');
-  const valor = campo === 'valorUnitario' || campo === 'valorTotal'
-    ? formatarMoeda(valorRaw)
-    : (campo === 'quantidade' ? valorRaw : iniciarComMaiuscula(valorRaw));
+  let valor = valorRaw;
+  if (campo === 'descricao' || campo === 'unidade') {
+    valor = capitalizeFirstSignificantLetter(valorRaw);
+  } else if (campo === 'quantidade') {
+    valor = sanitizeQuantidadeInput(valorRaw);
+  } else if (campo === 'valorUnitario' || campo === 'valorTotal') {
+    valor = formatMoedaBRLInput(valorRaw);
+  }
   itens.value = itens.value.map((it, i) => {
     if (i !== index) return it;
     const next = { ...it, [campo]: valor };

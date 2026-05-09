@@ -1,3 +1,5 @@
+import { capitalizeFirstSignificantLetter } from '../../utils/itemValorCampos.js';
+
 export const DATA_OPTIONS = ['Data automática', 'Datado e assinado digitalmente', 'Data manual'];
 export const TRATAMENTO_NOME = ['Ao senhor', 'A senhora'];
 export const TRATAMENTO_CARGO = ['Senhor', 'Senhora'];
@@ -18,10 +20,7 @@ export function campoPreenchido(valor) {
 }
 
 export function primeiraMaiuscula(valor) {
-  const v = String(valor || '');
-  const indice = v.search(/[A-Za-zÀ-ÿ]/);
-  if (indice < 0) return v;
-  return v.slice(0, indice) + v[indice].toUpperCase() + v.slice(indice + 1);
+  return capitalizeFirstSignificantLetter(valor);
 }
 
 export function formatarData(valor) {

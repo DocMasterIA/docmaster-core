@@ -351,6 +351,17 @@
                     @input="onCnpjDrawerInput(field, $event)"
                   />
                   <input
+                    v-else-if="isItemValorTextSlotField(field)"
+                    :id="'drawer-slot-' + field.id"
+                    :value="slotForm[field.id]"
+                    type="text"
+                    class="gov-input doc-gen__slot-input"
+                    autocomplete="off"
+                    :placeholder="field.placeholder || 'Selecione, digite ou adicione novo valor'"
+                    @focus="openFieldSuggestions(field.id)"
+                    @input="onItemValorSlotTextInput(field, $event)"
+                  />
+                  <input
                     v-else
                     :id="'drawer-slot-' + field.id"
                     v-model="slotForm[field.id]"
@@ -536,6 +547,11 @@ import { useRoute } from 'vue-router';
 import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
+import {
+  capitalizeFirstSignificantLetter,
+  formatMoedaBRLInput,
+  sanitizeQuantidadeInput,
+} from '@/utils/itemValorCampos.js';
 
 // Em dev: '' → proxy Vite `/api`
 const API_BASE = getApiBase();
@@ -945,6 +961,25 @@ function canRemoveFieldOption(fieldId) {
 function isCnpjSlotField(field) {
   const id = String(field?.id || '').toLowerCase();
   return id === 'fornecedor_cnpj' || id === 'cnpj_fornecedor' || id === 'cnpj' || id.endsWith('_cnpj');
+}
+
+const ITEM_VALOR_SLOT_IDS = new Set(['item_descricao', 'item_quantidade', 'item_unidade', 'item_valor_unitario']);
+
+function isItemValorTextSlotField(field) {
+  return field?.input === 'text' && ITEM_VALOR_SLOT_IDS.has(String(field?.id || ''));
+}
+
+function onItemValorSlotTextInput(field, event) {
+  const el = event?.target;
+  if (!el) return;
+  const raw = String(el.value ?? '');
+  const id = String(field?.id || '');
+  let v = raw;
+  if (id === 'item_descricao' || id === 'item_unidade') v = capitalizeFirstSignificantLetter(raw);
+  else if (id === 'item_quantidade') v = sanitizeQuantidadeInput(raw);
+  else if (id === 'item_valor_unitario') v = formatMoedaBRLInput(raw);
+  slotForm[field.id] = v;
+  openFieldSuggestions(field.id);
 }
 
 function onCnpjDrawerInput(field, event) {

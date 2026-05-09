@@ -153,7 +153,7 @@
 
             <div class="ixp-field ixp-half">
               <label>Valor total do processo</label>
-              <input v-model="valorGlobal" placeholder="R$ 0,00" />
+              <input :value="valorGlobal" placeholder="R$ 0,00" @input="valorGlobal = formatMoedaBRLInput(String($event.target.value || ''))" />
             </div>
 
             <article class="ixp-card">
@@ -399,6 +399,11 @@ import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js'
 import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
+import {
+  capitalizeFirstSignificantLetter as primeiraMaiuscula,
+  formatMoedaBRLInput,
+  sanitizeQuantidadeInput,
+} from '@/utils/itemValorCampos.js';
 import '@/components/dispensa-art-75-ii/dispensaArt75ii.css';
 
 const API_BASE = getApiBase();
@@ -888,9 +893,16 @@ function removerItem(index) {
 }
 function atualizarItem(index, campo, event) {
   const raw = String(event.target.value || '');
+  let nextVal = raw;
+  if (campo === 'descricao' || campo === 'unidade') {
+    nextVal = primeiraMaiuscula(raw);
+  } else if (campo === 'quantidade') {
+    nextVal = sanitizeQuantidadeInput(raw);
+  } else if (campo === 'valorUnitario' || campo === 'valorTotal') {
+    nextVal = formatMoedaBRLInput(raw);
+  }
   const next = [...itens.value];
-  const item = { ...next[index] };
-  item[campo] = campo === 'valorUnitario' ? formatarMoeda(raw) : raw;
+  const item = { ...next[index], [campo]: nextVal };
   if (campo === 'quantidade' || campo === 'valorUnitario') {
     item.valorTotal = calcularTotalItem(item.quantidade, item.valorUnitario);
   }
@@ -918,12 +930,6 @@ function toBrDate(iso) {
   const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return v;
   return `${m[3]}/${m[2]}/${m[1]}`;
-}
-function primeiraMaiuscula(valor) {
-  const v = String(valor || '');
-  const idx = v.search(/[A-Za-zÀ-ÿ]/);
-  if (idx < 0) return v;
-  return v.slice(0, idx) + v[idx].toUpperCase() + v.slice(idx + 1);
 }
 function gerarObjetoTexto(contratado, setor, caracteristicas, tipoManutencaoValue = '', revisaoKmValue = '') {
   const objeto = String(contratado || '').trim() || 'objeto nao informado';

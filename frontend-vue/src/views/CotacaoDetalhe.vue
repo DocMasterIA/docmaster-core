@@ -331,10 +331,11 @@
                 <td class="cot-sheet-center">—</td>
                 <td>
                   <input
-                    v-model.trim="manualItem.descricao_item"
+                    :value="manualItem.descricao_item"
                     type="text"
                     class="cot-sheet-inline-input"
                     placeholder="Nome/descrição do item"
+                    @input="onManualDescricaoItemInput"
                   />
                 </td>
                 <td class="cot-sheet-center">—</td>
@@ -344,19 +345,21 @@
                 <td class="cot-sheet-center">—</td>
                 <td class="cot-sheet-center">
                   <input
-                    v-model.trim="manualItem.quantidade"
+                    :value="manualItem.quantidade"
                     type="text"
                     inputmode="decimal"
                     class="cot-sheet-inline-input"
                     placeholder="Qtd."
+                    @input="onManualQuantidadeInput"
                   />
                 </td>
                 <td class="cot-sheet-center">
                   <input
-                    v-model.trim="manualItem.unidade_medida"
+                    :value="manualItem.unidade_medida"
                     type="text"
                     class="cot-sheet-inline-input"
                     placeholder="Unidade (ex.: UN, CX, KG)"
+                    @input="onManualUnidadeMedidaInput"
                   />
                 </td>
                 <td class="cot-sheet-center">—</td>
@@ -621,6 +624,11 @@ import {
   updateResearchSession,
   updateResearchSessionItem,
 } from '../services/pncpResearch';
+import {
+  capitalizeFirstSignificantLetter,
+  formatMoedaBRLInput,
+  sanitizeQuantidadeInput,
+} from '../utils/itemValorCampos';
 
 const route = useRoute();
 const router = useRouter();
@@ -947,7 +955,7 @@ async function addManualItem() {
     loadError.value = 'Informe a descrição do item manual.';
     return;
   }
-  const unidadeMedida = String(manualItem.value.unidade_medida || '').trim().toUpperCase();
+  const unidadeMedida = capitalizeFirstSignificantLetter(String(manualItem.value.unidade_medida || '').trim());
   if (!unidadeMedida) {
     loadError.value = 'Informe a unidade do item manual (definida pelo usuário).';
     return;
@@ -999,20 +1007,20 @@ function toggleManualItemEditor() {
   showManualItemEditor.value = !showManualItemEditor.value;
 }
 
+function onManualDescricaoItemInput(event) {
+  manualItem.value.descricao_item = capitalizeFirstSignificantLetter(String(event?.target?.value || ''));
+}
+
+function onManualQuantidadeInput(event) {
+  manualItem.value.quantidade = sanitizeQuantidadeInput(String(event?.target?.value || ''));
+}
+
+function onManualUnidadeMedidaInput(event) {
+  manualItem.value.unidade_medida = capitalizeFirstSignificantLetter(String(event?.target?.value || ''));
+}
+
 function onManualBaseInput(event) {
-  const raw = String(event?.target?.value || '');
-  const digits = raw.replace(/\D/g, '');
-  if (!digits) {
-    manualItem.value.valor_base = '';
-    return;
-  }
-  const cents = Number.parseInt(digits, 10);
-  if (!Number.isFinite(cents)) {
-    manualItem.value.valor_base = '';
-    return;
-  }
-  const value = cents / 100;
-  manualItem.value.valor_base = value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  manualItem.value.valor_base = formatMoedaBRLInput(String(event?.target?.value || ''));
 }
 
 function parseCurrencyInputToNumber(value) {
@@ -1423,19 +1431,7 @@ function faixaBaseDisplay(linha) {
 }
 
 function onFaixaBaseRowInput(itemId, event) {
-  const raw = String(event?.target?.value || '');
-  const digits = raw.replace(/\D/g, '');
-  if (!digits) {
-    faixaBaseDraft.value = { ...faixaBaseDraft.value, [itemId]: '' };
-    return;
-  }
-  const cents = Number.parseInt(digits, 10);
-  if (!Number.isFinite(cents)) {
-    faixaBaseDraft.value = { ...faixaBaseDraft.value, [itemId]: '' };
-    return;
-  }
-  const value = cents / 100;
-  const formatted = value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const formatted = formatMoedaBRLInput(String(event?.target?.value || ''));
   faixaBaseDraft.value = { ...faixaBaseDraft.value, [itemId]: formatted };
 }
 

@@ -36,19 +36,19 @@
                     <input v-model="processo" list="dl-processo-numero" placeholder="Ex: 123/2026" />
                   </div>
                   <div class="ixp-field">
-                    <label>Orgao / Unidade</label>
-                    <input v-model="orgao" list="dl-orgao" placeholder="Selecione ou digite o orgao" />
+                    <label>Órgão / Unidade</label>
+                    <input v-model="orgao" list="dl-orgao" placeholder="Selecione ou digite o órgão" />
                   </div>
                   <div v-if="isFornecedorExclusivoRoute" class="ixp-field">
-                    <label>Orgao / Unidade responsavel pelo equipamento</label>
+                    <label>Órgão / Unidade responsável pelo equipamento</label>
                     <input
                       v-model="orgaoResponsavelEquipamento"
-                      placeholder="Digite o orgao/unidade responsavel pelo equipamento"
+                      placeholder="Digite o órgão ou unidade responsável pelo equipamento"
                     />
                   </div>
                   <div v-if="isInexigibilidadeManutencaoRoute" class="ixp-field">
-                    <label>Orgao / Unidade do veiculo</label>
-                    <input v-model="orgaoUnidadeVeiculo" placeholder="Digite o orgao/unidade do veiculo" />
+                    <label>Órgão / Unidade do veículo</label>
+                    <input v-model="orgaoUnidadeVeiculo" placeholder="Digite o órgão ou unidade do veículo" />
                   </div>
                 </div>
               </div>
@@ -427,7 +427,7 @@ const objetoEspecificoOptions = [
   'Outro',
 ];
 const emptyItem = { descricao: '', quantidade: '', unidade: '', valorUnitario: '', valorTotal: '' };
-const placeholderDotacao = ['Ex:', 'Orgao: 02', 'Unidade: 05', 'Projeto/Atividade: 2.045', 'Elemento de despesa: 3.3.90.39.00', 'Fonte: 1.500'].join('\n');
+const placeholderDotacao = ['Ex:', 'Órgão: 02', 'Unidade: 05', 'Projeto/Atividade: 2.045', 'Elemento de despesa: 3.3.90.39.00', 'Fonte: 1.500'].join('\n');
 const DISPENSA_RAPIDA_TO_LOGICAL = {
   DispensaRapidaArt75IObrasEngenharia: 'DispensaArt75IObrasEngenharia',
   DispensaRapidaArt75IManutencaoVeiculos: 'DispensaArt75IManutencaoVeiculos',
@@ -1010,7 +1010,7 @@ function buildInexig74ManutencaoDfdJustificativa() {
     `O objeto da referencia e o ${natureza} do veiculo (${identVeiculo}), com vistas a preservar a disponibilidade, a seguranca e a economicidade da frota vinculada ao servico publico.`,
   ];
   if (orgVeic) {
-    partes.push(`Orgao / unidade do veiculo: ${orgVeic}.`);
+    partes.push(`Órgão / Unidade do veículo: ${orgVeic}.`);
   }
   if (tipo === 'Preventiva' && rk) {
     partes.push(`Para a manutencao preventiva, foi indicada a referencia de quilometragem ou revisao: ${rk}.`);
@@ -1518,12 +1518,12 @@ const secoes = computed(() => {
       linhas: [
         ['Cabecalho', cabecalhoDocumento.value || 'Nao informado', isFilled(cabecalhoDocumento.value)],
         ['Processo', processoAtivo.value ? processo.value || 'Nao informado' : 'Nao se aplica', !processoAtivo.value || isFilled(processo.value)],
-        ['Orgao', orgao.value || 'Nao informado', isFilled(orgao.value)],
+        ['Órgão', orgao.value || 'Não informado', isFilled(orgao.value)],
         ...(isFornecedorExclusivoRoute.value
-          ? [['Orgao / Unidade responsavel pelo equipamento', orgaoResponsavelEquipamento.value || 'Nao informado', isFilled(orgaoResponsavelEquipamento.value)]]
+          ? [['Órgão / Unidade responsável pelo equipamento', orgaoResponsavelEquipamento.value || 'Não informado', isFilled(orgaoResponsavelEquipamento.value)]]
           : []),
         ...(isInexigibilidadeManutencaoRoute.value
-          ? [['Orgao / Unidade do veiculo', orgaoUnidadeVeiculo.value || 'Nao informado', isFilled(orgaoUnidadeVeiculo.value)]]
+          ? [['Órgão / Unidade do veículo', orgaoUnidadeVeiculo.value || 'Não informado', isFilled(orgaoUnidadeVeiculo.value)]]
           : []),
       ],
     },

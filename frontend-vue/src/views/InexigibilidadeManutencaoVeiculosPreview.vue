@@ -942,35 +942,38 @@ function gerarJustificativaTexto(contratado, setor, caracteristicas, tipoManuten
   return `A presente contratacao justifica-se pela necessidade de assegurar ${objeto} para atendimento das demandas${destino}, garantindo a continuidade, eficiencia e adequada prestacao dos servicos publicos.${manutencao}${revisao}${detalhes}`;
 }
 
-/** Texto para (DFD_OBJETO_REFERENCIA) — apenas inexigibilidade Art. 74.I manutencao de veiculos. */
+/** Texto para (DFD_OBJETO_REFERENCIA) — redacao em prosa; inexigibilidade Art. 74.I manutencao de veiculos. */
 function buildInexig74ManutencaoDfdObjetoReferencia() {
   const m = String(marca.value || '').trim();
   const mod = String(modelo.value || '').trim();
   const pl = String(placa.value || '').trim();
-  const blocos = [];
-  const partesVeiculo = [];
-  if (m) partesVeiculo.push(`Marca: ${m}`);
-  if (mod) partesVeiculo.push(`Modelo: ${mod}`);
-  if (pl) partesVeiculo.push(`Placa: ${pl}`);
-  if (partesVeiculo.length) {
-    blocos.push(`Dados do veiculo\n${partesVeiculo.join('\n')}`);
-  }
   const tipo = String(tipoManutencao.value || '').trim();
+  const rk = String(revisaoKm.value || '').trim();
+  const orgVeic = String(orgaoUnidadeVeiculo.value || '').trim();
+  const ident = [m && `marca ${m}`, mod && `modelo ${mod}`, pl && `placa ${pl}`].filter(Boolean).join(', ');
+  if (!ident && !tipo) return '';
+
+  const paragrafos = [];
+  if (ident) {
+    paragrafos.push(
+      `A necessidade insere-se na manutencao do veiculo identificado (${ident}), indispensavel a disponibilidade e a seguranca da frota utilizada na prestacao de servicos publicos.`,
+    );
+  }
   if (tipo === 'Corretiva') {
-    blocos.push(
-      'Tipo de manutencao: Corretiva\n'
-      + 'Manutencao corretiva: reparo por falha, defeito ou necessidade imediata de restabelecimento da condicao de uso do veiculo.',
+    paragrafos.push(
+      'Trata-se de intervencao corretiva, orientada ao reparo de falha, defeito ou situacao que exija retorno imediato a condicao de uso, evitando prolongada indisponibilidade do veiculo.',
     );
   } else if (tipo === 'Preventiva') {
-    const rk = String(revisaoKm.value || '').trim();
-    let t = 'Tipo de manutencao: Preventiva\n'
-      + 'Manutencao preventiva: revisao programada conforme quilometragem ou plano de conservacao do veiculo.';
-    if (rk) t += `\nQuilometragem / revisao preventiva informada: ${rk}.`;
-    blocos.push(t);
+    let t = 'Trata-se de manutencao preventiva, alinhada a revisao programada por quilometragem ou plano de conservacao, visando reduzir custos corretivos futuros e preservar o estado mecanico do veiculo.';
+    if (rk) t += ` A referencia informada para a revisao e: ${rk}.`;
+    paragrafos.push(t);
   } else if (tipo) {
-    blocos.push(`Tipo de manutencao: ${tipo}.`);
+    paragrafos.push(`O tipo de manutencao previsto e ${tipo}.`);
   }
-  return blocos.join('\n\n');
+  if (orgVeic) {
+    paragrafos.push(`A unidade de lotacao ou uso do veiculo e ${orgVeic}.`);
+  }
+  return paragrafos.join('\n\n');
 }
 
 /** Texto para (DFD_JUSTIFICATIVA) — apenas inexigibilidade Art. 74.I manutencao de veiculos. */
@@ -1018,20 +1021,53 @@ function objetoEspecificoContratacaoIx() {
   return String(objetoEspecifico.value || '').trim();
 }
 
-/** DFD_OBJETO_REFERENCIA — inexigibilidade 74.I fornecedor exclusivo (esta tela compartilhada). */
+function necessidadeConsisteComObjetoIx(obRaw) {
+  const t = String(obRaw || '').trim();
+  if (!t) return '';
+  const low = t.toLowerCase();
+  const lowAscii = low.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (/^(prestacao|aquisicao|fornecimento|manutencao|assistencia|implementacao)\b/.test(lowAscii)) {
+    return `na ${low}`;
+  }
+  return `em assegurar ${low}`;
+}
+
+/** DFD_OBJETO_REFERENCIA — redacao em prosa; fornecedor exclusivo nesta tela compartilhada. */
 function buildInexigFornecedorExclusivoDfdObjetoReferencia() {
-  const blocos = [];
   const eq = String(equipamento.value || '').trim();
   const m = String(marca.value || '').trim();
   const mod = String(modelo.value || '').trim();
-  const linhasEq = [];
-  if (eq) linhasEq.push(`Equipamento: ${eq}`);
-  if (m) linhasEq.push(`Marca: ${m}`);
-  if (mod) linhasEq.push(`Modelo: ${mod}`);
-  if (linhasEq.length) blocos.push(`Dados do equipamento\n${linhasEq.join('\n')}`);
   const ob = objetoEspecificoContratacaoIx();
-  if (ob) blocos.push(`Objeto especifico da contratacao\n${ob}`);
-  return blocos.join('\n\n');
+  const org = String(orgaoResponsavelEquipamento.value || orgao.value || '').trim();
+  const temEquip = !!(eq || m || mod);
+  const fichaEquip = [eq, m && `marca ${m}`, mod && `modelo ${mod}`].filter(Boolean).join(', ');
+  const obFrase = ob ? (ob.charAt(0).toUpperCase() + ob.slice(1)) : '';
+
+  const paragrafos = [];
+  if (obFrase && temEquip) {
+    const nucleo = necessidadeConsisteComObjetoIx(ob);
+    paragrafos.push(
+      `A necessidade a ser atendida consiste ${nucleo} `
+      + `no ambito do equipamento identificado (${fichaEquip}), de forma a preservar a continuidade operacional, a rastreabilidade tecnica e condicoes seguras de uso do bem, `
+      + 'evitando paralisacoes ou degradacao do servico publico que depende dessa infraestrutura.',
+    );
+  } else if (obFrase) {
+    paragrafos.push(
+      `A necessidade administrativa consiste em formalizar a contratacao referente a ${obFrase.charAt(0).toLowerCase() + obFrase.slice(1)}, `
+      + 'alinhada a hipotese de inexigibilidade por fornecedor exclusivo e a continuidade adequada das atividades do orgao.',
+    );
+  } else if (temEquip) {
+    paragrafos.push(
+      `A necessidade reporta-se ao equipamento (${fichaEquip}), cuja manutencao da condicao de uso e do desempenho tecnico e imprescindivel a rotina administrativa ou assistencial, `
+      + 'devendo a contratacao observar a singularidade do fornecimento e os requisitos legais aplicaveis.',
+    );
+  }
+  if (org && paragrafos.length) {
+    paragrafos.push(
+      `A demanda e apresentada em nome do orgao ou unidade ${org}, responsavel pela guarda, operacao ou manutencao do equipamento.`,
+    );
+  }
+  return paragrafos.join('\n\n');
 }
 
 /** Justificativa para TR, DFD e oficio — fornecedor exclusivo nesta tela. */
@@ -1039,31 +1075,55 @@ function buildInexigFornecedorExclusivoJustificativaTrDfd() {
   const org = String(orgaoResponsavelEquipamento.value || orgao.value || '').trim();
   const ob = objetoEspecificoContratacaoIx();
   const partesEq = [String(equipamento.value || '').trim(), String(marca.value || '').trim(), String(modelo.value || '').trim()].filter(Boolean);
-  const eqRef = partesEq.length ? partesEq.join(' / ') : 'equipamento indicado nos dados da demanda';
+  const eqRef = partesEq.length ? partesEq.join(', ') : '';
   const forn = String(fornecedor.value || '').trim();
   const cnpjStr = String(cnpj.value || '').trim();
+  const obTxt = ob ? ob.charAt(0).toLowerCase() + ob.slice(1) : '';
+
   const partes = [
-    'A presente demanda insere-se na hipotese de inexigibilidade de licitacao prevista no art. 74, inciso I, da Lei n. 14.133/2021, em razao da exclusividade do fornecimento ou da prestacao tecnica especializada, com imprescindibilidade de compatibilidade com solucao ja existente no ambito do orgao.',
-    `O objeto especifico informado (${ob || 'conforme dados preenchidos'}) relaciona-se ao equipamento (${eqRef})${org ? `, vinculado ao orgao/unidade ${org}` : ''}.`,
+    'A contratacao direta enquadra-se na hipotese de inexigibilidade de licitacao prevista no art. 74, inciso I, da Lei n. 14.133/2021, em razao da exclusividade do fornecimento ou da prestacao tecnica especializada e da imprescindibilidade de compatibilidade com solucao ja existente no ambito do orgao.',
   ];
+  if (obTxt && eqRef) {
+    partes.push(
+      `Do ponto de vista fatico, a medida decorre da necessidade de ${obTxt} em relacao ao equipamento ${eqRef}${org ? `, sob a responsabilidade da unidade ${org}` : ''}, `
+      + 'de modo a restabelecer ou manter o padrao tecnico exigido para o uso regular do bem.',
+    );
+  } else if (obTxt) {
+    partes.push(
+      `A medida atende a necessidade de ${obTxt}${org ? `, conforme demanda apresentada pelo orgao ou unidade ${org}` : ''}, nos limites da legislacao aplicavel.`,
+    );
+  } else if (eqRef) {
+    partes.push(
+      `A medida atende a necessidade vinculada ao equipamento ${eqRef}${org ? `, sob a responsabilidade da unidade ${org}` : ''}, preservando a continuidade operacional e a seguranca de uso.`,
+    );
+  }
   if (forn) {
     partes.push(
-      `O fornecedor exclusivo indicado e ${forn}${cnpjStr ? `, inscrito no CNPJ ${cnpjStr}` : ''}, nos limites do artigo e da fundamentacao do termo de referencia.`,
+      `Para fins de instrucao do processo, o fornecedor exclusivo indicado e ${forn}${cnpjStr ? `, inscrito no CNPJ ${cnpjStr}` : ''}, observados os requisitos de idoneidade e a compatibilidade tecnica exigidos para a especie.`,
     );
   }
   partes.push(
-    'Assim, a justificativa consubstancia a demonstracao da singularidade do fornecedor e da natureza tecnica do objeto, permitindo a contratacao direta com observancia dos requisitos legais e da continuidade adequada do servico publico.',
+    'Por conseguinte, a justificativa demonstra a singularidade do fornecimento e a adequacao da contratacao direta a continuidade do servico publico, com observancia dos demais requisitos legais.',
   );
   return partes.join('\n\n');
 }
 
 function buildInexigFornecedorExclusivoObjetoTrResumo() {
-  const ob = objetoEspecificoContratacaoIx();
-  const partesEq = [String(equipamento.value || '').trim(), String(marca.value || '').trim(), String(modelo.value || '').trim()].filter(Boolean);
-  const trechos = [];
-  if (ob) trechos.push(`Objeto especifico: ${ob}.`);
-  if (partesEq.length) trechos.push(`Equipamento: ${partesEq.join(', ')}.`);
-  return trechos.join(' ');
+  const ob = String(objetoEspecificoContratacaoIx() || '').trim();
+  const eq = String(equipamento.value || '').trim();
+  const m = String(marca.value || '').trim();
+  const mod = String(modelo.value || '').trim();
+  const nomeEq = [eq, m, mod].filter(Boolean).join(', ');
+  if (ob && nomeEq) {
+    return `Contratacao de ${ob.charAt(0).toLowerCase() + ob.slice(1)} vinculada ao equipamento ${nomeEq}, na hipotese de fornecedor exclusivo (art. 74, inciso I, da Lei n. 14.133/2021).`;
+  }
+  if (ob) {
+    return `Contratacao de ${ob.charAt(0).toLowerCase() + ob.slice(1)}, na hipotese de fornecedor exclusivo (art. 74, inciso I, da Lei n. 14.133/2021).`;
+  }
+  if (nomeEq) {
+    return `Contratacao vinculada ao equipamento ${nomeEq}, na hipotese de fornecedor exclusivo (art. 74, inciso I, da Lei n. 14.133/2021).`;
+  }
+  return '';
 }
 
 function buildSlotsOverride() {

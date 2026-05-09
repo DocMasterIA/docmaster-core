@@ -99,6 +99,10 @@ class TRTemplateSlots:
     dfd_assinatura_cargo: str = ""
     dfd_assinatura_nome: str = ""
     dfd_data: str = ""
+    # Texto exclusivo do DFD (ex.: inexigibilidade Art. 74.I — manutenção de veículos).
+    # Quando vazios, render_dfd_from_tr_slots usa objeto/justificativa como fallback.
+    dfd_objeto_referencia: str = ""
+    dfd_justificativa: str = ""
     numero_processo: str = ""
     marca: str = ""
     modelo: str = ""

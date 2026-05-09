@@ -941,6 +941,131 @@ function gerarJustificativaTexto(contratado, setor, caracteristicas, tipoManuten
   const detalhes = String(caracteristicas || '').trim() ? ` A contratacao devera observar as caracteristicas minimas informadas: ${String(caracteristicas).trim()}.` : '';
   return `A presente contratacao justifica-se pela necessidade de assegurar ${objeto} para atendimento das demandas${destino}, garantindo a continuidade, eficiencia e adequada prestacao dos servicos publicos.${manutencao}${revisao}${detalhes}`;
 }
+
+/** Texto para (DFD_OBJETO_REFERENCIA) — apenas inexigibilidade Art. 74.I manutencao de veiculos. */
+function buildInexig74ManutencaoDfdObjetoReferencia() {
+  const m = String(marca.value || '').trim();
+  const mod = String(modelo.value || '').trim();
+  const pl = String(placa.value || '').trim();
+  const blocos = [];
+  const partesVeiculo = [];
+  if (m) partesVeiculo.push(`Marca: ${m}`);
+  if (mod) partesVeiculo.push(`Modelo: ${mod}`);
+  if (pl) partesVeiculo.push(`Placa: ${pl}`);
+  if (partesVeiculo.length) {
+    blocos.push(`Dados do veiculo\n${partesVeiculo.join('\n')}`);
+  }
+  const tipo = String(tipoManutencao.value || '').trim();
+  if (tipo === 'Corretiva') {
+    blocos.push(
+      'Tipo de manutencao: Corretiva\n'
+      + 'Manutencao corretiva: reparo por falha, defeito ou necessidade imediata de restabelecimento da condicao de uso do veiculo.',
+    );
+  } else if (tipo === 'Preventiva') {
+    const rk = String(revisaoKm.value || '').trim();
+    let t = 'Tipo de manutencao: Preventiva\n'
+      + 'Manutencao preventiva: revisao programada conforme quilometragem ou plano de conservacao do veiculo.';
+    if (rk) t += `\nQuilometragem / revisao preventiva informada: ${rk}.`;
+    blocos.push(t);
+  } else if (tipo) {
+    blocos.push(`Tipo de manutencao: ${tipo}.`);
+  }
+  return blocos.join('\n\n');
+}
+
+/** Texto para (DFD_JUSTIFICATIVA) — apenas inexigibilidade Art. 74.I manutencao de veiculos. */
+function buildInexig74ManutencaoDfdJustificativa() {
+  const m = String(marca.value || '').trim();
+  const mod = String(modelo.value || '').trim();
+  const pl = String(placa.value || '').trim();
+  const orgVeic = String(orgaoUnidadeVeiculo.value || '').trim();
+  const tipo = String(tipoManutencao.value || '').trim();
+  const rk = String(revisaoKm.value || '').trim();
+  const forn = String(fornecedor.value || '').trim();
+  const cnpjStr = String(cnpj.value || '').trim();
+  const identVeiculo = [m, mod, pl].filter(Boolean).join(' / ') || 'veiculo indicado nos dados da demanda';
+  let natureza = 'servico de manutencao do veiculo';
+  if (tipo === 'Corretiva') {
+    natureza = 'manutencao corretiva (reparo por falha, defeito ou necessidade imediata)';
+  } else if (tipo === 'Preventiva') {
+    natureza = 'manutencao preventiva (revisao programada conforme quilometragem ou plano de conservacao)';
+  } else if (tipo) {
+    natureza = `manutencao ${tipo.toLowerCase()}`;
+  }
+  const partes = [
+    'A presente demanda insere-se no ambito da contratacao direta por inexigibilidade de licitacao, nos termos do art. 74, inciso I, da Lei nº 14.133/2021, ante a necessidade de aquisicao de pecas, componentes ou servicos tecnicos de natureza singular, com fornecedor exclusivo.',
+    `O objeto da referencia e o ${natureza} do veiculo (${identVeiculo}), com vistas a preservar a disponibilidade, a seguranca e a economicidade da frota vinculada ao servico publico.`,
+  ];
+  if (orgVeic) {
+    partes.push(`Orgao / unidade do veiculo: ${orgVeic}.`);
+  }
+  if (tipo === 'Preventiva' && rk) {
+    partes.push(`Para a manutencao preventiva, foi indicada a referencia de quilometragem ou revisao: ${rk}.`);
+  }
+  if (forn) {
+    partes.push(
+      `O fornecedor exclusivo indicado e ${forn}${cnpjStr ? ` (CNPJ ${cnpjStr})` : ''}, nos limites do artigo e da fundamentacao do termo de referencia.`,
+    );
+  }
+  partes.push(
+    'Assim, a formalizacao no DFD consubstancia a descricao tecnica e administrativa necessaria para instruir a contratacao, mantendo coerencia entre o veiculo, o tipo de manutencao e a hipotes legal de inexigibilidade.',
+  );
+  return partes.join('\n\n');
+}
+
+function objetoEspecificoContratacaoIx() {
+  if (objetoEspecifico.value === 'Outro') return String(outroObjetoEspecifico.value || '').trim();
+  return String(objetoEspecifico.value || '').trim();
+}
+
+/** DFD_OBJETO_REFERENCIA — inexigibilidade 74.I fornecedor exclusivo (esta tela compartilhada). */
+function buildInexigFornecedorExclusivoDfdObjetoReferencia() {
+  const blocos = [];
+  const eq = String(equipamento.value || '').trim();
+  const m = String(marca.value || '').trim();
+  const mod = String(modelo.value || '').trim();
+  const linhasEq = [];
+  if (eq) linhasEq.push(`Equipamento: ${eq}`);
+  if (m) linhasEq.push(`Marca: ${m}`);
+  if (mod) linhasEq.push(`Modelo: ${mod}`);
+  if (linhasEq.length) blocos.push(`Dados do equipamento\n${linhasEq.join('\n')}`);
+  const ob = objetoEspecificoContratacaoIx();
+  if (ob) blocos.push(`Objeto especifico da contratacao\n${ob}`);
+  return blocos.join('\n\n');
+}
+
+/** Justificativa para TR, DFD e oficio — fornecedor exclusivo nesta tela. */
+function buildInexigFornecedorExclusivoJustificativaTrDfd() {
+  const org = String(orgaoResponsavelEquipamento.value || orgao.value || '').trim();
+  const ob = objetoEspecificoContratacaoIx();
+  const partesEq = [String(equipamento.value || '').trim(), String(marca.value || '').trim(), String(modelo.value || '').trim()].filter(Boolean);
+  const eqRef = partesEq.length ? partesEq.join(' / ') : 'equipamento indicado nos dados da demanda';
+  const forn = String(fornecedor.value || '').trim();
+  const cnpjStr = String(cnpj.value || '').trim();
+  const partes = [
+    'A presente demanda insere-se na hipotese de inexigibilidade de licitacao prevista no art. 74, inciso I, da Lei n. 14.133/2021, em razao da exclusividade do fornecimento ou da prestacao tecnica especializada, com imprescindibilidade de compatibilidade com solucao ja existente no ambito do orgao.',
+    `O objeto especifico informado (${ob || 'conforme dados preenchidos'}) relaciona-se ao equipamento (${eqRef})${org ? `, vinculado ao orgao/unidade ${org}` : ''}.`,
+  ];
+  if (forn) {
+    partes.push(
+      `O fornecedor exclusivo indicado e ${forn}${cnpjStr ? `, inscrito no CNPJ ${cnpjStr}` : ''}, nos limites do artigo e da fundamentacao do termo de referencia.`,
+    );
+  }
+  partes.push(
+    'Assim, a justificativa consubstancia a demonstracao da singularidade do fornecedor e da natureza tecnica do objeto, permitindo a contratacao direta com observancia dos requisitos legais e da continuidade adequada do servico publico.',
+  );
+  return partes.join('\n\n');
+}
+
+function buildInexigFornecedorExclusivoObjetoTrResumo() {
+  const ob = objetoEspecificoContratacaoIx();
+  const partesEq = [String(equipamento.value || '').trim(), String(marca.value || '').trim(), String(modelo.value || '').trim()].filter(Boolean);
+  const trechos = [];
+  if (ob) trechos.push(`Objeto especifico: ${ob}.`);
+  if (partesEq.length) trechos.push(`Equipamento: ${partesEq.join(', ')}.`);
+  return trechos.join(' ');
+}
+
 function buildSlotsOverride() {
   const o = {};
   const solDestNome = fixoNome.value.trim();
@@ -1056,6 +1181,27 @@ function buildSlotsOverride() {
   if (valorGlobal.value.trim()) o.valor_total = valorGlobal.value.trim();
   if (fixoTratNome.value.trim()) o.ao_senhor_genero = fixoTratNome.value.trim();
   if (fixoTratCargo.value.trim()) o.senhor_senhora_genero = fixoTratCargo.value.trim();
+
+  if (isInexigibilidadeManutencaoRoute.value) {
+    const dfdObjRef = buildInexig74ManutencaoDfdObjetoReferencia().trim();
+    const dfdJust = buildInexig74ManutencaoDfdJustificativa().trim();
+    if (dfdObjRef) o.dfd_objeto_referencia = dfdObjRef;
+    if (dfdJust) o.dfd_justificativa = dfdJust;
+  } else if (isFornecedorExclusivoRoute.value) {
+    const dfdObjFe = buildInexigFornecedorExclusivoDfdObjetoReferencia().trim();
+    const justFe = buildInexigFornecedorExclusivoJustificativaTrDfd().trim();
+    const objetoFe = buildInexigFornecedorExclusivoObjetoTrResumo().trim();
+    if (dfdObjFe) o.dfd_objeto_referencia = dfdObjFe;
+    if (justFe) {
+      o.justificativa = justFe;
+      o.dfd_justificativa = justFe;
+      o.sol_oficio_justificativa = justFe;
+    }
+    if (objetoFe) {
+      o.objeto = objetoFe;
+      o.sol_oficio_objeto = objetoFe;
+    }
+  }
 
   const fundamentoLegal = resolveSolOficioFundamentoLegal(logicalRouteName.value);
   if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;

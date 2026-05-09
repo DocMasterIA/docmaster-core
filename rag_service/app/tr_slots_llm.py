@@ -1240,6 +1240,8 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
         dfd_assinatura_cargo=str(data.get("dfd_assinatura_cargo", "")).strip(),
         dfd_assinatura_nome=str(data.get("dfd_assinatura_nome", "")).strip(),
         dfd_data=str(data.get("dfd_data", "")).strip(),
+        dfd_objeto_referencia=str(data.get("dfd_objeto_referencia", "")).strip(),
+        dfd_justificativa=str(data.get("dfd_justificativa", "")).strip(),
         numero_processo=str(data.get("numero_processo", "")).strip(),
         marca=str(data.get("marca", "")).strip(),
         modelo=str(data.get("modelo", "")).strip(),
@@ -1517,6 +1519,16 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         if override.get("senhor_senhora_genero") is not None
         else llm_slots.senhor_senhora_genero
     )
+    dfd_objeto_referencia = (
+        (override.get("dfd_objeto_referencia") or llm_slots.dfd_objeto_referencia)
+        if override.get("dfd_objeto_referencia") is not None
+        else llm_slots.dfd_objeto_referencia
+    )
+    dfd_justificativa = (
+        (override.get("dfd_justificativa") or llm_slots.dfd_justificativa)
+        if override.get("dfd_justificativa") is not None
+        else llm_slots.dfd_justificativa
+    )
 
     itens_override = override.get("itens")
     if isinstance(itens_override, list) and len(itens_override) > 0:
@@ -1576,6 +1588,8 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
                 dfd_assinatura_cargo=dfd_assinatura_cargo,
                 dfd_assinatura_nome=dfd_assinatura_nome,
                 dfd_data=dfd_data,
+                dfd_objeto_referencia=dfd_objeto_referencia,
+                dfd_justificativa=dfd_justificativa,
                 numero_processo=numero_processo,
                 marca=marca,
                 modelo=modelo,
@@ -1632,6 +1646,8 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         dfd_assinatura_cargo=dfd_assinatura_cargo,
         dfd_assinatura_nome=dfd_assinatura_nome,
         dfd_data=dfd_data,
+        dfd_objeto_referencia=dfd_objeto_referencia,
+        dfd_justificativa=dfd_justificativa,
         numero_processo=numero_processo,
         marca=marca,
         modelo=modelo,

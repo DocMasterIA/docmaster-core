@@ -657,6 +657,63 @@ function revokeDocumentUrls() {
     urlRef.value = '';
   });
 }
+
+function objetoEspecificoContratacaoFe() {
+  if (objetoEspecifico.value === 'Outro') return String(outroObjetoEspecifico.value || '').trim();
+  return String(objetoEspecifico.value || '').trim();
+}
+
+/** Texto para (DFD_OBJETO_REFERENCIA) — inexigibilidade Art. 74.I fornecedor exclusivo. */
+function buildFornecedorExclusivo74DfdObjetoReferencia() {
+  const blocos = [];
+  const eq = String(equipamento.value || '').trim();
+  const m = String(marca.value || '').trim();
+  const mod = String(modelo.value || '').trim();
+  const linhasEq = [];
+  if (eq) linhasEq.push(`Equipamento: ${eq}`);
+  if (m) linhasEq.push(`Marca: ${m}`);
+  if (mod) linhasEq.push(`Modelo: ${mod}`);
+  if (linhasEq.length) blocos.push(`Dados do equipamento\n${linhasEq.join('\n')}`);
+  const ob = objetoEspecificoContratacaoFe();
+  if (ob) {
+    blocos.push(`Objeto específico da contratação\n${ob}`);
+  }
+  return blocos.join('\n\n');
+}
+
+/** Justificativa para TR, DFD e ofício — mesma redação (TR tem campo de justificativa). */
+function buildFornecedorExclusivo74JustificativaTrDfd() {
+  const org = String(orgao.value || '').trim();
+  const ob = objetoEspecificoContratacaoFe();
+  const partesEq = [String(equipamento.value || '').trim(), String(marca.value || '').trim(), String(modelo.value || '').trim()].filter(Boolean);
+  const eqRef = partesEq.length ? partesEq.join(' / ') : 'equipamento indicado nos dados da demanda';
+  const forn = String(fornecedor.value || '').trim();
+  const cnpjStr = String(cnpj.value || '').trim();
+  const partes = [
+    'A presente demanda insere-se na hipótese de inexigibilidade de licitação prevista no art. 74, inciso I, da Lei nº 14.133/2021, em razão da exclusividade do fornecimento ou da prestação técnica especializada, com imprescindibilidade de compatibilidade com solução já existente no âmbito do órgão.',
+    `O objeto específico informado (${ob || 'conforme dados preenchidos'}) relaciona-se ao equipamento (${eqRef})${org ? `, vinculado ao órgão/unidade ${org}` : ''}.`,
+  ];
+  if (forn) {
+    partes.push(
+      `O fornecedor exclusivo indicado é ${forn}${cnpjStr ? `, inscrito no CNPJ sob o nº ${cnpjStr}` : ''}, nos limites do artigo e da fundamentação do termo de referência.`,
+    );
+  }
+  partes.push(
+    'Assim, a justificativa consubstancia a demonstração da singularidade do fornecedor e da natureza técnica do objeto, permitindo a contratação direta com observância dos requisitos legais e da continuidade adequada do serviço público.',
+  );
+  return partes.join('\n\n');
+}
+
+/** Objeto resumido para o TR e ofício (além do DFD_OBJETO_REFERENCIA detalhado). */
+function buildFornecedorExclusivo74ObjetoTrResumo() {
+  const ob = objetoEspecificoContratacaoFe();
+  const partesEq = [String(equipamento.value || '').trim(), String(marca.value || '').trim(), String(modelo.value || '').trim()].filter(Boolean);
+  const trechos = [];
+  if (ob) trechos.push(`Objeto específico: ${ob}.`);
+  if (partesEq.length) trechos.push(`Equipamento: ${partesEq.join(', ')}.`);
+  return trechos.join(' ');
+}
+
 function buildSlotsOverride() {
   const o = {
     numero_processo: processoAtivo.value ? String(processo.value || '').trim() : '',
@@ -713,6 +770,21 @@ function buildSlotsOverride() {
   o.fiscal = fiscalNome ? { nome: fiscalNome } : undefined;
   o.nome_assinante_termo = String(responsavel.value || '').trim();
   o.cargo_assinante_termo = String(responsavelCargo.value || '').trim();
+
+  const dfdObjRef = buildFornecedorExclusivo74DfdObjetoReferencia().trim();
+  const justTrDfd = buildFornecedorExclusivo74JustificativaTrDfd().trim();
+  const objetoTr = buildFornecedorExclusivo74ObjetoTrResumo().trim();
+  if (dfdObjRef) o.dfd_objeto_referencia = dfdObjRef;
+  if (justTrDfd) {
+    o.justificativa = justTrDfd;
+    o.dfd_justificativa = justTrDfd;
+    o.sol_oficio_justificativa = justTrDfd;
+  }
+  if (objetoTr) {
+    o.objeto = objetoTr;
+    o.sol_oficio_objeto = objetoTr;
+  }
+
   return o;
 }
 function buildUserPrompt() {

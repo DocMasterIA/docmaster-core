@@ -168,10 +168,12 @@ def render_dfd_from_tr_slots(
     doc = Document(str(tpl_path))
     dfd_data_text = slots.dfd_data or slots.data_termo or ""
 
+    dfd_obj = (slots.dfd_objeto_referencia or slots.objeto or "").strip()
+    dfd_just = (slots.dfd_justificativa or slots.justificativa or "").strip()
     mapping = {
         # Placeholders padronizados (preferenciais)
-        "(DFD_OBJETO_REFERENCIA)": slots.objeto or "",
-        "(DFD_JUSTIFICATIVA)": slots.justificativa or "",
+        "(DFD_OBJETO_REFERENCIA)": dfd_obj,
+        "(DFD_JUSTIFICATIVA)": dfd_just,
         "(DFD_CIDADE)": slots.cidade or "",
         "(DFD_SETOR_REQUISITANTE)": slots.dfd_setor_requisitante or "",
         "(DFD_NUMERO_PROCESSO)": slots.dfd_numero_processo or "",
@@ -182,9 +184,9 @@ def render_dfd_from_tr_slots(
         "(DFD_CARGO_ASSINATURA)": slots.dfd_assinatura_cargo or "",
         "(DFD_NOME_ASSINATURA)": slots.dfd_assinatura_nome or "",
         "(DFD_DATA)": dfd_data_text,
-        # Placeholders legados
-        "(Descrever objeto do termo de referencia)": slots.objeto or "",
-        "(descrever a justificativa usada no termo de referencias)": slots.justificativa or "",
+        # Placeholders legados (mesmo conteúdo que DFD_OBJETO_REFERENCIA / DFD_JUSTIFICATIVA)
+        "(Descrever objeto do termo de referencia)": dfd_obj,
+        "(descrever a justificativa usada no termo de referencias)": dfd_just,
         "(CIDADE)": slots.cidade or "",
         # Placeholders novos de identificação/assinatura do DFD
         "(SETOR REQUISITANTE)": slots.dfd_setor_requisitante or "",

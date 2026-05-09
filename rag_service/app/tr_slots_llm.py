@@ -710,13 +710,24 @@ def _extrair_int_positivo(value: Any) -> Optional[int]:
     return val if val > 0 else None
 
 
-def _polish_objeto_with_itens(objeto: str, itens: List[ItemSlot], user_prompt: str) -> str:
+def _polish_objeto_with_itens(
+    objeto: str,
+    itens: List[ItemSlot],
+    user_prompt: str,
+    *,
+    skip_item_injection: bool = False,
+) -> str:
     """
     Melhora o objeto para padrão técnico quando houver aquisição com itens/quantidade.
     Não substitui indiscriminadamente: atua como lapidação de qualidade.
+
+    skip_item_injection: fluxo «dispensa normal» (UI com tabela) — não recompõe o objeto a partir
+    das linhas de itens (evita «100 (cem) Medicamento A…» na cláusula; detalhe fica na tabela do TR).
     """
     t = (objeto or "").strip()
     if not t or not itens:
+        return t
+    if skip_item_injection:
         return t
 
     low_prompt = (user_prompt or "").lower()
@@ -1707,6 +1718,15 @@ async def fill_tr_slots_with_llm(
     user_prompt_text = _build_tr_slots_user_prompt(
         user_prompt, context_from_agent, user_context, skip_context_in_prompt, rag_objeto_examples or None
     )
+    _fluxo_ui = str((slots_override or {}).get("dispensa_fluxo_ui") or "").strip().lower()
+    skip_item_injection = _fluxo_ui == "normal"
+    if skip_item_injection:
+        user_prompt_text += (
+            "\n\n[Dispensa normal — cláusula de objeto]\n"
+            "Uma única oração institucional genérica (ex.: aquisição de medicamentos para atendimento "
+            "às necessidades da saúde/suprimento municipal), sem nomear produto, apresentação, dosagem, "
+            "marca, nem quantidades (nada como «100 (cem) unidades de X»). Itens e quantidades ficam só na tabela do TR."
+        )
     full_prompt = f"<<SYSTEM>>\n{TR_SLOTS_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{user_prompt_text}"
 
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
@@ -1812,7 +1832,12 @@ async def fill_tr_slots_with_llm(
             user_prompt,
         )
     # Lapidação final para cenários de aquisição com quantidade explícita nos itens.
-    llm_slots.objeto = _polish_objeto_with_itens(llm_slots.objeto, llm_slots.itens, user_prompt)
+    llm_slots.objeto = _polish_objeto_with_itens(
+        llm_slots.objeto,
+        llm_slots.itens,
+        user_prompt,
+        skip_item_injection=skip_item_injection,
+    )
     if TR_SLOTS_ENABLE_OBJETO_REWRITE:
         llm_slots.objeto = await _strip_enumeration_from_summarized_objeto_if_needed(
             llm_slots.objeto, llm_slots.itens, user_prompt

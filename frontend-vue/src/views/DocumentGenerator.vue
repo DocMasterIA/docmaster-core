@@ -1177,6 +1177,11 @@ function shouldRenderField(field) {
 function buildTrSlotsOverride() {
   const f = slotForm;
   const o = {};
+  {
+    const rn = String(route.name || '');
+    if (rn.startsWith('DispensaRapida')) o.dispensa_fluxo_ui = 'rapida';
+    else if (rn.startsWith('DispensaArt75')) o.dispensa_fluxo_ui = 'normal';
+  }
   const toBrDate = (iso) => {
     const v = String(iso || '').trim();
     if (!v) return '';

@@ -415,6 +415,7 @@ function revokeDocumentUrls() {
 
 function buildSlotsOverride() {
   const o = {};
+  o.dispensa_fluxo_ui = 'rapida';
   const destNome = String(dadosFixos.fixoNome || '').trim();
   const destCargo = String(dadosFixos.fixoCargo || '').trim();
   const respNome = String(dadosFixos.fixoResponsavel || '').trim();

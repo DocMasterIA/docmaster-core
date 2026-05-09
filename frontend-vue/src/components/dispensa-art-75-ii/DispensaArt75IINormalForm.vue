@@ -476,8 +476,9 @@ async function gerar() {
     return;
   } catch (err) {
     const base = err?.message || 'Falha ao gerar cláusulas via IA.';
+    const msg = String(base);
     const looksNet =
-      err?.name === 'TypeError' || /failed to fetch|network|load failed|err_failed|aborted/i.test(String(base));
+      err?.name === 'TypeError' || /failed to fetch|load failed|networkerror|err_failed/i.test(msg);
     erroGeracaoClausulas.value = looksNet ? describeApiFetchNetworkFailure(fillUrl, 'fill-tr-slots') : base;
   } finally {
     isGerandoClausulas.value = false;

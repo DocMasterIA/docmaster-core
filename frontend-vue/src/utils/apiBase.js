@@ -1,10 +1,10 @@
 /**
  * Base URL da API Django nos `fetch` do browser.
  * - Dev (Vite): string vazia → mesmo origin + proxy `/api` → backend local.
- * - Produção: `VITE_API_URL` trimado, sem barra final; fallback https://api.docmasteria.com.br
- * - `VITE_API_USE_PAGE_ORIGIN=1` + `VITE_API_URL` vazio: em build de produção usa `window.location.origin`
- *   (útil quando o mesmo nginx serve o SPA e faz proxy de `/api` — evita cross-origin e net::ERR_FAILED).
- * - Se a página for HTTPS e o env vier como http://..., força https para evitar mixed content (Chrome: net::ERR_FAILED).
+ * - Produção com `VITE_API_URL` definido: usa esse host (ajusta http→https se a página for https).
+ * - Produção com `VITE_API_URL` vazio: usa `window.location.origin` (nginx costuma expor `/api` no mesmo host do SPA;
+ *   evita pedidos cross-origin para api.* e erros tipo Failed to fetch / net::ERR_FAILED).
+ * - API só em subdomínio separado: defina `VITE_API_URL=https://api.docmasteria.com.br` no build.
  */
 export function getApiBase() {
   const raw = String(import.meta.env.VITE_API_URL || '').trim().replace(/\/$/, '');
@@ -20,11 +20,9 @@ export function getApiBase() {
     return raw;
   }
   if (import.meta.env.DEV) return '';
-  const usePage =
-    String(import.meta.env.VITE_API_USE_PAGE_ORIGIN || '').trim() === '1' &&
-    typeof window !== 'undefined' &&
-    window.location?.origin;
-  if (usePage) return String(window.location.origin).replace(/\/$/, '');
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return String(window.location.origin).replace(/\/$/, '');
+  }
   return 'https://api.docmasteria.com.br';
 }
 
@@ -39,11 +37,7 @@ export function buildGerarTrEDfdUrl(apiBase) {
   return path;
 }
 
-/** Mensagem quando o browser falha antes do HTTP (Chrome: net::ERR_FAILED / Failed to fetch). */
+/** Mensagem curta quando o fetch falha no browser (ex.: Failed to fetch / CORS). */
 export function describeApiFetchNetworkFailure(apiUrl, shortLabel = 'API') {
-  return [
-    `Não foi possível contactar a ${shortLabel} (${apiUrl}).`,
-    'Isto não é causado por opções de itens na tabela, numeração de processo ou flags de geração — o pedido nem chegou a responder em JSON.',
-    'Verifique: HTTPS, certificado, VPN, extensão bloqueadora, e se o deploy usa o mesmo domínio com proxy /api/ (neste caso use build com VITE_API_URL vazio e VITE_API_USE_PAGE_ORIGIN=1).',
-  ].join(' ');
+  return `Não foi possível contactar ${shortLabel} (${apiUrl}). Verifique rede, HTTPS e se o build usa a mesma origem do site quando o Django está em /api (VITE_API_URL vazio); se a API for só em outro host, defina VITE_API_URL nesse build.`;
 }

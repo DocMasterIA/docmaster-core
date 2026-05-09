@@ -47,7 +47,7 @@
               <button
                 type="button"
                 class="bia-geo-search-btn"
-                :disabled="isSearching || isAutoSearchingAll || (!itemContext?.descricao_item && allItemContexts.length === 0)"
+                :disabled="!itemContext?.descricao_item && allItemContexts.length === 0"
                 @click="applyFilters"
               >
                 <i class="fa-solid fa-map-location-dot" aria-hidden="true"></i>
@@ -402,6 +402,28 @@ function ufBandeiraUrl(code) {
 
 const rows = ref([]);
 const isSearching = ref(false);
+/** Conta chamadas HTTP de busca em voo (várias sequenciais ou reinício). */
+const activeSearchOps = ref(0);
+const searchGeneration = ref(0);
+let searchAbortController = null;
+
+function beginNewSearchSession() {
+  try {
+    searchAbortController?.abort();
+  } catch (_) {
+    /* ignore */
+  }
+  searchAbortController = new AbortController();
+  searchGeneration.value += 1;
+  return { generation: searchGeneration.value, signal: searchAbortController.signal };
+}
+
+function isAbortError(err) {
+  const name = String(err?.name || '');
+  const msg = String(err?.message || '');
+  return name === 'AbortError' || /aborted|abort|canceled|cancelled/i.test(msg);
+}
+
 const searchError = ref('');
 const saveMessage = ref('');
 const isSavingSelecionados = ref(false);
@@ -482,6 +504,9 @@ const groupedRows = computed(() => {
 });
 
 async function applyFilters() {
+  const { generation, signal } = beginNewSearchSession();
+  searchError.value = '';
+
   // Fluxo item único (abertura por itemId)
   if (String(itemContext.value?.descricao_item || '').trim()) {
     if (Number(itemContext.value?.total_cotacoes_item || 0) >= 3) {
@@ -493,6 +518,8 @@ async function applyFilters() {
       descricao: itemContext.value?.descricao_item || '',
       context: itemContext.value,
       append: false,
+      generation,
+      signal,
     });
   }
 
@@ -505,14 +532,27 @@ async function applyFilters() {
   rows.value = [];
   isAutoSearchingAll.value = true;
   autoSearchProgress.value = { done: 0, total: pendentes.length };
-  searchError.value = '';
   for (const ctx of pendentes) {
+    if (generation !== searchGeneration.value) {
+      isAutoSearchingAll.value = false;
+      return;
+    }
     await runSearchWithContext({
       descricao: ctx.descricao_item,
       context: ctx,
       append: true,
+      generation,
+      signal,
     });
+    if (generation !== searchGeneration.value) {
+      isAutoSearchingAll.value = false;
+      return;
+    }
     autoSearchProgress.value.done += 1;
+  }
+  if (generation !== searchGeneration.value) {
+    isAutoSearchingAll.value = false;
+    return;
   }
   isAutoSearchingAll.value = false;
   if (!rows.value.length) {
@@ -604,8 +644,15 @@ function parseNumericRef(...vals) {
   return null;
 }
 
-async function runSearchWithContext({ descricao, context = null, append = false }) {
+async function runSearchWithContext({
+  descricao,
+  context = null,
+  append = false,
+  generation = null,
+  signal = undefined,
+} = {}) {
   if (!String(descricao || '').trim()) return;
+  activeSearchOps.value += 1;
   isSearching.value = true;
   if (!append) searchError.value = '';
   try {
@@ -669,24 +716,34 @@ async function runSearchWithContext({ descricao, context = null, append = false 
     }
 
     if (recortes.length > 0) {
-      const backend = await intelligentMarketSearch({
-        ...basePayload,
-        recortes_geograficos: recortes,
-        uf: null,
-        municipio: null,
-      });
+      const backend = await intelligentMarketSearch(
+        {
+          ...basePayload,
+          recortes_geograficos: recortes,
+          uf: null,
+          municipio: null,
+        },
+        signal,
+      );
+      if (generation != null && generation !== searchGeneration.value) return;
       mapBackendToRows(backend, 'rec');
     } else {
       const ufsToRun = context?.uf_padrao ? [context.uf_padrao] : [null];
       for (const ufCode of ufsToRun) {
-        const backend = await intelligentMarketSearch({
-          ...basePayload,
-          uf: ufCode || null,
-          municipio: null,
-        });
+        if (generation != null && generation !== searchGeneration.value) return;
+        const backend = await intelligentMarketSearch(
+          {
+            ...basePayload,
+            uf: ufCode || null,
+            municipio: null,
+          },
+          signal,
+        );
+        if (generation != null && generation !== searchGeneration.value) return;
         mapBackendToRows(backend, ufCode || 'all');
       }
     }
+    if (generation != null && generation !== searchGeneration.value) return;
     if (aggregated.length > 0) {
       const unique = [];
       const seen = new Set();
@@ -718,9 +775,13 @@ async function runSearchWithContext({ descricao, context = null, append = false 
       searchError.value = 'A IA não encontrou 3 cotações aderentes para este termo no recorte atual.';
     }
   } catch (err) {
+    if (isAbortError(err)) return;
+    if (generation != null && generation !== searchGeneration.value) return;
     searchError.value = `Não foi possível consultar o backend (${err.message || 'erro desconhecido'}).`;
   } finally {
-    isSearching.value = false;
+    activeSearchOps.value -= 1;
+    if (activeSearchOps.value < 0) activeSearchOps.value = 0;
+    isSearching.value = activeSearchOps.value > 0;
   }
 }
 
@@ -893,10 +954,15 @@ onMounted(async () => {
         searchError.value = 'Todos os itens da cotação já estão completos (3+ preços).';
         return;
       }
+      const { generation, signal } = beginNewSearchSession();
       isAutoSearchingAll.value = true;
       rows.value = [];
       autoSearchProgress.value = { done: 0, total: pendentes.length };
       for (const it of pendentes) {
+        if (generation !== searchGeneration.value) {
+          isAutoSearchingAll.value = false;
+          return;
+        }
         const ctx = buildContextFromItem(it);
         if (!ctx.descricao_item) {
           autoSearchProgress.value.done += 1;
@@ -906,8 +972,18 @@ onMounted(async () => {
           descricao: ctx.descricao_item,
           context: ctx,
           append: true,
+          generation,
+          signal,
         });
+        if (generation !== searchGeneration.value) {
+          isAutoSearchingAll.value = false;
+          return;
+        }
         autoSearchProgress.value.done += 1;
+      }
+      if (generation !== searchGeneration.value) {
+        isAutoSearchingAll.value = false;
+        return;
       }
       isAutoSearchingAll.value = false;
       if (!rows.value.length) {

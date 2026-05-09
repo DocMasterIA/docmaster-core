@@ -37,18 +37,28 @@
                   </div>
                   <div class="ixp-field">
                     <label>{{ LABEL_ORGAO_UNIDADE }}</label>
-                    <input v-model="orgao" list="dl-orgao" :placeholder="PLACEHOLDER_ORGAO_GERAL" />
+                    <input
+                      :value="orgao"
+                      list="dl-orgao"
+                      :placeholder="PLACEHOLDER_ORGAO_GERAL"
+                      @input="onOrgaoInput($event)"
+                    />
                   </div>
                   <div v-if="isFornecedorExclusivoRoute" class="ixp-field">
                     <label>{{ LABEL_ORGAO_UNIDADE_RESP_EQUIP }}</label>
                     <input
-                      v-model="orgaoResponsavelEquipamento"
+                      :value="orgaoResponsavelEquipamento"
                       :placeholder="PLACEHOLDER_ORGAO_UNIDADE_RESP_EQUIP"
+                      @input="onOrgaoResponsavelEquipamentoInput($event)"
                     />
                   </div>
                   <div v-if="isInexigibilidadeManutencaoRoute" class="ixp-field">
                     <label>{{ LABEL_ORGAO_UNIDADE_VEICULO }}</label>
-                    <input v-model="orgaoUnidadeVeiculo" :placeholder="PLACEHOLDER_ORGAO_UNIDADE_VEICULO" />
+                    <input
+                      :value="orgaoUnidadeVeiculo"
+                      :placeholder="PLACEHOLDER_ORGAO_UNIDADE_VEICULO"
+                      @input="onOrgaoUnidadeVeiculoInput($event)"
+                    />
                   </div>
                 </div>
               </div>
@@ -487,6 +497,17 @@ const processo = ref('');
 const orgao = ref('');
 const orgaoResponsavelEquipamento = ref('');
 const orgaoUnidadeVeiculo = ref('');
+
+function onOrgaoInput(ev) {
+  orgao.value = primeiraMaiuscula(String(ev?.target?.value ?? ''));
+}
+function onOrgaoResponsavelEquipamentoInput(ev) {
+  orgaoResponsavelEquipamento.value = primeiraMaiuscula(String(ev?.target?.value ?? ''));
+}
+function onOrgaoUnidadeVeiculoInput(ev) {
+  orgaoUnidadeVeiculo.value = primeiraMaiuscula(String(ev?.target?.value ?? ''));
+}
+
 const objetoEspecifico = ref('');
 const outroObjetoEspecifico = ref('');
 const equipamento = ref('');
@@ -636,7 +657,10 @@ function applyGlobalFormStatePayload(data) {
   if ('cabecalho_documento' in data) cabecalhoDocumento.value = String(data.cabecalho_documento || '');
   if ('processo_ativo' in data) processoAtivo.value = !!data.processo_ativo;
   if ('processo_numero' in data) processo.value = String(data.processo_numero || '');
-  if ('orgao' in data) orgao.value = String(data.orgao || '');
+  if ('orgao' in data) {
+    const t = String(data.orgao || '').trim();
+    orgao.value = t ? primeiraMaiuscula(t) : '';
+  }
   if ('solicitacao_destinatario_nome' in data) fixoNome.value = String(data.solicitacao_destinatario_nome || '');
   if ('solicitacao_destinatario_cargo' in data) fixoCargo.value = String(data.solicitacao_destinatario_cargo || '');
   if ('solicitacao_responsavel_nome' in data) fixoResponsavel.value = String(data.solicitacao_responsavel_nome || '');

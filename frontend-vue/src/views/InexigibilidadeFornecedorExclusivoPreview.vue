@@ -29,7 +29,11 @@
                   </div>
                   <div class="fe-field">
                     <label>{{ LABEL_ORGAO_UNIDADE_RESP_EQUIP }}</label>
-                    <input v-model="orgao" :placeholder="PLACEHOLDER_ORGAO_UNIDADE" />
+                    <input
+                      :value="orgao"
+                      :placeholder="PLACEHOLDER_ORGAO_UNIDADE"
+                      @input="onOrgaoFeInput($event)"
+                    />
                   </div>
                 </div>
               </div>
@@ -348,6 +352,11 @@ const drawerOpen = ref(false);
 const processoAtivo = ref(false);
 const processo = ref('');
 const orgao = ref('');
+
+function onOrgaoFeInput(ev) {
+  orgao.value = capitalizeFirstSignificantLetter(String(ev?.target?.value ?? ''));
+}
+
 const objetoEspecifico = ref('');
 const outroObjetoEspecifico = ref('');
 const equipamento = ref('');
@@ -506,7 +515,10 @@ function applyGlobalFormStatePayload(data) {
   if (!data || typeof data !== 'object') return;
   if ('processo_ativo' in data) processoAtivo.value = !!data.processo_ativo;
   if ('processo_numero' in data) processo.value = String(data.processo_numero || '');
-  if ('orgao' in data) orgao.value = String(data.orgao || '');
+  if ('orgao' in data) {
+    const t = String(data.orgao || '').trim();
+    orgao.value = t ? capitalizeFirstSignificantLetter(t) : '';
+  }
   if ('solicitacao_destinatario_nome' in data) nome.value = String(data.solicitacao_destinatario_nome || '');
   if ('solicitacao_destinatario_cargo' in data) cargo.value = String(data.solicitacao_destinatario_cargo || '');
   if ('solicitacao_responsavel_nome' in data) fixoResponsavel.value = String(data.solicitacao_responsavel_nome || '');

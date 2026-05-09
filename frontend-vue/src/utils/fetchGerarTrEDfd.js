@@ -2,8 +2,15 @@ import { buildGerarTrEDfdUrl } from './apiBase.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+function defaultMaxAttempts() {
+  const raw = String(import.meta.env.VITE_GERAR_TR_DFD_RETRIES || '').trim();
+  const n = Number(raw);
+  if (Number.isFinite(n) && n >= 1 && n <= 4) return Math.floor(n);
+  return 1;
+}
+
 function backoffMs(attempt) {
-  return Math.min(3200, 450 * 2 ** attempt);
+  return Math.min(2400, 350 * 2 ** attempt);
 }
 
 function isTransientHttpStatus(status) {
@@ -26,7 +33,7 @@ function errorMessageSuggestsRetry(msg) {
  * @returns {Promise<{ ok: true, data: object, status: number } | { ok: false, kind: string, errorMessage: string, status: number, data?: object }>}
  */
 export async function fetchGerarTrEDfdWithRetry(apiBase, bodyObj, options = {}) {
-  const maxAttempts = Math.max(1, Math.min(5, options.maxAttempts ?? 2));
+  const maxAttempts = Math.max(1, Math.min(5, options.maxAttempts ?? defaultMaxAttempts()));
   const url = buildGerarTrEDfdUrl(apiBase);
   const requestInit = {
     method: 'POST',
@@ -110,5 +117,5 @@ export async function fetchGerarTrEDfdWithRetry(apiBase, bodyObj, options = {}) 
 }
 
 export function describeGerarTrEDfdNetworkFailure(gerarUrl) {
-  return `Falha de rede ao gerar o documento (ligação interrompida, firewall ou tempo limite). Com muitos itens na tabela o pedido pode ser maior; o sistema já tentou várias vezes. Tente de novo em instantes ou reduza linhas vazias.\n\n${gerarUrl}`;
+  return `Falha de rede ao gerar o documento (ligação interrompida, firewall ou tempo limite). Com muitos itens o pedido pode demorar mais. Tente de novo em instantes ou reduza linhas vazias.\n\n${gerarUrl}`;
 }

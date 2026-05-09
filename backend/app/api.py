@@ -9,7 +9,7 @@ from backend.app.services.llm_context import build_llm_context_from_request
 from backend.app.services.render import render_docx_by_index, render_docx_with_tokens
 from backend.app.services.preview import generate_docx_preview, generate_docx_preview_pdf
 from django.contrib.auth.decorators import login_required
-import json, tempfile, traceback, time
+import json, tempfile, traceback
 from django.http import JsonResponse, FileResponse, HttpResponse
 from django.core.files.base import ContentFile
 from backend.app.models import Template, TemplateSchema, DocumentInstance, Prefeitura, SubtopicoSecretaria, SlotValueCatalog, SlotFormState
@@ -39,38 +39,15 @@ def _rag_http_timeout_seconds() -> float:
     return max(5.0, val)
 
 
-def _rag_post_json_with_retries(url, body, *, params=None, max_attempts=2):
-    """
-    POST JSON ao rag_service com retries leves só onde faz sentido:
-    - reconexão (rag ainda subindo, reset TCP);
-    - 502/503/504 já respondidos pelo proxy (rápido).
-
-    Não repete em Timeout: cada tentativa já usa RAG_HTTP_TIMEOUT inteiro;
-    repetir multiplicava o tempo e «travava» geração de cláusulas/documentos.
-    """
+def _rag_post_json(url, body, *, params=None):
+    """POST JSON único ao rag_service (sem retry — retry duplicava tempo de LLM/TR)."""
     params = params if params is not None else {}
-    last_exc = None
-    for attempt in range(max_attempts):
-        try:
-            resp = requests.post(
-                url,
-                json=body,
-                params=params,
-                timeout=_rag_http_timeout_seconds(),
-            )
-            if resp.status_code in (502, 503, 504) and attempt < max_attempts - 1:
-                time.sleep(min(2.0, 0.5 * (2**attempt)))
-                continue
-            return resp
-        except requests.exceptions.Timeout:
-            raise
-        except requests.exceptions.ConnectionError as e:
-            last_exc = e
-            if attempt < max_attempts - 1:
-                time.sleep(min(2.0, 0.5 * (2**attempt)))
-                continue
-            raise last_exc from None
-    raise RuntimeError("unreachable rag retry loop")  # pragma: no cover
+    return requests.post(
+        url,
+        json=body,
+        params=params,
+        timeout=_rag_http_timeout_seconds(),
+    )
 
 
 def api_login_required(view_func):
@@ -418,7 +395,7 @@ def gerar_via_llm_api(request):
     }
 
     try:
-        resp = _rag_post_json_with_retries(url, body, params=params)
+        resp = _rag_post_json(url, body, params=params)
     except requests.exceptions.ConnectionError:
         return JsonResponse({"ok": False, "error": "Serviço de geração indisponível. Verifique se o rag_service está em execução."}, status=503)
     except requests.exceptions.Timeout:
@@ -579,7 +556,7 @@ def gerar_tr_modelo_api(request):
     }
 
     try:
-        resp = _rag_post_json_with_retries(url, body)
+        resp = _rag_post_json(url, body)
     except requests.exceptions.ConnectionError:
         return JsonResponse({"ok": False, "error": "Serviço de geração de TR indisponível. Verifique se o rag_service está em execução."}, status=503)
     except requests.exceptions.Timeout:
@@ -731,7 +708,7 @@ def gerar_tr_e_dfd_api(request):
     }
 
     try:
-        resp = _rag_post_json_with_retries(url, body)
+        resp = _rag_post_json(url, body)
     except requests.exceptions.ConnectionError:
         return JsonResponse({"ok": False, "error": "Serviço de geração de TR/DFD indisponível. Verifique se o rag_service está em execução."}, status=503)
     except requests.exceptions.Timeout:
@@ -904,7 +881,7 @@ def fill_tr_slots_api(request):
     }
 
     try:
-        resp = _rag_post_json_with_retries(url, body)
+        resp = _rag_post_json(url, body)
     except requests.exceptions.ConnectionError:
         return JsonResponse(
             {"ok": False, "error": "Serviço de geração indisponível. Verifique se o rag_service está em execução."},

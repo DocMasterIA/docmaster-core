@@ -362,7 +362,7 @@ function slotsOverrideWithoutClauseDraft(raw) {
   return Object.keys(o).length ? o : null;
 }
 
-/** Preenche objeto e justificativa via RAG (com retry), para o merge nos DOCX. */
+/** Preenche objeto e justificativa via RAG, para o merge nos DOCX. */
 async function preencherObjetoEJustificativaInterno() {
   const contratado = String(objetoContratado.value || '').trim();
   objetoGerado.value = '';
@@ -378,29 +378,19 @@ async function preencherObjetoEJustificativaInterno() {
       slot_package_key: slotPackageKey.value,
     }),
   };
-  let lastErr = null;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      const res = await fetch(fillUrl, requestInit);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) {
-        throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
-      }
-      const slots = data.slots && typeof data.slots === 'object' ? data.slots : {};
-      const obj = String(slots.objeto || '').trim();
-      const jus = String(slots.justificativa || '').trim();
-      if (!obj || !jus) {
-        throw new Error('IA não retornou objeto/justificativa completos.');
-      }
-      objetoGerado.value = obj;
-      justificativa.value = jus;
-      return;
-    } catch (err) {
-      lastErr = err;
-      if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 700));
-    }
+  const res = await fetch(fillUrl, requestInit);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) {
+    throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
   }
-  throw new Error(String(lastErr?.message || 'Falha ao gerar cláusulas via IA.'));
+  const slots = data.slots && typeof data.slots === 'object' ? data.slots : {};
+  const obj = String(slots.objeto || '').trim();
+  const jus = String(slots.justificativa || '').trim();
+  if (!obj || !jus) {
+    throw new Error('IA não retornou objeto/justificativa completos.');
+  }
+  objetoGerado.value = obj;
+  justificativa.value = jus;
 }
 
 function toBlobUrl(base64, mimeType) {

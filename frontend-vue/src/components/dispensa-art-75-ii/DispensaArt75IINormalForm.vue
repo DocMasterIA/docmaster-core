@@ -459,34 +459,25 @@ async function gerar() {
       slot_package_key: slotPackageKey.value,
     }),
   };
-  let lastErr = null;
   try {
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        const res = await fetch(fillUrl, requestInit);
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.ok) {
-          throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
-        }
-        const slots = data.slots && typeof data.slots === 'object' ? data.slots : {};
-        const obj = String(slots.objeto || '').trim();
-        const jus = String(slots.justificativa || '').trim();
-        if (!obj || !jus) {
-          throw new Error('IA não retornou objeto/justificativa completos.');
-        }
-        objetoGerado.value = obj;
-        justificativa.value = jus;
-        return;
-      } catch (err) {
-        lastErr = err;
-        if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 700));
-      }
+    const res = await fetch(fillUrl, requestInit);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
     }
-    throw new Error(String(lastErr?.message || 'Falha ao gerar cláusulas via IA.'));
-  } catch (_e) {
-    const base = lastErr?.message || 'Falha ao gerar cláusulas via IA.';
+    const slots = data.slots && typeof data.slots === 'object' ? data.slots : {};
+    const obj = String(slots.objeto || '').trim();
+    const jus = String(slots.justificativa || '').trim();
+    if (!obj || !jus) {
+      throw new Error('IA não retornou objeto/justificativa completos.');
+    }
+    objetoGerado.value = obj;
+    justificativa.value = jus;
+    return;
+  } catch (err) {
+    const base = err?.message || 'Falha ao gerar cláusulas via IA.';
     const looksNet =
-      lastErr?.name === 'TypeError' || /failed to fetch|network|load failed|err_failed|aborted/i.test(String(base));
+      err?.name === 'TypeError' || /failed to fetch|network|load failed|err_failed|aborted/i.test(String(base));
     erroGeracaoClausulas.value = looksNet ? describeApiFetchNetworkFailure(fillUrl, 'fill-tr-slots') : base;
   } finally {
     isGerandoClausulas.value = false;

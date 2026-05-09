@@ -163,7 +163,7 @@
   color: #64748b;
 }
 
-/* Grade de cartões — na web responsivo (1/2/5 colunas); no PDF uma coluna para largura útil e quebra de texto (WeasyPrint). */
+/* Grade de cartões — 5 colunas (Órgão, Responsável, Data, Método, Valor total); na web igual; PDF A4 mesma linha com minmax(0,1fr) para quebra de texto. */
 .rpp-info-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -172,10 +172,12 @@
   min-width: 0;
 }
 
-/* PDF A4: empilha como preview estreito; evita nomes longos (ex.: órgão) com letras sobrepostas */
+/* PDF A4: os cinco cartões do topo lado a lado */
 .rpp-body.rpp--pdf .rpp-info-grid {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 2mm;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75mm;
+  margin-bottom: 2mm;
+  align-items: stretch;
 }
 
 .rpp-info-card {
@@ -681,12 +683,26 @@
   font-size: var(--rpp-pdf-hero-muted);
   line-height: 1.35;
 }
+.rpp-body.rpp--pdf .rpp-info-card {
+  padding: 1mm 0.85mm 1.1mm;
+}
+
+.rpp-body.rpp--pdf .rpp-info-card__row {
+  gap: 0.6mm;
+}
+
+.rpp-body.rpp--pdf .rpp-emo {
+  font-size: 7.5pt;
+}
+
 .rpp-body.rpp--pdf .rpp-info-card__label {
   font-size: var(--rpp-pdf-info-label);
+  line-height: 1.15;
 }
 .rpp-body.rpp--pdf .rpp-info-card__value {
+  margin-top: 0.9mm;
   font-size: var(--rpp-pdf-info-value);
-  line-height: 1.38;
+  line-height: 1.25;
   word-break: normal;
   overflow-wrap: break-word;
 }

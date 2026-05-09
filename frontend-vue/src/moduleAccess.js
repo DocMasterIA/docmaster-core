@@ -54,7 +54,7 @@ export function firstAllowedPath(allowedSet) {
     ['dispensa_eletronica', '/dispensa-eletronica'],
     ['pregao', '/pregao'],
     ['pregao_eletronico', '/pregao-eletronico'],
-    ['inexigibilidade', '/geracao/inexigibilidade-art-74-i/show-artistico'],
+    ['inexigibilidade', '/geracao/inexigibilidade-art-74-i/manutencao-veiculos'],
     ['etp', '/geracao/etp-livre'],
     ['analisador', '/analisador'],
     ['pesquisa', '/pesquisador-pncp'],

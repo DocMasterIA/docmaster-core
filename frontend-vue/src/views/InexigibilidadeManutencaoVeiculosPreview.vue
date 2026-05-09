@@ -213,20 +213,6 @@
               </div>
             </article>
 
-            <article v-else-if="isInexigibilidadeArt74Route" class="ixp-card">
-              <h3>Objeto da contratacao</h3>
-              <div class="ixp-body">
-                <div class="ixp-field">
-                  <label>O que sera contratado?</label>
-                  <textarea
-                    v-model="clausulaContratado"
-                    rows="3"
-                    placeholder="Ex: Aquisicao de material de expediente para Secretaria da Administracao&#10;10 canetas azul, 2 grampeadores, 10 resmas de papel A4"
-                  />
-                </div>
-              </div>
-            </article>
-
             <div class="da75-space-y">
               <button type="button" class="da75-btn da75-btn--primary" :disabled="isSubmitting" @click="onSubmit">
                 {{ isSubmitting ? 'Gerando documentos...' : 'Gerar documento com IA' }}
@@ -446,7 +432,6 @@ const SLOT_PACKAGE_BY_ROUTE = {
   DispensaArt75IICompras: 'dispensa_75_ii_compras',
   DispensaArt75IIServicos: 'dispensa_75_ii_servicos',
   DispensaArt75IIComprasServicosInclusos: 'dispensa_75_ii_compras_servicos_inclusos',
-  InexigibilidadeArt74IShowArtistico: 'inexigibilidade_74_i_show_artistico',
   InexigibilidadeArt74IFornecedorExclusivoPreview: 'inexigibilidade_74_i_fornecedor_exclusivo',
   InexigibilidadeArt74IManutencaoVeiculosPreview: 'inexigibilidade_74_i_manutencao_veiculos',
 };
@@ -459,7 +444,6 @@ const SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE = {
   DispensaArt75IIServicos: 'Art. 75, Inciso II, da Lei no 14.133/2021',
   DispensaArt75IIComprasServicosInclusos: 'Art. 75, Inciso II, da Lei no 14.133/2021',
   InexigibilidadeArt74I: 'Art. 74, Inciso I, da Lei no 14.133/2021',
-  InexigibilidadeArt74IShowArtistico: 'Art. 74, Inciso I, da Lei no 14.133/2021',
   InexigibilidadeArt74IManutencaoVeiculosPreview: 'Art. 74, Inciso I, da Lei no 14.133/2021',
   InexigibilidadeArt74IManutencaoVeiculos: 'Art. 74, Inciso I, da Lei no 14.133/2021',
   InexigibilidadeArt74IFornecedorExclusivoPreview: 'Art. 74, Inciso I, da Lei no 14.133/2021',
@@ -544,7 +528,6 @@ const cabecalhoMergeTemplateId = computed(() => {
   return hit?.id ? String(hit.id) : null;
 });
 const isDispensaNormalRoute = computed(() => String(route.name || '').startsWith('DispensaArt75'));
-const isInexigibilidadeArt74Route = computed(() => String(route.name || '').startsWith('InexigibilidadeArt74I'));
 const isFornecedorExclusivoRoute = computed(() =>
   logicalRouteName.value === 'InexigibilidadeArt74IFornecedorExclusivoPreview'
   || logicalRouteName.value === 'InexigibilidadeArt74IFornecedorExclusivo',
@@ -1035,11 +1018,7 @@ function buildSlotsOverride() {
    * fill_tr_slots_with_llm, _merge_slots() da prioridade ao override sobre a IA (tr_slots_llm.py).
    * tr_template / dfd_template / oficio_template substituem placeholders a partir dos mesmos slots.
    */
-  const objetoFinal = (
-    isInexigibilidadeArt74Route.value
-      ? (clausulaContratado.value.trim() || clausulaObjeto.value.trim() || objetoFallback)
-      : (clausulaObjeto.value.trim() || objetoFallback)
-  );
+  const objetoFinal = clausulaObjeto.value.trim() || objetoFallback;
   o.objeto = objetoFinal;
   const justificativaFinal = (clausulaJustificativa.value.trim() || justificativaFallback) || '';
   if (justificativaFinal) o.justificativa = justificativaFinal;

@@ -16,7 +16,6 @@ PACKAGE_DIRS: Dict[str, str] = {
     "dispensa_75_ii_compras": "dispensa_75_ii_compras",
     "dispensa_75_ii_servicos": "dispensa_75_ii_servicos",
     "dispensa_75_ii_compras_servicos_inclusos": "dispensa_75_ii_compras_servicos_inclusos",
-    "inexigibilidade_74_i_show_artistico": "inexigibilidade_74_i_show_artistico",
     "inexigibilidade_74_i_fornecedor_exclusivo": "inexigibilidade_74_i_fornecedor_exclusivo",
     "inexigibilidade_74_i_manutencao_veiculos": "inexigibilidade_74_i_manutencao_de_veiculos",
     "tr_dfd_generico": "tr_dfd_generico",

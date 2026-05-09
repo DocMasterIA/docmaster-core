@@ -89,7 +89,7 @@ def _resolve_slot_package_key(payload: dict, request) -> str:
         "/geracao/dispensa-rapida/art-75-ii/compras": "dispensa_75_ii_compras",
         "/geracao/dispensa-rapida/art-75-ii/servicos": "dispensa_75_ii_servicos",
         "/geracao/dispensa-rapida/art-75-ii/compras-servicos-inclusos": "dispensa_75_ii_compras_servicos_inclusos",
-        "/geracao/inexigibilidade-art-74-i/show-artistico": "inexigibilidade_74_i_show_artistico",
+        "/geracao/inexigibilidade-art-74-i/show-artistico": "inexigibilidade_74_i_manutencao_veiculos",
         "/geracao/inexigibilidade-art-74-i/manutencao-veiculos": "inexigibilidade_74_i_manutencao_veiculos",
         "/geracao/inexigibilidade-art-74-i/fornecedor-exclusivo": "inexigibilidade_74_i_fornecedor_exclusivo",
         "/geracao/inexigibilidade-art-74-i/manutencao-veiculos-preview": "inexigibilidade_74_i_manutencao_veiculos",

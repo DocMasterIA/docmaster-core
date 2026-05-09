@@ -110,15 +110,11 @@ const routes = [
   },
   {
     path: '/geracao/inexigibilidade-art-74-i',
-    name: 'InexigibilidadeArt74I',
-    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
-    meta: { title: 'Inexigibilidade - Art. 74, I' },
+    redirect: { name: 'InexigibilidadeArt74IManutencaoVeiculosPreview' },
   },
   {
     path: '/geracao/inexigibilidade-art-74-i/show-artistico',
-    name: 'InexigibilidadeArt74IShowArtistico',
-    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
-    meta: { title: 'Inexigibilidade - Art. 74, I - Show Artístico' },
+    redirect: '/geracao/inexigibilidade-art-74-i/manutencao-veiculos',
   },
   {
     path: '/geracao/inexigibilidade-art-74-i/manutencao-veiculos',

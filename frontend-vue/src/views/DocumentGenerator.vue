@@ -734,20 +734,6 @@ const FLOW_CONFIG = {
       },
     ],
   },
-  InexigibilidadeArt74IShowArtistico: {
-    title: 'Assistente de Criação - Inexigibilidade - Art. 74, Inciso I - Show Artístico',
-    sections: [
-      {
-        key: 'base',
-        title: 'Campos principais',
-        fields: [
-          { id: 'artista', label: 'Artista / atração', input: 'text' },
-          { id: 'data_evento', label: 'Data do evento', input: 'date' },
-          { id: 'justificativa_inviabilidade', label: 'Justificativa de inviabilidade de competição', input: 'textarea', fullWidth: true },
-        ],
-      },
-    ],
-  },
   InexigibilidadeArt74IFornecedorExclusivoPreview: {
     title: 'Fornecedor Exclusivo Geral — Bens, Serviços e Soluções (Art. 74, I)',
     sections: [
@@ -887,7 +873,6 @@ const SLOT_PACKAGE_BY_ROUTE = {
   DispensaArt75IICompras: 'dispensa_75_ii_compras',
   DispensaArt75IIServicos: 'dispensa_75_ii_servicos',
   DispensaArt75IIComprasServicosInclusos: 'dispensa_75_ii_compras_servicos_inclusos',
-  InexigibilidadeArt74IShowArtistico: 'inexigibilidade_74_i_show_artistico',
   InexigibilidadeArt74IFornecedorExclusivoPreview: 'inexigibilidade_74_i_fornecedor_exclusivo',
   InexigibilidadeArt74IManutencaoVeiculosPreview: 'inexigibilidade_74_i_manutencao_veiculos',
 };
@@ -901,7 +886,6 @@ const SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE = {
   DispensaArt75IIServicos: 'Art. 75, Inciso II, da Lei nº 14.133/2021',
   DispensaArt75IIComprasServicosInclusos: 'Art. 75, Inciso II, da Lei nº 14.133/2021',
   InexigibilidadeArt74I: 'Art. 74, Inciso I, da Lei nº 14.133/2021',
-  InexigibilidadeArt74IShowArtistico: 'Art. 74, Inciso I, da Lei nº 14.133/2021',
   InexigibilidadeArt74IManutencaoVeiculos: 'Art. 74, Inciso I, da Lei nº 14.133/2021',
   InexigibilidadeArt74IManutencaoVeiculosPreview: 'Art. 74, Inciso I, da Lei nº 14.133/2021',
   InexigibilidadeArt74IFornecedorExclusivo: 'Art. 74, Inciso I, da Lei nº 14.133/2021',

@@ -56,40 +56,6 @@
             </article>
 
             <article class="fe-card">
-              <h3>Gerar objeto e justificativa (IA)</h3>
-              <div class="fe-body">
-                <div class="fe-field">
-                  <label>O que será contratado?</label>
-                  <textarea
-                    v-model="clausulaContratado"
-                    rows="3"
-                    placeholder="Ex: Aquisição de material de expediente para Secretaria da Administração&#10;10 canetas azul, 2 grampeadores, 10 resmas de papel A4"
-                  />
-                </div>
-                <div class="fe-field">
-                  <label>Qual setor/secretaria será atendido?</label>
-                  <input v-model="clausulaSetor" placeholder="Ex: Secretaria de Administração" />
-                </div>
-                <div class="fe-field">
-                  <label>Características mínimas obrigatórias (opcional)</label>
-                  <textarea v-model="clausulaCaracteristicas" rows="3" placeholder="Ex: Para uso contínuo das unidades administrativas" />
-                </div>
-                <button type="button" class="fe-btn-secondary" :disabled="isGeneratingClauses" @click="onGenerateClauses">
-                  {{ isGeneratingClauses ? 'Gerando objeto e justificativa...' : 'Gerar objeto e justificativa' }}
-                </button>
-                <div class="fe-field">
-                  <label>Objeto gerado pela IA</label>
-                  <textarea v-model="clausulaObjeto" rows="3" placeholder="Objeto do TR (gerado por IA ou manual)" />
-                </div>
-                <div class="fe-field">
-                  <label>Justificativa da contratação</label>
-                  <textarea v-model="clausulaJustificativa" rows="4" placeholder="Justificativa da necessidade" />
-                </div>
-                <p v-if="iaError" class="fe-error">{{ iaError }}</p>
-              </div>
-            </article>
-
-            <article class="fe-card">
               <h3>Dados do equipamento</h3>
               <div class="fe-body fe-grid-3">
                 <div class="fe-field"><label>Equipamento</label><input :value="equipamento" placeholder="Ex: Aparelho de raio-X" @input="equipamento = iniciarComMaiuscula(String(($event.target).value || ''))" /></div>
@@ -393,13 +359,6 @@ const documentTrFilename = ref('termo_referencia.docx');
 const documentDfdFilename = ref('dfd.docx');
 const documentOficioFilename = ref('oficio.docx');
 const documentZipFilename = ref('tr_dfd_oficio.zip');
-const isGeneratingClauses = ref(false);
-const iaError = ref('');
-const clausulaContratado = ref('');
-const clausulaSetor = ref('');
-const clausulaCaracteristicas = ref('');
-const clausulaObjeto = ref('');
-const clausulaJustificativa = ref('');
 
 const tratNome = ref('');
 const nome = ref('');
@@ -492,87 +451,6 @@ function removerItem(index) {
   itens.value = itens.value.filter((_, i) => i !== index);
   if (!itens.value.length) itens.value = [{ descricao: '', quantidade: '1', unidade: '', valorUnitario: 'R$ 0,00', valorTotal: 'R$ 0,00' }];
   valorGlobal.value = calcularValorGlobal();
-}
-function gerarObjetoTexto(contratado, setor, caracteristicas) {
-  const objeto = String(contratado || '').trim() || 'objeto não informado';
-  const destino = String(setor || '').trim() ? `, visando atender as demandas de ${String(setor).trim()}` : '';
-  const detalhes = String(caracteristicas || '').trim() ? `, observadas as seguintes características mínimas: ${String(caracteristicas).trim()}` : '';
-  return `${iniciarComMaiuscula(objeto)}${destino}${detalhes}.`;
-}
-function gerarJustificativaTexto(contratado, setor, caracteristicas) {
-  const objeto = String(contratado || '').trim() || 'o objeto indicado';
-  const destino = String(setor || '').trim() ? ` do(a) ${String(setor).trim()}` : ' da Administração Pública';
-  const detalhes = String(caracteristicas || '').trim() ? ` A contratação deverá observar as características mínimas informadas: ${String(caracteristicas).trim()}.` : '';
-  return `A presente contratação justifica-se pela necessidade de assegurar ${objeto} para atendimento das demandas${destino}, garantindo a continuidade e a eficiência dos serviços públicos.${detalhes}`;
-}
-function parseClauseSections(text) {
-  const normalized = String(text || '').replace(/\r/g, '');
-  const sections = { objeto: '', justificativa: '' };
-  const lines = normalized.split('\n');
-  let current = '';
-  lines.forEach((line) => {
-    const trimmed = line.trim();
-    const low = trimmed.toLowerCase().replace(/[*:#-]/g, '').trim();
-    if (low.startsWith('objeto')) {
-      current = 'objeto';
-      const content = trimmed.replace(/^.*?:\s*/, '');
-      if (content && content !== trimmed) sections.objeto += (sections.objeto ? '\n' : '') + content;
-      return;
-    }
-    if (low.startsWith('justificativa')) {
-      current = 'justificativa';
-      const content = trimmed.replace(/^.*?:\s*/, '');
-      if (content && content !== trimmed) sections.justificativa += (sections.justificativa ? '\n' : '') + content;
-      return;
-    }
-    if (current) sections[current] += (sections[current] ? '\n' : '') + trimmed;
-  });
-  return sections;
-}
-async function onGenerateClauses() {
-  isGeneratingClauses.value = true;
-  iaError.value = '';
-  try {
-    const contratado = String(clausulaContratado.value || '').trim();
-    const setor = String(clausulaSetor.value || '').trim();
-    const caracteristicas = String(clausulaCaracteristicas.value || '').trim();
-    if (!contratado || !setor) {
-      iaError.value = 'Preencha "O que será contratado?" e "Qual setor/secretaria será atendido?".';
-      return;
-    }
-    const prompt = [
-      'Com base EXCLUSIVAMENTE nos dados abaixo, gere APENAS duas seções:',
-      'Objeto:',
-      'Justificativa:',
-      '',
-      `O que será contratado: ${contratado}`,
-      `Setor/secretaria atendido: ${setor}`,
-      `Características mínimas (opcional): ${caracteristicas || 'não informado'}`,
-    ].join('\n');
-    const res = await fetch(`${API_BASE}/api/llm/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ prompt, stream: false }),
-    });
-    const data = await res.json().catch(() => ({}));
-    const text = data?.data?.response || data?.data?.text || data?.response || data?.text || '';
-    if (!res.ok || !data?.ok) {
-      iaError.value = data?.error || data?.detail || `Erro ${res.status} ao gerar objeto e justificativa.`;
-      clausulaObjeto.value = gerarObjetoTexto(contratado, setor, caracteristicas);
-      clausulaJustificativa.value = gerarJustificativaTexto(contratado, setor, caracteristicas);
-      return;
-    }
-    const parsed = parseClauseSections(text);
-    clausulaObjeto.value = parsed.objeto || gerarObjetoTexto(contratado, setor, caracteristicas);
-    clausulaJustificativa.value = parsed.justificativa || gerarJustificativaTexto(contratado, setor, caracteristicas);
-  } catch (e) {
-    clausulaObjeto.value = gerarObjetoTexto(clausulaContratado.value, clausulaSetor.value, clausulaCaracteristicas.value);
-    clausulaJustificativa.value = gerarJustificativaTexto(clausulaContratado.value, clausulaSetor.value, clausulaCaracteristicas.value);
-    iaError.value = e?.message || 'Não foi possível gerar via IA; aplicamos texto base.';
-  } finally {
-    isGeneratingClauses.value = false;
-  }
 }
 function collectGlobalFormStatePayload() {
   return {
@@ -806,14 +684,6 @@ function buildSlotsOverride() {
     dfd_assinatura_cargo: String(fixoAssinaturaCargo.value || '').trim(),
     sol_oficio_artigo_inciso: 'Art. 74, Inciso I, da Lei no 14.133/2021',
   };
-  if (clausulaObjeto.value.trim()) {
-    o.objeto = clausulaObjeto.value.trim();
-    o.sol_oficio_objeto = clausulaObjeto.value.trim();
-  }
-  if (clausulaJustificativa.value.trim()) {
-    o.justificativa = clausulaJustificativa.value.trim();
-    o.sol_oficio_justificativa = clausulaJustificativa.value.trim();
-  }
   if (dotacaoAtiva.value && String(dotacao.value || '').trim()) {
     const dotacaoTexto = String(dotacao.value || '').trim();
     o.dotacao = dotacaoTexto;

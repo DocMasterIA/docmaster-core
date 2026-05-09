@@ -13,7 +13,7 @@ Pastas de pacote previstas:
 - `dispensa_75_ii_compras`
 - `dispensa_75_ii_servicos`
 - `dispensa_75_ii_compras_servicos_inclusos`
-- `inexigibilidade_74_i_show_artistico`
+- `inexigibilidade_74_i_manutencao_de_veiculos` / `inexigibilidade_74_i_fornecedor_exclusivo`
 - `tr_dfd_generico`
 
 Observação:

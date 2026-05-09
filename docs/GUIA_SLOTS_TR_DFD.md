@@ -28,7 +28,8 @@ Para suportar múltiplos pacotes de TR/DFD/Ofício por página:
 - `DispensaArt75IICompras` -> `dispensa_75_ii_compras`
 - `DispensaArt75IIServicos` -> `dispensa_75_ii_servicos`
 - `DispensaArt75IIComprasServicosInclusos` -> `dispensa_75_ii_compras_servicos_inclusos`
-- `InexigibilidadeArt74IShowArtistico` -> `inexigibilidade_74_i_show_artistico`
+- `InexigibilidadeArt74IManutencaoVeiculosPreview` -> `inexigibilidade_74_i_manutencao_veiculos`
+- `InexigibilidadeArt74IFornecedorExclusivoPreview` -> `inexigibilidade_74_i_fornecedor_exclusivo`
 - `EtpLivre` -> `etp_livre`
 - fallback -> `tr_dfd_generico`
 

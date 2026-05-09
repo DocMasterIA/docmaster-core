@@ -261,12 +261,6 @@ const generationPages = [
         icon: 'fa-industry',
         to: '/geracao/inexigibilidade-art-74-i/fornecedor-exclusivo',
       },
-      {
-        name: 'InexigibilidadeArt74IShowArtistico',
-        label: 'Show artístico',
-        icon: 'fa-music',
-        to: '/geracao/inexigibilidade-art-74-i/show-artistico',
-      },
     ],
   },
   {
@@ -303,7 +297,7 @@ const mainTabs = [
   { key: 'dispensa_eletronica', label: 'Dispensa Eletrônica', icon: 'fa-file-lines', to: '/dispensa-eletronica' },
   { key: 'pregao', label: 'Pregão', icon: 'fa-file-lines', to: '/pregao' },
   { key: 'pregao_eletronico', label: 'Pregão Eletrônico', icon: 'fa-file-lines', to: '/pregao-eletronico' },
-  { key: 'inexigibilidade', label: 'Inexigibilidade', icon: 'fa-file-lines', to: '/geracao/inexigibilidade-art-74-i/show-artistico' },
+  { key: 'inexigibilidade', label: 'Inexigibilidade', icon: 'fa-file-lines', to: '/geracao/inexigibilidade-art-74-i/manutencao-veiculos' },
   { key: 'etp', label: 'ETP', icon: 'fa-file-lines', to: '/geracao/etp-livre' },
   { key: 'analisador', label: 'Analisador de Documentos', icon: 'fa-magnifying-glass-chart', to: '/analisador' },
   { key: 'pesquisa', label: 'Pesquisa de Preços Inteligente', icon: 'fa-database', to: '/pesquisador-pncp' },

@@ -198,7 +198,7 @@ import {
 import './dispensaArt75ii.css';
 import DispensaArt75IIDadosFixosDrawer from './DispensaArt75IIDadosFixosDrawer.vue';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
-import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
+import { buildGerarTrEDfdUrl, describeApiFetchNetworkFailure, getApiBase } from '@/utils/apiBase.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { useDispensaArt75IIDadosFixos } from '@/composables/useDispensaArt75IIDadosFixos.js';
 
@@ -542,7 +542,11 @@ async function onSubmit() {
     successMessage.value = 'Documentos gerados com sucesso.';
     await dadosFixos.saveUserGlobalPreset();
   } catch (e) {
-    generateError.value = e?.message || 'Erro ao gerar documento';
+    const m = String(e?.message || '');
+    const fillUrl = `${API_BASE}/api/documentos/fill-tr-slots`;
+    const looksNet =
+      e?.name === 'TypeError' || /failed to fetch|network|load failed|err_failed|aborted/i.test(m);
+    generateError.value = looksNet ? describeApiFetchNetworkFailure(fillUrl, 'fill-tr-slots') : m || 'Erro ao gerar documento';
   } finally {
     isSubmitting.value = false;
   }

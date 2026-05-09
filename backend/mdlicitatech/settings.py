@@ -72,7 +72,8 @@ else:
     ]
 # Permite qualquer origem ngrok (URL muda a cada reinício) – uso em teste/produção com túnel
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://([a-zA-Z0-9-]+\.)?docmasteria\.com\.br$",
+    # Vários níveis de subdomínio e porta não padrão (ex.: :8443) no header Origin
+    r"^https://([a-zA-Z0-9-]+\.)*docmasteria\.com\.br(?::\d+)?$",
     r"^https?://[a-zA-Z0-9-]+\.ngrok-free\.app$",
     r"^https?://[a-zA-Z0-9-]+\.ngrok\.io$",
 ]

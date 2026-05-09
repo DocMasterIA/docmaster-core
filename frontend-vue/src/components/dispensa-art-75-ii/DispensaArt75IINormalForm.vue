@@ -264,7 +264,7 @@ import './dispensaArt75ii.css';
 import DispensaArt75IIDadosFixosDrawer from './DispensaArt75IIDadosFixosDrawer.vue';
 import DispensaArt75IIItensValores from './DispensaArt75IIItensValores.vue';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
-import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
+import { buildGerarTrEDfdUrl, describeApiFetchNetworkFailure, getApiBase } from '@/utils/apiBase.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { useDispensaArt75IIDadosFixos } from '@/composables/useDispensaArt75IIDadosFixos.js';
 
@@ -484,7 +484,10 @@ async function gerar() {
     }
     throw new Error(String(lastErr?.message || 'Falha ao gerar cláusulas via IA.'));
   } catch (_e) {
-    erroGeracaoClausulas.value = lastErr?.message || 'Falha ao gerar cláusulas via IA.';
+    const base = lastErr?.message || 'Falha ao gerar cláusulas via IA.';
+    const looksNet =
+      lastErr?.name === 'TypeError' || /failed to fetch|network|load failed|err_failed|aborted/i.test(String(base));
+    erroGeracaoClausulas.value = looksNet ? describeApiFetchNetworkFailure(fillUrl, 'fill-tr-slots') : base;
   } finally {
     isGerandoClausulas.value = false;
   }

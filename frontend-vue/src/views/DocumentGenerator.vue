@@ -762,7 +762,7 @@ const FLOW_CONFIG = {
         fields: [
           { id: '_h_dados_basicos', label: 'Dados básicos', input: 'heading', fullWidth: true },
           { id: 'numero_processo', label: 'Informar número do processo (opcional)', input: 'text' },
-          { id: 'orgao_unidade', label: 'Órgão/Unidade responsável pelo equipamento', input: 'text' },
+          { id: 'orgao_unidade', label: 'Órgão/Unidade Responsável Pelo Equipamento', input: 'text' },
           { id: '_h_objeto_especifico', label: 'Objeto específico', input: 'heading', fullWidth: true },
           { id: 'objeto_especifico', label: 'Selecione o objeto específico da contratação', input: 'text' },
           { id: '_h_dados_equipamento', label: 'Dados do equipamento', input: 'heading', fullWidth: true },

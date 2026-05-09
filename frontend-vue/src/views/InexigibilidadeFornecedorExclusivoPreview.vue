@@ -28,8 +28,8 @@
                     <input v-model="processo" placeholder="Ex: 123/2026" />
                   </div>
                   <div class="fe-field">
-                    <label>Órgão / Unidade responsável pelo equipamento</label>
-                    <input v-model="orgao" placeholder="Digite o órgão" />
+                    <label>{{ LABEL_ORGAO_UNIDADE_RESP_EQUIP }}</label>
+                    <input v-model="orgao" :placeholder="PLACEHOLDER_ORGAO_UNIDADE" />
                   </div>
                 </div>
               </div>
@@ -322,10 +322,14 @@ import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
 import {
+  capitalizeEachWordLeadingPt,
   capitalizeFirstSignificantLetter,
   formatMoedaBRLInput,
   sanitizeQuantidadeInput,
 } from '@/utils/itemValorCampos.js';
+
+const LABEL_ORGAO_UNIDADE_RESP_EQUIP = capitalizeEachWordLeadingPt('Órgão / unidade responsável pelo equipamento');
+const PLACEHOLDER_ORGAO_UNIDADE = capitalizeEachWordLeadingPt('Digite o órgão');
 
 const API_BASE = getApiBase();
 const dataOptions = ['Data automática', 'Datado e assinado digitalmente', 'Data manual'];

@@ -666,7 +666,7 @@ function FormularioPrincipal() {
               </label>
               {processoAtivo ? <Campo label="Processo" value={processo} onChange={setProcesso} placeholder="Ex: 123/2026" /> : null}
               <CampoComAdicionar>
-                <Campo label="Órgão/Unidade responsável pelo equipamento" value={orgao} onChange={setOrgao} placeholder="Digite o órgão" />
+                <Campo label="Órgão/Unidade Responsável Pelo Equipamento" value={orgao} onChange={setOrgao} placeholder="Digite O Órgão" />
               </CampoComAdicionar>
             </div>
           </Card>

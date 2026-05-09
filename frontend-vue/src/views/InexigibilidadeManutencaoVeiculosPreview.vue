@@ -36,19 +36,19 @@
                     <input v-model="processo" list="dl-processo-numero" placeholder="Ex: 123/2026" />
                   </div>
                   <div class="ixp-field">
-                    <label>Órgão / Unidade</label>
-                    <input v-model="orgao" list="dl-orgao" placeholder="Selecione ou digite o órgão" />
+                    <label>{{ LABEL_ORGAO_UNIDADE }}</label>
+                    <input v-model="orgao" list="dl-orgao" :placeholder="PLACEHOLDER_ORGAO_GERAL" />
                   </div>
                   <div v-if="isFornecedorExclusivoRoute" class="ixp-field">
-                    <label>Órgão / Unidade responsável pelo equipamento</label>
+                    <label>{{ LABEL_ORGAO_UNIDADE_RESP_EQUIP }}</label>
                     <input
                       v-model="orgaoResponsavelEquipamento"
-                      placeholder="Digite o órgão ou unidade responsável pelo equipamento"
+                      :placeholder="PLACEHOLDER_ORGAO_UNIDADE_RESP_EQUIP"
                     />
                   </div>
                   <div v-if="isInexigibilidadeManutencaoRoute" class="ixp-field">
-                    <label>Órgão / Unidade do veículo</label>
-                    <input v-model="orgaoUnidadeVeiculo" placeholder="Digite o órgão ou unidade do veículo" />
+                    <label>{{ LABEL_ORGAO_UNIDADE_VEICULO }}</label>
+                    <input v-model="orgaoUnidadeVeiculo" :placeholder="PLACEHOLDER_ORGAO_UNIDADE_VEICULO" />
                   </div>
                 </div>
               </div>
@@ -400,10 +400,21 @@ import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
 import {
+  capitalizeEachWordLeadingPt,
   capitalizeFirstSignificantLetter as primeiraMaiuscula,
   formatMoedaBRLInput,
   sanitizeQuantidadeInput,
 } from '@/utils/itemValorCampos.js';
+
+/** Rótulos com cada palavra iniciando em maiúscula (pt-BR), p.ex. «Do Veículo», «Pelo Equipamento». */
+const LABEL_ORGAO_UNIDADE = capitalizeEachWordLeadingPt('Órgão / unidade');
+const LABEL_ORGAO_UNIDADE_VEICULO = capitalizeEachWordLeadingPt('Órgão / unidade do veículo');
+const LABEL_ORGAO_UNIDADE_RESP_EQUIP = capitalizeEachWordLeadingPt('Órgão / unidade responsável pelo equipamento');
+const PLACEHOLDER_ORGAO_GERAL = capitalizeEachWordLeadingPt('Selecione ou digite o órgão');
+const PLACEHOLDER_ORGAO_UNIDADE_VEICULO = capitalizeEachWordLeadingPt('Digite o órgão ou unidade do veículo');
+const PLACEHOLDER_ORGAO_UNIDADE_RESP_EQUIP = capitalizeEachWordLeadingPt(
+  'Digite o órgão ou unidade responsável pelo equipamento',
+);
 import '@/components/dispensa-art-75-ii/dispensaArt75ii.css';
 
 const API_BASE = getApiBase();
@@ -1021,7 +1032,7 @@ function buildInexig74ManutencaoDfdJustificativa() {
     `O objeto da referencia e o ${natureza} do veiculo (${identVeiculo}), com vistas a preservar a disponibilidade, a seguranca e a economicidade da frota vinculada ao servico publico.`,
   ];
   if (orgVeic) {
-    partes.push(`Órgão / Unidade do veículo: ${orgVeic}.`);
+    partes.push(`${LABEL_ORGAO_UNIDADE_VEICULO}: ${orgVeic}.`);
   }
   if (tipo === 'Preventiva' && rk) {
     partes.push(`Para a manutencao preventiva, foi indicada a referencia de quilometragem ou revisao: ${rk}.`);
@@ -1413,7 +1424,7 @@ function buildUserPrompt() {
     `Gerar documento com base nos dados preenchidos para ${String(route.meta?.title || 'a rota atual')}.`,
     `Cabecalho do documento: ${cabecalhoDocumento.value || 'Nao informado'}`,
     `Processo: ${processoAtivo.value ? (processo.value || 'Nao informado') : 'Nao se aplica'}`,
-    `Orgao: ${orgao.value || 'Nao informado'}`,
+    `Órgão: ${orgao.value || 'Não informado'}`,
     ...(isManutencaoVeiculosRoute.value
       ? [`Veiculo: ${marca.value || '-'} ${modelo.value || '-'} / Placa ${placa.value || '-'}`]
       : []),
@@ -1531,10 +1542,10 @@ const secoes = computed(() => {
         ['Processo', processoAtivo.value ? processo.value || 'Nao informado' : 'Nao se aplica', !processoAtivo.value || isFilled(processo.value)],
         ['Órgão', orgao.value || 'Não informado', isFilled(orgao.value)],
         ...(isFornecedorExclusivoRoute.value
-          ? [['Órgão / Unidade responsável pelo equipamento', orgaoResponsavelEquipamento.value || 'Não informado', isFilled(orgaoResponsavelEquipamento.value)]]
+          ? [[LABEL_ORGAO_UNIDADE_RESP_EQUIP, orgaoResponsavelEquipamento.value || 'Não informado', isFilled(orgaoResponsavelEquipamento.value)]]
           : []),
         ...(isInexigibilidadeManutencaoRoute.value
-          ? [['Órgão / Unidade do veículo', orgaoUnidadeVeiculo.value || 'Não informado', isFilled(orgaoUnidadeVeiculo.value)]]
+          ? [[LABEL_ORGAO_UNIDADE_VEICULO, orgaoUnidadeVeiculo.value || 'Não informado', isFilled(orgaoUnidadeVeiculo.value)]]
           : []),
       ],
     },

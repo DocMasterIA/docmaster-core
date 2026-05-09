@@ -17,6 +17,18 @@ export function capitalizeFirstSignificantLetter(value) {
 }
 
 /**
+ * Maiúscula na primeira letra de cada sequência de letras Unicode (inclui acentos em pt-BR).
+ * Ex.: "órgão / unidade do veículo" -> "Órgão / Unidade Do Veículo"
+ * @param {string} value
+ */
+export function capitalizeEachWordLeadingPt(value) {
+  return String(value ?? '').replace(/\p{L}[\p{L}\p{Mn}]*/gu, (w) => {
+    if (!w) return w;
+    return w.charAt(0).toLocaleUpperCase('pt-BR') + w.slice(1);
+  });
+}
+
+/**
  * Quantidade: só dígitos e um separador decimal (`,` ou `.`). Sem milhares.
  * @param {string} value
  */

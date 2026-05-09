@@ -44,10 +44,22 @@
           </div>
         </header>
 
-        <div class="dm-body">
+        <div class="dm-body" :class="{ 'dm-body--nav-hidden': sidebarNavHidden }">
           <aside class="dm-sidebar">
             <div class="dm-sidebar-head">
-              <div class="dm-sidebar-kicker">Navegação da seção</div>
+              <div class="dm-sidebar-head__row">
+                <div class="dm-sidebar-kicker">Navegação da seção</div>
+                <button
+                  type="button"
+                  class="dm-sidebar-hide-btn"
+                  title="Ocultar painel lateral"
+                  aria-label="Ocultar navegação da seção"
+                  @click="sidebarNavHidden = true"
+                >
+                  <i class="fa-solid fa-eye-slash" aria-hidden="true"></i>
+                  Ocultar
+                </button>
+              </div>
               <div class="dm-sidebar-title">{{ activeSectionLabel }}</div>
               <p>Selecione uma opção para avançar no fluxo.</p>
             </div>
@@ -172,6 +184,17 @@
           </aside>
 
           <main class="dm-content">
+            <button
+              v-show="sidebarNavHidden"
+              type="button"
+              class="dm-sidebar-reveal"
+              title="Mostrar navegação da seção"
+              aria-label="Mostrar navegação da seção"
+              @click="sidebarNavHidden = false"
+            >
+              <i class="fa-solid fa-bars" aria-hidden="true"></i>
+              <span>Menu</span>
+            </button>
             <router-view />
           </main>
         </div>
@@ -188,11 +211,14 @@ import { getApiBase } from '@/utils/apiBase.js';
 
 const API_BASE = getApiBase();
 const DARK_MODE_KEY = 'docmaster.ui.darkmode';
+const SIDEBAR_NAV_HIDDEN_KEY = 'docmaster.ui.sidebarNavHidden';
 const router = useRouter();
 const route = useRoute();
 
 const user = ref(null);
 const darkMode = ref(false);
+/** Painel lateral (≥1280px); em viewports estreitas a sidebar já fica oculta por CSS. */
+const sidebarNavHidden = ref(false);
 const generationMenuOpen = ref(false);
 /** Abre/fecha dropdown «Art. 75, I / II» por grupo: chave `${pageName}::${sectionKey}`. */
 const artSectionOpen = ref({});
@@ -531,6 +557,11 @@ onMounted(() => {
   } catch (_) {
     darkMode.value = false;
   }
+  try {
+    sidebarNavHidden.value = localStorage.getItem(SIDEBAR_NAV_HIDDEN_KEY) === '1';
+  } catch (_) {
+    sidebarNavHidden.value = false;
+  }
   syncDarkModeRootClass(darkMode.value);
   fetchMe().then(() => {
     const currentModule = resolveModuleKey(route);
@@ -551,6 +582,15 @@ watch(
     syncDarkModeRootClass(enabled);
   }
 );
+
+watch(sidebarNavHidden, (hidden) => {
+  try {
+    if (hidden) localStorage.setItem(SIDEBAR_NAV_HIDDEN_KEY, '1');
+    else localStorage.removeItem(SIDEBAR_NAV_HIDDEN_KEY);
+  } catch (_) {
+    // noop
+  }
+});
 
 watch(
   () => route.fullPath,
@@ -809,6 +849,14 @@ watch(
   grid-template-columns: 284px minmax(0, 1fr);
 }
 
+.dm-body--nav-hidden {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.dm-body--nav-hidden .dm-sidebar {
+  display: none;
+}
+
 .dm-sidebar {
   overflow: hidden;
   border-right: 1px solid #c6d3e1;
@@ -827,6 +875,102 @@ watch(
 .dm-dark .dm-sidebar-head {
   border-bottom-color: #1e293b;
   background: #0f172a;
+}
+
+.dm-sidebar-head__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dm-sidebar-head__row .dm-sidebar-kicker {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.dm-sidebar-hide-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 4px 8px;
+  border: 1px solid #94a3b8;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.65);
+  color: #334155;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.dm-sidebar-hide-btn:hover {
+  background: #fff;
+  border-color: #254e78;
+  color: #254e78;
+}
+.dm-dark .dm-sidebar-hide-btn {
+  border-color: #475569;
+  background: rgba(30, 41, 59, 0.6);
+  color: #cbd5e1;
+}
+.dm-dark .dm-sidebar-hide-btn:hover {
+  border-color: #60a5fa;
+  color: #f8fafc;
+  background: #1e293b;
+}
+
+@media (max-width: 1279px) {
+  .dm-sidebar-hide-btn {
+    display: none;
+  }
+}
+
+.dm-sidebar-reveal {
+  display: none;
+  position: fixed;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 60;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 8px 8px;
+  margin: 0;
+  border: 1px solid #cbd5e1;
+  border-left: none;
+  border-radius: 0 12px 12px 0;
+  background: #fff;
+  color: #254e78;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 4px 2px 18px rgba(15, 23, 42, 0.12);
+  transition: background 0.15s ease, color 0.15s ease, padding 0.15s ease;
+}
+.dm-sidebar-reveal:hover {
+  background: #f1f5f9;
+  padding-right: 12px;
+}
+.dm-dark .dm-sidebar-reveal {
+  border-color: #334155;
+  background: #0f172a;
+  color: #93c5fd;
+  box-shadow: 4px 2px 20px rgba(2, 6, 23, 0.45);
+}
+.dm-dark .dm-sidebar-reveal:hover {
+  background: #1e293b;
+}
+
+@media (min-width: 1280px) {
+  .dm-body--nav-hidden .dm-sidebar-reveal {
+    display: inline-flex;
+  }
 }
 
 .dm-sidebar-head .dm-sidebar-kicker {
@@ -1119,19 +1263,32 @@ watch(
   background: #0f172a;
 }
 
-/* Página actual: só contorno azul (sem fundo cheio nem badge) */
+/* Página actual: contorno azul + seta simples à direita */
 .dm-subsubnav-link--active {
   border: 2px solid #254e78;
   background: #fff;
   color: #0f172a;
   font-weight: 700;
   box-shadow: none;
+  padding-right: 12px;
+}
+.dm-subsubnav-link--active::after {
+  content: '\203A';
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 15px;
+  line-height: 1;
+  font-weight: 600;
+  color: #254e78;
 }
 .dm-dark .dm-subsubnav-link--active {
   border-color: #60a5fa;
   background: #0f172a;
   color: #f1f5f9;
   box-shadow: none;
+}
+.dm-dark .dm-subsubnav-link--active::after {
+  color: #93c5fd;
 }
 
 .dm-content {

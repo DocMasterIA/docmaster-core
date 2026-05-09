@@ -1032,3 +1032,14 @@
 .dm-dark-theme .da75-msg-error {
   color: #fca5a5;
 }
+
+/* Botões «Gerar documento com IA»: ícone a girar + texto */
+.dm-gen-ia-btn-spin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+}
+.dm-gen-ia-btn-spin .fa-spinner {
+  flex-shrink: 0;
+}

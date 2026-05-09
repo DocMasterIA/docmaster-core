@@ -149,7 +149,11 @@
             <article class="fe-card">
               <div class="fe-actions">
                 <button type="button" class="fe-btn-primary fe-btn-generate" :disabled="isSubmitting" @click="onSubmit">
-                  {{ isSubmitting ? 'Processando com IA...' : 'Gerar Documento com IA' }}
+                  <span v-if="!isSubmitting">Gerar Documento com IA</span>
+                  <span v-else class="fe-btn-loading" aria-live="polite">
+                    <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+                    Processando com IA…
+                  </span>
                 </button>
                 <template v-if="documentReady">
                   <a v-if="documentTrUrl" :href="documentTrUrl" :download="documentTrFilename" class="fe-btn-secondary">Download TR (DOCX)</a>
@@ -1054,6 +1058,15 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 .fe-orgao-profile-actions > button:disabled { opacity: 0.6; }
 .fe-actions { display: grid; gap: 8px; }
 .fe-btn-generate { font-weight: 700; letter-spacing: .2px; }
+.fe-btn-loading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+}
+.fe-btn-loading .fa-spinner {
+  flex-shrink: 0;
+}
 .fe-error { margin: 0; border: 1px solid #fecaca; background: #fff1f2; color: #b91c1c; border-radius: 8px; padding: 9px 11px; font-size: 13px; }
 .fe-success { margin: 0; border: 1px solid #bbf7d0; background: #f0fdf4; color: #166534; border-radius: 8px; padding: 9px 11px; font-size: 13px; }
 

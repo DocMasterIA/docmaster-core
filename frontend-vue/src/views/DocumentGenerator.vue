@@ -119,7 +119,10 @@
                   :disabled="isSubmitting || (!isInexigibilidadePreviewRoute && (!hasDocumentBase || !iaPrompt.trim()))"
                 >
                   <span v-if="!isSubmitting"><i class="fa-solid fa-robot" aria-hidden="true"></i> {{ isInexigibilidadePreviewRoute ? 'Gerar Documento com IA' : 'Gerar com IA Contextual' }}</span>
-                  <span v-else class="doc-gen__spinner">Processando com IA...</span>
+                  <span v-else class="doc-gen__spinner" aria-live="polite">
+                    <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+                    Processando com IA…
+                  </span>
                 </button>
                 <template v-if="documentReady">
                   <template v-if="docTypeMode === 'tr_modelo'">
@@ -2101,7 +2104,13 @@ function goToPage() {
   gap: 12px;
 }
 .doc-gen__spinner {
-  opacity: 0.9;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.95;
+}
+.doc-gen__spinner .fa-spinner {
+  flex-shrink: 0;
 }
 .doc-gen__loader-wrap {
   margin-top: 14px;

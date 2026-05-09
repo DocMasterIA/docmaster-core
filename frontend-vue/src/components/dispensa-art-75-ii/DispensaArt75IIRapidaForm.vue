@@ -116,7 +116,11 @@
 
             <div class="da75-space-y">
               <button type="button" class="da75-btn da75-btn--primary" :disabled="isSubmitting" @click="onSubmit">
-                {{ isSubmitting ? 'Gerando documentos...' : 'Gerar documento com IA' }}
+                <span v-if="!isSubmitting">Gerar documento com IA</span>
+                <span v-else class="dm-gen-ia-btn-spin" aria-live="polite">
+                  <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+                  Gerando documentos…
+                </span>
               </button>
               <p v-if="generateError" class="da75-helper">{{ generateError }}</p>
               <p v-if="successMessage" class="da75-helper">{{ successMessage }}</p>

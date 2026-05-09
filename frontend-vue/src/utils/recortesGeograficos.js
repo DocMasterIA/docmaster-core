@@ -1,23 +1,46 @@
 /**
  * Monta payload para `recortes_geograficos` (PNCP local / IA).
- * @param {Array<{ uf?: string, municipio?: string }>} locais
+ * Cada linha pode ter `municipios: string[]` (várias cidades na mesma UF) ou
+ * o formato legado `municipio: string` (uma cidade). Sem município = UF inteira.
+ * @param {Array<{ uf?: string, municipio?: string, municipios?: string[] }>} linhas
  * @returns {Array<{ uf: string, municipio: string | null }>}
  */
-export function buildRecortesGeograficosPayload(locais) {
+export function buildRecortesGeograficosPayload(linhas) {
   const out = [];
   const seen = new Set();
-  for (const row of locais || []) {
+  for (const row of linhas || []) {
     const uf = String(row?.uf || '')
       .trim()
       .toUpperCase();
     if (uf.length !== 2) continue;
-    const mRaw = String(row?.municipio || '').trim();
-    const municipio = mRaw || null;
-    const key = `${uf}|${municipio || ''}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(municipio ? { uf, municipio } : { uf, municipio: null });
-    if (out.length >= 30) break;
+
+    const arr = Array.isArray(row?.municipios)
+      ? row.municipios.map((m) => String(m || '').trim()).filter(Boolean)
+      : [];
+    const legacy = String(row?.municipio || '').trim();
+
+    if (arr.length > 0) {
+      for (const mRaw of arr) {
+        const municipio = mRaw;
+        const key = `${uf}|${municipio}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ uf, municipio });
+        if (out.length >= 30) return out;
+      }
+    } else if (legacy) {
+      const key = `${uf}|${legacy}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ uf, municipio: legacy });
+      if (out.length >= 30) return out;
+    } else {
+      const key = `${uf}|`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ uf, municipio: null });
+      if (out.length >= 30) return out;
+    }
   }
   return out;
 }

@@ -33,44 +33,74 @@
       </section>
 
       <section class="bia-filters">
-        <div class="bia-locais">
-          <div class="bia-locais__head">
-            <span class="bia-locais__title">Locais (opcional)</span>
-            <p class="bia-locais__hint">
-              Vários estados e cidades (ex.: Curitiba/PR e Campinas/SP). «Toda a UF» = estado inteiro. Vazio = usa a UF
-              do item ou busca ampla.
-            </p>
-            <button type="button" class="bia-locais__add" @click="addLocalRow">+ Adicionar local</button>
+        <div class="bia-geo-panel">
+          <div class="bia-geo-panel__top">
+            <div class="bia-geo-panel__intro">
+              <p class="bia-geo-panel__kicker">Busca geográfica</p>
+              <h2 class="bia-geo-panel__title">Escolher cidade</h2>
+              <p class="bia-geo-panel__hint">
+                Opcional: escolha a UF e marque várias cidades na lista (uma linha por estado). Sem nenhuma cidade
+                marcada, vale a UF inteira. Sem linhas, a pesquisa segue a UF do item ou cobertura ampla.
+              </p>
+            </div>
+            <div class="bia-geo-panel__actions">
+              <button
+                type="button"
+                class="bia-geo-search-btn"
+                :disabled="isSearching || isAutoSearchingAll || (!itemContext?.descricao_item && allItemContexts.length === 0)"
+                @click="applyFilters"
+              >
+                <i class="fa-solid fa-map-location-dot" aria-hidden="true"></i>
+                {{ pesquisaUfBotaoLabel }}
+              </button>
+              <button type="button" class="bia-geo-add-link" @click="addLinhaCidade">+ Adicionar UF</button>
+            </div>
           </div>
-          <div v-if="!filtros.locais.length" class="bia-locais__empty">Sem filtro geográfico extra.</div>
-          <div v-for="(loc, idx) in filtros.locais" :key="loc._id" class="bia-locais__row">
-            <label class="bia-locais__field">
+          <div v-if="!filtros.cidades.length" class="bia-geo-empty">Nenhum recorte por cidade/UF definido.</div>
+          <div v-for="(linha, idx) in filtros.cidades" :key="linha._id" class="bia-geo-row">
+            <label class="bia-geo-field">
               <span>UF</span>
-              <select v-model="loc.uf" class="bia-locais__select" @change="onLocalUfChange(loc)">
-                <option value="">—</option>
-                <option v-for="u in ufOptions" :key="u.code" :value="u.code">{{ u.code }}</option>
-              </select>
+              <div class="bia-geo-uf-filter">
+                <img
+                  v-if="ufBandeiraUrl(linha.uf)"
+                  :src="ufBandeiraUrl(linha.uf)"
+                  :alt="`Bandeira ${linha.uf}`"
+                  class="bia-geo-uf-flag"
+                />
+                <select v-model="linha.uf" class="bia-geo-select bia-geo-select--uf" @change="onUfLinhaCidadeChange(linha)">
+                  <option value="">—</option>
+                  <option v-for="u in ufOptions" :key="u.code" :value="u.code">{{ u.code }}</option>
+                </select>
+              </div>
             </label>
-            <label class="bia-locais__field bia-locais__field--grow">
-              <span>Município</span>
-              <select v-model="loc.municipio" class="bia-locais__select" :disabled="!loc.uf">
-                <option value="">Toda a UF</option>
-                <option v-for="m in municipiosForLocalRow(loc)" :key="m" :value="m">{{ m }}</option>
-              </select>
-            </label>
-            <button type="button" class="bia-locais__remove" title="Remover" @click="removeLocalRow(idx)">×</button>
+            <div class="bia-geo-field bia-geo-field--grow bia-geo-field--mun">
+              <span>Cidades</span>
+              <p v-if="!linha.uf" class="bia-geo-mun-hint">Escolha a UF para listar os municípios.</p>
+              <template v-else>
+                <input
+                  v-model="linha.filtroMun"
+                  type="search"
+                  class="bia-geo-mun-search"
+                  placeholder="Filtrar cidades…"
+                  autocomplete="off"
+                />
+                <p class="bia-geo-mun-hint">
+                  Marque quantas quiser; nenhuma marcada = inclui a <strong>UF inteira</strong>.
+                </p>
+                <div class="bia-geo-mun-list" role="group" :aria-label="`Cidades ${linha.uf}`">
+                  <label v-for="m in municipiosListaUfFiltrada(linha)" :key="m" class="bia-geo-mun-item">
+                    <input
+                      type="checkbox"
+                      :checked="linha.municipios.includes(m)"
+                      @change="toggleMunicipioLinha(linha, m, $event.target.checked)"
+                    />
+                    <span>{{ m }}</span>
+                  </label>
+                </div>
+              </template>
+            </div>
+            <button type="button" class="bia-geo-remove" title="Remover esta linha" @click="removeLinhaCidade(idx)">×</button>
           </div>
-        </div>
-        <div class="bia-filter bia-filter--action">
-          <span>Busca geográfica</span>
-          <button
-            type="button"
-            class="bia-add-cotacao-btn bia-add-cotacao-btn--ghost"
-            :disabled="isSearching || isAutoSearchingAll || (!itemContext?.descricao_item && allItemContexts.length === 0)"
-            @click="applyFilters"
-          >
-            {{ pesquisaUfBotaoLabel }}
-          </button>
         </div>
       </section>
       <p v-if="isAutoSearchingAll" class="bia-meta">
@@ -183,7 +213,17 @@
                       <span class="bia-badge bia-badge--ok">{{ labelInciso(row.incisoClassificacao) }}</span>
                     </td>
                     <td>{{ row.qtd }}</td>
-                    <td class="bia-cell-center">{{ row.uf }}</td>
+                    <td class="bia-cell-center">
+                      <div class="bia-uf-cell">
+                        <img
+                          v-if="ufBandeiraUrl(row.uf)"
+                          :src="ufBandeiraUrl(row.uf)"
+                          :alt="`UF ${row.uf}`"
+                          class="bia-geo-uf-flag bia-geo-uf-flag--table"
+                        />
+                        <span>{{ row.uf }}</span>
+                      </div>
+                    </td>
                     <td class="bia-cell-center">{{ row.data }}</td>
                     <td class="bia-bold">{{ row.valor }}</td>
                     <td class="bia-cell-center">
@@ -232,44 +272,66 @@ const autostart = computed(() => String(route.query.autostart || '').trim() === 
 
 const filtros = reactive({
   descricao: '',
-  /** @type {Array<{ _id: string, uf: string, municipio: string }>} */
-  locais: [],
+  /** @type {Array<{ _id: string, uf: string, municipios: string[], filtroMun: string }>} */
+  cidades: [],
 });
 
-function newLocalRow() {
+function newLinhaCidade() {
   return {
     _id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
     uf: '',
-    municipio: '',
+    municipios: [],
+    filtroMun: '',
   };
 }
 
-function addLocalRow() {
-  filtros.locais.push(newLocalRow());
+function addLinhaCidade() {
+  filtros.cidades.push(newLinhaCidade());
 }
 
-function removeLocalRow(idx) {
-  filtros.locais.splice(idx, 1);
+function removeLinhaCidade(idx) {
+  filtros.cidades.splice(idx, 1);
 }
 
-function onLocalUfChange(loc) {
-  const list = MUNICIPIOS_POR_UF[String(loc.uf || '').toUpperCase()] || [];
-  if (loc.municipio && !list.includes(loc.municipio)) {
-    loc.municipio = '';
-  }
+function onUfLinhaCidadeChange(linha) {
+  const list = MUNICIPIOS_POR_UF[String(linha.uf || '').toUpperCase()] || [];
+  linha.municipios = (linha.municipios || []).filter((m) => list.includes(m));
+  linha.filtroMun = '';
 }
 
-function municipiosForLocalRow(loc) {
-  const uf = String(loc.uf || '').toUpperCase();
+function municipiosListaUf(linha) {
+  const uf = String(linha.uf || '').toUpperCase();
   if (!uf) return [];
   const list = MUNICIPIOS_POR_UF[uf];
   return Array.isArray(list) ? list : [];
 }
 
+function normalizeMunFilter(v) {
+  return String(v ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function municipiosListaUfFiltrada(linha) {
+  const list = municipiosListaUf(linha);
+  const q = normalizeMunFilter(linha.filtroMun);
+  if (!q) return list;
+  return list.filter((m) => normalizeMunFilter(m).includes(q));
+}
+
+function toggleMunicipioLinha(linha, nome, checked) {
+  const set = new Set(linha.municipios || []);
+  if (checked) set.add(nome);
+  else set.delete(nome);
+  linha.municipios = Array.from(set);
+}
+
 const pesquisaUfBotaoLabel = computed(() => {
-  const n = buildRecortesGeograficosPayload(filtros.locais).length;
-  if (n > 1) return `Pesquisar em ${n} locais`;
-  if (n === 1) return 'Pesquisar no local definido';
+  const n = buildRecortesGeograficosPayload(filtros.cidades).length;
+  if (n > 1) return `Pesquisar (${n} trechos: cidades ou UF inteira)`;
+  if (n === 1) return 'Pesquisar (1 trecho geográfico)';
   return 'Fazer pesquisa (recorte do item)';
 });
 
@@ -332,6 +394,11 @@ const ufOptions = [
   { code: 'SE', name: 'Sergipe' },
   { code: 'TO', name: 'Tocantins' },
 ].map((uf) => ({ ...uf, flag: UF_FLAGS[uf.code] }));
+
+function ufBandeiraUrl(code) {
+  const k = String(code || '').trim().toUpperCase();
+  return UF_FLAGS[k] || '';
+}
 
 const rows = ref([]);
 const isSearching = ref(false);
@@ -449,7 +516,7 @@ async function applyFilters() {
   }
   isAutoSearchingAll.value = false;
   if (!rows.value.length) {
-    searchError.value = 'Nenhuma cotação aderente encontrada para os itens da cotação nos locais definidos.';
+    searchError.value = 'Nenhuma cotação aderente encontrada para os itens da cotação nas cidades/UF definidas.';
   }
 }
 
@@ -542,7 +609,7 @@ async function runSearchWithContext({ descricao, context = null, append = false 
   isSearching.value = true;
   if (!append) searchError.value = '';
   try {
-    const recortes = buildRecortesGeograficosPayload(filtros.locais);
+    const recortes = buildRecortesGeograficosPayload(filtros.cidades);
     const basePayload = {
       termo_busca: String(descricao).trim(),
       codigo_modalidade: null,
@@ -799,11 +866,10 @@ onMounted(async () => {
       itemContext.value = buildContextFromItem(it);
       filtros.descricao = String(it.descricao_item || '').trim();
       if (String(it.uf || '').trim()) {
-        filtros.locais = [
+        filtros.cidades = [
         {
-          ...newLocalRow(),
+          ...newLinhaCidade(),
           uf: String(it.uf || '').trim().toUpperCase(),
-          municipio: '',
         },
       ];
       }
@@ -1004,88 +1070,228 @@ function onVariacaoInput(event) {
 .bia-summary-card strong { font-size: 20px; color: #0f172a; }
 .bia-summary-card--highlight strong { color: #0f4c81; }
 
-.bia-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 6px; align-items: stretch; }
+.bia-filters { display: block; }
 .bia-controls { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
 .bia-controls__left,
 .bia-controls__right { display: flex; flex-wrap: wrap; gap: 8px; }
-.bia-filter { border: 1px solid #d6dde8; border-radius: 10px; background: #f8fafc; padding: 7px 8px; display: flex; flex-direction: column; gap: 4px; }
-.bia-filter > span { font-size: 9px; color: #64748b; text-transform: uppercase; line-height: 1.1; }
-.bia-filter--action { justify-content: space-between; }
-.bia-locais {
-  grid-column: 1 / -1;
-  border: 1px dashed #c5d4e8;
-  border-radius: 10px;
-  background: #fbfcfe;
-  padding: 8px 10px;
+
+.bia-geo-panel {
+  border: 1px solid #dbe4f0;
+  border-radius: 12px;
+  background: linear-gradient(165deg, #fbfdff 0%, #f3f7fb 100%);
+  padding: 12px 14px 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
 }
-.bia-locais__head {
+.bia-geo-panel__top {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 16px;
 }
-.bia-locais__title {
-  font-size: 9px;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: #475569;
+.bia-geo-panel__intro {
+  flex: 1 1 220px;
+  min-width: 0;
 }
-.bia-locais__hint {
+.bia-geo-panel__kicker {
   margin: 0;
-  flex: 1 1 200px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #3d6ea3;
+}
+.bia-geo-panel__title {
+  margin: 4px 0 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+}
+.bia-geo-panel__hint {
+  margin: 6px 0 0;
+  max-width: 520px;
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.45;
+}
+.bia-geo-panel__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.bia-geo-search-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(37, 99, 235, 0.35);
+  background: rgba(239, 246, 255, 0.95);
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.bia-geo-search-btn:hover:not(:disabled) {
+  background: #dbeafe;
+  border-color: rgba(37, 99, 235, 0.55);
+  color: #1e40af;
+}
+.bia-geo-search-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.bia-geo-add-link {
+  border: 0;
+  background: transparent;
+  padding: 2px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.bia-geo-add-link:hover {
+  color: #1d4ed8;
+}
+.bia-geo-empty {
+  font-size: 12px;
+  color: #94a3b8;
+  font-style: italic;
+  padding: 2px 0;
+}
+.bia-geo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+.bia-geo-row + .bia-geo-row {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid #e8eef5;
+}
+.bia-geo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 76px;
+}
+.bia-geo-field--grow {
+  flex: 1 1 180px;
+}
+.bia-geo-field--mun {
+  min-width: 200px;
+  max-width: min(100%, 420px);
+}
+.bia-geo-mun-hint {
+  margin: 0;
   font-size: 11px;
   color: #64748b;
   line-height: 1.35;
 }
-.bia-locais__add {
-  border: 1px solid #1f4e79;
-  border-radius: 8px;
-  background: #fff;
-  color: #1f4e79;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 8px;
-  cursor: pointer;
-}
-.bia-locais__empty {
-  font-size: 11px;
-  color: #94a3b8;
-  font-style: italic;
-}
-.bia-locais__row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 6px;
-}
-.bia-locais__field {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 72px;
-}
-.bia-locais__field--grow {
-  flex: 1 1 160px;
-}
-.bia-locais__field span {
-  font-size: 8px;
-  text-transform: uppercase;
-  color: #64748b;
-}
-.bia-locais__select {
+.bia-geo-mun-search {
+  margin-top: 4px;
+  width: 100%;
+  box-sizing: border-box;
   border: 1px solid #cfd8e3;
   border-radius: 8px;
   background: #fff;
   font-size: 12px;
-  padding: 5px 7px;
-  width: 100%;
+  padding: 5px 8px;
+  color: #0f172a;
+  outline: none;
 }
-.bia-locais__remove {
-  width: 28px;
-  height: 28px;
+.bia-geo-mun-search:focus {
+  border-color: #3b6f9e;
+  box-shadow: 0 0 0 2px rgba(59, 111, 158, 0.12);
+}
+.bia-geo-mun-list {
+  margin-top: 6px;
+  max-height: 200px;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: #f8fafc;
+}
+.bia-geo-mun-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12px;
+  color: #0f172a;
+  cursor: pointer;
+  line-height: 1.3;
+}
+.bia-geo-mun-item input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.bia-geo-field span {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+.bia-geo-uf-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.bia-geo-uf-flag {
+  width: 30px;
+  height: 21px;
+  object-fit: cover;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.1);
+  flex-shrink: 0;
+}
+.bia-geo-uf-flag--table {
+  width: 24px;
+  height: 16px;
+}
+.bia-uf-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.bia-geo-select--uf {
+  flex: 1;
+  min-width: 0;
+}
+.bia-geo-select {
+  border: 1px solid #cfd8e3;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+  padding: 6px 8px;
+  width: 100%;
+  color: #0f172a;
+  outline: none;
+}
+.bia-geo-select:focus {
+  border-color: #3b6f9e;
+  box-shadow: 0 0 0 2px rgba(59, 111, 158, 0.12);
+}
+.bia-geo-remove {
+  align-self: flex-start;
+  margin-top: 20px;
+  width: 30px;
+  height: 30px;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   background: #fff;
@@ -1094,36 +1300,26 @@ function onVariacaoInput(event) {
   line-height: 1;
   cursor: pointer;
 }
+.bia-geo-remove:hover {
+  border-color: #cbd5e1;
+  color: #475569;
+}
+@media (max-width: 600px) {
+  .bia-geo-panel__actions {
+    align-items: stretch;
+    width: 100%;
+  }
+  .bia-geo-search-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .bia-geo-add-link {
+    width: 100%;
+    text-align: center;
+  }
+}
 .bia-meta { margin: 2px 0 0; font-size: 12px; color: #64748b; }
 .bia-meta--error { color: #b91c1c; }
-.bia-filter input,
-.bia-filter select {
-  border: 1px solid #cfd8e3;
-  border-radius: 8px;
-  background: #fff;
-  color: #0f172a;
-  font-size: 12px;
-  padding: 6px 8px;
-  outline: none;
-}
-
-.bia-filter input:focus,
-.bia-filter select:focus {
-  border-color: #1f4e79;
-  box-shadow: 0 0 0 2px rgba(31, 78, 121, 0.12);
-}
-.bia-search-btn {
-  height: 100%;
-  min-height: 52px;
-  border-radius: 10px;
-  border: 1px solid #1f4e79;
-  background: #1f4e79;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  align-self: stretch;
-}
-
 .bia-table-shell { border: 1px solid #d6dde8; border-radius: 10px; background: #fff; min-width: 0; overflow: hidden; }
 .bia-table-head {
   display: flex;

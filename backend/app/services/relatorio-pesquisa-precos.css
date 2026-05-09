@@ -523,8 +523,8 @@
   font-size: 7.5pt;
   line-height: 1.2;
   color: #1e293b;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .rpp-mini-compact__value--strong {
@@ -632,6 +632,8 @@
 .rpp-body.rpp--pdf .rpp-info-card__value {
   font-size: var(--rpp-pdf-info-value);
   line-height: 1.38;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 .rpp-body.rpp--pdf .rpp-panel__title {
   font-size: var(--rpp-pdf-panel-title);
@@ -657,8 +659,8 @@
   padding: 1.5mm 1.4mm;
 }
 .rpp-body.rpp--pdf .rpp-td-name {
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 .rpp-body.rpp--pdf .rpp-detalhe-item__kicker {
   font-size: var(--rpp-pdf-detalhe-kicker);
@@ -666,8 +668,8 @@
 .rpp-body.rpp--pdf .rpp-detalhe-item__nome {
   font-size: var(--rpp-pdf-detalhe-nome);
   line-height: 1.28;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 .rpp-body.rpp--pdf .rpp-detail-list {
   padding: 1mm;
@@ -686,15 +688,17 @@
 .rpp-body.rpp--pdf .rpp-fonte-row--2 {
   grid-template-columns: minmax(0, 1fr);
 }
+/*
+ * WeasyPrint: grid «rótulo | valor» em colunas estreitas colapsava a 2ª coluna e
+ * `overflow-wrap:anywhere` quebrava uma letra por linha. No PDF usamos bloco empilhado.
+ */
 .rpp-body.rpp--pdf .rpp-mini-compact {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  align-items: start;
-  column-gap: 0.9mm;
-  row-gap: 0;
-  padding: 0.55mm 0.85mm;
+  display: block;
+  padding: 0.65mm 1mm;
   min-height: 0;
   min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 .rpp-body.rpp--pdf .rpp-fonte-row--5 .rpp-mini-compact--wide {
   grid-column: 1 / -1;
@@ -702,23 +706,23 @@
 .rpp-body.rpp--pdf .rpp-mini-compact__label {
   display: block;
   font-size: var(--rpp-pdf-mini-label);
-  line-height: 1.15;
+  line-height: 1.2;
   letter-spacing: 0.02em;
-  white-space: nowrap;
-  max-width: 26mm;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  max-width: 100%;
+  margin-bottom: 0.35mm;
 }
 .rpp-body.rpp--pdf .rpp-mini-compact__value {
   display: block;
   margin-top: 0;
   font-size: var(--rpp-pdf-mini-value);
-  line-height: 1.22;
+  line-height: 1.28;
   font-weight: 600;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-  hyphens: manual;
-  min-width: 0;
+  word-break: normal;
+  overflow-wrap: break-word;
+  hyphens: none;
+  width: 100%;
+  max-width: 100%;
 }
 .rpp-body.rpp--pdf .rpp-fornecedores-grid {
   grid-template-columns: minmax(0, 1fr);
@@ -727,14 +731,14 @@
 .rpp-body.rpp--pdf .rpp-fornecedor-card__name {
   font-size: var(--rpp-pdf-fornec-nome);
   line-height: 1.25;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 .rpp-body.rpp--pdf .rpp-fornecedor-card__lines {
   font-size: var(--rpp-pdf-fornec-lines);
   line-height: 1.38;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 .rpp-body.rpp--pdf .rpp-quote p {
   font-size: var(--rpp-pdf-quote);

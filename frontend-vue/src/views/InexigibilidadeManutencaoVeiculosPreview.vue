@@ -1010,9 +1010,6 @@ function buildInexig74ManutencaoDfdJustificativa() {
       `O fornecedor exclusivo indicado e ${forn}${cnpjStr ? ` (CNPJ ${cnpjStr})` : ''}, nos limites do artigo e da fundamentacao do termo de referencia.`,
     );
   }
-  partes.push(
-    'Assim, a formalizacao no DFD consubstancia a descricao tecnica e administrativa necessaria para instruir a contratacao, mantendo coerencia entre o veiculo, o tipo de manutencao e a hipotes legal de inexigibilidade.',
-  );
   return partes.join('\n\n');
 }
 

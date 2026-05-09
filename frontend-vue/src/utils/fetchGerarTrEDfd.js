@@ -7,14 +7,13 @@ function backoffMs(attempt) {
 }
 
 function isTransientHttpStatus(status) {
-  return [429, 502, 503, 504, 520, 521, 522, 524].includes(status);
+  // Sem 504: costuma ser «já esgotou o tempo» no backend; repetir só prolonga o travamento.
+  return [429, 502, 503, 520, 521, 522, 524].includes(status);
 }
 
 function errorMessageSuggestsRetry(msg) {
   const m = String(msg || '').toLowerCase();
-  return /timeout|tempo limite|timed out|indispon|econnreset|connection reset|bad gateway|service unavailable|gateway|524|503|504|502/.test(
-    m,
-  );
+  return /timeout|tempo limite|timed out|indispon|econnreset|connection reset|bad gateway|service unavailable|gateway timed|524/.test(m);
 }
 
 /**
@@ -27,7 +26,7 @@ function errorMessageSuggestsRetry(msg) {
  * @returns {Promise<{ ok: true, data: object, status: number } | { ok: false, kind: string, errorMessage: string, status: number, data?: object }>}
  */
 export async function fetchGerarTrEDfdWithRetry(apiBase, bodyObj, options = {}) {
-  const maxAttempts = Math.max(1, Math.min(8, options.maxAttempts ?? 4));
+  const maxAttempts = Math.max(1, Math.min(5, options.maxAttempts ?? 2));
   const url = buildGerarTrEDfdUrl(apiBase);
   const requestInit = {
     method: 'POST',

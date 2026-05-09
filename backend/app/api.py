@@ -39,10 +39,14 @@ def _rag_http_timeout_seconds() -> float:
     return max(5.0, val)
 
 
-def _rag_post_json_with_retries(url, body, *, params=None, max_attempts=3):
+def _rag_post_json_with_retries(url, body, *, params=None, max_attempts=2):
     """
-    POST JSON ao rag_service com retries leves para falhas transitórias
-    (timeout, conexão recusada, 502/503/504 do proxy).
+    POST JSON ao rag_service com retries leves só onde faz sentido:
+    - reconexão (rag ainda subindo, reset TCP);
+    - 502/503/504 já respondidos pelo proxy (rápido).
+
+    Não repete em Timeout: cada tentativa já usa RAG_HTTP_TIMEOUT inteiro;
+    repetir multiplicava o tempo e «travava» geração de cláusulas/documentos.
     """
     params = params if params is not None else {}
     last_exc = None
@@ -55,13 +59,15 @@ def _rag_post_json_with_retries(url, body, *, params=None, max_attempts=3):
                 timeout=_rag_http_timeout_seconds(),
             )
             if resp.status_code in (502, 503, 504) and attempt < max_attempts - 1:
-                time.sleep(min(3.0, 0.65 * (2**attempt)))
+                time.sleep(min(2.0, 0.5 * (2**attempt)))
                 continue
             return resp
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+        except requests.exceptions.Timeout:
+            raise
+        except requests.exceptions.ConnectionError as e:
             last_exc = e
             if attempt < max_attempts - 1:
-                time.sleep(min(3.0, 0.65 * (2**attempt)))
+                time.sleep(min(2.0, 0.5 * (2**attempt)))
                 continue
             raise last_exc from None
     raise RuntimeError("unreachable rag retry loop")  # pragma: no cover

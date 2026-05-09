@@ -1053,10 +1053,10 @@ watch(
 .dm-subsubnav-link:hover {
   background: #f8fafc;
 }
-.dm-subsubnav-link--active:hover {
+.dm-subsubnav-link.dm-subsubnav-link--active:hover {
   background: #f1f5f9;
 }
-.dm-dark .dm-subsubnav-link--active:hover {
+.dm-dark .dm-subsubnav-link.dm-subsubnav-link--active:hover {
   background: #1e293b;
 }
 
@@ -1271,8 +1271,9 @@ watch(
   background: #0f172a;
 }
 
-/* Página actual: só borda azul + seta à direita */
-.dm-subsubnav-link--active {
+/* Página actual: borda azul (tem de vencer :visited, que fixa borda cinza). */
+.dm-subsubnav-link.dm-subsubnav-link--active,
+.dm-subsubnav-link.dm-subsubnav-link--active:visited {
   border: 2px solid #254e78;
   background: #fff;
   color: #0f172a;
@@ -1280,7 +1281,7 @@ watch(
   box-shadow: none;
   padding-right: 12px;
 }
-.dm-subsubnav-link--active::after {
+.dm-subsubnav-link.dm-subsubnav-link--active::after {
   content: '\203A';
   margin-left: auto;
   flex-shrink: 0;
@@ -1289,13 +1290,14 @@ watch(
   font-weight: 600;
   color: #254e78;
 }
-.dm-dark .dm-subsubnav-link--active {
+.dm-dark .dm-subsubnav-link.dm-subsubnav-link--active,
+.dm-dark .dm-subsubnav-link.dm-subsubnav-link--active:visited {
   border-color: #60a5fa;
   background: #0f172a;
   color: #f1f5f9;
   box-shadow: none;
 }
-.dm-dark .dm-subsubnav-link--active::after {
+.dm-dark .dm-subsubnav-link.dm-subsubnav-link--active::after {
   color: #93c5fd;
 }
 

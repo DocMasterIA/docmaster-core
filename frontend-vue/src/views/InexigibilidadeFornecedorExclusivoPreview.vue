@@ -201,7 +201,7 @@
       </div>
       <div class="fe-drawer-body">
         <article class="fe-card">
-          <h3>Cadastros de órgãos</h3>
+          <h3>Cadastros de Órgãos</h3>
           <div class="fe-body">
             <div class="fe-field">
               <label>Órgão cadastrado</label>
@@ -595,7 +595,15 @@ function loadOrgaoProfiles() {
   try {
     const raw = localStorage.getItem(ORGAO_PROFILES_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
-    orgaoProfiles.value = Array.isArray(parsed) ? parsed : [];
+    const list = Array.isArray(parsed) ? parsed : [];
+    let dirty = false;
+    orgaoProfiles.value = list.map((p) => {
+      const trimmed = String(p?.name ?? '').trim();
+      const n = trimmed ? capitalizeFirstSignificantLetter(trimmed) : '';
+      if (n !== trimmed) dirty = true;
+      return { ...p, name: n };
+    });
+    if (dirty) persistOrgaoProfiles();
   } catch {
     orgaoProfiles.value = [];
   }
@@ -614,7 +622,8 @@ function loadOrgaoProfile(profileId) {
   selectedOrgaoProfileId.value = id;
   const hit = orgaoProfiles.value.find((p) => String(p.id) === id);
   if (!hit) return;
-  orgaoProfileName.value = String(hit.name || '');
+  const trimmed = String(hit.name || '').trim();
+  orgaoProfileName.value = trimmed ? capitalizeFirstSignificantLetter(trimmed) : '';
   applyGlobalFormStatePayload(hit.data || {});
 }
 
@@ -624,8 +633,10 @@ function newOrgaoProfile() {
 }
 
 function saveOrgaoProfile() {
-  const name = String(orgaoProfileName.value || '').trim();
+  const nameRaw = String(orgaoProfileName.value || '').trim();
+  const name = nameRaw ? capitalizeFirstSignificantLetter(nameRaw) : '';
   if (!name) return false;
+  orgaoProfileName.value = name;
   const data = collectGlobalFormStatePayload();
   data.orgao = name;
   const orgaoValue = String(data?.orgao || '').trim();

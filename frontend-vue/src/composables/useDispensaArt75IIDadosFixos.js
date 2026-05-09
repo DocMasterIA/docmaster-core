@@ -4,6 +4,7 @@ import {
   TRATAMENTO_CARGO,
   TRATAMENTO_NOME,
 } from '@/components/dispensa-art-75-ii/dispensaArt75iiShared.js';
+import { capitalizeFirstSignificantLetter } from '@/utils/itemValorCampos.js';
 
 export const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
 const ORGAO_PROFILES_STORAGE_KEY = 'orgao_profiles_v1';
@@ -265,7 +266,15 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     try {
       const raw = localStorage.getItem(ORGAO_PROFILES_STORAGE_KEY);
       const parsed = raw ? JSON.parse(raw) : [];
-      orgaoProfiles.value = Array.isArray(parsed) ? parsed : [];
+      const list = Array.isArray(parsed) ? parsed : [];
+      let dirty = false;
+      orgaoProfiles.value = list.map((p) => {
+        const trimmed = String(p?.name ?? '').trim();
+        const n = trimmed ? capitalizeFirstSignificantLetter(trimmed) : '';
+        if (n !== trimmed) dirty = true;
+        return { ...p, name: n };
+      });
+      if (dirty) persistOrgaoProfiles();
     } catch {
       orgaoProfiles.value = [];
     }
@@ -288,7 +297,8 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     selectedOrgaoProfileId.value = id;
     const hit = orgaoProfiles.value.find((p) => String(p.id) === id);
     if (!hit) return;
-    orgaoProfileName.value = String(hit.name || '');
+    const trimmed = String(hit.name || '').trim();
+    orgaoProfileName.value = trimmed ? capitalizeFirstSignificantLetter(trimmed) : '';
     applyPresetPayload(hit.data || {});
   }
 
@@ -298,8 +308,10 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
   }
 
   function saveOrgaoProfile() {
-    const name = String(orgaoProfileName.value || '').trim();
+    const nameRaw = String(orgaoProfileName.value || '').trim();
+    const name = nameRaw ? capitalizeFirstSignificantLetter(nameRaw) : '';
     if (!name) return false;
+    orgaoProfileName.value = name;
     const data = createOrgaoProfilePayload();
     data.orgao = name;
     const orgaoValue = String(data?.orgao || '').trim();

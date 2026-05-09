@@ -12,7 +12,7 @@
 
       <div class="ixp-drawer-body">
         <article class="ixp-card">
-          <h3>Cadastros de órgãos</h3>
+          <h3>Cadastros de Órgãos</h3>
           <div class="ixp-body">
             <div class="ixp-field">
               <label>Órgão cadastrado</label>

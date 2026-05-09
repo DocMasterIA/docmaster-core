@@ -493,6 +493,15 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* Fornecedor sozinho (altura do texto); CNPJ|Valor na linha seguinte evita vão enorme até Órgão */
+.rpp-fonte-row--1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.rpp-fonte-row--pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 /* ID / Processo: tabela evita colapso de grelha no WeasyPrint (uma letra por linha) */
 .rpp-fonte-processo-line {
   margin-bottom: 1.2mm;
@@ -727,6 +736,10 @@
 }
 /* Quatro mini-campos: 2×2 no A4 */
 .rpp-body.rpp--pdf .rpp-fonte-row--4 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+/* CNPJ + Valor: manter 2 colunas (não confundir com .rpp-fonte-row--2 = empilhado no PDF) */
+.rpp-body.rpp--pdf .rpp-fonte-row--pair {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .rpp-body.rpp--pdf .rpp-fonte-row--2 {

@@ -145,11 +145,13 @@
               <div v-for="(f, fi) in g.fontes" :key="fi" class="rpv-source">
                 <span class="rpv-source__badge">{{ fi + 1 }}</span>
                 <div class="rpv-source__inner">
-                  <div class="rpv-mini-grid rpv-mini-grid--3">
+                  <div class="rpv-mini-grid rpv-mini-grid--1">
                     <div class="rpv-dcard rpv-dcard--featured">
                       <span class="rpv-dcard__label">Fornecedor</span>
                       <span class="rpv-dcard__value rpv-dcard__value--strong">{{ f.fornecedor }}</span>
                     </div>
+                  </div>
+                  <div class="rpv-mini-grid rpv-mini-grid--2">
                     <div class="rpv-dcard"><span class="rpv-dcard__label">CNPJ</span><span class="rpv-dcard__value">{{ f.cnpj }}</span></div>
                     <div class="rpv-dcard rpv-dcard--featured">
                       <span class="rpv-dcard__label">Valor</span>

@@ -493,6 +493,15 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* Fornecedor sozinho (altura do texto); CNPJ|Valor na linha seguinte evita vão enorme até Órgão */
+.rpp-fonte-row--1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.rpp-fonte-row--pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 /* ID / Processo: tabela evita colapso de grelha no WeasyPrint (uma letra por linha) */
 .rpp-fonte-processo-line {
   margin-bottom: 1.2mm;
@@ -729,6 +738,10 @@
 .rpp-body.rpp--pdf .rpp-fonte-row--4 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+/* CNPJ + Valor: manter 2 colunas (não confundir com .rpp-fonte-row--2 = empilhado no PDF) */
+.rpp-body.rpp--pdf .rpp-fonte-row--pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 .rpp-body.rpp--pdf .rpp-fonte-row--2 {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -868,7 +881,8 @@
 .rpv-source{position:relative;border-radius:8px;border:1px solid #e2e8f0;background:rgba(248,250,252,.65);padding-left:24px}
 .rpv-source__badge{position:absolute;left:8px;top:50%;transform:translateY(-50%);width:16px;height:16px;border-radius:999px;background:#5f7f9a;color:#fff;font-size:7px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(15,23,42,.12)}
 .rpv-source__inner{padding:4px;display:flex;flex-direction:column;gap:3px}
-.rpv-mini-grid{display:grid;gap:3px}
+.rpv-mini-grid{display:grid;gap:3px;align-items:start}
+.rpv-mini-grid--1{grid-template-columns:1fr}
 .rpv-mini-grid--3{grid-template-columns:1fr}
 @media (min-width:768px){.rpv-mini-grid--3{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .rpv-mini-grid--5{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -924,7 +938,8 @@
 .rpv-source{border-radius:4px!important;padding-left:16px!important}
 .rpv-source__badge{left:4px!important;width:10px!important;height:10px!important;font-size:5px!important}
 .rpv-source__inner{padding:2px!important;gap:2px!important}
-.rpv-mini-grid{gap:1px!important}
+.rpv-mini-grid{gap:1px!important;align-items:start!important}
+.rpv-mini-grid--1{grid-template-columns:1fr!important}
 .rpv-mini-grid--5{grid-template-columns:repeat(3,minmax(0,1fr))!important}
 .rpv-dcard{border-radius:3px!important;padding:2px 3px!important;min-height:18px!important;display:flex!important;align-items:center!important;gap:3px!important;flex-wrap:nowrap!important}
 .rpv-dcard--wide{min-height:20px!important}

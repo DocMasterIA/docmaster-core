@@ -42,6 +42,7 @@ from backend.app.services.pncp_relatorio_itens import (
     agrupar_itens_relatorio_pesquisa_precos,
     preco_unitario_cotacao_fonte,
     resumo_calculo_precos,
+    texto_orgao_exibicao_relatorio_pesquisa_precos,
 )
 from backend.app.services.pncp_relatorio_pdf import extrair_cnpjs_dos_itens
 
@@ -1073,7 +1074,12 @@ def pncp_research_sessions_detail(request, sessao_id: int):
             c.delete()
         return JsonResponse({"ok": True, "sessao_id": sessao_id, "deleted": True})
 
-    c = _cotacao_qs_for_user(request.user).select_related("usuario").filter(pk=sessao_id).first()
+    c = (
+        _cotacao_qs_for_user(request.user)
+        .select_related("usuario", "prefeitura", "usuario__prefeitura")
+        .filter(pk=sessao_id)
+        .first()
+    )
     if not c:
         return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
 
@@ -1091,6 +1097,7 @@ def pncp_research_sessions_detail(request, sessao_id: int):
         )
     else:
         grupos_relatorio, total_linhas_cotacao = agrupar_itens_relatorio_pesquisa_precos(itens_asc)
+    orgao_exibicao = texto_orgao_exibicao_relatorio_pesquisa_precos(c, request.user, grupos_relatorio)
     formula_label = FORMULA_LABELS.get(formula_id, FORMULA_LABELS[DEFAULT_FORMULA_CALCULO])
     anexos = list(
         PncpCotacaoAnexoArquivo.objects.filter(cotacao_id=c.id)
@@ -1126,6 +1133,7 @@ def pncp_research_sessions_detail(request, sessao_id: int):
                 **_sessao_dict(c, include_owner=True),
                 "total_itens": len(itens_asc),
                 "total_grupos_relatorio": len(grupos_relatorio),
+                "orgao_exibicao": orgao_exibicao,
                 "formula_calculo": formula_label,
                 "formula_calculo_id": formula_id,
                 "anexo_fornecedor_pdf": bool(anexos_payload),

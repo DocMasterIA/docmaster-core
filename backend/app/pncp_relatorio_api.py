@@ -340,7 +340,7 @@ def _run_relatorio_pdf_job(
         qs = PncpCotacao.objects.all()
         if not is_superuser:
             qs = qs.filter(usuario_id=user_id)
-        c = qs.select_related("usuario").filter(pk=sessao_id).first()
+        c = qs.select_related("usuario", "prefeitura", "usuario__prefeitura").filter(pk=sessao_id).first()
         if not c:
             _write_job_meta_error(meta_path, "Cotação não encontrada.")
             return
@@ -414,7 +414,7 @@ def pncp_cotacao_relatorio_pdf_start(request, sessao_id: int):
 
     c = (
         _cotacao_qs_for_user(request.user)
-        .select_related("usuario")
+        .select_related("usuario", "prefeitura", "usuario__prefeitura")
         .filter(pk=sessao_id)
         .first()
     )
@@ -568,7 +568,7 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
 
     c = (
         _cotacao_qs_for_user(request.user)
-        .select_related("usuario")
+        .select_related("usuario", "prefeitura", "usuario__prefeitura")
         .filter(pk=sessao_id)
         .first()
     )
@@ -632,7 +632,7 @@ def pncp_cotacao_relatorio_verificar(request, sessao_id: int):
     """Resposta leve para validação digital (conteúdo apontado pelo QR)."""
     c = (
         _cotacao_qs_for_user(request.user)
-        .select_related("usuario")
+        .select_related("usuario", "prefeitura", "usuario__prefeitura")
         .filter(pk=sessao_id)
         .first()
     )

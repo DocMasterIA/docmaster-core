@@ -27,8 +27,18 @@ from weasyprint import HTML
 
 from backend.app.services.pncp_relatorio_itens import (
     FORMULA_LABELS,
+    _formatar_moeda_br,
     agrupar_cotacoes_por_item_relatorio_pesquisa_precos,
     agrupar_itens_relatorio_pesquisa_precos,
+    texto_orgao_exibicao_relatorio_pesquisa_precos,
+)
+from backend.app.services.pncp_relatorio_pdf_layout import (
+    PDF_CAPA_RESPONSAVEL_MAX,
+    PDF_CAPA_TITULO_COTACAO_MAX,
+    PDF_TERMO_PNCP_MAX,
+    sanear_grupos_relatorio_para_pdf,
+    sanear_texto_capa_pdf,
+    truncar_texto_pdf,
 )
 
 DOCUMENTO_TECNICO_LEAD = (
@@ -178,7 +188,11 @@ def nome_sistema_relatorio() -> str:
 
 
 def carregar_css_relatorio_pesquisa_precos() -> str:
-    """CSS compartilhado com frontend-vue (`relatorio-pesquisa-precos.css`)."""
+    """CSS compartilhado com frontend-vue (`relatorio-pesquisa-precos.css`).
+
+    Densidade do PDF: variáveis em `.rpp-body.rpp--pdf` no CSS e truncamento em
+    `pncp_relatorio_pdf_layout` (`sanear_grupos_relatorio_para_pdf`, capa).
+    """
     override = (getattr(settings, "PNCP_RELATORIO_CSS_PATH", None) or "").strip()
     if override:
         p = Path(override).expanduser()
@@ -219,18 +233,6 @@ class RelatorioCotacaoContext:
     valor_total_estimado_fmt: str
     fornecedores_capa: List[Dict[str, str]]
     documento_tecnico_lead: str
-
-
-def _formatar_moeda_br(v: Any) -> str:
-    if v is None:
-        return "—"
-    try:
-        n = float(v)
-    except (TypeError, ValueError):
-        return "—"
-    s = f"{n:.2f}"
-    inteiro, frac = s.split(".")
-    return f"{inteiro},{frac}"
 
 
 def _parse_qtd_br(v: Any) -> float:
@@ -299,6 +301,7 @@ def montar_contexto_relatorio(
         grupos, total_linhas = agrupar_cotacoes_por_item_relatorio_pesquisa_precos(itens, cotacoes)
     else:
         grupos, total_linhas = agrupar_itens_relatorio_pesquisa_precos(itens)
+    sanear_grupos_relatorio_para_pdf(grupos)
     # Prioriza CNPJs presentes nas fontes (cotações reais exibidas no relatório).
     cnpjs = extrair_cnpjs_das_fontes_grupos(grupos)
     if not cnpjs:
@@ -314,14 +317,9 @@ def montar_contexto_relatorio(
     criado_por = snap_nome or (u.get_full_name() or "").strip() or getattr(u, "email", "") or str(u.pk)
     snap_email = (getattr(cotacao, "criado_por_email", None) or "").strip()
     criado_email = snap_email or (getattr(u, "email", None) or "").strip()
-    orgao_exibicao = "—"
-    for g in grupos:
-        fontes = g.get("fontes") or []
-        if fontes:
-            org = str((fontes[0] or {}).get("orgao") or "").strip()
-            if org:
-                orgao_exibicao = org
-                break
+    orgao_exibicao = sanear_texto_capa_pdf(
+        texto_orgao_exibicao_relatorio_pesquisa_precos(cotacao, u, grupos)
+    )
     valor_total_estimado = 0.0
     for g in grupos:
         fontes = g.get("fontes") or []
@@ -343,12 +341,12 @@ def montar_contexto_relatorio(
 
     return RelatorioCotacaoContext(
         titulo_relatorio=(titulo_relatorio or "").strip()[:500],
-        titulo_cotacao=cotacao.titulo or "—",
+        titulo_cotacao=truncar_texto_pdf(cotacao.titulo or "—", PDF_CAPA_TITULO_COTACAO_MAX),
         data_pesquisa_exibicao=criado.strftime("%d/%m/%Y às %H:%M"),
         emitido_em_exibicao=emitido.strftime("%d/%m/%Y às %H:%M"),
-        criado_por=criado_por,
+        criado_por=truncar_texto_pdf(criado_por, PDF_CAPA_RESPONSAVEL_MAX),
         criado_por_email=criado_email,
-        termo_pncp=cotacao.termo_busca or "—",
+        termo_pncp=truncar_texto_pdf(cotacao.termo_busca or "—", PDF_TERMO_PNCP_MAX),
         total_itens=len(grupos),
         total_linhas_cotacao=total_linhas,
         grupos=grupos,

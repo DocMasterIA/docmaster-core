@@ -76,18 +76,47 @@
                       <i class="fa-solid" :class="isGroupOpen(page.name) ? 'fa-chevron-up' : 'fa-chevron-down'" aria-hidden="true"></i>
                     </button>
                     <div v-if="isGroupOpen(page.name) && page.children?.length" class="dm-subsubnav">
-                      <template v-for="section in groupedChildren(page)" :key="section.title">
-                        <div class="dm-subsubnav-section-title">{{ section.title }}</div>
-                        <router-link
-                          v-for="child in section.items"
-                          :key="child.name"
-                          :to="child.to"
-                          class="dm-subsubnav-link"
-                          :class="{ 'dm-subsubnav-link--active': isRouteActive(child.name) }"
-                        >
-                          <i class="fa-solid" :class="child.icon" aria-hidden="true"></i>
-                          {{ child.label }}
-                        </router-link>
+                      <template v-for="section in groupedChildren(page)" :key="section.key">
+                        <template v-if="isArt75DropdownSection(section)">
+                          <button
+                            type="button"
+                            class="dm-subnav-art-btn"
+                            :class="{ 'dm-subnav-art-btn--open': isArtSectionOpen(page.name, section.key) }"
+                            @click="toggleArtSection(page.name, section.key)"
+                          >
+                            <span>{{ section.title }}</span>
+                            <i
+                              class="fa-solid"
+                              :class="isArtSectionOpen(page.name, section.key) ? 'fa-chevron-up' : 'fa-chevron-down'"
+                              aria-hidden="true"
+                            ></i>
+                          </button>
+                          <div v-show="isArtSectionOpen(page.name, section.key)" class="dm-art-dropdown-links">
+                            <router-link
+                              v-for="child in section.items"
+                              :key="child.name"
+                              :to="child.to"
+                              class="dm-subsubnav-link"
+                              :class="{ 'dm-subsubnav-link--active': isRouteActive(child.name) }"
+                            >
+                              <i class="fa-solid" :class="child.icon" aria-hidden="true"></i>
+                              {{ child.label }}
+                            </router-link>
+                          </div>
+                        </template>
+                        <template v-else>
+                          <div class="dm-subsubnav-section-title">{{ section.title }}</div>
+                          <router-link
+                            v-for="child in section.items"
+                            :key="child.name"
+                            :to="child.to"
+                            class="dm-subsubnav-link"
+                            :class="{ 'dm-subsubnav-link--active': isRouteActive(child.name) }"
+                          >
+                            <i class="fa-solid" :class="child.icon" aria-hidden="true"></i>
+                            {{ child.label }}
+                          </router-link>
+                        </template>
                       </template>
                     </div>
                   </div>
@@ -152,6 +181,8 @@ const route = useRoute();
 const user = ref(null);
 const darkMode = ref(false);
 const generationMenuOpen = ref(false);
+/** Abre/fecha dropdown «Art. 75, I / II» por grupo: chave `${pageName}::${sectionKey}`. */
+const artSectionOpen = ref({});
 const groupOpenState = ref({
   DispensaRapidaGroup: false,
   DispensaArt75II: false,
@@ -278,9 +309,11 @@ const generationPages = [
   },
 ];
 
-const generationRouteNames = new Set(
-  generationPages.flatMap((page) => [page.name, ...(page.children || []).map((child) => child.name)]),
-);
+const generationRouteNames = new Set([
+  'DispensaGeracaoHub',
+  'InexigibilidadeGeracaoHub',
+  ...generationPages.flatMap((page) => [page.name, ...(page.children || []).map((child) => child.name)]),
+]);
 
 const PLACEHOLDER_TAB_KEYS = [
   'dispensa_eletronica',
@@ -293,11 +326,11 @@ const PLACEHOLDER_TAB_KEYS = [
 ];
 
 const mainTabs = [
-  { key: 'dispensa', label: 'Dispensa', icon: 'fa-file-lines', to: '/geracao/dispensa-rapida/art-75-i/obras-servicos-engenharia' },
+  { key: 'dispensa', label: 'Dispensa', icon: 'fa-file-lines', to: '/geracao/dispensa' },
   { key: 'dispensa_eletronica', label: 'Dispensa Eletrônica', icon: 'fa-file-lines', to: '/dispensa-eletronica' },
   { key: 'pregao', label: 'Pregão', icon: 'fa-file-lines', to: '/pregao' },
   { key: 'pregao_eletronico', label: 'Pregão Eletrônico', icon: 'fa-file-lines', to: '/pregao-eletronico' },
-  { key: 'inexigibilidade', label: 'Inexigibilidade', icon: 'fa-file-lines', to: '/geracao/inexigibilidade-art-74-i/manutencao-veiculos' },
+  { key: 'inexigibilidade', label: 'Inexigibilidade', icon: 'fa-file-lines', to: '/geracao/inexigibilidade' },
   { key: 'etp', label: 'ETP', icon: 'fa-file-lines', to: '/geracao/etp-livre' },
   { key: 'analisador', label: 'Analisador de Documentos', icon: 'fa-magnifying-glass-chart', to: '/analisador' },
   { key: 'pesquisa', label: 'Pesquisa de Preços Inteligente', icon: 'fa-database', to: '/pesquisador-pncp' },
@@ -319,6 +352,8 @@ const isGenerationSectionActive = computed(() => {
 function inferMainTabFromRoute() {
   const rname = String(route.name || '');
   const rpath = String(route.path || '');
+  if (rname === 'DispensaGeracaoHub' || rpath === '/geracao/dispensa') return 'dispensa';
+  if (rname === 'InexigibilidadeGeracaoHub' || rpath === '/geracao/inexigibilidade') return 'inexigibilidade';
   if (rname === 'ModuleDispensaEletronica' || rpath.startsWith('/dispensa-eletronica')) return 'dispensa_eletronica';
   if (rname === 'ModulePregao' || rpath === '/pregao') return 'pregao';
   if (rname === 'ModulePregaoEletronico' || rpath.startsWith('/pregao-eletronico')) return 'pregao_eletronico';
@@ -401,6 +436,19 @@ function isGroupOpen(name) {
 
 function isGroupActive(page) {
   return page.children?.some((child) => child.name === route.name) || false;
+}
+
+function isArt75DropdownSection(section) {
+  return section?.key === 'Art. 75, I' || section?.key === 'Art. 75, II';
+}
+
+function toggleArtSection(pageName, sectionKey) {
+  const k = `${pageName}::${sectionKey}`;
+  artSectionOpen.value = { ...artSectionOpen.value, [k]: !artSectionOpen.value[k] };
+}
+
+function isArtSectionOpen(pageName, sectionKey) {
+  return !!artSectionOpen.value[`${pageName}::${sectionKey}`];
 }
 
 function groupedChildren(page) {
@@ -494,6 +542,31 @@ watch(
     }
     selectedMainTabKey.value = inferMainTabFromRoute();
   }
+);
+
+watch(
+  () => route.name,
+  (n) => {
+    const name = String(n || '');
+    if (name === 'DispensaGeracaoHub' || name === 'InexigibilidadeGeracaoHub') {
+      artSectionOpen.value = {};
+      return;
+    }
+    for (const page of generationPages) {
+      if (page.name !== 'DispensaRapidaGroup' && page.name !== 'DispensaArt75II') continue;
+      for (const c of page.children || []) {
+        if (c.name === name && c.subsection) {
+          artSectionOpen.value = {
+            ...artSectionOpen.value,
+            [`${page.name}::${c.subsection}`]: true,
+          };
+          groupOpenState.value = { ...groupOpenState.value, [page.name]: true };
+          return;
+        }
+      }
+    }
+  },
+  { immediate: true },
 );
 </script>
 
@@ -885,6 +958,59 @@ watch(
 .dm-dark .dm-subnav-btn--active {
   border-color: #64748b;
   color: #f8fafc;
+}
+
+.dm-subnav-art-btn {
+  width: 100%;
+  margin-top: 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #334155;
+  padding: 7px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+.dm-subnav-art-btn:first-child {
+  margin-top: 0;
+}
+.dm-dark .dm-subnav-art-btn {
+  border-color: #334155;
+  background: #0f172a;
+  color: #cbd5e1;
+}
+.dm-subnav-art-btn:hover {
+  background: #eef2f7;
+}
+.dm-dark .dm-subnav-art-btn:hover {
+  background: #1e293b;
+}
+.dm-subnav-art-btn--open {
+  border-color: #254e78;
+  color: #254e78;
+}
+.dm-dark .dm-subnav-art-btn--open {
+  border-color: #64748b;
+  color: #f8fafc;
+}
+
+.dm-art-dropdown-links {
+  margin: 4px 0 8px 4px;
+  padding-left: 8px;
+  border-left: 1px dashed #cbd5e1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dm-dark .dm-art-dropdown-links {
+  border-left-color: #475569;
 }
 
 .dm-subsubnav {

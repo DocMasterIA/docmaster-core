@@ -295,6 +295,8 @@ const formulaCalculo = ref('');
 const formulaCalculoId = ref('');
 const grupos = ref([]);
 const totalLinhasCotacao = ref(0);
+/** Órgão da capa (prefeitura da sessão/usuário); alinhado ao PDF. */
+const orgaoExibicaoApi = ref('');
 
 const cotacaoIdQuery = computed(() => {
   const raw = route.query.cotacaoId;
@@ -303,6 +305,8 @@ const cotacaoIdQuery = computed(() => {
 });
 
 const orgaoExibicao = computed(() => {
+  const api = String(orgaoExibicaoApi.value || '').trim();
+  if (api && api !== '—') return api;
   for (const g of grupos.value) {
     const fontes = g?.fontes || [];
     for (const f of fontes) {
@@ -616,6 +620,7 @@ function obterFonte(tipo) {
 }
 
 function aplicarDemo() {
+  orgaoExibicaoApi.value = '';
   tituloCotacao.value =
     'Aquisição de medicamentos específicos para atender doações a pacientes em situação de vulnerabilidade social e risco à saúde';
   dataPesquisa.value = '01/04/2026 08:59';
@@ -658,6 +663,7 @@ async function carregar() {
       return;
     }
     const s = data.sessao;
+    orgaoExibicaoApi.value = String(s.orgao_exibicao ?? '').trim();
     tituloCotacao.value = s.titulo || '—';
     dataPesquisa.value = formatDataHoraIso(s.created_at);
     criadoPor.value = s.criado_por || '—';

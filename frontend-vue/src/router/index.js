@@ -24,10 +24,20 @@ const routes = [
     redirect: '/geracao/etp-livre',
   },
   {
+    path: '/geracao/dispensa',
+    name: 'DispensaGeracaoHub',
+    component: () => import('../views/GeracaoSecaoPlaceholder.vue'),
+    meta: { title: 'Dispensa', geracaoHubSection: 'dispensa' },
+  },
+  {
+    path: '/geracao/inexigibilidade',
+    name: 'InexigibilidadeGeracaoHub',
+    component: () => import('../views/GeracaoSecaoPlaceholder.vue'),
+    meta: { title: 'Inexigibilidade', geracaoHubSection: 'inexigibilidade' },
+  },
+  {
     path: '/geracao/dispensa-art-75-i',
-    name: 'DispensaArt75I',
-    component: () => import('../views/InexigibilidadeManutencaoVeiculosPreview.vue'),
-    meta: { title: 'Dispensa - Art. 75, I' },
+    redirect: '/geracao/dispensa',
   },
   {
     path: '/geracao/dispensa-art-75-i/obras-servicos-engenharia',
@@ -43,9 +53,7 @@ const routes = [
   },
   {
     path: '/geracao/dispensa-art-75-ii',
-    name: 'DispensaArt75II',
-    component: () => import('../views/DispensaArt75IINormalReactPreview.vue'),
-    meta: { title: 'Dispensa - Art. 75, II' },
+    redirect: '/geracao/dispensa',
   },
   {
     path: '/geracao/dispensa-art-75-ii/compras',
@@ -67,7 +75,7 @@ const routes = [
   },
   {
     path: '/geracao/dispensa-rapida',
-    redirect: '/geracao/dispensa-rapida/art-75-i/obras-servicos-engenharia',
+    redirect: '/geracao/dispensa',
   },
   {
     path: '/geracao/dispensa-rapida/art-75-i/obras-servicos-engenharia',
@@ -110,7 +118,7 @@ const routes = [
   },
   {
     path: '/geracao/inexigibilidade-art-74-i',
-    redirect: { name: 'InexigibilidadeArt74IManutencaoVeiculosPreview' },
+    redirect: '/geracao/inexigibilidade',
   },
   {
     path: '/geracao/inexigibilidade-art-74-i/show-artistico',

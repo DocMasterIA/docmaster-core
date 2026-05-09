@@ -56,7 +56,27 @@ def _primeiro_cnpj_no_json(obj: Any) -> str:
     return sorted(acc)[0] if acc else "—"
 
 
+def _inteiro_milhar_br(inteiro_sem_frac: str) -> str:
+    """Formata parte inteira com pontos de milhar (ex.: 85082 -> 85.082)."""
+    s = str(inteiro_sem_frac or "").strip()
+    if not s:
+        return "0"
+    neg = s.startswith("-")
+    if neg:
+        s = s[1:]
+    if not s.isdigit():
+        return inteiro_sem_frac
+    parts: List[str] = []
+    while len(s) > 3:
+        parts.append(s[-3:])
+        s = s[:-3]
+    parts.append(s)
+    body = ".".join(reversed(parts))
+    return f"-{body}" if neg else body
+
+
 def _formatar_moeda_br(v: Any) -> str:
+    """Valor em pt-BR: milhar com ponto, decimais com vírgula (ex.: R$ 85.082,26)."""
     if v is None:
         return "—"
     try:
@@ -65,9 +85,13 @@ def _formatar_moeda_br(v: Any) -> str:
         return "—"
     if math.isnan(n) or math.isinf(n):
         return "—"
-    s = f"{n:.2f}"
+    neg = n < 0
+    n_abs = abs(n)
+    s = f"{n_abs:.2f}"
     inteiro, frac = s.split(".")
-    return f"{inteiro},{frac}"
+    inteiro_fmt = _inteiro_milhar_br(inteiro)
+    body = f"{inteiro_fmt},{frac}"
+    return f"-{body}" if neg else body
 
 
 def _fmt_quantidade(q: Any) -> str:
@@ -723,3 +747,47 @@ def resumo_calculo_precos(grupos: List[Dict[str, Any]], formula_id: str) -> Dict
 
     val = _valor_formula_em_lista(medias, formula_id)
     return _resumo_from_values(medias, formula_id=formula_id, valor_calculado=val)
+
+
+def texto_orgao_capa_prefeitura_cotacao(cotacao: Any, usuario: Any) -> str:
+    """
+    Texto institucional para o campo «Órgão» na capa do relatório:
+    prefeitura vinculada à cotação (snapshot multi-tenant) ou, se ausente, a do usuário.
+    """
+    from backend.app.models.prefeitura import Prefeitura
+
+    pref = getattr(cotacao, "prefeitura", None)
+    if pref is None:
+        pid = getattr(cotacao, "prefeitura_id", None)
+        if pid:
+            pref = Prefeitura.objects.filter(pk=pid).only("nome_municipio", "estado").first()
+    if pref is None:
+        pref = getattr(usuario, "prefeitura", None)
+    if pref is None:
+        uid = getattr(usuario, "prefeitura_id", None)
+        if uid:
+            pref = Prefeitura.objects.filter(pk=uid).only("nome_municipio", "estado").first()
+    if pref is None:
+        return ""
+    nome = str(getattr(pref, "nome_municipio", "") or "").strip()
+    if not nome:
+        return ""
+    uf = str(getattr(pref, "estado", "") or "").strip()
+    base = f"Prefeitura Municipal de {nome}"
+    return f"{base} ({uf})" if uf else base
+
+
+def texto_orgao_exibicao_relatorio_pesquisa_precos(
+    cotacao: Any, usuario: Any, grupos: List[Dict[str, Any]]
+) -> str:
+    """Órgão na capa: prefeitura cadastrada; se não houver, primeira fonte com órgão preenchido."""
+    capa = texto_orgao_capa_prefeitura_cotacao(cotacao, usuario)
+    if capa:
+        return capa
+    for g in grupos:
+        fontes = g.get("fontes") or []
+        if fontes:
+            org = str((fontes[0] or {}).get("orgao") or "").strip()
+            if org:
+                return org
+    return "—"

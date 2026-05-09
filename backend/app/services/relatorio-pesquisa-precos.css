@@ -483,12 +483,53 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.rpp-fonte-row--5 {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+.rpp-fonte-row--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .rpp-fonte-row--2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* ID / Processo: tabela evita colapso de grelha no WeasyPrint (uma letra por linha) */
+.rpp-fonte-processo-line {
+  margin-bottom: 1.2mm;
+  width: 100%;
+}
+
+.rpp-processo-tbl {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  background: #fff;
+}
+
+.rpp-processo-tbl__k,
+.rpp-processo-tbl__v {
+  padding: 1mm 1.2mm;
+  vertical-align: top;
+  font-size: 7.5pt;
+  line-height: 1.35;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+.rpp-processo-tbl__k {
+  width: 28%;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #64748b;
+  border-right: 1px solid #e2e8f0;
+  white-space: nowrap;
+  background: #f8fafc;
+}
+
+.rpp-processo-tbl__v {
+  font-weight: 600;
+  color: #1e293b;
 }
 
 .rpp-mini-compact {
@@ -681,8 +722,8 @@
 .rpp-body.rpp--pdf .rpp-fonte-row--3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
-/* Cinco mini-campos: 2 colunas no A4 (células mais largas que 5 colunas) */
-.rpp-body.rpp--pdf .rpp-fonte-row--5 {
+/* Quatro mini-campos: 2×2 no A4 */
+.rpp-body.rpp--pdf .rpp-fonte-row--4 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .rpp-body.rpp--pdf .rpp-fonte-row--2 {
@@ -700,19 +741,25 @@
   width: 100%;
   box-sizing: border-box;
 }
-.rpp-body.rpp--pdf .rpp-fonte-row--5 .rpp-mini-compact--wide {
-  grid-column: 1 / -1;
-  /* WeasyPrint: span em grelha 2-col sem min-width explícito pode colapsar → letra a letra */
-  min-width: 100%;
+.rpp-body.rpp--pdf .rpp-fonte-processo-line {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
 }
-.rpp-body.rpp--pdf .rpp-fonte-row--5 .rpp-mini-compact--wide .rpp-mini-compact__label {
-  white-space: nowrap;
-  letter-spacing: normal;
+
+.rpp-body.rpp--pdf .rpp-processo-tbl {
+  width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
 }
-.rpp-body.rpp--pdf .rpp-fonte-row--5 .rpp-mini-compact--wide .rpp-mini-compact__value {
+
+.rpp-body.rpp--pdf .rpp-processo-tbl__k {
+  font-size: var(--rpp-pdf-mini-label);
+  white-space: nowrap;
+}
+
+.rpp-body.rpp--pdf .rpp-processo-tbl__v {
+  font-size: var(--rpp-pdf-mini-value);
   white-space: normal;
   overflow-wrap: break-word;
   word-break: normal;

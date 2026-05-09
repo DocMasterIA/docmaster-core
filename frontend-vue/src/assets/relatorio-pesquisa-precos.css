@@ -540,7 +540,7 @@
 
 .rpp-processo-tbl__k,
 .rpp-processo-tbl__v {
-  padding: 1mm 1.2mm;
+  padding: 1.85mm 1.2mm;
   vertical-align: top;
   font-size: 7.5pt;
   line-height: 1.35;
@@ -833,7 +833,7 @@
 
 .rpp-body.rpp--pdf .rpp-processo-tbl__k,
 .rpp-body.rpp--pdf .rpp-processo-tbl__v {
-  padding: 0.25mm 0.45mm;
+  padding: 0.95mm 0.5mm;
 }
 
 .rpp-body.rpp--pdf .rpp-processo-tbl__k {

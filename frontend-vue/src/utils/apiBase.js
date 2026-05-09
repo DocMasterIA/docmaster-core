@@ -2,9 +2,9 @@
  * Base URL da API Django nos `fetch` do browser.
  * - Dev (Vite): string vazia → mesmo origin + proxy `/api` → backend local.
  * - Produção com `VITE_API_URL` definido: usa esse host (ajusta http→https se a página for https).
- * - Produção com `VITE_API_URL` vazio: usa `window.location.origin` (nginx costuma expor `/api` no mesmo host do SPA;
- *   evita pedidos cross-origin para api.* e erros tipo Failed to fetch / net::ERR_FAILED).
- * - API só em subdomínio separado: defina `VITE_API_URL=https://api.docmasteria.com.br` no build.
+ * - Produção com `VITE_API_URL` vazio: fallback `https://api.docmasteria.com.br` (SPA estático em outro host
+ *   sem proxy /api devolve HTML em /api/me → quebra JSON; não usar origem da página nesse caso).
+ * - Mesmo host + nginx com `/api` → Django: `VITE_API_URL` vazio e `VITE_API_USE_PAGE_ORIGIN=1` no build.
  */
 export function getApiBase() {
   const raw = String(import.meta.env.VITE_API_URL || '').trim().replace(/\/$/, '');
@@ -20,9 +20,11 @@ export function getApiBase() {
     return raw;
   }
   if (import.meta.env.DEV) return '';
-  if (typeof window !== 'undefined' && window.location?.origin) {
-    return String(window.location.origin).replace(/\/$/, '');
-  }
+  const usePageOrigin =
+    String(import.meta.env.VITE_API_USE_PAGE_ORIGIN || '').trim() === '1' &&
+    typeof window !== 'undefined' &&
+    window.location?.origin;
+  if (usePageOrigin) return String(window.location.origin).replace(/\/$/, '');
   return 'https://api.docmasteria.com.br';
 }
 
@@ -39,5 +41,5 @@ export function buildGerarTrEDfdUrl(apiBase) {
 
 /** Mensagem curta quando o fetch falha no browser (ex.: Failed to fetch / CORS). */
 export function describeApiFetchNetworkFailure(apiUrl, shortLabel = 'API') {
-  return `Não foi possível contactar ${shortLabel} (${apiUrl}). Verifique rede, HTTPS e se o build usa a mesma origem do site quando o Django está em /api (VITE_API_URL vazio); se a API for só em outro host, defina VITE_API_URL nesse build.`;
+  return `Não foi possível contactar ${shortLabel} (${apiUrl}). Verifique rede, HTTPS e CORS. Se o Django está no mesmo domínio com proxy /api, use no build VITE_API_USE_PAGE_ORIGIN=1 e VITE_API_URL vazio; caso contrário defina VITE_API_URL com o host da API.`;
 }

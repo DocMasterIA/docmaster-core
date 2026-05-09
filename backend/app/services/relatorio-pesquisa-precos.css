@@ -506,6 +506,17 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/*
+ * Metadados da fonte (fornecedor → data): um único stack sem gap vertical entre linhas,
+ * para não parecer «dois blocos» entre CNPJ/Valor e Órgão (o gap do pai era somado visualmente).
+ */
+.rpp-fonte-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
 /* ID / Processo: tabela evita colapso de grelha no WeasyPrint (uma letra por linha) */
 .rpp-fonte-processo-line {
   margin: 0;
@@ -757,6 +768,10 @@
 
 .rpp-body.rpp--pdf .rpp-fonte-card__content > * {
   margin: 0;
+}
+
+.rpp-body.rpp--pdf .rpp-fonte-fields {
+  gap: 0;
 }
 
 .rpp-body.rpp--pdf .rpp-fonte-row {

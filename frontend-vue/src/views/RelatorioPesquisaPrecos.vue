@@ -145,28 +145,30 @@
               <div v-for="(f, fi) in g.fontes" :key="fi" class="rpv-source">
                 <span class="rpv-source__badge">{{ fi + 1 }}</span>
                 <div class="rpv-source__inner">
-                  <div class="rpv-mini-grid rpv-mini-grid--1">
-                    <div class="rpv-dcard rpv-dcard--featured">
-                      <span class="rpv-dcard__label">Fornecedor</span>
-                      <span class="rpv-dcard__value rpv-dcard__value--strong">{{ f.fornecedor }}</span>
+                  <div class="rpv-fonte-fields">
+                    <div class="rpv-mini-grid rpv-mini-grid--1">
+                      <div class="rpv-dcard rpv-dcard--featured">
+                        <span class="rpv-dcard__label">Fornecedor</span>
+                        <span class="rpv-dcard__value rpv-dcard__value--strong">{{ f.fornecedor }}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div class="rpv-mini-grid rpv-mini-grid--2">
-                    <div class="rpv-dcard"><span class="rpv-dcard__label">CNPJ</span><span class="rpv-dcard__value">{{ f.cnpj }}</span></div>
-                    <div class="rpv-dcard rpv-dcard--featured">
-                      <span class="rpv-dcard__label">Valor</span>
-                      <span class="rpv-dcard__value rpv-dcard__value--strong">{{ f.valor }}</span>
+                    <div class="rpv-mini-grid rpv-mini-grid--2">
+                      <div class="rpv-dcard"><span class="rpv-dcard__label">CNPJ</span><span class="rpv-dcard__value">{{ f.cnpj }}</span></div>
+                      <div class="rpv-dcard rpv-dcard--featured">
+                        <span class="rpv-dcard__label">Valor</span>
+                        <span class="rpv-dcard__value rpv-dcard__value--strong">{{ f.valor }}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div class="rpv-mini-grid rpv-mini-grid--1">
-                    <div class="rpv-dcard"><span class="rpv-dcard__label">Órgão</span><span class="rpv-dcard__value">{{ f.orgao }}</span></div>
-                  </div>
-                  <div class="rpv-mini-grid rpv-mini-grid--2">
-                    <div class="rpv-dcard">
-                      <span class="rpv-dcard__label">Modalidade</span>
-                      <span class="rpv-dcard__value">{{ obterModalidade(f.tipo) }}</span>
+                    <div class="rpv-mini-grid rpv-mini-grid--1">
+                      <div class="rpv-dcard"><span class="rpv-dcard__label">Órgão</span><span class="rpv-dcard__value">{{ f.orgao }}</span></div>
                     </div>
-                    <div class="rpv-dcard"><span class="rpv-dcard__label">Data</span><span class="rpv-dcard__value">{{ f.data }}</span></div>
+                    <div class="rpv-mini-grid rpv-mini-grid--2">
+                      <div class="rpv-dcard">
+                        <span class="rpv-dcard__label">Modalidade</span>
+                        <span class="rpv-dcard__value">{{ obterModalidade(f.tipo) }}</span>
+                      </div>
+                      <div class="rpv-dcard"><span class="rpv-dcard__label">Data</span><span class="rpv-dcard__value">{{ f.data }}</span></div>
+                    </div>
                   </div>
                   <div class="rpv-mini-grid rpv-mini-grid--5">
                     <div class="rpv-dcard rpv-dcard--wide">

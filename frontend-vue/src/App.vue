@@ -89,10 +89,7 @@
                             :aria-controls="`art-dd-${page.name}-${section.key}`"
                             @click="toggleArtSection(page.name, section.key)"
                           >
-                            <span class="dm-subnav-art-btn__label">
-                              {{ section.title }}
-                              <span v-if="isSectionRouteActive(section)" class="dm-subnav-art-btn__dot" aria-hidden="true" />
-                            </span>
+                            <span class="dm-subnav-art-btn__label">{{ section.title }}</span>
                             <i
                               class="fa-solid"
                               :class="isArtSectionOpen(page.name, section.key) ? 'fa-chevron-up' : 'fa-chevron-down'"
@@ -116,12 +113,6 @@
                             >
                               <i class="fa-solid" :class="child.icon" aria-hidden="true"></i>
                               <span class="dm-subsubnav-link__text">{{ child.label }}</span>
-                              <span
-                                v-if="isRouteActive(child.name)"
-                                class="dm-subsubnav-link__here"
-                                title="Página atual"
-                                >Atual</span
-                              >
                             </router-link>
                           </div>
                         </template>
@@ -137,9 +128,6 @@
                           >
                             <i class="fa-solid" :class="child.icon" aria-hidden="true"></i>
                             <span class="dm-subsubnav-link__text">{{ child.label }}</span>
-                            <span v-if="isRouteActive(child.name)" class="dm-subsubnav-link__here" title="Página atual"
-                              >Atual</span
-                            >
                           </router-link>
                         </template>
                       </template>
@@ -916,6 +904,12 @@ watch(
 .dm-subsubnav-link:hover {
   background: #f8fafc;
 }
+.dm-subsubnav-link--active:hover {
+  background: #f1f5f9;
+}
+.dm-dark .dm-subsubnav-link--active:hover {
+  background: #1e293b;
+}
 
 .dm-nav-item--active {
   border-color: #254e78;
@@ -1041,28 +1035,16 @@ watch(
   gap: 6px;
   min-width: 0;
 }
-.dm-subnav-art-btn__dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: #16a34a;
-  flex-shrink: 0;
-  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.25);
-}
-.dm-dark .dm-subnav-art-btn__dot {
-  background: #4ade80;
-  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.2);
-}
 
-/* Inciso com algum fluxo seleccionado na URL (mesmo com dropdown fechado) */
+/* Inciso com algum fluxo seleccionado na URL (mesmo com dropdown fechado): só contorno */
 .dm-subnav-art-btn--selected {
-  border-color: #1d4ed8;
-  background: linear-gradient(180deg, #eff6ff 0%, #e8f0fe 100%);
-  color: #1e3a5c;
+  border: 2px solid #254e78;
+  background: #f8fafc;
+  color: #1e293b;
 }
 .dm-dark .dm-subnav-art-btn--selected {
-  border-color: #3b82f6;
-  background: linear-gradient(180deg, #172554 0%, #0f172a 100%);
+  border-color: #60a5fa;
+  background: #0f172a;
   color: #e2e8f0;
 }
 .dm-subnav-art-btn--selected.dm-subnav-art-btn--open {
@@ -1130,23 +1112,6 @@ watch(
   text-align: left;
   line-height: 1.25;
 }
-.dm-subsubnav-link__here {
-  flex: 0 0 auto;
-  margin-left: auto;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #15803d;
-  background: #dcfce7;
-  border-radius: 999px;
-  padding: 2px 7px;
-  line-height: 1.2;
-}
-.dm-dark .dm-subsubnav-link__here {
-  color: #bbf7d0;
-  background: rgba(22, 163, 74, 0.28);
-}
 .dm-dark .dm-subsubnav-link,
 .dm-dark .dm-subsubnav-link:visited {
   color: #cbd5e1;
@@ -1154,22 +1119,19 @@ watch(
   background: #0f172a;
 }
 
+/* Página actual: só contorno azul (sem fundo cheio nem badge) */
 .dm-subsubnav-link--active {
-  border-color: #1e3a5c;
-  background: linear-gradient(135deg, #254e78 0%, #1a3652 100%);
-  color: #fff;
+  border: 2px solid #254e78;
+  background: #fff;
+  color: #0f172a;
   font-weight: 700;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
-  outline: 1px solid rgba(255, 255, 255, 0.12);
-  outline-offset: -1px;
+  box-shadow: none;
 }
-.dm-subsubnav-link--active .dm-subsubnav-link__here {
-  color: #14532d;
-  background: #ecfccb;
-}
-.dm-dark .dm-subsubnav-link--active .dm-subsubnav-link__here {
-  color: #ecfccb;
-  background: rgba(22, 101, 52, 0.55);
+.dm-dark .dm-subsubnav-link--active {
+  border-color: #60a5fa;
+  background: #0f172a;
+  color: #f1f5f9;
+  box-shadow: none;
 }
 
 .dm-content {

@@ -440,8 +440,8 @@
 .rpp-fontes-cards {
   display: flex;
   flex-direction: column;
-  gap: 1.5mm;
-  padding: 1.5mm;
+  gap: 1mm;
+  padding: 1.2mm;
 }
 
 .rpp-fonte-card {
@@ -470,13 +470,13 @@
 .rpp-fonte-card__content {
   display: flex;
   flex-direction: column;
-  gap: 1.2mm;
-  padding: 1.5mm 1.5mm 1.5mm 0.5mm;
+  gap: 0.55mm;
+  padding: 1.1mm 1.3mm 1.1mm 0.45mm;
 }
 
 .rpp-fonte-row {
   display: grid;
-  gap: 1.2mm;
+  gap: 0.55mm;
   /* Sem esticar à altura da célula vizinha: cada mini-cartão só o que o texto precisa */
   align-items: start;
 }
@@ -504,7 +504,7 @@
 
 /* ID / Processo: tabela evita colapso de grelha no WeasyPrint (uma letra por linha) */
 .rpp-fonte-processo-line {
-  margin-bottom: 1.2mm;
+  margin-bottom: 0.35mm;
   width: 100%;
 }
 
@@ -728,8 +728,15 @@
   padding: 1mm;
 }
 .rpp-body.rpp--pdf .rpp-fontes-cards {
-  gap: 1mm;
-  padding: 1mm;
+  gap: 0.65mm;
+  padding: 0.65mm;
+}
+.rpp-body.rpp--pdf .rpp-fonte-card__content {
+  gap: 0.35mm;
+  padding: 0.65mm 1mm 0.65mm 0.35mm;
+}
+.rpp-body.rpp--pdf .rpp-fonte-row {
+  gap: 0.35mm;
 }
 .rpp-body.rpp--pdf .rpp-fonte-row--3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -751,7 +758,7 @@
  */
 .rpp-body.rpp--pdf .rpp-mini-compact {
   display: block;
-  padding: 0.65mm 1mm;
+  padding: 0.45mm 0.85mm;
   min-height: 0;
   min-width: 0;
   width: 100%;
@@ -761,12 +768,18 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  margin-bottom: 0.2mm;
 }
 
 .rpp-body.rpp--pdf .rpp-processo-tbl {
   width: 100%;
   max-width: 100%;
   table-layout: fixed;
+}
+
+.rpp-body.rpp--pdf .rpp-processo-tbl__k,
+.rpp-body.rpp--pdf .rpp-processo-tbl__v {
+  padding: 0.55mm 0.85mm;
 }
 
 .rpp-body.rpp--pdf .rpp-processo-tbl__k {
@@ -783,11 +796,11 @@
 .rpp-body.rpp--pdf .rpp-mini-compact__label {
   display: block;
   font-size: var(--rpp-pdf-mini-label);
-  line-height: 1.2;
+  line-height: 1.15;
   letter-spacing: 0.02em;
   white-space: normal;
   max-width: 100%;
-  margin-bottom: 0.35mm;
+  margin-bottom: 0.15mm;
 }
 .rpp-body.rpp--pdf .rpp-mini-compact__value {
   display: block;
@@ -877,10 +890,10 @@
 .rpv-detail-item__head{border-bottom:1px solid #e2e8f0;background:#f8fafc;padding:6px 8px}
 .rpv-detail-item__kicker{display:block;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#64748b}
 .rpv-detail-item__name{margin-top:2px;font-size:11px;font-weight:700;line-height:1.25;color:#0f172a}
-.rpv-detail-item__body{padding:6px;display:flex;flex-direction:column;gap:4px}
+.rpv-detail-item__body{padding:6px;display:flex;flex-direction:column;gap:2px}
 .rpv-source{position:relative;border-radius:8px;border:1px solid #e2e8f0;background:rgba(248,250,252,.65);padding-left:24px}
 .rpv-source__badge{position:absolute;left:8px;top:50%;transform:translateY(-50%);width:16px;height:16px;border-radius:999px;background:#5f7f9a;color:#fff;font-size:7px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(15,23,42,.12)}
-.rpv-source__inner{padding:4px;display:flex;flex-direction:column;gap:3px}
+.rpv-source__inner{padding:4px;display:flex;flex-direction:column;gap:2px}
 .rpv-mini-grid{display:grid;gap:3px;align-items:start}
 .rpv-mini-grid--1{grid-template-columns:1fr}
 .rpv-mini-grid--3{grid-template-columns:1fr}
@@ -934,10 +947,10 @@
 .rpv-detail-item__head{padding:3px 5px!important}
 .rpv-detail-item__kicker{font-size:7px!important;letter-spacing:.04em!important}
 .rpv-detail-item__name{margin-top:1px!important;font-size:9px!important;line-height:1.1!important}
-.rpv-detail-item__body{padding:3px!important;gap:2px!important}
+.rpv-detail-item__body{padding:3px!important;gap:1px!important}
 .rpv-source{border-radius:4px!important;padding-left:16px!important}
 .rpv-source__badge{left:4px!important;width:10px!important;height:10px!important;font-size:5px!important}
-.rpv-source__inner{padding:2px!important;gap:2px!important}
+.rpv-source__inner{padding:2px!important;gap:1px!important}
 .rpv-mini-grid{gap:1px!important;align-items:start!important}
 .rpv-mini-grid--1{grid-template-columns:1fr!important}
 .rpv-mini-grid--5{grid-template-columns:repeat(3,minmax(0,1fr))!important}

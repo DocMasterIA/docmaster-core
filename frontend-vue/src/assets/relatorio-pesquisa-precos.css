@@ -774,35 +774,9 @@
   margin: 0;
 }
 
+/* Só cola na vertical; cartões / tabela mantêm o desenho original (.rpp-mini-compact, .rpp-processo-tbl) */
 .rpp-body.rpp--pdf .rpp-fonte-stack {
   gap: 0;
-  /* Um único bloco visual no PDF (evita «4 ilhas» com borda própria cada uma) */
-  border: 1px solid #e2e8f0;
-  border-radius: 5px;
-  background: #fff;
-  overflow: hidden;
-}
-
-.rpp-body.rpp--pdf .rpp-fonte-stack > .rpp-fonte-fields,
-.rpp-body.rpp--pdf .rpp-fonte-stack > .rpp-fonte-processo-line,
-.rpp-body.rpp--pdf .rpp-fonte-stack > .rpp-fonte-row {
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.rpp-body.rpp--pdf .rpp-fonte-stack > *:last-child {
-  border-bottom: none;
-}
-
-.rpp-body.rpp--pdf .rpp-fonte-stack .rpp-mini-compact {
-  border: none;
-  border-radius: 0;
-}
-
-.rpp-body.rpp--pdf .rpp-fonte-stack .rpp-processo-tbl {
-  border-radius: 0;
-  border-left: none;
-  border-right: none;
-  border-top: none;
 }
 
 .rpp-body.rpp--pdf .rpp-fonte-fields {

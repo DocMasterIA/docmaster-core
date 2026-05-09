@@ -56,7 +56,6 @@
                   aria-label="Ocultar navegação da seção"
                   @click="sidebarNavHidden = true"
                 >
-                  <i class="fa-solid fa-eye-slash" aria-hidden="true"></i>
                   Ocultar
                 </button>
               </div>
@@ -183,18 +182,19 @@
             </nav>
           </aside>
 
-          <main class="dm-content">
+          <div v-if="sidebarNavHidden" class="dm-sidebar-reveal-bar">
             <button
-              v-show="sidebarNavHidden"
               type="button"
-              class="dm-sidebar-reveal"
-              title="Mostrar navegação da seção"
+              class="dm-sidebar-reveal-bar__btn"
+              title="Mostrar painel lateral de navegação"
               aria-label="Mostrar navegação da seção"
               @click="sidebarNavHidden = false"
             >
-              <i class="fa-solid fa-bars" aria-hidden="true"></i>
-              <span>Menu</span>
+              Mostrar navegação
             </button>
+          </div>
+
+          <main class="dm-content">
             <router-view />
           </main>
         </div>
@@ -894,7 +894,7 @@ watch(
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
   margin: 0;
   padding: 4px 8px;
   border: 1px solid #94a3b8;
@@ -930,46 +930,51 @@ watch(
   }
 }
 
-.dm-sidebar-reveal {
+/* Faixa no topo da área de conteúdo quando a sidebar está oculta (desktop). */
+.dm-sidebar-reveal-bar {
   display: none;
-  position: fixed;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 60;
-  flex-direction: row;
+  min-width: 0;
+  padding: 8px 16px;
+  border-bottom: 2px solid #254e78;
+  background: #e8eef5;
+}
+.dm-dark .dm-sidebar-reveal-bar {
+  border-bottom-color: #60a5fa;
+  background: #0f172a;
+}
+.dm-sidebar-reveal-bar__btn {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 10px 8px 8px;
+  justify-content: center;
   margin: 0;
-  border: 1px solid #cbd5e1;
-  border-left: none;
-  border-radius: 0 12px 12px 0;
+  padding: 7px 14px;
+  border: 1px solid #94a3b8;
+  border-radius: 8px;
   background: #fff;
   color: #254e78;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 4px 2px 18px rgba(15, 23, 42, 0.12);
-  transition: background 0.15s ease, color 0.15s ease, padding 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
-.dm-sidebar-reveal:hover {
+.dm-sidebar-reveal-bar__btn:hover {
   background: #f1f5f9;
-  padding-right: 12px;
+  border-color: #254e78;
 }
-.dm-dark .dm-sidebar-reveal {
-  border-color: #334155;
-  background: #0f172a;
-  color: #93c5fd;
-  box-shadow: 4px 2px 20px rgba(2, 6, 23, 0.45);
-}
-.dm-dark .dm-sidebar-reveal:hover {
+.dm-dark .dm-sidebar-reveal-bar__btn {
+  border-color: #475569;
   background: #1e293b;
+  color: #93c5fd;
+}
+.dm-dark .dm-sidebar-reveal-bar__btn:hover {
+  background: #334155;
+  border-color: #60a5fa;
+  color: #f8fafc;
 }
 
 @media (min-width: 1280px) {
-  .dm-body--nav-hidden .dm-sidebar-reveal {
-    display: inline-flex;
+  .dm-body--nav-hidden .dm-sidebar-reveal-bar {
+    display: block;
   }
 }
 

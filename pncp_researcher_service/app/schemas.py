@@ -12,6 +12,32 @@ class HealthResponse(BaseModel):
     service: str = "pncp_researcher_service"
 
 
+class GeoRecorte(BaseModel):
+    """Um recorte UF + município opcional; vários recortes são unidos com OR no SQL."""
+
+    uf: str = Field(..., min_length=2, max_length=2, description="Sigla da UF.")
+    municipio: Optional[str] = Field(
+        None,
+        description="Nome do município; omitido ou vazio restringe apenas à UF.",
+    )
+
+    @field_validator("uf")
+    @classmethod
+    def normalize_uf(cls, v: str) -> str:
+        s = (v or "").strip().upper()
+        if len(s) != 2:
+            raise ValueError("UF deve ter 2 letras.")
+        return s
+
+    @field_validator("municipio", mode="before")
+    @classmethod
+    def strip_municipio_recorte(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        s = str(v).strip()
+        return s or None
+
+
 class MarketSearchRequest(BaseModel):
     termo_busca: str = Field(
         ...,
@@ -19,6 +45,14 @@ class MarketSearchRequest(BaseModel):
     )
     uf: Optional[str] = Field(None, description="UF para recorte geográfico.")
     codigo_municipio_ibge: Optional[str] = Field(None, description="Código IBGE do município.")
+    municipio: Optional[str] = Field(
+        None,
+        description="Nome do município (filtro no índice local de itens; comparado com normalização de busca).",
+    )
+    recortes_geograficos: Optional[List[GeoRecorte]] = Field(
+        None,
+        description="Vários UF+município (OR). Se preenchido, substitui o par único uf/municipio (máx. 30).",
+    )
     data_inicial: Optional[str] = Field(None, description="AAAAMMDD.")
     data_final: Optional[str] = Field(None, description="AAAAMMDD.")
     codigo_modalidade: Optional[int] = Field(
@@ -61,6 +95,30 @@ class MarketSearchRequest(BaseModel):
         if not v:
             raise ValueError("termo_busca é obrigatório.")
         return v
+
+    @field_validator("municipio", mode="before")
+    @classmethod
+    def strip_municipio(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        s = str(v).strip()
+        return s or None
+
+    @field_validator("recortes_geograficos", mode="before")
+    @classmethod
+    def empty_recortes_to_none(cls, v: Any) -> Any:
+        if v is None:
+            return None
+        if isinstance(v, list) and len(v) == 0:
+            return None
+        return v
+
+    @field_validator("recortes_geograficos")
+    @classmethod
+    def cap_recortes_list(cls, v: Optional[List[GeoRecorte]]) -> Optional[List[GeoRecorte]]:
+        if not v:
+            return v
+        return v[:30]
 
 
 class MarketSearchResponse(BaseModel):

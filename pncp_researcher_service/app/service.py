@@ -1769,6 +1769,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     base_items = local_item_search(
         payload.termo_busca,
         uf=payload.uf,
+        municipio=payload.municipio,
+        recortes_geograficos=payload.recortes_geograficos,
         codigo_modalidade=payload.codigo_modalidade,
         limit=limit,
         cleanup_for_display=False,
@@ -1789,6 +1791,12 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             "filtros": {
                 "termo_busca": payload.termo_busca,
                 "uf": payload.uf,
+                "municipio": payload.municipio,
+                "recortes_geograficos": (
+                    [r.model_dump() for r in payload.recortes_geograficos]
+                    if payload.recortes_geograficos
+                    else None
+                ),
                 "codigo_municipio_ibge": payload.codigo_municipio_ibge,
                 "codigo_modalidade": payload.codigo_modalidade,
                 "pagina_inicial": payload.pagina,
@@ -2123,6 +2131,12 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         "filtros": {
             "termo_busca": payload.termo_busca,
             "uf": payload.uf,
+            "municipio": payload.municipio,
+            "recortes_geograficos": (
+                [r.model_dump() for r in payload.recortes_geograficos]
+                if payload.recortes_geograficos
+                else None
+            ),
             "codigo_municipio_ibge": payload.codigo_municipio_ibge,
             "codigo_modalidade": payload.codigo_modalidade,
             "pagina_inicial": payload.pagina,

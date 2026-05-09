@@ -18,11 +18,17 @@ from .pncp_client import PNCPClientError, create_pncp_http_client, get_contract_
 from .search_text_clean import apply_item_display_cleanup, normalize_for_search
 
 
+def _sqlite_pncp_search_norm(value: Any) -> str:
+    """Função SQLite: mesmo pipeline de `normalize_for_search` para cruzar município PNCP × lista do usuário."""
+    return normalize_for_search(str(value) if value is not None else "")
+
+
 @contextmanager
 def _conn():
     conn = sqlite3.connect(PNCP_LOCAL_DB_PATH)
     try:
         conn.row_factory = sqlite3.Row
+        conn.create_function("pncp_search_norm", 1, _sqlite_pncp_search_norm)
         yield conn
         conn.commit()
     finally:
@@ -496,10 +502,39 @@ def _extract_esfera_from_contract_raw_json(raw_json_text: Any) -> tuple[Optional
     return (esfera or None), esfera_adm, (poder or None)
 
 
+def _normalize_recortes_geograficos(recortes_geograficos: Optional[List[Any]]) -> List[Dict[str, Optional[str]]]:
+    out: List[Dict[str, Optional[str]]] = []
+    if not recortes_geograficos:
+        return out
+    seen: set = set()
+    for raw in recortes_geograficos:
+        if raw is None:
+            continue
+        if isinstance(raw, dict):
+            u = str(raw.get("uf") or "").strip().upper()[:2]
+            m_raw = raw.get("municipio")
+        else:
+            u = str(getattr(raw, "uf", "") or "").strip().upper()[:2]
+            m_raw = getattr(raw, "municipio", None)
+        if len(u) != 2:
+            continue
+        m = (str(m_raw).strip() if m_raw is not None else "") or None
+        key = (u, m or "")
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"uf": u, "municipio": m})
+        if len(out) >= 30:
+            break
+    return out
+
+
 def local_item_search(
     termo_busca: str,
     *,
     uf: Optional[str] = None,
+    municipio: Optional[str] = None,
+    recortes_geograficos: Optional[List[Any]] = None,
     codigo_modalidade: Optional[int] = None,
     limit: int = 500,
     cleanup_for_display: bool = True,
@@ -512,9 +547,32 @@ def local_item_search(
     anchor = token_groups[0][0]
     where = ["i.descricao LIKE ?"]
     params: List[Any] = [f"%{anchor}%"]
-    if uf:
+    rec_norm = _normalize_recortes_geograficos(recortes_geograficos)
+    if rec_norm:
+        geo_parts: List[str] = []
+        for r in rec_norm:
+            if r.get("municipio"):
+                geo_parts.append(
+                    "(i.uf = ? AND pncp_search_norm(COALESCE(i.municipio,'')) = pncp_search_norm(?))"
+                )
+                params.append(r["uf"])
+                params.append(r["municipio"])
+            else:
+                geo_parts.append("(i.uf = ?)")
+                params.append(r["uf"])
+        where.append("(" + " OR ".join(geo_parts) + ")")
+    elif uf:
         where.append("i.uf = ?")
         params.append(uf)
+        muni = (municipio or "").strip()
+        if muni:
+            where.append("pncp_search_norm(COALESCE(i.municipio, '')) = pncp_search_norm(?)")
+            params.append(muni)
+    else:
+        muni = (municipio or "").strip()
+        if muni:
+            where.append("pncp_search_norm(COALESCE(i.municipio, '')) = pncp_search_norm(?)")
+            params.append(muni)
     if codigo_modalidade is not None:
         modalidade_patterns = {
             6: ["concorr"],

@@ -33,48 +33,43 @@
       </section>
 
       <section class="bia-filters">
-        <div class="bia-filter">
-          <span>UF</span>
-          <details class="bia-uf-dropdown">
-            <summary class="bia-uf-dropdown__summary">
-              <span>{{ selectedUfLabel }}</span>
-              <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-            </summary>
-            <div class="bia-uf-dropdown__menu" role="group" aria-label="Selecionar UFs">
-              <label class="bia-uf-dropdown__item bia-uf-dropdown__item--all">
-                <input
-                  type="checkbox"
-                  :checked="allUfsSelected"
-                  :indeterminate.prop="isPartiallySelectedUf"
-                  @change="toggleAllUfs"
-                />
-                <span>Todos os estados</span>
-              </label>
-              <label
-                v-for="uf in ufOptions"
-                :key="uf.code"
-                class="bia-uf-dropdown__item"
-              >
-                <input
-                  type="checkbox"
-                  :checked="filtros.ufs.includes(uf.code)"
-                  @change="toggleUf(uf.code)"
-                />
-                <img :src="uf.flag" :alt="`Bandeira ${uf.code}`" class="bia-uf-option__flag" />
-                <span>{{ uf.code }} - {{ uf.name }}</span>
-              </label>
-            </div>
-          </details>
+        <div class="bia-locais">
+          <div class="bia-locais__head">
+            <span class="bia-locais__title">Locais (opcional)</span>
+            <p class="bia-locais__hint">
+              Vários estados e cidades (ex.: Curitiba/PR e Campinas/SP). «Toda a UF» = estado inteiro. Vazio = usa a UF
+              do item ou busca ampla.
+            </p>
+            <button type="button" class="bia-locais__add" @click="addLocalRow">+ Adicionar local</button>
+          </div>
+          <div v-if="!filtros.locais.length" class="bia-locais__empty">Sem filtro geográfico extra.</div>
+          <div v-for="(loc, idx) in filtros.locais" :key="loc._id" class="bia-locais__row">
+            <label class="bia-locais__field">
+              <span>UF</span>
+              <select v-model="loc.uf" class="bia-locais__select" @change="onLocalUfChange(loc)">
+                <option value="">—</option>
+                <option v-for="u in ufOptions" :key="u.code" :value="u.code">{{ u.code }}</option>
+              </select>
+            </label>
+            <label class="bia-locais__field bia-locais__field--grow">
+              <span>Município</span>
+              <select v-model="loc.municipio" class="bia-locais__select" :disabled="!loc.uf">
+                <option value="">Toda a UF</option>
+                <option v-for="m in municipiosForLocalRow(loc)" :key="m" :value="m">{{ m }}</option>
+              </select>
+            </label>
+            <button type="button" class="bia-locais__remove" title="Remover" @click="removeLocalRow(idx)">×</button>
+          </div>
         </div>
         <div class="bia-filter bia-filter--action">
-          <span>Busca por UF</span>
+          <span>Busca geográfica</span>
           <button
             type="button"
             class="bia-add-cotacao-btn bia-add-cotacao-btn--ghost"
             :disabled="isSearching || isAutoSearchingAll || (!itemContext?.descricao_item && allItemContexts.length === 0)"
             @click="applyFilters"
           >
-            Fazer pesquisa pelos UFs selecionados
+            {{ pesquisaUfBotaoLabel }}
           </button>
         </div>
       </section>
@@ -223,6 +218,8 @@ import {
   getResearchSession,
   intelligentMarketSearch,
 } from '../services/pncpResearch';
+import { MUNICIPIOS_POR_UF } from '../data/brasilMunicipiosPorUf';
+import { buildRecortesGeograficosPayload } from '../utils/recortesGeograficos';
 
 const route = useRoute();
 const router = useRouter();
@@ -235,7 +232,45 @@ const autostart = computed(() => String(route.query.autostart || '').trim() === 
 
 const filtros = reactive({
   descricao: '',
-  ufs: [],
+  /** @type {Array<{ _id: string, uf: string, municipio: string }>} */
+  locais: [],
+});
+
+function newLocalRow() {
+  return {
+    _id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    uf: '',
+    municipio: '',
+  };
+}
+
+function addLocalRow() {
+  filtros.locais.push(newLocalRow());
+}
+
+function removeLocalRow(idx) {
+  filtros.locais.splice(idx, 1);
+}
+
+function onLocalUfChange(loc) {
+  const list = MUNICIPIOS_POR_UF[String(loc.uf || '').toUpperCase()] || [];
+  if (loc.municipio && !list.includes(loc.municipio)) {
+    loc.municipio = '';
+  }
+}
+
+function municipiosForLocalRow(loc) {
+  const uf = String(loc.uf || '').toUpperCase();
+  if (!uf) return [];
+  const list = MUNICIPIOS_POR_UF[uf];
+  return Array.isArray(list) ? list : [];
+}
+
+const pesquisaUfBotaoLabel = computed(() => {
+  const n = buildRecortesGeograficosPayload(filtros.locais).length;
+  if (n > 1) return `Pesquisar em ${n} locais`;
+  if (n === 1) return 'Pesquisar no local definido';
+  return 'Fazer pesquisa (recorte do item)';
 });
 
 const UF_FLAGS = {
@@ -297,34 +332,6 @@ const ufOptions = [
   { code: 'SE', name: 'Sergipe' },
   { code: 'TO', name: 'Tocantins' },
 ].map((uf) => ({ ...uf, flag: UF_FLAGS[uf.code] }));
-
-function toggleUf(code) {
-  if (filtros.ufs.includes(code)) {
-    filtros.ufs = filtros.ufs.filter((uf) => uf !== code);
-    return;
-  }
-  filtros.ufs.push(code);
-}
-
-const selectedUfLabel = computed(() => {
-  if (!filtros.ufs.length) return 'Selecionar UFs';
-  if (filtros.ufs.length <= 3) return filtros.ufs.join(', ');
-  return `${filtros.ufs.length} UFs selecionadas`;
-});
-
-const allUfsSelected = computed(() => filtros.ufs.length === ufOptions.length);
-
-const isPartiallySelectedUf = computed(
-  () => filtros.ufs.length > 0 && filtros.ufs.length < ufOptions.length,
-);
-
-function toggleAllUfs(event) {
-  if (event.target.checked) {
-    filtros.ufs = ufOptions.map((uf) => uf.code);
-    return;
-  }
-  filtros.ufs = [];
-}
 
 const rows = ref([]);
 const isSearching = ref(false);
@@ -417,7 +424,6 @@ async function applyFilters() {
     rows.value = [];
     return runSearchWithContext({
       descricao: itemContext.value?.descricao_item || '',
-      selectedUfCodes: [...filtros.ufs],
       context: itemContext.value,
       append: false,
     });
@@ -436,7 +442,6 @@ async function applyFilters() {
   for (const ctx of pendentes) {
     await runSearchWithContext({
       descricao: ctx.descricao_item,
-      selectedUfCodes: [...filtros.ufs],
       context: ctx,
       append: true,
     });
@@ -444,7 +449,7 @@ async function applyFilters() {
   }
   isAutoSearchingAll.value = false;
   if (!rows.value.length) {
-    searchError.value = 'Nenhuma cotação aderente encontrada para os itens da cotação nos UFs selecionados.';
+    searchError.value = 'Nenhuma cotação aderente encontrada para os itens da cotação nos locais definidos.';
   }
 }
 
@@ -532,33 +537,34 @@ function parseNumericRef(...vals) {
   return null;
 }
 
-async function runSearchWithContext({ descricao, selectedUfCodes = [], context = null, append = false }) {
+async function runSearchWithContext({ descricao, context = null, append = false }) {
   if (!String(descricao || '').trim()) return;
   isSearching.value = true;
   if (!append) searchError.value = '';
   try {
-    const ufsToRun = selectedUfCodes.length > 0 ? [...new Set(selectedUfCodes)] : [context?.uf_padrao || null];
+    const recortes = buildRecortesGeograficosPayload(filtros.locais);
+    const basePayload = {
+      termo_busca: String(descricao).trim(),
+      codigo_modalidade: null,
+      max_paginas: 500,
+      tamanho_pagina: 200,
+      quantidade_referencia: context?.quantidade ?? null,
+      unidade_medida_referencia: context?.unidade_medida ?? null,
+      valor_base_referencia: context?.valor_base_referencia ?? null,
+      variacao_percentual_referencia: context?.variacao_percentual_referencia ?? null,
+      variacao_sentido_referencia: context?.variacao_sentido_referencia ?? null,
+      valor_min_referencia: context?.valor_min_referencia ?? null,
+      valor_max_referencia: context?.valor_max_referencia ?? null,
+    };
+
     const aggregated = [];
-    for (const ufCode of ufsToRun) {
-      const backend = await intelligentMarketSearch({
-        termo_busca: String(descricao).trim(),
-        uf: ufCode || null,
-        codigo_modalidade: null,
-        max_paginas: 500,
-        tamanho_pagina: 200,
-        quantidade_referencia: context?.quantidade ?? null,
-        unidade_medida_referencia: context?.unidade_medida ?? null,
-        valor_base_referencia: context?.valor_base_referencia ?? null,
-        variacao_percentual_referencia: context?.variacao_percentual_referencia ?? null,
-        variacao_sentido_referencia: context?.variacao_sentido_referencia ?? null,
-        valor_min_referencia: context?.valor_min_referencia ?? null,
-        valor_max_referencia: context?.valor_max_referencia ?? null,
-      });
-      if (!backend?.ok || !Array.isArray(backend.itens)) continue;
+
+    function mapBackendToRows(backend, geoKeyPart) {
+      if (!backend?.ok || !Array.isArray(backend.itens)) return;
       const mapped = backend.itens.map((it, idx) => ({
         esferaAdministrativa: classificarEsferaAdministrativa(it),
         incisoClassificacao: mapEsferaParaInciso(classificarEsferaAdministrativa(it)),
-        id: `backend-${context?.id || 'none'}-${ufCode || 'all'}-${idx}-${it.numero_pncp || ''}`,
+        id: `backend-${context?.id || 'none'}-${geoKeyPart}-${idx}-${it.numero_pncp || ''}`,
         itemId: context?.id || null,
         itemRefLabel: context?.descricao_item || '-',
         sourceRaw: it,
@@ -593,6 +599,26 @@ async function runSearchWithContext({ descricao, selectedUfCodes = [], context =
         selecionado: false,
       }));
       aggregated.push(...mapped);
+    }
+
+    if (recortes.length > 0) {
+      const backend = await intelligentMarketSearch({
+        ...basePayload,
+        recortes_geograficos: recortes,
+        uf: null,
+        municipio: null,
+      });
+      mapBackendToRows(backend, 'rec');
+    } else {
+      const ufsToRun = context?.uf_padrao ? [context.uf_padrao] : [null];
+      for (const ufCode of ufsToRun) {
+        const backend = await intelligentMarketSearch({
+          ...basePayload,
+          uf: ufCode || null,
+          municipio: null,
+        });
+        mapBackendToRows(backend, ufCode || 'all');
+      }
     }
     if (aggregated.length > 0) {
       const unique = [];
@@ -773,7 +799,13 @@ onMounted(async () => {
       itemContext.value = buildContextFromItem(it);
       filtros.descricao = String(it.descricao_item || '').trim();
       if (String(it.uf || '').trim()) {
-        filtros.ufs = [String(it.uf).trim().toUpperCase()];
+        filtros.locais = [
+        {
+          ...newLocalRow(),
+          uf: String(it.uf || '').trim().toUpperCase(),
+          municipio: '',
+        },
+      ];
       }
       if (filtros.descricao) {
         await applyFilters();
@@ -806,7 +838,6 @@ onMounted(async () => {
         }
         await runSearchWithContext({
           descricao: ctx.descricao_item,
-          selectedUfCodes: ctx.uf_padrao ? [ctx.uf_padrao] : [],
           context: ctx,
           append: true,
         });
@@ -980,6 +1011,89 @@ function onVariacaoInput(event) {
 .bia-filter { border: 1px solid #d6dde8; border-radius: 10px; background: #f8fafc; padding: 7px 8px; display: flex; flex-direction: column; gap: 4px; }
 .bia-filter > span { font-size: 9px; color: #64748b; text-transform: uppercase; line-height: 1.1; }
 .bia-filter--action { justify-content: space-between; }
+.bia-locais {
+  grid-column: 1 / -1;
+  border: 1px dashed #c5d4e8;
+  border-radius: 10px;
+  background: #fbfcfe;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bia-locais__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.bia-locais__title {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #475569;
+}
+.bia-locais__hint {
+  margin: 0;
+  flex: 1 1 200px;
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.35;
+}
+.bia-locais__add {
+  border: 1px solid #1f4e79;
+  border-radius: 8px;
+  background: #fff;
+  color: #1f4e79;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.bia-locais__empty {
+  font-size: 11px;
+  color: #94a3b8;
+  font-style: italic;
+}
+.bia-locais__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 6px;
+}
+.bia-locais__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 72px;
+}
+.bia-locais__field--grow {
+  flex: 1 1 160px;
+}
+.bia-locais__field span {
+  font-size: 8px;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.bia-locais__select {
+  border: 1px solid #cfd8e3;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+  padding: 5px 7px;
+  width: 100%;
+}
+.bia-locais__remove {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #64748b;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
 .bia-meta { margin: 2px 0 0; font-size: 12px; color: #64748b; }
 .bia-meta--error { color: #b91c1c; }
 .bia-filter input,
@@ -991,76 +1105,6 @@ function onVariacaoInput(event) {
   font-size: 12px;
   padding: 6px 8px;
   outline: none;
-}
-
-.bia-uf-option__flag {
-  width: 18px;
-  height: 13px;
-  object-fit: cover;
-  border-radius: 2px;
-}
-
-.bia-uf-dropdown {
-  position: relative;
-}
-
-.bia-uf-dropdown__summary {
-  list-style: none;
-  border: 1px solid #cfd8e3;
-  border-radius: 8px;
-  background: #fff;
-  color: #1f2937;
-  font-size: 12px;
-  padding: 6px 8px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-}
-
-.bia-uf-dropdown__summary::-webkit-details-marker {
-  display: none;
-}
-
-.bia-uf-dropdown__menu {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% + 6px);
-  left: 0;
-  width: 100%;
-  min-width: 280px;
-  max-height: 270px;
-  overflow: auto;
-  border: 1px solid #cfd8e3;
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
-  padding: 6px;
-}
-
-.bia-uf-dropdown__item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.bia-uf-dropdown__item:hover {
-  background: #f6f9fc;
-}
-
-.bia-uf-dropdown__item input {
-  margin: 0;
-}
-
-.bia-uf-dropdown__item--all {
-  border-bottom: 1px solid #e5eaf3;
-  margin-bottom: 4px;
-  padding-bottom: 8px;
-  font-weight: 600;
 }
 
 .bia-filter input:focus,

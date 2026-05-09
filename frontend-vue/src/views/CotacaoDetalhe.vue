@@ -270,7 +270,6 @@
               <col style="width: 70px" />
               <col style="width: 70px" />
               <col style="width: 120px" />
-              <col style="width: 120px" />
               <col style="width: 170px" />
               <col style="width: 110px" />
               <col style="width: 170px" />
@@ -294,7 +293,6 @@
                 <th rowspan="2" class="cot-sheet-center">Qtd.</th>
                 <th rowspan="2" class="cot-sheet-center">Und.</th>
                 <th rowspan="2" class="cot-sheet-center">Média de preço</th>
-                <th rowspan="2" class="cot-sheet-center">Preco Total</th>
                 <th rowspan="2">Faixa Regional do Item</th>
                 <th rowspan="2" class="cot-sheet-center">Status</th>
                 <th rowspan="2" class="cot-sheet-center">Acoes</th>
@@ -361,7 +359,6 @@
                     placeholder="Unidade (ex.: UN, CX, KG)"
                   />
                 </td>
-                <td class="cot-sheet-center">—</td>
                 <td class="cot-sheet-center">—</td>
                 <td>
                   <div class="cot-faixa-inline cot-faixa-inline--manual">
@@ -464,7 +461,6 @@
                 <td class="cot-sheet-center">{{ linha.qtd }}</td>
                 <td class="cot-sheet-center">{{ linha.und }}</td>
                 <td class="cot-sheet-center">{{ linha.precoMedio }}</td>
-                <td class="cot-sheet-center">{{ linha.precoTotal }}</td>
                 <td>
                   <div class="cot-faixa-cell">
                     <div class="cot-faixa-edit-row">
@@ -861,13 +857,13 @@ function triggerTemplateDownload(url, filename) {
 
 function downloadModeloExcel() {
   triggerTemplateDownload(
-    '/modelos/cotacao-manual-modelo-docmasteria.xlsx?v=20260421',
+    '/modelos/cotacao-manual-modelo-docmasteria.xlsx?v=20260508',
     'cotacao-manual-modelo-docmasteria.xlsx',
   );
 }
 
 function downloadModeloSheetsCsv() {
-  triggerTemplateDownload('/modelos/cotacao-manual-modelo.csv?v=20260421', 'cotacao-manual-modelo.csv');
+  triggerTemplateDownload('/modelos/cotacao-manual-modelo.csv?v=20260508', 'cotacao-manual-modelo.csv');
 }
 
 async function onChangeFormulaCalculo(event) {
@@ -1319,9 +1315,6 @@ async function loadSessionFromBackend() {
               ?? it.valor_unitario
               ?? (Number(it?.quantidade) > 0 ? Number(it?.valor_total) / Number(it?.quantidade) : null)
               ?? 0,
-          ),
-          precoTotal: formatCurrency(
-            it.valor_total_refletido ?? it.valor_total ?? it.valor_unitario ?? 0,
           ),
           faixaRegionalBase: formatFaixaRegionalBase(it),
           faixaBaseInputSeed: initialFaixaBaseCurrencyInput(it),

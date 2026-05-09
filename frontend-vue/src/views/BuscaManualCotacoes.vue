@@ -54,36 +54,35 @@
               <option>Diálogo Competitivo</option>
             </select>
           </label>
-          <div class="manual-field manual-field--uf">
-            <span>UF</span>
-            <details class="manual-uf-dropdown">
-              <summary class="manual-uf-dropdown__summary">
-                <span>{{ selectedUfLabel }}</span>
-                <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-              </summary>
-              <div class="manual-uf-dropdown__menu" role="group" aria-label="Selecionar UFs">
-                <label class="manual-uf-dropdown__item manual-uf-dropdown__item--all">
-                  <input
-                    type="checkbox"
-                    :checked="allUfsSelected"
-                    :indeterminate.prop="isPartiallySelectedUf"
-                    @change="toggleAllUfs"
-                  />
-                  <span>Todos os estados</span>
-                </label>
-                <label v-for="uf in ufOptions" :key="uf.code" class="manual-uf-dropdown__item">
-                  <input
-                    type="checkbox"
-                    :checked="filtros.ufs.includes(uf.code)"
-                    @change="toggleUf(uf.code)"
-                  />
-                  <img :src="uf.flag" :alt="`Bandeira ${uf.code}`" class="manual-uf-option__flag" />
-                  <span>{{ uf.code }} - {{ uf.name }}</span>
-                </label>
-              </div>
-            </details>
-          </div>
           <button type="button" class="manual-btn-search" @click="buscarNoBackend">Buscar</button>
+        </div>
+        <div class="manual-locais">
+          <div class="manual-locais__head">
+            <span class="manual-locais__title">Locais (opcional)</span>
+            <p class="manual-locais__hint">
+              Adicione uma ou mais combinações de UF + município (ex.: Curitiba/PR e Campinas/SP). Deixe o município em
+              «Toda a UF» para incluir o estado inteiro. Sem linhas = busca em todo o país.
+            </p>
+            <button type="button" class="manual-locais__add" @click="addLocalRow">+ Adicionar local</button>
+          </div>
+          <div v-if="!filtros.locais.length" class="manual-locais__empty">Nenhum filtro geográfico (nacional).</div>
+          <div v-for="(loc, idx) in filtros.locais" :key="loc._id" class="manual-locais__row">
+            <label class="manual-locais__field">
+              <span>UF</span>
+              <select v-model="loc.uf" class="manual-locais__select" @change="onLocalUfChange(loc)">
+                <option value="">—</option>
+                <option v-for="u in ufOptions" :key="u.code" :value="u.code">{{ u.code }}</option>
+              </select>
+            </label>
+            <label class="manual-locais__field manual-locais__field--grow">
+              <span>Município</span>
+              <select v-model="loc.municipio" class="manual-locais__select" :disabled="!loc.uf">
+                <option value="">Toda a UF</option>
+                <option v-for="m in municipiosForLocalRow(loc)" :key="m" :value="m">{{ m }}</option>
+              </select>
+            </label>
+            <button type="button" class="manual-locais__remove" title="Remover" @click="removeLocalRow(idx)">×</button>
+          </div>
         </div>
         <div class="manual-local-db-row">
           <p class="manual-meta">
@@ -239,6 +238,8 @@ import {
   intelligentMarketSearch,
   searchLocalItems,
 } from '../services/pncpResearch';
+import { MUNICIPIOS_POR_UF } from '../data/brasilMunicipiosPorUf';
+import { buildRecortesGeograficosPayload, itemMatchesRecortesGeograficos } from '../utils/recortesGeograficos';
 
 const route = useRoute();
 const router = useRouter();
@@ -253,13 +254,54 @@ const filtros = reactive({
   periodo: 'Último Ano',
   tipo: 'Todos',
   modalidade: 'Todas',
-  ufs: [],
+  /** @type {Array<{ _id: string, uf: string, municipio: string }>} */
+  locais: [],
   ordenarPor: 'Produto',
   ordem: 'Decrescente',
   valorBase: '15,00',
   variacao: '20',
   variacaoSentido: 'ambos',
 });
+
+function newLocalRow() {
+  return {
+    _id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    uf: '',
+    municipio: '',
+  };
+}
+
+function addLocalRow() {
+  filtros.locais.push(newLocalRow());
+}
+
+function removeLocalRow(idx) {
+  filtros.locais.splice(idx, 1);
+}
+
+function onLocalUfChange(loc) {
+  const list = MUNICIPIOS_POR_UF[String(loc.uf || '').toUpperCase()] || [];
+  if (loc.municipio && !list.includes(loc.municipio)) {
+    loc.municipio = '';
+  }
+}
+
+function municipiosForLocalRow(loc) {
+  const uf = String(loc.uf || '').toUpperCase();
+  if (!uf) return [];
+  const list = MUNICIPIOS_POR_UF[uf];
+  return Array.isArray(list) ? list : [];
+}
+
+const recortesGeograficosAtivos = computed(() => buildRecortesGeograficosPayload(filtros.locais));
+
+function geoApiSlice() {
+  const recortes = buildRecortesGeograficosPayload(filtros.locais);
+  if (recortes.length > 0) {
+    return { recortes_geograficos: recortes };
+  }
+  return { uf: null, municipio: null };
+}
 
 const UF_FLAGS = {
   AC: new URL('../assets/estados/02-acre-full.svg', import.meta.url).href,
@@ -319,22 +361,6 @@ const MODALIDADE_TO_CODIGO = {
   'Diálogo Competitivo': 13,
 };
 
-function toggleUf(code) {
-  if (filtros.ufs.includes(code)) {
-    filtros.ufs = filtros.ufs.filter((uf) => uf !== code);
-    return;
-  }
-  filtros.ufs = [...filtros.ufs, code];
-}
-
-function toggleAllUfs(event) {
-  if (event.target.checked) {
-    filtros.ufs = ufOptions.map((uf) => uf.code);
-    return;
-  }
-  filtros.ufs = [];
-}
-
 function onVariacaoInput(event) {
   if (Number.isFinite(Number(variacaoGlobalDaSessao.value)) && Number(variacaoGlobalDaSessao.value) >= 0) {
     const locked = String(Math.round(Number(variacaoGlobalDaSessao.value)));
@@ -387,16 +413,6 @@ const faixaValorAtiva = computed(() => {
   const labelSentido = sentido === 'baixo' ? 'para baixo' : (sentido === 'cima' ? 'para cima' : 'para baixo/cima');
   return `${formatCurrency(min)} até ${formatCurrency(max)} (${perc}% ${labelSentido})`;
 });
-const selectedUfLabel = computed(() => {
-  if (!filtros.ufs.length) return 'Selecionar UFs';
-  if (filtros.ufs.length <= 3) return filtros.ufs.join(', ');
-  return `${filtros.ufs.length} UFs selecionadas`;
-});
-const allUfsSelected = computed(() => filtros.ufs.length === ufOptions.length);
-const isPartiallySelectedUf = computed(
-  () => filtros.ufs.length > 0 && filtros.ufs.length < ufOptions.length,
-);
-
 const resultadosFiltradosOrdenados = computed(() => {
   const base = [...resultados.value];
   const valorBase = parseMoeda(filtros.valorBase);
@@ -422,9 +438,13 @@ const resultadosFiltradosOrdenados = computed(() => {
       return v >= min && v <= max;
     });
   }
-  if (filtros.ufs.length > 0 && filtros.ufs.length < ufOptions.length) {
-    const selected = new Set(filtros.ufs);
-    filtrados = filtrados.filter((item) => selected.has(String(item.uf || '').toUpperCase()));
+  if (recortesGeograficosAtivos.value.length > 0) {
+    filtrados = filtrados.filter((item) =>
+      itemMatchesRecortesGeograficos(
+        { uf: item.uf, municipio: item.municipio },
+        recortesGeograficosAtivos.value,
+      ),
+    );
   }
   if (filtros.periodo) {
     filtrados = filtrados.filter((item) => isWithinPeriodo(item.data, filtros.periodo));
@@ -578,9 +598,10 @@ async function buscarNoBackend() {
         ? (MODALIDADE_TO_CODIGO[filtros.modalidade] ?? null)
         : null;
     const termoBuscaEfetivo = filtros.descricao.trim();
+    const geo = geoApiSlice();
     let data = await searchLocalItems({
       termo_busca: termoBuscaEfetivo,
-      uf: filtros.ufs.length === 1 ? filtros.ufs[0] : null,
+      ...geo,
       codigo_modalidade: codigoModalidade,
       // Busca agressiva para varrer o máximo possível (backend limita teto de segurança).
       max_paginas: 500,
@@ -592,7 +613,7 @@ async function buscarNoBackend() {
     if (!data?.ok || !Array.isArray(data?.itens) || localItemsCount === 0) {
       const iaData = await intelligentMarketSearch({
         termo_busca: termoBuscaEfetivo,
-        uf: filtros.ufs.length === 1 ? filtros.ufs[0] : null,
+        ...geo,
         codigo_modalidade: codigoModalidade,
         max_paginas: 500,
         tamanho_pagina: 200,
@@ -607,7 +628,7 @@ async function buscarNoBackend() {
       for (const term of fallbackTerms) {
         const iaFallback = await intelligentMarketSearch({
           termo_busca: term,
-          uf: filtros.ufs.length === 1 ? filtros.ufs[0] : null,
+          ...geo,
           codigo_modalidade: codigoModalidade,
           max_paginas: 500,
           tamanho_pagina: 200,
@@ -955,7 +976,96 @@ onMounted(async () => {
 
 .manual-field { border: 1px solid #d6dde8; border-radius: 10px; background: #f8fafc; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; min-width: 170px; }
 .manual-field--grow { flex: 1 1 320px; }
-.manual-field--uf { min-width: 220px; }
+.manual-locais {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px dashed #c5d4e8;
+  border-radius: 12px;
+  background: #fbfcfe;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.manual-locais__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.manual-locais__title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #475569;
+}
+.manual-locais__hint {
+  margin: 0;
+  flex: 1 1 220px;
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.35;
+}
+.manual-locais__add {
+  border: 1px solid #1f4e79;
+  border-radius: 8px;
+  background: #fff;
+  color: #1f4e79;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.manual-locais__empty {
+  font-size: 12px;
+  color: #94a3b8;
+  font-style: italic;
+}
+.manual-locais__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+.manual-locais__field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 88px;
+}
+.manual-locais__field--grow {
+  flex: 1 1 200px;
+  min-width: 160px;
+}
+.manual-locais__field span {
+  font-size: 9px;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.manual-locais__select {
+  border: 1px solid #cfd8e3;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+  padding: 6px 8px;
+  color: #0f172a;
+  width: 100%;
+}
+.manual-locais__remove {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #64748b;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  margin-bottom: 1px;
+}
+.manual-locais__remove:hover {
+  color: #b91c1c;
+  border-color: #fecaca;
+}
 .manual-field span { font-size: 10px; text-transform: uppercase; color: #64748b; }
 .manual-meta { margin: 0; font-size: 12px; color: #64748b; }
 .manual-meta--error { color: #b91c1c; }
@@ -1024,68 +1134,6 @@ onMounted(async () => {
   opacity: 0.7;
 }
 
-.manual-uf-dropdown {
-  position: relative;
-}
-
-.manual-uf-dropdown__summary {
-  list-style: none;
-  border: 1px solid #cfd8e3;
-  border-radius: 8px;
-  background: #fff;
-  padding: 7px 9px;
-  font-size: 13px;
-  color: #1f2937;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  cursor: pointer;
-}
-
-.manual-uf-dropdown__summary::-webkit-details-marker {
-  display: none;
-}
-
-.manual-uf-dropdown__menu {
-  position: absolute;
-  z-index: 10;
-  top: calc(100% + 6px);
-  left: 0;
-  width: 320px;
-  max-height: 280px;
-  overflow: auto;
-  border: 1px solid #d6dde8;
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
-  padding: 8px;
-  display: grid;
-  gap: 4px;
-}
-
-.manual-uf-dropdown__item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: #334155;
-  padding: 4px;
-}
-
-.manual-uf-option__flag {
-  width: 22px;
-  height: 15px;
-  object-fit: cover;
-  border-radius: 2px;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
-}
-
-.manual-uf-dropdown__item--all {
-  border-bottom: 1px solid #e8edf4;
-  margin-bottom: 4px;
-  padding-bottom: 8px;
-}
 /* Mantem o bloco de ordenacao/valor em linha (cards lado a lado) */
 .manual-controls {
   display: grid;

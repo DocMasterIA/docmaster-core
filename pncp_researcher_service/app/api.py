@@ -118,6 +118,8 @@ async def local_index_search_items_endpoint(body: MarketSearchRequest):
         return local_item_search(
             body.termo_busca,
             uf=body.uf,
+            municipio=body.municipio,
+            recortes_geograficos=body.recortes_geograficos,
             codigo_modalidade=body.codigo_modalidade,
             limit=max(200, body.max_paginas * body.tamanho_pagina),
         )

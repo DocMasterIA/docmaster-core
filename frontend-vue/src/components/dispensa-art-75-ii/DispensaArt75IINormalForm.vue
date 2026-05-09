@@ -583,8 +583,6 @@ function buildSlotsOverride() {
     const total = itensOverride.reduce((acc, item) => acc + moedaParaNumero(item.valor_total), 0);
     o.valor_total = formatCurrencyBr(total);
   }
-  // Dispensa normal: itens vêm da tabela; o rag_service usa isto para não puxar linhas de item para o texto do objeto/justificativa.
-  o.force_manual_items = true;
   const fundamentoLegal = resolveSolOficioFundamentoLegal(String(route.name || ''));
   if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;
   return Object.keys(o).length ? o : null;
@@ -599,11 +597,7 @@ function buildUserPrompt() {
     `Objeto base: ${objetoContratado.value || 'Não informado'}`,
     `Setor atendido: ${objetoSetor.value || 'Não informado'}`,
     `Características mínimas: ${objetoCaracteristicas.value || 'Não informado'}`,
-    '',
-    'REGRAS OBRIGATÓRIAS (dispensa normal — itens na tabela do formulário):',
-    '- Não invente nem enumere itens, produtos ou serviços específicos (ex.: listas "x, y, z", "incluindo...", "abrangendo...") além do que estiver expresso de forma genérica em "Objeto base" e "Características mínimas".',
-    '- Não repita descrições, quantidades ou valores de linhas de planilha: o detalhamento fica na tabela do Termo de Referência.',
-    '- Objeto e justificativa devem ser redação conceitual/institucional, referindo-se genericamente às especificações técnicas e quantitativos estabelecidos neste Termo de Referência.',
+    'Em objeto e justificativa não liste nem discuta itens da tabela (descrições, quantidades, valores); mantenha texto genérico.',
   ].join('\n');
 }
 

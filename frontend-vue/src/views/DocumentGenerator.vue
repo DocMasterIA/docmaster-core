@@ -1177,7 +1177,6 @@ function shouldRenderField(field) {
 function buildTrSlotsOverride() {
   const f = slotForm;
   const o = {};
-  const isDispensaNormalRoute = String(route.name || '').startsWith('DispensaArt75');
   const toBrDate = (iso) => {
     const v = String(iso || '').trim();
     if (!v) return '';
@@ -1218,8 +1217,6 @@ function buildTrSlotsOverride() {
       valor_total: itemValorTotal,
     }];
   }
-  if (isDispensaNormalRoute) o.force_manual_items = true;
-
   const trCargoAssinante = (f.tr_cargo_assinante || '').trim();
   if (trCargoAssinante) o.secretaria_usuario = trCargoAssinante;
   const setor = (f.dfd_setor_requisitante || '').trim();

@@ -477,6 +477,8 @@
 .rpp-fonte-row {
   display: grid;
   gap: 1.2mm;
+  /* Sem esticar à altura da célula vizinha: cada mini-cartão só o que o texto precisa */
+  align-items: start;
 }
 
 .rpp-fonte-row--3 {
@@ -536,8 +538,9 @@
   border: 1px solid #e2e8f0;
   border-radius: 5px;
   background: #fff;
-  padding: 1.2mm 1.5mm;
-  min-height: 10mm;
+  padding: 1mm 1.3mm;
+  min-height: 0;
+  align-self: start;
 }
 
 .rpp-mini-compact--featured {
@@ -545,7 +548,7 @@
 }
 
 .rpp-mini-compact--wide {
-  min-height: 11mm;
+  min-height: 0;
 }
 
 .rpp-mini-compact__label {
@@ -560,7 +563,7 @@
 
 .rpp-mini-compact__value {
   display: block;
-  margin-top: 1mm;
+  margin-top: 0.55mm;
   font-size: 7.5pt;
   line-height: 1.2;
   color: #1e293b;

@@ -472,13 +472,13 @@
 .rpp-fonte-card__content {
   display: flex;
   flex-direction: column;
-  gap: 0.35mm;
-  padding: 0.85mm 1.1mm 0.85mm 0.4mm;
+  gap: 0.15mm;
+  padding: 0.65mm 0.9mm 0.65mm 0.35mm;
 }
 
 .rpp-fonte-row {
   display: grid;
-  gap: 0.35mm;
+  gap: 0.15mm;
   /* Sem esticar à altura da célula vizinha: cada mini-cartão só o que o texto precisa */
   align-items: start;
   align-content: start;
@@ -508,7 +508,7 @@
 
 /* ID / Processo: tabela evita colapso de grelha no WeasyPrint (uma letra por linha) */
 .rpp-fonte-processo-line {
-  margin-bottom: 0.2mm;
+  margin: 0;
   width: 100%;
 }
 
@@ -576,9 +576,9 @@
 
 .rpp-mini-compact__value {
   display: block;
-  margin-top: 0.35mm;
+  margin-top: 0.25mm;
   font-size: 7.5pt;
-  line-height: 1.15;
+  line-height: 1.12;
   color: #1e293b;
   word-break: normal;
   overflow-wrap: break-word;
@@ -746,15 +746,21 @@
   padding: 1mm;
 }
 .rpp-body.rpp--pdf .rpp-fontes-cards {
-  gap: 0.65mm;
-  padding: 0.65mm;
+  gap: 0.45mm;
+  padding: 0.45mm;
 }
 .rpp-body.rpp--pdf .rpp-fonte-card__content {
-  gap: 0.2mm;
-  padding: 0.45mm 0.75mm 0.45mm 0.3mm;
+  /* pt: WeasyPrint trata melhor que mm muito pequenos */
+  gap: 0.35pt;
+  padding: 1pt 2pt 1pt 1pt;
 }
+
+.rpp-body.rpp--pdf .rpp-fonte-card__content > * {
+  margin: 0;
+}
+
 .rpp-body.rpp--pdf .rpp-fonte-row {
-  gap: 0.2mm;
+  gap: 0.35pt;
   align-items: start;
   align-content: start;
   grid-auto-rows: min-content;
@@ -779,7 +785,8 @@
  */
 .rpp-body.rpp--pdf .rpp-mini-compact {
   display: block;
-  padding: 0.3mm 0.65mm;
+  margin: 0;
+  padding: 0.15mm 0.45mm 0.2mm;
   min-height: 0;
   min-width: 0;
   width: 100%;
@@ -791,7 +798,7 @@
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  margin-bottom: 0.2mm;
+  margin: 0;
 }
 
 .rpp-body.rpp--pdf .rpp-processo-tbl {
@@ -802,18 +809,18 @@
 
 .rpp-body.rpp--pdf .rpp-processo-tbl__k,
 .rpp-body.rpp--pdf .rpp-processo-tbl__v {
-  padding: 0.55mm 0.85mm;
+  padding: 0.25mm 0.45mm;
 }
 
 .rpp-body.rpp--pdf .rpp-processo-tbl__k {
   font-size: var(--rpp-pdf-mini-label);
-  line-height: 1.12;
+  line-height: 1.05;
   white-space: nowrap;
 }
 
 .rpp-body.rpp--pdf .rpp-processo-tbl__v {
   font-size: var(--rpp-pdf-mini-value);
-  line-height: 1.12;
+  line-height: 1.08;
   white-space: normal;
   overflow-wrap: break-word;
   word-break: normal;
@@ -821,17 +828,18 @@
 .rpp-body.rpp--pdf .rpp-mini-compact__label {
   display: block;
   font-size: var(--rpp-pdf-mini-label);
-  line-height: 1.15;
+  line-height: 1.05;
   letter-spacing: 0.02em;
   white-space: normal;
   max-width: 100%;
-  margin-bottom: 0.15mm;
+  margin: 0 0 0.05mm;
 }
 .rpp-body.rpp--pdf .rpp-mini-compact__value {
   display: block;
-  margin-top: 0;
+  margin: 0;
+  padding-top: 0.08mm;
   font-size: var(--rpp-pdf-mini-value);
-  line-height: 1.12;
+  line-height: 1.08;
   font-weight: 600;
   word-break: normal;
   overflow-wrap: break-word;

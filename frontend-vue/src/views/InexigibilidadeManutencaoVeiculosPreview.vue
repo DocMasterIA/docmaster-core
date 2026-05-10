@@ -1209,6 +1209,28 @@ function buildInexig74ManutencaoDfdJustificativa() {
   return partes.join('\n\n');
 }
 
+/**
+ * Objeto do TR / Ofício na inexigibilidade art. 74, I — manutenção veicular (redação padrão).
+ * Substitui o fallback «Tipo: … | Marca: …» que não é adequado ao ofício.
+ */
+function buildInexig74ManutencaoObjetoTrResumo() {
+  const m = String(marca.value || '').trim();
+  const mod = String(modelo.value || '').trim();
+  const pl = String(placa.value || '').trim();
+  const org = String(orgaoUnidadeVeiculo.value || orgao.value || '').trim();
+  const partesVeic = [];
+  if (m) partesVeic.push(`marca ${m}`);
+  if (mod) partesVeic.push(`modelo ${mod}`);
+  if (pl) partesVeic.push(`placa ${pl}`);
+  const veiculo = partesVeic.length ? partesVeic.join(', ') : 'identificação do veículo a constar nos autos';
+  const orgaoFrase = org ? `pertencente ao ${org}` : 'pertencente ao órgão ou unidade competente';
+  return (
+    'Contratação por inexigibilidade de licitação, nos termos do art. 74, inciso I, da Lei nº 14.133/2021, '
+    + 'para prestação de serviços de manutenção veicular, com fornecimento de peças, componentes e acessórios, '
+    + `destinado ao veículo, ${veiculo}, ${orgaoFrase}.`
+  );
+}
+
 function objetoEspecificoContratacaoIx() {
   if (objetoEspecifico.value === 'Outro') return String(outroObjetoEspecifico.value || '').trim();
   return String(objetoEspecifico.value || '').trim();
@@ -1371,19 +1393,22 @@ function buildSlotsOverride() {
   if (responsavelCargo.value.trim()) o.cargo_assinante_termo = responsavelCargo.value.trim();
   if (responsavelCargo.value.trim()) o.secretaria_usuario = responsavelCargo.value.trim();
 
-  const manutencaoFallbackParts = isDispensaManutencaoRoute.value
-    ? [
-        tipoManutencao.value ? `Tipo: ${tipoManutencao.value}` : '',
-        revisaoKm.value ? `Revisao/KM: ${revisaoKm.value}` : '',
-      ]
-    : [];
-  const veiculoFallbackParts = isManutencaoVeiculosRoute.value
-    ? [
-        marca.value ? `Marca: ${marca.value}` : '',
-        modelo.value ? `Modelo: ${modelo.value}` : '',
-        placa.value ? `Placa: ${placa.value}` : '',
-      ]
-    : [];
+  // Tipo/revisão só na dispensa art. 75, I — na inexigibilidade 74, I não usar isto como objeto do ofício/TR.
+  const manutencaoFallbackParts =
+    logicalRouteName.value === 'DispensaArt75IManutencaoVeiculos'
+      ? [
+          tipoManutencao.value ? `Tipo: ${tipoManutencao.value}` : '',
+          revisaoKm.value ? `Revisao/KM: ${revisaoKm.value}` : '',
+        ]
+      : [];
+  const veiculoFallbackParts =
+    logicalRouteName.value === 'DispensaArt75IManutencaoVeiculos'
+      ? [
+          marca.value ? `Marca: ${marca.value}` : '',
+          modelo.value ? `Modelo: ${modelo.value}` : '',
+          placa.value ? `Placa: ${placa.value}` : '',
+        ]
+      : [];
   const objetoFallback = [...manutencaoFallbackParts, ...veiculoFallbackParts].filter(Boolean).join(' | ');
   const justificativaFallback = fornecedor.value.trim()
     ? `Fornecedor exclusivo: ${fornecedor.value.trim()} (CNPJ: ${cnpj.value.trim() || 'não informado'})`
@@ -1396,7 +1421,8 @@ function buildSlotsOverride() {
    * fill_tr_slots_with_llm, _merge_slots() da prioridade ao override sobre a IA (tr_slots_llm.py).
    * tr_template / dfd_template / oficio_template substituem placeholders a partir dos mesmos slots.
    */
-  const objetoFinal = clausulaObjeto.value.trim() || objetoFallback;
+  const objetoResumoInexig74M = isInexigibilidadeManutencaoRoute.value ? buildInexig74ManutencaoObjetoTrResumo().trim() : '';
+  const objetoFinal = clausulaObjeto.value.trim() || objetoResumoInexig74M || objetoFallback;
   o.objeto = objetoFinal;
   const justificativaFinal = (clausulaJustificativa.value.trim() || justificativaFallback) || '';
   if (justificativaFinal) o.justificativa = justificativaFinal;

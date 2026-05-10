@@ -273,7 +273,12 @@
             </article>
 
             <div class="da75-space-y">
-              <button type="button" class="da75-btn da75-btn--primary" :disabled="isSubmitting" @click="onSubmit">
+              <button
+                type="button"
+                class="da75-btn da75-btn--primary"
+                :disabled="isSubmitting || !podeGerarDocumentos"
+                @click="onSubmit"
+              >
                 Gerar documento com IA
               </button>
               <DocGenIaLoaderBlock v-if="isSubmitting" message="Gerando documentos…" />
@@ -1609,20 +1614,26 @@ function buildUserPrompt() {
   return lines.join('\n');
 }
 async function onSubmit() {
-  isSubmitting.value = true;
   generateError.value = '';
   successMessage.value = '';
   documentReady.value = false;
   revokeDocumentUrls();
-  try {
-    if (isDispensaNormalRoute.value) {
-      const hasObjeto = !!clausulaObjeto.value.trim();
-      const hasJustificativa = !!clausulaJustificativa.value.trim();
-      if (!hasObjeto || !hasJustificativa) {
-        generateError.value = 'Para Dispensa normal, gere as clausulas com IA (ou preencha Objeto e Justificativa manualmente) antes de gerar o documento.';
-        return;
-      }
+  if (isDispensaNormalRoute.value) {
+    const hasObjeto = !!clausulaObjeto.value.trim();
+    const hasJustificativa = !!clausulaJustificativa.value.trim();
+    if (!hasObjeto || !hasJustificativa) {
+      generateError.value =
+        'Para Dispensa normal, gere as clausulas com IA (ou preencha Objeto e Justificativa manualmente) antes de gerar o documento.';
+      return;
     }
+  }
+  const pendente = secoes.value.find((s) => !s.completo);
+  if (pendente) {
+    generateError.value = `Preencha todos os campos obrigatórios em «${pendente.titulo}» antes de gerar os documentos.`;
+    return;
+  }
+  isSubmitting.value = true;
+  try {
     const payload = {
       user_prompt: buildUserPrompt(),
       slots_override: buildSlotsOverride(),
@@ -1834,6 +1845,13 @@ const secoes = computed(() => {
 
 const completos = computed(() => secoes.value.filter((s) => s.completo).length);
 const progresso = computed(() => Math.round((completos.value / secoes.value.length) * 100));
+/** Dispensa normal exige objeto/justificativa do bloco de cláusulas; demais rotas seguem o resumo (opcionais não bloqueiam). */
+const podeGerarDocumentos = computed(() => {
+  if (isDispensaNormalRoute.value) {
+    if (!clausulaObjeto.value.trim() || !clausulaJustificativa.value.trim()) return false;
+  }
+  return secoes.value.every((s) => s.completo);
+});
 </script>
 
 <style>

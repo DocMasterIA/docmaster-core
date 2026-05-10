@@ -165,7 +165,12 @@
 
 
             <div class="da75-space-y">
-              <button type="button" class="da75-btn da75-btn--primary" :disabled="isSubmitting" @click="onSubmit">
+              <button
+                type="button"
+                class="da75-btn da75-btn--primary"
+                :disabled="isSubmitting || !podeGerarDocumentos"
+                @click="onSubmit"
+              >
                 Gerar documento com IA
               </button>
               <DocGenIaLoaderBlock v-if="isSubmitting" message="Gerando documentos…" />
@@ -477,6 +482,7 @@ const secoes = computed(() => {
 
 const completos = computed(() => secoes.value.filter((s) => s.completo).length);
 const progresso = computed(() => Math.round((completos.value / secoes.value.length) * 100));
+const podeGerarDocumentos = computed(() => secoes.value.every((s) => s.completo));
 
 /** Remove rascunho de objeto/justificativa para fill_tr_slots_with_llm (rag_service). */
 function slotsOverrideWithoutClauseDraft(raw) {
@@ -663,27 +669,28 @@ function sanitizeJsonBody(obj) {
 }
 
 async function onSubmit() {
-  isSubmitting.value = true;
   generateError.value = '';
   successMessage.value = '';
   documentReady.value = false;
   revokeDocumentUrls();
+  const pendente = secoes.value.find((s) => !s.completo);
+  if (pendente) {
+    generateError.value = `Preencha todos os campos obrigatórios em «${pendente.titulo}» antes de gerar os documentos.`;
+    return;
+  }
+  const payload = {
+    user_prompt: buildUserPrompt(),
+    slots_override: buildSlotsOverride(),
+    slot_package_key: slotPackageKey.value,
+  };
+  if (cabecalhoMergeTemplateId.value) payload.template_id = cabecalhoMergeTemplateId.value;
+  const bodyObj = sanitizeJsonBody(payload);
+  if (!bodyObj) {
+    generateError.value = 'Não foi possível preparar os dados para envio. Verifique os campos (especialmente itens e valores).';
+    return;
+  }
+  isSubmitting.value = true;
   try {
-    if (!objetoGerado.value.trim() || !justificativa.value.trim()) {
-      generateError.value = 'Gere (ou preencha) Objeto e Justificativa antes de gerar o documento.';
-      return;
-    }
-    const payload = {
-      user_prompt: buildUserPrompt(),
-      slots_override: buildSlotsOverride(),
-      slot_package_key: slotPackageKey.value,
-    };
-    if (cabecalhoMergeTemplateId.value) payload.template_id = cabecalhoMergeTemplateId.value;
-    const bodyObj = sanitizeJsonBody(payload);
-    if (!bodyObj) {
-      generateError.value = 'Não foi possível preparar os dados para envio. Verifique os campos (especialmente itens e valores).';
-      return;
-    }
     const gerarUrl = buildGerarTrEDfdUrl(API_BASE);
     const result = await fetchGerarTrEDfdWithRetry(API_BASE, bodyObj);
     if (!result.ok) {

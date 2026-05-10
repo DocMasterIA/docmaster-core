@@ -115,7 +115,12 @@
             </section>
 
             <div class="da75-space-y">
-              <button type="button" class="da75-btn da75-btn--primary" :disabled="isSubmitting" @click="onSubmit">
+              <button
+                type="button"
+                class="da75-btn da75-btn--primary"
+                :disabled="isSubmitting || !podeGerarDocumentos"
+                @click="onSubmit"
+              >
                 Gerar documento com IA
               </button>
               <DocGenIaLoaderBlock v-if="isSubmitting" message="Gerando documentos…" />
@@ -365,6 +370,8 @@ const secoes = computed(() => {
 
 const completos = computed(() => secoes.value.filter((s) => s.completo).length);
 const progresso = computed(() => Math.round((completos.value / secoes.value.length) * 100));
+/** Só envia geração (e mostra loader) quando blocos obrigatórios do resumo estão completos — opcionais não bloqueiam. */
+const podeGerarDocumentos = computed(() => secoes.value.every((s) => s.completo));
 
 function onModoData(valor) {
   modoData.value = valor;
@@ -506,16 +513,17 @@ function buildUserPrompt() {
 }
 
 async function onSubmit() {
-  isSubmitting.value = true;
   generateError.value = '';
   successMessage.value = '';
   documentReady.value = false;
   revokeDocumentUrls();
+  const pendente = secoes.value.find((s) => !s.completo);
+  if (pendente) {
+    generateError.value = `Preencha todos os campos obrigatórios em «${pendente.titulo}» antes de gerar os documentos.`;
+    return;
+  }
+  isSubmitting.value = true;
   try {
-    if (!String(objetoContratado.value || '').trim()) {
-      generateError.value = 'Preencha o campo «O que será contratado?» antes de gerar o documento.';
-      return;
-    }
     await preencherObjetoEJustificativaInterno();
     const payload = {
       user_prompt: buildUserPrompt(),

@@ -23,6 +23,17 @@ TEMPLATE_DFD_PATH_DEFAULT = (
 )
 
 
+def _dfd_numero_processo_display(slots: TRTemplateSlots) -> str:
+    """Número exibido no DFD: campo próprio ou, em fallback, o do TR."""
+    return str(slots.dfd_numero_processo or slots.numero_processo or "").strip()
+
+
+def _strip_invisible(s: str) -> str:
+    if not s:
+        return ""
+    return re.sub(r"[\s\u00a0\u200b-\u200d\ufeff]+", "", s)
+
+
 def _replace_placeholder_in_paragraph_runs(paragraph, placeholder: str, replacement: str) -> bool:
     runs = paragraph.runs
     if not runs:
@@ -90,51 +101,84 @@ def _replace_placeholders(doc: Document, mapping: dict[str, str]) -> None:
                     _replace_placeholders_in_paragraph(p, mapping)
 
 
+def _remove_paragraph_element(paragraph) -> None:
+    el = paragraph._element
+    parent = el.getparent()
+    if parent is not None:
+        parent.remove(el)
+
+
+def _table_has_process_line_sem_numero(table) -> bool:
+    """Há linha de «processo» sem dígito (rótulo vazio / só texto) — usado para decidir remoção de linhas em branco."""
+    for row in table.rows:
+        joined = " ".join((c.text or "") for c in row.cells)
+        j = re.sub(r"\s+", " ", joined).strip()
+        if not j:
+            continue
+        low = j.lower()
+        if "processo" not in low:
+            continue
+        if re.search(r"\d", j):
+            continue
+        return True
+    return False
+
+
+def _remove_nonempty_process_row_without_number(table, row) -> bool:
+    raw_join = " ".join((c.text or "") for c in row.cells)
+    t_show = re.sub(r"\s+", " ", raw_join).strip()
+    if not _strip_invisible(raw_join):
+        return False
+    if re.search(r"\d", t_show):
+        return False
+    low = t_show.lower()
+    if "processo" not in low:
+        return False
+    if re.fullmatch(r"N[º°o\.]?\s*Processo\s*:?", t_show, re.IGNORECASE):
+        return True
+    return len(t_show) <= 48
+
+
 def _remove_processo_visual_block_when_empty(doc: Document) -> None:
     """
-    Remove o bloco textual de processo quando não informado, incluindo o rótulo
-    e eventual placeholder, para não sobrar trilha de formatação no DFD.
+    Após substituir placeholders, remove linhas/parágrafos do bloco «Nº Processo»
+    quando não há número, evitando linha vazia com bordas ou só com formatação.
+    Duas passagens em tabelas: primeiro linhas em branco ligadas ao campo, depois
+    a linha do rótulo (caso contrário o helper deixa de ver «processo» e a linha
+    em branco não seria detectada).
     """
-    patterns = [
-        re.compile(r"\s*N[º°o]\s*Processo\s*:\s*\((?:DFD_NUMERO_PROCESSO|NUMERO PROCESSO)\)\s*", re.IGNORECASE),
-        re.compile(r"\s*N[º°o]\s*Processo\s*:\s*", re.IGNORECASE),
-    ]
+    proc_label = re.compile(r"^N[º°o\.]?\s*Processo\s*:?\s*$", re.IGNORECASE)
 
-    def _clean_paragraph(p) -> None:
-        text = p.text or ""
-        if not text:
-            return
-        cleaned = text
-        for pat in patterns:
-            cleaned = pat.sub(" ", cleaned)
-        cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
-        if cleaned != text:
-            p.text = cleaned
-
-    # 1) Remove linhas inteiras de tabela que contenham o bloco de processo
-    # (no template de inexigibilidade esse campo vive em uma linha própria).
-    row_tokens = (
-        "DFD_NUMERO_PROCESSO",
-        "NUMERO PROCESSO",
-        "Nº Processo",
-        "N° Processo",
-        "No Processo",
-    )
-    for table in doc.tables:
+    for table in list(doc.tables):
         for row in list(table.rows):
-            row_text = " ".join((cell.text or "") for cell in row.cells)
-            if any(token in row_text for token in row_tokens):
+            raw_join = " ".join((c.text or "") for c in row.cells)
+            if not _strip_invisible(raw_join) and _table_has_process_line_sem_numero(table):
+                table._tbl.remove(row._tr)
+        for row in list(table.rows):
+            if _remove_nonempty_process_row_without_number(table, row):
                 table._tbl.remove(row._tr)
 
-    # 2) Limpa eventuais parágrafos fora de tabela com o mesmo bloco
-    for p in doc.paragraphs:
-        _clean_paragraph(p)
+    for p in list(doc.paragraphs):
+        t = (p.text or "").replace("\u00a0", " ").strip()
+        if proc_label.fullmatch(t):
+            _remove_paragraph_element(p)
+            continue
+        if not t:
+            xml_l = (p._element.xml or b"").decode("utf-8", errors="ignore").lower()
+            if "processo" in xml_l and not re.search(r"\d", xml_l):
+                _remove_paragraph_element(p)
 
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                for p in cell.paragraphs:
-                    _clean_paragraph(p)
+    # Tabela de uma linha que ficou só com células vazias (ex.: só o placeholder do processo).
+    for table in list(doc.tables):
+        if len(table.rows) != 1:
+            continue
+        r0 = table.rows[0]
+        if _strip_invisible(" ".join((c.text or "") for c in r0.cells)):
+            continue
+        tbl_el = table._tbl
+        parent = tbl_el.getparent()
+        if parent is not None:
+            parent.remove(tbl_el)
 
 
 def render_dfd_from_tr_slots(
@@ -152,7 +196,7 @@ def render_dfd_from_tr_slots(
     - (descrever a justificativa usada no termo de referencias)    -> slots.justificativa
     - (CIDADE)                                                     -> slots.cidade
     - (SETOR REQUISITANTE)                                         -> slots.dfd_setor_requisitante
-    - (NUMERO PROCESSO)                                            -> slots.dfd_numero_processo
+    - (NUMERO PROCESSO)                                            -> dfd_numero_processo ou numero_processo
     - (RESPONSAVEL DEMANDA)                                        -> slots.dfd_responsavel_demanda
     - (EMAIL DFD)                                                  -> slots.dfd_email
     - (GESTORA CONTRATOS)                                          -> slots.dfd_gestor_contratos
@@ -170,13 +214,14 @@ def render_dfd_from_tr_slots(
 
     dfd_obj = (slots.dfd_objeto_referencia or slots.objeto or "").strip()
     dfd_just = (slots.dfd_justificativa or slots.justificativa or "").strip()
+    num_proc = _dfd_numero_processo_display(slots)
     mapping = {
         # Placeholders padronizados (preferenciais)
         "(DFD_OBJETO_REFERENCIA)": dfd_obj,
         "(DFD_JUSTIFICATIVA)": dfd_just,
         "(DFD_CIDADE)": slots.cidade or "",
         "(DFD_SETOR_REQUISITANTE)": slots.dfd_setor_requisitante or "",
-        "(DFD_NUMERO_PROCESSO)": slots.dfd_numero_processo or "",
+        "(DFD_NUMERO_PROCESSO)": num_proc,
         "(DFD_RESPONSAVEL_DEMANDA)": slots.dfd_responsavel_demanda or "",
         "(DFD_EMAIL)": slots.dfd_email or "",
         "(DFD_GESTOR_CONTRATOS)": slots.dfd_gestor_contratos or "",
@@ -190,7 +235,7 @@ def render_dfd_from_tr_slots(
         "(CIDADE)": slots.cidade or "",
         # Placeholders novos de identificação/assinatura do DFD
         "(SETOR REQUISITANTE)": slots.dfd_setor_requisitante or "",
-        "(NUMERO PROCESSO)": slots.dfd_numero_processo or "",
+        "(NUMERO PROCESSO)": num_proc,
         "(RESPONSAVEL DEMANDA)": slots.dfd_responsavel_demanda or "",
         "(EMAIL DFD)": slots.dfd_email or "",
         "(GESTORA CONTRATOS)": slots.dfd_gestor_contratos or "",
@@ -202,7 +247,7 @@ def render_dfd_from_tr_slots(
 
     # Quando o número de processo não for informado, remove também o rótulo textual
     # para não deixar "Nº Processo:" vazio no DFD.
-    if not str(slots.dfd_numero_processo or "").strip():
+    if not num_proc:
         process_cleanup = {
             "Nº Processo: (DFD_NUMERO_PROCESSO)": "",
             "N° Processo: (DFD_NUMERO_PROCESSO)": "",
@@ -223,7 +268,7 @@ def render_dfd_from_tr_slots(
         mapping = {**process_cleanup, **mapping}
 
     _replace_placeholders(doc, mapping)
-    if not str(slots.dfd_numero_processo or "").strip():
+    if not num_proc:
         _remove_processo_visual_block_when_empty(doc)
 
     out_path = Path(output_path) if output_path else None

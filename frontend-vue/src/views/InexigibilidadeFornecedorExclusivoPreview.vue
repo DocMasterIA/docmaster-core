@@ -187,7 +187,12 @@
 
             <article class="fe-card">
               <div class="fe-actions">
-                <button type="button" class="fe-btn-primary fe-btn-generate" :disabled="isSubmitting" @click="onSubmit">
+                <button
+                  type="button"
+                  class="fe-btn-primary fe-btn-generate"
+                  :disabled="isSubmitting || !podeGerarDocumentos"
+                  @click="onSubmit"
+                >
                   Gerar Documento com IA
                 </button>
                 <DocGenIaLoaderBlock v-if="isSubmitting" message="Gerando documento com IA…" />
@@ -998,11 +1003,16 @@ function buildUserPrompt() {
   ].join('\n');
 }
 async function onSubmit() {
-  isSubmitting.value = true;
   generateError.value = '';
   successMessage.value = '';
   documentReady.value = false;
   revokeDocumentUrls();
+  const pendente = secoes.value.find((s) => !s.completo);
+  if (pendente) {
+    generateError.value = `Preencha todos os campos obrigatórios em «${pendente.titulo}» antes de gerar os documentos.`;
+    return;
+  }
+  isSubmitting.value = true;
   try {
     const payload = {
       user_prompt: buildUserPrompt(),
@@ -1131,6 +1141,7 @@ const secoes = computed(() => [
 ]);
 const completos = computed(() => secoes.value.filter((s) => s.completo).length);
 const progresso = computed(() => Math.round((completos.value / secoes.value.length) * 100));
+const podeGerarDocumentos = computed(() => secoes.value.every((s) => s.completo));
 </script>
 
 <style scoped>

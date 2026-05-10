@@ -401,13 +401,12 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
         return
 
     existing_cols_count = _table_column_count(target_table)
-    has_price_values = any(
-        str(getattr(item, "valor_unitario", "") or "").strip()
-        or str(getattr(item, "valor_total", "") or "").strip()
-        for item in itens
+    # Só colunas «Valor unit.» e «Valor total» quando houver valor unitário informado
+    # em algum item. Só «valor total» por linha (sem unitário) não ativa essas colunas.
+    has_valor_unitario_em_algum_item = any(
+        str(getattr(item, "valor_unitario", "") or "").strip() for item in itens
     )
-    # Modelo com 6 colunas já inclui preços; ou o utilizador enviou valores → layout completo.
-    use_price_layout = (existing_cols_count >= 6 and existing_cols_count > 0) or has_price_values
+    use_price_layout = has_valor_unitario_em_algum_item
     required_cols = 6 if use_price_layout else 4
 
     if existing_cols_count != required_cols:

@@ -864,12 +864,11 @@ watch(
   display: none;
 }
 
-/* Navegação lateral — referência visual: pílulas hierárquicas (nível 1 branco + traço; nível 2 azul escuro; nível 3 ativo azul médio). */
+/* Navegação lateral — hierarquia com cantos arredondados moderados (nível 1 branco; nível 2 azul escuro; nível 3 ativo azul médio). */
 .dm-sidebar {
   --dm-nav-bg: #e4ecf4;
   --dm-nav-l1-bg: #ffffff;
   --dm-nav-l1-text: #154e78;
-  --dm-nav-l1-bar: #154e78;
   --dm-nav-l1-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   --dm-nav-l2-bg: #154e78;
   --dm-nav-l2-text: #ffffff;
@@ -880,6 +879,7 @@ watch(
   --dm-nav-l3-text: #154e78;
   --dm-nav-tree: #c5d0e0;
   --dm-nav-chevron-muted: #94a3b8;
+  --dm-nav-item-radius: 12px;
   overflow: hidden;
   border-right: 1px solid #c6d3e1;
   background: var(--dm-nav-bg);
@@ -888,7 +888,6 @@ watch(
   --dm-nav-bg: #020617;
   --dm-nav-l1-bg: #0f172a;
   --dm-nav-l1-text: #e2e8f0;
-  --dm-nav-l1-bar: #60a5fa;
   --dm-nav-l1-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   --dm-nav-l2-bg: #1e3a5f;
   --dm-nav-l2-text: #f8fafc;
@@ -899,6 +898,7 @@ watch(
   --dm-nav-l3-text: #e2e8f0;
   --dm-nav-tree: #334155;
   --dm-nav-chevron-muted: #94a3b8;
+  --dm-nav-item-radius: 12px;
   border-right-color: #1e293b;
   background: var(--dm-nav-bg);
 }
@@ -1065,7 +1065,7 @@ watch(
   color: var(--dm-nav-l1-text);
   border: none;
   background: var(--dm-nav-l1-bg);
-  border-radius: 999px;
+  border-radius: var(--dm-nav-item-radius, 12px);
   padding: 11px 14px 11px 16px;
   font-size: 13px;
   font-weight: 700;
@@ -1073,14 +1073,14 @@ watch(
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  box-shadow: inset 5px 0 0 var(--dm-nav-l1-bar), var(--dm-nav-l1-shadow);
+  box-shadow: var(--dm-nav-l1-shadow);
   transition: background 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
 }
 .dm-dark .dm-nav-item,
 .dm-dark .dm-nav-item:visited {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
-  box-shadow: inset 5px 0 0 var(--dm-nav-l1-bar), var(--dm-nav-l1-shadow);
+  box-shadow: var(--dm-nav-l1-shadow);
 }
 
 .dm-nav-item--expandable {
@@ -1126,12 +1126,12 @@ watch(
 .dm-nav-item--active {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
-  box-shadow: inset 5px 0 0 var(--dm-nav-l1-bar), 0 2px 6px rgba(21, 78, 120, 0.12);
+  box-shadow: var(--dm-nav-l1-shadow), 0 2px 6px rgba(21, 78, 120, 0.12);
 }
 .dm-dark .dm-nav-item--active {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
-  box-shadow: inset 5px 0 0 var(--dm-nav-l1-bar), var(--dm-nav-l1-shadow);
+  box-shadow: var(--dm-nav-l1-shadow), 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .dm-nav-item--static {
@@ -1163,11 +1163,11 @@ watch(
   border-left-color: var(--dm-nav-tree);
 }
 
-/* Nível 1 (grupo: Dispensa rápida, etc.) — pílula branca, texto azul escuro, traço interior. */
+/* Nível 1 (grupo: Dispensa rápida, etc.) — fundo branco, texto azul escuro, sombra leve. */
 .dm-subnav-btn {
   width: 100%;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--dm-nav-item-radius, 12px);
   background: var(--dm-nav-l1-bg);
   color: var(--dm-nav-l1-text);
   padding: 10px 14px 10px 16px;
@@ -1178,13 +1178,13 @@ watch(
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
-  box-shadow: inset 4px 0 0 var(--dm-nav-l1-bar), var(--dm-nav-l1-shadow);
+  box-shadow: var(--dm-nav-l1-shadow);
   transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 .dm-dark .dm-subnav-btn {
   background: var(--dm-nav-l1-bg);
   color: var(--dm-nav-l1-text);
-  box-shadow: inset 4px 0 0 var(--dm-nav-l1-bar), var(--dm-nav-l1-shadow);
+  box-shadow: var(--dm-nav-l1-shadow);
 }
 
 .dm-subnav-btn span {
@@ -1203,12 +1203,12 @@ watch(
 .dm-subnav-btn--active {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
-  box-shadow: inset 5px 0 0 var(--dm-nav-l1-bar), 0 2px 6px rgba(21, 78, 120, 0.14);
+  box-shadow: var(--dm-nav-l1-shadow), 0 2px 6px rgba(21, 78, 120, 0.14);
 }
 .dm-dark .dm-subnav-btn--active {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
-  box-shadow: inset 5px 0 0 var(--dm-nav-l1-bar), var(--dm-nav-l1-shadow);
+  box-shadow: var(--dm-nav-l1-shadow), 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 /* Nível 2 (Art. 75, I / II) — pílula azul escuro, texto branco, chevron branco. */
@@ -1216,7 +1216,7 @@ watch(
   width: 100%;
   margin-top: 4px;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--dm-nav-item-radius, 12px);
   background: var(--dm-nav-l2-bg);
   color: var(--dm-nav-l2-text);
   padding: 9px 14px 9px 16px;
@@ -1329,7 +1329,7 @@ watch(
   text-decoration: none;
   color: var(--dm-nav-l3-text);
   border: none;
-  border-radius: 999px;
+  border-radius: var(--dm-nav-item-radius, 12px);
   background: var(--dm-nav-l3-bg);
   padding: 8px 14px 8px 16px;
   font-size: 12px;

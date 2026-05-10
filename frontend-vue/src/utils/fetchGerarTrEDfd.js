@@ -117,5 +117,11 @@ export async function fetchGerarTrEDfdWithRetry(apiBase, bodyObj, options = {}) 
 }
 
 export function describeGerarTrEDfdNetworkFailure(gerarUrl) {
-  return `Falha de rede ao gerar o documento (ligação interrompida, firewall ou tempo limite). Com muitos itens o pedido pode demorar mais. Tente de novo em instantes ou reduza linhas vazias.\n\n${gerarUrl}`;
+  return (
+    'Falha de rede ao gerar o documento (ligação interrompida, firewall ou tempo limite do navegador/proxy). ' +
+    'Com muitos itens o pedido demora mais: tente de novo em instantes, reduza linhas vazias nos itens ou peça ao ' +
+    'administrador para subir o tempo limite do proxy (nginx/Cloudflare) e, no backend, RAG_HTTP_TIMEOUT / ' +
+    'RAG_HTTP_TIMEOUT_TR_DFD_MAX.\n\n' +
+    `${gerarUrl}`
+  );
 }

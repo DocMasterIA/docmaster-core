@@ -20,6 +20,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Cm, Pt
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+from docx.text.paragraph import Paragraph
 
 TR_ITEMS_TABLE_ANCHOR = "(TR_TABELA_ITENS)"
 
@@ -160,6 +161,45 @@ def _style_items_table(table) -> None:
         border.set(qn("w:color"), "000000")
         tblBorders.append(border)
     tblPr.append(tblBorders)
+
+    # Margem superior padrão das células (tblCellMar) costuma deixar faixa em branco acima do 1º conteúdo.
+    tcm = tblPr.find(qn("w:tblCellMar"))
+    if tcm is None:
+        tcm = OxmlElement("w:tblCellMar")
+        tblPr.append(tcm)
+    top = tcm.find(qn("w:top"))
+    if top is None:
+        top = OxmlElement("w:top")
+        tcm.insert(0, top)
+    top.set(qn("w:w"), "0")
+    top.set(qn("w:type"), "dxa")
+
+
+def _tighten_vertical_space_above_items_table(doc: Document, table) -> None:
+    """
+    Reduz espaço extra acima da tabela de itens no corpo do documento:
+    remove até 3 parágrafos vazios consecutivos imediatamente acima e zera
+    space_after do primeiro parágrafo com texto que preceder a tabela.
+    """
+    tbl_el = table._tbl
+    parent = tbl_el.getparent()
+    if parent is None or parent.tag != qn("w:body"):
+        return
+    body_el = parent
+    for _ in range(3):
+        prev = tbl_el.getprevious()
+        if prev is None or prev.tag != qn("w:p"):
+            break
+        p_graph = Paragraph(prev, doc._body)
+        pf = p_graph.paragraph_format
+        pf.space_before = Pt(0)
+        pf.line_spacing = 1.0
+        if not (p_graph.text or "").strip():
+            pf.space_after = Pt(0)
+            body_el.remove(prev)
+            continue
+        pf.space_after = Pt(0)
+        break
 
 
 def _table_column_count(table) -> int:
@@ -549,6 +589,8 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
                 total_cells[5].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
                 for run in total_cells[5].paragraphs[0].runs:
                     run.bold = True
+
+    _tighten_vertical_space_above_items_table(doc, target_table)
 
 
 def _clear_headers(doc: Document) -> None:

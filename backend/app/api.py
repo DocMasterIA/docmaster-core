@@ -39,14 +39,39 @@ def _rag_http_timeout_seconds() -> float:
     return max(5.0, val)
 
 
-def _rag_post_json(url, body, *, params=None):
+def _rag_timeout_seconds_for_tr_dfd(body: dict) -> float:
+    """
+    Estende o timeout Django→rag_service em /gerar-tr-e-dfd quando há muitos itens
+    ou prompt longo (LLM + DOCX), reduzindo ReadTimeout com payloads grandes.
+    Teto configurável: RAG_HTTP_TIMEOUT_TR_DFD_MAX (segundos, default 600).
+    """
+    base = _rag_http_timeout_seconds()
+    slots = body.get("slots_override") if isinstance(body, dict) else None
+    if not isinstance(slots, dict):
+        slots = {}
+    itens = slots.get("itens")
+    n = len(itens) if isinstance(itens, list) else 0
+    prompt_len = len(str((body or {}).get("user_prompt") or ""))
+    extra_items = min(360.0, max(0, n - 3) * 22.0)
+    extra_prompt = min(240.0, max(0, prompt_len - 6000) / 25.0)
+    raw_max = (os.environ.get("RAG_HTTP_TIMEOUT_TR_DFD_MAX") or "600").strip()
+    try:
+        cap = float(raw_max)
+    except Exception:
+        cap = 600.0
+    cap = max(120.0, cap)
+    return min(cap, base + extra_items + extra_prompt)
+
+
+def _rag_post_json(url, body, *, params=None, timeout=None):
     """POST JSON único ao rag_service (sem retry — retry duplicava tempo de LLM/TR)."""
     params = params if params is not None else {}
+    t = float(timeout) if timeout is not None else _rag_http_timeout_seconds()
     return requests.post(
         url,
         json=body,
         params=params,
-        timeout=_rag_http_timeout_seconds(),
+        timeout=max(5.0, t),
     )
 
 
@@ -708,11 +733,21 @@ def gerar_tr_e_dfd_api(request):
     }
 
     try:
-        resp = _rag_post_json(url, body)
+        resp = _rag_post_json(url, body, timeout=_rag_timeout_seconds_for_tr_dfd(body))
     except requests.exceptions.ConnectionError:
         return JsonResponse({"ok": False, "error": "Serviço de geração de TR/DFD indisponível. Verifique se o rag_service está em execução."}, status=503)
     except requests.exceptions.Timeout:
-        return JsonResponse({"ok": False, "error": "Tempo limite na geração de TR/DFD. O rag_service demorou para responder."}, status=504)
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": (
+                    "Tempo limite na geração de TR/DFD (o serviço demorou além do permitido). "
+                    "Com muitos itens tente de novo, reduza itens em branco ou peça ao administrador "
+                    "para aumentar RAG_HTTP_TIMEOUT / RAG_HTTP_TIMEOUT_TR_DFD_MAX ou o limite do proxy (ex.: nginx)."
+                ),
+            },
+            status=504,
+        )
     except Exception as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=502)
 

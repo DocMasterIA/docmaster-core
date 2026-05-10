@@ -59,44 +59,24 @@
   line-height: 1.42;
 }
 
-/* Cabeçalho repetido (running): barra institucional, QR à esquerda, logo branca centrada (flex — WeasyPrint). */
+/* Cabeçalho repetido (running): só logo (PNG) centrada — mínimo para WeasyPrint. */
 .rpp-head-main {
   width: 100%;
   box-sizing: border-box;
 }
 
-.rpp-head-main--inst-bar {
-  padding: 2mm 3mm;
+.rpp-head-main--logo-only {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5mm 4mm;
   background: #254e78;
   border: none;
   border-radius: 8px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
 }
 
-.rpp-head-main__row {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  gap: 2mm;
-}
-
-.rpp-head-main__l {
-  flex: 0 0 16mm;
-}
-
-.rpp-head-main__c {
-  flex: 1 1 auto;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-width: 0;
-}
-
-.rpp-head-main__r {
-  flex: 0 0 16mm;
-}
-
-.rpp-head-main--inst-bar .rpp-head-main__logo {
+.rpp-head-main--logo-only .rpp-head-main__logo {
   height: 8mm;
   max-width: 44mm;
   object-fit: contain;
@@ -168,11 +148,6 @@
   padding: 1mm;
   background: #fff;
   border: 1px solid #e2e8f0;
-}
-
-.rpp-head-main--inst-bar .rpp-head-main__qr {
-  width: 14mm;
-  height: 14mm;
 }
 
 /* QR de verificação no corpo (HTML legado / preview) */

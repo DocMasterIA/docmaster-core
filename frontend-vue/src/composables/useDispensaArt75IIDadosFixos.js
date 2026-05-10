@@ -23,7 +23,6 @@ function catalogItemToString(x) {
 /** Mesmas chaves do catálogo usadas em dispensa normal + campos do TR (Art. 75 II). */
 export const DA75_FIXOS_CATALOG_KEYS = [
   'cabecalho_documento',
-  'processo_numero',
   'orgao',
   'solicitacao_destinatario_nome',
   'solicitacao_destinatario_cargo',
@@ -85,8 +84,9 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
   function collectPresetPayload() {
     return {
       cabecalho_documento: cabecalho.value,
-      processo_ativo: !!processoAtivo.value,
-      processo_numero: processo.value,
+      // Processo (opcional) não entra no preset/perfil — só limpa merge antigo no servidor.
+      processo_ativo: false,
+      processo_numero: '',
       orgao: orgao.value,
       solicitacao_tratamento_nome: fixoTratNome.value,
       solicitacao_tratamento_cargo: fixoTratCargo.value,
@@ -111,8 +111,6 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
   function applyPresetPayload(data) {
     if (!data || typeof data !== 'object') return;
     if ('cabecalho_documento' in data) cabecalho.value = String(data.cabecalho_documento || '');
-    if ('processo_ativo' in data) processoAtivo.value = !!data.processo_ativo;
-    if ('processo_numero' in data) processo.value = String(data.processo_numero || '');
     if ('orgao' in data) orgao.value = String(data.orgao || '');
     if ('solicitacao_tratamento_nome' in data) fixoTratNome.value = String(data.solicitacao_tratamento_nome || '');
     if ('solicitacao_tratamento_cargo' in data) fixoTratCargo.value = String(data.solicitacao_tratamento_cargo || '');
@@ -142,7 +140,6 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
   function buildCatalogEntries() {
     const pairs = [
       ['cabecalho_documento', cabecalho.value],
-      ['processo_numero', processo.value],
       ['orgao', orgao.value],
       ['solicitacao_destinatario_nome', fixoNome.value],
       ['solicitacao_destinatario_cargo', fixoCargo.value],

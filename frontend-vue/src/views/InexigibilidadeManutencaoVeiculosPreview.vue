@@ -122,7 +122,15 @@
             <article class="ixp-card">
               <h3>Fornecedor exclusivo</h3>
               <div class="ixp-body ixp-grid-2">
-                <div class="ixp-field"><label>Razao social / Nome do fornecedor</label><input v-model="fornecedor" list="dl-fornecedor" placeholder="Digite a razao social" /></div>
+                <div class="ixp-field">
+                  <label>Razao social / Nome do fornecedor</label>
+                  <input
+                    :value="fornecedor"
+                    list="dl-fornecedor"
+                    placeholder="Digite a razao social"
+                    @input="fornecedor = primeiraMaiuscula(String(($event.target).value || ''))"
+                  />
+                </div>
                 <div class="ixp-field"><label>CNPJ</label><input :value="cnpj" type="text" inputmode="numeric" maxlength="18" autocomplete="off" placeholder="00.000.000/0001-00" @keydown="onCnpjInputKeydown" @input="cnpj = formatCnpjBr(String(($event.target).value || ''))" /></div>
               </div>
             </article>
@@ -169,15 +177,36 @@
             <article class="ixp-card">
               <h3>Fiscalizacao</h3>
               <div class="ixp-body">
-                <div class="ixp-field"><label>Nome do fiscal de contratos</label><input v-model="fiscal" list="dl-fiscal" /></div>
+                <div class="ixp-field">
+                  <label>Nome do fiscal de contratos</label>
+                  <input
+                    :value="fiscal"
+                    list="dl-fiscal"
+                    @input="fiscal = primeiraMaiuscula(String(($event.target).value || ''))"
+                  />
+                </div>
               </div>
             </article>
 
             <article class="ixp-card">
               <h3>Responsavel pelo Termo de Referencia</h3>
               <div class="ixp-body ixp-grid-2">
-                <div class="ixp-field"><label>Nome do responsavel</label><input v-model="responsavel" list="dl-tr-nome-assinante" /></div>
-                <div class="ixp-field"><label>Cargo/Funcao</label><input v-model="responsavelCargo" list="dl-tr-cargo-assinante" /></div>
+                <div class="ixp-field">
+                  <label>Nome do responsavel</label>
+                  <input
+                    :value="responsavel"
+                    list="dl-tr-nome-assinante"
+                    @input="responsavel = primeiraMaiuscula(String(($event.target).value || ''))"
+                  />
+                </div>
+                <div class="ixp-field">
+                  <label>Cargo/Funcao</label>
+                  <input
+                    :value="responsavelCargo"
+                    list="dl-tr-cargo-assinante"
+                    @input="responsavelCargo = primeiraMaiuscula(String(($event.target).value || ''))"
+                  />
+                </div>
               </div>
             </article>
 
@@ -403,7 +432,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
 import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
@@ -465,6 +494,11 @@ const SLOT_PACKAGE_BY_ROUTE = {
   InexigibilidadeArt74IFornecedorExclusivoPreview: 'inexigibilidade_74_i_fornecedor_exclusivo',
   InexigibilidadeArt74IManutencaoVeiculosPreview: 'inexigibilidade_74_i_manutencao_veiculos',
 };
+/** Rotas que compartilham este SFC; ao alternar entre elas o router reutiliza a instância — é preciso zerar o formulário. */
+const INEX_ART74_I_SHARED_ROUTE_NAMES = new Set([
+  'InexigibilidadeArt74IManutencaoVeiculosPreview',
+  'InexigibilidadeArt74IFornecedorExclusivoPreview',
+]);
 const SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE = {
   DispensaArt75I: 'Art. 75, Inciso I, da Lei no 14.133/2021',
   DispensaArt75IManutencaoVeiculos: 'Art. 75, Inciso I, da Lei no 14.133/2021',
@@ -601,7 +635,6 @@ const orgaoOptionsFromProfiles = computed(() => {
 const mergedOrgaoOptions = computed(() => orgaoOptionsFromProfiles.value);
 const CATALOG_KEYS = [
   'cabecalho_documento',
-  'processo_numero',
   'orgao',
   'fornecedor',
   'fiscal',
@@ -626,8 +659,8 @@ const CATALOG_KEYS = [
 function collectGlobalFormStatePayload() {
   return {
     cabecalho_documento: cabecalhoDocumento.value,
-    processo_ativo: !!processoAtivo.value,
-    processo_numero: processo.value,
+    processo_ativo: false,
+    processo_numero: '',
     orgao: orgao.value,
     solicitacao_destinatario_nome: fixoNome.value,
     solicitacao_destinatario_cargo: fixoCargo.value,
@@ -655,8 +688,6 @@ function collectGlobalFormStatePayload() {
 function applyGlobalFormStatePayload(data) {
   if (!data || typeof data !== 'object') return;
   if ('cabecalho_documento' in data) cabecalhoDocumento.value = String(data.cabecalho_documento || '');
-  if ('processo_ativo' in data) processoAtivo.value = !!data.processo_ativo;
-  if ('processo_numero' in data) processo.value = String(data.processo_numero || '');
   if ('orgao' in data) {
     const t = String(data.orgao || '').trim();
     orgao.value = t ? primeiraMaiuscula(t) : '';
@@ -703,7 +734,6 @@ async function saveUserGlobalPreset() {
 function buildCatalogEntries() {
   const pairs = [
     ['cabecalho_documento', cabecalhoDocumento.value],
-    ['processo_numero', processo.value],
     ['orgao', orgao.value],
     ['fornecedor', fornecedor.value],
     ['fiscal', fiscal.value],
@@ -1012,22 +1042,22 @@ function buildInexig74ManutencaoDfdObjetoReferencia() {
   const paragrafos = [];
   if (ident) {
     paragrafos.push(
-      `A necessidade insere-se na manutencao do veiculo identificado (${ident}), indispensavel a disponibilidade e a seguranca da frota utilizada na prestacao de servicos publicos.`,
+      `A necessidade insere-se na manutenção do veículo identificado (${ident}), indispensável à disponibilidade e à segurança da frota utilizada na prestação de serviços públicos.`,
     );
   }
   if (tipo === 'Corretiva') {
     paragrafos.push(
-      'Trata-se de intervencao corretiva, orientada ao reparo de falha, defeito ou situacao que exija retorno imediato a condicao de uso, evitando prolongada indisponibilidade do veiculo.',
+      'Trata-se de intervenção corretiva, orientada ao reparo de falha, defeito ou situação que exija retorno imediato à condição de uso, evitando prolongada indisponibilidade do veículo.',
     );
   } else if (tipo === 'Preventiva') {
-    let t = 'Trata-se de manutencao preventiva, alinhada a revisao programada por quilometragem ou plano de conservacao, visando reduzir custos corretivos futuros e preservar o estado mecanico do veiculo.';
-    if (rk) t += ` A referencia informada para a revisao e: ${rk}.`;
+    let t = 'Trata-se de manutenção preventiva, alinhada à revisão programada por quilometragem ou plano de conservação, visando reduzir custos corretivos futuros e preservar o estado mecânico do veículo.';
+    if (rk) t += ` A referência informada para a revisão é: ${rk}.`;
     paragrafos.push(t);
   } else if (tipo) {
-    paragrafos.push(`O tipo de manutencao previsto e ${tipo}.`);
+    paragrafos.push(`O tipo de manutenção previsto é ${tipo}.`);
   }
   if (orgVeic) {
-    paragrafos.push(`A unidade de lotacao ou uso do veiculo e ${orgVeic}.`);
+    paragrafos.push(`A unidade de lotação ou uso do veículo é ${orgVeic}.`);
   }
   return paragrafos.join('\n\n');
 }
@@ -1042,28 +1072,28 @@ function buildInexig74ManutencaoDfdJustificativa() {
   const rk = String(revisaoKm.value || '').trim();
   const forn = String(fornecedor.value || '').trim();
   const cnpjStr = String(cnpj.value || '').trim();
-  const identVeiculo = [m, mod, pl].filter(Boolean).join(' / ') || 'veiculo indicado nos dados da demanda';
-  let natureza = 'servico de manutencao do veiculo';
+  const identVeiculo = [m, mod, pl].filter(Boolean).join(' / ') || 'veículo indicado nos dados da demanda';
+  let natureza = 'serviço de manutenção do veículo';
   if (tipo === 'Corretiva') {
-    natureza = 'manutencao corretiva (reparo por falha, defeito ou necessidade imediata)';
+    natureza = 'manutenção corretiva (reparo por falha, defeito ou necessidade imediata)';
   } else if (tipo === 'Preventiva') {
-    natureza = 'manutencao preventiva (revisao programada conforme quilometragem ou plano de conservacao)';
+    natureza = 'manutenção preventiva (revisão programada conforme quilometragem ou plano de conservação)';
   } else if (tipo) {
-    natureza = `manutencao ${tipo.toLowerCase()}`;
+    natureza = `manutenção ${tipo.toLowerCase()}`;
   }
   const partes = [
-    'A presente demanda insere-se no ambito da contratacao direta por inexigibilidade de licitacao, nos termos do art. 74, inciso I, da Lei nº 14.133/2021, ante a necessidade de aquisicao de pecas, componentes ou servicos tecnicos de natureza singular, com fornecedor exclusivo.',
-    `O objeto da referencia e o ${natureza} do veiculo (${identVeiculo}), com vistas a preservar a disponibilidade, a seguranca e a economicidade da frota vinculada ao servico publico.`,
+    'A presente demanda insere-se no âmbito da contratação direta por inexigibilidade de licitação, nos termos do art. 74, inciso I, da Lei nº 14.133/2021, ante a necessidade de aquisição de peças, componentes ou serviços técnicos de natureza singular, com fornecedor exclusivo.',
+    `O objeto da referência é o ${natureza} do veículo (${identVeiculo}), com vistas a preservar a disponibilidade, a segurança e a economicidade da frota vinculada ao serviço público.`,
   ];
   if (orgVeic) {
     partes.push(`${LABEL_ORGAO_UNIDADE_VEICULO}: ${orgVeic}.`);
   }
   if (tipo === 'Preventiva' && rk) {
-    partes.push(`Para a manutencao preventiva, foi indicada a referencia de quilometragem ou revisao: ${rk}.`);
+    partes.push(`Para a manutenção preventiva, foi indicada a referência de quilometragem ou revisão: ${rk}.`);
   }
   if (forn) {
     partes.push(
-      `O fornecedor exclusivo indicado e ${forn}${cnpjStr ? ` (CNPJ ${cnpjStr})` : ''}, nos limites do artigo e da fundamentacao do termo de referencia.`,
+      `O fornecedor exclusivo indicado é ${forn}${cnpjStr ? ` (CNPJ ${cnpjStr})` : ''}, nos limites do artigo e da fundamentação do termo de referência.`,
     );
   }
   return partes.join('\n\n');
@@ -1101,23 +1131,23 @@ function buildInexigFornecedorExclusivoDfdObjetoReferencia() {
     const nucleo = necessidadeConsisteComObjetoIx(ob);
     paragrafos.push(
       `A necessidade a ser atendida consiste ${nucleo} `
-      + `no ambito do equipamento identificado (${fichaEquip}), de forma a preservar a continuidade operacional, a rastreabilidade tecnica e condicoes seguras de uso do bem, `
-      + 'evitando paralisacoes ou degradacao do servico publico que depende dessa infraestrutura.',
+      + `no âmbito do equipamento identificado (${fichaEquip}), de forma a preservar a continuidade operacional, a rastreabilidade técnica e condições seguras de uso do bem, `
+      + 'evitando paralisações ou degradação do serviço público que depende dessa infraestrutura.',
     );
   } else if (obFrase) {
     paragrafos.push(
-      `A necessidade administrativa consiste em formalizar a contratacao referente a ${obFrase.charAt(0).toLowerCase() + obFrase.slice(1)}, `
-      + 'alinhada a hipotese de inexigibilidade por fornecedor exclusivo e a continuidade adequada das atividades do orgao.',
+      `A necessidade administrativa consiste em formalizar a contratação referente a ${obFrase.charAt(0).toLowerCase() + obFrase.slice(1)}, `
+      + 'alinhada à hipótese de inexigibilidade por fornecedor exclusivo e à continuidade adequada das atividades do órgão.',
     );
   } else if (temEquip) {
     paragrafos.push(
-      `A necessidade reporta-se ao equipamento (${fichaEquip}), cuja manutencao da condicao de uso e do desempenho tecnico e imprescindivel a rotina administrativa ou assistencial, `
-      + 'devendo a contratacao observar a singularidade do fornecimento e os requisitos legais aplicaveis.',
+      `A necessidade reporta-se ao equipamento (${fichaEquip}), cuja manutenção da condição de uso e do desempenho técnico é imprescindível à rotina administrativa ou assistencial, `
+      + 'devendo a contratação observar a singularidade do fornecimento e os requisitos legais aplicáveis.',
     );
   }
   if (org && paragrafos.length) {
     paragrafos.push(
-      `A demanda e apresentada em nome do orgao ou unidade ${org}, responsavel pela guarda, operacao ou manutencao do equipamento.`,
+      `A demanda é apresentada em nome do órgão ou unidade ${org}, responsável pela guarda, operação ou manutenção do equipamento.`,
     );
   }
   return paragrafos.join('\n\n');
@@ -1134,29 +1164,29 @@ function buildInexigFornecedorExclusivoJustificativaTrDfd() {
   const obTxt = ob ? ob.charAt(0).toLowerCase() + ob.slice(1) : '';
 
   const partes = [
-    'A contratacao direta enquadra-se na hipotese de inexigibilidade de licitacao prevista no art. 74, inciso I, da Lei n. 14.133/2021, em razao da exclusividade do fornecimento ou da prestacao tecnica especializada e da imprescindibilidade de compatibilidade com solucao ja existente no ambito do orgao.',
+    'A contratação direta enquadra-se na hipótese de inexigibilidade de licitação prevista no art. 74, inciso I, da Lei nº 14.133/2021, em razão da exclusividade do fornecimento ou da prestação técnica especializada e da imprescindibilidade de compatibilidade com solução já existente no âmbito do órgão.',
   ];
   if (obTxt && eqRef) {
     partes.push(
-      `Do ponto de vista fatico, a medida decorre da necessidade de ${obTxt} em relacao ao equipamento ${eqRef}${org ? `, sob a responsabilidade da unidade ${org}` : ''}, `
-      + 'de modo a restabelecer ou manter o padrao tecnico exigido para o uso regular do bem.',
+      `Do ponto de vista fático, a medida decorre da necessidade de ${obTxt} em relação ao equipamento ${eqRef}${org ? `, sob a responsabilidade da unidade ${org}` : ''}, `
+      + 'de modo a restabelecer ou manter o padrão técnico exigido para o uso regular do bem.',
     );
   } else if (obTxt) {
     partes.push(
-      `A medida atende a necessidade de ${obTxt}${org ? `, conforme demanda apresentada pelo orgao ou unidade ${org}` : ''}, nos limites da legislacao aplicavel.`,
+      `A medida atende à necessidade de ${obTxt}${org ? `, conforme demanda apresentada pelo órgão ou unidade ${org}` : ''}, nos limites da legislação aplicável.`,
     );
   } else if (eqRef) {
     partes.push(
-      `A medida atende a necessidade vinculada ao equipamento ${eqRef}${org ? `, sob a responsabilidade da unidade ${org}` : ''}, preservando a continuidade operacional e a seguranca de uso.`,
+      `A medida atende à necessidade vinculada ao equipamento ${eqRef}${org ? `, sob a responsabilidade da unidade ${org}` : ''}, preservando a continuidade operacional e a segurança de uso.`,
     );
   }
   if (forn) {
     partes.push(
-      `Para fins de instrucao do processo, o fornecedor exclusivo indicado e ${forn}${cnpjStr ? `, inscrito no CNPJ ${cnpjStr}` : ''}, observados os requisitos de idoneidade e a compatibilidade tecnica exigidos para a especie.`,
+      `Para fins de instrução do processo, o fornecedor exclusivo indicado é ${forn}${cnpjStr ? `, inscrito no CNPJ ${cnpjStr}` : ''}, observados os requisitos de idoneidade e a compatibilidade técnica exigidos para a espécie.`,
     );
   }
   partes.push(
-    'Por conseguinte, a justificativa demonstra a singularidade do fornecimento e a adequacao da contratacao direta a continuidade do servico publico, com observancia dos demais requisitos legais.',
+    'Por conseguinte, a justificativa demonstra a singularidade do fornecimento e a adequação da contratação direta à continuidade do serviço público, com observância dos demais requisitos legais.',
   );
   return partes.join('\n\n');
 }
@@ -1168,13 +1198,13 @@ function buildInexigFornecedorExclusivoObjetoTrResumo() {
   const mod = String(modelo.value || '').trim();
   const nomeEq = [eq, m, mod].filter(Boolean).join(', ');
   if (ob && nomeEq) {
-    return `Contratacao de ${ob.charAt(0).toLowerCase() + ob.slice(1)} vinculada ao equipamento ${nomeEq}, na hipotese de fornecedor exclusivo (art. 74, inciso I, da Lei n. 14.133/2021).`;
+    return `Contratação de ${ob.charAt(0).toLowerCase() + ob.slice(1)} vinculada ao equipamento ${nomeEq}, na hipótese de fornecedor exclusivo (art. 74, inciso I, da Lei nº 14.133/2021).`;
   }
   if (ob) {
-    return `Contratacao de ${ob.charAt(0).toLowerCase() + ob.slice(1)}, na hipotese de fornecedor exclusivo (art. 74, inciso I, da Lei n. 14.133/2021).`;
+    return `Contratação de ${ob.charAt(0).toLowerCase() + ob.slice(1)}, na hipótese de fornecedor exclusivo (art. 74, inciso I, da Lei nº 14.133/2021).`;
   }
   if (nomeEq) {
-    return `Contratacao vinculada ao equipamento ${nomeEq}, na hipotese de fornecedor exclusivo (art. 74, inciso I, da Lei n. 14.133/2021).`;
+    return `Contratação vinculada ao equipamento ${nomeEq}, na hipótese de fornecedor exclusivo (art. 74, inciso I, da Lei nº 14.133/2021).`;
   }
   return '';
 }
@@ -1246,10 +1276,10 @@ function buildSlotsOverride() {
     : [];
   const objetoFallback = [...manutencaoFallbackParts, ...veiculoFallbackParts].filter(Boolean).join(' | ');
   const justificativaFallback = fornecedor.value.trim()
-    ? `Fornecedor exclusivo: ${fornecedor.value.trim()} (CNPJ: ${cnpj.value.trim() || 'nao informado'})`
+    ? `Fornecedor exclusivo: ${fornecedor.value.trim()} (CNPJ: ${cnpj.value.trim() || 'não informado'})`
     : '';
   const entregasFallback = valorGlobal.value.trim() ? `Valor total estimado: ${valorGlobal.value.trim()}` : '';
-  const resultadosFallback = dotacaoAtiva.value && dotacao.value.trim() ? `Dotacao orcamentaria: ${dotacao.value.trim()}` : '';
+  const resultadosFallback = dotacaoAtiva.value && dotacao.value.trim() ? `Dotação orçamentária: ${dotacao.value.trim()}` : '';
   const dotacaoTexto = dotacaoAtiva.value && dotacao.value.trim() ? dotacao.value.trim() : '';
   /*
    * TR + DFD + Solicitacao/Oficio (rag_service): estes campos entram em slots_override e, apos
@@ -1318,6 +1348,18 @@ function buildSlotsOverride() {
 
   const fundamentoLegal = resolveSolOficioFundamentoLegal(logicalRouteName.value);
   if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;
+
+  const itensPayload = itens.value
+    .filter((i) => Object.values(i).some((v) => String(v || '').trim()))
+    .map((i) => ({
+      descricao: String(i.descricao || '').trim(),
+      unidade: String(i.unidade || '').trim(),
+      quantidade: String(i.quantidade || '').trim(),
+      valor_unitario: String(i.valorUnitario || '').trim(),
+      valor_total: String(i.valorTotal || '').trim(),
+    }));
+  if (itensPayload.length) o.itens = itensPayload;
+
   return Object.keys(o).length ? o : null;
 }
 function parseClauseSections(text) {
@@ -1532,7 +1574,68 @@ async function onApplyFixedData() {
   }
   drawerOpen.value = false;
 }
-onMounted(async () => {
+
+/** Zera o estado da tela e reaplica preset global / catálogo (mesmo fluxo do primeiro acesso). */
+async function resetFormStateForNewRoute() {
+  revokeDocumentUrls();
+  drawerOpen.value = false;
+  cabecalhoDocumento.value = '';
+  processoAtivo.value = false;
+  processo.value = '';
+  orgao.value = '';
+  orgaoResponsavelEquipamento.value = '';
+  orgaoUnidadeVeiculo.value = '';
+  objetoEspecifico.value = '';
+  outroObjetoEspecifico.value = '';
+  equipamento.value = '';
+  marca.value = '';
+  modelo.value = '';
+  placa.value = '';
+  tipoManutencao.value = '';
+  revisaoKm.value = '';
+  fornecedor.value = '';
+  cnpj.value = '';
+  dotacaoAtiva.value = false;
+  dotacao.value = '';
+  itens.value = [{ ...emptyItem }];
+  valorGlobal.value = '';
+  fiscal.value = '';
+  responsavel.value = '';
+  responsavelCargo.value = '';
+  modoData.value = '';
+  dataManual.value = '';
+  fixoTratNome.value = '';
+  fixoNome.value = '';
+  fixoTratCargo.value = '';
+  fixoCargo.value = '';
+  fixoResponsavel.value = '';
+  fixoResponsavelCargo.value = '';
+  fixoSetor.value = '';
+  fixoDemanda.value = '';
+  fixoEmail.value = '';
+  fixoGestor.value = '';
+  fixoFiscal.value = '';
+  fixoAssinatura.value = '';
+  fixoAssinaturaCargo.value = '';
+  isSubmitting.value = false;
+  generateError.value = '';
+  successMessage.value = '';
+  documentReady.value = false;
+  documentTrFilename.value = 'termo_referencia.docx';
+  documentDfdFilename.value = 'dfd.docx';
+  documentOficioFilename.value = 'oficio.docx';
+  documentZipFilename.value = 'tr_dfd_oficio.zip';
+  isGeneratingClauses.value = false;
+  clausulaContratado.value = '';
+  clausulaSetor.value = '';
+  clausulaCaracteristicas.value = '';
+  clausulaObjeto.value = '';
+  clausulaJustificativa.value = '';
+  selectedOrgaoProfileId.value = '';
+  orgaoProfileName.value = '';
+  Object.keys(slotFieldOptions).forEach((k) => {
+    delete slotFieldOptions[k];
+  });
   loadOrgaoProfiles();
   await loadUserGlobalPreset();
   await loadCabecalhoOptions();
@@ -1544,7 +1647,23 @@ onMounted(async () => {
       if (!allowed.has(current)) orgao.value = '';
     }
   }
+}
+
+onMounted(async () => {
+  await resetFormStateForNewRoute();
 });
+
+watch(
+  () => route.name,
+  async (name, prev) => {
+    if (prev === undefined) return;
+    const n = String(name || '');
+    const p = String(prev || '');
+    if (n === p) return;
+    if (!INEX_ART74_I_SHARED_ROUTE_NAMES.has(n) || !INEX_ART74_I_SHARED_ROUTE_NAMES.has(p)) return;
+    await resetFormStateForNewRoute();
+  },
+);
 onBeforeUnmount(() => {
   revokeDocumentUrls();
 });

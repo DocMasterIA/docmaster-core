@@ -1035,7 +1035,11 @@ async function loadSlotCatalogSuggestions() {
   if (!showSlotsCard.value) return;
   const fieldIds = selectedFlow.value.sections
     .flatMap((section) => section.fields)
-    .filter((field) => field.input === 'text' || field.input === 'email' || field.input === 'datalist')
+    .filter(
+      (field) =>
+        field.id !== 'numero_processo'
+        && (field.input === 'text' || field.input === 'email' || field.input === 'datalist'),
+    )
     .map((field) => field.id);
   if (!fieldIds.length) return;
 
@@ -1060,6 +1064,7 @@ function collectSlotFormStatePayload() {
   for (const section of selectedFlow.value.sections) {
     for (const field of section.fields) {
       if (field.input === 'heading') continue;
+      if (field.id === 'numero_processo') continue;
       const raw = slotForm[field.id];
       if (field.input === 'checkbox') {
         data[field.id] = !!raw;
@@ -1074,6 +1079,8 @@ function collectSlotFormStatePayload() {
 /** Preset global: slots do assistente + template da biblioteca (merge no backend). */
 function buildGlobalPresetPayload() {
   const data = showSlotsCard.value ? collectSlotFormStatePayload() : {};
+  // Campo opcional só na sessão — remove do preset global (merge no backend).
+  data.numero_processo = '';
   if (selectedTemplate.value?.id) {
     data[LIBRARY_TEMPLATE_ID_KEY] = String(selectedTemplate.value.id);
     data[LIBRARY_TEMPLATE_NAME_KEY] = String(selectedTemplate.value.name || '');
@@ -1128,6 +1135,7 @@ async function loadSlotFormState() {
     for (const section of selectedFlow.value.sections) {
       for (const field of section.fields) {
         if (field.input === 'heading') continue;
+        if (field.id === 'numero_processo') continue;
         if (!(field.id in data)) continue;
         const value = data[field.id];
         if (field.input === 'checkbox') {
@@ -1155,6 +1163,7 @@ function buildSlotEntriesFromForm() {
   for (const section of selectedFlow.value.sections) {
     for (const field of section.fields) {
       if (field.input === 'heading' || field.input === 'checkbox') continue;
+      if (field.id === 'numero_processo') continue;
       const value = String(slotForm[field.id] || '').trim();
       if (!value) continue;
       entries.push({ field_key: field.id, value });

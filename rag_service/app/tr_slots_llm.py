@@ -1252,6 +1252,8 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
         cnpj_fornecedor=str(data.get("cnpj_fornecedor", "")).strip(),
         ao_senhor_genero=str(data.get("ao_senhor_genero", "")).strip(),
         senhor_senhora_genero=str(data.get("senhor_senhora_genero", "")).strip(),
+        objeto_especifico=str(data.get("objeto_especifico", "")).strip(),
+        equipamento=str(data.get("equipamento", "")).strip(),
     )
 
 
@@ -1529,6 +1531,16 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         if override.get("dfd_justificativa") is not None
         else llm_slots.dfd_justificativa
     )
+    objeto_especifico = (
+        (override.get("objeto_especifico") or llm_slots.objeto_especifico)
+        if override.get("objeto_especifico") is not None
+        else llm_slots.objeto_especifico
+    )
+    equipamento = (
+        (override.get("equipamento") or llm_slots.equipamento)
+        if override.get("equipamento") is not None
+        else llm_slots.equipamento
+    )
 
     itens_override = override.get("itens")
     if isinstance(itens_override, list) and len(itens_override) > 0:
@@ -1600,6 +1612,8 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
                 cnpj_fornecedor=cnpj_fornecedor,
                 ao_senhor_genero=ao_senhor_genero,
                 senhor_senhora_genero=senhor_senhora_genero,
+                objeto_especifico=objeto_especifico,
+                equipamento=equipamento,
             )
     itens = llm_slots.itens
 
@@ -1658,6 +1672,8 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         cnpj_fornecedor=cnpj_fornecedor,
         ao_senhor_genero=ao_senhor_genero,
         senhor_senhora_genero=senhor_senhora_genero,
+        objeto_especifico=objeto_especifico,
+        equipamento=equipamento,
     )
 
 

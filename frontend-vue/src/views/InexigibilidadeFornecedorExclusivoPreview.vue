@@ -73,7 +73,11 @@
               <div class="fe-body fe-grid-2">
                 <div class="fe-field">
                   <label>Razão social / Nome do fornecedor</label>
-                  <input v-model="fornecedor" placeholder="Digite a razão social" @input="fornecedor = iniciarComMaiuscula(fornecedor)" />
+                  <input
+                    :value="fornecedor"
+                    placeholder="Digite a razão social"
+                    @input="fornecedor = iniciarComMaiuscula(String(($event.target).value || ''))"
+                  />
                 </div>
                 <div class="fe-field">
                   <label>CNPJ</label>
@@ -126,14 +130,37 @@
 
             <article class="fe-card">
               <h3>Fiscalização</h3>
-              <div class="fe-body"><div class="fe-field"><label>Nome do fiscal de contratos</label><input v-model="fiscal" placeholder="Digite o nome do fiscal de contratos" /></div></div>
+              <div class="fe-body">
+                <div class="fe-field">
+                  <label>Nome do fiscal de contratos</label>
+                  <input
+                    :value="fiscal"
+                    placeholder="Digite o nome do fiscal de contratos"
+                    @input="fiscal = iniciarComMaiuscula(String(($event.target).value || ''))"
+                  />
+                </div>
+              </div>
             </article>
 
             <article class="fe-card">
               <h3>Responsável pelo Termo de Referência</h3>
               <div class="fe-body fe-grid-2">
-                <div class="fe-field"><label>Nome do responsável</label><input v-model="responsavel" placeholder="Digite o nome" /></div>
-                <div class="fe-field"><label>Cargo/Função</label><input v-model="responsavelCargo" placeholder="Digite o cargo" /></div>
+                <div class="fe-field">
+                  <label>Nome do responsável</label>
+                  <input
+                    :value="responsavel"
+                    placeholder="Digite o nome"
+                    @input="responsavel = iniciarComMaiuscula(String(($event.target).value || ''))"
+                  />
+                </div>
+                <div class="fe-field">
+                  <label>Cargo/Função</label>
+                  <input
+                    :value="responsavelCargo"
+                    placeholder="Digite o cargo"
+                    @input="responsavelCargo = iniciarComMaiuscula(String(($event.target).value || ''))"
+                  />
+                </div>
               </div>
             </article>
 
@@ -413,7 +440,6 @@ const mergedOrgaoOptions = computed(() => orgaoOptionsFromProfiles.value);
 const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
 const SLOT_PACKAGE_KEY = 'inexigibilidade_74_i_fornecedor_exclusivo';
 const CATALOG_KEYS = [
-  'processo_numero',
   'orgao',
   'solicitacao_destinatario_nome',
   'solicitacao_destinatario_cargo',
@@ -478,8 +504,8 @@ function removerItem(index) {
 }
 function collectGlobalFormStatePayload() {
   return {
-    processo_ativo: !!processoAtivo.value,
-    processo_numero: processo.value,
+    processo_ativo: false,
+    processo_numero: '',
     orgao: orgao.value,
     solicitacao_destinatario_nome: nome.value,
     solicitacao_destinatario_cargo: cargo.value,
@@ -513,8 +539,6 @@ async function saveUserGlobalPreset() {
 }
 function applyGlobalFormStatePayload(data) {
   if (!data || typeof data !== 'object') return;
-  if ('processo_ativo' in data) processoAtivo.value = !!data.processo_ativo;
-  if ('processo_numero' in data) processo.value = String(data.processo_numero || '');
   if ('orgao' in data) {
     const t = String(data.orgao || '').trim();
     orgao.value = t ? capitalizeFirstSignificantLetter(t) : '';

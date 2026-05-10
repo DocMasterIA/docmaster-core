@@ -278,20 +278,6 @@ const generationPages = [
     icon: 'fa-scale-balanced',
     children: [
       {
-        name: 'DispensaArt75IObrasEngenharia',
-        label: 'Obras e serviços de engenharia',
-        icon: 'fa-compass-drafting',
-        subsection: 'Art. 75, I',
-        to: '/geracao/dispensa-art-75-i/obras-servicos-engenharia',
-      },
-      {
-        name: 'DispensaArt75IManutencaoVeiculos',
-        label: 'Manutenção de veículos',
-        icon: 'fa-car-side',
-        subsection: 'Art. 75, I',
-        to: '/geracao/dispensa-art-75-i/manutencao-veiculos',
-      },
-      {
         name: 'DispensaArt75IICompras',
         label: 'Compras',
         icon: 'fa-cart-shopping',
@@ -473,7 +459,18 @@ function isSectionRouteActive(section) {
 }
 
 function toggleGroup(name) {
-  groupOpenState.value[name] = !groupOpenState.value[name];
+  const willClose = !!groupOpenState.value[name];
+  if (willClose) {
+    groupOpenState.value = { ...groupOpenState.value, [name]: false };
+    return;
+  }
+  const next = {};
+  for (const key of Object.keys(groupOpenState.value)) {
+    next[key] = key === name;
+  }
+  groupOpenState.value = next;
+  /* Ao mudar de «Dispensa rápida» / «Dispensa normal», etc., fecha dropdowns Art. 75 abertos no grupo anterior. */
+  artSectionOpen.value = {};
 }
 
 function isGroupOpen(name) {
@@ -490,7 +487,13 @@ function isArt75DropdownSection(section) {
 
 function toggleArtSection(pageName, sectionKey) {
   const k = `${pageName}::${sectionKey}`;
-  artSectionOpen.value = { ...artSectionOpen.value, [k]: !artSectionOpen.value[k] };
+  const isOpen = !!artSectionOpen.value[k];
+  if (isOpen) {
+    artSectionOpen.value = { ...artSectionOpen.value, [k]: false };
+    return;
+  }
+  /* Só uma secção Art. 75 (I ou II) aberta de cada vez na navegação lateral. */
+  artSectionOpen.value = { [k]: true };
 }
 
 function isArtSectionOpen(pageName, sectionKey) {
@@ -617,10 +620,13 @@ watch(
       for (const c of page.children || []) {
         if (c.name === name && c.subsection) {
           artSectionOpen.value = {
-            ...artSectionOpen.value,
             [`${page.name}::${c.subsection}`]: true,
           };
-          groupOpenState.value = { ...groupOpenState.value, [page.name]: true };
+          const nextG = {};
+          for (const key of Object.keys(groupOpenState.value)) {
+            nextG[key] = key === page.name;
+          }
+          groupOpenState.value = nextG;
           return;
         }
       }
@@ -1136,14 +1142,18 @@ watch(
 }
 
 .dm-subnav-btn--active {
-  border-color: #254e78;
+  border: 1px solid #cbd5e1;
+  border-left: 2px solid #254e78;
   color: #254e78;
-  box-shadow: inset 3px 0 0 #254e78;
+  background: #f8fafc;
+  box-shadow: none;
 }
 .dm-dark .dm-subnav-btn--active {
-  border-color: #64748b;
-  color: #f8fafc;
-  box-shadow: inset 3px 0 0 #94a3b8;
+  border-color: #334155;
+  border-left-color: #60a5fa;
+  color: #93c5fd;
+  background: #0f172a;
+  box-shadow: none;
 }
 
 .dm-subnav-art-btn {
@@ -1179,12 +1189,14 @@ watch(
   background: #1e293b;
 }
 .dm-subnav-art-btn--open {
-  border-color: #254e78;
-  color: #254e78;
+  border: 1px solid #94a3b8;
+  color: #1e293b;
+  background: #f1f5f9;
 }
 .dm-dark .dm-subnav-art-btn--open {
-  border-color: #64748b;
-  color: #f8fafc;
+  border-color: #475569;
+  color: #e2e8f0;
+  background: #1e293b;
 }
 
 .dm-subnav-art-btn__label {
@@ -1194,22 +1206,26 @@ watch(
   min-width: 0;
 }
 
-/* Inciso com algum fluxo seleccionado na URL (mesmo com dropdown fechado): só contorno */
+/* Inciso com fluxo activo na URL: traço à esquerda + texto azul */
 .dm-subnav-art-btn--selected {
-  border: 2px solid #254e78;
+  border: 1px solid #cbd5e1;
+  border-left: 2px solid #254e78;
   background: #f8fafc;
-  color: #1e293b;
+  color: #254e78;
 }
 .dm-dark .dm-subnav-art-btn--selected {
-  border-color: #60a5fa;
+  border-color: #334155;
+  border-left-color: #60a5fa;
   background: #0f172a;
-  color: #e2e8f0;
+  color: #93c5fd;
 }
 .dm-subnav-art-btn--selected.dm-subnav-art-btn--open {
-  border-color: #254e78;
+  border-left-color: #254e78;
+  color: #254e78;
 }
 .dm-dark .dm-subnav-art-btn--selected.dm-subnav-art-btn--open {
-  border-color: #60a5fa;
+  border-left-color: #60a5fa;
+  color: #93c5fd;
 }
 
 .dm-art-dropdown-links {
@@ -1280,12 +1296,13 @@ watch(
   background: #0f172a;
 }
 
-/* Página actual: borda azul (tem de vencer :visited, que fixa borda cinza). */
+/* Página actual: traço à esquerda + texto azul (tem de vencer :visited). */
 .dm-subsubnav-link.dm-subsubnav-link--active,
 .dm-subsubnav-link.dm-subsubnav-link--active:visited {
-  border: 2px solid #254e78;
-  background: #fff;
-  color: #0f172a;
+  border: 1px solid #d1d5db;
+  border-left: 2px solid #254e78;
+  background: #f8fafc;
+  color: #254e78;
   font-weight: 700;
   box-shadow: none;
   padding-right: 12px;
@@ -1301,9 +1318,10 @@ watch(
 }
 .dm-dark .dm-subsubnav-link.dm-subsubnav-link--active,
 .dm-dark .dm-subsubnav-link.dm-subsubnav-link--active:visited {
-  border-color: #60a5fa;
+  border-color: #334155;
+  border-left-color: #60a5fa;
   background: #0f172a;
-  color: #f1f5f9;
+  color: #93c5fd;
   box-shadow: none;
 }
 .dm-dark .dm-subsubnav-link.dm-subsubnav-link--active::after {

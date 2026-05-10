@@ -22,6 +22,14 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
 TR_ITEMS_TABLE_ANCHOR = "(TR_TABELA_ITENS)"
+
+
+def _valor_total_sem_rs(valor: str) -> str:
+    """Texto para placeholders ( VALOR_TOTAL ): modelo costuma já incluir 'R$' no rótulo."""
+    s = str(valor or "").strip()
+    return re.sub(r"(?i)^\s*R\$\s*", "", s).strip()
+
+
 TR_ITEMS_LEGACY_CELL_PLACEHOLDERS = {
     "(Descrever o item de acordo com o solicitado)",
     "(Inserir unidade de medida ex: caixa, litro, unidade etc)",
@@ -113,6 +121,9 @@ class TRTemplateSlots:
     cnpj_fornecedor: str = ""
     ao_senhor_genero: str = ""
     senhor_senhora_genero: str = ""
+    # Inexigibilidade Art. 74.I — fornecedor exclusivo (placeholders no .docx com espaços).
+    objeto_especifico: str = ""
+    equipamento: str = ""
 
 
 def _style_items_table(table) -> None:
@@ -622,6 +633,7 @@ def render_tr_from_slots(
     justificativa_text = _normalize_slot_block(slots.justificativa or "")
     problema_text = _normalize_slot_block(slots.problema_administrativo or slots.justificativa or "")
     beneficio_text = _normalize_slot_block(slots.beneficio_esperado or slots.justificativa or "")
+    valor_total_placeholder = _valor_total_sem_rs(slots.valor_total or "")
 
     # Dá um respiro visual após a justificativa no TR.
     if justificativa_text:
@@ -637,6 +649,13 @@ def render_tr_from_slots(
         "(TR_OBJETO_RESULTADOS_ESPERADOS)": slots.objeto_resultados or slots.objeto or "",
         "(TR_DISPENSA_INCISO)": slots.dispensa.inciso or "",
         "(TR_JUSTIFICATIVA)": justificativa_text,
+        # Mesmo texto da justificativa; modelos Art. 74.I usam token com espaços.
+        "( JUSTIFICATIVA )": justificativa_text,
+        "(JUSTIFICATIVA)": justificativa_text,
+        "( OBJETO_ESPECIFICO )": (slots.objeto_especifico or "").strip(),
+        "(OBJETO_ESPECIFICO)": (slots.objeto_especifico or "").strip(),
+        "( EQUIPAMENTO )": (slots.equipamento or "").strip(),
+        "(EQUIPAMENTO)": (slots.equipamento or "").strip(),
         "(TR_FISCAL_NOME)": slots.fiscal.nome or "",
         "(TR_DOTACAO)": slots.dotacao or "",
         "(DOTACAO_NUMERO)": slots.dotacao or "",
@@ -661,8 +680,8 @@ def render_tr_from_slots(
         "( NUMERO_PLACA )": slots.numero_placa or "",
         "(ORGAO)": slots.orgao or slots.secretaria_usuario or "",
         "( ORGAO )": slots.orgao or slots.secretaria_usuario or "",
-        "(VALOR_TOTAL)": slots.valor_total or "",
-        "( VALOR_TOTAL )": slots.valor_total or "",
+        "(VALOR_TOTAL)": valor_total_placeholder,
+        "( VALOR_TOTAL )": valor_total_placeholder,
         "(FORNECEDOR)": slots.fornecedor or "",
         "( FORNECEDOR )": slots.fornecedor or "",
         "(CNPJ FORNECEDOR)": slots.cnpj_fornecedor or "",

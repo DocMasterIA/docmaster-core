@@ -344,16 +344,6 @@ defineEmits(['close', 'apply']);
   font-size: 13px;
   border-radius: 10px;
 }
-.ixp-orgao-btn-save {
-  background: #2563eb;
-  border-color: #2563eb;
-  color: #fff;
-}
-.ixp-orgao-btn-delete {
-  background: #dc2626;
-  border-color: #dc2626;
-  color: #fff;
-}
 .ixp-orgao-profile-actions > button:disabled {
   opacity: 0.6;
 }
@@ -370,6 +360,17 @@ defineEmits(['close', 'apply']);
   padding: 6px 10px;
   font-size: 12px;
   border-radius: 10px;
+}
+/* Depois de .ixp-btn-secondary: mesma ordem que inexigibilidade (evita sumir azul/vermelho). */
+.ixp-btn-secondary.ixp-orgao-btn-save {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+.ixp-btn-secondary.ixp-orgao-btn-delete {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
 }
 .ixp-btn-primary {
   border: 0;
@@ -461,14 +462,14 @@ defineEmits(['close', 'apply']);
 .dm-dark-theme .ixp-btn-secondary {
   color: #cbd5e1;
 }
-.dm-dark .ixp-orgao-btn-save,
-.dm-dark-theme .ixp-orgao-btn-save {
+.dm-dark .ixp-btn-secondary.ixp-orgao-btn-save,
+.dm-dark-theme .ixp-btn-secondary.ixp-orgao-btn-save {
   background: #2563eb;
   border-color: #2563eb;
   color: #fff;
 }
-.dm-dark .ixp-orgao-btn-delete,
-.dm-dark-theme .ixp-orgao-btn-delete {
+.dm-dark .ixp-btn-secondary.ixp-orgao-btn-delete,
+.dm-dark-theme .ixp-btn-secondary.ixp-orgao-btn-delete {
   background: #dc2626;
   border-color: #dc2626;
   color: #fff;

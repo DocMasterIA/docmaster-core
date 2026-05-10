@@ -118,10 +118,9 @@
                   class="gov-btn gov-btn--primary"
                   :disabled="isSubmitting || (!isInexigibilidadePreviewRoute && (!hasDocumentBase || !iaPrompt.trim()))"
                 >
-                  <span v-if="!isSubmitting"><i class="fa-solid fa-robot" aria-hidden="true"></i> {{ isInexigibilidadePreviewRoute ? 'Gerar Documento com IA' : 'Gerar com IA Contextual' }}</span>
-                  <span v-else class="doc-gen__spinner" aria-live="polite">
-                    <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
-                    Processando com IA…
+                  <span>
+                    <i class="fa-solid fa-robot" aria-hidden="true"></i>
+                    {{ isInexigibilidadePreviewRoute ? 'Gerar Documento com IA' : 'Gerar com IA Contextual' }}
                   </span>
                 </button>
                 <template v-if="documentReady">
@@ -180,53 +179,7 @@
                 </template>
               </div>
 
-              <div v-if="isSubmitting" class="doc-gen__loader-wrap" role="status" aria-live="polite">
-                <svg class="doc-gen__pl" width="240" height="240" viewBox="0 0 240 240" aria-hidden="true">
-                  <circle
-                    class="doc-gen__pl-ring doc-gen__pl-ring--a"
-                    cx="120"
-                    cy="120"
-                    r="105"
-                    fill="none"
-                    stroke-width="20"
-                    stroke-dasharray="0 660"
-                    stroke-dashoffset="-330"
-                    stroke-linecap="round"
-                  ></circle>
-                  <circle
-                    class="doc-gen__pl-ring doc-gen__pl-ring--b"
-                    cx="120"
-                    cy="120"
-                    r="35"
-                    fill="none"
-                    stroke-width="20"
-                    stroke-dasharray="0 220"
-                    stroke-dashoffset="-110"
-                    stroke-linecap="round"
-                  ></circle>
-                  <circle
-                    class="doc-gen__pl-ring doc-gen__pl-ring--c"
-                    cx="85"
-                    cy="120"
-                    r="70"
-                    fill="none"
-                    stroke-width="20"
-                    stroke-dasharray="0 440"
-                    stroke-linecap="round"
-                  ></circle>
-                  <circle
-                    class="doc-gen__pl-ring doc-gen__pl-ring--d"
-                    cx="155"
-                    cy="120"
-                    r="70"
-                    fill="none"
-                    stroke-width="20"
-                    stroke-dasharray="0 440"
-                    stroke-linecap="round"
-                  ></circle>
-                </svg>
-                <p class="doc-gen__loader-text">Gerando documento com IA...</p>
-              </div>
+              <DocGenIaLoaderBlock v-if="isSubmitting" />
             </div>
           </form>
 
@@ -566,6 +519,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import DocGenIaLoaderBlock from '@/components/DocGenIaLoaderBlock.vue';
 import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
@@ -2213,203 +2167,6 @@ function goToPage() {
   align-items: center;
   gap: 12px;
 }
-.doc-gen__spinner {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  opacity: 0.95;
-}
-.doc-gen__spinner .fa-spinner {
-  flex-shrink: 0;
-}
-.doc-gen__loader-wrap {
-  margin-top: 14px;
-  padding: 10px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: #f4f9fe;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-.doc-gen__loader-text {
-  margin: 0;
-  font-size: 12px;
-  color: var(--color-primary-dark);
-  font-weight: 600;
-}
-.doc-gen__pl {
-  width: 5.4em;
-  height: 5.4em;
-}
-.doc-gen__pl-ring {
-  animation: docGenRingA 2s linear infinite;
-}
-.doc-gen__pl-ring--a {
-  stroke: #0d6efd;
-}
-.doc-gen__pl-ring--b {
-  animation-name: docGenRingB;
-  stroke: #2a8cff;
-}
-.doc-gen__pl-ring--c {
-  animation-name: docGenRingC;
-  stroke: #1b74e4;
-}
-.doc-gen__pl-ring--d {
-  animation-name: docGenRingD;
-  stroke: #59a8ff;
-}
-@keyframes docGenRingA {
-  from, 4% {
-    stroke-dasharray: 0 660;
-    stroke-width: 20;
-    stroke-dashoffset: -330;
-  }
-  12% {
-    stroke-dasharray: 60 600;
-    stroke-width: 30;
-    stroke-dashoffset: -335;
-  }
-  32% {
-    stroke-dasharray: 60 600;
-    stroke-width: 30;
-    stroke-dashoffset: -595;
-  }
-  40%, 54% {
-    stroke-dasharray: 0 660;
-    stroke-width: 20;
-    stroke-dashoffset: -660;
-  }
-  62% {
-    stroke-dasharray: 60 600;
-    stroke-width: 30;
-    stroke-dashoffset: -665;
-  }
-  82% {
-    stroke-dasharray: 60 600;
-    stroke-width: 30;
-    stroke-dashoffset: -925;
-  }
-  90%, to {
-    stroke-dasharray: 0 660;
-    stroke-width: 20;
-    stroke-dashoffset: -990;
-  }
-}
-@keyframes docGenRingB {
-  from, 12% {
-    stroke-dasharray: 0 220;
-    stroke-width: 20;
-    stroke-dashoffset: -110;
-  }
-  20% {
-    stroke-dasharray: 20 200;
-    stroke-width: 30;
-    stroke-dashoffset: -115;
-  }
-  40% {
-    stroke-dasharray: 20 200;
-    stroke-width: 30;
-    stroke-dashoffset: -195;
-  }
-  48%, 62% {
-    stroke-dasharray: 0 220;
-    stroke-width: 20;
-    stroke-dashoffset: -220;
-  }
-  70% {
-    stroke-dasharray: 20 200;
-    stroke-width: 30;
-    stroke-dashoffset: -225;
-  }
-  90% {
-    stroke-dasharray: 20 200;
-    stroke-width: 30;
-    stroke-dashoffset: -305;
-  }
-  98%, to {
-    stroke-dasharray: 0 220;
-    stroke-width: 20;
-    stroke-dashoffset: -330;
-  }
-}
-@keyframes docGenRingC {
-  from {
-    stroke-dasharray: 0 440;
-    stroke-width: 20;
-    stroke-dashoffset: 0;
-  }
-  8% {
-    stroke-dasharray: 40 400;
-    stroke-width: 30;
-    stroke-dashoffset: -5;
-  }
-  28% {
-    stroke-dasharray: 40 400;
-    stroke-width: 30;
-    stroke-dashoffset: -175;
-  }
-  36%, 58% {
-    stroke-dasharray: 0 440;
-    stroke-width: 20;
-    stroke-dashoffset: -220;
-  }
-  66% {
-    stroke-dasharray: 40 400;
-    stroke-width: 30;
-    stroke-dashoffset: -225;
-  }
-  86% {
-    stroke-dasharray: 40 400;
-    stroke-width: 30;
-    stroke-dashoffset: -395;
-  }
-  94%, to {
-    stroke-dasharray: 0 440;
-    stroke-width: 20;
-    stroke-dashoffset: -440;
-  }
-}
-@keyframes docGenRingD {
-  from, 8% {
-    stroke-dasharray: 0 440;
-    stroke-width: 20;
-    stroke-dashoffset: 0;
-  }
-  16% {
-    stroke-dasharray: 40 400;
-    stroke-width: 30;
-    stroke-dashoffset: -5;
-  }
-  36% {
-    stroke-dasharray: 40 400;
-    stroke-width: 30;
-    stroke-dashoffset: -175;
-  }
-  44%, 50% {
-    stroke-dasharray: 0 440;
-    stroke-width: 20;
-    stroke-dashoffset: -220;
-  }
-  58% {
-    stroke-dasharray: 40 400;
-    stroke-width: 30;
-    stroke-dashoffset: -225;
-  }
-  78% {
-    stroke-dasharray: 40 400;
-    stroke-width: 30;
-    stroke-dashoffset: -395;
-  }
-  86%, to {
-    stroke-dasharray: 0 440;
-    stroke-width: 20;
-    stroke-dashoffset: -440;
-  }
-}
 .doc-gen__success {
   margin-top: 20px;
   padding: 16px 20px;
@@ -3034,14 +2791,6 @@ function goToPage() {
   font-weight: 600;
   color: #166534;
 }
-.doc-gen.doc-gen--rapida :deep(.doc-gen__loader-wrap) {
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
-}
-.doc-gen.doc-gen--rapida :deep(.doc-gen__loader-text) {
-  color: #334155;
-}
 .doc-gen.doc-gen--rapida :deep(.doc-gen__var-heading),
 .doc-gen.doc-gen--rapida :deep(.doc-gen__slot-subheading) {
   color: #334155;
@@ -3204,31 +2953,6 @@ function goToPage() {
 .dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__success-title),
 .dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__success-title) {
   color: #bbf7d0;
-}
-.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__loader-wrap),
-.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__loader-wrap) {
-  background: #082f49;
-  border-color: #0ea5e9;
-}
-.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__loader-text),
-.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__loader-text) {
-  color: #bae6fd;
-}
-.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__pl-ring--a),
-.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__pl-ring--a) {
-  stroke: #38bdf8;
-}
-.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__pl-ring--b),
-.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__pl-ring--b) {
-  stroke: #7dd3fc;
-}
-.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__pl-ring--c),
-.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__pl-ring--c) {
-  stroke: #0ea5e9;
-}
-.dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__pl-ring--d),
-.dm-dark-theme .doc-gen.doc-gen--rapida :deep(.doc-gen__pl-ring--d) {
-  stroke: #bae6fd;
 }
 .dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__var-heading),
 .dm-dark .doc-gen.doc-gen--rapida :deep(.doc-gen__slot-subheading),

@@ -16,53 +16,66 @@
           </div>
 
           <div class="ixp-main-body">
-            <article class="ixp-card">
-              <h3>Dados basicos</h3>
-              <div class="ixp-body">
-                <div class="ixp-field">
-                  <label>Cabecalho do documento</label>
-                  <select v-model="cabecalhoDocumento">
-                    <option value="">Selecione</option>
-                    <option v-for="op in cabecalhoOptions" :key="op.id" :value="op.name">{{ op.name }}</option>
-                  </select>
-                </div>
-                <label class="ixp-check">
-                  <input v-model="processoAtivo" type="checkbox" />
-                  Informar numero do processo (opcional)
-                </label>
-                <div class="ixp-grid-2">
-                  <div v-if="processoAtivo" class="ixp-field">
-                    <label>Processo</label>
-                    <input v-model="processo" list="dl-processo-numero" placeholder="Ex: 123/2026" />
+            <section class="da75-block da75-block--muted">
+              <h3>Dados básicos</h3>
+              <div class="da75-block__body">
+                <div class="da75-row da75-row--basic">
+                  <div class="da75-field">
+                    <label class="da75-label da75-label--compact">Cabeçalho do documento</label>
+                    <select v-model="cabecalhoDocumento" class="da75-select da75-select--sm">
+                      <option value="">Selecione</option>
+                      <option v-for="op in cabecalhoOptions" :key="op.id" :value="op.name">{{ op.name }}</option>
+                    </select>
                   </div>
-                  <div class="ixp-field">
-                    <label>{{ LABEL_ORGAO_UNIDADE }}</label>
+                  <div class="da75-field">
+                    <label class="da75-label da75-label--compact">{{ LABEL_ORGAO_UNIDADE }}</label>
                     <input
                       :value="orgao"
+                      class="da75-input da75-input--sm"
                       list="dl-orgao"
                       :placeholder="PLACEHOLDER_ORGAO_GERAL"
                       @input="onOrgaoInput($event)"
                     />
                   </div>
-                  <div v-if="isFornecedorExclusivoRoute" class="ixp-field">
-                    <label>{{ LABEL_ORGAO_UNIDADE_RESP_EQUIP }}</label>
+                  <label class="da75-check da75-check--inline">
+                    <input v-model="processoAtivo" type="checkbox" />
+                    Processo (opcional)
+                  </label>
+                </div>
+                <div v-if="processoAtivo" class="da75-max-xs da75-mt">
+                  <label class="da75-label">Número do processo (opcional)</label>
+                  <input
+                    v-model="processo"
+                    class="da75-input"
+                    list="dl-processo-numero"
+                    placeholder="Ex: 123/2026"
+                  />
+                </div>
+                <div
+                  v-if="isFornecedorExclusivoRoute || isInexigibilidadeManutencaoRoute"
+                  class="da75-row da75-row--2 da75-mt"
+                >
+                  <div v-if="isFornecedorExclusivoRoute" class="da75-field">
+                    <label class="da75-label da75-label--compact">{{ LABEL_ORGAO_UNIDADE_RESP_EQUIP }}</label>
                     <input
                       :value="orgaoResponsavelEquipamento"
+                      class="da75-input da75-input--sm"
                       :placeholder="PLACEHOLDER_ORGAO_UNIDADE_RESP_EQUIP"
                       @input="onOrgaoResponsavelEquipamentoInput($event)"
                     />
                   </div>
-                  <div v-if="isInexigibilidadeManutencaoRoute" class="ixp-field">
-                    <label>{{ LABEL_ORGAO_UNIDADE_VEICULO }}</label>
+                  <div v-if="isInexigibilidadeManutencaoRoute" class="da75-field">
+                    <label class="da75-label da75-label--compact">{{ LABEL_ORGAO_UNIDADE_VEICULO }}</label>
                     <input
                       :value="orgaoUnidadeVeiculo"
+                      class="da75-input da75-input--sm"
                       :placeholder="PLACEHOLDER_ORGAO_UNIDADE_VEICULO"
                       @input="onOrgaoUnidadeVeiculoInput($event)"
                     />
                   </div>
                 </div>
               </div>
-            </article>
+            </section>
 
             <article v-if="isFornecedorExclusivoRoute" class="ixp-card">
               <h3>Objeto especifico</h3>
@@ -237,8 +250,13 @@
                 <div class="ixp-field"><label>Qual setor/secretaria sera atendido?</label><input v-model="clausulaSetor" list="dl-clausula-setor" placeholder="Ex: Secretaria de Administracao" /></div>
                 <div class="ixp-field"><label>Caracteristicas minimas obrigatorias (opcional)</label><textarea v-model="clausulaCaracteristicas" rows="3" placeholder="Ex: Itens de primeira linha, entrega fracionada e suporte tecnico" /></div>
                 <button class="ixp-btn-secondary" type="button" :disabled="isGeneratingClauses" @click="onGenerateClauses">
-                  {{ isGeneratingClauses ? 'Gerando objeto e justificativa...' : 'Gerar objeto e justificativa' }}
+                  Gerar objeto e justificativa
                 </button>
+                <DocGenIaLoaderBlock
+                  v-if="isGeneratingClauses"
+                  compact
+                  message="Gerando objeto e justificativa…"
+                />
                 <div class="ixp-grid-1">
                   <div class="ixp-field">
                     <label>Objeto gerado pela IA</label>
@@ -254,12 +272,9 @@
 
             <div class="da75-space-y">
               <button type="button" class="da75-btn da75-btn--primary" :disabled="isSubmitting" @click="onSubmit">
-                <span v-if="!isSubmitting">Gerar documento com IA</span>
-                <span v-else class="dm-gen-ia-btn-spin" aria-live="polite">
-                  <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
-                  Gerando documentos…
-                </span>
+                Gerar documento com IA
               </button>
+              <DocGenIaLoaderBlock v-if="isSubmitting" message="Gerando documentos…" />
               <p v-if="generateError" class="da75-helper">{{ generateError }}</p>
               <p v-if="documentReady && successMessage" class="da75-helper">{{ successMessage }}</p>
               <div v-if="documentReady" class="da75-inline-actions">
@@ -506,6 +521,7 @@ const PLACEHOLDER_ORGAO_UNIDADE_RESP_EQUIP = capitalizeEachWordLeadingPt(
   'Digite o órgão ou unidade responsável pelo equipamento',
 );
 import '@/components/dispensa-art-75-ii/dispensaArt75ii.css';
+import DocGenIaLoaderBlock from '@/components/DocGenIaLoaderBlock.vue';
 
 const API_BASE = getApiBase();
 const route = useRoute();

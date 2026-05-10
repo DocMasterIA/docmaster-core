@@ -15,29 +15,33 @@
           </div>
 
           <div class="fe-main-body">
-            <article class="fe-card">
+            <section class="da75-block da75-block--muted">
               <h3>Dados básicos</h3>
-              <div class="fe-body">
-                <label class="fe-check">
-                  <input v-model="processoAtivo" type="checkbox" />
-                  Informar número do processo (opcional)
-                </label>
-                <div class="fe-grid-2">
-                  <div v-if="processoAtivo" class="fe-field">
-                    <label>Processo</label>
-                    <input v-model="processo" placeholder="Ex: 123/2026" />
-                  </div>
-                  <div class="fe-field">
-                    <label>{{ LABEL_ORGAO_UNIDADE_RESP_EQUIP }}</label>
+              <div class="da75-block__body">
+                <div class="da75-row da75-row--2 fe-db-dados-basicos-top">
+                  <div class="da75-field">
+                    <label class="da75-label da75-label--compact">{{ LABEL_ORGAO_UNIDADE_RESP_EQUIP }}</label>
                     <input
                       :value="orgao"
+                      class="da75-input da75-input--sm"
                       :placeholder="PLACEHOLDER_ORGAO_UNIDADE"
                       @input="onOrgaoFeInput($event)"
                     />
                   </div>
+                  <div class="da75-field fe-db-processo-check">
+                    <span class="da75-label da75-label--compact fe-db-processo-check__spacer" aria-hidden="true">&nbsp;</span>
+                    <label class="da75-check">
+                      <input v-model="processoAtivo" type="checkbox" />
+                      Processo (opcional)
+                    </label>
+                  </div>
+                </div>
+                <div v-if="processoAtivo" class="da75-max-xs da75-mt">
+                  <label class="da75-label">Número do processo (opcional)</label>
+                  <input v-model="processo" class="da75-input" placeholder="Ex: 123/2026" />
                 </div>
               </div>
-            </article>
+            </section>
 
             <article class="fe-card">
               <h3>Objeto específico</h3>
@@ -184,12 +188,9 @@
             <article class="fe-card">
               <div class="fe-actions">
                 <button type="button" class="fe-btn-primary fe-btn-generate" :disabled="isSubmitting" @click="onSubmit">
-                  <span v-if="!isSubmitting">Gerar Documento com IA</span>
-                  <span v-else class="fe-btn-loading" aria-live="polite">
-                    <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
-                    Processando com IA…
-                  </span>
+                  Gerar Documento com IA
                 </button>
+                <DocGenIaLoaderBlock v-if="isSubmitting" message="Gerando documento com IA…" />
                 <template v-if="documentReady">
                   <a v-if="documentTrUrl" :href="documentTrUrl" :download="documentTrFilename" class="fe-btn-secondary">Download TR (DOCX)</a>
                   <a v-if="documentDfdUrl" :href="documentDfdUrl" :download="documentDfdFilename" class="fe-btn-secondary">Download DFD (DOCX)</a>
@@ -397,6 +398,8 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import '@/components/dispensa-art-75-ii/dispensaArt75ii.css';
+import DocGenIaLoaderBlock from '@/components/DocGenIaLoaderBlock.vue';
 import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
@@ -1150,6 +1153,20 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 }
 .fe-body { display: grid; gap: 8px; }
 .fe-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.fe-db-dados-basicos-top {
+  align-items: end;
+}
+.fe-db-processo-check {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+.fe-db-processo-check__spacer {
+  visibility: hidden;
+  min-height: 1em;
+  line-height: 1.25;
+}
 .fe-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
 .fe-grid-item { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; align-items: end; }
 .fe-field label { font-size: 12px; color: #475569; display: block; margin-bottom: 3px; }

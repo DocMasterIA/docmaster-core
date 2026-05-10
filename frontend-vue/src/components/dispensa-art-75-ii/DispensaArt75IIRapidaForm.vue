@@ -116,12 +116,9 @@
 
             <div class="da75-space-y">
               <button type="button" class="da75-btn da75-btn--primary" :disabled="isSubmitting" @click="onSubmit">
-                <span v-if="!isSubmitting">Gerar documento com IA</span>
-                <span v-else class="dm-gen-ia-btn-spin" aria-live="polite">
-                  <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
-                  Gerando documentos…
-                </span>
+                Gerar documento com IA
               </button>
+              <DocGenIaLoaderBlock v-if="isSubmitting" message="Gerando documentos…" />
               <p v-if="generateError" class="da75-helper">{{ generateError }}</p>
               <p v-if="successMessage" class="da75-helper">{{ successMessage }}</p>
               <div v-if="documentReady" class="da75-inline-actions">
@@ -201,6 +198,7 @@ import {
 } from './dispensaArt75iiShared.js';
 import './dispensaArt75ii.css';
 import DispensaArt75IIDadosFixosDrawer from './DispensaArt75IIDadosFixosDrawer.vue';
+import DocGenIaLoaderBlock from '@/components/DocGenIaLoaderBlock.vue';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
 import { buildGerarTrEDfdUrl, describeApiFetchNetworkFailure, getApiBase } from '@/utils/apiBase.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';

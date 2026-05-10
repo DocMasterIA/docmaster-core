@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import { firstAllowedPath, normalizeAllowedModules, resolveModuleKey } from '../moduleAccess';
 /** Import estático: evita chunk lazy `DispensaArt75IIRapidaReactPreview-*.js` (falha com index.html ou CDN em cache após deploy). */
 import DispensaArt75IIRapidaReactPreview from '../views/DispensaArt75IIRapidaReactPreview.vue';
 import { getApiBase } from '../utils/apiBase.js';
@@ -304,11 +303,7 @@ router.beforeEach(async (to) => {
   if (!me) {
     return { path: '/login', query: { redirect: to.fullPath } };
   }
-  const allowed = new Set(normalizeAllowedModules(me.allowed_modules, !!me.is_superuser));
-  const moduleKey = resolveModuleKey(to);
-  if (moduleKey && !allowed.has(moduleKey)) {
-    return { path: firstAllowedPath(allowed) };
-  }
+  /* Módulos sem permissão: a navegação prossegue; o App.vue mostra «Módulo Não Liberado». */
 });
 
 function fetchMePayload() {

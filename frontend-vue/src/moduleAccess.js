@@ -16,9 +16,17 @@ export const MODULE_KEYS = [
 
 export function normalizeAllowedModules(raw, isSuperuser = false) {
   if (isSuperuser) return [...MODULE_KEYS];
-  if (!Array.isArray(raw)) return [...MODULE_KEYS];
+  // Perfil ainda não carregado (ex.: /api/me/ pendente): não assumir «todos os módulos» no UI.
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) return [];
   const valid = raw.map((x) => String(x || '').trim()).filter((x) => MODULE_KEYS.includes(x));
-  return valid.length ? Array.from(new Set(valid)) : [...MODULE_KEYS];
+  const unique = Array.from(new Set(valid));
+  if (!unique.length) {
+    // Alinhado a User.get_allowed_modules: lista vazia ou só chaves inválidas = acesso implícito
+    // a todos os módulos (legado / mesma semântica que a API já devolve após normalização).
+    return [...MODULE_KEYS];
+  }
+  return unique;
 }
 
 export function resolveModuleKey(to) {
@@ -51,6 +59,9 @@ export function resolveModuleKey(to) {
 }
 
 export function firstAllowedPath(allowedSet) {
+  if (!allowedSet || allowedSet.size === 0) {
+    return '/area-do-usuario';
+  }
   const order = [
     ['dispensa', '/geracao/dispensa'],
     ['dispensa_eletronica', '/dispensa-eletronica'],

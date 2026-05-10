@@ -902,21 +902,28 @@ function buildFornecedorExclusivo74JustificativaTrDfd() {
   return partes.join('\n\n');
 }
 
-/** Objeto resumido para o TR e ofício — uma frase em prosa. */
-function buildFornecedorExclusivo74ObjetoTrResumo() {
+/**
+ * Objeto resumido em uma frase — TR (com citação legal) vs ofício/assunto (sem o trecho entre parênteses).
+ * @param {{ forOficio?: boolean }} [opts]
+ */
+function buildFornecedorExclusivo74ObjetoTrResumo(opts = {}) {
+  const forOficio = opts.forOficio === true;
   const ob = objetoEspecificoContratacaoFe().trim();
   const eq = String(equipamento.value || '').trim();
   const m = String(marca.value || '').trim();
   const mod = String(modelo.value || '').trim();
   const nomeEq = [eq, m, mod].filter(Boolean).join(', ');
+  const tail = forOficio
+    ? 'na hipótese de fornecedor exclusivo.'
+    : 'na hipótese de fornecedor exclusivo (art. 74, inciso I, da Lei nº 14.133/2021).';
   if (ob && nomeEq) {
-    return `Contratação de ${ob.charAt(0).toLowerCase() + ob.slice(1)} vinculada ao equipamento ${nomeEq}, na hipótese de fornecedor exclusivo (art. 74, inciso I, da Lei nº 14.133/2021).`;
+    return `Contratação de ${ob.charAt(0).toLowerCase() + ob.slice(1)} vinculada ao equipamento ${nomeEq}, ${tail}`;
   }
   if (ob) {
-    return `Contratação de ${ob.charAt(0).toLowerCase() + ob.slice(1)}, na hipótese de fornecedor exclusivo (art. 74, inciso I, da Lei nº 14.133/2021).`;
+    return `Contratação de ${ob.charAt(0).toLowerCase() + ob.slice(1)}, ${tail}`;
   }
   if (nomeEq) {
-    return `Contratação vinculada ao equipamento ${nomeEq}, na hipótese de fornecedor exclusivo (art. 74, inciso I, da Lei nº 14.133/2021).`;
+    return `Contratação vinculada ao equipamento ${nomeEq}, ${tail}`;
   }
   return '';
 }
@@ -980,7 +987,8 @@ function buildSlotsOverride() {
 
   const dfdObjRef = buildFornecedorExclusivo74DfdObjetoReferencia().trim();
   const justTrDfd = buildFornecedorExclusivo74JustificativaTrDfd().trim();
-  const objetoTr = buildFornecedorExclusivo74ObjetoTrResumo().trim();
+  const objetoTr = buildFornecedorExclusivo74ObjetoTrResumo({ forOficio: false }).trim();
+  const objetoOficioLinha = buildFornecedorExclusivo74ObjetoTrResumo({ forOficio: true }).trim();
   if (dfdObjRef) o.dfd_objeto_referencia = dfdObjRef;
   if (justTrDfd) {
     o.justificativa = justTrDfd;
@@ -989,7 +997,10 @@ function buildSlotsOverride() {
   }
   if (objetoTr) {
     o.objeto = objetoTr;
-    o.sol_oficio_objeto = objetoTr;
+  }
+  if (objetoOficioLinha) {
+    o.sol_oficio_objeto = objetoOficioLinha;
+    o.sol_oficio_assunto = objetoOficioLinha;
   }
 
   return o;

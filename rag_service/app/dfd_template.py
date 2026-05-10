@@ -15,7 +15,7 @@ from typing import Optional
 
 from docx import Document
 
-from .tr_template import TRTemplateSlots
+from .tr_template import TRTemplateSlots, split_paragraphs_on_double_newline
 
 
 TEMPLATE_DFD_PATH_DEFAULT = (
@@ -276,6 +276,7 @@ def render_dfd_from_tr_slots(
         mapping = {**process_cleanup, **mapping}
 
     _replace_placeholders(doc, mapping)
+    split_paragraphs_on_double_newline(doc)
     if not num_proc:
         _remove_processo_visual_block_when_empty(doc)
 

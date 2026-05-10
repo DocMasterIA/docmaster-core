@@ -1211,7 +1211,7 @@ function buildInexig74ManutencaoDfdJustificativa() {
 
 /**
  * Objeto do TR / Ofício na inexigibilidade art. 74, I — manutenção veicular (redação padrão).
- * Substitui o fallback «Tipo: … | Marca: …» que não é adequado ao ofício.
+ * Começa pela prestação de serviços (sem o preâmbulo «Contratação por inexigibilidade…»).
  */
 function buildInexig74ManutencaoObjetoTrResumo() {
   const m = String(marca.value || '').trim();
@@ -1225,8 +1225,7 @@ function buildInexig74ManutencaoObjetoTrResumo() {
   const veiculo = partesVeic.length ? partesVeic.join(', ') : 'identificação do veículo a constar nos autos';
   const orgaoFrase = org ? `pertencente ao ${org}` : 'pertencente ao órgão ou unidade competente';
   return (
-    'Contratação por inexigibilidade de licitação, nos termos do art. 74, inciso I, da Lei nº 14.133/2021, '
-    + 'para prestação de serviços de manutenção veicular, com fornecimento de peças, componentes e acessórios, '
+    'Prestação de serviços de manutenção veicular, com fornecimento de peças, componentes e acessórios, '
     + `destinado ao veículo, ${veiculo}, ${orgaoFrase}.`
   );
 }
@@ -1323,20 +1322,28 @@ function buildInexigFornecedorExclusivoJustificativaTrDfd() {
   return partes.join('\n\n');
 }
 
-function buildInexigFornecedorExclusivoObjetoTrResumo() {
+/**
+ * Objeto resumido — TR (com art. 74 na frase) vs ofício/assunto (termina em «fornecedor exclusivo.»).
+ * @param {{ forOficio?: boolean }} [opts]
+ */
+function buildInexigFornecedorExclusivoObjetoTrResumo(opts = {}) {
+  const forOficio = opts.forOficio === true;
   const ob = String(objetoEspecificoContratacaoIx() || '').trim();
   const eq = String(equipamento.value || '').trim();
   const m = String(marca.value || '').trim();
   const mod = String(modelo.value || '').trim();
   const nomeEq = [eq, m, mod].filter(Boolean).join(', ');
+  const tail = forOficio
+    ? 'na hipótese de fornecedor exclusivo.'
+    : 'na hipótese de fornecedor exclusivo (art. 74, inciso I, da Lei nº 14.133/2021).';
   if (ob && nomeEq) {
-    return `Contratação de ${ob.charAt(0).toLowerCase() + ob.slice(1)} vinculada ao equipamento ${nomeEq}, na hipótese de fornecedor exclusivo (art. 74, inciso I, da Lei nº 14.133/2021).`;
+    return `Contratação de ${ob.charAt(0).toLowerCase() + ob.slice(1)} vinculada ao equipamento ${nomeEq}, ${tail}`;
   }
   if (ob) {
-    return `Contratação de ${ob.charAt(0).toLowerCase() + ob.slice(1)}, na hipótese de fornecedor exclusivo (art. 74, inciso I, da Lei nº 14.133/2021).`;
+    return `Contratação de ${ob.charAt(0).toLowerCase() + ob.slice(1)}, ${tail}`;
   }
   if (nomeEq) {
-    return `Contratação vinculada ao equipamento ${nomeEq}, na hipótese de fornecedor exclusivo (art. 74, inciso I, da Lei nº 14.133/2021).`;
+    return `Contratação vinculada ao equipamento ${nomeEq}, ${tail}`;
   }
   return '';
 }
@@ -1469,16 +1476,20 @@ function buildSlotsOverride() {
   } else if (isFornecedorExclusivoRoute.value) {
     const dfdObjFe = buildInexigFornecedorExclusivoDfdObjetoReferencia().trim();
     const justFe = buildInexigFornecedorExclusivoJustificativaTrDfd().trim();
-    const objetoFe = buildInexigFornecedorExclusivoObjetoTrResumo().trim();
+    const objetoFeTr = buildInexigFornecedorExclusivoObjetoTrResumo({ forOficio: false }).trim();
+    const objetoFeOf = buildInexigFornecedorExclusivoObjetoTrResumo({ forOficio: true }).trim();
     if (dfdObjFe) o.dfd_objeto_referencia = dfdObjFe;
     if (justFe) {
       o.justificativa = justFe;
       o.dfd_justificativa = justFe;
       o.sol_oficio_justificativa = justFe;
     }
-    if (objetoFe) {
-      o.objeto = objetoFe;
-      o.sol_oficio_objeto = objetoFe;
+    if (objetoFeTr) {
+      o.objeto = objetoFeTr;
+    }
+    if (objetoFeOf) {
+      o.sol_oficio_objeto = objetoFeOf;
+      o.sol_oficio_assunto = objetoFeOf;
     }
   }
 

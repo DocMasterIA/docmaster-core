@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from dataclasses import replace
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -1254,6 +1255,7 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
         senhor_senhora_genero=str(data.get("senhor_senhora_genero", "")).strip(),
         objeto_especifico=str(data.get("objeto_especifico", "")).strip(),
         equipamento=str(data.get("equipamento", "")).strip(),
+        slot_package_key=str(data.get("slot_package_key", "")).strip(),
     )
 
 
@@ -1541,6 +1543,11 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         if override.get("equipamento") is not None
         else llm_slots.equipamento
     )
+    slot_package_key = str(
+        (override.get("slot_package_key") or llm_slots.slot_package_key)
+        if override.get("slot_package_key") is not None
+        else llm_slots.slot_package_key
+    ).strip()
 
     itens_override = override.get("itens")
     if isinstance(itens_override, list) and len(itens_override) > 0:
@@ -1614,6 +1621,7 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
                 senhor_senhora_genero=senhor_senhora_genero,
                 objeto_especifico=objeto_especifico,
                 equipamento=equipamento,
+                slot_package_key=slot_package_key,
             )
     itens = llm_slots.itens
 
@@ -1674,6 +1682,7 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         senhor_senhora_genero=senhor_senhora_genero,
         objeto_especifico=objeto_especifico,
         equipamento=equipamento,
+        slot_package_key=slot_package_key,
     )
 
 
@@ -1978,4 +1987,9 @@ async def fill_tr_slots_with_llm(
 
     llm_slots.dispensa.inciso = chosen_inciso
 
-    return _merge_slots(llm_slots, slots_override or {})
+    merged = _merge_slots(llm_slots, slots_override or {})
+    if isinstance(user_context, dict):
+        ctx_pk = str(user_context.get("slot_package_key") or "").strip()
+        if ctx_pk and not (merged.slot_package_key or "").strip():
+            merged = replace(merged, slot_package_key=ctx_pk)
+    return merged

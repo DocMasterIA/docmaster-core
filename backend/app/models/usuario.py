@@ -132,6 +132,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.email
 
     def get_allowed_modules(self) -> list[str]:
+        """Resolve módulos efectivos; vazio ou inválido na BD = todos (legado). Ver migração 0038."""
         raw = self.allowed_modules
         if self.is_superuser:
             return list(MODULE_ACCESS_CHOICES)

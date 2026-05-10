@@ -11,7 +11,7 @@ from typing import Optional
 
 from docx import Document
 
-from .tr_template import TRTemplateSlots
+from .tr_template import TRTemplateSlots, split_paragraphs_on_double_newline
 
 
 TEMPLATE_OFICIO_PATH_DEFAULT = (
@@ -159,6 +159,7 @@ def render_oficio_from_slots(
     }
 
     _replace_placeholders(doc, mapping)
+    split_paragraphs_on_double_newline(doc)
 
     out_path = Path(output_path) if output_path else None
     if out_path is None:

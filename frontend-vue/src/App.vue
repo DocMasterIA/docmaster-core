@@ -29,7 +29,7 @@
           </div>
           <div class="dm-top-tabs">
             <button
-              v-for="tab in visibleMainTabs"
+              v-for="tab in mainTabs"
               :key="tab.key"
               type="button"
               class="dm-top-tab"
@@ -63,7 +63,12 @@
               <p>Selecione uma opção para avançar no fluxo.</p>
             </div>
             <nav class="dm-sidebar-nav">
-              <template v-if="['dispensa', 'inexigibilidade', 'etp'].includes(activeMainTabKey)">
+              <template v-if="isCurrentRouteModuleLocked">
+                <p class="dm-sidebar-locked-note">
+                  Este módulo não está liberado. Utilize outro separador da barra superior ou contacte o suporte.
+                </p>
+              </template>
+              <template v-else-if="showGenerationHubSidebar">
                 <button
                   v-if="activeMainTabKey !== 'dispensa'"
                   type="button"
@@ -205,7 +210,8 @@
           </button>
 
           <main class="dm-content">
-            <router-view />
+            <ModuleNotLicensed v-if="isCurrentRouteModuleLocked" />
+            <router-view v-else />
           </main>
         </div>
       </div>
@@ -216,7 +222,8 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { firstAllowedPath, normalizeAllowedModules, resolveModuleKey } from './moduleAccess';
+import { normalizeAllowedModules, resolveModuleKey } from './moduleAccess';
+import ModuleNotLicensed from './views/ModuleNotLicensed.vue';
 import { getApiBase } from '@/utils/apiBase.js';
 
 const API_BASE = getApiBase();
@@ -380,7 +387,14 @@ const mainTabs = [
 
 const allowedModules = computed(() => normalizeAllowedModules(user.value?.allowed_modules, !!user.value?.is_superuser));
 const allowedModuleSet = computed(() => new Set(allowedModules.value));
-const visibleMainTabs = computed(() => mainTabs.filter((tab) => allowedModuleSet.value.has(tab.key)));
+
+/** Perfil carregado: evita mostrar bloqueio antes do /api/me/ no App (router já validou sessão). */
+const isCurrentRouteModuleLocked = computed(() => {
+  if (!user.value) return false;
+  const key = resolveModuleKey(route);
+  if (!key) return false;
+  return !allowedModuleSet.value.has(key);
+});
 
 const isGenerationSectionActive = computed(() => {
   return route.name === 'DocumentGenerator' || generationRouteNames.has(route.name);
@@ -416,14 +430,24 @@ function inferMainTabFromRoute() {
 const selectedMainTabKey = ref(inferMainTabFromRoute());
 const activeMainTabKey = computed(() => selectedMainTabKey.value);
 
+/** Sidebar de fluxos (Dispensa / Inexigibilidade / ETP) só se o módulo estiver permitido para o utilizador. */
+const showGenerationHubSidebar = computed(
+  () =>
+    ['dispensa', 'inexigibilidade', 'etp'].includes(activeMainTabKey.value)
+    && allowedModuleSet.value.has(activeMainTabKey.value),
+);
+
 const visibleGenerationPages = computed(() => {
   if (activeMainTabKey.value === 'dispensa') {
+    if (!allowedModuleSet.value.has('dispensa')) return [];
     return generationPages.filter((p) => p.name === 'DispensaRapidaGroup' || p.name === 'DispensaArt75II');
   }
   if (activeMainTabKey.value === 'inexigibilidade') {
+    if (!allowedModuleSet.value.has('inexigibilidade')) return [];
     return generationPages.filter((p) => p.name === 'InexigibilidadeArt74I');
   }
   if (activeMainTabKey.value === 'etp') {
+    if (!allowedModuleSet.value.has('etp')) return [];
     return generationPages.filter((p) => p.name === 'EtpLivreGroup');
   }
   return [];
@@ -451,7 +475,6 @@ function isMainTabActive(key) {
 }
 
 function onMainTabClick(tab) {
-  if (!allowedModuleSet.value.has(tab.key)) return;
   selectedMainTabKey.value = tab.key;
   if (['dispensa', 'inexigibilidade', 'etp'].includes(tab.key)) {
     generationMenuOpen.value = true;
@@ -587,17 +610,13 @@ onMounted(() => {
     sidebarNavHidden.value = false;
   }
   syncDarkModeRootClass(darkMode.value);
-  fetchMe().then(() => {
-    const currentModule = resolveModuleKey(route);
-    if (currentModule && !allowedModuleSet.value.has(currentModule)) {
-      router.replace(firstAllowedPath(allowedModuleSet.value));
-      return;
-    }
-    if (visibleMainTabs.value.length && !allowedModuleSet.value.has(activeMainTabKey.value)) {
-      selectedMainTabKey.value = visibleMainTabs.value[0].key;
-    }
-  });
-  if (['dispensa', 'inexigibilidade', 'etp'].includes(activeMainTabKey.value)) generationMenuOpen.value = true;
+  fetchMe();
+  if (
+    ['dispensa', 'inexigibilidade', 'etp'].includes(activeMainTabKey.value)
+    && allowedModuleSet.value.has(activeMainTabKey.value)
+  ) {
+    generationMenuOpen.value = true;
+  }
 });
 
 watch(
@@ -619,11 +638,6 @@ watch(sidebarNavHidden, (hidden) => {
 watch(
   () => route.fullPath,
   () => {
-    const currentModule = resolveModuleKey(route);
-    if (currentModule && !allowedModuleSet.value.has(currentModule)) {
-      router.replace(firstAllowedPath(allowedModuleSet.value));
-      return;
-    }
     selectedMainTabKey.value = inferMainTabFromRoute();
   }
 );
@@ -1218,6 +1232,18 @@ watch(
 }
 
 .dm-dark .dm-sidebar-placeholder-note {
+  color: #94a3b8;
+}
+
+.dm-sidebar-locked-note {
+  margin: 4px 0 0;
+  padding: 0 4px 0 2px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.dm-dark .dm-sidebar-locked-note {
   color: #94a3b8;
 }
 

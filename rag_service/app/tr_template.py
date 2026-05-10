@@ -125,6 +125,9 @@ class TRTemplateSlots:
     # Inexigibilidade Art. 74.I — fornecedor exclusivo (placeholders no .docx com espaços).
     objeto_especifico: str = ""
     equipamento: str = ""
+    # Pacote Django (ex.: inexigibilidade_74_i_fornecedor_exclusivo) — usado quando o caminho do .docx
+    # é genérico (fallback tr_base) e as regras Art. 74.I ainda devem aplicar-se.
+    slot_package_key: str = ""
 
 
 def _style_items_table(table) -> None:
@@ -258,14 +261,15 @@ def _configure_items_table_columns(table, doc: Document, use_price_layout: bool 
         return
 
     # Ajuste fino: continua priorizando "Descrição", sem esmagar cabeçalhos.
+    # Coluna «Item» (01, 02…) um pouco mais larga para alinhar texto e evitar aperto visual.
     if use_price_layout:
-        item_w = Cm(1.2)
+        item_w = Cm(1.5)
         quantidade_w = Cm(1.8)
         unidade_w = Cm(1.6)
         valor_unit_w = Cm(2.4)
         valor_total_w = Cm(2.4)
     else:
-        item_w = Cm(1.3)
+        item_w = Cm(1.55)
         unidade_w = Cm(1.9)
         quantidade_w = Cm(2.5)
 
@@ -366,6 +370,44 @@ def _replace_placeholders_in_paragraphs(doc: Document, mapping: Dict[str, str]) 
             for cell in row.cells:
                 for p in cell.paragraphs:
                     _replace_in_paragraph(p)
+
+
+def split_paragraphs_on_double_newline(doc: Document, *, space_after_pt: float = 10.0) -> None:
+    """
+    Onde o texto tiver linha em branco dupla (\\n\\n), divide em parágrafos Word distintos
+    e aplica espaço vertical mínimo (space_after) entre blocos — usado p.ex. na justificativa
+    da inexigibilidade (fornecedor exclusivo) gerada com partes.join('\\n\\n') no frontend.
+    """
+    gap = Pt(space_after_pt)
+
+    def process_para(para: Paragraph) -> None:
+        t = para.text or ""
+        if "\n\n" not in t:
+            return
+        parts = [p.strip() for p in t.split("\n\n") if p.strip()]
+        if len(parts) <= 1:
+            return
+        para.text = parts[0]
+        n = len(parts)
+        if n >= 2:
+            para.paragraph_format.space_after = gap
+        ref_el = para._p
+        for idx, chunk in enumerate(parts[1:]):
+            new_p = OxmlElement("w:p")
+            ref_el.addnext(new_p)
+            new_para = Paragraph(new_p, para._parent)
+            new_para.text = chunk
+            if idx < n - 2:
+                new_para.paragraph_format.space_after = gap
+            ref_el = new_p
+
+    for p in list(doc.paragraphs):
+        process_para(p)
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for p in list(cell.paragraphs):
+                    process_para(p)
 
 
 def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
@@ -682,31 +724,39 @@ def _is_manutencao_veiculos_template(template_path: Path) -> bool:
     return "manutencao de veiculos" in name
 
 
-def _tr_template_art74_i_dotacao_branches(template_path: Path) -> bool:
+def _tr_is_lei14133_art74_i_inexigibilidade_pack(
+    template_path: Path, slots: Optional[TRTemplateSlots] = None
+) -> bool:
     """
-    TR dos pacotes Lei 14.133 Art. 74, I (manutenção de veículos ou fornecedor exclusivo),
-    com duas redações alternativas sobre dotação orçamentária no .docx.
+    TR dos pacotes Lei 14.133 Art. 74, I (manutenção de veículos ou fornecedor exclusivo):
+    dotação alternativa, remoção do §1.1 sem preços, etc.
+
+    Reconhece pelo caminho do modelo ou por `slots.slot_package_key` (útil se o .docx veio do fallback
+    `tr_base/TR_modelo_base.docx`, sem «inexigibilidade» no path).
     """
     if _is_manutencao_veiculos_template(template_path):
         return True
     n = _normalize_text_for_match(str(template_path))
-    if "inexigibilidade" not in n or "74" not in n:
-        return False
-    return (
-        "fornecedor" in n
-        or "exclusivo" in n
-        or "manutencao" in n
-        or "veiculo" in n
-    )
+    if "inexigibilidade" in n and "74" in n:
+        if any(x in n for x in ("fornecedor", "exclusivo", "manutencao", "veiculo")):
+            return True
+    if slots is not None:
+        k = _normalize_text_for_match(getattr(slots, "slot_package_key", "") or "")
+        if "inexigibilidade" in k and "74" in k:
+            if any(x in k for x in ("fornecedor", "exclusivo", "manutencao", "veiculo")):
+                return True
+    return False
 
 
-def _apply_art74_i_dotacao_paragraph_branch(doc: Document, tpl_path: Path, dotacao: str | None) -> None:
+def _apply_art74_i_dotacao_paragraph_branch(
+    doc: Document, tpl_path: Path, dotacao: str | None, slots: TRTemplateSlots
+) -> None:
     """
     - Com dotação preenchida: remove o bloco «dotação orçamentária própria…» (15.1 alternativo).
     - Sem dotação: remove o bloco «…seguinte dotação orçamentária…» (15.1 com campo numérico).
     Em ambos os casos, comprime parágrafos vazios extras no corpo.
     """
-    if not _tr_template_art74_i_dotacao_branches(tpl_path):
+    if not _tr_is_lei14133_art74_i_inexigibilidade_pack(tpl_path, slots):
         return
     has_dot = bool(str(dotacao or "").strip())
     removed = 0
@@ -724,6 +774,41 @@ def _apply_art74_i_dotacao_paragraph_branch(doc: Document, tpl_path: Path, dotac
             doc,
             "seguinte dotação orçamentária",
         )
+    if removed:
+        _collapse_consecutive_empty_body_paragraphs(doc)
+
+
+def _tr_precos_comerciais_informados(slots: TRTemplateSlots) -> bool:
+    """
+    Há preço de referência nos itens (unitário ou total por linha) ou valor total global no TR.
+    Alinhado à regra da tabela de itens: sem isto, o modelo não deve exibir o §1.1 do valor do processo.
+    """
+    for item in slots.itens or []:
+        if str(getattr(item, "valor_unitario", "") or "").strip():
+            return True
+        if str(getattr(item, "valor_total", "") or "").strip():
+            return True
+    if str(getattr(slots, "valor_total", "") or "").strip():
+        return True
+    return False
+
+
+def _apply_art74_i_remove_valor_total_processo_sem_precos(
+    doc: Document, tpl_path: Path, slots: TRTemplateSlots
+) -> None:
+    """
+    Modelos Art. 74, I (fornecedor exclusivo / manutenção de veículos) trazem o §1.1 sobre
+    valor total obtido por proposta comercial. Se nenhum preço foi informado, remove o parágrafo
+    (evita «R$0,00» e texto desnecessário).
+    """
+    if not _tr_is_lei14133_art74_i_inexigibilidade_pack(tpl_path, slots):
+        return
+    if _tr_precos_comerciais_informados(slots):
+        return
+    removed = _remove_body_paragraphs_matching_needle(
+        doc,
+        "proposta comercial fornecida pelo fornecedor exclusivo",
+    )
     if removed:
         _collapse_consecutive_empty_body_paragraphs(doc)
 
@@ -753,8 +838,8 @@ def render_tr_from_slots(
 
     def _normalize_slot_block(text: str) -> str:
         t = str(text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
-        # Evita "double space"/linhas em branco duplas entre blocos
-        t = re.sub(r"\n{2,}", "\n", t)
+        # Preserva um par de quebras (parágrafo lógico); só colapsa 3+ linhas vazias a \\n\\n.
+        t = re.sub(r"\n{3,}", "\n\n", t)
         return t
 
     justificativa_text = _normalize_slot_block(slots.justificativa or "")
@@ -849,8 +934,10 @@ def render_tr_from_slots(
     }
 
     _replace_placeholders_in_paragraphs(doc, mapping)
+    split_paragraphs_on_double_newline(doc)
     _fix_respetiva_typo_in_document(doc)
-    _apply_art74_i_dotacao_paragraph_branch(doc, tpl_path, slots.dotacao)
+    _apply_art74_i_dotacao_paragraph_branch(doc, tpl_path, slots.dotacao, slots)
+    _apply_art74_i_remove_valor_total_processo_sem_precos(doc, tpl_path, slots)
     _fill_items_table(doc, slots.itens)
 
     out_path = Path(output_path) if output_path else None

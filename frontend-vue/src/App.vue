@@ -72,7 +72,7 @@
                   @click="generationMenuOpen = !generationMenuOpen"
                 >
                   <span><i class="fa-solid fa-file-lines" aria-hidden="true"></i>{{ activeSectionLabel }}</span>
-                  <i class="fa-solid" :class="generationMenuOpen ? 'fa-chevron-up' : 'fa-chevron-down'" aria-hidden="true"></i>
+                  <i class="fa-solid" :class="generationMenuOpen ? 'fa-chevron-down' : 'fa-chevron-right'" aria-hidden="true"></i>
                 </button>
 
                 <div v-if="activeMainTabKey === 'dispensa' || generationMenuOpen" class="dm-subnav">
@@ -84,7 +84,7 @@
                       @click="toggleGroup(page.name)"
                     >
                       <span><i class="fa-solid" :class="page.icon" aria-hidden="true"></i>{{ page.label }}</span>
-                      <i class="fa-solid" :class="isGroupOpen(page.name) ? 'fa-chevron-up' : 'fa-chevron-down'" aria-hidden="true"></i>
+                      <i class="fa-solid" :class="isGroupOpen(page.name) ? 'fa-chevron-down' : 'fa-chevron-right'" aria-hidden="true"></i>
                     </button>
                     <div v-if="isGroupOpen(page.name) && page.children?.length" class="dm-subsubnav">
                       <template v-for="section in groupedChildren(page)" :key="section.key">
@@ -103,7 +103,7 @@
                             <span class="dm-subnav-art-btn__label">{{ section.title }}</span>
                             <i
                               class="fa-solid"
-                              :class="isArtSectionOpen(page.name, section.key) ? 'fa-chevron-up' : 'fa-chevron-down'"
+                              :class="isArtSectionOpen(page.name, section.key) ? 'fa-chevron-down' : 'fa-chevron-right'"
                               aria-hidden="true"
                             ></i>
                           </button>
@@ -1096,7 +1096,7 @@ watch(
 }
 
 .dm-nav-item--expandable .fa-chevron-down,
-.dm-nav-item--expandable .fa-chevron-up {
+.dm-nav-item--expandable .fa-chevron-right {
   color: var(--dm-nav-chevron-muted);
   font-size: 11px;
   opacity: 0.95;
@@ -1194,7 +1194,7 @@ watch(
 }
 
 .dm-subnav-btn .fa-chevron-down,
-.dm-subnav-btn .fa-chevron-up {
+.dm-subnav-btn .fa-chevron-right {
   color: var(--dm-nav-chevron-muted);
   font-size: 10px;
 }
@@ -1255,7 +1255,7 @@ watch(
 }
 
 .dm-subnav-art-btn .fa-chevron-down,
-.dm-subnav-art-btn .fa-chevron-up {
+.dm-subnav-art-btn .fa-chevron-right {
   color: rgba(255, 255, 255, 0.85);
   font-size: 10px;
 }

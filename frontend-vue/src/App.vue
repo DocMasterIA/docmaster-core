@@ -182,17 +182,17 @@
             </nav>
           </aside>
 
-          <div v-if="sidebarNavHidden" class="dm-sidebar-reveal-bar">
-            <button
-              type="button"
-              class="dm-sidebar-reveal-bar__btn"
-              title="Mostrar painel lateral de navegação"
-              aria-label="Mostrar navegação da seção"
-              @click="sidebarNavHidden = false"
-            >
-              Mostrar navegação
-            </button>
-          </div>
+          <button
+            v-if="sidebarNavHidden"
+            type="button"
+            class="dm-nav-reveal-fab"
+            title="Mostrar painel lateral de navegação"
+            aria-label="Mostrar navegação da seção"
+            @click="sidebarNavHidden = false"
+          >
+            <i class="fa-solid fa-bars dm-nav-reveal-fab__icon" aria-hidden="true"></i>
+            <span>Mostrar navegação</span>
+          </button>
 
           <main class="dm-content">
             <router-view />
@@ -851,6 +851,7 @@ watch(
 
 .dm-body--nav-hidden {
   grid-template-columns: minmax(0, 1fr);
+  position: relative;
 }
 
 .dm-body--nav-hidden .dm-sidebar {
@@ -930,51 +931,59 @@ watch(
   }
 }
 
-/* Faixa no topo da área de conteúdo quando a sidebar está oculta (desktop). */
-.dm-sidebar-reveal-bar {
+/* Botão flutuante (sem faixa) quando a sidebar está oculta — desktop. */
+.dm-nav-reveal-fab {
   display: none;
-  min-width: 0;
-  padding: 8px 16px;
-  border-bottom: 2px solid #254e78;
-  background: #e8eef5;
-}
-.dm-dark .dm-sidebar-reveal-bar {
-  border-bottom-color: #60a5fa;
-  background: #0f172a;
-}
-.dm-sidebar-reveal-bar__btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  z-index: 40;
   margin: 0;
-  padding: 7px 14px;
+  gap: 8px;
+  padding: 8px 14px;
   border: 1px solid #94a3b8;
-  border-radius: 8px;
+  border-radius: 10px;
   background: #fff;
   color: #254e78;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
-.dm-sidebar-reveal-bar__btn:hover {
+
+.dm-nav-reveal-fab__icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.dm-nav-reveal-fab:hover {
   background: #f1f5f9;
   border-color: #254e78;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
 }
-.dm-dark .dm-sidebar-reveal-bar__btn {
+.dm-dark .dm-nav-reveal-fab {
   border-color: #475569;
   background: #1e293b;
   color: #93c5fd;
+  box-shadow: 0 4px 16px rgba(2, 6, 23, 0.45);
 }
-.dm-dark .dm-sidebar-reveal-bar__btn:hover {
+.dm-dark .dm-nav-reveal-fab:hover {
   background: #334155;
   border-color: #60a5fa;
   color: #f8fafc;
 }
 
 @media (min-width: 1280px) {
-  .dm-body--nav-hidden .dm-sidebar-reveal-bar {
-    display: block;
+  .dm-body--nav-hidden .dm-nav-reveal-fab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Espaço para o FAB não cobrir o primeiro bloco da página. */
+  .dm-body--nav-hidden .dm-content {
+    padding-top: 52px;
   }
 }
 

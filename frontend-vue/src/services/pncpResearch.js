@@ -252,6 +252,35 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Reintentos só para falhas de rede transitórias (proxy, Wi‑Fi, browser em segundo plano).
+ * Erros HTTP devolvem `Response` normalmente; não se reintenta aqui.
+ */
+async function fetchWithNetworkRetry(url, init, { retries = 12, baseDelayMs = 700 } = {}) {
+  let lastErr;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    if (init?.signal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
+    }
+    try {
+      return await fetch(url, { ...init, cache: init?.cache ?? 'no-store' });
+    } catch (err) {
+      lastErr = err;
+      if (init?.signal?.aborted) throw err;
+      const msg = String(err?.message || err || '');
+      if (!/failed to fetch|networkerror|load failed/i.test(msg)) {
+        throw err;
+      }
+      if (attempt < retries - 1) {
+        const jitter = Math.random() * 400;
+        const wait = Math.round(baseDelayMs * 1.4 ** attempt + jitter);
+        await sleep(wait);
+      }
+    }
+  }
+  throw lastErr;
+}
+
 function mapNetworkError(err, context) {
   const msg = String(err?.message || err || '');
   if (/failed to fetch|networkerror|load failed/i.test(msg)) {
@@ -262,11 +291,11 @@ function mapNetworkError(err, context) {
     }
     if (context === 'poll') {
       return new Error(
-        'A conexão caiu ao aguardar o PDF. O servidor pode ainda estar a gerar — feche e abra o relatório e tente «Gerar e baixar» outra vez.',
+        'A rede falhou várias vezes ao consultar o estado do PDF (o servidor pode já ter concluído). Verifique a ligação e tente «Gerar e baixar» outra vez.',
       );
     }
     return new Error(
-      'O download do PDF foi interrompido (rede). Tente novamente; se o relatório for muito grande, aguarde e volte a gerar.',
+      'O download do PDF foi interrompido (rede). Tente novamente; se o relatório for muito grande, aguarde um pouco e volte a gerar.',
     );
   }
   return err;
@@ -309,9 +338,10 @@ export async function downloadCotacaoRelatorioPdf(
 
   let startRes;
   try {
-    startRes = await fetch(
+    startRes = await fetchWithNetworkRetry(
       `${API_BASE}/api/pncp/cotacoes/research/sessions/${encodeURIComponent(sessaoId)}/relatorio/pdf/start`,
       startOpts,
+      { retries: 5, baseDelayMs: 500 },
     );
   } catch (err) {
     throw mapNetworkError(err, 'start');
@@ -342,13 +372,18 @@ export async function downloadCotacaoRelatorioPdf(
     }
     let pollRes;
     try {
-      pollRes = await fetch(pollUrl, { credentials: 'include', signal });
+      pollRes = await fetchWithNetworkRetry(pollUrl, { credentials: 'include', signal });
     } catch (err) {
       throw mapNetworkError(err, 'poll');
     }
     const pollCtype = (pollRes.headers.get('content-type') || '').toLowerCase();
 
     if (pollRes.status === 202) {
+      try {
+        await pollRes.text();
+      } catch (_) {
+        /* ignorar — apenas libertar corpo da resposta */
+      }
       await sleep(POLL_MS);
       continue;
     }
@@ -377,7 +412,7 @@ export async function downloadCotacaoRelatorioPdf(
     const fileUrl = `${API_BASE}${pollData.file_url}`;
     let fileRes;
     try {
-      fileRes = await fetch(fileUrl, { credentials: 'include', signal });
+      fileRes = await fetchWithNetworkRetry(fileUrl, { credentials: 'include', signal }, { retries: 8, baseDelayMs: 900 });
     } catch (err) {
       throw mapNetworkError(err, 'blob');
     }

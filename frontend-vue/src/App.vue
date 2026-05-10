@@ -96,7 +96,7 @@
                     </button>
                     <div v-if="isGroupOpen(page.name) && page.children?.length" class="dm-subsubnav">
                       <template v-for="section in groupedChildren(page)" :key="section.key">
-                        <template v-if="isArt75DropdownSection(section)">
+                        <template v-if="isCollapsibleSubsectionNav(section)">
                           <button
                             type="button"
                             class="dm-subnav-art-btn"
@@ -230,7 +230,7 @@ const darkMode = ref(false);
 /** Painel lateral (≥1280px); em viewports estreitas a sidebar já fica oculta por CSS. */
 const sidebarNavHidden = ref(false);
 const generationMenuOpen = ref(false);
-/** Abre/fecha dropdown «Art. 75, I / II» por grupo: chave `${pageName}::${sectionKey}`. */
+/** Abre/fecha dropdown por inciso (Art. 75 I/II, Art. 74 I, etc.): chave `${pageName}::${sectionKey}`. */
 const artSectionOpen = ref({});
 const groupOpenState = ref({
   DispensaRapidaGroup: false,
@@ -319,12 +319,14 @@ const generationPages = [
         name: 'InexigibilidadeArt74IManutencaoVeiculosPreview',
         label: 'Manutenção de veículos',
         icon: 'fa-car-side',
+        subsection: 'Art. 74, I',
         to: '/geracao/inexigibilidade-art-74-i/manutencao-veiculos',
       },
       {
         name: 'InexigibilidadeArt74IFornecedorExclusivoPreview',
         label: 'Fornecedor exclusivo',
         icon: 'fa-industry',
+        subsection: 'Art. 74, I',
         to: '/geracao/inexigibilidade-art-74-i/fornecedor-exclusivo',
       },
     ],
@@ -491,8 +493,19 @@ function isGroupActive(page) {
   return page.children?.some((child) => child.name === route.name) || false;
 }
 
-function isArt75DropdownSection(section) {
-  return section?.key === 'Art. 75, I' || section?.key === 'Art. 75, II';
+function isCollapsibleSubsectionNav(section) {
+  const k = section?.key;
+  return k === 'Art. 75, I' || k === 'Art. 75, II' || k === 'Art. 74, I';
+}
+
+function collapsibleSubsectionDefinitions(pageName) {
+  if (pageName === 'InexigibilidadeArt74I') {
+    return [{ key: 'Art. 74, I', title: 'Art. 74, I' }];
+  }
+  return [
+    { key: 'Art. 75, I', title: 'Art. 75, I' },
+    { key: 'Art. 75, II', title: 'Art. 75, II' },
+  ];
 }
 
 function toggleArtSection(pageName, sectionKey) {
@@ -502,7 +515,7 @@ function toggleArtSection(pageName, sectionKey) {
     artSectionOpen.value = { ...artSectionOpen.value, [k]: false };
     return;
   }
-  /* Só uma secção Art. 75 (I ou II) aberta de cada vez na navegação lateral. */
+  /* Só uma secção por inciso aberta de cada vez na navegação lateral (ex.: Art. 75, I vs II). */
   artSectionOpen.value = { [k]: true };
 }
 
@@ -512,10 +525,8 @@ function isArtSectionOpen(pageName, sectionKey) {
 
 function groupedChildren(page) {
   const children = Array.isArray(page?.children) ? page.children : [];
-  const sections = [
-    { key: 'Art. 75, I', title: 'Art. 75, I', items: [] },
-    { key: 'Art. 75, II', title: 'Art. 75, II', items: [] },
-  ];
+  const defs = collapsibleSubsectionDefinitions(page?.name);
+  const sections = defs.map((d) => ({ key: d.key, title: d.title, items: [] }));
   const byKey = new Map(sections.map((s) => [s.key, s]));
   const fallback = [];
   children.forEach((child) => {
@@ -626,9 +637,8 @@ watch(
       return;
     }
     for (const page of generationPages) {
-      if (page.name !== 'DispensaRapidaGroup' && page.name !== 'DispensaArt75II') continue;
       for (const c of page.children || []) {
-        if (c.name === name && c.subsection) {
+        if (c.name === name && c.subsection && isCollapsibleSubsectionNav({ key: c.subsection })) {
           artSectionOpen.value = {
             [`${page.name}::${c.subsection}`]: true,
           };
@@ -874,11 +884,12 @@ watch(
   display: none;
 }
 
-/* Navegação lateral — hierarquia com cantos arredondados moderados (nível 1 branco; nível 2 azul escuro; nível 3 activo mesmo azul escuro). */
+/* Navegação lateral — nível 1 com traço azul à esquerda; nível 2 / nível 3 activo em azul escuro. */
 .dm-sidebar {
   --dm-nav-bg: #e4ecf4;
   --dm-nav-l1-bg: #ffffff;
   --dm-nav-l1-text: #154e78;
+  --dm-nav-l1-bar: #154e78;
   --dm-nav-l2-bg: #154e78;
   --dm-nav-l2-text: #ffffff;
   --dm-nav-l2-hover: #1a5d8f;
@@ -898,6 +909,7 @@ watch(
   --dm-nav-bg: #020617;
   --dm-nav-l1-bg: #0f172a;
   --dm-nav-l1-text: #e2e8f0;
+  --dm-nav-l1-bar: #60a5fa;
   --dm-nav-l2-bg: #1e3a5f;
   --dm-nav-l2-text: #f8fafc;
   --dm-nav-l2-hover: #2563eb;
@@ -1100,12 +1112,14 @@ watch(
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  box-shadow: inset 5px 0 0 0 var(--dm-nav-l1-bar);
   transition: background 0.15s ease, color 0.15s ease;
 }
 .dm-dark .dm-nav-item,
 .dm-dark .dm-nav-item:visited {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
+  box-shadow: inset 5px 0 0 0 var(--dm-nav-l1-bar);
 }
 
 .dm-nav-item--expandable {
@@ -1156,10 +1170,12 @@ watch(
 .dm-nav-item--active {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
+  box-shadow: inset 6px 0 0 0 var(--dm-nav-l1-bar);
 }
 .dm-dark .dm-nav-item--active {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
+  box-shadow: inset 6px 0 0 0 var(--dm-nav-l1-bar);
 }
 
 .dm-nav-item--static {
@@ -1191,7 +1207,7 @@ watch(
   border-left-color: var(--dm-nav-tree);
 }
 
-/* Nível 1 (grupo: Dispensa rápida, etc.) — fundo branco, texto azul escuro. */
+/* Nível 1 (grupo: Dispensa rápida, Dispensa normal, etc.) — traço azul à esquerda. */
 .dm-subnav-btn {
   width: 100%;
   border: none;
@@ -1206,11 +1222,13 @@ watch(
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
+  box-shadow: inset 5px 0 0 0 var(--dm-nav-l1-bar);
   transition: background 0.15s ease, color 0.15s ease;
 }
 .dm-dark .dm-subnav-btn {
   background: var(--dm-nav-l1-bg);
   color: var(--dm-nav-l1-text);
+  box-shadow: inset 5px 0 0 0 var(--dm-nav-l1-bar);
 }
 
 .dm-subnav-btn span {
@@ -1224,14 +1242,16 @@ watch(
   font-size: 10px;
 }
 
-/* Grupo com rota activa: mantém nível 1. */
+/* Grupo com rota activa: mantém nível 1; traço um pouco mais espesso. */
 .dm-subnav-btn--active {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
+  box-shadow: inset 6px 0 0 0 var(--dm-nav-l1-bar);
 }
 .dm-dark .dm-subnav-btn--active {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
+  box-shadow: inset 6px 0 0 0 var(--dm-nav-l1-bar);
 }
 .dm-subnav-btn--active:hover {
   background: #e8eef6;

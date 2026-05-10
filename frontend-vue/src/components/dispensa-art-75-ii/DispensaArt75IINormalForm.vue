@@ -63,7 +63,7 @@
                       <textarea
                         class="da75-textarea"
                         :value="objetoContratado"
-                        placeholder="Ex: Aquisição de medicamentos"
+                        :placeholder="normalPhObjeto"
                         @input="objetoContratado = primeiraMaiuscula(($event.target).value)"
                       />
                     </div>
@@ -72,7 +72,7 @@
                       <input
                         class="da75-input"
                         :value="objetoSetor"
-                        placeholder="Ex: UBS Leontino"
+                        :placeholder="normalPhSetor"
                         @input="objetoSetor = primeiraMaiuscula(($event.target).value)"
                       />
                     </div>
@@ -81,7 +81,7 @@
                       <textarea
                         class="da75-textarea"
                         :value="objetoCaracteristicas"
-                        placeholder="Ex: Para doação à população carente"
+                        :placeholder="normalPhCaracteristicas"
                         @input="objetoCaracteristicas = primeiraMaiuscula(($event.target).value)"
                       />
                     </div>
@@ -316,6 +316,50 @@ const SLOT_PACKAGE_BY_ROUTE = {
   DispensaArt75IIComprasServicosInclusos: 'dispensa_75_ii_compras_servicos_inclusos',
 };
 const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[String(route.name || '')] || 'tr_dfd_generico');
+
+/** Exemplos por modalidade (dispensa normal — objeto / setor / características). */
+const NORMAL_OBJ_EXAMPLES = {
+  DispensaArt75IObrasEngenharia: {
+    objeto: 'Ex: Reforma do prédio da prefeitura, incluindo fornecimento de materiais e mão de obra',
+    setor: 'Ex: Secretaria Municipal de Obras e Urbanismo',
+    caracteristicas: 'Ex: Cronograma físico-financeiro em anexo ao processo (opcional)',
+  },
+  DispensaArt75IManutencaoVeiculos: {
+    objeto: 'Ex: Prestação de serviços com reparo no módulo de injeção eletrônica',
+    setor: 'Ex: Frota oficial da Prefeitura',
+    caracteristicas: 'Ex: Peças com garantia mínima de 90 dias (opcional)',
+  },
+  DispensaArt75IICompras: {
+    objeto: 'Ex: Aquisição de medicamentos',
+    setor: 'Ex: UBS Leontino',
+    caracteristicas: 'Ex: Para doação à população carente',
+  },
+  DispensaArt75IIServicos: {
+    objeto: 'Ex: Prestação de serviços de limpeza e conservação predial',
+    setor: 'Ex: Prédios públicos municipais',
+    caracteristicas: 'Ex: Com fornecimento de materiais de limpeza',
+  },
+  DispensaArt75IIComprasServicosInclusos: {
+    objeto: 'Ex: Aquisição de playground infantil com instalação',
+    setor: 'Ex: Secretaria Municipal de Assistência Social',
+    caracteristicas: 'Ex: Para recreação das crianças',
+  },
+};
+
+const normalPhTrio = computed(() => {
+  const n = String(route.name || '');
+  return (
+    NORMAL_OBJ_EXAMPLES[n] || {
+      objeto: 'Ex: Descreva o objeto da contratação',
+      setor: 'Ex: Setor ou secretaria atendida',
+      caracteristicas: 'Ex: Requisitos ou observações (opcional)',
+    }
+  );
+});
+
+const normalPhObjeto = computed(() => normalPhTrio.value.objeto);
+const normalPhSetor = computed(() => normalPhTrio.value.setor);
+const normalPhCaracteristicas = computed(() => normalPhTrio.value.caracteristicas);
 
 function resolveSolOficioFundamentoLegal(routeName) {
   const name = String(routeName || '').trim();

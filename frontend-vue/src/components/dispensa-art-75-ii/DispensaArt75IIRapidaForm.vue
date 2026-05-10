@@ -237,8 +237,25 @@ const documentDfdFilename = ref('dfd.docx');
 const documentOficioFilename = ref('oficio.docx');
 const documentZipFilename = ref('tr_dfd_oficio.zip');
 
-const rapidaObjPlaceholder = `Ex: Aquisição de material de expediente para Secretaria da Administração
-10 canetas azul, 2 grampeadores, 10 resmas de papel A4`;
+/** Exemplos por modalidade (dispensa rápida). */
+const RAPIDA_OBJ_PLACEHOLDER_BY_ROUTE = {
+  DispensaRapidaArt75IObrasEngenharia:
+    'Ex: Reforma do prédio da prefeitura, incluindo fornecimento de materiais e mão de obra',
+  DispensaRapidaArt75IManutencaoVeiculos:
+    'Ex: Prestação de serviços com reparo no módulo de injeção eletrônica',
+  DispensaRapidaArt75IICompras: `Ex: Aquisição de material de expediente para Secretaria da Administração
+10 canetas azul, 2 grampeadores, 10 resmas de papel A4`,
+  DispensaRapidaArt75IIServicos:
+    'Ex: Prestação de serviços de manutenção preventiva e corretiva em aparelhos de ar-condicionado da sede da Prefeitura.',
+  DispensaRapidaArt75IIComprasServicosInclusos:
+    'Ex: Aquisição de câmeras de segurança e equipamentos de videomonitoramento, incluindo os serviços de instalação',
+};
+
+const rapidaObjPlaceholder = computed(
+  () =>
+    RAPIDA_OBJ_PLACEHOLDER_BY_ROUTE[String(route.name || '')] ||
+    'Ex: Descreva de forma objetiva o que será contratado',
+);
 
 const SLOT_PACKAGE_BY_ROUTE = {
   DispensaRapidaArt75IObrasEngenharia: 'dispensa_75_i_obras_engenharia',

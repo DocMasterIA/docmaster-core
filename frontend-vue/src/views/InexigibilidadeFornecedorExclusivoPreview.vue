@@ -115,7 +115,7 @@
                   <div class="fe-grid-item">
                     <div class="fe-field"><label>Descrição</label><input :value="item.descricao" placeholder="Descreva o item" @input="atualizarItem(index, 'descricao', $event)" /></div>
                     <div class="fe-field"><label>Quantidade</label><input :value="item.quantidade" placeholder="1" @input="atualizarItem(index, 'quantidade', $event)" /></div>
-                    <div class="fe-field"><label>Unidade medida</label><input :value="item.unidade" placeholder="Ex: Unidade" @input="atualizarItem(index, 'unidade', $event)" /></div>
+                    <div class="fe-field"><label>Unidade de medida</label><input :value="item.unidade" placeholder="Ex: Unidade" @input="atualizarItem(index, 'unidade', $event)" /></div>
                     <div class="fe-field"><label>Valor unitário</label><input :value="item.valorUnitario" @input="atualizarItem(index, 'valorUnitario', $event)" /></div>
                     <div class="fe-field"><label>Valor total</label><input :value="item.valorTotal" @input="atualizarItem(index, 'valorTotal', $event)" /></div>
                     <button type="button" class="fe-btn-secondary" @click="adicionarItem">+</button>

@@ -7,9 +7,9 @@
             <div class="ixp-main-title">
               <div class="ixp-bot">IA</div>
               <div>
-                <small>Modulo ativo</small>
+                <small>Módulo ativo</small>
                 <h2>Inexigibilidade</h2>
-                <p>Fornecedor Exclusivo para manutencao de veiculos (Art. 74, I)</p>
+                <p>{{ pageSubtitle }}</p>
               </div>
             </div>
             <button type="button" class="ixp-btn-secondary" @click="drawerOpen = true">Dados fixos</button>
@@ -80,18 +80,18 @@
             </section>
 
             <article v-if="isFornecedorExclusivoRoute" class="ixp-card">
-              <h3>Objeto especifico</h3>
+              <h3>Objeto específico</h3>
               <div class="ixp-body">
                 <div class="ixp-field">
-                  <label>Selecione o objeto especifico da contratacao</label>
+                  <label>Selecione o objeto específico da contratação</label>
                   <select v-model="objetoEspecifico">
                     <option value="">Selecione</option>
                     <option v-for="op in objetoEspecificoOptions" :key="op" :value="op">{{ op }}</option>
                   </select>
                 </div>
                 <div v-if="objetoEspecifico === 'Outro'" class="ixp-field">
-                  <label>Descreva o objeto especifico da contratacao</label>
-                  <input v-model="outroObjetoEspecifico" placeholder="Ex: Fornecimento de kit de manutencao original" />
+                  <label>Descreva o objeto específico da contratação</label>
+                  <input v-model="outroObjetoEspecifico" placeholder="Ex: Fornecimento de kit de manutenção original" />
                 </div>
               </div>
             </article>
@@ -106,7 +106,7 @@
             </article>
 
             <article v-if="isManutencaoVeiculosRoute" class="ixp-card">
-              <h3>Dados do veiculo</h3>
+              <h3>Dados do veículo</h3>
               <div class="ixp-body ixp-grid-3">
                 <div class="ixp-field"><label>Marca</label><input :value="marca" placeholder="Ex: Chevrolet" @input="marca = primeiraMaiuscula(String(($event.target).value || ''))" /></div>
                 <div class="ixp-field"><label>Modelo</label><input :value="modelo" placeholder="Ex: S10" @input="modelo = primeiraMaiuscula(String(($event.target).value || ''))" /></div>
@@ -115,21 +115,21 @@
             </article>
 
             <article v-if="isDispensaManutencaoRoute" class="ixp-card">
-              <h3>Tipo de manutencao</h3>
+              <h3>Tipo de manutenção</h3>
               <div class="ixp-body">
                 <div class="ixp-grid-2">
                   <button type="button" :class="['ixp-choice', tipoManutencao === 'Corretiva' && 'is-active']" @click="setCorretiva">
-                    <strong>Manutencao corretiva</strong>
+                    <strong>Manutenção corretiva</strong>
                     <span>Reparo por falha, defeito ou necessidade imediata.</span>
                   </button>
                   <button type="button" :class="['ixp-choice', tipoManutencao === 'Preventiva' && 'is-active']" @click="tipoManutencao = 'Preventiva'">
-                    <strong>Manutencao preventiva</strong>
-                    <span>Revisao programada conforme quilometragem ou plano.</span>
+                    <strong>Manutenção preventiva</strong>
+                    <span>Revisão programada conforme quilometragem ou plano.</span>
                   </button>
                 </div>
                 <div v-if="tipoManutencao === 'Preventiva'" class="ixp-field ixp-mt">
-                  <label>Quilometragem / Revisao preventiva</label>
-                  <input v-model="revisaoKm" placeholder="Ex: Revisao de 10.000 km" />
+                  <label>Quilometragem / revisão preventiva</label>
+                  <input v-model="revisaoKm" placeholder="Ex: Revisão de 10.000 km" />
                 </div>
               </div>
             </article>
@@ -138,11 +138,11 @@
               <h3>Fornecedor exclusivo</h3>
               <div class="ixp-body ixp-grid-2">
                 <div class="ixp-field">
-                  <label>Razao social / Nome do fornecedor</label>
+                  <label>Razão social / nome do fornecedor</label>
                   <input
                     :value="fornecedor"
                     list="dl-fornecedor"
-                    placeholder="Digite a razao social"
+                    placeholder="Digite a razão social"
                     @input="fornecedor = tituloNomePt(String(($event.target).value || ''))"
                   />
                 </div>
@@ -151,14 +151,14 @@
             </article>
 
             <article class="ixp-card">
-              <h3>Dotacao orcamentaria</h3>
+              <h3>Dotação orçamentária</h3>
               <div class="ixp-body">
                 <label class="ixp-check">
                   <input v-model="dotacaoAtiva" type="checkbox" />
-                  Informar dotacao orcamentaria (opcional)
+                  Informar dotação orçamentária (opcional)
                 </label>
                 <div v-if="dotacaoAtiva" class="ixp-field">
-                  <label>Dotacao orcamentaria</label>
+                  <label>Dotação orçamentária</label>
                   <textarea v-model="dotacao" rows="3" :placeholder="placeholderDotacao" />
                 </div>
               </div>
@@ -173,10 +173,10 @@
                     <button v-if="itens.length > 1" type="button" class="ixp-link-danger" @click="removerItem(index)">Remover</button>
                   </div>
                   <div class="ixp-grid-item">
-                    <div class="ixp-field"><label>Descricao</label><input :value="item.descricao" @input="atualizarItem(index, 'descricao', $event)" /></div>
+                    <div class="ixp-field"><label>Descrição</label><input :value="item.descricao" @input="atualizarItem(index, 'descricao', $event)" /></div>
                     <div class="ixp-field"><label>Quantidade</label><input :value="item.quantidade" @input="atualizarItem(index, 'quantidade', $event)" /></div>
-                    <div class="ixp-field"><label>Unidade medida</label><input :value="item.unidade" @input="atualizarItem(index, 'unidade', $event)" /></div>
-                    <div class="ixp-field"><label>Valor unitario</label><input :value="item.valorUnitario" @input="atualizarItem(index, 'valorUnitario', $event)" /></div>
+                    <div class="ixp-field"><label>Unidade de medida</label><input :value="item.unidade" @input="atualizarItem(index, 'unidade', $event)" /></div>
+                    <div class="ixp-field"><label>Valor unitário</label><input :value="item.valorUnitario" @input="atualizarItem(index, 'valorUnitario', $event)" /></div>
                     <div class="ixp-field"><label>Valor total</label><input :value="item.valorTotal" @input="atualizarItem(index, 'valorTotal', $event)" /></div>
                     <button type="button" class="ixp-btn-secondary" @click="adicionarItem">+</button>
                   </div>
@@ -190,7 +190,7 @@
             </div>
 
             <article class="ixp-card">
-              <h3>Fiscalizacao</h3>
+              <h3>Fiscalização</h3>
               <div class="ixp-body">
                 <div class="ixp-field">
                   <label>Nome do fiscal de contratos</label>
@@ -204,10 +204,10 @@
             </article>
 
             <article class="ixp-card">
-              <h3>Responsavel pelo Termo de Referencia</h3>
+              <h3>Responsável pelo Termo de Referência</h3>
               <div class="ixp-body ixp-grid-2">
                 <div class="ixp-field">
-                  <label>Nome do responsavel</label>
+                  <label>Nome do responsável</label>
                   <input
                     :value="responsavel"
                     list="dl-tr-nome-assinante"
@@ -215,7 +215,7 @@
                   />
                 </div>
                 <div class="ixp-field">
-                  <label>Cargo/Funcao</label>
+                  <label>Cargo / função</label>
                   <input
                     :value="responsavelCargo"
                     list="dl-tr-cargo-assinante"
@@ -243,14 +243,14 @@
             </article>
 
             <article v-if="isDispensaNormalRoute" class="ixp-card">
-              <h3>Gerar clausulas (IA)</h3>
+              <h3>Gerar cláusulas (IA)</h3>
               <div class="ixp-body">
                 <p class="ixp-hint">
-                  Gere e revise as clausulas antes do documento final. Esse fluxo vale apenas para Dispensa normal.
+                  Gere e revise as cláusulas antes do documento final. Esse fluxo vale apenas para dispensa normal.
                 </p>
-                <div class="ixp-field"><label>O que sera contratado?</label><textarea v-model="clausulaContratado" rows="3" placeholder="Ex: Aquisicao de material de expediente" /></div>
-                <div class="ixp-field"><label>Qual setor/secretaria sera atendido?</label><input v-model="clausulaSetor" list="dl-clausula-setor" placeholder="Ex: Secretaria de Administracao" /></div>
-                <div class="ixp-field"><label>Caracteristicas minimas obrigatorias (opcional)</label><textarea v-model="clausulaCaracteristicas" rows="3" placeholder="Ex: Itens de primeira linha, entrega fracionada e suporte tecnico" /></div>
+                <div class="ixp-field"><label>O que será contratado?</label><textarea v-model="clausulaContratado" rows="3" placeholder="Ex: Aquisição de material de expediente" /></div>
+                <div class="ixp-field"><label>Qual setor/secretaria será atendido?</label><input v-model="clausulaSetor" list="dl-clausula-setor" placeholder="Ex: Secretaria de Administração" /></div>
+                <div class="ixp-field"><label>Características mínimas obrigatórias (opcional)</label><textarea v-model="clausulaCaracteristicas" rows="3" placeholder="Ex: Itens de primeira linha, entrega fracionada e suporte técnico" /></div>
                 <button class="ixp-btn-secondary" type="button" :disabled="isGeneratingClauses" @click="onGenerateClauses">
                   Gerar objeto e justificativa
                 </button>
@@ -265,7 +265,7 @@
                     <textarea v-model="clausulaObjeto" rows="3" placeholder="Objeto do TR (gerado por IA ou manual)" />
                   </div>
                   <div class="ixp-field">
-                    <label>Justificativa da contratacao</label>
+                    <label>Justificativa da contratação</label>
                     <textarea v-model="clausulaJustificativa" rows="4" placeholder="Justificativa da necessidade" />
                   </div>
                 </div>
@@ -334,7 +334,7 @@
     <div v-if="drawerOpen" class="ixp-overlay" @click="drawerOpen = false"></div>
     <aside :class="['ixp-drawer', drawerOpen && 'is-open']">
       <div class="ixp-drawer-head">
-        <div><small>Configuracao oculta</small><h3>Dados fixos</h3></div>
+        <div><small>Configuração oculta</small><h3>Dados fixos</h3></div>
         <button type="button" class="ixp-btn-secondary" @click="drawerOpen = false">X</button>
       </div>
       <div class="ixp-drawer-body">
@@ -365,12 +365,12 @@
         </article>
 
         <article class="ixp-card">
-          <h3>1. Solicitacao / Oficio</h3>
+          <h3>1. Solicitação / ofício</h3>
           <div class="ixp-body">
             <div class="ixp-grid-3">
               <div class="ixp-field"><label>Tratamento</label><select v-model="fixoTratNome"><option value="">Selecione</option><option v-for="op in tratamentoNome" :key="op" :value="op">{{ op }}</option></select></div>
               <div class="ixp-field ixp-col-2">
-                <label>1.1 A quem e direcionada a solicitacao — Nome</label>
+                <label>1.1 A quem é direcionada a solicitação — nome</label>
                 <input
                   :value="fixoNome"
                   list="dl-solicitacao-destinatario-nome"
@@ -382,11 +382,11 @@
             <div class="ixp-grid-3">
               <div class="ixp-field"><label>Tratamento</label><select v-model="fixoTratCargo"><option value="">Selecione</option><option v-for="op in tratamentoCargo" :key="op" :value="op">{{ op }}</option></select></div>
               <div class="ixp-field ixp-col-2">
-                <label>1.2 A quem e direcionada a solicitacao — Funcao / Cargo</label>
+                <label>1.2 A quem é direcionada a solicitação — função / cargo</label>
                 <input
                   :value="fixoCargo"
                   list="dl-solicitacao-destinatario-cargo"
-                  placeholder="Digite a funcao ou cargo"
+                  placeholder="Digite a função ou cargo"
                   @input="fixoCargo = tituloNomePt(String(($event.target).value || ''))"
                 />
               </div>
@@ -394,16 +394,16 @@
             <h4 class="ixp-subsection-title">1.3 Responsável pela solicitação</h4>
             <div class="ixp-grid-2">
               <div class="ixp-field">
-                <label>Nome do responsavel</label>
+                <label>Nome do responsável</label>
                 <input
                   :value="fixoResponsavel"
                   list="dl-solicitacao-responsavel-nome"
-                  placeholder="Digite o nome do responsavel"
+                  placeholder="Digite o nome do responsável"
                   @input="fixoResponsavel = tituloNomePt(String(($event.target).value || ''))"
                 />
               </div>
               <div class="ixp-field">
-                <label>Funcao / Cargo</label>
+                <label>Função / cargo</label>
                 <input
                   :value="fixoResponsavelCargo"
                   list="dl-solicitacao-responsavel-cargo"
@@ -415,7 +415,7 @@
           </div>
         </article>
         <article class="ixp-card">
-          <h3>2. DFD - Documento de Formalizacao da Demanda</h3>
+          <h3>2. DFD — documento de formalização da demanda</h3>
           <div class="ixp-body ixp-grid-1">
             <div class="ixp-field">
               <label>2.1 Setor requisitante (Unidade / Setor / Departamento)</label>
@@ -426,7 +426,7 @@
               />
             </div>
             <div class="ixp-field">
-              <label>2.2 Responsavel pela demanda</label>
+              <label>2.2 Responsável pela demanda</label>
               <input
                 :value="fixoDemanda"
                 list="dl-dfd-responsavel-demanda"
@@ -456,16 +456,16 @@
             <h4 class="ixp-subsection-title">2.6 Responsável pela assinatura do DFD</h4>
             <div class="ixp-grid-2">
               <div class="ixp-field">
-                <label>Nome do responsavel</label>
+                <label>Nome do responsável</label>
                 <input
                   :value="fixoAssinatura"
                   list="dl-dfd-assinatura-nome"
-                  placeholder="Digite o nome do responsavel"
+                  placeholder="Digite o nome do responsável"
                   @input="fixoAssinatura = tituloNomePt(String(($event.target).value || ''))"
                 />
               </div>
               <div class="ixp-field">
-                <label>Funcao / Cargo</label>
+                <label>Função / cargo</label>
                 <input
                   :value="fixoAssinaturaCargo"
                   list="dl-dfd-assinatura-cargo"
@@ -532,22 +532,22 @@ import DocGenIaLoaderBlock from '@/components/DocGenIaLoaderBlock.vue';
 
 const API_BASE = getApiBase();
 const route = useRoute();
-const dataOptions = ['Data automatica', 'Datado e assinado digitalmente', 'Data manual'];
+const dataOptions = ['Data automática', 'Datado e assinado digitalmente', 'Data manual'];
 const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
 const ORGAO_PROFILES_STORAGE_KEY = 'orgao_profiles_v1';
 const cabecalhoOptions = ref([]);
 const tratamentoNome = ['Ao senhor', 'A senhora'];
 const tratamentoCargo = ['Senhor', 'Senhora'];
 const objetoEspecificoOptions = [
-  'Aquisicao de bens/produtos',
-  'Fornecimento de pecas',
-  'Pecas originais',
-  'Pecas de reposicao',
-  'Componentes e acessorios',
+  'Aquisição de bens/produtos',
+  'Fornecimento de peças',
+  'Peças originais',
+  'Peças de reposição',
+  'Componentes e acessórios',
   'Insumos e materiais',
-  'Prestacao de servicos',
-  'Assistencia tecnica autorizada',
-  'Suporte tecnico especializado',
+  'Prestação de serviços',
+  'Assistência técnica autorizada',
+  'Suporte técnico especializado',
   'Outro',
 ];
 const emptyItem = { descricao: '', quantidade: '', unidade: '', valorUnitario: '', valorTotal: '' };
@@ -696,6 +696,16 @@ const isManutencaoVeiculosRoute = computed(() =>
   || logicalRouteName.value === 'InexigibilidadeArt74IManutencaoVeiculosPreview'
   || logicalRouteName.value === 'InexigibilidadeArt74IManutencaoVeiculos',
 );
+/** Subtítulo da cabeceira conforme a rota (manutenção de veículos vs. fornecedor exclusivo geral). */
+const pageSubtitle = computed(() => {
+  if (isInexigibilidadeManutencaoRoute.value) {
+    return 'Fornecedor exclusivo — manutenção de veículos (Art. 74, I)';
+  }
+  if (isFornecedorExclusivoRoute.value) {
+    return 'Fornecedor exclusivo geral — bens, serviços e soluções (Art. 74, I)';
+  }
+  return 'Documentos de inexigibilidade ou dispensa';
+});
 const slotFieldOptions = reactive({});
 const orgaoProfiles = ref([]);
 const selectedOrgaoProfileId = ref('');
@@ -1118,24 +1128,24 @@ function toBrDate(iso) {
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
 function gerarObjetoTexto(contratado, setor, caracteristicas, tipoManutencaoValue = '', revisaoKmValue = '') {
-  const objeto = String(contratado || '').trim() || 'objeto nao informado';
+  const objeto = String(contratado || '').trim() || 'objeto não informado';
   const destino = String(setor || '').trim() ? `, visando atender as demandas de ${String(setor).trim()}` : '';
   const manutencao = String(tipoManutencaoValue || '').trim()
-    ? `, no escopo de manutencao ${String(tipoManutencaoValue).trim().toLowerCase()}`
+    ? `, no escopo de manutenção ${String(tipoManutencaoValue).trim().toLowerCase()}`
     : '';
-  const revisao = String(revisaoKmValue || '').trim() ? ` (referencia: ${String(revisaoKmValue).trim()})` : '';
-  const detalhes = String(caracteristicas || '').trim() ? `, observadas as seguintes caracteristicas minimas: ${String(caracteristicas).trim()}` : '';
+  const revisao = String(revisaoKmValue || '').trim() ? ` (referência: ${String(revisaoKmValue).trim()})` : '';
+  const detalhes = String(caracteristicas || '').trim() ? `, observadas as seguintes características mínimas: ${String(caracteristicas).trim()}` : '';
   return `${primeiraMaiuscula(objeto)}${destino}${manutencao}${revisao}${detalhes}.`;
 }
 function gerarJustificativaTexto(contratado, setor, caracteristicas, tipoManutencaoValue = '', revisaoKmValue = '') {
   const objeto = String(contratado || '').trim() || 'o objeto indicado';
-  const destino = String(setor || '').trim() ? ` do(a) ${String(setor).trim()}` : ' da Administracao Publica';
+  const destino = String(setor || '').trim() ? ` do(a) ${String(setor).trim()}` : ' da Administração Pública';
   const manutencao = String(tipoManutencaoValue || '').trim()
-    ? ` Considera-se a manutencao ${String(tipoManutencaoValue).trim().toLowerCase()} como eixo da contratacao.`
+    ? ` Considera-se a manutenção ${String(tipoManutencaoValue).trim().toLowerCase()} como eixo da contratação.`
     : '';
-  const revisao = String(revisaoKmValue || '').trim() ? ` Foi indicada a referencia de revisao/quilometragem: ${String(revisaoKmValue).trim()}.` : '';
-  const detalhes = String(caracteristicas || '').trim() ? ` A contratacao devera observar as caracteristicas minimas informadas: ${String(caracteristicas).trim()}.` : '';
-  return `A presente contratacao justifica-se pela necessidade de assegurar ${objeto} para atendimento das demandas${destino}, garantindo a continuidade, eficiencia e adequada prestacao dos servicos publicos.${manutencao}${revisao}${detalhes}`;
+  const revisao = String(revisaoKmValue || '').trim() ? ` Foi indicada a referência de revisão/quilometragem: ${String(revisaoKmValue).trim()}.` : '';
+  const detalhes = String(caracteristicas || '').trim() ? ` A contratação deverá observar as características mínimas informadas: ${String(caracteristicas).trim()}.` : '';
+  return `A presente contratação justifica-se pela necessidade de assegurar ${objeto} para atendimento das demandas${destino}, garantindo a continuidade, eficiência e adequada prestação dos serviços públicos.${manutencao}${revisao}${detalhes}`;
 }
 
 /** Texto para (DFD_OBJETO_REFERENCIA) — redacao em prosa; inexigibilidade Art. 74.I manutencao de veiculos. */
@@ -1407,7 +1417,7 @@ function buildSlotsOverride() {
     logicalRouteName.value === 'DispensaArt75IManutencaoVeiculos'
       ? [
           tipoManutencao.value ? `Tipo: ${tipoManutencao.value}` : '',
-          revisaoKm.value ? `Revisao/KM: ${revisaoKm.value}` : '',
+          revisaoKm.value ? `Revisão/KM: ${revisaoKm.value}` : '',
         ]
       : [];
   const veiculoFallbackParts =
@@ -1565,35 +1575,35 @@ async function onGenerateClauses() {
     const setor = String(clausulaSetor.value || '').trim();
     const caracteristicas = String(clausulaCaracteristicas.value || '').trim();
     if (!contratado || !setor) {
-      generateError.value = 'Preencha "O que sera contratado?" e "Qual setor/secretaria sera atendido?" para gerar objeto e justificativa.';
+      generateError.value = 'Preencha "O que será contratado?" e "Qual setor/secretaria será atendido?" para gerar objeto e justificativa.';
       return;
     }
     const prompt = [
-      'Com base EXCLUSIVAMENTE nos dados abaixo, gere APENAS duas secoes:',
+      'Com base EXCLUSIVAMENTE nos dados abaixo, gere APENAS duas seções:',
       'Objeto:',
       'Justificativa:',
       '',
-      'REGRAS OBRIGATORIAS:',
-      '- Nao inventar orgao, secretaria, tipo de objeto, localidade, frota, veiculos, alunos ou professores se nao estiver explicitamente informado.',
-      '- Nao reutilizar contexto de mensagens anteriores.',
-      '- Usar apenas os tres campos fornecidos pelo usuario.',
-      '- Se faltar informacao, escrever de forma generica sem adicionar fatos novos.',
+      'REGRAS OBRIGATÓRIAS:',
+      '- Não inventar órgão, secretaria, tipo de objeto, localidade, frota, veículos, alunos ou professores se não estiver explicitamente informado.',
+      '- Não reutilizar contexto de mensagens anteriores.',
+      '- Usar apenas os três campos fornecidos pelo usuário.',
+      '- Se faltar informação, escrever de forma genérica sem adicionar fatos novos.',
       '',
-      `O que sera contratado: ${contratado}`,
+      `O que será contratado: ${contratado}`,
       `Setor/secretaria atendido: ${setor}`,
-      `Caracteristicas minimas (opcional): ${caracteristicas || 'nao informado'}`,
-      `Tipo de manutencao: ${isDispensaManutencaoRoute.value ? (tipoManutencao.value || 'nao informado') : 'nao se aplica'}`,
-      `Revisao/KM: ${isDispensaManutencaoRoute.value ? (revisaoKm.value || 'nao informado') : 'nao se aplica'}`,
+      `Características mínimas (opcional): ${caracteristicas || 'não informado'}`,
+      `Tipo de manutenção: ${isDispensaManutencaoRoute.value ? (tipoManutencao.value || 'não informado') : 'não se aplica'}`,
+      `Revisão/KM: ${isDispensaManutencaoRoute.value ? (revisaoKm.value || 'não informado') : 'não se aplica'}`,
     ].join('\n');
     async function requestClausesFast(promptText) {
       const fastPrompt = [
         promptText,
         '',
-        'Formato obrigatorio de resposta:',
+        'Formato obrigatório de resposta:',
         'Objeto: <texto>',
         'Justificativa: <texto>',
         '',
-        'Nao inclua nenhuma secao extra.',
+        'Não inclua nenhuma seção extra.',
       ].join('\n');
       const res = await fetch(`${API_BASE}/api/llm/generate`, {
         method: 'POST',
@@ -1609,7 +1619,7 @@ async function onGenerateClauses() {
     if (!res.ok || !data.ok) {
       generateError.value = res.status === 504
         ? 'A IA demorou para responder (504 Gateway Timeout). Tente um prompt mais objetivo ou gere novamente em alguns instantes.'
-        : (data.error || data.detail || `Erro ${res.status} ao gerar clausulas`);
+        : (data.error || data.detail || `Erro ${res.status} ao gerar cláusulas`);
       return;
     }
     const bySections = extractClausesFromSectionTexts(data.section_texts || {});
@@ -1628,7 +1638,7 @@ async function onGenerateClauses() {
   } catch (e) {
     clausulaObjeto.value = gerarObjetoTexto(clausulaContratado.value, clausulaSetor.value, clausulaCaracteristicas.value, tipoManutencao.value, revisaoKm.value);
     clausulaJustificativa.value = gerarJustificativaTexto(clausulaContratado.value, clausulaSetor.value, clausulaCaracteristicas.value, tipoManutencao.value, revisaoKm.value);
-    generateError.value = e?.message || 'Nao foi possivel gerar via IA; aplicamos a versao padrao local.';
+    generateError.value = e?.message || 'Não foi possível gerar via IA; aplicamos a versão padrão local.';
     await saveUserGlobalPreset();
   } finally {
     isGeneratingClauses.value = false;
@@ -1637,18 +1647,18 @@ async function onGenerateClauses() {
 function buildUserPrompt() {
   const lines = [
     `Gerar documento com base nos dados preenchidos para ${String(route.meta?.title || 'a rota atual')}.`,
-    `Cabecalho do documento: ${cabecalhoDocumento.value || 'Nao informado'}`,
-    `Processo: ${processoAtivo.value ? (processo.value || 'Nao informado') : 'Nao se aplica'}`,
+    `Cabeçalho do documento: ${cabecalhoDocumento.value || 'Não informado'}`,
+    `Processo: ${processoAtivo.value ? (processo.value || 'Não informado') : 'Não se aplica'}`,
     `Órgão: ${orgao.value || 'Não informado'}`,
     ...(isManutencaoVeiculosRoute.value
-      ? [`Veiculo: ${marca.value || '-'} ${modelo.value || '-'} / Placa ${placa.value || '-'}`]
+      ? [`Veículo: ${marca.value || '-'} ${modelo.value || '-'} / Placa ${placa.value || '-'}`]
       : []),
-    `Fornecedor: ${fornecedor.value || 'Nao informado'} / CNPJ: ${cnpj.value || 'Nao informado'}`,
-    `Valor global: ${valorGlobal.value || 'Nao informado'}`,
+    `Fornecedor: ${fornecedor.value || 'Não informado'} / CNPJ: ${cnpj.value || 'Não informado'}`,
+    `Valor global: ${valorGlobal.value || 'Não informado'}`,
   ];
   if (isDispensaManutencaoRoute.value) {
     const idx = isManutencaoVeiculosRoute.value ? 5 : 4;
-    lines.splice(idx, 0, `Tipo manutencao: ${tipoManutencao.value || 'Nao informado'}`);
+    lines.splice(idx, 0, `Tipo de manutenção: ${tipoManutencao.value || 'Não informado'}`);
   }
   return lines.join('\n');
 }
@@ -1662,7 +1672,7 @@ async function onSubmit() {
     const hasJustificativa = !!clausulaJustificativa.value.trim();
     if (!hasObjeto || !hasJustificativa) {
       generateError.value =
-        'Para Dispensa normal, gere as clausulas com IA (ou preencha Objeto e Justificativa manualmente) antes de gerar o documento.';
+        'Para Dispensa normal, gere as cláusulas com IA (ou preencha Objeto e Justificativa manualmente) antes de gerar o documento.';
       return;
     }
   }
@@ -1698,7 +1708,7 @@ async function onSubmit() {
     }
     const { data } = result;
     if (!data.tr?.docx_base64 || !data.dfd?.docx_base64 || !data.oficio?.docx_base64) {
-      generateError.value = data.error || 'TR, DFD ou Solicitacao/Oficio nao vieram na resposta.';
+      generateError.value = data.error || 'TR, DFD ou Solicitação/Ofício não vieram na resposta.';
       return;
     }
     documentTrUrl.value = toBlobUrl(data.tr.docx_base64, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
@@ -1710,7 +1720,7 @@ async function onSubmit() {
     documentOficioFilename.value = data.oficio?.filename || 'oficio.docx';
     documentZipFilename.value = data.zip?.filename || 'tr_dfd_oficio.zip';
     documentReady.value = true;
-    successMessage.value = 'Termo de Referencia, DFD e Solicitacao/Oficio gerados com sucesso. Baixe os arquivos abaixo.';
+    successMessage.value = 'Termo de Referência, DFD e Solicitação/Ofício gerados com sucesso. Baixe os arquivos abaixo.';
     await saveUserGlobalPreset();
   } catch (e) {
     generateError.value = e?.message || 'Erro ao gerar documento';
@@ -1827,7 +1837,7 @@ const secoes = computed(() => {
   const itensValidos = itens.value.filter((i) => Object.values(i).some(isFilled));
   return [
     {
-      titulo: 'Dados basicos',
+      titulo: 'Dados básicos',
       completo: (
         isFilled(cabecalhoDocumento.value)
         && (!processoAtivo.value || isFilled(processo.value))
@@ -1836,8 +1846,8 @@ const secoes = computed(() => {
         && (!isInexigibilidadeManutencaoRoute.value || isFilled(orgaoUnidadeVeiculo.value))
       ),
       linhas: [
-        ['Cabecalho', cabecalhoDocumento.value || 'Nao informado', isFilled(cabecalhoDocumento.value)],
-        ['Processo', processoAtivo.value ? processo.value || 'Nao informado' : 'Nao se aplica', !processoAtivo.value || isFilled(processo.value)],
+        ['Cabeçalho', cabecalhoDocumento.value || 'Não informado', isFilled(cabecalhoDocumento.value)],
+        ['Processo', processoAtivo.value ? processo.value || 'Não informado' : 'Não se aplica', !processoAtivo.value || isFilled(processo.value)],
         ['Órgão', orgao.value || 'Não informado', isFilled(orgao.value)],
         ...(isFornecedorExclusivoRoute.value
           ? [[LABEL_ORGAO_UNIDADE_RESP_EQUIP, orgaoResponsavelEquipamento.value || 'Não informado', isFilled(orgaoResponsavelEquipamento.value)]]
@@ -1847,38 +1857,38 @@ const secoes = computed(() => {
           : []),
       ],
     },
-    ...(isManutencaoVeiculosRoute.value ? [{ titulo: 'Veiculo', completo: isFilled(marca.value) && isFilled(modelo.value) && isFilled(placa.value), linhas: [['Marca', marca.value || 'Nao informado', isFilled(marca.value)], ['Modelo', modelo.value || 'Nao informado', isFilled(modelo.value)], ['Placa', placa.value || 'Nao informado', isFilled(placa.value)]] }] : []),
+    ...(isManutencaoVeiculosRoute.value ? [{ titulo: 'Veículo', completo: isFilled(marca.value) && isFilled(modelo.value) && isFilled(placa.value), linhas: [['Marca', marca.value || 'Não informado', isFilled(marca.value)], ['Modelo', modelo.value || 'Não informado', isFilled(modelo.value)], ['Placa', placa.value || 'Não informado', isFilled(placa.value)]] }] : []),
     ...(isFornecedorExclusivoRoute.value ? [{
-      titulo: 'Objeto especifico',
+      titulo: 'Objeto específico',
       completo: isFilled(objetoEspecifico.value) && (objetoEspecifico.value !== 'Outro' || isFilled(outroObjetoEspecifico.value)),
       linhas: [
-        ['Objeto especifico', objetoEspecifico.value || 'Nao informado', isFilled(objetoEspecifico.value)],
-        ['Descricao', objetoEspecifico.value === 'Outro' ? (outroObjetoEspecifico.value || 'Nao informada') : 'Nao se aplica', objetoEspecifico.value !== 'Outro' || isFilled(outroObjetoEspecifico.value)],
+        ['Objeto específico', objetoEspecifico.value || 'Não informado', isFilled(objetoEspecifico.value)],
+        ['Descrição', objetoEspecifico.value === 'Outro' ? (outroObjetoEspecifico.value || 'Não informada') : 'Não se aplica', objetoEspecifico.value !== 'Outro' || isFilled(outroObjetoEspecifico.value)],
       ],
     }] : []),
     ...(isFornecedorExclusivoRoute.value ? [{
       titulo: 'Equipamento',
       completo: isFilled(equipamento.value) && isFilled(marca.value) && isFilled(modelo.value),
       linhas: [
-        ['Equipamento', equipamento.value || 'Nao informado', isFilled(equipamento.value)],
-        ['Marca', marca.value || 'Nao informado', isFilled(marca.value)],
-        ['Modelo', modelo.value || 'Nao informado', isFilled(modelo.value)],
+        ['Equipamento', equipamento.value || 'Não informado', isFilled(equipamento.value)],
+        ['Marca', marca.value || 'Não informado', isFilled(marca.value)],
+        ['Modelo', modelo.value || 'Não informado', isFilled(modelo.value)],
       ],
     }] : []),
     ...(isDispensaManutencaoRoute.value ? [{
-      titulo: 'Manutencao',
+      titulo: 'Manutenção',
       completo: isFilled(tipoManutencao.value) && (tipoManutencao.value !== 'Preventiva' || isFilled(revisaoKm.value)),
       linhas: [
-        ['Tipo', tipoManutencao.value || 'Nao informado', isFilled(tipoManutencao.value)],
-        ['Revisao/KM', tipoManutencao.value === 'Preventiva' ? revisaoKm.value || 'Nao informado' : 'Nao se aplica', tipoManutencao.value !== 'Preventiva' || isFilled(revisaoKm.value)],
+        ['Tipo', tipoManutencao.value || 'Não informado', isFilled(tipoManutencao.value)],
+        ['Revisão/KM', tipoManutencao.value === 'Preventiva' ? revisaoKm.value || 'Não informado' : 'Não se aplica', tipoManutencao.value !== 'Preventiva' || isFilled(revisaoKm.value)],
       ],
     }] : []),
-    { titulo: 'Fornecedor', completo: isFilled(fornecedor.value) && isFilled(cnpj.value), linhas: [['Razao social', fornecedor.value || 'Nao informado', isFilled(fornecedor.value)], ['CNPJ', cnpj.value || 'Nao informado', isFilled(cnpj.value)]] },
-    { titulo: 'Dotacao orcamentaria', completo: !dotacaoAtiva.value || isFilled(dotacao.value), linhas: [['Situacao', dotacaoAtiva.value ? 'Informar dotacao' : 'Nao informada', true], ['Dotacao', dotacaoAtiva.value ? dotacao.value || 'Nao informada' : 'Nao se aplica', !dotacaoAtiva.value || isFilled(dotacao.value)]] },
-    { titulo: 'Itens', completo: itensValidos.length > 0 && isFilled(valorGlobal.value), linhas: [['Itens lancados', String(itensValidos.length), itensValidos.length > 0], ['Valor global', valorGlobal.value || 'Nao informado', isFilled(valorGlobal.value)]] },
-    { titulo: 'Fiscalizacao', completo: isFilled(fiscal.value), linhas: [['Fiscal', fiscal.value || 'Nao informado', isFilled(fiscal.value)]] },
-    { titulo: 'Responsavel pelo TR', completo: isFilled(responsavel.value) && isFilled(responsavelCargo.value), linhas: [['Responsavel', responsavel.value || 'Nao informado', isFilled(responsavel.value)], ['Cargo/Funcao', responsavelCargo.value || 'Nao informado', isFilled(responsavelCargo.value)]] },
-    { titulo: 'Data', completo: isFilled(modoData.value) && (modoData.value !== 'Data manual' || isFilled(dataManual.value)), linhas: [['Modo', modoData.value || 'Nao informado', isFilled(modoData.value)], ['Data', modoData.value === 'Data manual' ? dataManual.value || 'Nao informada' : 'Nao se aplica', modoData.value !== 'Data manual' || isFilled(dataManual.value)]] },
+    { titulo: 'Fornecedor', completo: isFilled(fornecedor.value) && isFilled(cnpj.value), linhas: [['Razão social', fornecedor.value || 'Não informado', isFilled(fornecedor.value)], ['CNPJ', cnpj.value || 'Não informado', isFilled(cnpj.value)]] },
+    { titulo: 'Dotação orçamentária', completo: !dotacaoAtiva.value || isFilled(dotacao.value), linhas: [['Situação', dotacaoAtiva.value ? 'Informar dotação' : 'Não informada', true], ['Dotação', dotacaoAtiva.value ? dotacao.value || 'Não informada' : 'Não se aplica', !dotacaoAtiva.value || isFilled(dotacao.value)]] },
+    { titulo: 'Itens', completo: itensValidos.length > 0 && isFilled(valorGlobal.value), linhas: [['Itens lançados', String(itensValidos.length), itensValidos.length > 0], ['Valor global', valorGlobal.value || 'Não informado', isFilled(valorGlobal.value)]] },
+    { titulo: 'Fiscalização', completo: isFilled(fiscal.value), linhas: [['Fiscal', fiscal.value || 'Não informado', isFilled(fiscal.value)]] },
+    { titulo: 'Responsável pelo TR', completo: isFilled(responsavel.value) && isFilled(responsavelCargo.value), linhas: [['Responsável', responsavel.value || 'Não informado', isFilled(responsavel.value)], ['Cargo/função', responsavelCargo.value || 'Não informado', isFilled(responsavelCargo.value)]] },
+    { titulo: 'Data', completo: isFilled(modoData.value) && (modoData.value !== 'Data manual' || isFilled(dataManual.value)), linhas: [['Modo', modoData.value || 'Não informado', isFilled(modoData.value)], ['Data', modoData.value === 'Data manual' ? dataManual.value || 'Não informada' : 'Não se aplica', modoData.value !== 'Data manual' || isFilled(dataManual.value)]] },
   ];
 });
 

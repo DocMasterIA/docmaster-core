@@ -34,6 +34,14 @@ def _strip_invisible(s: str) -> str:
     return re.sub(r"[\s\u00a0\u200b-\u200d\ufeff]+", "", s)
 
 
+def _element_xml_lower(el) -> str:
+    """Serialização XML do elemento em minúsculas (compatível com bytes ou XmlString/lxml)."""
+    raw = getattr(el, "xml", None) or ""
+    if isinstance(raw, (bytes, bytearray)):
+        return raw.decode("utf-8", errors="ignore").lower()
+    return str(raw).lower()
+
+
 def _replace_placeholder_in_paragraph_runs(paragraph, placeholder: str, replacement: str) -> bool:
     runs = paragraph.runs
     if not runs:
@@ -164,7 +172,7 @@ def _remove_processo_visual_block_when_empty(doc: Document) -> None:
             _remove_paragraph_element(p)
             continue
         if not t:
-            xml_l = (p._element.xml or b"").decode("utf-8", errors="ignore").lower()
+            xml_l = _element_xml_lower(p._element)
             if "processo" in xml_l and not re.search(r"\d", xml_l):
                 _remove_paragraph_element(p)
 

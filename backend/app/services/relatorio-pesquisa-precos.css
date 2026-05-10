@@ -93,16 +93,6 @@
   min-width: 0;
 }
 
-.rpp-head-main__brand-inner {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.2mm 3.5mm;
-  background: #254e78;
-  border-radius: 8px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
-}
-
 .rpp-head-main__qr-wrap {
   flex: 0 0 15mm;
   width: 15mm;
@@ -112,8 +102,8 @@
 }
 
 .rpp-head-main--card-white .rpp-head-main__logo {
-  height: 7mm;
-  max-width: 40mm;
+  height: 10mm;
+  max-width: 52mm;
   object-fit: contain;
   display: block;
 }

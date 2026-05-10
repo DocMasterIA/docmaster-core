@@ -72,7 +72,11 @@
                   @click="generationMenuOpen = !generationMenuOpen"
                 >
                   <span><i class="fa-solid fa-file-lines" aria-hidden="true"></i>{{ activeSectionLabel }}</span>
-                  <i class="fa-solid" :class="generationMenuOpen ? 'fa-chevron-down' : 'fa-chevron-right'" aria-hidden="true"></i>
+                  <i
+                    class="fa-solid fa-chevron-down dm-sidebar-chevron"
+                    :class="{ 'dm-sidebar-chevron--open': generationMenuOpen }"
+                    aria-hidden="true"
+                  ></i>
                 </button>
 
                 <div v-if="activeMainTabKey === 'dispensa' || generationMenuOpen" class="dm-subnav">
@@ -84,7 +88,11 @@
                       @click="toggleGroup(page.name)"
                     >
                       <span><i class="fa-solid" :class="page.icon" aria-hidden="true"></i>{{ page.label }}</span>
-                      <i class="fa-solid" :class="isGroupOpen(page.name) ? 'fa-chevron-down' : 'fa-chevron-right'" aria-hidden="true"></i>
+                      <i
+                        class="fa-solid fa-chevron-down dm-sidebar-chevron"
+                        :class="{ 'dm-sidebar-chevron--open': isGroupOpen(page.name) }"
+                        aria-hidden="true"
+                      ></i>
                     </button>
                     <div v-if="isGroupOpen(page.name) && page.children?.length" class="dm-subsubnav">
                       <template v-for="section in groupedChildren(page)" :key="section.key">
@@ -102,8 +110,8 @@
                           >
                             <span class="dm-subnav-art-btn__label">{{ section.title }}</span>
                             <i
-                              class="fa-solid"
-                              :class="isArtSectionOpen(page.name, section.key) ? 'fa-chevron-down' : 'fa-chevron-right'"
+                              class="fa-solid fa-chevron-down dm-sidebar-chevron"
+                              :class="{ 'dm-sidebar-chevron--open': isArtSectionOpen(page.name, section.key) }"
                               aria-hidden="true"
                             ></i>
                           </button>
@@ -122,8 +130,9 @@
                               :class="{ 'dm-subsubnav-link--active': isRouteActive(child.name) }"
                               :aria-current="isRouteActive(child.name) ? 'page' : undefined"
                             >
-                              <i class="fa-solid" :class="child.icon" aria-hidden="true"></i>
+                              <i class="fa-solid dm-subsubnav-link__icon" :class="child.icon" aria-hidden="true"></i>
                               <span class="dm-subsubnav-link__text">{{ child.label }}</span>
+                              <i class="fa-solid fa-chevron-right dm-subsubnav-link__chevron" aria-hidden="true"></i>
                             </router-link>
                           </div>
                         </template>
@@ -137,8 +146,9 @@
                             :class="{ 'dm-subsubnav-link--active': isRouteActive(child.name) }"
                             :aria-current="isRouteActive(child.name) ? 'page' : undefined"
                           >
-                            <i class="fa-solid" :class="child.icon" aria-hidden="true"></i>
+                            <i class="fa-solid dm-subsubnav-link__icon" :class="child.icon" aria-hidden="true"></i>
                             <span class="dm-subsubnav-link__text">{{ child.label }}</span>
+                            <i class="fa-solid fa-chevron-right dm-subsubnav-link__chevron" aria-hidden="true"></i>
                           </router-link>
                         </template>
                       </template>
@@ -869,7 +879,6 @@ watch(
   --dm-nav-bg: #e4ecf4;
   --dm-nav-l1-bg: #ffffff;
   --dm-nav-l1-text: #154e78;
-  --dm-nav-l1-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   --dm-nav-l2-bg: #154e78;
   --dm-nav-l2-text: #ffffff;
   --dm-nav-l2-hover: #1a5d8f;
@@ -880,6 +889,7 @@ watch(
   --dm-nav-tree: #c5d0e0;
   --dm-nav-chevron-muted: #94a3b8;
   --dm-nav-item-radius: 12px;
+  --dm-subnav-major-to-nested-gap: 10px;
   overflow: hidden;
   border-right: 1px solid #c6d3e1;
   background: var(--dm-nav-bg);
@@ -888,7 +898,6 @@ watch(
   --dm-nav-bg: #020617;
   --dm-nav-l1-bg: #0f172a;
   --dm-nav-l1-text: #e2e8f0;
-  --dm-nav-l1-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   --dm-nav-l2-bg: #1e3a5f;
   --dm-nav-l2-text: #f8fafc;
   --dm-nav-l2-hover: #2563eb;
@@ -899,6 +908,7 @@ watch(
   --dm-nav-tree: #334155;
   --dm-nav-chevron-muted: #94a3b8;
   --dm-nav-item-radius: 12px;
+  --dm-subnav-major-to-nested-gap: 10px;
   border-right-color: #1e293b;
   background: var(--dm-nav-bg);
 }
@@ -1059,6 +1069,23 @@ watch(
   gap: 10px;
 }
 
+/* Chevron da sidebar: fechado aponta à direita (−90°), aberto para baixo (0°). */
+.dm-sidebar-chevron {
+  display: inline-block;
+  flex-shrink: 0;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  transition: transform 0.22s cubic-bezier(0.33, 1, 0.68, 1);
+}
+.dm-sidebar-chevron.dm-sidebar-chevron--open {
+  transform: rotate(0deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dm-sidebar-chevron {
+    transition: none;
+  }
+}
+
 .dm-nav-item,
 .dm-nav-item:visited {
   text-decoration: none;
@@ -1073,14 +1100,12 @@ watch(
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  box-shadow: var(--dm-nav-l1-shadow);
-  transition: background 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 .dm-dark .dm-nav-item,
 .dm-dark .dm-nav-item:visited {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
-  box-shadow: var(--dm-nav-l1-shadow);
 }
 
 .dm-nav-item--expandable {
@@ -1095,43 +1120,46 @@ watch(
   gap: 8px;
 }
 
-.dm-nav-item--expandable .fa-chevron-down,
-.dm-nav-item--expandable .fa-chevron-right {
+.dm-nav-item--expandable .dm-sidebar-chevron {
   color: var(--dm-nav-chevron-muted);
   font-size: 11px;
   opacity: 0.95;
 }
 
-.dm-nav-item:hover,
-.dm-subnav-btn:hover:not(.dm-subnav-btn--active),
-.dm-subsubnav-link:hover:not(.dm-subsubnav-link--active) {
-  filter: brightness(0.98);
+.dm-nav-item:not(.dm-nav-item--static):hover {
+  background: #eef3f9;
 }
-.dm-dark .dm-nav-item:hover {
-  filter: brightness(1.08);
+.dm-dark .dm-nav-item:not(.dm-nav-item--static):hover {
+  background: #1e293b;
+}
+.dm-nav-item--active:not(.dm-nav-item--static):hover {
+  background: var(--dm-nav-l1-bg);
+}
+.dm-dark .dm-nav-item--active:not(.dm-nav-item--static):hover {
+  background: var(--dm-nav-l1-bg);
+}
+
+.dm-subnav-btn:hover:not(.dm-subnav-btn--active) {
+  background: #eef3f9;
 }
 .dm-dark .dm-subnav-btn:hover:not(.dm-subnav-btn--active) {
-  filter: brightness(1.12);
+  background: #1e293b;
+}
+
+.dm-subsubnav-link:hover:not(.dm-subsubnav-link--active) {
+  background: #eef3f9;
 }
 .dm-dark .dm-subsubnav-link:hover:not(.dm-subsubnav-link--active) {
-  filter: brightness(1.1);
-}
-.dm-subsubnav-link.dm-subsubnav-link--active:hover {
-  filter: brightness(1.05);
-}
-.dm-dark .dm-subsubnav-link.dm-subsubnav-link--active:hover {
-  filter: brightness(1.08);
+  background: #1e293b;
 }
 
 .dm-nav-item--active {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
-  box-shadow: var(--dm-nav-l1-shadow), 0 2px 6px rgba(21, 78, 120, 0.12);
 }
 .dm-dark .dm-nav-item--active {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
-  box-shadow: var(--dm-nav-l1-shadow), 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .dm-nav-item--static {
@@ -1163,7 +1191,7 @@ watch(
   border-left-color: var(--dm-nav-tree);
 }
 
-/* Nível 1 (grupo: Dispensa rápida, etc.) — fundo branco, texto azul escuro, sombra leve. */
+/* Nível 1 (grupo: Dispensa rápida, etc.) — fundo branco, texto azul escuro. */
 .dm-subnav-btn {
   width: 100%;
   border: none;
@@ -1178,13 +1206,11 @@ watch(
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
-  box-shadow: var(--dm-nav-l1-shadow);
-  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 .dm-dark .dm-subnav-btn {
   background: var(--dm-nav-l1-bg);
   color: var(--dm-nav-l1-text);
-  box-shadow: var(--dm-nav-l1-shadow);
 }
 
 .dm-subnav-btn span {
@@ -1193,22 +1219,25 @@ watch(
   gap: 8px;
 }
 
-.dm-subnav-btn .fa-chevron-down,
-.dm-subnav-btn .fa-chevron-right {
+.dm-subnav-btn .dm-sidebar-chevron {
   color: var(--dm-nav-chevron-muted);
   font-size: 10px;
 }
 
-/* Grupo com rota activa: mantém nível 1; realce suave. */
+/* Grupo com rota activa: mantém nível 1. */
 .dm-subnav-btn--active {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
-  box-shadow: var(--dm-nav-l1-shadow), 0 2px 6px rgba(21, 78, 120, 0.14);
 }
 .dm-dark .dm-subnav-btn--active {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
-  box-shadow: var(--dm-nav-l1-shadow), 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.dm-subnav-btn--active:hover {
+  background: #e8eef6;
+}
+.dm-dark .dm-subnav-btn--active:hover {
+  background: #1e293b;
 }
 
 /* Nível 2 (Art. 75, I / II) — pílula azul escuro, texto branco, chevron branco. */
@@ -1229,7 +1258,7 @@ watch(
   gap: 8px;
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s ease, filter 0.15s ease;
+  transition: background 0.15s ease;
 }
 .dm-subnav-art-btn:first-child {
   margin-top: 0;
@@ -1240,7 +1269,6 @@ watch(
 }
 .dm-subnav-art-btn:hover {
   background: var(--dm-nav-l2-hover);
-  filter: none;
 }
 .dm-dark .dm-subnav-art-btn:hover {
   background: var(--dm-nav-l2-hover);
@@ -1254,8 +1282,7 @@ watch(
   color: var(--dm-nav-l2-text);
 }
 
-.dm-subnav-art-btn .fa-chevron-down,
-.dm-subnav-art-btn .fa-chevron-right {
+.dm-subnav-art-btn .dm-sidebar-chevron {
   color: rgba(255, 255, 255, 0.85);
   font-size: 10px;
 }
@@ -1270,12 +1297,14 @@ watch(
 .dm-subnav-art-btn--selected {
   background: var(--dm-nav-l2-bg);
   color: var(--dm-nav-l2-text);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+  outline: 2px solid rgba(255, 255, 255, 0.45);
+  outline-offset: 0;
 }
 .dm-dark .dm-subnav-art-btn--selected {
   background: var(--dm-nav-l2-bg);
   color: var(--dm-nav-l2-text);
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.45);
+  outline: 2px solid rgba(147, 197, 253, 0.55);
+  outline-offset: 0;
 }
 .dm-subnav-art-btn--selected.dm-subnav-art-btn--open {
   background: var(--dm-nav-l2-hover);
@@ -1297,6 +1326,7 @@ watch(
 }
 
 .dm-subsubnav {
+  margin-top: var(--dm-subnav-major-to-nested-gap);
   margin-left: 6px;
   padding-left: 12px;
   border-left: 1px solid var(--dm-nav-tree);
@@ -1340,8 +1370,7 @@ watch(
   width: 100%;
   box-sizing: border-box;
   justify-content: flex-start;
-  box-shadow: var(--dm-nav-l1-shadow);
-  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 .dm-subsubnav-link__text {
   flex: 1 1 auto;
@@ -1349,16 +1378,23 @@ watch(
   text-align: left;
   line-height: 1.25;
 }
-.dm-subsubnav-link .fa-solid {
+.dm-subsubnav-link__icon {
   color: var(--dm-nav-l3-text);
   opacity: 0.88;
   flex-shrink: 0;
+}
+.dm-subsubnav-link__chevron {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 6px;
+  font-size: 10px;
+  color: var(--dm-nav-chevron-muted);
+  opacity: 0.95;
 }
 .dm-dark .dm-subsubnav-link,
 .dm-dark .dm-subsubnav-link:visited {
   color: var(--dm-nav-l3-text);
   background: var(--dm-nav-l3-bg);
-  box-shadow: var(--dm-nav-l1-shadow);
 }
 
 .dm-subsubnav-link.dm-subsubnav-link--active,
@@ -1367,16 +1403,17 @@ watch(
   background: var(--dm-nav-l3-active-bg);
   color: var(--dm-nav-l3-active-text);
   font-weight: 700;
-  box-shadow: 0 2px 8px rgba(45, 106, 166, 0.35);
 }
-.dm-subsubnav-link.dm-subsubnav-link--active .fa-solid {
+.dm-subsubnav-link.dm-subsubnav-link--active .dm-subsubnav-link__icon {
   color: rgba(255, 255, 255, 0.92);
+}
+.dm-subsubnav-link.dm-subsubnav-link--active .dm-subsubnav-link__chevron {
+  color: rgba(255, 255, 255, 0.78);
 }
 .dm-dark .dm-subsubnav-link.dm-subsubnav-link--active,
 .dm-dark .dm-subsubnav-link.dm-subsubnav-link--active:visited {
   background: var(--dm-nav-l3-active-bg);
   color: var(--dm-nav-l3-active-text);
-  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.35);
 }
 
 /* Foco por teclado: contorno azul discreto (sem anel largo). */

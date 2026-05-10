@@ -700,6 +700,68 @@ def _collapse_consecutive_empty_body_paragraphs(doc: Document) -> None:
             last_nonempty = not empty
 
 
+def _normalize_art74_sec15_1_15_2_spacing(doc: Document) -> None:
+    """
+    Entre o §15.1 (despesas / dotação) e o §15.2 (omissos / Lei 14.133/2021), remove parágrafos
+    vazios intermédios e fixa um único intervalo vertical (evita «duas linhas» por vazio + space_after).
+    """
+    body = doc.element.body
+
+    def _is_15_1_para(para: Paragraph) -> bool:
+        t = (para.text or "").strip()
+        if not t:
+            return False
+        tl = t.lower()
+        if not re.search(r"15\s*\.\s*1", t):
+            return False
+        return "despesas" in tl and ("dotação" in tl or "dotacao" in tl)
+
+    def _is_15_2_para(para: Paragraph) -> bool:
+        t = (para.text or "").strip()
+        if not t:
+            return False
+        tl = t.lower()
+        if not re.search(r"15\s*\.\s*2", t):
+            return False
+        return "omissos" in tl
+
+    def _body_paragraph_elements():
+        return [el for el in body if el.tag == qn("w:p")]
+
+    wps = _body_paragraph_elements()
+    idx_15_1 = None
+    idx_15_2 = None
+    for i, el in enumerate(wps):
+        p = Paragraph(el, doc._body)
+        if idx_15_1 is None and _is_15_1_para(p):
+            idx_15_1 = i
+            continue
+        if idx_15_1 is not None and _is_15_2_para(p):
+            idx_15_2 = i
+            break
+
+    if idx_15_1 is None or idx_15_2 is None or idx_15_2 <= idx_15_1:
+        return
+
+    # Remove todos os parágrafos vazios estritamente entre 15.1 e 15.2 (de trás para a frente).
+    for j in range(idx_15_2 - 1, idx_15_1, -1):
+        el = wps[j]
+        p = Paragraph(el, doc._body)
+        if not (p.text or "").strip():
+            parent = el.getparent()
+            if parent is not None:
+                parent.remove(el)
+
+    # Um único «respiro» após 15.1; sem espaço extra antes de 15.2.
+    for el in _body_paragraph_elements():
+        p = Paragraph(el, doc._body)
+        if _is_15_1_para(p):
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.space_after = Pt(6)
+        elif _is_15_2_para(p):
+            p.paragraph_format.space_before = Pt(0)
+
+
 def _fix_respetiva_typo_in_paragraph(paragraph) -> None:
     for run in paragraph.runs:
         t = run.text or ""
@@ -938,6 +1000,8 @@ def render_tr_from_slots(
     _fix_respetiva_typo_in_document(doc)
     _apply_art74_i_dotacao_paragraph_branch(doc, tpl_path, slots.dotacao, slots)
     _apply_art74_i_remove_valor_total_processo_sem_precos(doc, tpl_path, slots)
+    if _tr_is_lei14133_art74_i_inexigibilidade_pack(tpl_path, slots):
+        _normalize_art74_sec15_1_15_2_spacing(doc)
     _fill_items_table(doc, slots.itens)
 
     out_path = Path(output_path) if output_path else None

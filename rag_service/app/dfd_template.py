@@ -2,11 +2,10 @@ from __future__ import annotations
 
 """
 Geração de Documento de Formalização da Demanda (DFD) a partir do modelo fixo
-`template_packages/tr_base/DFD_modelo_base.docx`, preenchendo apenas os slots
-marcados entre parênteses.
+(`DFD_modelo_base.docx` ou, sem número de processo quando existir no pacote,
+`DFD_modelo_base_v2.docx`), preenchendo os mesmos slots.
 
-Este módulo NÃO chama IA – ele só aplica os dados já gerados para o TR
-em cima do template de DFD.
+Este módulo NÃO chama IA – aplica os dados já gerados para o TR em cima do template de DFD.
 """
 
 import re
@@ -26,6 +25,13 @@ TEMPLATE_DFD_PATH_DEFAULT = (
 def _dfd_numero_processo_display(slots: TRTemplateSlots) -> str:
     """Número exibido no DFD: campo próprio ou, em fallback, o do TR."""
     return str(slots.dfd_numero_processo or slots.numero_processo or "").strip()
+
+
+def dfd_numero_processo_filled(slots: Optional[TRTemplateSlots]) -> bool:
+    """True quando há número de processo (DFD ou TR); controla escolha v1 vs `DFD_modelo_base_v2.docx`."""
+    if slots is None:
+        return True
+    return bool(_dfd_numero_processo_display(slots).strip())
 
 
 def _strip_invisible(s: str) -> str:

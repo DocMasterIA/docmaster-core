@@ -23,7 +23,11 @@ from .chroma_client import delete_collection, get_chroma_client, list_collection
 from .ingestion import ingest_text
 from .retrieval import check_compliance, generate_answer, retrieve
 from .text_corrector_client import correct_section_texts
-from .template_packages import get_package_template_paths, ensure_fallback_path
+from .template_packages import (
+    ensure_fallback_path,
+    get_package_template_paths,
+    pick_dfd_template_in_package,
+)
 from .schemas import (
     AnalyzeDocumentResponse,
     CheckComplianceRequest,
@@ -459,14 +463,27 @@ def _merge_user_context_into_tr_slots(
     return slots
 
 
-def _resolve_tr_dfd_template_paths(context: Optional[Dict[str, Any]]) -> Dict[str, Path]:
+def _resolve_tr_dfd_template_paths(
+    context: Optional[Dict[str, Any]],
+    slots: Optional[Any] = None,
+) -> Dict[str, Path]:
+    """
+    Resolve TR + DFD. O DFD usa `DFD_modelo_base_v2.docx` no pacote quando não há
+    número de processo e esse ficheiro existir; caso contrário `DFD_modelo_base.docx`.
+    """
+    from .dfd_template import dfd_numero_processo_filled
+
     slot_package_key = ""
     if isinstance(context, dict):
         slot_package_key = str(context.get("slot_package_key") or "").strip()
     paths = get_package_template_paths(slot_package_key)
+    dfd_chosen = pick_dfd_template_in_package(
+        paths["base_dir"],
+        has_numero_processo=dfd_numero_processo_filled(slots),
+    )
     return {
         "tr": ensure_fallback_path(paths["tr"], "TR_modelo_base.docx"),
-        "dfd": ensure_fallback_path(paths["dfd"], "DFD_modelo_base.docx"),
+        "dfd": ensure_fallback_path(dfd_chosen, "DFD_modelo_base.docx"),
     }
 
 
@@ -501,7 +518,7 @@ async def endpoint_generate_tr_from_model(body: GenerateTRFromModelRequest):
             slots_override=slots_override,
             user_context=body.context,
         )
-        template_paths = _resolve_tr_dfd_template_paths(body.context)
+        template_paths = _resolve_tr_dfd_template_paths(body.context, slots)
         # Gera TR
         docx_tr_path = render_tr_from_slots(slots, template_path=template_paths["tr"])
         if not Path(docx_tr_path).exists():
@@ -550,7 +567,7 @@ async def endpoint_generate_tr_and_dfd(body: GenerateTRFromModelRequest):
             user_context=body.context,
         )
 
-        template_paths = _resolve_tr_dfd_template_paths(body.context)
+        template_paths = _resolve_tr_dfd_template_paths(body.context, slots)
         # Gera TR e DFD em caminhos temporários
         docx_tr_path = render_tr_from_slots(slots, template_path=template_paths["tr"])
         if not Path(docx_tr_path).exists():
@@ -613,7 +630,7 @@ async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
             skip_context_in_prompt=skip_ctx,
         )
 
-        template_paths = _resolve_tr_dfd_template_paths(body.context)
+        template_paths = _resolve_tr_dfd_template_paths(body.context, slots)
         # Gera TR, DFD e Ofício em caminhos temporários
         docx_tr_path = render_tr_from_slots(slots, template_path=template_paths["tr"])
         if not Path(docx_tr_path).exists():

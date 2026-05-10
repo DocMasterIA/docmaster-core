@@ -874,7 +874,7 @@ watch(
   display: none;
 }
 
-/* Navegação lateral — hierarquia com cantos arredondados moderados (nível 1 branco; nível 2 azul escuro; nível 3 ativo azul médio). */
+/* Navegação lateral — hierarquia com cantos arredondados moderados (nível 1 branco; nível 2 azul escuro; nível 3 activo mesmo azul escuro). */
 .dm-sidebar {
   --dm-nav-bg: #e4ecf4;
   --dm-nav-l1-bg: #ffffff;
@@ -882,7 +882,7 @@ watch(
   --dm-nav-l2-bg: #154e78;
   --dm-nav-l2-text: #ffffff;
   --dm-nav-l2-hover: #1a5d8f;
-  --dm-nav-l3-active-bg: #2d6aa6;
+  --dm-nav-l3-active-bg: var(--dm-nav-l2-bg);
   --dm-nav-l3-active-text: #ffffff;
   --dm-nav-l3-bg: #ffffff;
   --dm-nav-l3-text: #154e78;
@@ -901,7 +901,7 @@ watch(
   --dm-nav-l2-bg: #1e3a5f;
   --dm-nav-l2-text: #f8fafc;
   --dm-nav-l2-hover: #2563eb;
-  --dm-nav-l3-active-bg: #2563eb;
+  --dm-nav-l3-active-bg: var(--dm-nav-l2-bg);
   --dm-nav-l3-active-text: #f8fafc;
   --dm-nav-l3-bg: #0f172a;
   --dm-nav-l3-text: #e2e8f0;

@@ -163,6 +163,18 @@ export function updateCotacaoInItemResearchSession(sessaoId, itemId, cotacaoId, 
   );
 }
 
+/** Remove uma cotação de preço ligada ao item (qualquer fonte: PNCP, manual, direta, domínio amplo, etc.). */
+export function deleteCotacaoFromItemResearchSession(sessaoId, itemId, cotacaoId, signal) {
+  return cotacaoRequest(
+    `research/sessions/${encodeURIComponent(sessaoId)}/items/${encodeURIComponent(itemId)}/cotacoes/${encodeURIComponent(cotacaoId)}/delete`,
+    {
+      method: 'POST',
+      body: {},
+      signal,
+    },
+  );
+}
+
 export function deleteItemsFromResearchSession(sessaoId, itemIds, signal) {
   return cotacaoRequest(`research/sessions/${encodeURIComponent(sessaoId)}/items/delete`, {
     method: 'POST',

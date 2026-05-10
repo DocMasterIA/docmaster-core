@@ -1569,6 +1569,47 @@ def pncp_research_sessions_item_cotacoes_update(request, sessao_id: int, item_id
 @csrf_exempt
 @require_http_methods(["POST", "OPTIONS"])
 @_pncp_json_errors
+def pncp_research_sessions_item_cotacao_delete(request, sessao_id: int, item_id: int, cotacao_id: int):
+    """Remove uma linha de preço/cotação vinculada ao item (qualquer fonte)."""
+    if request.method == "OPTIONS":
+        return JsonResponse({}, status=204)
+
+    c = _cotacao_qs_for_user(request.user).filter(pk=sessao_id).first()
+    if not c:
+        return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
+    if c.status in CLOSED_FOR_ITEMS:
+        return JsonResponse({"detail": "Cotação encerrada; não é permitido excluir preços."}, status=409)
+
+    item = c.itens.filter(pk=item_id).first()
+    if not item:
+        return JsonResponse({"ok": False, "error": "Item não encontrado na sessão.", "item_id": item_id}, status=404)
+
+    row = item.cotacoes.filter(pk=cotacao_id).first()
+    if not row:
+        return JsonResponse(
+            {"ok": False, "error": "Cotação não encontrada para este item.", "cotacao_id": cotacao_id},
+            status=404,
+        )
+
+    with transaction.atomic():
+        row.delete()
+        c.save(update_fields=["updated_at"])
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "sessao_id": c.id,
+            "item_id": item.id,
+            "cotacao_id": int(cotacao_id),
+            "deleted": True,
+        }
+    )
+
+
+@api_login_required
+@csrf_exempt
+@require_http_methods(["POST", "OPTIONS"])
+@_pncp_json_errors
 def pncp_research_sessions_upload_supplier_pdf(request, sessao_id: int):
     if request.method == "OPTIONS":
         return JsonResponse({}, status=204)

@@ -92,15 +92,27 @@
             <article v-for="r in itemCotacoesFiltradas" :key="r.id" class="item-cotacao-card">
               <header class="item-cotacao-card__head">
                 <span class="item-cotacao-card__id">#{{ r.id }}</span>
-                <div class="item-cotacao-card__badges">
-                  <span class="item-cotacao-card__fonte">{{ labelFonte(classificarFonte(r)) }}</span>
-                  <span
-                    v-if="Boolean(r?.source?.similaridade_encontrada)"
-                    class="item-cotacao-card__similaridade"
-                    title="Cotação vinculada por similaridade semântica"
+                <div class="item-cotacao-card__head-actions">
+                  <div class="item-cotacao-card__badges">
+                    <span class="item-cotacao-card__fonte">{{ labelFonte(classificarFonte(r)) }}</span>
+                    <span
+                      v-if="Boolean(r?.source?.similaridade_encontrada)"
+                      class="item-cotacao-card__similaridade"
+                      title="Cotação vinculada por similaridade semântica"
+                    >
+                      Similaridade parcial encontrada
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    class="item-cotacao-card__remove"
+                    :disabled="deletingCotacaoId === r.id"
+                    title="Excluir esta cotação de preço"
+                    @click="excluirCotacaoPreco(r)"
                   >
-                    Similaridade parcial encontrada
-                  </span>
+                    <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                    {{ deletingCotacaoId === r.id ? 'A excluir…' : 'Excluir' }}
+                  </button>
                 </div>
               </header>
               <div
@@ -255,7 +267,11 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import { getItemCotacoesFromResearchSession, getResearchSession } from '../services/pncpResearch';
+import {
+  deleteCotacaoFromItemResearchSession,
+  getItemCotacoesFromResearchSession,
+  getResearchSession,
+} from '../services/pncpResearch';
 
 const route = useRoute();
 const cotacaoId = computed(() => String(route.params.cotacaoId || ''));
@@ -267,6 +283,8 @@ const item = ref(null);
 const allItems = ref([]);
 const itemCotacoes = ref([]);
 const variacaoGlobalSessao = ref(20);
+/** ID da linha PncpCotacaoItemCotacao em exclusão (evita cliques duplicados). */
+const deletingCotacaoId = ref(null);
 
 const fonteSelecionada = computed(() => normalizeFonte(route.query.fonte));
 const fonteSelecionadaLabel = computed(() => (fonteSelecionada.value ? labelFonte(fonteSelecionada.value) : 'Todas'));
@@ -367,6 +385,34 @@ const itemCotacoesFiltradas = computed(() => {
 });
 
 onMounted(loadItem);
+
+async function refreshCotacoesOnly() {
+  const sessionId = Number(cotacaoId.value);
+  if (!Number.isFinite(sessionId) || sessionId <= 0 || !Number.isFinite(itemId.value) || itemId.value <= 0) {
+    return;
+  }
+  const cot = await getItemCotacoesFromResearchSession(sessionId, itemId.value);
+  itemCotacoes.value = Array.isArray(cot?.cotacoes) ? cot.cotacoes : [];
+}
+
+async function excluirCotacaoPreco(r) {
+  const id = Number(r?.id);
+  if (!Number.isFinite(id) || id <= 0) return;
+  const ok = window.confirm(
+    `Excluir esta cotação de preço (#${id})? A média e totais do item serão recalculados sem este registo.`,
+  );
+  if (!ok) return;
+  const sessionId = Number(cotacaoId.value);
+  deletingCotacaoId.value = id;
+  try {
+    await deleteCotacaoFromItemResearchSession(sessionId, itemId.value, id);
+    await refreshCotacoesOnly();
+  } catch (err) {
+    window.alert(err?.message || 'Não foi possível excluir a cotação.');
+  } finally {
+    deletingCotacaoId.value = null;
+  }
+}
 
 async function loadItem() {
   const sessionId = Number(cotacaoId.value);
@@ -744,12 +790,43 @@ function labelIncisoFromCotacao(cotacao) {
   font-size: 10px;
   white-space: nowrap;
 }
+.item-cotacao-card__head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 .item-cotacao-card__badges {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+.item-cotacao-card__remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 5px 10px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fff;
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.item-cotacao-card__remove:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #f87171;
+}
+.item-cotacao-card__remove:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 .item-cotacao-card__similaridade {
   border: 1px solid #f2dfb7;

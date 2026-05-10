@@ -1737,6 +1737,12 @@ watch(
   color: #94a3b8 !important;
 }
 
+.dm-dark .dm-content :deep(.item-cotacao-card__remove) {
+  border-color: #7f1d1d !important;
+  background: #0f172a !important;
+  color: #fca5a5 !important;
+}
+
 /* Pedido do usuário: textos cinza -> branco no dark mode */
 .dm-dark :deep(.gov-surface__subtitle),
 .dm-dark :deep(.gov-text-soft),

@@ -4,7 +4,12 @@ import {
   TRATAMENTO_CARGO,
   TRATAMENTO_NOME,
 } from '@/components/dispensa-art-75-ii/dispensaArt75iiShared.js';
-import { capitalizeFirstSignificantLetter } from '@/utils/itemValorCampos.js';
+import { capitalizeNomeTituloPt } from '@/utils/itemValorCampos.js';
+
+function normNomeTitulo(raw) {
+  const v = String(raw ?? '').trim();
+  return v ? capitalizeNomeTituloPt(v) : '';
+}
 
 export const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
 const ORGAO_PROFILES_STORAGE_KEY = 'orgao_profiles_v1';
@@ -111,29 +116,29 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
   function applyPresetPayload(data) {
     if (!data || typeof data !== 'object') return;
     if ('cabecalho_documento' in data) cabecalho.value = String(data.cabecalho_documento || '');
-    if ('orgao' in data) orgao.value = String(data.orgao || '');
+    if ('orgao' in data) orgao.value = normNomeTitulo(data.orgao);
     if ('solicitacao_tratamento_nome' in data) fixoTratNome.value = String(data.solicitacao_tratamento_nome || '');
     if ('solicitacao_tratamento_cargo' in data) fixoTratCargo.value = String(data.solicitacao_tratamento_cargo || '');
-    if ('solicitacao_destinatario_nome' in data) fixoNome.value = String(data.solicitacao_destinatario_nome || '');
-    if ('solicitacao_destinatario_cargo' in data) fixoCargo.value = String(data.solicitacao_destinatario_cargo || '');
-    if ('solicitacao_responsavel_nome' in data) fixoResponsavel.value = String(data.solicitacao_responsavel_nome || '');
-    if ('solicitacao_responsavel_cargo' in data) fixoResponsavelCargo.value = String(data.solicitacao_responsavel_cargo || '');
-    if ('dfd_setor_requisitante' in data) fixoSetor.value = String(data.dfd_setor_requisitante || '');
-    if ('dfd_responsavel_demanda' in data) fixoDemanda.value = String(data.dfd_responsavel_demanda || '');
+    if ('solicitacao_destinatario_nome' in data) fixoNome.value = normNomeTitulo(data.solicitacao_destinatario_nome);
+    if ('solicitacao_destinatario_cargo' in data) fixoCargo.value = normNomeTitulo(data.solicitacao_destinatario_cargo);
+    if ('solicitacao_responsavel_nome' in data) fixoResponsavel.value = normNomeTitulo(data.solicitacao_responsavel_nome);
+    if ('solicitacao_responsavel_cargo' in data) fixoResponsavelCargo.value = normNomeTitulo(data.solicitacao_responsavel_cargo);
+    if ('dfd_setor_requisitante' in data) fixoSetor.value = normNomeTitulo(data.dfd_setor_requisitante);
+    if ('dfd_responsavel_demanda' in data) fixoDemanda.value = normNomeTitulo(data.dfd_responsavel_demanda);
     if ('dfd_email' in data) fixoEmail.value = String(data.dfd_email || '');
-    if ('dfd_gestor_contratos' in data) fixoGestor.value = String(data.dfd_gestor_contratos || '');
-    if ('dfd_fiscal_contratos' in data) fixoFiscal.value = String(data.dfd_fiscal_contratos || '');
-    if ('dfd_assinatura_nome' in data) fixoAssinatura.value = String(data.dfd_assinatura_nome || '');
-    if ('dfd_assinatura_cargo' in data) fixoAssinaturaCargo.value = String(data.dfd_assinatura_cargo || '');
+    if ('dfd_gestor_contratos' in data) fixoGestor.value = normNomeTitulo(data.dfd_gestor_contratos);
+    if ('dfd_fiscal_contratos' in data) fixoFiscal.value = normNomeTitulo(data.dfd_fiscal_contratos);
+    if ('dfd_assinatura_nome' in data) fixoAssinatura.value = normNomeTitulo(data.dfd_assinatura_nome);
+    if ('dfd_assinatura_cargo' in data) fixoAssinaturaCargo.value = normNomeTitulo(data.dfd_assinatura_cargo);
     if ('tr_endereco_entrega_propostas' in data) {
       fixoEnderecoEntrega.value = String(data.tr_endereco_entrega_propostas || '');
     }
     if ('tr_email_recebimento_propostas' in data) {
       fixoEmailPropostas.value = String(data.tr_email_recebimento_propostas || '');
     }
-    if ('tr_termo_responsavel_nome' in data) fixoTrResponsavelNome.value = String(data.tr_termo_responsavel_nome || '');
+    if ('tr_termo_responsavel_nome' in data) fixoTrResponsavelNome.value = normNomeTitulo(data.tr_termo_responsavel_nome);
     if ('tr_termo_responsavel_cargo' in data) {
-      fixoTrResponsavelCargo.value = String(data.tr_termo_responsavel_cargo || '');
+      fixoTrResponsavelCargo.value = normNomeTitulo(data.tr_termo_responsavel_cargo);
     }
   }
 
@@ -267,7 +272,7 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
       let dirty = false;
       orgaoProfiles.value = list.map((p) => {
         const trimmed = String(p?.name ?? '').trim();
-        const n = trimmed ? capitalizeFirstSignificantLetter(trimmed) : '';
+        const n = trimmed ? capitalizeNomeTituloPt(trimmed) : '';
         if (n !== trimmed) dirty = true;
         return { ...p, name: n };
       });
@@ -295,7 +300,7 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     const hit = orgaoProfiles.value.find((p) => String(p.id) === id);
     if (!hit) return;
     const trimmed = String(hit.name || '').trim();
-    orgaoProfileName.value = trimmed ? capitalizeFirstSignificantLetter(trimmed) : '';
+    orgaoProfileName.value = trimmed ? capitalizeNomeTituloPt(trimmed) : '';
     applyPresetPayload(hit.data || {});
   }
 
@@ -306,7 +311,7 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
 
   function saveOrgaoProfile() {
     const nameRaw = String(orgaoProfileName.value || '').trim();
-    const name = nameRaw ? capitalizeFirstSignificantLetter(nameRaw) : '';
+    const name = nameRaw ? capitalizeNomeTituloPt(nameRaw) : '';
     if (!name) return false;
     orgaoProfileName.value = name;
     const data = createOrgaoProfilePayload();

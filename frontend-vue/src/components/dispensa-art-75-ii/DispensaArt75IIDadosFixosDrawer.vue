@@ -23,7 +23,11 @@
             </div>
             <div class="ixp-field">
               <label>Nome do cadastro</label>
-              <input v-model="ctx.orgaoProfileName" placeholder="Ex: Fundo Municipal de Saúde" />
+              <input
+                :value="ctx.orgaoProfileName"
+                placeholder="Ex: Fundo Municipal de Saúde"
+                @input="ctx.orgaoProfileName = capNome(String(($event.target).value || ''))"
+              />
             </div>
             <div class="ixp-inline-actions ixp-orgao-profile-actions">
               <button type="button" class="ixp-btn-secondary ixp-btn-xs ixp-orgao-btn-new" @click="ctx.newOrgaoProfile()">Novo cadastro</button>
@@ -53,7 +57,12 @@
               </div>
               <div class="ixp-field ixp-col-2">
                 <label>1.1 A quem é direcionada a solicitação — Nome</label>
-                <input v-model="ctx.fixoNome" list="da75-dl-solicitacao-destinatario-nome" placeholder="Digite o nome" />
+                <input
+                  :value="ctx.fixoNome"
+                  list="da75-dl-solicitacao-destinatario-nome"
+                  placeholder="Digite o nome"
+                  @input="ctx.fixoNome = capNome(String(($event.target).value || ''))"
+                />
               </div>
             </div>
             <div class="ixp-grid-3">
@@ -66,18 +75,33 @@
               </div>
               <div class="ixp-field ixp-col-2">
                 <label>1.2 A quem é direcionada a solicitação — Função / Cargo</label>
-                <input v-model="ctx.fixoCargo" list="da75-dl-solicitacao-destinatario-cargo" placeholder="Digite a função ou cargo" />
+                <input
+                  :value="ctx.fixoCargo"
+                  list="da75-dl-solicitacao-destinatario-cargo"
+                  placeholder="Digite a função ou cargo"
+                  @input="ctx.fixoCargo = capNome(String(($event.target).value || ''))"
+                />
               </div>
             </div>
             <h4 class="ixp-subsection-title">1.3 Responsável pela solicitação</h4>
             <div class="ixp-grid-2">
               <div class="ixp-field">
                 <label>Nome do responsável</label>
-                <input v-model="ctx.fixoResponsavel" list="da75-dl-solicitacao-responsavel-nome" placeholder="Digite o nome do responsável" />
+                <input
+                  :value="ctx.fixoResponsavel"
+                  list="da75-dl-solicitacao-responsavel-nome"
+                  placeholder="Digite o nome do responsável"
+                  @input="ctx.fixoResponsavel = capNome(String(($event.target).value || ''))"
+                />
               </div>
               <div class="ixp-field">
                 <label>Função / Cargo</label>
-                <input v-model="ctx.fixoResponsavelCargo" list="da75-dl-solicitacao-responsavel-cargo" placeholder="Digite o cargo" />
+                <input
+                  :value="ctx.fixoResponsavelCargo"
+                  list="da75-dl-solicitacao-responsavel-cargo"
+                  placeholder="Digite o cargo"
+                  @input="ctx.fixoResponsavelCargo = capNome(String(($event.target).value || ''))"
+                />
               </div>
             </div>
           </div>
@@ -88,11 +112,19 @@
           <div class="ixp-body ixp-grid-1">
             <div class="ixp-field">
               <label>2.1 Setor requisitante (Unidade / Setor / Departamento)</label>
-              <input v-model="ctx.fixoSetor" list="da75-dl-dfd-setor-requisitante" />
+              <input
+                :value="ctx.fixoSetor"
+                list="da75-dl-dfd-setor-requisitante"
+                @input="ctx.fixoSetor = capNome(String(($event.target).value || ''))"
+              />
             </div>
             <div class="ixp-field">
               <label>2.2 Responsável pela demanda</label>
-              <input v-model="ctx.fixoDemanda" list="da75-dl-dfd-responsavel-demanda" />
+              <input
+                :value="ctx.fixoDemanda"
+                list="da75-dl-dfd-responsavel-demanda"
+                @input="ctx.fixoDemanda = capNome(String(($event.target).value || ''))"
+              />
             </div>
             <div class="ixp-field">
               <label>2.3 E-mail</label>
@@ -100,21 +132,39 @@
             </div>
             <div class="ixp-field">
               <label>2.4 Nome do(a) gestor(a) de contratos</label>
-              <input v-model="ctx.fixoGestor" list="da75-dl-dfd-gestor-contratos" />
+              <input
+                :value="ctx.fixoGestor"
+                list="da75-dl-dfd-gestor-contratos"
+                @input="ctx.fixoGestor = capNome(String(($event.target).value || ''))"
+              />
             </div>
             <div class="ixp-field">
               <label>2.5 Nome do(a) fiscal de contratos</label>
-              <input v-model="ctx.fixoFiscal" list="da75-dl-dfd-fiscal-contratos" />
+              <input
+                :value="ctx.fixoFiscal"
+                list="da75-dl-dfd-fiscal-contratos"
+                @input="ctx.fixoFiscal = capNome(String(($event.target).value || ''))"
+              />
             </div>
             <h4 class="ixp-subsection-title">2.6 Responsável pela assinatura do DFD</h4>
             <div class="ixp-grid-2">
               <div class="ixp-field">
                 <label>Nome do responsável</label>
-                <input v-model="ctx.fixoAssinatura" list="da75-dl-dfd-assinatura-nome" placeholder="Digite o nome do responsável" />
+                <input
+                  :value="ctx.fixoAssinatura"
+                  list="da75-dl-dfd-assinatura-nome"
+                  placeholder="Digite o nome do responsável"
+                  @input="ctx.fixoAssinatura = capNome(String(($event.target).value || ''))"
+                />
               </div>
               <div class="ixp-field">
                 <label>Função / Cargo</label>
-                <input v-model="ctx.fixoAssinaturaCargo" list="da75-dl-dfd-assinatura-cargo" placeholder="Digite o cargo" />
+                <input
+                  :value="ctx.fixoAssinaturaCargo"
+                  list="da75-dl-dfd-assinatura-cargo"
+                  placeholder="Digite o cargo"
+                  @input="ctx.fixoAssinaturaCargo = capNome(String(($event.target).value || ''))"
+                />
               </div>
             </div>
           </div>
@@ -125,7 +175,11 @@
           <div class="ixp-body ixp-grid-1">
             <div class="ixp-field">
               <label>Endereço presencial para envio ou entrega de propostas</label>
-              <textarea v-model="ctx.fixoEnderecoEntrega" rows="3" />
+              <textarea
+                :value="ctx.fixoEnderecoEntrega"
+                rows="3"
+                @input="ctx.fixoEnderecoEntrega = capFirst(String(($event.target).value || ''))"
+              />
               <p class="ixp-hint">Texto pré-preenchido e editável. Ajuste município, UF, endereço e horário conforme o órgão.</p>
             </div>
             <div class="ixp-field">
@@ -135,11 +189,19 @@
             <div class="ixp-grid-2">
               <div class="ixp-field">
                 <label>Responsável pelo Termo de Referência — Nome</label>
-                <input v-model="ctx.fixoTrResponsavelNome" list="da75-dl-tr-resp-nome" />
+                <input
+                  :value="ctx.fixoTrResponsavelNome"
+                  list="da75-dl-tr-resp-nome"
+                  @input="ctx.fixoTrResponsavelNome = capNome(String(($event.target).value || ''))"
+                />
               </div>
               <div class="ixp-field">
                 <label>Cargo / Função</label>
-                <input v-model="ctx.fixoTrResponsavelCargo" list="da75-dl-tr-resp-cargo" />
+                <input
+                  :value="ctx.fixoTrResponsavelCargo"
+                  list="da75-dl-tr-resp-cargo"
+                  @input="ctx.fixoTrResponsavelCargo = capNome(String(($event.target).value || ''))"
+                />
               </div>
             </div>
           </div>
@@ -197,6 +259,11 @@
 </template>
 
 <script setup>
+import {
+  capitalizeFirstSignificantLetter as capFirst,
+  capitalizeNomeTituloPt as capNome,
+} from '@/utils/itemValorCampos.js';
+
 defineProps({
   open: { type: Boolean, default: false },
   /** Retorno de `useDispensaArt75IIDadosFixos` */

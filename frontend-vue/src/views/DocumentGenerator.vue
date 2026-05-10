@@ -362,6 +362,17 @@
                     @input="onItemValorSlotTextInput(field, $event)"
                   />
                   <input
+                    v-else-if="isSlotNomeTituloTextField(field)"
+                    :id="'drawer-slot-' + field.id"
+                    :value="slotForm[field.id]"
+                    type="text"
+                    class="gov-input doc-gen__slot-input"
+                    autocomplete="off"
+                    :placeholder="field.placeholder || 'Selecione, digite ou adicione novo valor'"
+                    @focus="openFieldSuggestions(field.id)"
+                    @input="onSlotNomeTituloDrawerInput(field, $event)"
+                  />
+                  <input
                     v-else
                     :id="'drawer-slot-' + field.id"
                     v-model="slotForm[field.id]"
@@ -421,6 +432,17 @@
                     @keydown="onCnpjInputKeydown"
                     @focus="openFieldSuggestions(field.id)"
                     @input="onCnpjDrawerInput(field, $event)"
+                  />
+                  <input
+                    v-else-if="isSlotNomeTituloFieldId(field.id)"
+                    :id="'drawer-slot-' + field.id"
+                    :value="slotForm[field.id]"
+                    type="text"
+                    class="gov-input doc-gen__slot-input"
+                    autocomplete="off"
+                    :placeholder="field.placeholder || 'Escolha ou digite o cargo'"
+                    @focus="openFieldSuggestions(field.id)"
+                    @input="onSlotNomeTituloDrawerInput(field, $event)"
                   />
                   <input
                     v-else
@@ -549,6 +571,7 @@ import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/
 import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
 import {
   capitalizeFirstSignificantLetter,
+  capitalizeNomeTituloPt,
   formatMoedaBRLInput,
   sanitizeQuantidadeInput,
 } from '@/utils/itemValorCampos.js';
@@ -965,6 +988,48 @@ function isCnpjSlotField(field) {
 
 const ITEM_VALOR_SLOT_IDS = new Set(['item_descricao', 'item_quantidade', 'item_unidade', 'item_valor_unitario']);
 
+/** Campos de nome próprio / cargo / setor nos fluxos TR+DFD+Ofício (drawer Dados fixos). */
+const SLOT_NOME_TITULO_IDS = new Set([
+  'solicitacao_destinatario_nome',
+  'solicitacao_destinatario_cargo',
+  'solicitacao_responsavel_nome',
+  'solicitacao_responsavel_cargo',
+  'dfd_setor_requisitante',
+  'dfd_responsavel_demanda',
+  'dfd_gestor_contratos',
+  'dfd_fiscal_contratos',
+  'dfd_assinatura_nome',
+  'dfd_assinatura_cargo',
+  'tr_termo_responsavel_nome',
+  'tr_termo_responsavel_cargo',
+  'orgao_unidade',
+  'objeto_especifico',
+  'equipamento',
+  'marca',
+  'modelo',
+  'fornecedor_nome',
+  'fiscal_nome',
+  'responsavel_tr_nome',
+  'responsavel_tr_cargo',
+  'setor_responsavel',
+  'responsavel_tecnico',
+]);
+
+function isSlotNomeTituloFieldId(fieldId) {
+  return SLOT_NOME_TITULO_IDS.has(String(fieldId || ''));
+}
+
+function isSlotNomeTituloTextField(field) {
+  return field?.input === 'text' && isSlotNomeTituloFieldId(field.id);
+}
+
+function onSlotNomeTituloDrawerInput(field, event) {
+  const el = event?.target;
+  if (!el) return;
+  slotForm[field.id] = capitalizeNomeTituloPt(String(el.value ?? ''));
+  openFieldSuggestions(field.id);
+}
+
 function isItemValorTextSlotField(field) {
   return field?.input === 'text' && ITEM_VALOR_SLOT_IDS.has(String(field?.id || ''));
 }
@@ -998,7 +1063,8 @@ function isFieldSuggestionsOpen(fieldId) {
 }
 
 function selectFieldSuggestion(fieldId, value) {
-  slotForm[fieldId] = value;
+  const raw = String(value ?? '');
+  slotForm[fieldId] = isSlotNomeTituloFieldId(fieldId) ? capitalizeNomeTituloPt(raw) : raw;
   suggestionOpenField.value = '';
 }
 

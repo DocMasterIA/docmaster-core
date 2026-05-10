@@ -28,6 +28,36 @@ export function capitalizeEachWordLeadingPt(value) {
   });
 }
 
+/** Partículas comuns em nomes próprios e títulos (permanecem em minúsculas após a primeira palavra). */
+const PT_NOME_TITULO_PARTICULAS = new Set([
+  'de', 'da', 'do', 'dos', 'das', 'e', 'del', 'y', 'em', 'na', 'no', 'nas', 'nos',
+]);
+
+/**
+ * Formata texto livre como nome ou título em pt-BR: cada palavra com inicial maiúscula,
+ * exceto partículas (de, da, do…) quando não são a primeira palavra.
+ * Ex.: "ariane do nascimento martins" → "Ariane do Nascimento Martins"
+ * @param {string} value
+ */
+export function capitalizeNomeTituloPt(value) {
+  const raw = String(value ?? '');
+  if (!raw.trim()) return raw;
+  const parts = raw.split(/(\s+)/);
+  let seenWord = false;
+  return parts
+    .map((segment) => {
+      if (/^\s+$/.test(segment)) return segment;
+      const lower = segment.toLocaleLowerCase('pt-BR');
+      const letters = lower.match(/\p{L}/u);
+      if (!letters) return segment;
+      const isParticle = seenWord && PT_NOME_TITULO_PARTICULAS.has(lower);
+      seenWord = true;
+      if (isParticle) return lower;
+      return lower.charAt(0).toLocaleUpperCase('pt-BR') + lower.slice(1);
+    })
+    .join('');
+}
+
 /**
  * Quantidade: só dígitos e um separador decimal (`,` ou `.`). Sem milhares.
  * @param {string} value

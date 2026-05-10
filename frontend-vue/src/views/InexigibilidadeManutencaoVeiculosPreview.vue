@@ -128,7 +128,7 @@
                     :value="fornecedor"
                     list="dl-fornecedor"
                     placeholder="Digite a razao social"
-                    @input="fornecedor = primeiraMaiuscula(String(($event.target).value || ''))"
+                    @input="fornecedor = tituloNomePt(String(($event.target).value || ''))"
                   />
                 </div>
                 <div class="ixp-field"><label>CNPJ</label><input :value="cnpj" type="text" inputmode="numeric" maxlength="18" autocomplete="off" placeholder="00.000.000/0001-00" @keydown="onCnpjInputKeydown" @input="cnpj = formatCnpjBr(String(($event.target).value || ''))" /></div>
@@ -182,7 +182,7 @@
                   <input
                     :value="fiscal"
                     list="dl-fiscal"
-                    @input="fiscal = primeiraMaiuscula(String(($event.target).value || ''))"
+                    @input="fiscal = tituloNomePt(String(($event.target).value || ''))"
                   />
                 </div>
               </div>
@@ -196,7 +196,7 @@
                   <input
                     :value="responsavel"
                     list="dl-tr-nome-assinante"
-                    @input="responsavel = primeiraMaiuscula(String(($event.target).value || ''))"
+                    @input="responsavel = tituloNomePt(String(($event.target).value || ''))"
                   />
                 </div>
                 <div class="ixp-field">
@@ -204,7 +204,7 @@
                   <input
                     :value="responsavelCargo"
                     list="dl-tr-cargo-assinante"
-                    @input="responsavelCargo = primeiraMaiuscula(String(($event.target).value || ''))"
+                    @input="responsavelCargo = tituloNomePt(String(($event.target).value || ''))"
                   />
                 </div>
               </div>
@@ -328,7 +328,11 @@
             </div>
             <div class="ixp-field">
               <label>Nome do cadastro</label>
-              <input v-model="orgaoProfileName" placeholder="Ex: Fundo Municipal de Saúde" />
+              <input
+                :value="orgaoProfileName"
+                placeholder="Ex: Fundo Municipal de Saúde"
+                @input="orgaoProfileName = tituloNomePt(String(($event.target).value || ''))"
+              />
             </div>
             <div class="ixp-inline-actions ixp-orgao-profile-actions">
               <button type="button" class="ixp-btn-secondary ixp-btn-xs ixp-orgao-btn-new" @click="newOrgaoProfile">Novo cadastro</button>
@@ -345,25 +349,45 @@
               <div class="ixp-field"><label>Tratamento</label><select v-model="fixoTratNome"><option value="">Selecione</option><option v-for="op in tratamentoNome" :key="op" :value="op">{{ op }}</option></select></div>
               <div class="ixp-field ixp-col-2">
                 <label>1.1 A quem e direcionada a solicitacao — Nome</label>
-                <input v-model="fixoNome" list="dl-solicitacao-destinatario-nome" placeholder="Digite o nome" />
+                <input
+                  :value="fixoNome"
+                  list="dl-solicitacao-destinatario-nome"
+                  placeholder="Digite o nome"
+                  @input="fixoNome = tituloNomePt(String(($event.target).value || ''))"
+                />
               </div>
             </div>
             <div class="ixp-grid-3">
               <div class="ixp-field"><label>Tratamento</label><select v-model="fixoTratCargo"><option value="">Selecione</option><option v-for="op in tratamentoCargo" :key="op" :value="op">{{ op }}</option></select></div>
               <div class="ixp-field ixp-col-2">
                 <label>1.2 A quem e direcionada a solicitacao — Funcao / Cargo</label>
-                <input v-model="fixoCargo" list="dl-solicitacao-destinatario-cargo" placeholder="Digite a funcao ou cargo" />
+                <input
+                  :value="fixoCargo"
+                  list="dl-solicitacao-destinatario-cargo"
+                  placeholder="Digite a funcao ou cargo"
+                  @input="fixoCargo = tituloNomePt(String(($event.target).value || ''))"
+                />
               </div>
             </div>
             <h4 class="ixp-subsection-title">1.3 Responsável pela solicitação</h4>
             <div class="ixp-grid-2">
               <div class="ixp-field">
                 <label>Nome do responsavel</label>
-                <input v-model="fixoResponsavel" list="dl-solicitacao-responsavel-nome" placeholder="Digite o nome do responsavel" />
+                <input
+                  :value="fixoResponsavel"
+                  list="dl-solicitacao-responsavel-nome"
+                  placeholder="Digite o nome do responsavel"
+                  @input="fixoResponsavel = tituloNomePt(String(($event.target).value || ''))"
+                />
               </div>
               <div class="ixp-field">
                 <label>Funcao / Cargo</label>
-                <input v-model="fixoResponsavelCargo" list="dl-solicitacao-responsavel-cargo" placeholder="Digite o cargo" />
+                <input
+                  :value="fixoResponsavelCargo"
+                  list="dl-solicitacao-responsavel-cargo"
+                  placeholder="Digite o cargo"
+                  @input="fixoResponsavelCargo = tituloNomePt(String(($event.target).value || ''))"
+                />
               </div>
             </div>
           </div>
@@ -373,11 +397,19 @@
           <div class="ixp-body ixp-grid-1">
             <div class="ixp-field">
               <label>2.1 Setor requisitante (Unidade / Setor / Departamento)</label>
-              <input v-model="fixoSetor" list="dl-dfd-setor-requisitante" />
+              <input
+                :value="fixoSetor"
+                list="dl-dfd-setor-requisitante"
+                @input="fixoSetor = tituloNomePt(String(($event.target).value || ''))"
+              />
             </div>
             <div class="ixp-field">
               <label>2.2 Responsavel pela demanda</label>
-              <input v-model="fixoDemanda" list="dl-dfd-responsavel-demanda" />
+              <input
+                :value="fixoDemanda"
+                list="dl-dfd-responsavel-demanda"
+                @input="fixoDemanda = tituloNomePt(String(($event.target).value || ''))"
+              />
             </div>
             <div class="ixp-field">
               <label>2.3 E-mail</label>
@@ -385,21 +417,39 @@
             </div>
             <div class="ixp-field">
               <label>2.4 Nome do(a) gestor(a) de contratos</label>
-              <input v-model="fixoGestor" list="dl-dfd-gestor-contratos" />
+              <input
+                :value="fixoGestor"
+                list="dl-dfd-gestor-contratos"
+                @input="fixoGestor = tituloNomePt(String(($event.target).value || ''))"
+              />
             </div>
             <div class="ixp-field">
               <label>2.5 Nome do(a) fiscal de contratos</label>
-              <input v-model="fixoFiscal" list="dl-dfd-fiscal-contratos" />
+              <input
+                :value="fixoFiscal"
+                list="dl-dfd-fiscal-contratos"
+                @input="fixoFiscal = tituloNomePt(String(($event.target).value || ''))"
+              />
             </div>
             <h4 class="ixp-subsection-title">2.6 Responsável pela assinatura do DFD</h4>
             <div class="ixp-grid-2">
               <div class="ixp-field">
                 <label>Nome do responsavel</label>
-                <input v-model="fixoAssinatura" list="dl-dfd-assinatura-nome" placeholder="Digite o nome do responsavel" />
+                <input
+                  :value="fixoAssinatura"
+                  list="dl-dfd-assinatura-nome"
+                  placeholder="Digite o nome do responsavel"
+                  @input="fixoAssinatura = tituloNomePt(String(($event.target).value || ''))"
+                />
               </div>
               <div class="ixp-field">
                 <label>Funcao / Cargo</label>
-                <input v-model="fixoAssinaturaCargo" list="dl-dfd-assinatura-cargo" placeholder="Digite o cargo" />
+                <input
+                  :value="fixoAssinaturaCargo"
+                  list="dl-dfd-assinatura-cargo"
+                  placeholder="Digite o cargo"
+                  @input="fixoAssinaturaCargo = tituloNomePt(String(($event.target).value || ''))"
+                />
               </div>
             </div>
           </div>
@@ -441,6 +491,7 @@ import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
 import {
   capitalizeEachWordLeadingPt,
   capitalizeFirstSignificantLetter as primeiraMaiuscula,
+  capitalizeNomeTituloPt as tituloNomePt,
   formatMoedaBRLInput,
   sanitizeQuantidadeInput,
 } from '@/utils/itemValorCampos.js';
@@ -533,13 +584,13 @@ const orgaoResponsavelEquipamento = ref('');
 const orgaoUnidadeVeiculo = ref('');
 
 function onOrgaoInput(ev) {
-  orgao.value = primeiraMaiuscula(String(ev?.target?.value ?? ''));
+  orgao.value = tituloNomePt(String(ev?.target?.value ?? ''));
 }
 function onOrgaoResponsavelEquipamentoInput(ev) {
-  orgaoResponsavelEquipamento.value = primeiraMaiuscula(String(ev?.target?.value ?? ''));
+  orgaoResponsavelEquipamento.value = tituloNomePt(String(ev?.target?.value ?? ''));
 }
 function onOrgaoUnidadeVeiculoInput(ev) {
-  orgaoUnidadeVeiculo.value = primeiraMaiuscula(String(ev?.target?.value ?? ''));
+  orgaoUnidadeVeiculo.value = tituloNomePt(String(ev?.target?.value ?? ''));
 }
 
 const objetoEspecifico = ref('');
@@ -690,21 +741,57 @@ function applyGlobalFormStatePayload(data) {
   if ('cabecalho_documento' in data) cabecalhoDocumento.value = String(data.cabecalho_documento || '');
   if ('orgao' in data) {
     const t = String(data.orgao || '').trim();
-    orgao.value = t ? primeiraMaiuscula(t) : '';
+    orgao.value = t ? tituloNomePt(t) : '';
   }
-  if ('solicitacao_destinatario_nome' in data) fixoNome.value = String(data.solicitacao_destinatario_nome || '');
-  if ('solicitacao_destinatario_cargo' in data) fixoCargo.value = String(data.solicitacao_destinatario_cargo || '');
-  if ('solicitacao_responsavel_nome' in data) fixoResponsavel.value = String(data.solicitacao_responsavel_nome || '');
-  if ('solicitacao_responsavel_cargo' in data) fixoResponsavelCargo.value = String(data.solicitacao_responsavel_cargo || '');
-  if ('dfd_setor_requisitante' in data) fixoSetor.value = String(data.dfd_setor_requisitante || '');
-  if ('dfd_responsavel_demanda' in data) fixoDemanda.value = String(data.dfd_responsavel_demanda || '');
+  if ('solicitacao_destinatario_nome' in data) {
+    const v = String(data.solicitacao_destinatario_nome || '').trim();
+    fixoNome.value = v ? tituloNomePt(v) : '';
+  }
+  if ('solicitacao_destinatario_cargo' in data) {
+    const v = String(data.solicitacao_destinatario_cargo || '').trim();
+    fixoCargo.value = v ? tituloNomePt(v) : '';
+  }
+  if ('solicitacao_responsavel_nome' in data) {
+    const v = String(data.solicitacao_responsavel_nome || '').trim();
+    fixoResponsavel.value = v ? tituloNomePt(v) : '';
+  }
+  if ('solicitacao_responsavel_cargo' in data) {
+    const v = String(data.solicitacao_responsavel_cargo || '').trim();
+    fixoResponsavelCargo.value = v ? tituloNomePt(v) : '';
+  }
+  if ('dfd_setor_requisitante' in data) {
+    const v = String(data.dfd_setor_requisitante || '').trim();
+    fixoSetor.value = v ? tituloNomePt(v) : '';
+  }
+  if ('dfd_responsavel_demanda' in data) {
+    const v = String(data.dfd_responsavel_demanda || '').trim();
+    fixoDemanda.value = v ? tituloNomePt(v) : '';
+  }
   if ('dfd_email' in data) fixoEmail.value = String(data.dfd_email || '');
-  if ('dfd_gestor_contratos' in data) fixoGestor.value = String(data.dfd_gestor_contratos || '');
-  if ('dfd_fiscal_contratos' in data) fixoFiscal.value = String(data.dfd_fiscal_contratos || '');
-  if ('dfd_assinatura_nome' in data) fixoAssinatura.value = String(data.dfd_assinatura_nome || '');
-  if ('dfd_assinatura_cargo' in data) fixoAssinaturaCargo.value = String(data.dfd_assinatura_cargo || '');
-  if ('tr_nome_assinante' in data) responsavel.value = String(data.tr_nome_assinante || '');
-  if ('tr_cargo_assinante' in data) responsavelCargo.value = String(data.tr_cargo_assinante || '');
+  if ('dfd_gestor_contratos' in data) {
+    const v = String(data.dfd_gestor_contratos || '').trim();
+    fixoGestor.value = v ? tituloNomePt(v) : '';
+  }
+  if ('dfd_fiscal_contratos' in data) {
+    const v = String(data.dfd_fiscal_contratos || '').trim();
+    fixoFiscal.value = v ? tituloNomePt(v) : '';
+  }
+  if ('dfd_assinatura_nome' in data) {
+    const v = String(data.dfd_assinatura_nome || '').trim();
+    fixoAssinatura.value = v ? tituloNomePt(v) : '';
+  }
+  if ('dfd_assinatura_cargo' in data) {
+    const v = String(data.dfd_assinatura_cargo || '').trim();
+    fixoAssinaturaCargo.value = v ? tituloNomePt(v) : '';
+  }
+  if ('tr_nome_assinante' in data) {
+    const v = String(data.tr_nome_assinante || '').trim();
+    responsavel.value = v ? tituloNomePt(v) : '';
+  }
+  if ('tr_cargo_assinante' in data) {
+    const v = String(data.tr_cargo_assinante || '').trim();
+    responsavelCargo.value = v ? tituloNomePt(v) : '';
+  }
   if ('clausula_contratado' in data) clausulaContratado.value = String(data.clausula_contratado || '');
   if ('clausula_setor' in data) clausulaSetor.value = String(data.clausula_setor || '');
   if ('clausula_caracteristicas' in data) clausulaCaracteristicas.value = String(data.clausula_caracteristicas || '');
@@ -819,7 +906,7 @@ function loadOrgaoProfiles() {
     let dirty = false;
     orgaoProfiles.value = list.map((p) => {
       const trimmed = String(p?.name ?? '').trim();
-      const n = trimmed ? primeiraMaiuscula(trimmed) : '';
+      const n = trimmed ? tituloNomePt(trimmed) : '';
       if (n !== trimmed) dirty = true;
       return { ...p, name: n };
     });
@@ -843,7 +930,7 @@ function loadOrgaoProfile(profileId) {
   const hit = orgaoProfiles.value.find((p) => String(p.id) === id);
   if (!hit) return;
   const trimmed = String(hit.name || '').trim();
-  orgaoProfileName.value = trimmed ? primeiraMaiuscula(trimmed) : '';
+  orgaoProfileName.value = trimmed ? tituloNomePt(trimmed) : '';
   applyGlobalFormStatePayload(hit.data || {});
 }
 
@@ -854,7 +941,7 @@ function newOrgaoProfile() {
 
 function saveOrgaoProfile() {
   const nameRaw = String(orgaoProfileName.value || '').trim();
-  const name = nameRaw ? primeiraMaiuscula(nameRaw) : '';
+  const name = nameRaw ? tituloNomePt(nameRaw) : '';
   if (!name) return false;
   orgaoProfileName.value = name;
   const data = collectGlobalFormStatePayload();

@@ -76,7 +76,7 @@
                   <input
                     :value="fornecedor"
                     placeholder="Digite a razão social"
-                    @input="fornecedor = iniciarComMaiuscula(String(($event.target).value || ''))"
+                    @input="fornecedor = tituloNomePt(String(($event.target).value || ''))"
                   />
                 </div>
                 <div class="fe-field">
@@ -136,7 +136,7 @@
                   <input
                     :value="fiscal"
                     placeholder="Digite o nome do fiscal de contratos"
-                    @input="fiscal = iniciarComMaiuscula(String(($event.target).value || ''))"
+                    @input="fiscal = tituloNomePt(String(($event.target).value || ''))"
                   />
                 </div>
               </div>
@@ -150,7 +150,7 @@
                   <input
                     :value="responsavel"
                     placeholder="Digite o nome"
-                    @input="responsavel = iniciarComMaiuscula(String(($event.target).value || ''))"
+                    @input="responsavel = tituloNomePt(String(($event.target).value || ''))"
                   />
                 </div>
                 <div class="fe-field">
@@ -158,7 +158,7 @@
                   <input
                     :value="responsavelCargo"
                     placeholder="Digite o cargo"
-                    @input="responsavelCargo = iniciarComMaiuscula(String(($event.target).value || ''))"
+                    @input="responsavelCargo = tituloNomePt(String(($event.target).value || ''))"
                   />
                 </div>
               </div>
@@ -243,7 +243,11 @@
             </div>
             <div class="fe-field">
               <label>Nome do cadastro</label>
-              <input v-model="orgaoProfileName" placeholder="Ex: Fundo Municipal de Saúde" />
+              <input
+                :value="orgaoProfileName"
+                placeholder="Ex: Fundo Municipal de Saúde"
+                @input="orgaoProfileName = tituloNomePt(String(($event.target).value || ''))"
+              />
             </div>
             <div class="fe-inline-actions fe-orgao-profile-actions">
               <button type="button" class="fe-btn-secondary fe-btn-xs fe-orgao-btn-new" @click="newOrgaoProfile">Novo cadastro</button>
@@ -263,7 +267,11 @@
               </div>
               <div class="fe-field fe-col-2">
                 <label>1.1 A quem é direcionada a solicitação — Nome</label>
-                <input v-model="nome" list="dl-solicitacao-destinatario-nome" />
+                <input
+                  :value="nome"
+                  list="dl-solicitacao-destinatario-nome"
+                  @input="nome = tituloNomePt(String(($event.target).value || ''))"
+                />
               </div>
             </div>
             <div class="fe-grid-3">
@@ -273,18 +281,32 @@
               </div>
               <div class="fe-field fe-col-2">
                 <label>1.2 A quem é direcionada a solicitação — Função/Cargo</label>
-                <input v-model="cargo" list="dl-solicitacao-destinatario-cargo" />
+                <input
+                  :value="cargo"
+                  list="dl-solicitacao-destinatario-cargo"
+                  @input="cargo = tituloNomePt(String(($event.target).value || ''))"
+                />
               </div>
             </div>
             <h4 class="fe-subsection-title">1.3 Responsável pela solicitação</h4>
             <div class="fe-grid-2">
               <div class="fe-field">
                 <label>Nome do responsável</label>
-                <input v-model="fixoResponsavel" list="dl-solicitacao-responsavel-nome" placeholder="Digite o nome do responsável" />
+                <input
+                  :value="fixoResponsavel"
+                  list="dl-solicitacao-responsavel-nome"
+                  placeholder="Digite o nome do responsável"
+                  @input="fixoResponsavel = tituloNomePt(String(($event.target).value || ''))"
+                />
               </div>
               <div class="fe-field">
                 <label>Função / Cargo</label>
-                <input v-model="fixoResponsavelCargo" list="dl-solicitacao-responsavel-cargo" placeholder="Digite a função ou cargo" />
+                <input
+                  :value="fixoResponsavelCargo"
+                  list="dl-solicitacao-responsavel-cargo"
+                  placeholder="Digite a função ou cargo"
+                  @input="fixoResponsavelCargo = tituloNomePt(String(($event.target).value || ''))"
+                />
               </div>
             </div>
           </div>
@@ -294,11 +316,19 @@
           <div class="fe-body">
             <div class="fe-field">
               <label>2.1 Setor requisitante (Unidade / Setor / Departamento)</label>
-              <input v-model="fixoSetor" list="dl-dfd-setor-requisitante" />
+              <input
+                :value="fixoSetor"
+                list="dl-dfd-setor-requisitante"
+                @input="fixoSetor = tituloNomePt(String(($event.target).value || ''))"
+              />
             </div>
             <div class="fe-field">
               <label>2.2 Responsável pela demanda</label>
-              <input v-model="fixoDemanda" list="dl-dfd-responsavel-demanda" />
+              <input
+                :value="fixoDemanda"
+                list="dl-dfd-responsavel-demanda"
+                @input="fixoDemanda = tituloNomePt(String(($event.target).value || ''))"
+              />
             </div>
             <div class="fe-field">
               <label>2.3 E-mail</label>
@@ -306,21 +336,39 @@
             </div>
             <div class="fe-field">
               <label>2.4 Nome do(a) gestor(a) de contratos</label>
-              <input v-model="fixoGestor" list="dl-dfd-gestor-contratos" />
+              <input
+                :value="fixoGestor"
+                list="dl-dfd-gestor-contratos"
+                @input="fixoGestor = tituloNomePt(String(($event.target).value || ''))"
+              />
             </div>
             <div class="fe-field">
               <label>2.5 Nome do(a) fiscal de contratos</label>
-              <input v-model="fixoFiscal" list="dl-dfd-fiscal-contratos" />
+              <input
+                :value="fixoFiscal"
+                list="dl-dfd-fiscal-contratos"
+                @input="fixoFiscal = tituloNomePt(String(($event.target).value || ''))"
+              />
             </div>
             <h4 class="fe-subsection-title">2.6 Responsável pela assinatura do DFD</h4>
             <div class="fe-grid-2">
               <div class="fe-field">
                 <label>Nome do responsável</label>
-                <input v-model="fixoAssinatura" list="dl-dfd-assinatura-nome" placeholder="Digite o nome do responsável" />
+                <input
+                  :value="fixoAssinatura"
+                  list="dl-dfd-assinatura-nome"
+                  placeholder="Digite o nome do responsável"
+                  @input="fixoAssinatura = tituloNomePt(String(($event.target).value || ''))"
+                />
               </div>
               <div class="fe-field">
                 <label>Função / Cargo</label>
-                <input v-model="fixoAssinaturaCargo" list="dl-dfd-assinatura-cargo" placeholder="Digite a função ou cargo" />
+                <input
+                  :value="fixoAssinaturaCargo"
+                  list="dl-dfd-assinatura-cargo"
+                  placeholder="Digite a função ou cargo"
+                  @input="fixoAssinaturaCargo = tituloNomePt(String(($event.target).value || ''))"
+                />
               </div>
             </div>
           </div>
@@ -355,6 +403,7 @@ import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
 import {
   capitalizeEachWordLeadingPt,
   capitalizeFirstSignificantLetter,
+  capitalizeNomeTituloPt as tituloNomePt,
   formatMoedaBRLInput,
   sanitizeQuantidadeInput,
 } from '@/utils/itemValorCampos.js';
@@ -381,7 +430,7 @@ const processo = ref('');
 const orgao = ref('');
 
 function onOrgaoFeInput(ev) {
-  orgao.value = capitalizeFirstSignificantLetter(String(ev?.target?.value ?? ''));
+  orgao.value = tituloNomePt(String(ev?.target?.value ?? ''));
 }
 
 const objetoEspecifico = ref('');
@@ -541,19 +590,49 @@ function applyGlobalFormStatePayload(data) {
   if (!data || typeof data !== 'object') return;
   if ('orgao' in data) {
     const t = String(data.orgao || '').trim();
-    orgao.value = t ? capitalizeFirstSignificantLetter(t) : '';
+    orgao.value = t ? tituloNomePt(t) : '';
   }
-  if ('solicitacao_destinatario_nome' in data) nome.value = String(data.solicitacao_destinatario_nome || '');
-  if ('solicitacao_destinatario_cargo' in data) cargo.value = String(data.solicitacao_destinatario_cargo || '');
-  if ('solicitacao_responsavel_nome' in data) fixoResponsavel.value = String(data.solicitacao_responsavel_nome || '');
-  if ('solicitacao_responsavel_cargo' in data) fixoResponsavelCargo.value = String(data.solicitacao_responsavel_cargo || '');
-  if ('dfd_setor_requisitante' in data) fixoSetor.value = String(data.dfd_setor_requisitante || '');
-  if ('dfd_responsavel_demanda' in data) fixoDemanda.value = String(data.dfd_responsavel_demanda || '');
+  if ('solicitacao_destinatario_nome' in data) {
+    const v = String(data.solicitacao_destinatario_nome || '').trim();
+    nome.value = v ? tituloNomePt(v) : '';
+  }
+  if ('solicitacao_destinatario_cargo' in data) {
+    const v = String(data.solicitacao_destinatario_cargo || '').trim();
+    cargo.value = v ? tituloNomePt(v) : '';
+  }
+  if ('solicitacao_responsavel_nome' in data) {
+    const v = String(data.solicitacao_responsavel_nome || '').trim();
+    fixoResponsavel.value = v ? tituloNomePt(v) : '';
+  }
+  if ('solicitacao_responsavel_cargo' in data) {
+    const v = String(data.solicitacao_responsavel_cargo || '').trim();
+    fixoResponsavelCargo.value = v ? tituloNomePt(v) : '';
+  }
+  if ('dfd_setor_requisitante' in data) {
+    const v = String(data.dfd_setor_requisitante || '').trim();
+    fixoSetor.value = v ? tituloNomePt(v) : '';
+  }
+  if ('dfd_responsavel_demanda' in data) {
+    const v = String(data.dfd_responsavel_demanda || '').trim();
+    fixoDemanda.value = v ? tituloNomePt(v) : '';
+  }
   if ('dfd_email' in data) fixoEmail.value = String(data.dfd_email || '');
-  if ('dfd_gestor_contratos' in data) fixoGestor.value = String(data.dfd_gestor_contratos || '');
-  if ('dfd_fiscal_contratos' in data) fixoFiscal.value = String(data.dfd_fiscal_contratos || '');
-  if ('dfd_assinatura_nome' in data) fixoAssinatura.value = String(data.dfd_assinatura_nome || '');
-  if ('dfd_assinatura_cargo' in data) fixoAssinaturaCargo.value = String(data.dfd_assinatura_cargo || '');
+  if ('dfd_gestor_contratos' in data) {
+    const v = String(data.dfd_gestor_contratos || '').trim();
+    fixoGestor.value = v ? tituloNomePt(v) : '';
+  }
+  if ('dfd_fiscal_contratos' in data) {
+    const v = String(data.dfd_fiscal_contratos || '').trim();
+    fixoFiscal.value = v ? tituloNomePt(v) : '';
+  }
+  if ('dfd_assinatura_nome' in data) {
+    const v = String(data.dfd_assinatura_nome || '').trim();
+    fixoAssinatura.value = v ? tituloNomePt(v) : '';
+  }
+  if ('dfd_assinatura_cargo' in data) {
+    const v = String(data.dfd_assinatura_cargo || '').trim();
+    fixoAssinaturaCargo.value = v ? tituloNomePt(v) : '';
+  }
   if ('ao_senhor_genero' in data) tratNome.value = String(data.ao_senhor_genero || '');
   if ('senhor_senhora_genero' in data) tratCargo.value = String(data.senhor_senhora_genero || '');
 }
@@ -639,7 +718,7 @@ function loadOrgaoProfiles() {
     let dirty = false;
     orgaoProfiles.value = list.map((p) => {
       const trimmed = String(p?.name ?? '').trim();
-      const n = trimmed ? capitalizeFirstSignificantLetter(trimmed) : '';
+      const n = trimmed ? tituloNomePt(trimmed) : '';
       if (n !== trimmed) dirty = true;
       return { ...p, name: n };
     });
@@ -663,7 +742,7 @@ function loadOrgaoProfile(profileId) {
   const hit = orgaoProfiles.value.find((p) => String(p.id) === id);
   if (!hit) return;
   const trimmed = String(hit.name || '').trim();
-  orgaoProfileName.value = trimmed ? capitalizeFirstSignificantLetter(trimmed) : '';
+  orgaoProfileName.value = trimmed ? tituloNomePt(trimmed) : '';
   applyGlobalFormStatePayload(hit.data || {});
 }
 
@@ -674,7 +753,7 @@ function newOrgaoProfile() {
 
 function saveOrgaoProfile() {
   const nameRaw = String(orgaoProfileName.value || '').trim();
-  const name = nameRaw ? capitalizeFirstSignificantLetter(nameRaw) : '';
+  const name = nameRaw ? tituloNomePt(nameRaw) : '';
   if (!name) return false;
   orgaoProfileName.value = name;
   const data = collectGlobalFormStatePayload();

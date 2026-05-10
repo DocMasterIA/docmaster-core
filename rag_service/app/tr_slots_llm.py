@@ -116,6 +116,7 @@ REGRAS:
 - objeto_entregas: texto complementar (1 a 2 frases) com principais entregas/resultados verificáveis esperados da contratação.
 - objeto_resultados: texto complementar (1 a 2 frases) com impactos/resultados esperados para a Administração e usuários do serviço.
 - justificativa: parágrafo de justificativa técnica/administrativa para a contratação, em linguagem formal. - Deve ser um texto dissertativo-argumentativo extenso, completo e técnico. Não deve ser uma frase curta e simplificada.
+  - Concordância de gênero em português: a palavra «manutenção» é feminina — nunca escreva «é o manutenção» ou «o manutenção»; use «é a manutenção», «constitui a manutenção», «a manutenção corretiva/preventiva», ou «o serviço de manutenção» (masculino) quando couber.
   - Deve ser um parágrafo de justificativa técnica/administrativa mais rico (idealmente 3 a 6 frases), em linguagem formal, explicando:
     * por que a contratação é necessária para a Administração,
     * quais riscos existem se a contratação não for realizada (ex.: prejuízo à continuidade dos serviços, impacto no atendimento ao público),
@@ -1259,6 +1260,43 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
     )
 
 
+def _fix_o_manutencao_para_a_manutencao(text: str) -> str:
+    """
+    Corrige erro comum de concordância: «é o manutenção» → «é a manutenção»
+    (e equivalentes com «É», grafia sem cedilha).
+    """
+    if not text or "manuten" not in text.lower():
+        return text
+
+    def _sub(m: re.Match) -> str:
+        e_tok = m.group(1)
+        man = m.group(2)
+        if e_tok == "É":
+            return f"É a {man}"
+        return f"é a {man}"
+
+    return re.sub(r"\b(É|é)\s+o\s+(manuten(?:ç|c)(?:a|ã)o)\b", _sub, text)
+
+
+def _apply_o_manutencao_fix_to_tr_slots(slots: TRTemplateSlots) -> TRTemplateSlots:
+    """Normaliza concordância «é o manutenção» → «é a manutenção» nos campos de texto dos slots."""
+    mf = _fix_o_manutencao_para_a_manutencao
+    return replace(
+        slots,
+        objeto=mf(slots.objeto or ""),
+        objeto_escopo=mf(slots.objeto_escopo or ""),
+        objeto_entregas=mf(slots.objeto_entregas or ""),
+        objeto_resultados=mf(slots.objeto_resultados or ""),
+        justificativa=mf(slots.justificativa or ""),
+        problema_administrativo=mf(slots.problema_administrativo or ""),
+        beneficio_esperado=mf(slots.beneficio_esperado or ""),
+        sol_oficio_objeto=mf(slots.sol_oficio_objeto or ""),
+        sol_oficio_justificativa=mf(slots.sol_oficio_justificativa or ""),
+        dfd_objeto_referencia=mf(slots.dfd_objeto_referencia or ""),
+        dfd_justificativa=mf(slots.dfd_justificativa or ""),
+    )
+
+
 def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemplateSlots:
     """
     Mescla slots vindos da IA com override enviado pelo usuário.
@@ -1992,4 +2030,4 @@ async def fill_tr_slots_with_llm(
         ctx_pk = str(user_context.get("slot_package_key") or "").strip()
         if ctx_pk and not (merged.slot_package_key or "").strip():
             merged = replace(merged, slot_package_key=ctx_pk)
-    return merged
+    return _apply_o_manutencao_fix_to_tr_slots(merged)

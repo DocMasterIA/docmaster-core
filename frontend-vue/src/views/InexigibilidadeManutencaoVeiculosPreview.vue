@@ -1191,9 +1191,11 @@ function buildInexig74ManutencaoDfdJustificativa() {
   } else if (tipo) {
     natureza = `manutenção ${tipo.toLowerCase()}`;
   }
+  const nl = natureza.trim().toLowerCase();
+  const artObjetoRef = nl.startsWith('manutenção') || nl.startsWith('manutencao') ? 'a' : 'o';
   const partes = [
     'A presente demanda insere-se no âmbito da contratação direta por inexigibilidade de licitação, nos termos do art. 74, inciso I, da Lei nº 14.133/2021, ante a necessidade de aquisição de peças, componentes ou serviços técnicos de natureza singular, com fornecedor exclusivo.',
-    `O objeto da referência é o ${natureza} do veículo (${identVeiculo}), com vistas a preservar a disponibilidade, a segurança e a economicidade da frota vinculada ao serviço público.`,
+    `O objeto da referência é ${artObjetoRef} ${natureza} do veículo (${identVeiculo}), com vistas a preservar a disponibilidade, a segurança e a economicidade da frota vinculada ao serviço público.`,
   ];
   if (orgVeic) {
     partes.push(`${LABEL_ORGAO_UNIDADE_VEICULO}: ${orgVeic}.`);

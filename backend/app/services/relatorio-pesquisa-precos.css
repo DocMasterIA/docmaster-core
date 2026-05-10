@@ -59,27 +59,69 @@
   line-height: 1.42;
 }
 
-/* Cabeçalho repetido (running): só logo (PNG) centrada — mínimo para WeasyPrint. */
+/* Cabeçalho repetido (running): card branco, logo centrada, QR à direita. */
 .rpp-head-main {
   width: 100%;
   box-sizing: border-box;
 }
 
-.rpp-head-main--logo-only {
+.rpp-head-main--card-white {
+  padding: 2.2mm 3mm;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.rpp-head-main__grid {
   display: flex;
   align-items: center;
+  width: 100%;
+  gap: 2mm;
+}
+
+.rpp-head-main__spacer {
+  flex: 0 0 15mm;
+  width: 15mm;
+}
+
+.rpp-head-main__brand {
+  flex: 1 1 auto;
+  display: flex;
   justify-content: center;
-  padding: 2.5mm 4mm;
+  align-items: center;
+  min-width: 0;
+}
+
+.rpp-head-main__brand-inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.2mm 3.5mm;
   background: #254e78;
-  border: none;
   border-radius: 8px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
 }
 
-.rpp-head-main--logo-only .rpp-head-main__logo {
-  height: 8mm;
-  max-width: 44mm;
+.rpp-head-main__qr-wrap {
+  flex: 0 0 15mm;
+  width: 15mm;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.rpp-head-main--card-white .rpp-head-main__logo {
+  height: 7mm;
+  max-width: 40mm;
   object-fit: contain;
+  display: block;
+}
+
+.rpp-head-main--card-white .rpp-head-main__qr {
+  width: 13mm;
+  height: 13mm;
+  padding: 0.5mm;
 }
 
 .rpp--pdf #rpp-head-main {

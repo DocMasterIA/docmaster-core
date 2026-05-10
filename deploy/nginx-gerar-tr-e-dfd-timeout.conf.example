@@ -1,0 +1,39 @@
+# Exemplo para nginx na frente do Django (api.docmasteria.com.br).
+# Se o browser mostra «Falha de rede» / «Failed to fetch» ao gerar TR+DFD com muitos itens,
+# o proxy costuma estar a cortar antes do Django devolver o JSON (resposta grande + LLM lenta).
+#
+# Ajuste no backend: RAG_HTTP_TIMEOUT, RAG_HTTP_TIMEOUT_TR_DFD_MAX (ver backend/app/api.py).
+# O Gunicorn neste repo usa GUNICORN_TIMEOUT default 0 (sem limite por worker).
+#
+# Cloudflare: no plano gratuito o limite de origem é ~100 s; pedidos longos precisam de
+# subdomínio «grey cloud» ou plano que permita mais tempo, ou fila assíncrona no futuro.
+
+# Opção A — só este endpoint (recomendado):
+#
+# location = /api/documentos/gerar-tr-e-dfd {
+#     proxy_pass http://django_upstream;
+#     proxy_http_version 1.1;
+#     proxy_set_header Host $host;
+#     proxy_set_header X-Real-IP $remote_addr;
+#     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#     proxy_set_header X-Forwarded-Proto $scheme;
+#     proxy_connect_timeout 10s;
+#     proxy_send_timeout 900s;
+#     proxy_read_timeout 900s;
+#     client_max_body_size 32m;
+# }
+
+# Opção B — todo /api/ com timeouts altos (mais simples, menos restritivo):
+#
+# location /api/ {
+#     proxy_pass http://django_upstream;
+#     proxy_http_version 1.1;
+#     proxy_set_header Host $host;
+#     proxy_set_header X-Real-IP $remote_addr;
+#     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#     proxy_set_header X-Forwarded-Proto $scheme;
+#     proxy_connect_timeout 10s;
+#     proxy_send_timeout 900s;
+#     proxy_read_timeout 900s;
+#     client_max_body_size 32m;
+# }

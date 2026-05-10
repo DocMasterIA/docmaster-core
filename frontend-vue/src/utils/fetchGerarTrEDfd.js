@@ -120,8 +120,10 @@ export function describeGerarTrEDfdNetworkFailure(gerarUrl) {
   return (
     'Falha de rede ao gerar o documento (ligação interrompida, firewall ou tempo limite do navegador/proxy). ' +
     'Com muitos itens o pedido demora mais: tente de novo em instantes, reduza linhas vazias nos itens ou peça ao ' +
-    'administrador para subir o tempo limite do proxy (nginx/Cloudflare) e, no backend, RAG_HTTP_TIMEOUT / ' +
-    'RAG_HTTP_TIMEOUT_TR_DFD_MAX.\n\n' +
+    'administrador para subir o tempo limite do proxy (nginx: proxy_read_timeout / proxy_send_timeout; ' +
+    'Cloudflare ~100 s no plano gratuito) de forma a exceder o tempo Django→rag_service. ' +
+    'No backend: RAG_HTTP_TIMEOUT e RAG_HTTP_TIMEOUT_TR_DFD_MAX. Exemplo nginx no repositório: ' +
+    'deploy/nginx-gerar-tr-e-dfd-timeout.conf.example\n\n' +
     `${gerarUrl}`
   );
 }

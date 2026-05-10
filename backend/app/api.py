@@ -30,12 +30,12 @@ from functools import wraps
 from urllib.parse import urlparse
 
 def _rag_http_timeout_seconds() -> float:
-    """Timeout HTTP do backend -> rag_service (evita 524 do proxy externo)."""
-    raw = (os.environ.get("RAG_HTTP_TIMEOUT") or "95").strip()
+    """Timeout HTTP do backend -> rag_service (pedidos genéricos; TR/DFD usa função dedicada)."""
+    raw = (os.environ.get("RAG_HTTP_TIMEOUT") or "120").strip()
     try:
         val = float(raw)
     except Exception:
-        val = 95.0
+        val = 120.0
     return max(5.0, val)
 
 
@@ -43,7 +43,12 @@ def _rag_timeout_seconds_for_tr_dfd(body: dict) -> float:
     """
     Estende o timeout Django→rag_service em /gerar-tr-e-dfd quando há muitos itens
     ou prompt longo (LLM + DOCX), reduzindo ReadTimeout com payloads grandes.
-    Teto configurável: RAG_HTTP_TIMEOUT_TR_DFD_MAX (segundos, default 600).
+
+    O reverse proxy (nginx, Cloudflare, etc.) tem de permitir *pelo menos* este
+    tempo entre cliente e Django; caso contrário o browser vê «ligação interrompida»
+    mesmo com o Gunicorn/Django ainda a trabalhar.
+
+    Teto configurável: RAG_HTTP_TIMEOUT_TR_DFD_MAX (segundos, default 720).
     """
     base = _rag_http_timeout_seconds()
     slots = body.get("slots_override") if isinstance(body, dict) else None
@@ -52,13 +57,14 @@ def _rag_timeout_seconds_for_tr_dfd(body: dict) -> float:
     itens = slots.get("itens")
     n = len(itens) if isinstance(itens, list) else 0
     prompt_len = len(str((body or {}).get("user_prompt") or ""))
-    extra_items = min(360.0, max(0, n - 3) * 22.0)
+    # Antes: extra em itens capped em 360s → muitas linhas tinham o mesmo teto que ~20 itens.
+    extra_items = min(580.0, max(0, n - 3) * 20.0)
     extra_prompt = min(240.0, max(0, prompt_len - 6000) / 25.0)
-    raw_max = (os.environ.get("RAG_HTTP_TIMEOUT_TR_DFD_MAX") or "600").strip()
+    raw_max = (os.environ.get("RAG_HTTP_TIMEOUT_TR_DFD_MAX") or "720").strip()
     try:
         cap = float(raw_max)
     except Exception:
-        cap = 600.0
+        cap = 720.0
     cap = max(120.0, cap)
     return min(cap, base + extra_items + extra_prompt)
 
@@ -743,7 +749,7 @@ def gerar_tr_e_dfd_api(request):
                 "error": (
                     "Tempo limite na geração de TR/DFD (o serviço demorou além do permitido). "
                     "Com muitos itens tente de novo, reduza itens em branco ou peça ao administrador "
-                    "para aumentar RAG_HTTP_TIMEOUT / RAG_HTTP_TIMEOUT_TR_DFD_MAX ou o limite do proxy (ex.: nginx)."
+                    "para aumentar RAG_HTTP_TIMEOUT / RAG_HTTP_TIMEOUT_TR_DFD_MAX ou o limite do proxy (nginx/Cloudflare; ver deploy/nginx-gerar-tr-e-dfd-timeout.conf.example)."
                 ),
             },
             status=504,

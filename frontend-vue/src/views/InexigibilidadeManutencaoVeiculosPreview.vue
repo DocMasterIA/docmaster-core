@@ -19,7 +19,14 @@
             <section class="da75-block da75-block--muted">
               <h3>Dados básicos</h3>
               <div class="da75-block__body">
-                <div class="da75-row da75-row--basic">
+                <div
+                  class="da75-row"
+                  :class="
+                    isFornecedorExclusivoRoute || isInexigibilidadeManutencaoRoute
+                      ? 'da75-row--basic-4'
+                      : 'da75-row--basic'
+                  "
+                >
                   <div class="da75-field">
                     <label class="da75-label da75-label--compact">Cabeçalho do documento</label>
                     <select v-model="cabecalhoDocumento" class="da75-select da75-select--sm">
@@ -41,20 +48,6 @@
                     <input v-model="processoAtivo" type="checkbox" />
                     Processo (opcional)
                   </label>
-                </div>
-                <div v-if="processoAtivo" class="da75-max-xs da75-mt">
-                  <label class="da75-label">Número do processo (opcional)</label>
-                  <input
-                    v-model="processo"
-                    class="da75-input"
-                    list="dl-processo-numero"
-                    placeholder="Ex: 123/2026"
-                  />
-                </div>
-                <div
-                  v-if="isFornecedorExclusivoRoute || isInexigibilidadeManutencaoRoute"
-                  class="da75-row da75-row--2 da75-mt"
-                >
                   <div v-if="isFornecedorExclusivoRoute" class="da75-field">
                     <label class="da75-label da75-label--compact">{{ LABEL_ORGAO_UNIDADE_RESP_EQUIP }}</label>
                     <input
@@ -64,7 +57,7 @@
                       @input="onOrgaoResponsavelEquipamentoInput($event)"
                     />
                   </div>
-                  <div v-if="isInexigibilidadeManutencaoRoute" class="da75-field">
+                  <div v-else-if="isInexigibilidadeManutencaoRoute" class="da75-field">
                     <label class="da75-label da75-label--compact">{{ LABEL_ORGAO_UNIDADE_VEICULO }}</label>
                     <input
                       :value="orgaoUnidadeVeiculo"
@@ -73,6 +66,15 @@
                       @input="onOrgaoUnidadeVeiculoInput($event)"
                     />
                   </div>
+                </div>
+                <div v-if="processoAtivo" class="da75-max-xs da75-mt">
+                  <label class="da75-label">Número do processo (opcional)</label>
+                  <input
+                    v-model="processo"
+                    class="da75-input"
+                    list="dl-processo-numero"
+                    placeholder="Ex: 123/2026"
+                  />
                 </div>
               </div>
             </section>

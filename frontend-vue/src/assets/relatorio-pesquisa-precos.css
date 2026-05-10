@@ -59,21 +59,45 @@
   line-height: 1.42;
 }
 
-/* Cabeçalho repetido (running): só logo DocMaster centrada (fundo institucional). */
+/* Cabeçalho repetido (running): barra branca, QR à esquerda, logo DocMaster centrada. */
 .rpp-head-main {
   width: 100%;
   box-sizing: border-box;
 }
 
-.rpp-head-main--logo-only {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2.5mm 4mm;
-  background: #254e78;
-  border: none;
+.rpp-head-main--top-bar {
+  padding: 2mm 3mm;
+  background: #fff;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.rpp-head-main__grid {
+  display: grid;
+  grid-template-columns: 18mm 1fr 18mm;
+  align-items: center;
+  column-gap: 2mm;
+}
+
+.rpp-head-main__side--left {
+  justify-self: start;
+}
+
+.rpp-head-main__center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+}
+
+.rpp-head-main__side--right {
+  width: 18mm;
+}
+
+.rpp-head-main--top-bar .rpp-head-main__logo {
+  height: 8mm;
+  max-width: 42mm;
 }
 
 .rpp--pdf #rpp-head-main {
@@ -144,7 +168,25 @@
   border: 1px solid #e2e8f0;
 }
 
-/* QR de verificação: no corpo (não no running header) */
+.rpp-head-main--top-bar .rpp-head-main__qr {
+  width: 14mm;
+  height: 14mm;
+}
+
+.rpp-qr-note {
+  margin: 0 0 2.5mm;
+  font-size: 7.5pt;
+  line-height: 1.35;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.rpp-body.rpp--pdf .rpp-qr-note {
+  font-size: var(--rpp-pdf-mini-value);
+  margin-bottom: 2mm;
+}
+
+/* QR de verificação no corpo (HTML legado / preview) */
 .rpp-qr-verify {
   display: flex;
   align-items: center;

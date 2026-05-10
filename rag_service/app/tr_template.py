@@ -162,7 +162,7 @@ def _style_items_table(table) -> None:
         tblBorders.append(border)
     tblPr.append(tblBorders)
 
-    # Margem superior padrão das células (tblCellMar) costuma deixar faixa em branco acima do 1º conteúdo.
+    # Margem superior padrão das células costuma ser grande; reduzimos sem colar no texto de cima.
     tcm = tblPr.find(qn("w:tblCellMar"))
     if tcm is None:
         tcm = OxmlElement("w:tblCellMar")
@@ -171,35 +171,41 @@ def _style_items_table(table) -> None:
     if top is None:
         top = OxmlElement("w:top")
         tcm.insert(0, top)
-    top.set(qn("w:w"), "0")
+    top.set(qn("w:w"), "40")
     top.set(qn("w:type"), "dxa")
+
+
+# ~uma linha simples (11 pt) entre o bloco anterior e a tabela de itens
+_ITEMS_TABLE_GAP_AFTER_PREV_PT = 11
 
 
 def _tighten_vertical_space_above_items_table(doc: Document, table) -> None:
     """
-    Reduz espaço extra acima da tabela de itens no corpo do documento:
-    remove até 3 parágrafos vazios consecutivos imediatamente acima e zera
-    space_after do primeiro parágrafo com texto que preceder a tabela.
+    Tira o «buraco» extra acima da tabela de itens no corpo do documento, mas deixa
+    o equivalente a cerca de uma linha: remove parágrafos vazios em excesso e aplica
+    space_after moderado no último parágrafo com texto antes da tabela.
     """
     tbl_el = table._tbl
     parent = tbl_el.getparent()
     if parent is None or parent.tag != qn("w:body"):
         return
     body_el = parent
-    for _ in range(3):
+    while True:
         prev = tbl_el.getprevious()
         if prev is None or prev.tag != qn("w:p"):
             break
         p_graph = Paragraph(prev, doc._body)
+        if (p_graph.text or "").strip():
+            break
+        body_el.remove(prev)
+    prev = tbl_el.getprevious()
+    if prev is not None and prev.tag == qn("w:p"):
+        p_graph = Paragraph(prev, doc._body)
         pf = p_graph.paragraph_format
         pf.space_before = Pt(0)
         pf.line_spacing = 1.0
-        if not (p_graph.text or "").strip():
-            pf.space_after = Pt(0)
-            body_el.remove(prev)
-            continue
-        pf.space_after = Pt(0)
-        break
+        if (p_graph.text or "").strip():
+            pf.space_after = Pt(_ITEMS_TABLE_GAP_AFTER_PREV_PT)
 
 
 def _table_column_count(table) -> int:
@@ -617,20 +623,109 @@ def _normalize_text_for_match(text: str) -> str:
     return "".join(ch for ch in t if ch.isalnum() or ch.isspace())
 
 
-def _remove_paragraph_if_contains(doc: Document, needle: str) -> None:
+def _remove_body_paragraphs_matching_needle(doc: Document, needle: str) -> int:
+    """Remove parágrafos do corpo (não em tabela) cujo texto normalizado contém `needle`. Retorna quantos removeu."""
     target = _normalize_text_for_match(needle)
     if not target:
-        return
+        return 0
+    n = 0
     for para in list(doc.paragraphs):
         text = _normalize_text_for_match(para.text or "")
         if target in text:
-            p = para._element
-            p.getparent().remove(p)
+            el = para._element
+            parent = el.getparent()
+            if parent is not None:
+                parent.remove(el)
+                n += 1
+    return n
+
+
+def _collapse_consecutive_empty_body_paragraphs(doc: Document) -> None:
+    """Remove parágrafos vazios duplicados consecutivos no corpo (só `w:body`, não tabelas)."""
+    body = doc.element.body
+    changed = True
+    while changed:
+        changed = False
+        els = [e for e in body if e.tag == qn("w:p")]
+        last_nonempty = True
+        for el in els:
+            para = Paragraph(el, doc._body)
+            empty = not (para.text or "").strip()
+            if empty and not last_nonempty:
+                body.remove(el)
+                changed = True
+                break
+            last_nonempty = not empty
+
+
+def _fix_respetiva_typo_in_paragraph(paragraph) -> None:
+    for run in paragraph.runs:
+        t = run.text or ""
+        if not t or "respet" not in t.lower():
+            continue
+        run.text = re.sub(r"(?i)respetiva", "respectiva", t)
+
+
+def _fix_respetiva_typo_in_document(doc: Document) -> None:
+    """Corrige grafia «respetiva» → «respectiva» em parágrafos do corpo e em células."""
+    for p in doc.paragraphs:
+        _fix_respetiva_typo_in_paragraph(p)
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for p in cell.paragraphs:
+                    _fix_respetiva_typo_in_paragraph(p)
 
 
 def _is_manutencao_veiculos_template(template_path: Path) -> bool:
     name = _normalize_text_for_match(template_path.name)
     return "manutencao de veiculos" in name
+
+
+def _tr_template_art74_i_dotacao_branches(template_path: Path) -> bool:
+    """
+    TR dos pacotes Lei 14.133 Art. 74, I (manutenção de veículos ou fornecedor exclusivo),
+    com duas redações alternativas sobre dotação orçamentária no .docx.
+    """
+    if _is_manutencao_veiculos_template(template_path):
+        return True
+    n = _normalize_text_for_match(str(template_path))
+    if "inexigibilidade" not in n or "74" not in n:
+        return False
+    return (
+        "fornecedor" in n
+        or "exclusivo" in n
+        or "manutencao" in n
+        or "veiculo" in n
+    )
+
+
+def _apply_art74_i_dotacao_paragraph_branch(doc: Document, tpl_path: Path, dotacao: str | None) -> None:
+    """
+    - Com dotação preenchida: remove o bloco «dotação orçamentária própria…» (15.1 alternativo).
+    - Sem dotação: remove o bloco «…seguinte dotação orçamentária…» (15.1 com campo numérico).
+    Em ambos os casos, comprime parágrafos vazios extras no corpo.
+    """
+    if not _tr_template_art74_i_dotacao_branches(tpl_path):
+        return
+    has_dot = bool(str(dotacao or "").strip())
+    removed = 0
+    if has_dot:
+        removed += _remove_body_paragraphs_matching_needle(
+            doc,
+            "correrão à conta de dotação orçamentária própria, prevista no orçamento vigente do órgão contratante",
+        )
+        removed += _remove_body_paragraphs_matching_needle(
+            doc,
+            "dotação orçamentária própria, prevista no orçamento vigente do órgão contratante",
+        )
+    else:
+        removed += _remove_body_paragraphs_matching_needle(
+            doc,
+            "seguinte dotação orçamentária",
+        )
+    if removed:
+        _collapse_consecutive_empty_body_paragraphs(doc)
 
 
 def render_tr_from_slots(
@@ -655,15 +750,6 @@ def render_tr_from_slots(
     # Remove cabeçalho padrão do modelo (ex.: timbre de prefeitura),
     # deixando o TR gerado sem esse cabeçalho fixo.
     _clear_headers(doc)
-
-    # Regra de negócio (Art. 74 I - Manutenção de Veículos):
-    # Se houver número de dotação, remove o texto alternativo "dotação própria".
-    # Assim, o documento não apresenta as duas redações ao mesmo tempo.
-    if _is_manutencao_veiculos_template(tpl_path) and str(slots.dotacao or "").strip():
-        _remove_paragraph_if_contains(
-            doc,
-            "correrão à conta de dotação orçamentária própria, prevista no orçamento vigente do órgão contratante",
-        )
 
     def _normalize_slot_block(text: str) -> str:
         t = str(text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
@@ -763,6 +849,8 @@ def render_tr_from_slots(
     }
 
     _replace_placeholders_in_paragraphs(doc, mapping)
+    _fix_respetiva_typo_in_document(doc)
+    _apply_art74_i_dotacao_paragraph_branch(doc, tpl_path, slots.dotacao)
     _fill_items_table(doc, slots.itens)
 
     out_path = Path(output_path) if output_path else None

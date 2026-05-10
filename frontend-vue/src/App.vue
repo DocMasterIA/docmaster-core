@@ -900,6 +900,9 @@ watch(
   --dm-nav-tree: #c5d0e0;
   --dm-nav-chevron-muted: #94a3b8;
   --dm-nav-item-radius: 12px;
+  --dm-nav-l1-bar-width: 5px;
+  --dm-nav-l1-bar-offset: 11px;
+  --dm-nav-l1-bar-pad-extra: 12px;
   --dm-subnav-major-to-nested-gap: 10px;
   overflow: hidden;
   border-right: 1px solid #c6d3e1;
@@ -920,6 +923,9 @@ watch(
   --dm-nav-tree: #334155;
   --dm-nav-chevron-muted: #94a3b8;
   --dm-nav-item-radius: 12px;
+  --dm-nav-l1-bar-width: 5px;
+  --dm-nav-l1-bar-offset: 11px;
+  --dm-nav-l1-bar-pad-extra: 12px;
   --dm-subnav-major-to-nested-gap: 10px;
   border-right-color: #1e293b;
   background: var(--dm-nav-bg);
@@ -1105,21 +1111,40 @@ watch(
   border: none;
   background: var(--dm-nav-l1-bg);
   border-radius: var(--dm-nav-item-radius, 12px);
-  padding: 11px 14px 11px 16px;
+  padding: 11px 14px 11px calc(16px + var(--dm-nav-l1-bar-width) + var(--dm-nav-l1-bar-pad-extra));
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.01em;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  box-shadow: inset 5px 0 0 0 var(--dm-nav-l1-bar);
+  position: relative;
+  isolation: isolate;
   transition: background 0.15s ease, color 0.15s ease;
+}
+.dm-nav-item::before {
+  content: '';
+  position: absolute;
+  left: var(--dm-nav-l1-bar-offset);
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--dm-nav-l1-bar-width);
+  height: calc(100% - 18px);
+  min-height: 1.25rem;
+  border-radius: 999px;
+  background: var(--dm-nav-l1-bar);
+  pointer-events: none;
+  z-index: 0;
+}
+.dm-nav-item > *,
+.dm-subnav-btn > * {
+  position: relative;
+  z-index: 1;
 }
 .dm-dark .dm-nav-item,
 .dm-dark .dm-nav-item:visited {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
-  box-shadow: inset 5px 0 0 0 var(--dm-nav-l1-bar);
 }
 
 .dm-nav-item--expandable {
@@ -1167,15 +1192,16 @@ watch(
   background: #1e293b;
 }
 
+.dm-nav-item--active::before {
+  width: calc(var(--dm-nav-l1-bar-width) + 1px);
+}
 .dm-nav-item--active {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
-  box-shadow: inset 6px 0 0 0 var(--dm-nav-l1-bar);
 }
 .dm-dark .dm-nav-item--active {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
-  box-shadow: inset 6px 0 0 0 var(--dm-nav-l1-bar);
 }
 
 .dm-nav-item--static {
@@ -1207,14 +1233,14 @@ watch(
   border-left-color: var(--dm-nav-tree);
 }
 
-/* Nível 1 (grupo: Dispensa rápida, Dispensa normal, etc.) — traço azul à esquerda. */
+/* Nível 1 (grupo: Dispensa rápida, Dispensa normal, etc.) — traço vertical interno antes do texto. */
 .dm-subnav-btn {
   width: 100%;
   border: none;
   border-radius: var(--dm-nav-item-radius, 12px);
   background: var(--dm-nav-l1-bg);
   color: var(--dm-nav-l1-text);
-  padding: 10px 14px 10px 16px;
+  padding: 10px 14px 10px calc(16px + var(--dm-nav-l1-bar-width) + var(--dm-nav-l1-bar-pad-extra));
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -1222,13 +1248,27 @@ watch(
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
-  box-shadow: inset 5px 0 0 0 var(--dm-nav-l1-bar);
+  position: relative;
+  isolation: isolate;
   transition: background 0.15s ease, color 0.15s ease;
+}
+.dm-subnav-btn::before {
+  content: '';
+  position: absolute;
+  left: var(--dm-nav-l1-bar-offset);
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--dm-nav-l1-bar-width);
+  height: calc(100% - 16px);
+  min-height: 1.15rem;
+  border-radius: 999px;
+  background: var(--dm-nav-l1-bar);
+  pointer-events: none;
+  z-index: 0;
 }
 .dm-dark .dm-subnav-btn {
   background: var(--dm-nav-l1-bg);
   color: var(--dm-nav-l1-text);
-  box-shadow: inset 5px 0 0 0 var(--dm-nav-l1-bar);
 }
 
 .dm-subnav-btn span {
@@ -1242,16 +1282,17 @@ watch(
   font-size: 10px;
 }
 
-/* Grupo com rota activa: mantém nível 1; traço um pouco mais espesso. */
+/* Grupo com rota activa: traço ligeiramente mais espesso. */
+.dm-subnav-btn--active::before {
+  width: calc(var(--dm-nav-l1-bar-width) + 1px);
+}
 .dm-subnav-btn--active {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
-  box-shadow: inset 6px 0 0 0 var(--dm-nav-l1-bar);
 }
 .dm-dark .dm-subnav-btn--active {
   color: var(--dm-nav-l1-text);
   background: var(--dm-nav-l1-bg);
-  box-shadow: inset 6px 0 0 0 var(--dm-nav-l1-bar);
 }
 .dm-subnav-btn--active:hover {
   background: #e8eef6;

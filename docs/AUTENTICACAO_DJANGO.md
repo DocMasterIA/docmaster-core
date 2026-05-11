@@ -13,7 +13,7 @@ Visão geral de como a autenticação está implementada no backend Django e na 
 | **Session** | Padrão Django | `SessionMiddleware` + `AuthenticationMiddleware`; sessão em banco (db.sqlite3) por padrão. |
 | **CSRF** | `CsrfViewMiddleware` ativo | APIs de login/logout e outras que o frontend chama usam `@csrf_exempt` para aceitar POST sem token CSRF. |
 
-**CORS** está configurado via `django-cors-headers`. Em desenvolvimento (DEBUG=True), as origens `http://localhost:5173` e `http://127.0.0.1:5173` são permitidas. Em produção, defina a variável de ambiente `CORS_ALLOWED_ORIGINS` com as origens separadas por vírgula (ex.: `https://app.exemplo.com`). O frontend usa `credentials: 'include'`, por isso `CORS_ALLOW_CREDENTIALS = True` está ativo.
+**CORS** está configurado via `django-cors-headers`. Em desenvolvimento (DEBUG=True), as origens `http://localhost:5173` e `http://127.0.0.1:5173` são permitidas. Em produção, `https://docmasteria.com.br` (e www), `docmaster.com.br` e equivalentes são **sempre** permitidos; a variável `CORS_ALLOWED_ORIGINS` (origens separadas por vírgula) **acrescenta** origens extra (ex.: `https://app.cliente.com`) sem remover as do produto. O frontend usa `credentials: 'include'`, por isso `CORS_ALLOW_CREDENTIALS = True` está ativo.
 
 ---
 

@@ -50,9 +50,9 @@ export function describeApiFetchNetworkFailure(apiUrl, shortLabel = 'API') {
     !apiUrl.startsWith(origin) &&
     /^https?:\/\//i.test(String(apiUrl));
   const corsHint = crossHost
-    ? ` O browser bloqueou a ligação ao outro domínio (CORS ou rede). No Django inclua em CORS_ALLOWED_ORIGINS o origin exato desta página (${origin}) ou regex equivalente (credentials: 'include' exige lista explícita).`
+    ? ` Origem ${origin} ≠ host da API: net::ERR_FAILED costuma ser rede, TLS, firewall, extensão ou proxy — não é necessariamente CORS (CORS na consola traz mensagem explícita a bloquear leitura da resposta). Se for CORS, o Django tem de enviar Access-Control-Allow-Origin para esse origin (credentials exigem correspondência exata); docmasteria/docmaster já estão nos defaults do backend e há regex para subdomínios.`
     : '';
   const viteHint =
-    ' VITE_API_USE_PAGE_ORIGIN=1 só quando o mesmo site serve o SPA e o proxy /api para o Django; com API noutro host use VITE_API_URL=https://… (API) e CORS no backend para o origin do SPA.';
-  return `Não foi possível contactar ${shortLabel} (${apiUrl}). Verifique rede, HTTPS, extensões e CORS.${corsHint}${viteHint}`;
+    ' VITE_API_USE_PAGE_ORIGIN=1 só quando o mesmo site serve o SPA e o proxy /api para o Django; com API noutro host use VITE_API_URL=https://… (API).';
+  return `Não foi possível contactar ${shortLabel} (${apiUrl}). Verifique rede, HTTPS e extensões.${corsHint}${viteHint}`;
 }

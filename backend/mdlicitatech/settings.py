@@ -59,21 +59,22 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 # CORS: SPA (docmasteria.com.br e/ou docmaster.com.br) ↔ API api.docmasteria.com.br (credentials: 'include')
-_cors_origins = os.environ.get(
-    "CORS_ALLOWED_ORIGINS",
-    "https://docmasteria.com.br,https://www.docmasteria.com.br,https://docmaster.com.br,https://www.docmaster.com.br",
-).strip()
-if _cors_origins:
-    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(",") if o.strip()]
+# Origens do produto ficam sempre permitidas; CORS_ALLOWED_ORIGINS no .env *acrescenta* (não substitui),
+# para deploys com CORS_ALLOWED_ORIGINS antigo não removerem docmasteria.com.br por engano.
+_CORS_PRODUCT_ORIGINS = [
+    "https://docmasteria.com.br",
+    "https://www.docmasteria.com.br",
+    "https://docmaster.com.br",
+    "https://www.docmaster.com.br",
+]
+_cors_extra_raw = os.environ.get("CORS_ALLOWED_ORIGINS")
+if _cors_extra_raw is not None:
+    _cors_extra = [o.strip() for o in _cors_extra_raw.strip().split(",") if o.strip()]
+    CORS_ALLOWED_ORIGINS = list(dict.fromkeys(_CORS_PRODUCT_ORIGINS + _cors_extra))
 elif DEBUG:
     CORS_ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
 else:
-    CORS_ALLOWED_ORIGINS = [
-        "https://docmasteria.com.br",
-        "https://www.docmasteria.com.br",
-        "https://docmaster.com.br",
-        "https://www.docmaster.com.br",
-    ]
+    CORS_ALLOWED_ORIGINS = list(_CORS_PRODUCT_ORIGINS)
 # Permite qualquer origem ngrok (URL muda a cada reinício) – uso em teste/produção com túnel
 CORS_ALLOWED_ORIGIN_REGEXES = [
     # Vários níveis de subdomínio e porta não padrão (ex.: :8443) no header Origin

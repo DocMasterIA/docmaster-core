@@ -26,7 +26,7 @@ O Django chama o RAG; o RAG chama o llm_agent e o llm_api; o llm_agent chama o l
 | `SECRET_KEY` | - | Chave secreta Django |
 | `DEBUG` | False | Modo debug |
 | `ALLOWED_HOSTS` | - | Hosts permitidos |
-| `CORS_ALLOWED_ORIGINS` | (em DEBUG: localhost:5173, 127.0.0.1:5173) | Origens CORS |
+| `CORS_ALLOWED_ORIGINS` | Opcional: acrescenta origens; docmasteria/docmaster vêm sempre do código | Origens CORS extra (merge com lista fixa de produto) |
 | `LLM_API_BASE_URL` | `http://127.0.0.1:8002` | Base URL do llm_api (proxy `/api/llm/<path>`) |
 | `RAG_SERVICE_URL` | `http://127.0.0.1:8004` | Base URL do RAG (gerar-via-llm) |
 

@@ -547,7 +547,8 @@ import {
 
 /** Rótulos com cada palavra iniciando em maiúscula (pt-BR), p.ex. «Do Veículo», «Pelo Equipamento». */
 const LABEL_ORGAO_UNIDADE = capitalizeEachWordLeadingPt('Órgão / unidade');
-const LABEL_ORGAO_UNIDADE_VEICULO = capitalizeEachWordLeadingPt('Órgão / unidade do veículo');
+/** Título de campo: partículas em minúscula («do»), evita «Unidade Do Veículo». */
+const LABEL_ORGAO_UNIDADE_VEICULO = tituloNomePt('órgão / unidade do veículo');
 const LABEL_ORGAO_UNIDADE_RESP_EQUIP = capitalizeEachWordLeadingPt('Órgão / unidade responsável pelo equipamento');
 const PLACEHOLDER_ORGAO_GERAL = capitalizeEachWordLeadingPt('Selecione ou digite o órgão');
 const PLACEHOLDER_ORGAO_UNIDADE_VEICULO = capitalizeEachWordLeadingPt('Digite o órgão ou unidade do veículo');
@@ -1154,13 +1155,31 @@ function toBrDate(iso) {
   if (!m) return v;
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
+
+/**
+ * Campo livre costuma repetir o enunciado («Revisão de 10.000 km»). Para o texto do documento,
+ * extrai o marco numérico e devolve «10.000 km» (evita «A referência… é: Revisão de…»).
+ */
+function formatarTrechoQuilometragemRevisao(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  const oneLine = s.replace(/\s+/g, ' ');
+  const mDot = oneLine.match(/(\d{1,3}(?:\.\d{3})+|\d{4,})/);
+  if (mDot) return `${mDot[1]} km`;
+  const mCom = oneLine.match(/(\d{1,3}(?:,\d{3})+)/);
+  if (mCom) return `${mCom[1].replace(/,/g, '.')} km`;
+  return oneLine;
+}
+
 function gerarObjetoTexto(contratado, setor, caracteristicas, tipoManutencaoValue = '', revisaoKmValue = '') {
   const objeto = String(contratado || '').trim() || 'objeto não informado';
   const destino = String(setor || '').trim() ? `, visando atender as demandas de ${String(setor).trim()}` : '';
   const manutencao = String(tipoManutencaoValue || '').trim()
     ? `, no escopo de manutenção ${String(tipoManutencaoValue).trim().toLowerCase()}`
     : '';
-  const revisao = String(revisaoKmValue || '').trim() ? ` (referência: ${String(revisaoKmValue).trim()})` : '';
+  const rkTrim = String(revisaoKmValue || '').trim();
+  const prev = String(tipoManutencaoValue || '').trim() === 'Preventiva';
+  const revisao = rkTrim && prev ? ` (marco de ${formatarTrechoQuilometragemRevisao(rkTrim)})` : '';
   const detalhes = String(caracteristicas || '').trim() ? `, observadas as seguintes características mínimas: ${String(caracteristicas).trim()}` : '';
   return `${primeiraMaiuscula(objeto)}${destino}${manutencao}${revisao}${detalhes}.`;
 }
@@ -1170,7 +1189,11 @@ function gerarJustificativaTexto(contratado, setor, caracteristicas, tipoManuten
   const manutencao = String(tipoManutencaoValue || '').trim()
     ? ` Considera-se a manutenção ${String(tipoManutencaoValue).trim().toLowerCase()} como eixo da contratação.`
     : '';
-  const revisao = String(revisaoKmValue || '').trim() ? ` Foi indicada a referência de revisão/quilometragem: ${String(revisaoKmValue).trim()}.` : '';
+  const rkTrim = String(revisaoKmValue || '').trim();
+  const prev = String(tipoManutencaoValue || '').trim() === 'Preventiva';
+  const revisao = rkTrim && prev
+    ? ` Para calendário da preventiva, considera-se o intervalo de ${formatarTrechoQuilometragemRevisao(rkTrim)}.`
+    : '';
   const detalhes = String(caracteristicas || '').trim() ? ` A contratação deverá observar as características mínimas informadas: ${String(caracteristicas).trim()}.` : '';
   return `A presente contratação justifica-se pela necessidade de assegurar ${objeto} para atendimento das demandas${destino}, garantindo a continuidade, eficiência e adequada prestação dos serviços públicos.${manutencao}${revisao}${detalhes}`;
 }
@@ -1198,7 +1221,10 @@ function buildInexig74ManutencaoDfdObjetoReferencia() {
     );
   } else if (tipo === 'Preventiva') {
     let t = 'Trata-se de manutenção preventiva, alinhada à revisão programada por quilometragem ou plano de conservação, visando reduzir custos corretivos futuros e preservar o estado mecânico do veículo.';
-    if (rk) t += ` A referência informada para a revisão é: ${rk}.`;
+    if (rk) {
+      const km = formatarTrechoQuilometragemRevisao(rk);
+      t += ` O plano de conservação considera, como marco orientador, ${km}.`;
+    }
     paragrafos.push(t);
   } else if (tipo) {
     paragrafos.push(`O tipo de manutenção previsto é ${tipo}.`);
@@ -1235,10 +1261,11 @@ function buildInexig74ManutencaoDfdJustificativa() {
     `O objeto da referência é ${artObjetoRef} ${natureza} do veículo (${identVeiculo}), com vistas a preservar a disponibilidade, a segurança e a economicidade da frota vinculada ao serviço público.`,
   ];
   if (orgVeic) {
-    partes.push(`${LABEL_ORGAO_UNIDADE_VEICULO}: ${orgVeic}.`);
+    partes.push(`Informa-se, para fins de lotação ou uso do veículo, o órgão ou unidade ${orgVeic}.`);
   }
   if (tipo === 'Preventiva' && rk) {
-    partes.push(`Para a manutenção preventiva, foi indicada a referência de quilometragem ou revisão: ${rk}.`);
+    const km = formatarTrechoQuilometragemRevisao(rk);
+    partes.push(`Na modalidade preventiva, adota-se como referência operacional o intervalo de ${km}.`);
   }
   if (forn) {
     partes.push(
@@ -1444,7 +1471,9 @@ function buildSlotsOverride() {
     logicalRouteName.value === 'DispensaArt75IManutencaoVeiculos'
       ? [
           tipoManutencao.value ? `Tipo: ${tipoManutencao.value}` : '',
-          revisaoKm.value ? `Revisão/KM: ${revisaoKm.value}` : '',
+          tipoManutencao.value === 'Preventiva' && revisaoKm.value.trim()
+            ? `Revisão/KM: ${formatarTrechoQuilometragemRevisao(revisaoKm.value)}`
+            : '',
         ]
       : [];
   const veiculoFallbackParts =
@@ -1677,16 +1706,24 @@ function buildUserPrompt() {
     `Cabeçalho do documento: ${cabecalhoDocumento.value || 'Não informado'}`,
     `Processo: ${processoAtivo.value ? (processo.value || 'Não informado') : 'Não se aplica'}`,
     `Órgão: ${orgao.value || 'Não informado'}`,
+    ...(isInexigibilidadeManutencaoRoute.value
+      ? [`Unidade de lotação ou uso do veículo: ${orgaoUnidadeVeiculo.value || 'Não informado'}`]
+      : []),
     ...(isManutencaoVeiculosRoute.value
       ? [`Veículo: ${marca.value || '-'} ${modelo.value || '-'} / Placa ${placa.value || '-'}`]
+      : []),
+    ...(isDispensaManutencaoRoute.value
+      ? [
+          (() => {
+            const t = tipoManutencao.value || 'Não informado';
+            if (t !== 'Preventiva' || !String(revisaoKm.value || '').trim()) return `Tipo de manutenção: ${t}`;
+            return `Tipo de manutenção: ${t}; intervalo de referência: ${formatarTrechoQuilometragemRevisao(revisaoKm.value.trim())}`;
+          })(),
+        ]
       : []),
     `Fornecedor: ${fornecedor.value || 'Não informado'} / CNPJ: ${cnpj.value || 'Não informado'}`,
     `Valor global: ${valorGlobal.value || 'Não informado'}`,
   ];
-  if (isDispensaManutencaoRoute.value) {
-    const idx = isManutencaoVeiculosRoute.value ? 5 : 4;
-    lines.splice(idx, 0, `Tipo de manutenção: ${tipoManutencao.value || 'Não informado'}`);
-  }
   return lines.join('\n');
 }
 async function onSubmit() {
@@ -1907,7 +1944,13 @@ const secoes = computed(() => {
       completo: isFilled(tipoManutencao.value) && (tipoManutencao.value !== 'Preventiva' || isFilled(revisaoKm.value)),
       linhas: [
         ['Tipo', tipoManutencao.value || 'Não informado', isFilled(tipoManutencao.value)],
-        ['Revisão/KM', tipoManutencao.value === 'Preventiva' ? revisaoKm.value || 'Não informado' : 'Não se aplica', tipoManutencao.value !== 'Preventiva' || isFilled(revisaoKm.value)],
+        [
+          'Revisão/KM',
+          tipoManutencao.value === 'Preventiva'
+            ? (revisaoKm.value ? formatarTrechoQuilometragemRevisao(revisaoKm.value) : 'Não informado')
+            : 'Não se aplica',
+          tipoManutencao.value !== 'Preventiva' || isFilled(revisaoKm.value),
+        ],
       ],
     }] : []),
     { titulo: 'Fornecedor', completo: isFilled(fornecedor.value) && isFilled(cnpj.value), linhas: [['Razão social', fornecedor.value || 'Não informado', isFilled(fornecedor.value)], ['CNPJ', cnpj.value || 'Não informado', isFilled(cnpj.value)]] },

@@ -18,7 +18,6 @@ from docx import Document
 from .docx_typography import apply_standard_body_font_to_document
 from .tr_template import (
     TRTemplateSlots,
-    prepend_processo_line_when_filled,
     slots_numero_processo_display,
     split_paragraphs_on_double_newline,
 )
@@ -231,7 +230,6 @@ def render_dfd_from_tr_slots(
         raise FileNotFoundError(f"Template DFD não encontrado: {tpl_path}")
 
     doc = Document(str(tpl_path))
-    prepend_processo_line_when_filled(doc, slots)
 
     dfd_data_text = slots.dfd_data or slots.data_termo or ""
 

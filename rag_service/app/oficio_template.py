@@ -16,7 +16,6 @@ from .docx_typography import apply_standard_body_font_to_document
 
 from .tr_template import (
     TRTemplateSlots,
-    prepend_processo_line_when_filled,
     slots_numero_processo_display,
     split_paragraphs_on_double_newline,
 )
@@ -145,7 +144,6 @@ def render_oficio_from_slots(
         raise FileNotFoundError(f"Template OFICIO não encontrado: {tpl_path}")
 
     doc = Document(str(tpl_path))
-    prepend_processo_line_when_filled(doc, slots)
 
     num_proc = slots_numero_processo_display(slots)
 

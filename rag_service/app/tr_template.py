@@ -24,7 +24,7 @@ from docx.oxml.ns import qn
 from docx.table import Table as DocxTable
 from docx.text.paragraph import Paragraph
 
-from .docx_typography import apply_standard_body_font_to_document, set_run_standard_body_font
+from .docx_typography import apply_standard_body_font_to_document
 
 TR_ITEMS_TABLE_ANCHOR = "(TR_TABELA_ITENS)"
 
@@ -44,39 +44,6 @@ def slots_numero_processo_display(slots: TRTemplateSlots) -> str:
         str(getattr(slots, "dfd_numero_processo", "") or "").strip()
         or str(getattr(slots, "numero_processo", "") or "").strip()
     )
-
-
-def _doc_body_has_processo_heading(doc: Document, *, max_paras: int = 6) -> bool:
-    """True se os primeiros parágrafos do corpo já trazem linha tipo «PROCESSO: …» (evita duplicar)."""
-    for i, para in enumerate(doc.paragraphs):
-        if i >= max_paras:
-            break
-        t = (para.text or "").strip()
-        if re.match(r"(?i)^processo\s*:", t):
-            return True
-    return False
-
-
-def prepend_processo_line_when_filled(doc: Document, slots: TRTemplateSlots) -> None:
-    """
-    Insere no topo do corpo a linha «PROCESSO: <número>» quando há processo informado.
-    Usado em TR, DFD e ofício (ex.: inexigibilidade com processo opcional ativo).
-    """
-    num = slots_numero_processo_display(slots)
-    if not num or _doc_body_has_processo_heading(doc):
-        return
-    body = doc.element.body
-    p_el = OxmlElement("w:p")
-    body.insert(0, p_el)
-    para = Paragraph(p_el, doc._body)
-    run = para.add_run()
-    run.text = f"PROCESSO: {num}"
-    run.bold = True
-    set_run_standard_body_font(run)
-    try:
-        para.paragraph_format.space_after = Pt(8)
-    except Exception:
-        pass
 
 
 def _parse_br_money_to_float(value: Any) -> Optional[float]:
@@ -1011,7 +978,6 @@ def render_tr_from_slots(
     # Remove cabeçalho padrão do modelo (ex.: timbre de prefeitura),
     # deixando o TR gerado sem esse cabeçalho fixo.
     _clear_headers(doc)
-    prepend_processo_line_when_filled(doc, slots)
 
     def _normalize_slot_block(text: str) -> str:
         t = str(text or "").replace("\r\n", "\n").replace("\r", "\n").strip()

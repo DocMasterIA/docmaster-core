@@ -77,12 +77,19 @@ export async function fetchGerarTrEDfdWithRetry(apiBase, bodyObj, options = {}) 
     }
 
     if (!parsed) {
+      const st = res.status;
+      const gateway = st === 502 || st === 503 || st === 504;
+      const gatewayHint =
+        ' O nginx (ou outro proxy) entre o browser e o Django costuma cortar pedidos longos: defina proxy_read_timeout e proxy_send_timeout altos neste location (ex.: 900s). Ver deploy/nginx-gerar-tr-e-dfd-timeout.conf.example. No Django: RAG_HTTP_TIMEOUT e RAG_HTTP_TIMEOUT_TR_DFD_MAX. Cloudflare gratuito ~100s.';
+      const stLabel = st === 504 ? 'Gateway Timeout' : st === 502 ? 'Bad Gateway' : 'Erro de proxy/upstream';
       last = {
         kind: 'parse',
-        errorMessage: rawText.trim().startsWith('<')
-          ? `Servidor devolveu HTML em vez de JSON (proxy ou erro ${res.status}).`
-          : `Resposta inválida do servidor (não é JSON). HTTP ${res.status}.`,
-        status: res.status,
+        errorMessage: gateway
+          ? `HTTP ${st} (${stLabel}): a resposta não chegou em JSON — o proxy pode ter fechado a ligação antes do Django terminar (geração TR+DFD é pesada).${gatewayHint}`
+          : rawText.trim().startsWith('<')
+            ? `Servidor devolveu HTML em vez de JSON (proxy ou erro ${st}).${st === 502 ? gatewayHint : ''}`
+            : `Resposta inválida do servidor (não é JSON). HTTP ${st}.`,
+        status: st,
         data: {},
       };
       if (attempt < maxAttempts - 1 && isTransientHttpStatus(res.status)) {
@@ -118,12 +125,10 @@ export async function fetchGerarTrEDfdWithRetry(apiBase, bodyObj, options = {}) 
 
 export function describeGerarTrEDfdNetworkFailure(gerarUrl) {
   return (
-    'Falha de rede ao gerar o documento (ligação interrompida, firewall ou tempo limite do navegador/proxy). ' +
-    'Com muitos itens o pedido demora mais: tente de novo em instantes, reduza linhas vazias nos itens ou peça ao ' +
-    'administrador para subir o tempo limite do proxy (nginx: proxy_read_timeout / proxy_send_timeout; ' +
-    'Cloudflare ~100 s no plano gratuito) de forma a exceder o tempo Django→rag_service. ' +
-    'No backend: RAG_HTTP_TIMEOUT e RAG_HTTP_TIMEOUT_TR_DFD_MAX. Exemplo nginx no repositório: ' +
-    'deploy/nginx-gerar-tr-e-dfd-timeout.conf.example\n\n' +
+    'Falha de rede ao gerar o documento (o browser não recebeu resposta HTTP válida: ligação cortada, firewall, ou proxy a devolver 502/524). ' +
+    'Se no separador Rede aparece 502 Bad Gateway, o nginx (ou CDN) entre o utilizador e o Django fechou antes do JSON terminar — não é falha do teu PC sozinha. ' +
+    'Com muitos itens o pedido demora mais: tente outra vez, reduza linhas vazias nos itens ou peça ao administrador para subir proxy_read_timeout / proxy_send_timeout neste location (ex.: 900s; ficheiro deploy/nginx-gerar-tr-e-dfd-timeout.conf.example). ' +
+    'Cloudflare gratuito ~100s. No Django: RAG_HTTP_TIMEOUT e RAG_HTTP_TIMEOUT_TR_DFD_MAX.\n\n' +
     `${gerarUrl}`
   );
 }

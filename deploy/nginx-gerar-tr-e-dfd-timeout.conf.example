@@ -1,6 +1,7 @@
 # Exemplo para nginx na frente do Django (api.docmasteria.com.br).
-# Se o browser mostra «Falha de rede» / «Failed to fetch» ao gerar TR+DFD com muitos itens,
+# Se o browser mostra «Falha de rede» / «Failed to fetch» / HTTP 502 Bad Gateway ao gerar TR+DFD,
 # o proxy costuma estar a cortar antes do Django devolver o JSON (resposta grande + LLM lenta).
+# 502 = nginx não obteve resposta válida do upstream a tempo (ou upstream resetou); confira error_log.
 #
 # Ajuste no backend: RAG_HTTP_TIMEOUT, RAG_HTTP_TIMEOUT_TR_DFD_MAX (ver backend/app/api.py).
 # O Gunicorn neste repo usa GUNICORN_TIMEOUT default 0 (sem limite por worker).

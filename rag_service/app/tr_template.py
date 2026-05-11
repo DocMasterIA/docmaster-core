@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import uuid
 
 """
 Geração de Termo de Referência a partir do modelo fixo
@@ -1007,8 +1008,12 @@ def render_tr_from_slots(
     out_path = Path(output_path) if output_path else None
     if out_path is None:
         import tempfile
+
         tmp_dir = Path(tempfile.gettempdir())
-        out_path = tmp_dir / f"tr_preenchido_{Path(tpl_path).stem}.docx"
+        # Nome único por geração: o caminho fixo por stem causava corrupção quando
+        # duas requisições TR/DFD/Ofício coincidiam (multi-worker, outro utilizador
+        # ou segundo clique antes de terminar a primeira).
+        out_path = tmp_dir / f"tr_preenchido_{Path(tpl_path).stem}_{uuid.uuid4().hex}.docx"
 
     doc.save(str(out_path))
     return str(out_path)

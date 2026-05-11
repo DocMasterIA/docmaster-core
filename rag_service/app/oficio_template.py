@@ -5,8 +5,9 @@ Geração de Solicitação/Ofício a partir do modelo fixo
 `template_packages/tr_base/OFICIO_modelo_base.docx`, preenchendo apenas os slots.
 """
 
-from pathlib import Path
+import uuid
 from copy import deepcopy
+from pathlib import Path
 from typing import Optional
 
 from docx import Document
@@ -166,7 +167,7 @@ def render_oficio_from_slots(
         import tempfile
 
         tmp_dir = Path(tempfile.gettempdir())
-        out_path = tmp_dir / f"oficio_preenchido_{Path(tpl_path).stem}.docx"
+        out_path = tmp_dir / f"oficio_preenchido_{Path(tpl_path).stem}_{uuid.uuid4().hex}.docx"
 
     doc.save(str(out_path))
     return str(out_path)

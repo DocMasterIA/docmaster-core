@@ -29,6 +29,7 @@
               <label>Nome do cadastro</label>
               <input
                 :value="ctx.orgaoProfileName"
+                class="da75-input da75-input--sm"
                 placeholder="Ex: Fundo Municipal de Saúde"
                 @input="ctx.orgaoProfileName = capNome(String(($event.target).value || ''))"
               />
@@ -63,6 +64,7 @@
                 <label>1.1 A quem é direcionada a solicitação — Nome</label>
                 <input
                   :value="ctx.fixoNome"
+                  class="da75-input da75-input--sm"
                   list="da75-dl-solicitacao-destinatario-nome"
                   placeholder="Digite o nome"
                   @input="ctx.fixoNome = capNome(String(($event.target).value || ''))"
@@ -81,6 +83,7 @@
                 <label>1.2 A quem é direcionada a solicitação — Função / Cargo</label>
                 <input
                   :value="ctx.fixoCargo"
+                  class="da75-input da75-input--sm"
                   list="da75-dl-solicitacao-destinatario-cargo"
                   placeholder="Digite a função ou cargo"
                   @input="ctx.fixoCargo = capNome(String(($event.target).value || ''))"
@@ -93,6 +96,7 @@
                 <label>Nome do responsável</label>
                 <input
                   :value="ctx.fixoResponsavel"
+                  class="da75-input da75-input--sm"
                   list="da75-dl-solicitacao-responsavel-nome"
                   placeholder="Digite o nome do responsável"
                   @input="ctx.fixoResponsavel = capNome(String(($event.target).value || ''))"
@@ -102,6 +106,7 @@
                 <label>Função / Cargo</label>
                 <input
                   :value="ctx.fixoResponsavelCargo"
+                  class="da75-input da75-input--sm"
                   list="da75-dl-solicitacao-responsavel-cargo"
                   placeholder="Digite o cargo"
                   @input="ctx.fixoResponsavelCargo = capNome(String(($event.target).value || ''))"
@@ -118,6 +123,7 @@
               <label>2.1 Setor requisitante (Unidade / Setor / Departamento)</label>
               <input
                 :value="ctx.fixoSetor"
+                class="da75-input da75-input--sm"
                 list="da75-dl-dfd-setor-requisitante"
                 @input="ctx.fixoSetor = capNome(String(($event.target).value || ''))"
               />
@@ -126,18 +132,20 @@
               <label>2.2 Responsável pela demanda</label>
               <input
                 :value="ctx.fixoDemanda"
+                class="da75-input da75-input--sm"
                 list="da75-dl-dfd-responsavel-demanda"
                 @input="ctx.fixoDemanda = capNome(String(($event.target).value || ''))"
               />
             </div>
             <div class="ixp-field">
               <label>2.3 E-mail</label>
-              <input v-model="ctx.fixoEmail" list="da75-dl-dfd-email" />
+              <input v-model="ctx.fixoEmail" class="da75-input da75-input--sm" list="da75-dl-dfd-email" />
             </div>
             <div class="ixp-field">
               <label>2.4 Nome do(a) gestor(a) de contratos</label>
               <input
                 :value="ctx.fixoGestor"
+                class="da75-input da75-input--sm"
                 list="da75-dl-dfd-gestor-contratos"
                 @input="ctx.fixoGestor = capNome(String(($event.target).value || ''))"
               />
@@ -146,6 +154,7 @@
               <label>2.5 Nome do(a) fiscal de contratos</label>
               <input
                 :value="ctx.fixoFiscal"
+                class="da75-input da75-input--sm"
                 list="da75-dl-dfd-fiscal-contratos"
                 @input="ctx.fixoFiscal = capNome(String(($event.target).value || ''))"
               />
@@ -156,6 +165,7 @@
                 <label>Nome do responsável</label>
                 <input
                   :value="ctx.fixoAssinatura"
+                  class="da75-input da75-input--sm"
                   list="da75-dl-dfd-assinatura-nome"
                   placeholder="Digite o nome do responsável"
                   @input="ctx.fixoAssinatura = capNome(String(($event.target).value || ''))"
@@ -165,6 +175,7 @@
                 <label>Função / Cargo</label>
                 <input
                   :value="ctx.fixoAssinaturaCargo"
+                  class="da75-input da75-input--sm"
                   list="da75-dl-dfd-assinatura-cargo"
                   placeholder="Digite o cargo"
                   @input="ctx.fixoAssinaturaCargo = capNome(String(($event.target).value || ''))"
@@ -181,6 +192,7 @@
               <label>Endereço presencial para envio ou entrega de propostas</label>
               <textarea
                 :value="ctx.fixoEnderecoEntrega"
+                class="da75-textarea"
                 rows="3"
                 @input="ctx.fixoEnderecoEntrega = capFirst(String(($event.target).value || ''))"
               />
@@ -188,13 +200,19 @@
             </div>
             <div class="ixp-field">
               <label>E-mail para recebimento de propostas</label>
-              <input v-model="ctx.fixoEmailPropostas" list="da75-dl-tr-email-propostas" placeholder="Ex: propostas@municipio.go.gov.br" />
+              <input
+                v-model="ctx.fixoEmailPropostas"
+                class="da75-input da75-input--sm"
+                list="da75-dl-tr-email-propostas"
+                placeholder="Ex: propostas@municipio.go.gov.br"
+              />
             </div>
             <div class="ixp-grid-2">
               <div class="ixp-field">
                 <label>Responsável pelo Termo de Referência — Nome</label>
                 <input
                   :value="ctx.fixoTrResponsavelNome"
+                  class="da75-input da75-input--sm"
                   list="da75-dl-tr-resp-nome"
                   @input="ctx.fixoTrResponsavelNome = capNome(String(($event.target).value || ''))"
                 />
@@ -203,6 +221,7 @@
                 <label>Cargo / Função</label>
                 <input
                   :value="ctx.fixoTrResponsavelCargo"
+                  class="da75-input da75-input--sm"
                   list="da75-dl-tr-resp-cargo"
                   @input="ctx.fixoTrResponsavelCargo = capNome(String(($event.target).value || ''))"
                 />
@@ -378,12 +397,13 @@ defineEmits(['close', 'apply']);
   gap: 4px;
 }
 .ixp-field label {
-  font-size: 12px;
-  color: #475569;
+  font-size: 11px;
+  color: #64748b;
   font-weight: 500;
 }
-.ixp-field input,
-.ixp-field textarea {
+/* Não estilizar inputs/selects da75 — o scoped venceria as classes globais e quebrava paridade com «Dados básicos». */
+.ixp-field input:not(.da75-input),
+.ixp-field textarea:not(.da75-textarea) {
   width: 100%;
   border: 1px solid #cbd5e1;
   border-radius: 12px;
@@ -401,8 +421,8 @@ defineEmits(['close', 'apply']);
   color: #1e293b;
   outline: none;
 }
-.ixp-field input:focus,
-.ixp-field textarea:focus {
+.ixp-field input:not(.da75-input):focus,
+.ixp-field textarea:not(.da75-textarea):focus {
   border-color: #38bdf8;
 }
 .ixp-field select:not(.da75-select):focus {
@@ -514,29 +534,29 @@ defineEmits(['close', 'apply']);
 .dm-dark-theme .ixp-field label {
   color: #94a3b8;
 }
-.dm-dark .ixp-field input,
-.dm-dark .ixp-field textarea,
+.dm-dark .ixp-field input:not(.da75-input),
+.dm-dark .ixp-field textarea:not(.da75-textarea),
 .dm-dark .ixp-field select:not(.da75-select),
 .dm-dark .ixp-btn-secondary,
-.dm-dark-theme .ixp-field input,
-.dm-dark-theme .ixp-field textarea,
+.dm-dark-theme .ixp-field input:not(.da75-input),
+.dm-dark-theme .ixp-field textarea:not(.da75-textarea),
 .dm-dark-theme .ixp-field select:not(.da75-select),
 .dm-dark-theme .ixp-btn-secondary {
   background: #0b1222;
   border-color: #334155;
   color: #e2e8f0;
 }
-.dm-dark .ixp-field input::placeholder,
-.dm-dark .ixp-field textarea::placeholder,
-.dm-dark-theme .ixp-field input::placeholder,
-.dm-dark-theme .ixp-field textarea::placeholder {
+.dm-dark .ixp-field input:not(.da75-input)::placeholder,
+.dm-dark .ixp-field textarea:not(.da75-textarea)::placeholder,
+.dm-dark-theme .ixp-field input:not(.da75-input)::placeholder,
+.dm-dark-theme .ixp-field textarea:not(.da75-textarea)::placeholder {
   color: #64748b;
 }
-.dm-dark .ixp-field input:focus,
-.dm-dark .ixp-field textarea:focus,
+.dm-dark .ixp-field input:not(.da75-input):focus,
+.dm-dark .ixp-field textarea:not(.da75-textarea):focus,
 .dm-dark .ixp-field select:not(.da75-select):focus,
-.dm-dark-theme .ixp-field input:focus,
-.dm-dark-theme .ixp-field textarea:focus,
+.dm-dark-theme .ixp-field input:not(.da75-input):focus,
+.dm-dark-theme .ixp-field textarea:not(.da75-textarea):focus,
 .dm-dark-theme .ixp-field select:not(.da75-select):focus {
   border-color: #0ea5e9;
 }

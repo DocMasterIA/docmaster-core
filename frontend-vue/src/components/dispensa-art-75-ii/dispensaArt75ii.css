@@ -194,6 +194,7 @@
   background: #fff;
   padding: 0.625rem 0.75rem;
   font-size: 0.875rem;
+  font-family: inherit;
   color: #1e293b;
   outline: none;
 }
@@ -221,6 +222,11 @@
 .da75-input--sm {
   border-radius: 0.5rem;
   font-size: 0.75rem;
+  /* Mesma caixa que select na mesma linha (cabeçalho × órgão): altura fixa evita diferença nativa browser */
+  min-height: 2.375rem;
+  height: 2.375rem;
+  line-height: 1.35;
+  box-sizing: border-box;
 }
 
 .da75-input--sm {
@@ -233,9 +239,13 @@
   background-size: 0.95rem 0.95rem;
 }
 
-/* Grelhas ixp/fe: label já define ritmo — sem margem extra do bloco .da75-input */
+/* Grelhas ixp/fe e linha da75: label já dá o ritmo vertical */
+.da75-field > .da75-input,
+.da75-field > .da75-select,
+.da75-field > .da75-textarea,
 .ixp-field > .da75-select,
 .ixp-field > .da75-input,
+.ixp-field > .da75-textarea,
 .fe-field > .da75-select,
 .fe-field > .da75-input {
   margin-top: 0;
@@ -319,7 +329,9 @@
 }
 
 .da75-check--inline {
-  height: 34px;
+  min-height: 2.375rem;
+  height: 2.375rem;
+  box-sizing: border-box;
   padding: 0 0.75rem;
   border-radius: 0.5rem;
   border: 1px solid #e2e8f0;

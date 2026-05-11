@@ -356,6 +356,7 @@
               <label>Nome do cadastro</label>
               <input
                 :value="orgaoProfileName"
+                class="da75-input da75-input--sm"
                 placeholder="Ex: Fundo Municipal de Saúde"
                 @input="orgaoProfileName = tituloNomePt(String(($event.target).value || ''))"
               />
@@ -383,6 +384,7 @@
                 <label>1.1 A quem é direcionada a solicitação — nome</label>
                 <input
                   :value="fixoNome"
+                  class="da75-input da75-input--sm"
                   list="dl-solicitacao-destinatario-nome"
                   placeholder="Digite o nome"
                   @input="fixoNome = tituloNomePt(String(($event.target).value || ''))"
@@ -401,6 +403,7 @@
                 <label>1.2 A quem é direcionada a solicitação — função / cargo</label>
                 <input
                   :value="fixoCargo"
+                  class="da75-input da75-input--sm"
                   list="dl-solicitacao-destinatario-cargo"
                   placeholder="Digite a função ou cargo"
                   @input="fixoCargo = tituloNomePt(String(($event.target).value || ''))"
@@ -413,6 +416,7 @@
                 <label>Nome do responsável</label>
                 <input
                   :value="fixoResponsavel"
+                  class="da75-input da75-input--sm"
                   list="dl-solicitacao-responsavel-nome"
                   placeholder="Digite o nome do responsável"
                   @input="fixoResponsavel = tituloNomePt(String(($event.target).value || ''))"
@@ -422,6 +426,7 @@
                 <label>Função / cargo</label>
                 <input
                   :value="fixoResponsavelCargo"
+                  class="da75-input da75-input--sm"
                   list="dl-solicitacao-responsavel-cargo"
                   placeholder="Digite o cargo"
                   @input="fixoResponsavelCargo = tituloNomePt(String(($event.target).value || ''))"
@@ -437,6 +442,7 @@
               <label>2.1 Setor requisitante (Unidade / Setor / Departamento)</label>
               <input
                 :value="fixoSetor"
+                class="da75-input da75-input--sm"
                 list="dl-dfd-setor-requisitante"
                 @input="fixoSetor = tituloNomePt(String(($event.target).value || ''))"
               />
@@ -445,18 +451,20 @@
               <label>2.2 Responsável pela demanda</label>
               <input
                 :value="fixoDemanda"
+                class="da75-input da75-input--sm"
                 list="dl-dfd-responsavel-demanda"
                 @input="fixoDemanda = tituloNomePt(String(($event.target).value || ''))"
               />
             </div>
             <div class="ixp-field">
               <label>2.3 E-mail</label>
-              <input v-model="fixoEmail" list="dl-dfd-email" />
+              <input v-model="fixoEmail" class="da75-input da75-input--sm" list="dl-dfd-email" />
             </div>
             <div class="ixp-field">
               <label>2.4 Nome do(a) gestor(a) de contratos</label>
               <input
                 :value="fixoGestor"
+                class="da75-input da75-input--sm"
                 list="dl-dfd-gestor-contratos"
                 @input="fixoGestor = tituloNomePt(String(($event.target).value || ''))"
               />
@@ -465,6 +473,7 @@
               <label>2.5 Nome do(a) fiscal de contratos</label>
               <input
                 :value="fixoFiscal"
+                class="da75-input da75-input--sm"
                 list="dl-dfd-fiscal-contratos"
                 @input="fixoFiscal = tituloNomePt(String(($event.target).value || ''))"
               />
@@ -475,6 +484,7 @@
                 <label>Nome do responsável</label>
                 <input
                   :value="fixoAssinatura"
+                  class="da75-input da75-input--sm"
                   list="dl-dfd-assinatura-nome"
                   placeholder="Digite o nome do responsável"
                   @input="fixoAssinatura = tituloNomePt(String(($event.target).value || ''))"
@@ -484,6 +494,7 @@
                 <label>Função / cargo</label>
                 <input
                   :value="fixoAssinaturaCargo"
+                  class="da75-input da75-input--sm"
                   list="dl-dfd-assinatura-cargo"
                   placeholder="Digite o cargo"
                   @input="fixoAssinaturaCargo = tituloNomePt(String(($event.target).value || ''))"
@@ -1940,9 +1951,9 @@ const podeGerarDocumentos = computed(() => {
 .ixp-grid-item { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 44px; gap: 10px; }
 .ixp-field { display: grid; gap: 4px; }
 .ixp-field label { font-size: 12px; color: #475569; font-weight: 500; }
-.ixp-field input, .ixp-field textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px 11px; font-size: 14px; color: #1e293b; outline: none; }
+.ixp-field input:not(.da75-input), .ixp-field textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px 11px; font-size: 14px; color: #1e293b; outline: none; }
 .ixp-field select:not(.da75-select) { width: 100%; border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px 11px; font-size: 14px; color: #1e293b; outline: none; }
-.ixp-field input:focus, .ixp-field textarea:focus { border-color: #38bdf8; }
+.ixp-field input:not(.da75-input):focus, .ixp-field textarea:focus { border-color: #38bdf8; }
 .ixp-field select:not(.da75-select):focus { border-color: #38bdf8; }
 .ixp-check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #334155; }
 .ixp-choice { border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; padding: 12px; text-align: left; }
@@ -1976,6 +1987,13 @@ const podeGerarDocumentos = computed(() => {
 .ixp-drawer-head small { font-size: 11px; text-transform: uppercase; color: #64748b; letter-spacing: .08em; }
 .ixp-drawer-head h3 { margin: 3px 0 0; font-size: 16px; color: #0f172a; }
 .ixp-drawer-body { overflow: auto; padding: 16px; display: grid; gap: 12px; }
+/* Mesmos rótulos que «Dados básicos» (da75-label--compact) */
+.ixp-drawer .ixp-field > label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  letter-spacing: 0.02em;
+}
 .ixp-drawer-foot { border-top: 1px solid #e2e8f0; padding: 14px 16px; }
 .ixp-drawer-foot .ixp-btn-primary { width: 100%; }
 @media (max-width: 900px) { .ixp-grid-2, .ixp-grid-3, .ixp-grid-item { grid-template-columns: 1fr; } .ixp-col-2 { grid-column: auto; } }
@@ -1983,16 +2001,18 @@ const podeGerarDocumentos = computed(() => {
 .dm-dark-theme .ixp-main, .dm-dark-theme .ixp-card, .dm-dark-theme .ixp-drawer, .dm-dark-theme .ixp-item { background: #0f172a; border-color: #334155; }
 .dm-dark .ixp-main-head, .dm-dark .ixp-drawer-head, .dm-dark .ixp-drawer-foot,
 .dm-dark-theme .ixp-main-head, .dm-dark-theme .ixp-drawer-head, .dm-dark-theme .ixp-drawer-foot { border-color: #334155; }
+.dm-dark .ixp-drawer .ixp-field > label,
+.dm-dark-theme .ixp-drawer .ixp-field > label { color: #94a3b8; }
 .dm-dark .ixp-main-title h2, .dm-dark .ixp-main-title p, .dm-dark .ixp-card h3, .dm-dark .ixp-choice strong,
 .dm-dark-theme .ixp-main-title h2, .dm-dark-theme .ixp-main-title p, .dm-dark-theme .ixp-card h3, .dm-dark-theme .ixp-choice strong { color: #e2e8f0; }
 .dm-dark .ixp-main-title small, .dm-dark .ixp-field label, .dm-dark .ixp-check, .dm-dark .ixp-item-head span, .dm-dark .ixp-choice span, .dm-dark .ixp-drawer-head small,
 .dm-dark-theme .ixp-main-title small, .dm-dark-theme .ixp-field label, .dm-dark-theme .ixp-check, .dm-dark-theme .ixp-item-head span, .dm-dark-theme .ixp-choice span, .dm-dark-theme .ixp-drawer-head small { color: #94a3b8; }
-.dm-dark .ixp-field input, .dm-dark .ixp-field textarea, .dm-dark .ixp-field select:not(.da75-select), .dm-dark .ixp-btn-secondary, .dm-dark .ixp-choice,
-.dm-dark-theme .ixp-field input, .dm-dark-theme .ixp-field textarea, .dm-dark-theme .ixp-field select:not(.da75-select), .dm-dark-theme .ixp-btn-secondary, .dm-dark-theme .ixp-choice { background: #0b1222; border-color: #334155; color: #e2e8f0; }
+.dm-dark .ixp-field input:not(.da75-input), .dm-dark .ixp-field textarea, .dm-dark .ixp-field select:not(.da75-select), .dm-dark .ixp-btn-secondary, .dm-dark .ixp-choice,
+.dm-dark-theme .ixp-field input:not(.da75-input), .dm-dark-theme .ixp-field textarea, .dm-dark-theme .ixp-field select:not(.da75-select), .dm-dark-theme .ixp-btn-secondary, .dm-dark-theme .ixp-choice { background: #0b1222; border-color: #334155; color: #e2e8f0; }
 .dm-dark .ixp-field input::placeholder, .dm-dark .ixp-field textarea::placeholder,
 .dm-dark-theme .ixp-field input::placeholder, .dm-dark-theme .ixp-field textarea::placeholder { color: #64748b; }
-.dm-dark .ixp-field input:focus, .dm-dark .ixp-field textarea:focus, .dm-dark .ixp-field select:not(.da75-select):focus,
-.dm-dark-theme .ixp-field input:focus, .dm-dark-theme .ixp-field textarea:focus, .dm-dark-theme .ixp-field select:not(.da75-select):focus { border-color: #0ea5e9; }
+.dm-dark .ixp-field input:not(.da75-input):focus, .dm-dark .ixp-field textarea:focus, .dm-dark .ixp-field select:not(.da75-select):focus,
+.dm-dark-theme .ixp-field input:not(.da75-input):focus, .dm-dark-theme .ixp-field textarea:focus, .dm-dark-theme .ixp-field select:not(.da75-select):focus { border-color: #0ea5e9; }
 .dm-dark .ixp-btn-secondary,
 .dm-dark-theme .ixp-btn-secondary { color: #cbd5e1; }
 .dm-dark .ixp-orgao-btn-save,

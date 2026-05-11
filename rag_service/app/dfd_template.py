@@ -15,6 +15,7 @@ from typing import Optional
 
 from docx import Document
 
+from .docx_typography import apply_standard_body_font_to_document
 from .tr_template import (
     TRTemplateSlots,
     prepend_processo_line_when_filled,
@@ -293,6 +294,8 @@ def render_dfd_from_tr_slots(
     split_paragraphs_on_double_newline(doc)
     if not num_proc:
         _remove_processo_visual_block_when_empty(doc)
+
+    apply_standard_body_font_to_document(doc)
 
     out_path = Path(output_path) if output_path else None
     if out_path is None:

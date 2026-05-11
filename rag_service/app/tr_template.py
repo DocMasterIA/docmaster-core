@@ -24,6 +24,8 @@ from docx.oxml.ns import qn
 from docx.table import Table as DocxTable
 from docx.text.paragraph import Paragraph
 
+from .docx_typography import apply_standard_body_font_to_document, set_run_standard_body_font
+
 TR_ITEMS_TABLE_ANCHOR = "(TR_TABELA_ITENS)"
 
 
@@ -70,6 +72,7 @@ def prepend_processo_line_when_filled(doc: Document, slots: TRTemplateSlots) -> 
     run = para.add_run()
     run.text = f"PROCESSO: {num}"
     run.bold = True
+    set_run_standard_body_font(run)
     try:
         para.paragraph_format.space_after = Pt(8)
     except Exception:
@@ -1125,6 +1128,8 @@ def render_tr_from_slots(
     if _tr_is_lei14133_art74_i_inexigibilidade_pack(tpl_path, slots):
         _normalize_art74_sec15_1_15_2_spacing(doc)
     _fill_items_table(doc, slots.itens)
+
+    apply_standard_body_font_to_document(doc)
 
     out_path = Path(output_path) if output_path else None
     if out_path is None:

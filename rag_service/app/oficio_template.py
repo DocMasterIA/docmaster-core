@@ -12,6 +12,8 @@ from typing import Optional
 
 from docx import Document
 
+from .docx_typography import apply_standard_body_font_to_document
+
 from .tr_template import (
     TRTemplateSlots,
     prepend_processo_line_when_filled,
@@ -173,6 +175,8 @@ def render_oficio_from_slots(
 
     _replace_placeholders(doc, mapping)
     split_paragraphs_on_double_newline(doc)
+
+    apply_standard_body_font_to_document(doc)
 
     out_path = Path(output_path) if output_path else None
     if out_path is None:

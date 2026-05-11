@@ -50,16 +50,18 @@ CSRF_TRUSTED_ORIGINS = [
     "http://docmasteria.com.br",
     "https://www.docmasteria.com.br",
     "http://www.docmasteria.com.br",
+    "https://docmaster.com.br",
+    "https://www.docmaster.com.br",
     "https://*.ngrok-free.app",
     "http://*.ngrok-free.app",
     "https://*.ngrok.io",
     "http://*.ngrok.io",
 ]
 
-# CORS: frontend Vue em docmasteria.com.br ↔ API em api.docmasteria.com.br (credentials: 'include')
+# CORS: SPA (docmasteria.com.br e/ou docmaster.com.br) ↔ API api.docmasteria.com.br (credentials: 'include')
 _cors_origins = os.environ.get(
     "CORS_ALLOWED_ORIGINS",
-    "https://docmasteria.com.br,https://www.docmasteria.com.br",
+    "https://docmasteria.com.br,https://www.docmasteria.com.br,https://docmaster.com.br,https://www.docmaster.com.br",
 ).strip()
 if _cors_origins:
     CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(",") if o.strip()]
@@ -69,11 +71,14 @@ else:
     CORS_ALLOWED_ORIGINS = [
         "https://docmasteria.com.br",
         "https://www.docmasteria.com.br",
+        "https://docmaster.com.br",
+        "https://www.docmaster.com.br",
     ]
 # Permite qualquer origem ngrok (URL muda a cada reinício) – uso em teste/produção com túnel
 CORS_ALLOWED_ORIGIN_REGEXES = [
     # Vários níveis de subdomínio e porta não padrão (ex.: :8443) no header Origin
     r"^https://([a-zA-Z0-9-]+\.)*docmasteria\.com\.br(?::\d+)?$",
+    r"^https://([a-zA-Z0-9-]+\.)*docmaster\.com\.br(?::\d+)?$",
     r"^https?://[a-zA-Z0-9-]+\.ngrok-free\.app$",
     r"^https?://[a-zA-Z0-9-]+\.ngrok\.io$",
 ]

@@ -23,19 +23,14 @@ from docx.shared import Pt, RGBColor
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
-FONT_NAME = "Times New Roman"
-FONT_COLOR = RGBColor(0, 0, 0)
+from .docx_typography import (
+    STANDARD_BODY_FONT,
+    STANDARD_FONT_COLOR,
+    apply_standard_body_font_to_document,
+)
 
-
-def _apply_document_styles(doc: Document) -> None:
-    """Define fonte Times New Roman e cor preta em todos os estilos do documento."""
-    for style_name in ("Normal", "Title", "Heading 1", "Heading 2", "Heading 3", "List Paragraph"):
-        try:
-            style = doc.styles[style_name]
-            style.font.name = FONT_NAME
-            style.font.color.rgb = FONT_COLOR
-        except KeyError:
-            pass
+FONT_NAME = STANDARD_BODY_FONT
+FONT_COLOR = STANDARD_FONT_COLOR
 
 
 def _add_table_borders(table, style: str = "single") -> None:
@@ -172,7 +167,6 @@ def json_to_docx(
     root_sections = structure.get("root_sections") or []
 
     doc = Document()
-    _apply_document_styles(doc)
     doc_type = structure.get("document_type", "documento")
     title_para = doc.add_paragraph()
     title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -185,6 +179,8 @@ def json_to_docx(
 
     for node in root_sections:
         _render_section(doc, node, section_texts, table_data, level=0)
+
+    apply_standard_body_font_to_document(doc)
 
     if output_path is None:
         fd, output_path = tempfile.mkstemp(suffix=".docx")

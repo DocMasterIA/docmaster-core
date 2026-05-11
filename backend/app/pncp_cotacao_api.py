@@ -1903,6 +1903,9 @@ def pncp_research_sessions_item_update(request, sessao_id: int, item_id: int):
         else:
             fr["valor_base"] = float(vb_num)  # type: ignore[arg-type]
             src["faixa_regional"] = fr
+        # Evita valor_base duplicado no topo do JSON (import/planos antigos) sobrepor faixa_regional na UI.
+        src.pop("valor_base", None)
+        src.pop("valorBase", None)
         for k in ("variacao_percentual", "variacaoPercentual", "variacao"):
             src.pop(k, None)
         item.source = src

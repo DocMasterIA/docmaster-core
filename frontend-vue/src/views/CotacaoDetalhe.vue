@@ -1385,16 +1385,20 @@ function pickNumeric(...vals) {
 function extractItemSourceNumber(item, ...keys) {
   const src = item?.sourceRaw || item?.source;
   if (!src || typeof src !== 'object') return null;
+  // O endpoint de «Salvar» grava em source.faixa_regional.valor_base; imports antigos
+  // podem deixar source.valor_base no topo — esse valor ficava a «ganhar» e a UI não atualizava.
+  for (const frKey of ['faixa_regional', 'faixaRegional']) {
+    const faixa = src[frKey];
+    if (faixa && typeof faixa === 'object') {
+      for (const k of keys) {
+        const n = Number(faixa[k]);
+        if (Number.isFinite(n) && n > 0) return n;
+      }
+    }
+  }
   for (const k of keys) {
     const n = Number(src[k]);
     if (Number.isFinite(n) && n > 0) return n;
-  }
-  const faixa = src?.faixa_regional || src?.faixaRegional;
-  if (faixa && typeof faixa === 'object') {
-    for (const k of keys) {
-      const n = Number(faixa[k]);
-      if (Number.isFinite(n) && n > 0) return n;
-    }
   }
   return null;
 }

@@ -14,13 +14,14 @@ do template. Quem monta os slots (usuário ou LLM) é outra camada.
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Cm, Pt
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+from docx.table import Table as DocxTable
 from docx.text.paragraph import Paragraph
 
 TR_ITEMS_TABLE_ANCHOR = "(TR_TABELA_ITENS)"
@@ -30,6 +31,47 @@ def _valor_total_sem_rs(valor: str) -> str:
     """Texto para placeholders ( VALOR_TOTAL ): modelo costuma já incluir 'R$' no rótulo."""
     s = str(valor or "").strip()
     return re.sub(r"(?i)^\s*R\$\s*", "", s).strip()
+
+
+def _parse_br_money_to_float(value: Any) -> Optional[float]:
+    """Interpreta valor monetário BR (R$, milhar com ponto, decimal com vírgula). None se vazio ou inválido."""
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    cleaned = re.sub(r"(?i)^\s*R\$\s*", "", raw).replace(" ", "").strip()
+    if not cleaned:
+        return None
+    if "," in cleaned:
+        cleaned = cleaned.replace(".", "").replace(",", ".")
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def _money_field_is_positive(value: Any) -> bool:
+    n = _parse_br_money_to_float(value)
+    return n is not None and n > 0.0
+
+
+def _iter_all_document_paragraphs(doc: Document) -> Iterator[Paragraph]:
+    """
+    Parágrafos do documento principal e de todas as tabelas (incl. aninhadas).
+
+    `Document.paragraphs` só cobre `w:p` filhos diretos do corpo — conteúdo em células
+    não aparece e quebrava remoção/substituição do §1.1 (valor total / VALOR_TOTAL).
+    """
+
+    def walk(container) -> Iterator[Paragraph]:
+        for item in container.iter_inner_content():
+            if isinstance(item, Paragraph):
+                yield item
+            elif isinstance(item, DocxTable):
+                for row in item.rows:
+                    for cell in row.cells:
+                        yield from walk(cell)
+
+    yield from walk(doc)
 
 
 TR_ITEMS_LEGACY_CELL_PLACEHOLDERS = {
@@ -363,14 +405,8 @@ def _replace_placeholders_in_paragraphs(doc: Document, mapping: Dict[str, str]) 
                 if ph and ph in replacement:
                     break
 
-    for p in doc.paragraphs:
+    for p in _iter_all_document_paragraphs(doc):
         _replace_in_paragraph(p)
-
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                for p in cell.paragraphs:
-                    _replace_in_paragraph(p)
 
 
 def split_paragraphs_on_double_newline(doc: Document, *, space_after_pt: float = 10.0) -> None:
@@ -402,13 +438,8 @@ def split_paragraphs_on_double_newline(doc: Document, *, space_after_pt: float =
                 new_para.paragraph_format.space_after = gap
             ref_el = new_p
 
-    for p in list(doc.paragraphs):
+    for p in list(_iter_all_document_paragraphs(doc)):
         process_para(p)
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                for p in list(cell.paragraphs):
-                    process_para(p)
 
 
 def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
@@ -667,12 +698,12 @@ def _normalize_text_for_match(text: str) -> str:
 
 
 def _remove_body_paragraphs_matching_needle(doc: Document, needle: str) -> int:
-    """Remove parágrafos do corpo (não em tabela) cujo texto normalizado contém `needle`. Retorna quantos removeu."""
+    """Remove parágrafos (corpo ou células de tabela) cujo texto normalizado contém `needle`. Retorna quantos removeu."""
     target = _normalize_text_for_match(needle)
     if not target:
         return 0
     n = 0
-    for para in list(doc.paragraphs):
+    for para in list(_iter_all_document_paragraphs(doc)):
         text = _normalize_text_for_match(para.text or "")
         if target in text:
             el = para._element
@@ -845,27 +876,29 @@ def _tr_precos_comerciais_informados(slots: TRTemplateSlots) -> bool:
     """
     Há preço de referência nos itens (unitário ou total por linha) ou valor total global no TR.
     Alinhado à regra da tabela de itens: sem isto, o modelo não deve exibir o §1.1 do valor do processo.
+    Valores zero ou «R$ 0,00» não contam como preço informado.
     """
     for item in slots.itens or []:
-        if str(getattr(item, "valor_unitario", "") or "").strip():
+        if _money_field_is_positive(getattr(item, "valor_unitario", "")):
             return True
-        if str(getattr(item, "valor_total", "") or "").strip():
+        if _money_field_is_positive(getattr(item, "valor_total", "")):
             return True
-    if str(getattr(slots, "valor_total", "") or "").strip():
+    if _money_field_is_positive(getattr(slots, "valor_total", "")):
         return True
     return False
 
 
 def _apply_art74_i_remove_valor_total_processo_sem_precos(
-    doc: Document, tpl_path: Path, slots: TRTemplateSlots
+    doc: Document, _tpl_path: Path, slots: TRTemplateSlots
 ) -> None:
     """
     Modelos Art. 74, I (fornecedor exclusivo / manutenção de veículos) trazem o §1.1 sobre
     valor total obtido por proposta comercial. Se nenhum preço foi informado, remove o parágrafo
     (evita «R$0,00» e texto desnecessário).
+
+    A frase-gatilho é exclusiva desses modelos; não depende de reconhecer o pacote pelo path
+    (fallback `tr_base` + `slot_package_key` vazio deixava o §1.1 no documento).
     """
-    if not _tr_is_lei14133_art74_i_inexigibilidade_pack(tpl_path, slots):
-        return
     if _tr_precos_comerciais_informados(slots):
         return
     removed = _remove_body_paragraphs_matching_needle(
@@ -874,6 +907,18 @@ def _apply_art74_i_remove_valor_total_processo_sem_precos(
     )
     if removed:
         _collapse_consecutive_empty_body_paragraphs(doc)
+
+
+def _scrub_valor_total_placeholders_sem_preco(doc: Document, slots: TRTemplateSlots) -> None:
+    """Remove tokens «( VALOR_TOTAL )» residuais se nenhum preço foi informado (runs que impedem o match do mapping)."""
+    if _tr_precos_comerciais_informados(slots):
+        return
+    pat = re.compile(r"\(\s*VALOR\s*_?\s*TOTAL\s*\)", re.IGNORECASE)
+    for p in list(_iter_all_document_paragraphs(doc)):
+        t = p.text or ""
+        if not pat.search(t):
+            continue
+        p.text = pat.sub("", t).strip()
 
 
 def render_tr_from_slots(
@@ -1001,6 +1046,7 @@ def render_tr_from_slots(
     _fix_respetiva_typo_in_document(doc)
     _apply_art74_i_dotacao_paragraph_branch(doc, tpl_path, slots.dotacao, slots)
     _apply_art74_i_remove_valor_total_processo_sem_precos(doc, tpl_path, slots)
+    _scrub_valor_total_placeholders_sem_preco(doc, slots)
     if _tr_is_lei14133_art74_i_inexigibilidade_pack(tpl_path, slots):
         _normalize_art74_sec15_1_15_2_spacing(doc)
     _fill_items_table(doc, slots.itens)

@@ -865,7 +865,7 @@ function triggerTemplateDownload(url, filename) {
 
 function downloadModeloExcel() {
   triggerTemplateDownload(
-    '/modelos/cotacao-manual-modelo-docmasteria.xlsx?v=20260508',
+    '/modelos/cotacao-manual-modelo-docmasteria.xlsx?v=20260509',
     'cotacao-manual-modelo-docmasteria.xlsx',
   );
 }

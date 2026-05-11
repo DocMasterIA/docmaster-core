@@ -18,7 +18,7 @@ Este documento define os campos aceitos na importacao de planilha para preencher
 
 Modelos prontos para download no frontend:
 
-- Excel (`.xlsx`): `/modelos/cotacao-manual-modelo.xlsx`
+- Excel (`.xlsx`): `/modelos/cotacao-manual-modelo-docmasteria.xlsx` (colunas: item, quantidade, unidade, faixa regional base; sem preço total nem faixa de variação no modelo)
 - Google Sheets (`.csv`): `/modelos/cotacao-manual-modelo.csv`
 
 Observacao:

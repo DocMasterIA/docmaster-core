@@ -33,6 +33,49 @@ def _valor_total_sem_rs(valor: str) -> str:
     return re.sub(r"(?i)^\s*R\$\s*", "", s).strip()
 
 
+def slots_numero_processo_display(slots: TRTemplateSlots) -> str:
+    """
+    Número de processo para exibição nos documentos (TR, DFD, ofício).
+    Mesma ordem que o DFD: `dfd_numero_processo`, com fallback a `numero_processo`.
+    """
+    return (
+        str(getattr(slots, "dfd_numero_processo", "") or "").strip()
+        or str(getattr(slots, "numero_processo", "") or "").strip()
+    )
+
+
+def _doc_body_has_processo_heading(doc: Document, *, max_paras: int = 6) -> bool:
+    """True se os primeiros parágrafos do corpo já trazem linha tipo «PROCESSO: …» (evita duplicar)."""
+    for i, para in enumerate(doc.paragraphs):
+        if i >= max_paras:
+            break
+        t = (para.text or "").strip()
+        if re.match(r"(?i)^processo\s*:", t):
+            return True
+    return False
+
+
+def prepend_processo_line_when_filled(doc: Document, slots: TRTemplateSlots) -> None:
+    """
+    Insere no topo do corpo a linha «PROCESSO: <número>» quando há processo informado.
+    Usado em TR, DFD e ofício (ex.: inexigibilidade com processo opcional ativo).
+    """
+    num = slots_numero_processo_display(slots)
+    if not num or _doc_body_has_processo_heading(doc):
+        return
+    body = doc.element.body
+    p_el = OxmlElement("w:p")
+    body.insert(0, p_el)
+    para = Paragraph(p_el, doc._body)
+    run = para.add_run()
+    run.text = f"PROCESSO: {num}"
+    run.bold = True
+    try:
+        para.paragraph_format.space_after = Pt(8)
+    except Exception:
+        pass
+
+
 def _parse_br_money_to_float(value: Any) -> Optional[float]:
     """Interpreta valor monetário BR (R$, milhar com ponto, decimal com vírgula). None se vazio ou inválido."""
     raw = str(value or "").strip()
@@ -734,26 +777,32 @@ def _collapse_consecutive_empty_body_paragraphs(doc: Document) -> None:
 
 def _normalize_art74_sec15_1_15_2_spacing(doc: Document) -> None:
     """
-    Entre o §15.1 (despesas / dotação) e o §15.2 (omissos / Lei 14.133/2021), remove parágrafos
-    vazios intermédios e fixa um único intervalo vertical (evita «duas linhas» por vazio + space_after).
+    Entre o bloco «despesas / dotação» e o §…2 (omissos / Lei 14.133/2021), remove parágrafos
+    vazios intermédios e reduz espaço vertical.
+
+    - inexigibilidade **manutenção de veículos**: §15.1 → §15.2;
+    - inexigibilidade **fornecedor exclusivo**: §13.1 → §13.2 (o modelo não usa §15.x nessa parte).
+
+    Também zera `space_before` / `space_after` nos parágrafos entre os dois (ex.: linha só com
+    `( DOTACAO_NUMERO )`), onde o .docx costuma trazer `w:before` alto.
     """
     body = doc.element.body
 
-    def _is_15_1_para(para: Paragraph) -> bool:
+    def _is_art74_tr_dotacao_heading_para(para: Paragraph) -> bool:
         t = (para.text or "").strip()
         if not t:
             return False
         tl = t.lower()
-        if not re.search(r"15\s*\.\s*1", t):
+        if not re.search(r"(?:13|15)\s*\.\s*1", t):
             return False
         return "despesas" in tl and ("dotação" in tl or "dotacao" in tl)
 
-    def _is_15_2_para(para: Paragraph) -> bool:
+    def _is_art74_tr_omissos_heading_para(para: Paragraph) -> bool:
         t = (para.text or "").strip()
         if not t:
             return False
         tl = t.lower()
-        if not re.search(r"15\s*\.\s*2", t):
+        if not re.search(r"(?:13|15)\s*\.\s*2", t):
             return False
         return "omissos" in tl
 
@@ -761,22 +810,22 @@ def _normalize_art74_sec15_1_15_2_spacing(doc: Document) -> None:
         return [el for el in body if el.tag == qn("w:p")]
 
     wps = _body_paragraph_elements()
-    idx_15_1 = None
-    idx_15_2 = None
+    idx_dot = None
+    idx_omissos = None
     for i, el in enumerate(wps):
         p = Paragraph(el, doc._body)
-        if idx_15_1 is None and _is_15_1_para(p):
-            idx_15_1 = i
+        if idx_dot is None and _is_art74_tr_dotacao_heading_para(p):
+            idx_dot = i
             continue
-        if idx_15_1 is not None and _is_15_2_para(p):
-            idx_15_2 = i
+        if idx_dot is not None and _is_art74_tr_omissos_heading_para(p):
+            idx_omissos = i
             break
 
-    if idx_15_1 is None or idx_15_2 is None or idx_15_2 <= idx_15_1:
+    if idx_dot is None or idx_omissos is None or idx_omissos <= idx_dot:
         return
 
-    # Remove todos os parágrafos vazios estritamente entre 15.1 e 15.2 (de trás para a frente).
-    for j in range(idx_15_2 - 1, idx_15_1, -1):
+    # Remove todos os parágrafos vazios estritamente entre §…1 e §…2 (de trás para a frente).
+    for j in range(idx_omissos - 1, idx_dot, -1):
         el = wps[j]
         p = Paragraph(el, doc._body)
         if not (p.text or "").strip():
@@ -784,13 +833,29 @@ def _normalize_art74_sec15_1_15_2_spacing(doc: Document) -> None:
             if parent is not None:
                 parent.remove(el)
 
-    # Um único «respiro» após 15.1; sem espaço extra antes de 15.2.
+    wps_mid = _body_paragraph_elements()
+    idx_a = idx_b = None
+    for i, el in enumerate(wps_mid):
+        p = Paragraph(el, doc._body)
+        if idx_a is None and _is_art74_tr_dotacao_heading_para(p):
+            idx_a = i
+            continue
+        if idx_a is not None and _is_art74_tr_omissos_heading_para(p):
+            idx_b = i
+            break
+    if idx_a is not None and idx_b is not None and idx_b > idx_a + 1:
+        for j in range(idx_a + 1, idx_b):
+            pm = Paragraph(wps_mid[j], doc._body)
+            pm.paragraph_format.space_before = Pt(0)
+            pm.paragraph_format.space_after = Pt(0)
+
+    # Um único «respiro» após o §…1 da dotação; sem espaço extra antes do §…2 omissos.
     for el in _body_paragraph_elements():
         p = Paragraph(el, doc._body)
-        if _is_15_1_para(p):
+        if _is_art74_tr_dotacao_heading_para(p):
             p.paragraph_format.space_before = Pt(0)
             p.paragraph_format.space_after = Pt(6)
-        elif _is_15_2_para(p):
+        elif _is_art74_tr_omissos_heading_para(p):
             p.paragraph_format.space_before = Pt(0)
 
 
@@ -943,6 +1008,7 @@ def render_tr_from_slots(
     # Remove cabeçalho padrão do modelo (ex.: timbre de prefeitura),
     # deixando o TR gerado sem esse cabeçalho fixo.
     _clear_headers(doc)
+    prepend_processo_line_when_filled(doc, slots)
 
     def _normalize_slot_block(text: str) -> str:
         t = str(text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
@@ -960,6 +1026,8 @@ def render_tr_from_slots(
         justificativa_text = f"{justificativa_text}\n"
     if problema_text and beneficio_text:
         problema_text = f"{problema_text}\n"
+
+    num_proc_display = slots_numero_processo_display(slots)
 
     mapping = {
         # Placeholders padronizados (preferenciais)
@@ -990,8 +1058,10 @@ def render_tr_from_slots(
         "(TR_DATA_TERMO)": slots.data_termo or "",
         "(TR_NOME_ASSINANTE_TERMO)": slots.nome_assinante_termo or "",
         "(TR_CARGO_ASSINANTE_TERMO)": slots.cargo_assinante_termo or "",
-        "(NUMERO_PROCESSO)": slots.numero_processo or "",
-        "( NUMERO_PROCESSO )": slots.numero_processo or "",
+        "(NUMERO_PROCESSO)": num_proc_display,
+        "( NUMERO_PROCESSO )": num_proc_display,
+        "(NUMERO PROCESSO)": num_proc_display,
+        "( NUMERO PROCESSO )": num_proc_display,
         "(MARCA)": slots.marca or "",
         "( MARCA )": slots.marca or "",
         "(MODELO)": slots.modelo or "",
@@ -1004,8 +1074,13 @@ def render_tr_from_slots(
         "( VALOR_TOTAL )": valor_total_placeholder,
         "(FORNECEDOR)": slots.fornecedor or "",
         "( FORNECEDOR )": slots.fornecedor or "",
+        # TR inexigibilidade manutenção de veículos: «( FORNECEDOR), CNPJ…» (sem espaço antes do «)»).
+        "( FORNECEDOR)": slots.fornecedor or "",
         "(CNPJ FORNECEDOR)": slots.cnpj_fornecedor or "",
         "( CNPJ FORNECEDOR )": slots.cnpj_fornecedor or "",
+        # inexigibilidade fornecedor exclusivo: token com underscore no .docx.
+        "(CNPJ_FORNECEDOR)": slots.cnpj_fornecedor or "",
+        "( CNPJ_FORNECEDOR )": slots.cnpj_fornecedor or "",
         "(AO_SENHOR_GENERO)": slots.ao_senhor_genero or "",
         "( AO_SENHOR_GENERO )": slots.ao_senhor_genero or "",
         "(SENHOR_SENHORA_GENERO)": slots.senhor_senhora_genero or "",

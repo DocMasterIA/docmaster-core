@@ -15,7 +15,12 @@ from typing import Optional
 
 from docx import Document
 
-from .tr_template import TRTemplateSlots, split_paragraphs_on_double_newline
+from .tr_template import (
+    TRTemplateSlots,
+    prepend_processo_line_when_filled,
+    slots_numero_processo_display,
+    split_paragraphs_on_double_newline,
+)
 
 
 TEMPLATE_DFD_PATH_DEFAULT = (
@@ -24,8 +29,8 @@ TEMPLATE_DFD_PATH_DEFAULT = (
 
 
 def _dfd_numero_processo_display(slots: TRTemplateSlots) -> str:
-    """Número exibido no DFD: campo próprio ou, em fallback, o do TR."""
-    return str(slots.dfd_numero_processo or slots.numero_processo or "").strip()
+    """Número exibido no DFD (mesma regra que TR/ofício: dfd_numero_processo, depois numero_processo)."""
+    return slots_numero_processo_display(slots)
 
 
 def dfd_numero_processo_filled(slots: Optional[TRTemplateSlots]) -> bool:
@@ -225,6 +230,8 @@ def render_dfd_from_tr_slots(
         raise FileNotFoundError(f"Template DFD não encontrado: {tpl_path}")
 
     doc = Document(str(tpl_path))
+    prepend_processo_line_when_filled(doc, slots)
+
     dfd_data_text = slots.dfd_data or slots.data_termo or ""
 
     dfd_obj = (slots.dfd_objeto_referencia or slots.objeto or "").strip()

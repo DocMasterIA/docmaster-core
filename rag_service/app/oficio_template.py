@@ -12,7 +12,12 @@ from typing import Optional
 
 from docx import Document
 
-from .tr_template import TRTemplateSlots, split_paragraphs_on_double_newline
+from .tr_template import (
+    TRTemplateSlots,
+    prepend_processo_line_when_filled,
+    slots_numero_processo_display,
+    split_paragraphs_on_double_newline,
+)
 
 
 TEMPLATE_OFICIO_PATH_DEFAULT = (
@@ -138,8 +143,15 @@ def render_oficio_from_slots(
         raise FileNotFoundError(f"Template OFICIO não encontrado: {tpl_path}")
 
     doc = Document(str(tpl_path))
+    prepend_processo_line_when_filled(doc, slots)
+
+    num_proc = slots_numero_processo_display(slots)
 
     mapping = {
+        "(NUMERO_PROCESSO)": num_proc,
+        "( NUMERO_PROCESSO )": num_proc,
+        "(NUMERO PROCESSO)": num_proc,
+        "( NUMERO PROCESSO )": num_proc,
         "(AO_SENHOR_GENERO)": slots.ao_senhor_genero or "",
         "( AO_SENHOR_GENERO )": slots.ao_senhor_genero or "",
         "(SENHOR_SENHORA_GENERO)": slots.senhor_senhora_genero or "",

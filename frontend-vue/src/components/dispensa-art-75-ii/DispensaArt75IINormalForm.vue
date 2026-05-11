@@ -262,6 +262,7 @@ import {
   DATA_OPTIONS,
   EMPTY_ITEM,
   PLACEHOLDER_DOTACAO,
+  TEXTO_PADRAO_ENDERECO_PROPOSTAS,
   calcularValorTotalEstimado,
   campoPreenchido,
   formatarData,
@@ -323,6 +324,8 @@ const SLOT_PACKAGE_BY_ROUTE = {
   DispensaArt75IIServicos: 'dispensa_75_ii_servicos',
   DispensaArt75IIComprasServicosInclusos: 'dispensa_75_ii_compras_servicos_inclusos',
 };
+/** Mesmo componente em várias rotas — ao mudar de modalidade, não manter rascunho da página anterior. */
+const DISPENSA_ART75_II_NORMAL_SHARED_ROUTES = new Set(Object.keys(SLOT_PACKAGE_BY_ROUTE));
 const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[String(route.name || '')] || 'tr_dfd_generico');
 
 /** Exemplos por modalidade (dispensa normal — objeto / setor / características). */
@@ -391,7 +394,7 @@ function sanitizeOrgaoValue() {
   if (!allowed.has(current)) orgao.value = '';
 }
 
-onMounted(async () => {
+async function reloadPresetCabecalhosOrgao() {
   await dadosFixos.loadUserGlobalPreset();
   await dadosFixos.loadSlotCatalogSuggestions();
   sanitizeOrgaoValue();
@@ -403,7 +406,72 @@ onMounted(async () => {
   } finally {
     cabecalhosLoading.value = false;
   }
+}
+
+async function resetFormStateForNewRoute() {
+  revokeDocumentUrls();
+  drawerAberto.value = false;
+  cabecalho.value = '';
+  processoAtivo.value = false;
+  processo.value = '';
+  orgao.value = '';
+  objetoContratado.value = '';
+  objetoSetor.value = '';
+  objetoCaracteristicas.value = '';
+  objetoGerado.value = '';
+  justificativa.value = '';
+  itens.value = [{ ...EMPTY_ITEM }];
+  dotacaoAtiva.value = false;
+  dotacao.value = '';
+  modoData.value = '';
+  dataManual.value = '';
+  isGerandoClausulas.value = false;
+  erroGeracaoClausulas.value = '';
+  isSubmitting.value = false;
+  generateError.value = '';
+  successMessage.value = '';
+  documentReady.value = false;
+  documentTrFilename.value = 'termo_referencia.docx';
+  documentDfdFilename.value = 'dfd.docx';
+  documentOficioFilename.value = 'oficio.docx';
+  documentZipFilename.value = 'tr_dfd_oficio.zip';
+  dadosFixos.selectedOrgaoProfileId = '';
+  dadosFixos.orgaoProfileName = '';
+  dadosFixos.fixoTratNome = '';
+  dadosFixos.fixoNome = '';
+  dadosFixos.fixoTratCargo = '';
+  dadosFixos.fixoCargo = '';
+  dadosFixos.fixoResponsavel = '';
+  dadosFixos.fixoResponsavelCargo = '';
+  dadosFixos.fixoSetor = '';
+  dadosFixos.fixoDemanda = '';
+  dadosFixos.fixoEmail = '';
+  dadosFixos.fixoGestor = '';
+  dadosFixos.fixoFiscal = '';
+  dadosFixos.fixoAssinatura = '';
+  dadosFixos.fixoAssinaturaCargo = '';
+  dadosFixos.fixoEnderecoEntrega = TEXTO_PADRAO_ENDERECO_PROPOSTAS;
+  dadosFixos.fixoEmailPropostas = '';
+  dadosFixos.fixoTrResponsavelNome = '';
+  dadosFixos.fixoTrResponsavelCargo = '';
+  await reloadPresetCabecalhosOrgao();
+}
+
+onMounted(async () => {
+  await reloadPresetCabecalhosOrgao();
 });
+
+watch(
+  () => route.name,
+  async (name, prev) => {
+    if (prev === undefined) return;
+    const n = String(name || '');
+    const p = String(prev || '');
+    if (n === p) return;
+    if (!DISPENSA_ART75_II_NORMAL_SHARED_ROUTES.has(n) || !DISPENSA_ART75_II_NORMAL_SHARED_ROUTES.has(p)) return;
+    await resetFormStateForNewRoute();
+  },
+);
 
 watch(dotacaoAtiva, (v) => {
   if (!v) dotacao.value = '';

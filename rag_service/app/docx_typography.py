@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Iterator
 
 from docx.document import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 from docx.shared import RGBColor
@@ -69,6 +70,53 @@ def _apply_font_to_header_footer_part(part) -> None:
                 set_run_standard_body_font(run)
     except Exception:
         pass
+
+
+def _justify_paragraphs_in_container(container, *, justify_heading_styles: bool) -> None:
+    """Justifica parágrafos alinhados à esquerda (ou sem alinhamento explícito); preserva centro/direita."""
+    if container is None:
+        return
+    try:
+        for p in _iter_paragraphs_deep(container):
+            if not justify_heading_styles:
+                try:
+                    sn = (p.style and p.style.name) or ""
+                    if sn.startswith("Heading"):
+                        continue
+                except Exception:
+                    pass
+            al = p.alignment
+            if al in (None, WD_ALIGN_PARAGRAPH.LEFT):
+                p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    except Exception:
+        pass
+
+
+def apply_default_justify_to_document(doc: Document, *, justify_heading_styles: bool = False) -> None:
+    """
+    Alinha em justificado o texto corrido (blocos que estavam à esquerda).
+    Mantém CENTRO e DIREITA (títulos, algumas células de tabela).
+    Por omissão não altera estilos «Heading N» (títulos gerados por add_heading no JSON→DOCX).
+    """
+    _justify_paragraphs_in_container(doc, justify_heading_styles=justify_heading_styles)
+    for section in doc.sections:
+        _justify_paragraphs_in_container(section.header, justify_heading_styles=justify_heading_styles)
+        _justify_paragraphs_in_container(section.footer, justify_heading_styles=justify_heading_styles)
+        try:
+            if section.different_first_page_header_footer:
+                _justify_paragraphs_in_container(
+                    section.first_page_header, justify_heading_styles=justify_heading_styles
+                )
+                _justify_paragraphs_in_container(
+                    section.first_page_footer, justify_heading_styles=justify_heading_styles
+                )
+        except Exception:
+            pass
+        try:
+            _justify_paragraphs_in_container(section.even_page_header, justify_heading_styles=justify_heading_styles)
+            _justify_paragraphs_in_container(section.even_page_footer, justify_heading_styles=justify_heading_styles)
+        except Exception:
+            pass
 
 
 def apply_standard_body_font_to_document(doc: Document) -> None:

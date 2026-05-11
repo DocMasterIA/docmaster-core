@@ -26,6 +26,7 @@ from docx.oxml import OxmlElement
 from .docx_typography import (
     STANDARD_BODY_FONT,
     STANDARD_FONT_COLOR,
+    apply_default_justify_to_document,
     apply_standard_body_font_to_document,
 )
 
@@ -181,6 +182,7 @@ def json_to_docx(
         _render_section(doc, node, section_texts, table_data, level=0)
 
     apply_standard_body_font_to_document(doc)
+    apply_default_justify_to_document(doc)
 
     if output_path is None:
         fd, output_path = tempfile.mkstemp(suffix=".docx")

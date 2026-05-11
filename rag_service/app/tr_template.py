@@ -24,7 +24,7 @@ from docx.oxml.ns import qn
 from docx.table import Table as DocxTable
 from docx.text.paragraph import Paragraph
 
-from .docx_typography import apply_standard_body_font_to_document
+from .docx_typography import apply_default_justify_to_document, apply_standard_body_font_to_document
 
 TR_ITEMS_TABLE_ANCHOR = "(TR_TABELA_ITENS)"
 
@@ -1105,6 +1105,7 @@ def render_tr_from_slots(
     _fill_items_table(doc, slots.itens)
 
     apply_standard_body_font_to_document(doc)
+    apply_default_justify_to_document(doc)
 
     out_path = Path(output_path) if output_path else None
     if out_path is None:

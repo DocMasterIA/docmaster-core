@@ -15,7 +15,7 @@ from typing import Optional
 
 from docx import Document
 
-from .docx_typography import apply_standard_body_font_to_document
+from .docx_typography import apply_default_justify_to_document, apply_standard_body_font_to_document
 from .tr_template import (
     TRTemplateSlots,
     numero_processo_valor_placeholder_tr,
@@ -299,6 +299,7 @@ def render_dfd_from_tr_slots(
         _remove_processo_visual_block_when_empty(doc)
 
     apply_standard_body_font_to_document(doc)
+    apply_default_justify_to_document(doc)
 
     out_path = Path(output_path) if output_path else None
     if out_path is None:

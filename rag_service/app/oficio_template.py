@@ -12,7 +12,7 @@ from typing import Optional
 
 from docx import Document
 
-from .docx_typography import apply_standard_body_font_to_document
+from .docx_typography import apply_default_justify_to_document, apply_standard_body_font_to_document
 
 from .tr_template import (
     TRTemplateSlots,
@@ -177,6 +177,7 @@ def render_oficio_from_slots(
     split_paragraphs_on_double_newline(doc)
 
     apply_standard_body_font_to_document(doc)
+    apply_default_justify_to_document(doc)
 
     out_path = Path(output_path) if output_path else None
     if out_path is None:

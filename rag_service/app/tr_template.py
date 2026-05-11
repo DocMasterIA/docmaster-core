@@ -46,6 +46,14 @@ def slots_numero_processo_display(slots: TRTemplateSlots) -> str:
     )
 
 
+def numero_processo_valor_placeholder_tr(raw: str) -> str:
+    """Substituição de `( NUMERO_PROCESSO )` no modelo: «PROCESSO: <número>» ou vazio."""
+    s = str(raw or "").strip()
+    if not s:
+        return ""
+    return f"PROCESSO: {s}"
+
+
 def _parse_br_money_to_float(value: Any) -> Optional[float]:
     """Interpreta valor monetário BR (R$, milhar com ponto, decimal com vírgula). None se vazio ou inválido."""
     raw = str(value or "").strip()
@@ -997,6 +1005,7 @@ def render_tr_from_slots(
         problema_text = f"{problema_text}\n"
 
     num_proc_display = slots_numero_processo_display(slots)
+    num_proc_tr_placeholder = numero_processo_valor_placeholder_tr(num_proc_display)
 
     mapping = {
         # Placeholders padronizados (preferenciais)
@@ -1027,10 +1036,10 @@ def render_tr_from_slots(
         "(TR_DATA_TERMO)": slots.data_termo or "",
         "(TR_NOME_ASSINANTE_TERMO)": slots.nome_assinante_termo or "",
         "(TR_CARGO_ASSINANTE_TERMO)": slots.cargo_assinante_termo or "",
-        "(NUMERO_PROCESSO)": num_proc_display,
-        "( NUMERO_PROCESSO )": num_proc_display,
-        "(NUMERO PROCESSO)": num_proc_display,
-        "( NUMERO PROCESSO )": num_proc_display,
+        "(NUMERO_PROCESSO)": num_proc_tr_placeholder,
+        "( NUMERO_PROCESSO )": num_proc_tr_placeholder,
+        "(NUMERO PROCESSO)": num_proc_tr_placeholder,
+        "( NUMERO PROCESSO )": num_proc_tr_placeholder,
         "(MARCA)": slots.marca or "",
         "( MARCA )": slots.marca or "",
         "(MODELO)": slots.modelo or "",

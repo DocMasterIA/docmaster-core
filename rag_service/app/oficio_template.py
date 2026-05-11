@@ -16,6 +16,7 @@ from .docx_typography import apply_standard_body_font_to_document
 
 from .tr_template import (
     TRTemplateSlots,
+    numero_processo_valor_placeholder_tr,
     slots_numero_processo_display,
     split_paragraphs_on_double_newline,
 )
@@ -146,12 +147,13 @@ def render_oficio_from_slots(
     doc = Document(str(tpl_path))
 
     num_proc = slots_numero_processo_display(slots)
+    num_proc_tr_placeholder = numero_processo_valor_placeholder_tr(num_proc)
 
     mapping = {
-        "(NUMERO_PROCESSO)": num_proc,
-        "( NUMERO_PROCESSO )": num_proc,
-        "(NUMERO PROCESSO)": num_proc,
-        "( NUMERO PROCESSO )": num_proc,
+        "(NUMERO_PROCESSO)": num_proc_tr_placeholder,
+        "( NUMERO_PROCESSO )": num_proc_tr_placeholder,
+        "(NUMERO PROCESSO)": num_proc_tr_placeholder,
+        "( NUMERO PROCESSO )": num_proc_tr_placeholder,
         "(AO_SENHOR_GENERO)": slots.ao_senhor_genero or "",
         "( AO_SENHOR_GENERO )": slots.ao_senhor_genero or "",
         "(SENHOR_SENHORA_GENERO)": slots.senhor_senhora_genero or "",

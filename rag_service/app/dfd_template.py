@@ -18,6 +18,7 @@ from docx import Document
 from .docx_typography import apply_standard_body_font_to_document
 from .tr_template import (
     TRTemplateSlots,
+    numero_processo_valor_placeholder_tr,
     slots_numero_processo_display,
     split_paragraphs_on_double_newline,
 )
@@ -236,6 +237,7 @@ def render_dfd_from_tr_slots(
     dfd_obj = (slots.dfd_objeto_referencia or slots.objeto or "").strip()
     dfd_just = (slots.dfd_justificativa or slots.justificativa or "").strip()
     num_proc = _dfd_numero_processo_display(slots)
+    num_proc_tr_style = numero_processo_valor_placeholder_tr(num_proc)
     mapping = {
         # Placeholders padronizados (preferenciais)
         "(DFD_OBJETO_REFERENCIA)": dfd_obj,
@@ -243,6 +245,10 @@ def render_dfd_from_tr_slots(
         "(DFD_CIDADE)": slots.cidade or "",
         "(DFD_SETOR_REQUISITANTE)": slots.dfd_setor_requisitante or "",
         "(DFD_NUMERO_PROCESSO)": num_proc,
+        "(NUMERO_PROCESSO)": num_proc_tr_style,
+        "( NUMERO_PROCESSO )": num_proc_tr_style,
+        "(NUMERO PROCESSO)": num_proc_tr_style,
+        "( NUMERO PROCESSO )": num_proc_tr_style,
         "(DFD_RESPONSAVEL_DEMANDA)": slots.dfd_responsavel_demanda or "",
         "(DFD_EMAIL)": slots.dfd_email or "",
         "(DFD_GESTOR_CONTRATOS)": slots.dfd_gestor_contratos or "",
@@ -256,7 +262,6 @@ def render_dfd_from_tr_slots(
         "(CIDADE)": slots.cidade or "",
         # Placeholders novos de identificação/assinatura do DFD
         "(SETOR REQUISITANTE)": slots.dfd_setor_requisitante or "",
-        "(NUMERO PROCESSO)": num_proc,
         "(RESPONSAVEL DEMANDA)": slots.dfd_responsavel_demanda or "",
         "(EMAIL DFD)": slots.dfd_email or "",
         "(GESTORA CONTRATOS)": slots.dfd_gestor_contratos or "",

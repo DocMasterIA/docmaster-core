@@ -420,7 +420,8 @@ def _merge_user_context_into_tr_slots(
     Mescla contexto do usuário (Django) em slots_override.
 
     Regras:
-    - fiscal.nome = usuario.nome_completo quando não informado em slots_override.
+    - fiscal.nome = dfd_fiscal_contratos (drawer 2.5) quando o override trouxer só o DFD;
+    - fiscal.nome = usuario.nome_completo quando ainda não houver nome em slots_override.
     - SECRETARIA DO USUARIO, Nome do USUARIO, CIDADE - ESTADO e CIDADE
       são preenchidos diretamente do backend (sem inferência da IA).
     """
@@ -433,10 +434,15 @@ def _merge_user_context_into_tr_slots(
 
     slots = dict(slots_override) if slots_override else {}
 
-    # Fiscal.nome: se não vier no override, usa nome do usuário logado
+    # Fiscal do TR: mesma pessoa que «Fiscal de contratos» no DFD (drawer), quando só vier em dfd_fiscal_contratos.
     fiscal = (slots.get("fiscal") or {}) if isinstance(slots.get("fiscal"), dict) else {}
+    dfd_fiscal = str(slots.get("dfd_fiscal_contratos") or "").strip()
+    if dfd_fiscal and not str(fiscal.get("nome") or "").strip():
+        fiscal = {**fiscal, "nome": dfd_fiscal}
+        slots["fiscal"] = fiscal
+
     nome_completo = (usuario.get("nome_completo") or "").strip()
-    if nome_completo and not fiscal.get("nome"):
+    if nome_completo and not str(fiscal.get("nome") or "").strip():
         fiscal = {**fiscal, "nome": nome_completo}
         slots["fiscal"] = fiscal
 

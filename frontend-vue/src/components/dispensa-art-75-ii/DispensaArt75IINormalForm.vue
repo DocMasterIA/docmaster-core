@@ -658,7 +658,11 @@ function buildSlotsOverride() {
   if (String(dadosFixos.fixoDemanda || '').trim()) o.dfd_responsavel_demanda = String(dadosFixos.fixoDemanda).trim();
   if (String(dadosFixos.fixoEmail || '').trim()) o.dfd_email = String(dadosFixos.fixoEmail).trim();
   if (String(dadosFixos.fixoGestor || '').trim()) o.dfd_gestor_contratos = String(dadosFixos.fixoGestor).trim();
-  if (String(dadosFixos.fixoFiscal || '').trim()) o.dfd_fiscal_contratos = String(dadosFixos.fixoFiscal).trim();
+  if (String(dadosFixos.fixoFiscal || '').trim()) {
+    const fn = String(dadosFixos.fixoFiscal).trim();
+    o.dfd_fiscal_contratos = fn;
+    o.fiscal = { nome: fn };
+  }
   if (String(dadosFixos.fixoAssinatura || '').trim()) o.dfd_assinatura_nome = String(dadosFixos.fixoAssinatura).trim();
   if (String(dadosFixos.fixoAssinaturaCargo || '').trim()) o.dfd_assinatura_cargo = String(dadosFixos.fixoAssinaturaCargo).trim();
   if (processoAtivo.value && String(processo.value || '').trim()) {

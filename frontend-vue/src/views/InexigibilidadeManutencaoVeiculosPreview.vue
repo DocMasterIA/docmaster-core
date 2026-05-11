@@ -1230,7 +1230,7 @@ function buildInexig74ManutencaoDfdObjetoReferencia() {
     paragrafos.push(`O tipo de manutenção previsto é ${tipo}.`);
   }
   if (orgVeic) {
-    paragrafos.push(`A unidade de lotação ou uso do veículo é ${orgVeic}.`);
+    paragrafos.push(`Para fins de lotação ou uso, o órgão ou unidade do veículo é ${orgVeic}.`);
   }
   return paragrafos.join('\n\n');
 }
@@ -1240,9 +1240,7 @@ function buildInexig74ManutencaoDfdJustificativa() {
   const m = String(marca.value || '').trim();
   const mod = String(modelo.value || '').trim();
   const pl = String(placa.value || '').trim();
-  const orgVeic = String(orgaoUnidadeVeiculo.value || '').trim();
   const tipo = String(tipoManutencao.value || '').trim();
-  const rk = String(revisaoKm.value || '').trim();
   const forn = String(fornecedor.value || '').trim();
   const cnpjStr = String(cnpj.value || '').trim();
   const identVeiculo = [m, mod, pl].filter(Boolean).join(' / ') || 'veículo indicado nos dados da demanda';
@@ -1260,13 +1258,6 @@ function buildInexig74ManutencaoDfdJustificativa() {
     'A presente demanda insere-se no âmbito da contratação direta por inexigibilidade de licitação, nos termos do art. 74, inciso I, da Lei nº 14.133/2021, ante a necessidade de aquisição de peças, componentes ou serviços técnicos de natureza singular, com fornecedor exclusivo.',
     `O objeto da referência é ${artObjetoRef} ${natureza} do veículo (${identVeiculo}), com vistas a preservar a disponibilidade, a segurança e a economicidade da frota vinculada ao serviço público.`,
   ];
-  if (orgVeic) {
-    partes.push(`Informa-se, para fins de lotação ou uso do veículo, o órgão ou unidade ${orgVeic}.`);
-  }
-  if (tipo === 'Preventiva' && rk) {
-    const km = formatarTrechoQuilometragemRevisao(rk);
-    partes.push(`Na modalidade preventiva, adota-se como referência operacional o intervalo de ${km}.`);
-  }
   if (forn) {
     partes.push(
       `O fornecedor exclusivo indicado é ${forn}${cnpjStr ? ` (CNPJ ${cnpjStr})` : ''}, nos limites do artigo e da fundamentação do termo de referência.`,

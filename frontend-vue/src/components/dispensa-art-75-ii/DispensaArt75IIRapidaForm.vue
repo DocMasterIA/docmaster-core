@@ -592,7 +592,19 @@ async function onSubmit() {
   }
   isSubmitting.value = true;
   try {
-    await preencherObjetoEJustificativaInterno();
+    try {
+      await preencherObjetoEJustificativaInterno();
+    } catch (e) {
+      const fillUrl = `${API_BASE}/api/documentos/fill-tr-slots`;
+      const m = String(e?.message || '');
+      const looksNet =
+        e?.name === 'TypeError' || /failed to fetch|load failed|networkerror|err_failed/i.test(m);
+      generateError.value = looksNet
+        ? describeApiFetchNetworkFailure(fillUrl, 'fill-tr-slots')
+        : m || 'Erro ao pedir objeto e justificativa (fill-tr-slots).';
+      return;
+    }
+
     const payload = {
       user_prompt: buildUserPrompt(),
       slots_override: buildSlotsOverride(),
@@ -628,11 +640,7 @@ async function onSubmit() {
     successMessage.value = 'Documentos gerados com sucesso.';
     await dadosFixos.saveUserGlobalPreset();
   } catch (e) {
-    const m = String(e?.message || '');
-    const fillUrl = `${API_BASE}/api/documentos/fill-tr-slots`;
-    const looksNet =
-      e?.name === 'TypeError' || /failed to fetch|load failed|networkerror|err_failed/i.test(m);
-    generateError.value = looksNet ? describeApiFetchNetworkFailure(fillUrl, 'fill-tr-slots') : m || 'Erro ao gerar documento';
+    generateError.value = e?.message || 'Erro ao gerar documento';
   } finally {
     isSubmitting.value = false;
   }

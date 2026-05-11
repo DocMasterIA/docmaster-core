@@ -84,7 +84,7 @@
               <div class="ixp-body">
                 <div class="ixp-field">
                   <label>Selecione o objeto específico da contratação</label>
-                  <select v-model="objetoEspecifico">
+                  <select v-model="objetoEspecifico" class="da75-select">
                     <option value="">Selecione</option>
                     <option v-for="op in objetoEspecificoOptions" :key="op" :value="op">{{ op }}</option>
                   </select>
@@ -230,7 +230,7 @@
               <div class="ixp-body ixp-grid-2">
                 <div class="ixp-field">
                   <label>Modo da data</label>
-                  <select v-model="modoData">
+                  <select v-model="modoData" class="da75-select">
                     <option value="">Selecione</option>
                     <option v-for="op in dataOptions" :key="op" :value="op">{{ op }}</option>
                   </select>
@@ -343,7 +343,11 @@
           <div class="ixp-body">
             <div class="ixp-field">
               <label>Órgão cadastrado</label>
-              <select :value="selectedOrgaoProfileId" @change="loadOrgaoProfile(($event.target).value)">
+              <select
+                :value="selectedOrgaoProfileId"
+                class="da75-select da75-select--sm"
+                @change="loadOrgaoProfile(($event.target).value)"
+              >
                 <option value="">Selecione um cadastro salvo</option>
                 <option v-for="p in orgaoProfiles" :key="`org-${p.id}`" :value="p.id">{{ p.name }}</option>
               </select>
@@ -368,7 +372,13 @@
           <h3>1. Solicitação / ofício</h3>
           <div class="ixp-body">
             <div class="ixp-grid-3">
-              <div class="ixp-field"><label>Tratamento</label><select v-model="fixoTratNome"><option value="">Selecione</option><option v-for="op in tratamentoNome" :key="op" :value="op">{{ op }}</option></select></div>
+              <div class="ixp-field">
+                <label>Tratamento</label>
+                <select v-model="fixoTratNome" class="da75-select da75-select--sm">
+                  <option value="">Selecione</option>
+                  <option v-for="op in tratamentoNome" :key="op" :value="op">{{ op }}</option>
+                </select>
+              </div>
               <div class="ixp-field ixp-col-2">
                 <label>1.1 A quem é direcionada a solicitação — nome</label>
                 <input
@@ -380,7 +390,13 @@
               </div>
             </div>
             <div class="ixp-grid-3">
-              <div class="ixp-field"><label>Tratamento</label><select v-model="fixoTratCargo"><option value="">Selecione</option><option v-for="op in tratamentoCargo" :key="op" :value="op">{{ op }}</option></select></div>
+              <div class="ixp-field">
+                <label>Tratamento</label>
+                <select v-model="fixoTratCargo" class="da75-select da75-select--sm">
+                  <option value="">Selecione</option>
+                  <option v-for="op in tratamentoCargo" :key="op" :value="op">{{ op }}</option>
+                </select>
+              </div>
               <div class="ixp-field ixp-col-2">
                 <label>1.2 A quem é direcionada a solicitação — função / cargo</label>
                 <input
@@ -1924,8 +1940,10 @@ const podeGerarDocumentos = computed(() => {
 .ixp-grid-item { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 44px; gap: 10px; }
 .ixp-field { display: grid; gap: 4px; }
 .ixp-field label { font-size: 12px; color: #475569; font-weight: 500; }
-.ixp-field input, .ixp-field textarea, .ixp-field select { width: 100%; border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px 11px; font-size: 14px; color: #1e293b; outline: none; }
-.ixp-field input:focus, .ixp-field textarea:focus, .ixp-field select:focus { border-color: #38bdf8; }
+.ixp-field input, .ixp-field textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px 11px; font-size: 14px; color: #1e293b; outline: none; }
+.ixp-field select:not(.da75-select) { width: 100%; border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px 11px; font-size: 14px; color: #1e293b; outline: none; }
+.ixp-field input:focus, .ixp-field textarea:focus { border-color: #38bdf8; }
+.ixp-field select:not(.da75-select):focus { border-color: #38bdf8; }
 .ixp-check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #334155; }
 .ixp-choice { border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; padding: 12px; text-align: left; }
 .ixp-choice strong { display: block; font-size: 14px; color: #1e293b; }
@@ -1969,12 +1987,12 @@ const podeGerarDocumentos = computed(() => {
 .dm-dark-theme .ixp-main-title h2, .dm-dark-theme .ixp-main-title p, .dm-dark-theme .ixp-card h3, .dm-dark-theme .ixp-choice strong { color: #e2e8f0; }
 .dm-dark .ixp-main-title small, .dm-dark .ixp-field label, .dm-dark .ixp-check, .dm-dark .ixp-item-head span, .dm-dark .ixp-choice span, .dm-dark .ixp-drawer-head small,
 .dm-dark-theme .ixp-main-title small, .dm-dark-theme .ixp-field label, .dm-dark-theme .ixp-check, .dm-dark-theme .ixp-item-head span, .dm-dark-theme .ixp-choice span, .dm-dark-theme .ixp-drawer-head small { color: #94a3b8; }
-.dm-dark .ixp-field input, .dm-dark .ixp-field textarea, .dm-dark .ixp-field select, .dm-dark .ixp-btn-secondary, .dm-dark .ixp-choice,
-.dm-dark-theme .ixp-field input, .dm-dark-theme .ixp-field textarea, .dm-dark-theme .ixp-field select, .dm-dark-theme .ixp-btn-secondary, .dm-dark-theme .ixp-choice { background: #0b1222; border-color: #334155; color: #e2e8f0; }
+.dm-dark .ixp-field input, .dm-dark .ixp-field textarea, .dm-dark .ixp-field select:not(.da75-select), .dm-dark .ixp-btn-secondary, .dm-dark .ixp-choice,
+.dm-dark-theme .ixp-field input, .dm-dark-theme .ixp-field textarea, .dm-dark-theme .ixp-field select:not(.da75-select), .dm-dark-theme .ixp-btn-secondary, .dm-dark-theme .ixp-choice { background: #0b1222; border-color: #334155; color: #e2e8f0; }
 .dm-dark .ixp-field input::placeholder, .dm-dark .ixp-field textarea::placeholder,
 .dm-dark-theme .ixp-field input::placeholder, .dm-dark-theme .ixp-field textarea::placeholder { color: #64748b; }
-.dm-dark .ixp-field input:focus, .dm-dark .ixp-field textarea:focus, .dm-dark .ixp-field select:focus,
-.dm-dark-theme .ixp-field input:focus, .dm-dark-theme .ixp-field textarea:focus, .dm-dark-theme .ixp-field select:focus { border-color: #0ea5e9; }
+.dm-dark .ixp-field input:focus, .dm-dark .ixp-field textarea:focus, .dm-dark .ixp-field select:not(.da75-select):focus,
+.dm-dark-theme .ixp-field input:focus, .dm-dark-theme .ixp-field textarea:focus, .dm-dark-theme .ixp-field select:not(.da75-select):focus { border-color: #0ea5e9; }
 .dm-dark .ixp-btn-secondary,
 .dm-dark-theme .ixp-btn-secondary { color: #cbd5e1; }
 .dm-dark .ixp-orgao-btn-save,

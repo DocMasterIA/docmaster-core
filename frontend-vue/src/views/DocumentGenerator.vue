@@ -273,7 +273,7 @@
                   v-else-if="field.input === 'select'"
                   :id="'drawer-slot-' + field.id"
                   v-model="slotForm[field.id]"
-                  class="gov-input doc-gen__slot-input"
+                  class="da75-select da75-select--sm doc-gen__slot-input"
                 >
                   <option value="">Selecione</option>
                   <option v-for="opt in field.options || []" :key="'drawer-select-' + field.id + '-' + opt" :value="opt">
@@ -529,6 +529,7 @@ import {
   formatMoedaBRLInput,
   sanitizeQuantidadeInput,
 } from '@/utils/itemValorCampos.js';
+import '@/components/dispensa-art-75-ii/dispensaArt75ii.css';
 
 // Em dev: '' → proxy Vite `/api`
 const API_BASE = getApiBase();
@@ -2260,6 +2261,14 @@ function goToPage() {
   font-size: 12px;
   padding: 6px 8px;
   min-width: 0;
+}
+.doc-gen__slot-field select.da75-select.doc-gen__slot-input.da75-select--sm {
+  margin-top: 0;
+  font-size: 12px;
+  padding: 6px 1.85rem 6px 8px;
+  border-radius: 0.5rem;
+  background-position: right 0.45rem center;
+  background-size: 0.85rem 0.85rem;
 }
 .doc-gen__required {
   color: #c62828;

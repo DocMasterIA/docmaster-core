@@ -48,7 +48,7 @@
               <div class="fe-body">
                 <div class="fe-field">
                   <label>Selecione o objeto específico da contratação</label>
-                  <select v-model="objetoEspecifico">
+                  <select v-model="objetoEspecifico" class="da75-select">
                     <option value="">Selecione</option>
                     <option v-for="o in objetoOptions" :key="o" :value="o">{{ o }}</option>
                   </select>
@@ -173,7 +173,7 @@
               <div class="fe-body fe-grid-2">
                 <div class="fe-field">
                   <label>Modo da data</label>
-                  <select v-model="modoData">
+                  <select v-model="modoData" class="da75-select">
                     <option value="">Selecione</option>
                     <option v-for="o in dataOptions" :key="o" :value="o">{{ o }}</option>
                   </select>
@@ -242,7 +242,11 @@
           <div class="fe-body">
             <div class="fe-field">
               <label>Órgão cadastrado</label>
-              <select :value="selectedOrgaoProfileId" @change="loadOrgaoProfile(($event.target).value)">
+              <select
+                :value="selectedOrgaoProfileId"
+                class="da75-select da75-select--sm"
+                @change="loadOrgaoProfile(($event.target).value)"
+              >
                 <option value="">Selecione um cadastro salvo</option>
                 <option v-for="p in orgaoProfiles" :key="`org-${p.id}`" :value="p.id">{{ p.name }}</option>
               </select>
@@ -269,7 +273,10 @@
             <div class="fe-grid-3">
               <div class="fe-field">
                 <label>Tratamento</label>
-                <select v-model="tratNome"><option value="">Selecione</option><option v-for="o in tratamentoNome" :key="o" :value="o">{{ o }}</option></select>
+                <select v-model="tratNome" class="da75-select da75-select--sm">
+                  <option value="">Selecione</option>
+                  <option v-for="o in tratamentoNome" :key="o" :value="o">{{ o }}</option>
+                </select>
               </div>
               <div class="fe-field fe-col-2">
                 <label>1.1 A quem é direcionada a solicitação — Nome</label>
@@ -283,7 +290,10 @@
             <div class="fe-grid-3">
               <div class="fe-field">
                 <label>Tratamento</label>
-                <select v-model="tratCargo"><option value="">Selecione</option><option v-for="o in tratamentoCargo" :key="o" :value="o">{{ o }}</option></select>
+                <select v-model="tratCargo" class="da75-select da75-select--sm">
+                  <option value="">Selecione</option>
+                  <option v-for="o in tratamentoCargo" :key="o" :value="o">{{ o }}</option>
+                </select>
               </div>
               <div class="fe-field fe-col-2">
                 <label>1.2 A quem é direcionada a solicitação — Função/Cargo</label>
@@ -1192,7 +1202,8 @@ const podeGerarDocumentos = computed(() => secoes.value.every((s) => s.completo)
 .fe-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
 .fe-grid-item { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; align-items: end; }
 .fe-field label { font-size: 12px; color: #475569; display: block; margin-bottom: 3px; }
-.fe-field input, .fe-field select, .fe-field textarea { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; }
+.fe-field input, .fe-field textarea { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px 11px; font-size: 14px; color: #1e293b; }
+.fe-field select:not(.da75-select) { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px 11px; font-size: 14px; color: #1e293b; }
 .fe-check { font-size: 13px; color: #334155; }
 .fe-item { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; }
 .fe-item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 12px; color: #64748b; }
@@ -1296,11 +1307,11 @@ const podeGerarDocumentos = computed(() => secoes.value.every((s) => s.completo)
 
 .dm-dark .fe-field input,
 .dm-dark .fe-field textarea,
-.dm-dark .fe-field select,
+.dm-dark .fe-field select:not(.da75-select),
 .dm-dark .fe-btn-secondary,
 .dm-dark-theme .fe-field input,
 .dm-dark-theme .fe-field textarea,
-.dm-dark-theme .fe-field select,
+.dm-dark-theme .fe-field select:not(.da75-select),
 .dm-dark-theme .fe-btn-secondary {
   background: #0b1222;
   border-color: #334155;
@@ -1314,10 +1325,10 @@ const podeGerarDocumentos = computed(() => secoes.value.every((s) => s.completo)
 
 .dm-dark .fe-field input:focus,
 .dm-dark .fe-field textarea:focus,
-.dm-dark .fe-field select:focus,
+.dm-dark .fe-field select:not(.da75-select):focus,
 .dm-dark-theme .fe-field input:focus,
 .dm-dark-theme .fe-field textarea:focus,
-.dm-dark-theme .fe-field select:focus { border-color: #0ea5e9; outline: none; }
+.dm-dark-theme .fe-field select:not(.da75-select):focus { border-color: #0ea5e9; outline: none; }
 
 .dm-dark .fe-btn-secondary,
 .dm-dark-theme .fe-btn-secondary { color: #cbd5e1; }

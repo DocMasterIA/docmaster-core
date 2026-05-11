@@ -204,11 +204,41 @@
   border-color: #38bdf8;
 }
 
+/* Select nativo alinhado ao restante da75 (seta custom — evita estilo browser antigo) */
+.da75-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  background-size: 1.1rem 1.1rem;
+  padding-right: 2.35rem;
+}
+
 .da75-select--sm,
 .da75-input--sm {
   border-radius: 0.5rem;
-  padding: 0.5rem 0.625rem;
   font-size: 0.75rem;
+}
+
+.da75-input--sm {
+  padding: 0.5rem 0.625rem;
+}
+
+.da75-select--sm {
+  padding: 0.5rem 2.1rem 0.5rem 0.625rem;
+  background-position: right 0.5rem center;
+  background-size: 0.95rem 0.95rem;
+}
+
+/* Grelhas ixp/fe: label já define ritmo — sem margem extra do bloco .da75-input */
+.ixp-field > .da75-select,
+.ixp-field > .da75-input,
+.fe-field > .da75-select,
+.fe-field > .da75-input {
+  margin-top: 0;
 }
 
 .da75-textarea {
@@ -787,6 +817,11 @@
 .dm-dark-theme .da75-select:focus,
 .dm-dark-theme .da75-textarea:focus {
   border-color: #38bdf8;
+}
+
+.dm-dark .da75-select,
+.dm-dark-theme .da75-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
 .dm-dark .da75-input::placeholder,

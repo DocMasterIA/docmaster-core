@@ -16,7 +16,11 @@
           <div class="ixp-body">
             <div class="ixp-field">
               <label>Órgão cadastrado</label>
-              <select :value="ctx.selectedOrgaoProfileId" @change="ctx.loadOrgaoProfile(($event.target).value)">
+              <select
+                :value="ctx.selectedOrgaoProfileId"
+                class="da75-select da75-select--sm"
+                @change="ctx.loadOrgaoProfile(($event.target).value)"
+              >
                 <option value="">Selecione um cadastro salvo</option>
                 <option v-for="p in (ctx.orgaoProfiles || [])" :key="`org-${p.id}`" :value="p.id">{{ p.name }}</option>
               </select>
@@ -50,7 +54,7 @@
             <div class="ixp-grid-3">
               <div class="ixp-field">
                 <label>Tratamento</label>
-                <select v-model="ctx.fixoTratNome">
+                <select v-model="ctx.fixoTratNome" class="da75-select da75-select--sm">
                   <option value="">Selecione</option>
                   <option v-for="op in ctx.tratamentoNome" :key="op" :value="op">{{ op }}</option>
                 </select>
@@ -68,7 +72,7 @@
             <div class="ixp-grid-3">
               <div class="ixp-field">
                 <label>Tratamento</label>
-                <select v-model="ctx.fixoTratCargo">
+                <select v-model="ctx.fixoTratCargo" class="da75-select da75-select--sm">
                   <option value="">Selecione</option>
                   <option v-for="op in ctx.tratamentoCargo" :key="op" :value="op">{{ op }}</option>
                 </select>
@@ -263,6 +267,7 @@ import {
   capitalizeFirstSignificantLetter as capFirst,
   capitalizeNomeTituloPt as capNome,
 } from '@/utils/itemValorCampos.js';
+import './dispensaArt75ii.css';
 
 defineProps({
   open: { type: Boolean, default: false },
@@ -378,8 +383,16 @@ defineEmits(['close', 'apply']);
   font-weight: 500;
 }
 .ixp-field input,
-.ixp-field textarea,
-.ixp-field select {
+.ixp-field textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 10px 11px;
+  font-size: 14px;
+  color: #1e293b;
+  outline: none;
+}
+.ixp-field select:not(.da75-select) {
   width: 100%;
   border: 1px solid #cbd5e1;
   border-radius: 12px;
@@ -389,8 +402,10 @@ defineEmits(['close', 'apply']);
   outline: none;
 }
 .ixp-field input:focus,
-.ixp-field textarea:focus,
-.ixp-field select:focus {
+.ixp-field textarea:focus {
+  border-color: #38bdf8;
+}
+.ixp-field select:not(.da75-select):focus {
   border-color: #38bdf8;
 }
 .ixp-inline-actions {
@@ -501,11 +516,11 @@ defineEmits(['close', 'apply']);
 }
 .dm-dark .ixp-field input,
 .dm-dark .ixp-field textarea,
-.dm-dark .ixp-field select,
+.dm-dark .ixp-field select:not(.da75-select),
 .dm-dark .ixp-btn-secondary,
 .dm-dark-theme .ixp-field input,
 .dm-dark-theme .ixp-field textarea,
-.dm-dark-theme .ixp-field select,
+.dm-dark-theme .ixp-field select:not(.da75-select),
 .dm-dark-theme .ixp-btn-secondary {
   background: #0b1222;
   border-color: #334155;
@@ -519,10 +534,10 @@ defineEmits(['close', 'apply']);
 }
 .dm-dark .ixp-field input:focus,
 .dm-dark .ixp-field textarea:focus,
-.dm-dark .ixp-field select:focus,
+.dm-dark .ixp-field select:not(.da75-select):focus,
 .dm-dark-theme .ixp-field input:focus,
 .dm-dark-theme .ixp-field textarea:focus,
-.dm-dark-theme .ixp-field select:focus {
+.dm-dark-theme .ixp-field select:not(.da75-select):focus {
   border-color: #0ea5e9;
 }
 .dm-dark .ixp-btn-secondary,

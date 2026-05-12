@@ -517,6 +517,10 @@
   margin-bottom: 0;
 }
 
+.rpp-detalhe-item__body {
+  display: block;
+}
+
 .rpp-detalhe-item__head {
   padding: 2.5mm 3mm;
   background: #f8fafc;
@@ -863,12 +867,28 @@
 
 /*
  * WeasyPrint / detalhamento por item:
- * - Não usar break-inside: avoid no .rpp-detalhe-item inteiro: com muitas fontes o bloco
- *   excede a página e o motor acaba a isolar só o cabeçalho numa folha.
- * - Cabeçalho (Item N + nome): evita quebra no meio e evita quebra *logo após* o título,
- *   puxando para a mesma página o início da lista de preços (tantos cartões quanto couberem).
- * - Cada .rpp-fonte-card tenta permanecer numa página só; quebras naturais entre cartões.
+ * - Não usar break-inside: avoid no .rpp-detalhe-item inteiro (bloco maior que a página).
+ * - .rpp-detalhe-item__body agrupa título + lista; o primeiro preço usa break-before: avoid-page
+ *   para não ficar só o título no fim da folha.
+ * - Lista em display:block no PDF (evita flex a ignorar quebras).
+ * - Cada .rpp-fonte-card: break-inside avoid para não cortar um preço ao meio.
  */
+.rpp-body.rpp--pdf .rpp-detalhe-item__body {
+  display: block;
+  break-inside: auto;
+  page-break-inside: auto;
+}
+
+/*
+ * Evitar título do item (ITEM N + nome) sozinho no fim da página sem nenhum preço:
+ * o primeiro .rpp-fonte-card não deve começar depois de quebra de página em relação ao cabeçalho.
+ * display:block na lista (em vez de flex) melhora a fragmentação no WeasyPrint.
+ */
+.rpp-body.rpp--pdf .rpp-detalhe-item__body > .rpp-fontes-cards > .rpp-fonte-card:first-child {
+  break-before: avoid-page;
+  page-break-before: avoid;
+}
+
 .rpp-body.rpp--pdf .rpp-detalhe-item {
   break-inside: auto;
   page-break-inside: auto;
@@ -885,10 +905,14 @@
   padding: 1mm;
 }
 .rpp-body.rpp--pdf .rpp-fontes-cards {
-  gap: 0.45mm;
+  display: block;
+  gap: 0;
   padding: 0.45mm;
   break-inside: auto;
   page-break-inside: auto;
+}
+.rpp-body.rpp--pdf .rpp-fontes-cards > .rpp-fonte-card:not(:last-child) {
+  margin-bottom: 0.45mm;
 }
 .rpp-body.rpp--pdf .rpp-fonte-card {
   break-inside: avoid-page;

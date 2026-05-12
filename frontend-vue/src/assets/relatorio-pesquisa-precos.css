@@ -580,6 +580,13 @@
   padding: 0.65mm 0.9mm 0.65mm 0.35mm;
 }
 
+/* Quebra preferencial no PDF entre metadados (lead) e descrição/ajuste (tail) */
+.rpp-fonte-card__lead,
+.rpp-fonte-card__tail {
+  display: block;
+  min-width: 0;
+}
+
 .rpp-fonte-stack {
   display: flex;
   flex-direction: column;
@@ -871,7 +878,8 @@
  * - .rpp-detalhe-item__body agrupa título + lista; o primeiro preço usa break-before: avoid-page
  *   para não ficar só o título no fim da folha.
  * - Lista em display:block no PDF (evita flex a ignorar quebras).
- * - Cada .rpp-fonte-card: break-inside avoid para não cortar um preço ao meio.
+ * - Cada .rpp-fonte-card pode partir entre .rpp-fonte-card__lead e __tail (evita vão
+ *   quando só descrição/ajuste não cabe); lead e tail evitam quebra interna.
  */
 .rpp-body.rpp--pdf .rpp-detalhe-item__body {
   display: block;
@@ -915,6 +923,11 @@
   margin-bottom: 0.45mm;
 }
 .rpp-body.rpp--pdf .rpp-fonte-card {
+  break-inside: auto;
+  page-break-inside: auto;
+}
+.rpp-body.rpp--pdf .rpp-fonte-card__lead,
+.rpp-body.rpp--pdf .rpp-fonte-card__tail {
   break-inside: avoid-page;
   page-break-inside: avoid;
 }
@@ -928,6 +941,7 @@
 
 /* Só cola na vertical; cartões / tabela mantêm o desenho original (.rpp-mini-compact, .rpp-processo-tbl) */
 .rpp-body.rpp--pdf .rpp-fonte-stack {
+  display: block;
   gap: 0;
 }
 

@@ -108,12 +108,27 @@ def _cnpj_digits(raw: Any) -> str:
 
 
 def _fornecedor_display_name_from_source(src: Dict[str, Any]) -> str:
-    return str(
-        src.get("fornecedor")
-        or src.get("fornecedor_nome")
-        or src.get("nome_fornecedor")
-        or ""
-    ).strip()
+    """Primeiro nome legível no topo do source (ignora CNPJ colado em «fornecedor»)."""
+    keys = (
+        "fornecedor",
+        "fornecedor_nome",
+        "nome_fornecedor",
+        "nomeRazaoSocialFornecedor",
+        "razaoSocialFornecedor",
+        "razao_social",
+    )
+    generic = {"demais", "nao informado", "não informado", "epp", "me", "mei", "outros"}
+    for k in keys:
+        v = str(src.get(k) or "").strip()
+        if not v:
+            continue
+        low = re.sub(r"\s+", " ", v).strip().lower()
+        if low in generic:
+            continue
+        if _nome_e_somente_cnpj_formatado(v):
+            continue
+        return v
+    return ""
 
 
 def _nome_e_somente_cnpj_formatado(nome: str) -> bool:

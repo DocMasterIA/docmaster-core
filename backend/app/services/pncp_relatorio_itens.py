@@ -16,6 +16,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from django.utils import timezone
 
+from backend.app.services.pncp_supplier_enrichment import _nome_e_somente_cnpj_formatado
+
 # Mínimo de cotações (fontes) por item para marcar situação como válida (IN 65 / prática comum).
 MIN_FONTES_SITUACAO_VALIDA = 3
 
@@ -237,19 +239,39 @@ def _looks_orgao_context(path: str) -> bool:
     return any(part in {"orgao", "orgaoentidade", "unidadeorgao"} for part in parts)
 
 
+_SUPPLIER_NAME_TOP_KEYS = (
+    "fornecedor",
+    "nomeRazaoSocialFornecedor",
+    "razaoSocialFornecedor",
+    "razao_social",
+    "nome_fornecedor",
+    "fornecedor_nome",
+)
+
+
+def nome_fornecedor_e_util_para_exibicao(nome: str) -> bool:
+    """Nome legível (não placeholder PNCP nem o próprio CNPJ no campo de razão social)."""
+    n = str(nome or "").strip()
+    if len(n) <= 2:
+        return False
+    low = re.sub(r"\s+", " ", n).strip().lower()
+    if low in {"demais", "nao informado", "não informado", "epp", "me", "mei", "outros"}:
+        return False
+    if _nome_e_somente_cnpj_formatado(n):
+        return False
+    return True
+
+
 def _pick_supplier_name_from_source(src: Dict[str, Any]) -> str:
-    nome = _pick_source(
-        src,
-        "fornecedor",
-        "nomeRazaoSocialFornecedor",
-        "razaoSocialFornecedor",
-        "razao_social",
-        "nome_fornecedor",
-        "fornecedor_nome",
-        default="",
-    ).strip()
-    if nome:
-        return nome
+    # Não parar no primeiro campo preenchido: «fornecedor» costuma repetir o CNPJ
+    # enquanto nomeRazaoSocialFornecedor / razaoSocial trazem a razão social.
+    for k in _SUPPLIER_NAME_TOP_KEYS:
+        v = src.get(k)
+        if v is None:
+            continue
+        s = str(v).strip()
+        if nome_fornecedor_e_util_para_exibicao(s):
+            return s
     # Busca aninhada por chaves de fornecedor, sem cair em contexto de órgão.
     for path, key, value in _iter_source_pairs(src):
         if _looks_orgao_context(path):
@@ -257,9 +279,9 @@ def _pick_supplier_name_from_source(src: Dict[str, Any]) -> str:
         k = key.lower()
         if any(t in k for t in ("fornecedor", "razaosocial", "razao_social", "nomefornecedor", "nome_fornecedor")):
             s = str(value or "").strip()
-            if s and len(s) > 2:
+            if nome_fornecedor_e_util_para_exibicao(s):
                 return s
-    return nome
+    return ""
 
 
 def _pick_supplier_cnpj_from_source(src: Dict[str, Any]) -> str:
@@ -302,7 +324,7 @@ def _build_supplier_name_index(rows: List[Any]) -> Dict[str, str]:
             continue
         cnpj = _pick_supplier_cnpj_from_source(src)
         nome = _pick_supplier_name_from_source(src)
-        if cnpj and nome:
+        if cnpj and nome and nome_fornecedor_e_util_para_exibicao(nome):
             idx[cnpj] = nome
     return idx
 

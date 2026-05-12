@@ -226,6 +226,7 @@ def _generate_relatorio_pdf_bytes(
 ) -> bytes:
     formula_id = _resolve_formula_calculo_id(cotacao.filtros or {})
     url_qr = _url_qr_acesso_cotacao_no_sistema(sessao_id)
+    # Enriquecimento PNCP/BrasilAPI: ligado por omissão; desligar com PNCP_RELATORIO_PDF_SKIP_ENRICH.
     if not settings.PNCP_RELATORIO_PDF_SKIP_ENRICH:
         try:
             enrich_missing_supplier_fields_for_cotacao(

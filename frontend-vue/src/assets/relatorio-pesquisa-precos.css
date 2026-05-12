@@ -862,16 +862,23 @@
 }
 
 /*
- * WeasyPrint: evitar que o cartão do item (cabeçalho + fontes) parta entre páginas —
- * se não couber no resto da folha, o bloco inteiro desce para a seguinte.
+ * WeasyPrint / detalhamento por item:
+ * - Não usar break-inside: avoid no .rpp-detalhe-item inteiro: com muitas fontes o bloco
+ *   excede a página e o motor acaba a isolar só o cabeçalho numa folha.
+ * - Cabeçalho (Item N + nome): evita quebra no meio e evita quebra *logo após* o título,
+ *   puxando para a mesma página o início da lista de preços (tantos cartões quanto couberem).
+ * - Cada .rpp-fonte-card tenta permanecer numa página só; quebras naturais entre cartões.
  */
 .rpp-body.rpp--pdf .rpp-detalhe-item {
-  break-inside: avoid;
-  page-break-inside: avoid;
+  break-inside: auto;
+  page-break-inside: auto;
+  overflow: visible;
 }
 .rpp-body.rpp--pdf .rpp-detalhe-item__head {
   break-inside: avoid;
   page-break-inside: avoid;
+  break-after: avoid-page;
+  page-break-after: avoid;
 }
 
 .rpp-body.rpp--pdf .rpp-detail-list {
@@ -880,6 +887,12 @@
 .rpp-body.rpp--pdf .rpp-fontes-cards {
   gap: 0.45mm;
   padding: 0.45mm;
+  break-inside: auto;
+  page-break-inside: auto;
+}
+.rpp-body.rpp--pdf .rpp-fonte-card {
+  break-inside: avoid-page;
+  page-break-inside: avoid;
 }
 .rpp-body.rpp--pdf .rpp-fonte-card__content {
   padding: 1pt 2pt 1pt 1pt;

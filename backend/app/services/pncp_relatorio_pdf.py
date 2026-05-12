@@ -211,23 +211,26 @@ def _png_bytes_for_pdf_header(raw: bytes) -> bytes:
 def _logo_png_data_url() -> str:
     """PNG do sistema em data URL para o cabeçalho do PDF (WeasyPrint).
 
-    Ordem: ``PNCP_RELATORIO_LOGO_PATH`` (settings), ``logo_branca.png`` junto a este
-    módulo (deploy), ``docmaster_logo_relatorio.png``, depois ``frontend-vue`` assets.
+    Ordem: ``PNCP_RELATORIO_LOGO_PATH`` (settings), ``frontend-vue/src/assets/fonte_de_preço.png``,
+    ``fonte_de_preço.png`` junto a este módulo (deploy), ``docmaster_logo_relatorio.png``,
+    depois ``logo_branca.png`` / ``logo_brancad.png`` (legado).
     PNGs pesados são reduzidos antes do base64.
     """
     override = (getattr(settings, "PNCP_RELATORIO_LOGO_PATH", None) or "").strip()
     paths: List[Path] = []
     if override:
         paths.append(Path(override).expanduser())
-    paths.append(_SERVICES_DIR / "logo_branca.png")
-    paths.append(_SERVICES_DIR / "docmaster_logo_relatorio.png")
     repo_assets = Path(settings.BASE_DIR).resolve().parent / "frontend-vue" / "src" / "assets"
+    paths.append(repo_assets / "fonte_de_preço.png")
+    paths.append(_SERVICES_DIR / "fonte_de_preço.png")
+    paths.append(_SERVICES_DIR / "docmaster_logo_relatorio.png")
     paths.extend(
         [
             repo_assets / "logo_branca.png",
             repo_assets / "logo_brancad.png",
         ]
     )
+    paths.append(_SERVICES_DIR / "logo_branca.png")
     for p in paths:
         try:
             if p.is_file():

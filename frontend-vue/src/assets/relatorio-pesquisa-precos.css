@@ -105,8 +105,8 @@
 }
 
 .rpp-head-main--card-white .rpp-head-main__logo {
-  height: 10mm;
-  max-width: 52mm;
+  height: 14mm;
+  max-width: 72mm;
   object-fit: contain;
   display: block;
 }
@@ -124,9 +124,9 @@
 
 .rpp-head-main__logo {
   display: block;
-  height: 9mm;
+  height: 12mm;
   width: auto;
-  max-width: 48mm;
+  max-width: 64mm;
   object-fit: contain;
 }
 

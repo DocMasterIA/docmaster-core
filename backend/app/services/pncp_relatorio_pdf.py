@@ -215,7 +215,7 @@ def _png_bytes_for_pdf_header(raw: bytes) -> bytes:
         if im.mode not in ("RGB", "RGBA"):
             im = im.convert("RGBA")
         w, h = im.size
-        max_side = 300
+        max_side = 400
         if max(w, h) <= max_side and len(raw) < 50_000:
             return raw
         ratio = max_side / max(w, h)

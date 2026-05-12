@@ -117,6 +117,26 @@ def _fornecedores_capa_from_grupos(grupos: List[Dict[str, Any]]) -> List[Dict[st
 
 _SERVICES_DIR = Path(__file__).resolve().parent
 
+
+def _repo_root_from_pdf_module() -> Optional[Path]:
+    """Raiz do monorepo (pasta que contém `backend/` e `frontend-vue/`)."""
+    try:
+        return Path(__file__).resolve().parents[3]
+    except IndexError:
+        return None
+
+
+def _dedupe_paths(paths: List[Path]) -> List[Path]:
+    seen: Set[str] = set()
+    out: List[Path] = []
+    for p in paths:
+        key = str(p)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(p)
+    return out
+
 # ---------------------------------------------------------------------------
 # Extração de CNPJ em textos / JSON de `source` dos itens
 # ---------------------------------------------------------------------------
@@ -211,33 +231,53 @@ def _png_bytes_for_pdf_header(raw: bytes) -> bytes:
 def _logo_png_data_url() -> str:
     """PNG do sistema em data URL para o cabeçalho do PDF (WeasyPrint).
 
-    Ordem: ``PNCP_RELATORIO_LOGO_PATH`` (settings), ``frontend-vue/src/assets/fonte_de_preço.png``,
-    ``fonte_de_preço.png`` junto a este módulo (deploy), ``docmaster_logo_relatorio.png``,
-    depois ``logo_branca.png`` / ``logo_brancad.png`` (legado).
-    PNGs pesados são reduzidos antes do base64.
+    Ordem (após ``PNCP_RELATORIO_LOGO_PATH`` se definido no settings):
+
+    1. ``fonte_de_preço.png`` na mesma pasta deste módulo (``backend/app/services/``) —
+       cópia versionada para deploy sem ``frontend-vue`` no disco.
+    2. ``frontend-vue/src/assets/fonte_de_preço.png`` via raiz do repo (``__file__``)
+       ou ``BASE_DIR`` (``…/backend`` ou raiz do repo).
+    3. Logos legadas / genéricas.
+
+    Se nada existir, devolve string vazia (o HTML usa texto «DocMaster»).
     """
     override = (getattr(settings, "PNCP_RELATORIO_LOGO_PATH", None) or "").strip()
-    paths: List[Path] = []
+    base = Path(getattr(settings, "BASE_DIR", "") or ".").resolve()
+
+    candidates: List[Path] = []
     if override:
-        paths.append(Path(override).expanduser())
-    repo_assets = Path(settings.BASE_DIR).resolve().parent / "frontend-vue" / "src" / "assets"
-    paths.append(repo_assets / "fonte_de_preço.png")
-    paths.append(_SERVICES_DIR / "fonte_de_preço.png")
-    paths.append(_SERVICES_DIR / "docmaster_logo_relatorio.png")
-    paths.extend(
+        candidates.append(Path(override).expanduser())
+
+    # Sempre primeiro entre os ficheiros do projeto: acompanha o backend no Docker/git.
+    candidates.append(_SERVICES_DIR / "fonte_de_preço.png")
+
+    root = _repo_root_from_pdf_module()
+    if root is not None:
+        candidates.append(root / "frontend-vue" / "src" / "assets" / "fonte_de_preço.png")
+
+    # BASE_DIR típico = …/backend → assets ao lado
+    candidates.append(base.parent / "frontend-vue" / "src" / "assets" / "fonte_de_preço.png")
+    # BASE_DIR = raiz do repositório (alguns arranques)
+    candidates.append(base / "frontend-vue" / "src" / "assets" / "fonte_de_preço.png")
+
+    candidates.append(_SERVICES_DIR / "docmaster_logo_relatorio.png")
+    candidates.extend(
         [
-            repo_assets / "logo_branca.png",
-            repo_assets / "logo_brancad.png",
+            base.parent / "frontend-vue" / "src" / "assets" / "logo_branca.png",
+            base.parent / "frontend-vue" / "src" / "assets" / "logo_brancad.png",
+            base / "frontend-vue" / "src" / "assets" / "logo_branca.png",
+            base / "frontend-vue" / "src" / "assets" / "logo_brancad.png",
         ]
     )
-    paths.append(_SERVICES_DIR / "logo_branca.png")
-    for p in paths:
+    candidates.append(_SERVICES_DIR / "logo_branca.png")
+
+    for p in _dedupe_paths(candidates):
         try:
             if p.is_file():
                 raw = _png_bytes_for_pdf_header(p.read_bytes())
                 b64 = base64.b64encode(raw).decode("ascii")
                 return f"data:image/png;base64,{b64}"
-        except OSError:
+        except Exception:
             continue
     return ""
 

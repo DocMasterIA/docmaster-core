@@ -875,26 +875,16 @@
 /*
  * WeasyPrint / detalhamento por item:
  * - Não usar break-inside: avoid no .rpp-detalhe-item inteiro (bloco maior que a página).
- * - .rpp-detalhe-item__body agrupa título + lista; o primeiro preço usa break-before: avoid-page
- *   para não ficar só o título no fim da folha.
+ * - .rpp-detalhe-item__body agrupa título + lista. O lead do cartão pode partir entre linhas
+ *   (cada .rpp-fonte-row / processo evita corte ao meio) para preencher o fim da folha.
  * - Lista em display:block no PDF (evita flex a ignorar quebras).
- * - Cada .rpp-fonte-card pode partir entre .rpp-fonte-card__lead e __tail (evita vão
- *   quando só descrição/ajuste não cabe); lead e tail evitam quebra interna.
+ * - Cada .rpp-fonte-card pode partir entre lead e tail (descrição/ajuste) e também dentro
+ *   do lead entre linhas, desde que linhas e tabela de processo permaneçam íntegras.
  */
 .rpp-body.rpp--pdf .rpp-detalhe-item__body {
   display: block;
   break-inside: auto;
   page-break-inside: auto;
-}
-
-/*
- * Evitar título do item (ITEM N + nome) sozinho no fim da página sem nenhum preço:
- * o primeiro .rpp-fonte-card não deve começar depois de quebra de página em relação ao cabeçalho.
- * display:block na lista (em vez de flex) melhora a fragmentação no WeasyPrint.
- */
-.rpp-body.rpp--pdf .rpp-detalhe-item__body > .rpp-fontes-cards > .rpp-fonte-card:first-child {
-  break-before: avoid-page;
-  page-break-before: avoid;
 }
 
 .rpp-body.rpp--pdf .rpp-detalhe-item {
@@ -905,8 +895,10 @@
 .rpp-body.rpp--pdf .rpp-detalhe-item__head {
   break-inside: avoid;
   page-break-inside: avoid;
-  break-after: avoid-page;
-  page-break-after: avoid;
+  /* auto: se só couber o título no fim da folha, o primeiro preço pode começar na página seguinte;
+     evitar avoid aqui + avoid no lead inteiro empurrava o item inteiro (vão grande). */
+  break-after: auto;
+  page-break-after: auto;
 }
 
 .rpp-body.rpp--pdf .rpp-detail-list {
@@ -926,8 +918,24 @@
   break-inside: auto;
   page-break-inside: auto;
 }
-.rpp-body.rpp--pdf .rpp-fonte-card__lead,
+/* Tail (descrição + ajuste): bloco curto, manter junto. */
 .rpp-body.rpp--pdf .rpp-fonte-card__tail {
+  break-inside: avoid-page;
+  page-break-inside: avoid;
+}
+
+/* Lead pode fragmentar entre linhas; cada linha / processo permanece íntegra. */
+.rpp-body.rpp--pdf .rpp-fonte-card__lead {
+  break-inside: auto;
+  page-break-inside: auto;
+}
+.rpp-body.rpp--pdf .rpp-fonte-card__lead .rpp-fonte-fields {
+  display: block;
+  break-inside: auto;
+  page-break-inside: auto;
+}
+.rpp-body.rpp--pdf .rpp-fonte-card__lead .rpp-fonte-row,
+.rpp-body.rpp--pdf .rpp-fonte-card__lead .rpp-fonte-processo-line {
   break-inside: avoid-page;
   page-break-inside: avoid;
 }

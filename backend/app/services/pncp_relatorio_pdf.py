@@ -30,6 +30,7 @@ from backend.app.services.pncp_relatorio_itens import (
     _formatar_moeda_br,
     agrupar_cotacoes_por_item_relatorio_pesquisa_precos,
     agrupar_itens_relatorio_pesquisa_precos,
+    nome_fornecedor_e_util_para_exibicao,
     texto_orgao_exibicao_relatorio_pesquisa_precos,
 )
 from backend.app.services.pncp_relatorio_pdf_layout import (
@@ -81,9 +82,13 @@ def _fornecedores_capa_from_grupos(grupos: List[Dict[str, Any]]) -> List[Dict[st
             if len(key) != 14:
                 continue
             cnpj_fmt = _normalize_cnpj(raw_cnpj)
+            nv = (str(f.get("fornecedor") or "").strip() or "")[:400]
             if key not in by_key:
+                capa_nome = nv if nome_fornecedor_e_util_para_exibicao(nv) else ("Não informado" if nv else "—")
+                if not nv or nv == "—":
+                    capa_nome = "—"
                 by_key[key] = {
-                    "fornecedor": (str(f.get("fornecedor") or "").strip() or "—")[:400],
+                    "fornecedor": capa_nome[:400],
                     "cnpj": cnpj_fmt,
                     "telefone": str(f.get("telefone") or "").strip()[:64],
                     "email": str(f.get("email") or "").strip()[:255],
@@ -92,9 +97,14 @@ def _fornecedores_capa_from_grupos(grupos: List[Dict[str, Any]]) -> List[Dict[st
                 order.append(key)
                 continue
             ex = by_key[key]
-            nv = (str(f.get("fornecedor") or "").strip() or "")[:400]
-            if nv and (not ex["fornecedor"] or ex["fornecedor"] in {"—", "Não informado"}):
-                ex["fornecedor"] = nv
+            if nv and nome_fornecedor_e_util_para_exibicao(nv):
+                ex_fn = ex["fornecedor"]
+                if (
+                    not ex_fn
+                    or ex_fn in {"—", "Não informado"}
+                    or not nome_fornecedor_e_util_para_exibicao(ex_fn)
+                ):
+                    ex["fornecedor"] = nv
             for fld, mx in (("telefone", 64), ("email", 255), ("endereco", 400)):
                 v2 = str(f.get(fld) or "").strip()[:mx]
                 if v2 and not ex.get(fld, ""):

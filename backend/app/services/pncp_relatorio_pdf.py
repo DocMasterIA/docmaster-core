@@ -181,9 +181,9 @@ def extrair_cnpjs_das_fontes_grupos(grupos: List[Dict[str, Any]]) -> List[str]:
             if not isinstance(f, dict):
                 continue
             raw = str(f.get("cnpj") or "").strip()
-            cnpj = _normalize_cnpj(raw)
-            if cnpj:
-                acc.add(cnpj)
+            digits = re.sub(r"\D", "", raw)
+            if len(digits) == 14:
+                acc.add(_normalize_cnpj(digits))
     return sorted(acc)
 
 

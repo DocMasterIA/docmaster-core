@@ -233,13 +233,11 @@ def _logo_png_data_url() -> str:
 
     Ordem (após ``PNCP_RELATORIO_LOGO_PATH`` se definido no settings):
 
-    1. ``fonte_de_preço.png`` na mesma pasta deste módulo (``backend/app/services/``) —
-       cópia versionada para deploy sem ``frontend-vue`` no disco.
-    2. ``frontend-vue/src/assets/fonte_de_preço.png`` via raiz do repo (``__file__``)
-       ou ``BASE_DIR`` (``…/backend`` ou raiz do repo).
+    1. ``frontend-vue/src/assets/fonte_de_preços.png`` (nome atual; lido em dev direto do repo).
+    2. ``fonte_de_preço.png`` / ``fonte_de_preços.png`` em ``backend/app/services/`` (deploy sem frontend).
     3. Logos legadas / genéricas.
 
-    Se nada existir, devolve string vazia (o HTML usa texto «DocMaster»).
+    Mantém ``fonte_de_preço.png`` (singular) nos caminhos do frontend como compatibilidade.
     """
     override = (getattr(settings, "PNCP_RELATORIO_LOGO_PATH", None) or "").strip()
     base = Path(getattr(settings, "BASE_DIR", "") or ".").resolve()
@@ -248,17 +246,25 @@ def _logo_png_data_url() -> str:
     if override:
         candidates.append(Path(override).expanduser())
 
-    # Sempre primeiro entre os ficheiros do projeto: acompanha o backend no Docker/git.
-    candidates.append(_SERVICES_DIR / "fonte_de_preço.png")
+    # Nome canónico atual no frontend (plural: preços).
+    _names_primary = ("fonte_de_preços.png",)
+    _names_compat = ("fonte_de_preço.png",)
+
+    def _append_assets_dir(assets_dir: Path) -> None:
+        for name in _names_primary + _names_compat:
+            candidates.append(assets_dir / name)
 
     root = _repo_root_from_pdf_module()
     if root is not None:
-        candidates.append(root / "frontend-vue" / "src" / "assets" / "fonte_de_preço.png")
+        _append_assets_dir(root / "frontend-vue" / "src" / "assets")
 
     # BASE_DIR típico = …/backend → assets ao lado
-    candidates.append(base.parent / "frontend-vue" / "src" / "assets" / "fonte_de_preço.png")
+    _append_assets_dir(base.parent / "frontend-vue" / "src" / "assets")
     # BASE_DIR = raiz do repositório (alguns arranques)
-    candidates.append(base / "frontend-vue" / "src" / "assets" / "fonte_de_preço.png")
+    _append_assets_dir(base / "frontend-vue" / "src" / "assets")
+
+    for name in _names_primary + _names_compat:
+        candidates.append(_SERVICES_DIR / name)
 
     candidates.append(_SERVICES_DIR / "docmaster_logo_relatorio.png")
     candidates.extend(

@@ -11,6 +11,7 @@ from typing import Iterator
 
 from docx.document import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 from docx.shared import RGBColor
@@ -59,6 +60,65 @@ def _iter_paragraphs_deep(container) -> Iterator[Paragraph]:
             for row in item.rows:
                 for cell in row.cells:
                     yield from _iter_paragraphs_deep(cell)
+
+
+def _clamp_indents_on_p_el(p_el) -> None:
+    """
+    OOXML: w:ind com w:right ou w:left negativos alarga a caixa de texto para fora da margem
+    (ex.: modelo DFD com w:right=\"-144\" na célula do objeto).
+    """
+    try:
+        pPr = p_el.find(qn("w:pPr"))
+        if pPr is None:
+            return
+        ind = pPr.find(qn("w:ind"))
+        if ind is None:
+            return
+        for attr in ("right", "left", "start", "end"):
+            key = qn(f"w:{attr}")
+            raw = ind.get(key)
+            if raw is None:
+                continue
+            try:
+                n = int(raw)
+            except (TypeError, ValueError):
+                continue
+            if n < 0:
+                ind.set(key, "0")
+    except Exception:
+        pass
+
+
+def _clamp_indents_on_container(container) -> None:
+    if container is None:
+        return
+    try:
+        for p in _iter_paragraphs_deep(container):
+            _clamp_indents_on_p_el(p._element)
+    except Exception:
+        pass
+
+
+def clamp_docx_paragraph_indents(doc: Document) -> None:
+    """
+    Percorre corpo, tabelas e cabeçalhos/rodapés e zera indentações negativas que fazem texto
+    transbordar para fora da área imprimível (margens).
+    """
+    _clamp_indents_on_container(doc)
+    for section in doc.sections:
+        _clamp_indents_on_container(section.header)
+        _clamp_indents_on_container(section.footer)
+        try:
+            if section.different_first_page_header_footer:
+                _clamp_indents_on_container(section.first_page_header)
+                _clamp_indents_on_container(section.first_page_footer)
+        except Exception:
+            pass
+        try:
+            _clamp_indents_on_container(section.even_page_header)
+            _clamp_indents_on_container(section.even_page_footer)
+        except Exception:
+            pass
 
 
 def _apply_font_to_header_footer_part(part) -> None:

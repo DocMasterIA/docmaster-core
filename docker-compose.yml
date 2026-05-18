@@ -10,7 +10,7 @@
 # Qwen só para ETP: docker compose --profile qwen up -d qwen_llm_service
 # No rag_service: LLM_ETP_GENERATION_BASE_URL=http://qwen_llm_service:8015 (Ollama/llm_api segue em LLM_ORCHESTRATION_BASE_URL).
 #
-# Métricas: backend expõe GET /metrics (django-prometheus); Prometheus scrape backend:8000
+# Métricas: GET /metrics — django-prometheus + docmaster_* (logins, gerações TR/DFD, pacotes)
 # Prometheus: docker compose up -d prometheus  → http://localhost:9090
 # Grafana:    docker compose up -d grafana     → http://localhost:3000  (admin / GRAFANA_ADMIN_PASSWORD)
 #             Dashboard provisionado: pasta DocMaster → «DocMaster — Backend Django»

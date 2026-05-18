@@ -29,6 +29,16 @@ import re
 from functools import wraps
 from urllib.parse import urlparse
 
+from backend.app.metrics import (
+    record_auth_login,
+    record_auth_logout,
+    record_document_instance_created,
+    set_request_metrics,
+    tenant_label,
+    tenant_label_from_request,
+    track_docmaster_view,
+)
+
 def _rag_http_timeout_seconds() -> float:
     """Timeout HTTP do backend -> rag_service (pedidos genéricos; TR/DFD usa função dedicada)."""
     raw = (os.environ.get("RAG_HTTP_TIMEOUT") or "120").strip()
@@ -330,6 +340,7 @@ def template_filters_api(request):
 # API: gerar documento (DOCX/PDF) a partir de valores recebidos, usando schema (index) ou fallback tokens.
 @csrf_exempt  # se for API token-based, prefira auth token em header e remova csrf_exempt
 @api_login_required
+@track_docmaster_view("generate_values")
 def generate_document_with_values_api(request):
     if request.method != "POST":
         return JsonResponse({"ok": False, "error": "Use POST"}, status=405)
@@ -338,6 +349,7 @@ def generate_document_with_values_api(request):
     template_id = payload.get("template_id")
     values = payload.get("values", {})
     output = payload.get("output", "pdf")
+    set_request_metrics(request, output=output or "pdf")
 
     if not template_id:
         return JsonResponse({"ok": False, "error": "template_id obrigatório"}, status=400)
@@ -370,6 +382,7 @@ def generate_document_with_values_api(request):
 # API: gerar documento via LLM (rag_service) com contexto do usuário.
 @csrf_exempt
 @api_login_required
+@track_docmaster_view("gerar_llm")
 def gerar_via_llm_api(request):
     """
     Gera documento (ETP, DFD, TR) via serviço RAG/LLM.
@@ -395,6 +408,7 @@ def gerar_via_llm_api(request):
     template_id = _resolve_merge_template_id(request, payload)
     output = (payload.get("output") or "docx").lower()
     slot_package_key = _resolve_slot_package_key(payload, request)
+    set_request_metrics(request, package=slot_package_key, output=output)
 
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
@@ -402,6 +416,7 @@ def gerar_via_llm_api(request):
     # TR+DFD (modelo oficial): mesma URL que ETP, desvio interno para evitar 404 em rotas separadas
     if output == "tr_dfd":
         try:
+            request._docmaster_skip_metrics = True
             return gerar_tr_e_dfd_api(request)
         except Exception as e:
             return JsonResponse({"ok": False, "error": str(e)}, status=500)
@@ -544,6 +559,7 @@ def gerar_via_llm_api(request):
 
 @csrf_exempt
 @api_login_required
+@track_docmaster_view("gerar_tr_modelo")
 def gerar_tr_modelo_api(request):
     """
     Gera Termo de Referência a partir do modelo fixo do rag_service (/api/rag/generate-tr-from-model).
@@ -569,6 +585,7 @@ def gerar_tr_modelo_api(request):
     slots_override = payload.get("slots_override")  # opcional
     template_id = _resolve_merge_template_id(request, payload)
     slot_package_key = _resolve_slot_package_key(payload, request)
+    set_request_metrics(request, package=slot_package_key, output="docx")
 
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
@@ -665,6 +682,11 @@ def gerar_tr_modelo_api(request):
                             ContentFile(final_bytes),
                             save=True,
                         )
+                        record_document_instance_created(
+                            doc_type="tr_modelo",
+                            package=slot_package_key,
+                            tenant=tenant_label_from_request(request),
+                        )
                 except Exception:
                     pass
             except Exception:
@@ -681,6 +703,7 @@ def gerar_tr_modelo_api(request):
 
 @csrf_exempt
 @api_login_required
+@track_docmaster_view("gerar_tr_e_dfd")
 def gerar_tr_e_dfd_api(request):
     """
     Gera Termo de Referência e DFD a partir dos modelos fixos do rag_service,
@@ -707,6 +730,7 @@ def gerar_tr_e_dfd_api(request):
     slots_override = payload.get("slots_override")  # opcional
     template_id = _resolve_merge_template_id(request, payload)
     slot_package_key = _resolve_slot_package_key(payload, request)
+    set_request_metrics(request, package=slot_package_key, output="zip")
 
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
@@ -846,6 +870,11 @@ def gerar_tr_e_dfd_api(request):
                 ContentFile(tr_bytes),
                 save=True,
             )
+            record_document_instance_created(
+                doc_type="tr_dfd",
+                package=slot_package_key,
+                tenant=tenant_label_from_request(request),
+            )
         except Exception:
             pass
 
@@ -888,6 +917,7 @@ def gerar_tr_e_dfd_api(request):
 
 @csrf_exempt
 @api_login_required
+@track_docmaster_view("fill_tr_slots")
 def fill_tr_slots_api(request):
     """
     Preenche slots do TR via rag_service (fill_tr_slots_with_llm) — mesmo pipeline da
@@ -904,6 +934,7 @@ def fill_tr_slots_api(request):
     user_prompt = (payload.get("user_prompt") or "").strip()
     slots_override = payload.get("slots_override")
     slot_package_key = _resolve_slot_package_key(payload, request)
+    set_request_metrics(request, package=slot_package_key, output="json")
 
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
@@ -1096,9 +1127,11 @@ def api_auth_login(request):
     prefeitura_url = (data.get("prefeitura_url") or "").strip()
 
     if not email_or_username or not password:
+        record_auth_login(result="failure", tenant="anonymous")
         return JsonResponse({"ok": False, "error": "E-mail/usuário e senha são obrigatórios."}, status=400)
 
     if request.user.is_authenticated:
+        record_auth_login(result="success", tenant=tenant_label_from_request(request))
         return JsonResponse({"ok": True, "message": "Já autenticado."})
 
     prefeitura = None
@@ -1108,6 +1141,7 @@ def api_auth_login(request):
             prefeitura = Prefeitura.objects.get(url=prefeitura_url)
             enforce_prefeitura_match = True
         except Prefeitura.DoesNotExist:
+            record_auth_login(result="failure", tenant="anonymous")
             return JsonResponse({"ok": False, "error": "Prefeitura inválida."}, status=400)
     else:
         # Login por SPA/API sem contexto explícito de prefeitura:
@@ -1116,6 +1150,7 @@ def api_auth_login(request):
 
     ip_key = f"ip:{get_client_ip(request)}"
     if is_locked(ip_key):
+        record_auth_login(result="locked", tenant="anonymous")
         return JsonResponse({"ok": False, "error": "Muitas tentativas deste IP. Tente novamente mais tarde."}, status=429)
 
     form = LoginForm(request=request, data={"email_or_username": email_or_username, "password": password, "remember": remember})
@@ -1123,6 +1158,7 @@ def api_auth_login(request):
         record_failed_attempt(ip_key)
         if email_or_username:
             record_failed_attempt(f"user:{email_or_username}")
+        record_auth_login(result="failure", tenant="anonymous")
         err = form.non_field_errors()
         if err:
             return JsonResponse({"ok": False, "error": err[0]}, status=401)
@@ -1131,9 +1167,11 @@ def api_auth_login(request):
     user = form.get_user()
     if enforce_prefeitura_match and not user.is_staff and not user.is_superuser:
         if user.prefeitura_id != prefeitura.id:
+            record_auth_login(result="forbidden_prefeitura", tenant=tenant_label(user))
             return JsonResponse({"ok": False, "error": "Usuário não pertence a esta prefeitura."}, status=403)
     user_key = f"user:{user.get_username()}"
     if is_locked(user_key):
+        record_auth_login(result="locked", tenant=tenant_label(user))
         return JsonResponse({"ok": False, "error": "Conta bloqueada temporariamente. Tente novamente mais tarde."}, status=429)
     clear_failed_attempts(ip_key)
     clear_failed_attempts(user_key)
@@ -1143,6 +1181,7 @@ def api_auth_login(request):
     else:
         request.session.set_expiry(0)
     resolved_prefeitura_url = prefeitura.url if prefeitura else getattr(getattr(user, "prefeitura", None), "url", "")
+    record_auth_login(result="success", tenant=tenant_label(user))
     return JsonResponse({"ok": True, "message": "Login realizado com sucesso.", "prefeitura_url": resolved_prefeitura_url})
 
 
@@ -1151,7 +1190,9 @@ def api_auth_login(request):
 def api_auth_logout(request):
     if request.method not in ("GET", "POST"):
         return JsonResponse({"ok": False, "error": "Use GET ou POST"}, status=405)
+    tenant = tenant_label_from_request(request)
     auth_logout(request)
+    record_auth_logout(tenant=tenant)
     return JsonResponse({"ok": True, "message": "Logout realizado."})
 
 

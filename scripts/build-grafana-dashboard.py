@@ -30,7 +30,10 @@ def ts(id_, title, y, x, w, h, targets, unit="short", desc=""):
     return {
         "datasource": DS,
         "description": desc,
-        "fieldConfig": {"defaults": {"noValue": "0", "unit": unit}, "overrides": []},
+        "fieldConfig": {
+            "defaults": {"decimals": 0 if unit == "short" else None, "noValue": "0", "unit": unit},
+            "overrides": [],
+        },
         "gridPos": {"h": h, "w": w, "x": x, "y": y},
         "id": id_,
         "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
@@ -42,11 +45,40 @@ def ts(id_, title, y, x, w, h, targets, unit="short", desc=""):
     }
 
 
+def count_range(selector: str) -> str:
+    """Contagem inteira no período do dashboard (evita 1.07 do increase extrapolado)."""
+    return f"ceil(sum(increase({selector}[$__range])))"
+
+
+def count_interval(selector: str) -> str:
+    return f"ceil(sum(increase({selector}[$__interval])))"
+
+
+def count_range_by(selector: str, by: str) -> str:
+    return f"ceil(sum(increase({selector}[$__range])) by ({by}))"
+
+
+PACKAGE_LABELS = {
+    "dispensa_75_i_manutencao_veiculos": "Dispensa 75-I — Veículos",
+    "dispensa_75_i_obras_engenharia": "Dispensa 75-I — Obras",
+    "dispensa_75_ii_compras": "Dispensa 75-II — Compras",
+    "dispensa_75_ii_servicos": "Dispensa 75-II — Serviços",
+    "dispensa_75_ii_compras_servicos_inclusos": "Dispensa 75-II — Compras+Serv.",
+    "inexigibilidade_74_i_manutencao_veiculos": "Inexig. 74-I — Veículos",
+    "inexigibilidade_74_i_fornecedor_exclusivo": "Inexig. 74-I — Exclusivo",
+}
+
+
+def package_field_config():
+    mappings = [{"type": "value", "options": {k: {"text": v} for k, v in PACKAGE_LABELS.items()}}]
+    return {"defaults": {"decimals": 0, "unit": "none"}, "overrides": []}
+
+
 def bar_multi(id_, title, y, x, w, h, targets, desc=""):
     return {
         "datasource": DS,
         "description": desc,
-        "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+        "fieldConfig": {"defaults": {"decimals": 0, "unit": "none"}, "overrides": []},
         "gridPos": {"h": h, "w": w, "x": x, "y": y},
         "id": id_,
         "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["sum"]}, "orientation": "horizontal"},
@@ -58,31 +90,39 @@ def bar_multi(id_, title, y, x, w, h, targets, desc=""):
     }
 
 
-def bar_tenant(id_, title, y, x, w, h, expr):
+def bar_prefeitura(id_, title, y, x, w, h, expr):
     return {
         "datasource": DS,
-        "description": "tenant = UF (2 letras), staff, ou slug da prefeitura se UF ausente.",
-        "fieldConfig": {
-            "defaults": {
-                "unit": "short",
-                "mappings": [
-                    {
-                        "type": "value",
-                        "options": {
-                            "staff": {"text": "Equipe DocMaster (staff)"},
-                            "anonymous": {"text": "Anônimo"},
-                            "sem_prefeitura": {"text": "Sem prefeitura"},
-                            "test": {"text": "Slug prefeitura «test»"},
-                        },
-                    }
-                ],
-            },
-            "overrides": [],
-        },
+        "description": "Nome do município + UF (label prefeitura na métrica docmaster_auth_login_total).",
+        "fieldConfig": {"defaults": {"decimals": 0, "unit": "none"}, "overrides": []},
         "gridPos": {"h": h, "w": w, "x": x, "y": y},
         "id": id_,
         "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull"]}},
-        "targets": [{"datasource": DS, "expr": expr, "legendFormat": "{{tenant}}", "refId": "A"}],
+        "targets": [{"datasource": DS, "expr": expr, "legendFormat": "{{prefeitura}}", "refId": "A"}],
+        "title": title,
+        "type": "barchart",
+    }
+
+
+def bar_packages(id_, title, y, x, w, h):
+    return {
+        "datasource": DS,
+        "description": "Uma barra = número inteiro de gerações OK daquele pacote no período.",
+        "fieldConfig": package_field_config(),
+        "gridPos": {"h": h, "w": w, "x": x, "y": y},
+        "id": id_,
+        "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull"]}, "orientation": "horizontal"},
+        "targets": [
+            {
+                "datasource": DS,
+                "expr": count_range_by(
+                    'docmaster_document_operations_total{result="success",package!~"unknown|other"}',
+                    "package",
+                ),
+                "legendFormat": "{{package}}",
+                "refId": "A",
+            }
+        ],
         "title": title,
         "type": "barchart",
     }
@@ -107,8 +147,8 @@ panels.append(
     text_panel(
         299,
         y,
-        "**Como ler:** cartões = total desde o último restart do backend. Gráficos = actividade no período do Grafana. "
-        "Dados vêm do Prometheus (scrape `api.docmasteria.com.br`). Faça login/geração **nesse** ambiente.",
+        "**Como ler:** cartões = **totais inteiros** desde o último restart do backend. Barras/gráficos de contagem = operações no período "
+        "(sempre número inteiro — ex.: 1 geração, não «1,07»). Fonte: Prometheus → `api.docmasteria.com.br`.",
     )
 )
 y += 3
@@ -134,11 +174,12 @@ panels.append(
         12,
         8,
         [
-            ('sum(increase(docmaster_document_operations_total{operation="fill_tr_slots",result="success"}[$__range]))', "Preencher slots (IA)"),
-            ('sum(increase(docmaster_document_operations_total{operation="gerar_llm",result="success"}[$__range]))', "Gerar via LLM"),
-            ('sum(increase(docmaster_document_operations_total{operation="gerar_tr_e_dfd",result="success"}[$__range]))', "TR + DFD"),
-            ('sum(increase(docmaster_document_operations_total{operation="gerar_tr_modelo",result="success"}[$__range]))', "TR modelo"),
+            (count_range('docmaster_document_operations_total{operation="fill_tr_slots",result="success"}'), "Preencher slots (IA)"),
+            (count_range('docmaster_document_operations_total{operation="gerar_llm",result="success"}'), "Gerar via LLM"),
+            (count_range('docmaster_document_operations_total{operation="gerar_tr_e_dfd",result="success"}'), "TR + DFD"),
+            (count_range('docmaster_document_operations_total{operation="gerar_tr_modelo",result="success"}'), "TR modelo"),
         ],
+        "Contagens inteiras no período (ceil do increase Prometheus).",
     )
 )
 panels.append(
@@ -150,10 +191,11 @@ panels.append(
         12,
         8,
         [
-            ('sum(increase(docmaster_document_operations_total{operation="fill_tr_slots",result="success"}[$__interval]))', "Slots IA"),
-            ('sum(increase(docmaster_document_operations_total{operation="gerar_llm",result="success"}[$__interval]))', "LLM"),
-            ('sum(increase(docmaster_document_operations_total{operation="gerar_tr_e_dfd",result="success"}[$__interval]))', "TR+DFD"),
+            (count_interval('docmaster_document_operations_total{operation="fill_tr_slots",result="success"}'), "Slots IA"),
+            (count_interval('docmaster_document_operations_total{operation="gerar_llm",result="success"}'), "LLM"),
+            (count_interval('docmaster_document_operations_total{operation="gerar_tr_e_dfd",result="success"}'), "TR+DFD"),
         ],
+        desc="Cada ponto = gerações naquele intervalo (inteiro).",
     )
 )
 y += 8
@@ -177,10 +219,10 @@ panels.append(
         12,
         7,
         [
-            ('sum(increase(docmaster_platform_events_total{module="llm",action="planner"}[$__interval]))', "Planner"),
-            ('sum(increase(docmaster_platform_events_total{module="llm",action="section"}[$__interval]))', "Section"),
-            ('sum(increase(docmaster_platform_events_total{module="llm",action="generate"}[$__interval]))', "Generate"),
-            ('sum(increase(docmaster_platform_events_total{module="llm",action="analysis"}[$__interval]))', "Analysis"),
+            (count_interval('docmaster_platform_events_total{module="llm",action="planner"}'), "Planner"),
+            (count_interval('docmaster_platform_events_total{module="llm",action="section"}'), "Section"),
+            (count_interval('docmaster_platform_events_total{module="llm",action="generate"}'), "Generate"),
+            (count_interval('docmaster_platform_events_total{module="llm",action="analysis"}'), "Analysis"),
         ],
     )
 )
@@ -218,9 +260,9 @@ panels.append(
         24,
         7,
         [
-            ('sum(increase(docmaster_platform_events_total{module="pncp_cotacao"}[$__interval]))', "Cotações"),
-            ('sum(increase(docmaster_platform_events_total{module="pncp_research"}[$__interval]))', "Research"),
-            ('sum(increase(django_http_requests_total_by_view_transport_method_total{view=~"api_pncp.*"}[$__interval]))', "HTTP PNCP"),
+            (count_interval('docmaster_platform_events_total{module="pncp_cotacao"}'), "Cotações"),
+            (count_interval('docmaster_platform_events_total{module="pncp_research"}'), "Research"),
+            (count_interval('django_http_requests_total_by_view_transport_method_total{view=~"api_pncp.*"}'), "HTTP PNCP"),
         ],
     )
 )
@@ -237,39 +279,29 @@ panels.append(
         12,
         7,
         [
-            ('sum(increase(docmaster_auth_login_total{result="success"}[$__interval]))', "Sucesso"),
-            ('sum(increase(docmaster_auth_login_total{result="failure"}[$__interval]))', "Falha"),
-            ('sum(increase(docmaster_auth_login_total{result="locked"}[$__interval]))', "Bloqueado"),
-            ('sum(increase(django_http_requests_total_by_view_transport_method_total{view="api_auth_login"}[$__interval]))', "HTTP login (fallback)"),
+            (count_interval('docmaster_auth_login_total{result="success"}'), "Sucesso"),
+            (count_interval('docmaster_auth_login_total{result="failure"}'), "Falha"),
+            (count_interval('docmaster_auth_login_total{result="locked"}'), "Bloqueado"),
+            (count_interval('django_http_requests_total_by_view_transport_method_total{view="api_auth_login"}'), "HTTP login (fallback)"),
         ],
     )
 )
 panels.append(
-    bar_tenant(
+    bar_prefeitura(
         332,
-        "Logins OK — por tenant (total acumulado)",
+        "Logins OK — por prefeitura (total acumulado)",
         y,
         12,
         12,
         7,
-        'sum(docmaster_auth_login_total{result="success"}) by (tenant)',
+        'sum(docmaster_auth_login_total{result="success"}) by (prefeitura)',
     )
 )
 y += 7
 
 panels.append(row(340, "Pacotes / dispensas", y))
 y += 1
-panels.append(
-    bar_multi(
-        341,
-        "Gerações por pacote (período)",
-        y,
-        0,
-        14,
-        8,
-        [('sum(increase(docmaster_document_operations_total{result="success",package!~"unknown|other"}[$__range])) by (package)', "{{package}}")],
-    )
-)
+panels.append(bar_packages(341, "Gerações por pacote / dispensa (período)", y, 0, 14, 8))
 panels.append(
     ts(
         342,
@@ -278,7 +310,7 @@ panels.append(
         14,
         10,
         8,
-        [('sum(increase(docmaster_document_instances_created_total[$__interval])) by (doc_type)', "{{doc_type}}")],
+        [(count_range_by("docmaster_document_instances_created_total", "doc_type"), "{{doc_type}}")],
     )
 )
 y += 8
@@ -287,9 +319,9 @@ panels.append(row(350, "Desenvolvimento — saúde", y, collapsed=True))
 y += 1
 panels += [
     stat(351, "Backend UP", y, 0, 4, 'up{job="backend"}'),
-    stat(352, "HTTP total (período)", y, 4, 5, 'sum(increase(django_http_requests_total_by_method_total{job="backend"}[$__range]))'),
-    stat(353, "5xx (período)", y, 9, 5, 'sum(increase(django_http_responses_total_by_status_total{job="backend",status=~"5.."}[$__range]))'),
-    stat(354, "4xx (período)", y, 14, 5, 'sum(increase(django_http_responses_total_by_status_total{job="backend",status=~"4.."}[$__range]))'),
+    stat(352, "HTTP total (período)", y, 4, 5, count_range('django_http_requests_total_by_method_total{job="backend"}')),
+    stat(353, "5xx (período)", y, 9, 5, count_range('django_http_responses_total_by_status_total{job="backend",status=~"5.."}')),
+    stat(354, "4xx (período)", y, 14, 5, count_range('django_http_responses_total_by_status_total{job="backend",status=~"4.."}')),
     stat(355, "RSS", y, 19, 5, 'max(process_resident_memory_bytes{job="backend"})'),
 ]
 y += 4

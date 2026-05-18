@@ -29,13 +29,13 @@ KNOWN_SLOT_PACKAGES = frozenset(
 docmaster_auth_login_total = Counter(
     "docmaster_auth_login_total",
     "Tentativas de login na API DocMaster",
-    ["result", "tenant"],
+    ["result", "prefeitura"],
 )
 
 docmaster_auth_logout_total = Counter(
     "docmaster_auth_logout_total",
     "Logouts na API DocMaster",
-    ["tenant"],
+    ["prefeitura"],
 )
 
 docmaster_document_operations_total = Counter(
@@ -112,6 +112,29 @@ def tenant_label_from_request(request) -> str:
     return tenant_label(getattr(request, "user", None))
 
 
+def prefeitura_label(user) -> str:
+    """Nome legível da prefeitura para dashboards (baixa cardinalidade: uma série por município)."""
+    if user is None or not getattr(user, "is_authenticated", False):
+        return "Não identificado"
+    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+        return "Equipe DocMaster (staff)"
+    pref = getattr(user, "prefeitura", None)
+    if pref is None:
+        return "Sem prefeitura"
+    nome = (getattr(pref, "nome_municipio", None) or "").strip()
+    uf = (getattr(pref, "estado", None) or "").strip().upper()
+    if nome and uf:
+        return f"{nome} ({uf})"[:56]
+    if nome:
+        return nome[:56]
+    url = (getattr(pref, "url", None) or "").strip()
+    return url[:56] if url else "Prefeitura sem nome"
+
+
+def prefeitura_label_from_request(request) -> str:
+    return prefeitura_label(getattr(request, "user", None))
+
+
 def result_from_response(response) -> str:
     if response is None:
         return "error"
@@ -137,12 +160,14 @@ def set_request_metrics(request, *, package: str = "", output: str = "") -> None
     }
 
 
-def record_auth_login(*, result: str, tenant: str) -> None:
-    docmaster_auth_login_total.labels(result=result, tenant=tenant).inc()
+def record_auth_login(*, result: str, user=None, prefeitura: str | None = None) -> None:
+    pref = prefeitura if prefeitura is not None else prefeitura_label(user)
+    docmaster_auth_login_total.labels(result=result, prefeitura=pref).inc()
 
 
-def record_auth_logout(*, tenant: str) -> None:
-    docmaster_auth_logout_total.labels(tenant=tenant).inc()
+def record_auth_logout(*, user=None, prefeitura: str | None = None) -> None:
+    pref = prefeitura if prefeitura is not None else prefeitura_label(user)
+    docmaster_auth_logout_total.labels(prefeitura=pref).inc()
 
 
 def record_document_operation(
@@ -306,7 +331,7 @@ def connect_auth_signals() -> None:
     from django.contrib.auth.signals import user_logged_out
 
     def _on_logout(sender, request, user, **kwargs):
-        record_auth_logout(tenant=tenant_label(user) if user else "anonymous")
+        record_auth_logout(user=user)
 
     # Login API: record_auth_login em api_auth_login (evita duplicar com sinal).
     user_logged_out.connect(_on_logout, dispatch_uid="docmaster_metrics_logout")

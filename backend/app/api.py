@@ -1128,7 +1128,7 @@ def api_auth_login(request):
     prefeitura_url = (data.get("prefeitura_url") or "").strip()
 
     if not email_or_username or not password:
-        record_auth_login(result="failure", tenant="anonymous")
+        record_auth_login(result="failure", prefeitura="Não identificado")
         return JsonResponse({"ok": False, "error": "E-mail/usuário e senha são obrigatórios."}, status=400)
 
     if request.user.is_authenticated:
@@ -1141,7 +1141,7 @@ def api_auth_login(request):
             prefeitura = Prefeitura.objects.get(url=prefeitura_url)
             enforce_prefeitura_match = True
         except Prefeitura.DoesNotExist:
-            record_auth_login(result="failure", tenant="anonymous")
+            record_auth_login(result="failure", prefeitura="Não identificado")
             return JsonResponse({"ok": False, "error": "Prefeitura inválida."}, status=400)
     else:
         # Login por SPA/API sem contexto explícito de prefeitura:
@@ -1150,7 +1150,7 @@ def api_auth_login(request):
 
     ip_key = f"ip:{get_client_ip(request)}"
     if is_locked(ip_key):
-        record_auth_login(result="locked", tenant="anonymous")
+        record_auth_login(result="locked", prefeitura="Não identificado")
         return JsonResponse({"ok": False, "error": "Muitas tentativas deste IP. Tente novamente mais tarde."}, status=429)
 
     form = LoginForm(request=request, data={"email_or_username": email_or_username, "password": password, "remember": remember})
@@ -1158,7 +1158,7 @@ def api_auth_login(request):
         record_failed_attempt(ip_key)
         if email_or_username:
             record_failed_attempt(f"user:{email_or_username}")
-        record_auth_login(result="failure", tenant="anonymous")
+        record_auth_login(result="failure", prefeitura="Não identificado")
         err = form.non_field_errors()
         if err:
             return JsonResponse({"ok": False, "error": err[0]}, status=401)
@@ -1167,11 +1167,11 @@ def api_auth_login(request):
     user = form.get_user()
     if enforce_prefeitura_match and not user.is_staff and not user.is_superuser:
         if user.prefeitura_id != prefeitura.id:
-            record_auth_login(result="forbidden_prefeitura", tenant=tenant_label(user))
+            record_auth_login(result="forbidden_prefeitura", user=user)
             return JsonResponse({"ok": False, "error": "Usuário não pertence a esta prefeitura."}, status=403)
     user_key = f"user:{user.get_username()}"
     if is_locked(user_key):
-        record_auth_login(result="locked", tenant=tenant_label(user))
+        record_auth_login(result="locked", user=user)
         return JsonResponse({"ok": False, "error": "Conta bloqueada temporariamente. Tente novamente mais tarde."}, status=429)
     clear_failed_attempts(ip_key)
     clear_failed_attempts(user_key)
@@ -1181,7 +1181,7 @@ def api_auth_login(request):
     else:
         request.session.set_expiry(0)
     resolved_prefeitura_url = prefeitura.url if prefeitura else getattr(getattr(user, "prefeitura", None), "url", "")
-    record_auth_login(result="success", tenant=tenant_label(user))
+    record_auth_login(result="success", user=user)
     return JsonResponse({"ok": True, "message": "Login realizado com sucesso.", "prefeitura_url": resolved_prefeitura_url})
 
 

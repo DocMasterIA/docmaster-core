@@ -19,7 +19,7 @@
       "id": 299,
       "options": {
         "mode": "markdown",
-        "content": "**Como ler:** cartões = total desde o último restart do backend. Gráficos = actividade no período do Grafana. Dados vêm do Prometheus (scrape `api.docmasteria.com.br`). Faça login/geração **nesse** ambiente."
+        "content": "**Como ler:** cartões = **totais inteiros** desde o último restart do backend. Barras/gráficos de contagem = operações no período (sempre número inteiro — ex.: 1 geração, não «1,07»). Fonte: Prometheus → `api.docmasteria.com.br`."
       },
       "title": "",
       "type": "text",
@@ -306,10 +306,11 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "",
+      "description": "Contagens inteiras no período (ceil do increase Prometheus).",
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "decimals": 0,
+          "unit": "none"
         },
         "overrides": []
       },
@@ -336,7 +337,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"fill_tr_slots\",result=\"success\"}[$__range]))",
+          "expr": "ceil(sum(increase(docmaster_document_operations_total{operation=\"fill_tr_slots\",result=\"success\"}[$__range])))",
           "legendFormat": "Preencher slots (IA)",
           "refId": "A"
         },
@@ -345,7 +346,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_llm\",result=\"success\"}[$__range]))",
+          "expr": "ceil(sum(increase(docmaster_document_operations_total{operation=\"gerar_llm\",result=\"success\"}[$__range])))",
           "legendFormat": "Gerar via LLM",
           "refId": "B"
         },
@@ -354,7 +355,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"success\"}[$__range]))",
+          "expr": "ceil(sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"success\"}[$__range])))",
           "legendFormat": "TR + DFD",
           "refId": "C"
         },
@@ -363,7 +364,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_modelo\",result=\"success\"}[$__range]))",
+          "expr": "ceil(sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_modelo\",result=\"success\"}[$__range])))",
           "legendFormat": "TR modelo",
           "refId": "D"
         }
@@ -376,9 +377,10 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "",
+      "description": "Cada ponto = gerações naquele intervalo (inteiro).",
       "fieldConfig": {
         "defaults": {
+          "decimals": 0,
           "noValue": "0",
           "unit": "short"
         },
@@ -406,7 +408,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"fill_tr_slots\",result=\"success\"}[$__interval]))",
+          "expr": "ceil(sum(increase(docmaster_document_operations_total{operation=\"fill_tr_slots\",result=\"success\"}[$__interval])))",
           "legendFormat": "Slots IA",
           "refId": "A"
         },
@@ -415,7 +417,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_llm\",result=\"success\"}[$__interval]))",
+          "expr": "ceil(sum(increase(docmaster_document_operations_total{operation=\"gerar_llm\",result=\"success\"}[$__interval])))",
           "legendFormat": "LLM",
           "refId": "B"
         },
@@ -424,7 +426,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"success\"}[$__interval]))",
+          "expr": "ceil(sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"success\"}[$__interval])))",
           "legendFormat": "TR+DFD",
           "refId": "C"
         }
@@ -628,6 +630,7 @@
       "description": "",
       "fieldConfig": {
         "defaults": {
+          "decimals": 0,
           "noValue": "0",
           "unit": "short"
         },
@@ -655,7 +658,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",action=\"planner\"}[$__interval]))",
+          "expr": "ceil(sum(increase(docmaster_platform_events_total{module=\"llm\",action=\"planner\"}[$__interval])))",
           "legendFormat": "Planner",
           "refId": "A"
         },
@@ -664,7 +667,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",action=\"section\"}[$__interval]))",
+          "expr": "ceil(sum(increase(docmaster_platform_events_total{module=\"llm\",action=\"section\"}[$__interval])))",
           "legendFormat": "Section",
           "refId": "B"
         },
@@ -673,7 +676,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",action=\"generate\"}[$__interval]))",
+          "expr": "ceil(sum(increase(docmaster_platform_events_total{module=\"llm\",action=\"generate\"}[$__interval])))",
           "legendFormat": "Generate",
           "refId": "C"
         },
@@ -682,7 +685,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",action=\"analysis\"}[$__interval]))",
+          "expr": "ceil(sum(increase(docmaster_platform_events_total{module=\"llm\",action=\"analysis\"}[$__interval])))",
           "legendFormat": "Analysis",
           "refId": "D"
         }
@@ -698,6 +701,7 @@
       "description": "",
       "fieldConfig": {
         "defaults": {
+          "decimals": null,
           "noValue": "0",
           "unit": "s"
         },
@@ -894,6 +898,7 @@
       "description": "",
       "fieldConfig": {
         "defaults": {
+          "decimals": 0,
           "noValue": "0",
           "unit": "short"
         },
@@ -921,7 +926,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"pncp_cotacao\"}[$__interval]))",
+          "expr": "ceil(sum(increase(docmaster_platform_events_total{module=\"pncp_cotacao\"}[$__interval])))",
           "legendFormat": "Cotações",
           "refId": "A"
         },
@@ -930,7 +935,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"pncp_research\"}[$__interval]))",
+          "expr": "ceil(sum(increase(docmaster_platform_events_total{module=\"pncp_research\"}[$__interval])))",
           "legendFormat": "Research",
           "refId": "B"
         },
@@ -939,7 +944,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(django_http_requests_total_by_view_transport_method_total{view=~\"api_pncp.*\"}[$__interval]))",
+          "expr": "ceil(sum(increase(django_http_requests_total_by_view_transport_method_total{view=~\"api_pncp.*\"}[$__interval])))",
           "legendFormat": "HTTP PNCP",
           "refId": "C"
         }
@@ -967,6 +972,7 @@
       "description": "",
       "fieldConfig": {
         "defaults": {
+          "decimals": 0,
           "noValue": "0",
           "unit": "short"
         },
@@ -994,7 +1000,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_auth_login_total{result=\"success\"}[$__interval]))",
+          "expr": "ceil(sum(increase(docmaster_auth_login_total{result=\"success\"}[$__interval])))",
           "legendFormat": "Sucesso",
           "refId": "A"
         },
@@ -1003,7 +1009,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_auth_login_total{result=\"failure\"}[$__interval]))",
+          "expr": "ceil(sum(increase(docmaster_auth_login_total{result=\"failure\"}[$__interval])))",
           "legendFormat": "Falha",
           "refId": "B"
         },
@@ -1012,7 +1018,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_auth_login_total{result=\"locked\"}[$__interval]))",
+          "expr": "ceil(sum(increase(docmaster_auth_login_total{result=\"locked\"}[$__interval])))",
           "legendFormat": "Bloqueado",
           "refId": "C"
         },
@@ -1021,7 +1027,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(django_http_requests_total_by_view_transport_method_total{view=\"api_auth_login\"}[$__interval]))",
+          "expr": "ceil(sum(increase(django_http_requests_total_by_view_transport_method_total{view=\"api_auth_login\"}[$__interval])))",
           "legendFormat": "HTTP login (fallback)",
           "refId": "D"
         }
@@ -1034,29 +1040,11 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "tenant = UF (2 letras), staff, ou slug da prefeitura se UF ausente.",
+      "description": "Nome do município + UF (label prefeitura na métrica docmaster_auth_login_total).",
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "staff": {
-                  "text": "Equipe DocMaster (staff)"
-                },
-                "anonymous": {
-                  "text": "Anônimo"
-                },
-                "sem_prefeitura": {
-                  "text": "Sem prefeitura"
-                },
-                "test": {
-                  "text": "Slug prefeitura «test»"
-                }
-              }
-            }
-          ]
+          "decimals": 0,
+          "unit": "none"
         },
         "overrides": []
       },
@@ -1082,12 +1070,12 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(docmaster_auth_login_total{result=\"success\"}) by (tenant)",
-          "legendFormat": "{{tenant}}",
+          "expr": "sum(docmaster_auth_login_total{result=\"success\"}) by (prefeitura)",
+          "legendFormat": "{{prefeitura}}",
           "refId": "A"
         }
       ],
-      "title": "Logins OK — por tenant (total acumulado)",
+      "title": "Logins OK — por prefeitura (total acumulado)",
       "type": "barchart"
     },
     {
@@ -1107,10 +1095,11 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "",
+      "description": "Uma barra = número inteiro de gerações OK daquele pacote no período.",
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "decimals": 0,
+          "unit": "none"
         },
         "overrides": []
       },
@@ -1126,7 +1115,7 @@
           "displayMode": "table",
           "placement": "right",
           "calcs": [
-            "sum"
+            "lastNotNull"
           ]
         },
         "orientation": "horizontal"
@@ -1137,12 +1126,12 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_document_operations_total{result=\"success\",package!~\"unknown|other\"}[$__range])) by (package)",
+          "expr": "ceil(sum(increase(docmaster_document_operations_total{result=\"success\",package!~\"unknown|other\"}[$__range])) by (package))",
           "legendFormat": "{{package}}",
           "refId": "A"
         }
       ],
-      "title": "Gerações por pacote (período)",
+      "title": "Gerações por pacote / dispensa (período)",
       "type": "barchart"
     },
     {
@@ -1153,6 +1142,7 @@
       "description": "",
       "fieldConfig": {
         "defaults": {
+          "decimals": 0,
           "noValue": "0",
           "unit": "short"
         },
@@ -1180,7 +1170,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_document_instances_created_total[$__interval])) by (doc_type)",
+          "expr": "ceil(sum(increase(docmaster_document_instances_created_total[$__range])) by (doc_type))",
           "legendFormat": "{{doc_type}}",
           "refId": "A"
         }
@@ -1281,7 +1271,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(django_http_requests_total_by_method_total{job=\"backend\"}[$__range]))",
+          "expr": "ceil(sum(increase(django_http_requests_total_by_method_total{job=\"backend\"}[$__range])))",
           "refId": "A"
         }
       ],
@@ -1325,7 +1315,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(django_http_responses_total_by_status_total{job=\"backend\",status=~\"5..\"}[$__range]))",
+          "expr": "ceil(sum(increase(django_http_responses_total_by_status_total{job=\"backend\",status=~\"5..\"}[$__range])))",
           "refId": "A"
         }
       ],
@@ -1369,7 +1359,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(django_http_responses_total_by_status_total{job=\"backend\",status=~\"4..\"}[$__range]))",
+          "expr": "ceil(sum(increase(django_http_responses_total_by_status_total{job=\"backend\",status=~\"4..\"}[$__range])))",
           "refId": "A"
         }
       ],
@@ -1428,6 +1418,7 @@
       "description": "",
       "fieldConfig": {
         "defaults": {
+          "decimals": null,
           "noValue": "0",
           "unit": "s"
         },
@@ -1489,6 +1480,7 @@
       "description": "",
       "fieldConfig": {
         "defaults": {
+          "decimals": 0,
           "noValue": "0",
           "unit": "short"
         },

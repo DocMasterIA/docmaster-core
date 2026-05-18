@@ -3,7 +3,7 @@
     "list": []
   },
   "editable": false,
-  "description": "Layout v15 — textos em português brasileiro; logins por prefeitura em tabela.",
+  "description": "Layout v16 — logins com município + UF; compatível com métrica antiga (só UF).",
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
@@ -342,7 +342,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Métrica antiga: label tenant (ex.: staff). Nova: prefeitura com \"Município (UF)\". Após o deploy do backend, novos logins passam a aparecer com o nome completo.",
+      "description": "Exige backend com label prefeitura (nome + UF). Métrica antiga gravava só a UF (ex.: SC). Após deploy do backend, faça login de novo para aparecer \"Joinville (SC)\".",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -406,7 +406,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(\n  label_replace(\n    label_replace(\n      docmaster_auth_login_total{result=\"success\"},\n      \"nome\", \"$1\", \"prefeitura\", \"(.+)\"\n    ),\n    \"nome\", \"$1\", \"tenant\", \"(.+)\"\n  )\n) by (nome)",
+          "expr": "sum(\n  label_replace(\n    label_replace(\n      label_replace(\n        docmaster_auth_login_total{result=\"success\"},\n        \"nome\", \"$1\", \"tenant\", \"(.+)\"\n      ),\n      \"nome\", \"$1\", \"prefeitura\", \"(.+)\"\n    ),\n    \"nome\", \"Só UF ($1) — refaça login após deploy\", \"nome\", \"^([A-Z]{2})$\"\n  )\n) by (nome)",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -1805,7 +1805,7 @@
     "docmaster",
     "backend",
     "django",
-    "layout-v15"
+    "layout-v16"
   ],
   "templating": {
     "list": []
@@ -1817,5 +1817,5 @@
   "timezone": "browser",
   "title": "DocMaster — Backend Django",
   "uid": "docmaster-backend",
-  "version": 15
+  "version": 16
 }

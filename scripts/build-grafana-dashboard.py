@@ -78,16 +78,19 @@ def total_by(selector: str, label: str) -> str:
     return f"sum({selector}) by ({label})"
 
 
-# Métrica antiga em produção usa label `tenant`; a nova usa `prefeitura` (nome legível).
-# Normaliza para `nome` e agrupa — funciona antes e depois do deploy do backend.
+# Métrica antiga: label `tenant` (só UF, ex. SC). Nova: `prefeitura` = "Joinville (SC)".
+# Ordem: tenant → prefeitura (prefeitura ganha). UF de 2 letras = dado antigo sem município.
 def login_by_prefeitura_display(selector: str = 'docmaster_auth_login_total{result="success"}') -> str:
     return f"""sum(
   label_replace(
     label_replace(
-      {selector},
+      label_replace(
+        {selector},
+        "nome", "$1", "tenant", "(.+)"
+      ),
       "nome", "$1", "prefeitura", "(.+)"
     ),
-    "nome", "$1", "tenant", "(.+)"
+    "nome", "Só UF ($1) — refaça login após deploy", "nome", "^([A-Z]{{2}})$"
   )
 ) by (nome)"""
 
@@ -308,8 +311,8 @@ panels.append(
         8,
         login_by_prefeitura_display(),
         desc=(
-            "Métrica antiga: label tenant (ex.: staff). Nova: prefeitura com \"Município (UF)\". "
-            "Após o deploy do backend, novos logins passam a aparecer com o nome completo."
+            "Exige backend com label prefeitura (nome + UF). Métrica antiga gravava só a UF (ex.: SC). "
+            "Após deploy do backend, faça login de novo para aparecer \"Joinville (SC)\"."
         ),
     )
 )
@@ -530,7 +533,7 @@ panels.append(
 dash = {
     "annotations": {"list": []},
     "editable": False,
-    "description": "Layout v15 — textos em português brasileiro; logins por prefeitura em tabela.",
+    "description": "Layout v16 — logins com município + UF; compatível com métrica antiga (só UF).",
     "fiscalYearStartMonth": 0,
     "graphTooltip": 1,
     "id": None,
@@ -538,13 +541,13 @@ dash = {
     "panels": panels,
     "refresh": "1m",
     "schemaVersion": 39,
-    "tags": ["docmaster", "backend", "django", "layout-v15"],
+    "tags": ["docmaster", "backend", "django", "layout-v16"],
     "templating": {"list": []},
     "time": {"from": "now-24h", "to": "now"},
     "timezone": "browser",
     "title": "DocMaster — Backend Django",
     "uid": "docmaster-backend",
-    "version": 15,
+    "version": 16,
 }
 
 OUT.write_text(json.dumps(dash, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

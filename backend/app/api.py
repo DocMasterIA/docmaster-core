@@ -30,6 +30,7 @@ from functools import wraps
 from urllib.parse import urlparse
 
 from backend.app.metrics import (
+    prefeitura_label_from_instance,
     record_auth_login,
     record_document_instance_created,
     set_request_metrics,
@@ -1181,7 +1182,12 @@ def api_auth_login(request):
     else:
         request.session.set_expiry(0)
     resolved_prefeitura_url = prefeitura.url if prefeitura else getattr(getattr(user, "prefeitura", None), "url", "")
-    record_auth_login(result="success", user=user)
+    pref_metric = prefeitura or getattr(user, "prefeitura", None)
+    record_auth_login(
+        result="success",
+        prefeitura=prefeitura_label_from_instance(pref_metric) if pref_metric else None,
+        user=user,
+    )
     return JsonResponse({"ok": True, "message": "Login realizado com sucesso.", "prefeitura_url": resolved_prefeitura_url})
 
 

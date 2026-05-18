@@ -1,7 +1,8 @@
 """
 Métricas Prometheus de negócio do DocMaster (exportadas em GET /metrics).
 
-Labels com cardinalidade controlada: pacotes de slots conhecidos, tenant por UF/staff.
+Labels com cardinalidade controlada: pacotes de slots conhecidos; tenant truncado em 16 chars.
+Logins usam label `prefeitura` com nome do município + UF (até 56 chars).
 """
 from __future__ import annotations
 
@@ -94,6 +95,7 @@ def normalize_package_key(key: str | None) -> str:
 
 
 def tenant_label(user) -> str:
+    """Identificador curto (16 chars) para métricas de documento/IA — não usar em logins."""
     if user is None or not getattr(user, "is_authenticated", False):
         return "anonymous"
     if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
@@ -101,9 +103,12 @@ def tenant_label(user) -> str:
     pref = getattr(user, "prefeitura", None)
     if pref is None:
         return "sem_prefeitura"
-    estado = (getattr(pref, "estado", None) or "").strip().upper()
-    if len(estado) == 2 and estado.isalpha():
-        return estado
+    nome = (getattr(pref, "nome_municipio", None) or "").strip()
+    uf = (getattr(pref, "estado", None) or "").strip().upper()
+    if nome and len(uf) == 2 and uf.isalpha():
+        return f"{nome} ({uf})"[:16]
+    if nome:
+        return nome[:16]
     url = (getattr(pref, "url", None) or "").strip().lower()[:16]
     return url or "sem_prefeitura"
 
@@ -112,13 +117,8 @@ def tenant_label_from_request(request) -> str:
     return tenant_label(getattr(request, "user", None))
 
 
-def prefeitura_label(user) -> str:
-    """Nome legível da prefeitura para dashboards (baixa cardinalidade: uma série por município)."""
-    if user is None or not getattr(user, "is_authenticated", False):
-        return "Não identificado"
-    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
-        return "Equipe DocMaster (staff)"
-    pref = getattr(user, "prefeitura", None)
+def prefeitura_label_from_instance(pref) -> str:
+    """Nome legível a partir do modelo Prefeitura (município + UF quando possível)."""
     if pref is None:
         return "Sem prefeitura"
     nome = (getattr(pref, "nome_municipio", None) or "").strip()
@@ -129,6 +129,15 @@ def prefeitura_label(user) -> str:
         return nome[:56]
     url = (getattr(pref, "url", None) or "").strip()
     return url[:56] if url else "Prefeitura sem nome"
+
+
+def prefeitura_label(user) -> str:
+    """Nome legível da prefeitura para dashboards de login (uma série por município)."""
+    if user is None or not getattr(user, "is_authenticated", False):
+        return "Não identificado"
+    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+        return "Equipe DocMaster (staff)"
+    return prefeitura_label_from_instance(getattr(user, "prefeitura", None))
 
 
 def prefeitura_label_from_request(request) -> str:

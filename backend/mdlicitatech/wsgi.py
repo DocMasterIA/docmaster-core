@@ -14,3 +14,6 @@ from django.core.wsgi import get_wsgi_application
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.mdlicitatech.settings')
 
 application = get_wsgi_application()
+
+# Garante registro das métricas docmaster_* em cada worker Gunicorn.
+import backend.app.metrics  # noqa: E402, F401

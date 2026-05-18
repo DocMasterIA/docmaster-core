@@ -35,7 +35,7 @@ if [[ ! -f "$REPO_DASH" ]]; then
   exit 1
 fi
 
-if ! grep -qE 'layout-v(6|7|8|9|10|11|12|13|14|15|16|17|18)' "$REPO_DASH"; then
+if ! grep -qE 'layout-v(6|7|8|9|10|11|12|13|14|15|16|17|18|19)' "$REPO_DASH"; then
   echo "ERRO: JSON no repo desatualizado. Faça git pull em ${REPO_ROOT}"
   exit 1
 fi
@@ -117,11 +117,11 @@ print("Tags:", tags)
 print("Painéis:", len(panels))
 print("Secções:", rows[:3])
 
-if not any(t in tags for t in ("layout-v6", "layout-v7", "layout-v8", "layout-v9", "layout-v10", "layout-v11", "layout-v12", "layout-v13", "layout-v14", "layout-v15", "layout-v16", "layout-v17", "layout-v18")):
-    sys.exit("ERRO: Grafana ainda sem layout novo (layout-v18).")
+if not any(t in tags for t in ("layout-v6", "layout-v7", "layout-v8", "layout-v9", "layout-v10", "layout-v11", "layout-v12", "layout-v13", "layout-v14", "layout-v15", "layout-v16", "layout-v17", "layout-v18", "layout-v19")):
+    sys.exit("ERRO: Grafana ainda sem layout novo (layout-v19).")
 if len(panels) < 10:
     sys.exit("ERRO: dashboard incompleto.")
-print("\nOK — dashboard atualizado (layout-v18).")
+print("\nOK — dashboard atualizado (layout-v19).")
 PY
 
 if [[ "$VERIFY_OK" -ne 0 ]]; then
@@ -138,4 +138,4 @@ fi
 
 echo ""
 echo "Abra: ${GRAFANA_URL}/d/${DASH_UID}"
-echo "Painel operacional erros/velocidade/prefeituras (layout-v18)"
+echo "PromQL corrigido — layout-v19"

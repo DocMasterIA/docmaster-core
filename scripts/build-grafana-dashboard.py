@@ -103,6 +103,13 @@ def total_by(selector: str, label: str) -> str:
 
 # Métrica antiga: label `tenant` (só UF, ex. SC). Nova: `prefeitura` = "Joinville (SC)".
 # Ordem: tenant → prefeitura (prefeitura ganha). UF de 2 letras = dado antigo sem município.
+def _selector_with_offset(selector: str, offset: str = "") -> str:
+    """Aplica offset ao seletor de métrica (antes de agregações)."""
+    if not offset:
+        return selector
+    return f"{selector} offset {offset}"
+
+
 def metric_prefeitura_nome(selector: str) -> str:
     """Unifica label prefeitura (novo) e tenant (legado) em nome."""
     return f"""label_replace(
@@ -115,18 +122,33 @@ def metric_prefeitura_nome(selector: str) -> str:
 
 
 def period_delta_by_nome(selector: str) -> str:
-    inner = metric_prefeitura_nome(selector)
+    now = metric_prefeitura_nome(selector)
+    then = metric_prefeitura_nome(_selector_with_offset(selector, "$__range"))
     return f"""clamp_min(
-sum({inner}) by (nome)
-- sum({inner} offset $__range) by (nome),
+sum({now}) by (nome)
+- sum({then}) by (nome),
 0)"""
 
 
+def login_prefeitura_nome_chain(selector: str) -> str:
+    return f"""label_replace(
+  label_replace(
+    label_replace(
+      {selector},
+      "nome", "$1", "tenant", "(.+)"
+    ),
+    "nome", "$1", "prefeitura", "(.+)"
+  ),
+  "nome", "Só UF ($1) — refaça login após deploy", "nome", "^([A-Z]{{2}})$"
+)"""
+
+
 def period_delta_login_by_nome(selector: str) -> str:
-    inner = login_by_prefeitura_display(selector)
+    now = login_prefeitura_nome_chain(selector)
+    then = login_prefeitura_nome_chain(_selector_with_offset(selector, "$__range"))
     return f"""clamp_min(
-sum({inner}) by (nome)
-- sum({inner} offset $__range) by (nome),
+sum({now}) by (nome)
+- sum({then}) by (nome),
 0)"""
 
 
@@ -154,18 +176,7 @@ def p95_duration_by_prefeitura(operation: str) -> str:
 
 
 def login_by_prefeitura_display(selector: str = 'docmaster_auth_login_total{result="success"}') -> str:
-    return f"""sum(
-  label_replace(
-    label_replace(
-      label_replace(
-        {selector},
-        "nome", "$1", "tenant", "(.+)"
-      ),
-      "nome", "$1", "prefeitura", "(.+)"
-    ),
-    "nome", "Só UF ($1) — refaça login após deploy", "nome", "^([A-Z]{{2}})$"
-  )
-) by (nome)"""
+    return f"sum({login_prefeitura_nome_chain(selector)}) by (nome)"
 
 
 LOGIN_NOME_MAPPINGS = {
@@ -216,17 +227,28 @@ def stat(id_, title, y, x, w, expr, desc="", *, period=False, unit="none", decim
 
 
 def stat_duration(id_, title, y, x, w, expr, desc=""):
-    return stat(
-        id_,
-        title,
-        y,
-        x,
-        w,
-        expr,
-        desc=desc or "Percentil 95 da duração no intervalo do Grafana (requer tráfego recente).",
-        unit="s",
-        decimals=1,
-    )
+    """p95 exige query de intervalo (rate/histogram), não instant."""
+    return {
+        "datasource": DS,
+        "description": desc
+        or "Percentil 95 da duração no intervalo do Grafana (requer tráfego recente).",
+        "fieldConfig": {
+            "defaults": {"decimals": 1, "noValue": "—", "unit": "s"},
+            "overrides": [],
+        },
+        "gridPos": {"h": 4, "w": w, "x": x, "y": y},
+        "id": id_,
+        "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
+            "textMode": "auto",
+        },
+        "targets": [range_query(expr)],
+        "title": title,
+        "type": "stat",
+    }
 
 
 def prom_table_p95_prefeitura(id_, title, y, x, w, h, operation, desc=""):
@@ -263,8 +285,8 @@ def prom_table_p95_prefeitura(id_, title, y, x, w, h, operation, desc=""):
                 "datasource": DS,
                 "expr": p95_duration_by_prefeitura(operation),
                 "refId": "A",
-                "instant": True,
-                "range": False,
+                "instant": False,
+                "range": True,
                 "format": "table",
                 "editorMode": "code",
             }
@@ -953,7 +975,7 @@ panels.append(
 dash = {
     "annotations": {"list": []},
     "editable": False,
-    "description": "Layout v18 — painel operacional (erros, p95, prefeituras) + totais acumulados.",
+    "description": "Layout v19 — corrige PromQL (offset em métrica, p95 em range query).",
     "fiscalYearStartMonth": 0,
     "graphTooltip": 1,
     "id": None,
@@ -961,13 +983,13 @@ dash = {
     "panels": panels,
     "refresh": "1m",
     "schemaVersion": 39,
-    "tags": ["docmaster", "backend", "django", "layout-v18"],
+    "tags": ["docmaster", "backend", "django", "layout-v19"],
     "templating": {"list": []},
     "time": {"from": "now-24h", "to": "now"},
     "timezone": "browser",
     "title": "DocMaster — Backend Django",
     "uid": "docmaster-backend",
-    "version": 18,
+    "version": 19,
 }
 
 OUT.write_text(json.dumps(dash, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

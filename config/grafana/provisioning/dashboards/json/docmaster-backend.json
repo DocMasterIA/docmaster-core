@@ -3,7 +3,7 @@
     "list": []
   },
   "editable": false,
-  "description": "Layout v11 — período via delta de contador (coerente 16h ⊆ 24h).",
+  "description": "Layout v12 — tabelas prefeitura/pacote com format=table + seriesToRows.",
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
@@ -81,8 +81,8 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "editorMode": "code",
-          "legendFormat": ""
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "title": "IA — preencher slots",
@@ -132,8 +132,8 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "editorMode": "code",
-          "legendFormat": ""
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "title": "Gerar via LLM",
@@ -183,8 +183,8 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "editorMode": "code",
-          "legendFormat": ""
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "title": "TR + DFD + Ofício",
@@ -234,8 +234,8 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "editorMode": "code",
-          "legendFormat": ""
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "title": "Docs salvos",
@@ -285,8 +285,8 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "editorMode": "code",
-          "legendFormat": ""
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "title": "Logins OK",
@@ -336,8 +336,8 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "editorMode": "code",
-          "legendFormat": ""
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "title": "Erros geração",
@@ -351,9 +351,42 @@
       "description": "Query instantânea. Coluna Prefeitura = nome do município no cadastro.",
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "align": "left",
+            "filterable": true
+          },
           "decimals": 0
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Prefeitura"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Logins"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "custom.align",
+                "value": "center"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -363,6 +396,10 @@
       },
       "id": 332,
       "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
         "showHeader": true,
         "sortBy": [
           {
@@ -381,29 +418,51 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "editorMode": "code",
-          "legendFormat": "{{prefeitura}}"
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "transformations": [
         {
-          "id": "labelsToFields",
-          "options": {
-            "mode": "columns",
-            "keepLabels": [
-              "prefeitura"
-            ]
-          }
+          "id": "seriesToRows",
+          "options": {}
         },
         {
           "id": "organize",
           "options": {
             "excludeByName": {
-              "Time": true
+              "Time": true,
+              "time": true,
+              "__name__": true,
+              "Metric": true,
+              "job": true,
+              "instance": true,
+              "service": true,
+              "result": true,
+              "operation": true,
+              "output": true,
+              "tenant": true
+            },
+            "indexByName": {
+              "prefeitura": 0,
+              "Value": 1,
+              "Value #A": 1
             },
             "renameByName": {
               "prefeitura": "Prefeitura",
-              "Value": "Logins"
+              "Value": "Logins",
+              "Value #A": "Logins"
+            }
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Prefeitura",
+                "Logins"
+              ]
             }
           }
         }
@@ -416,9 +475,13 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "",
+      "description": "Pacote = tipo de dispensa / fluxo de geração.",
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "align": "left",
+            "filterable": true
+          },
           "decimals": 0
         },
         "overrides": [
@@ -428,6 +491,10 @@
               "options": "Pacote"
             },
             "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              },
               {
                 "id": "mappings",
                 "value": [
@@ -460,6 +527,22 @@
                 ]
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Gerações"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "custom.align",
+                "value": "center"
+              }
+            ]
           }
         ]
       },
@@ -471,6 +554,10 @@
       },
       "id": 341,
       "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
         "showHeader": true,
         "sortBy": [
           {
@@ -489,29 +576,51 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "editorMode": "code",
-          "legendFormat": "{{package}}"
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "transformations": [
         {
-          "id": "labelsToFields",
-          "options": {
-            "mode": "columns",
-            "keepLabels": [
-              "package"
-            ]
-          }
+          "id": "seriesToRows",
+          "options": {}
         },
         {
           "id": "organize",
           "options": {
             "excludeByName": {
-              "Time": true
+              "Time": true,
+              "time": true,
+              "__name__": true,
+              "Metric": true,
+              "job": true,
+              "instance": true,
+              "service": true,
+              "result": true,
+              "operation": true,
+              "output": true,
+              "tenant": true
+            },
+            "indexByName": {
+              "package": 0,
+              "Value": 1,
+              "Value #A": 1
             },
             "renameByName": {
               "package": "Pacote",
-              "Value": "Gerações"
+              "Value": "Gerações",
+              "Value #A": "Gerações"
+            }
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "Pacote",
+                "Gerações"
+              ]
             }
           }
         }
@@ -934,8 +1043,8 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "editorMode": "code",
-          "legendFormat": ""
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "title": "LLM OK (total)",
@@ -985,8 +1094,8 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "editorMode": "code",
-          "legendFormat": ""
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "title": "Análise RAG (total)",
@@ -1036,8 +1145,8 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "editorMode": "code",
-          "legendFormat": ""
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "title": "Erros IA (total)",
@@ -1087,8 +1196,8 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "editorMode": "code",
-          "legendFormat": ""
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "title": "PNCP OK (total)",
@@ -1259,8 +1368,8 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "editorMode": "code",
-          "legendFormat": ""
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "title": "Cotações OK",
@@ -1310,8 +1419,8 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "editorMode": "code",
-          "legendFormat": ""
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "title": "PDF relatório",
@@ -1361,8 +1470,8 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "editorMode": "code",
-          "legendFormat": ""
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "title": "Research OK",
@@ -1481,8 +1590,8 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "editorMode": "code",
-          "legendFormat": ""
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "title": "Backend UP",
@@ -1682,8 +1791,8 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "editorMode": "code",
-          "legendFormat": ""
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "title": "Memória RSS",
@@ -1800,7 +1909,7 @@
     "docmaster",
     "backend",
     "django",
-    "layout-v11"
+    "layout-v12"
   ],
   "templating": {
     "list": []
@@ -1812,5 +1921,5 @@
   "timezone": "browser",
   "title": "DocMaster — Backend Django",
   "uid": "docmaster-backend",
-  "version": 11
+  "version": 12
 }

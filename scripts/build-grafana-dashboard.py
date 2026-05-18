@@ -22,9 +22,16 @@ def row(id_, title, y, collapsed=False):
     return {"collapsed": collapsed, "gridPos": {"h": 1, "w": 24, "x": 0, "y": y}, "id": id_, "title": title, "type": "row"}
 
 
-def instant(expr, ref="A", legend=None):
-    t = {"datasource": DS, "expr": expr, "refId": ref, "instant": True, "range": False, "editorMode": "code", "legendFormat": legend or ""}
-    return t
+def instant(expr, ref="A"):
+    return {
+        "datasource": DS,
+        "expr": expr,
+        "refId": ref,
+        "instant": True,
+        "range": False,
+        "format": "table",
+        "editorMode": "code",
+    }
 
 
 def range_query(expr, ref="A", legend=None):
@@ -107,21 +114,55 @@ def ts_duration(id_, title, y, x, w, h, series, desc=""):
     }
 
 
-def prom_table_by_label(id_, title, y, x, w, h, expr, label_name: str, value_name: str, desc=""):
-    """Tabela com nomes legíveis (evita barchart mostrar «VALUE»)."""
+def _table_transforms(label_key: str, label_col: str, value_col: str):
+    """Prometheus format=table + séries em linhas com coluna de label visível."""
+    return [
+        {"id": "seriesToRows", "options": {}},
+        {
+            "id": "organize",
+            "options": {
+                "excludeByName": {
+                    "Time": True,
+                    "time": True,
+                    "__name__": True,
+                    "Metric": True,
+                    "job": True,
+                    "instance": True,
+                    "service": True,
+                    "result": True,
+                    "operation": True,
+                    "output": True,
+                    "tenant": True,
+                },
+                "indexByName": {label_key: 0, "Value": 1, "Value #A": 1},
+                "renameByName": {
+                    label_key: label_col,
+                    "Value": value_col,
+                    "Value #A": value_col,
+                },
+            },
+        },
+        {
+            "id": "filterFieldsByName",
+            "options": {"include": {"names": [label_col, value_col]}},
+        },
+    ]
+
+
+def prom_table_prefeitura(id_, title, y, x, w, h, expr, desc=""):
     return {
         "datasource": DS,
-        "description": desc,
+        "description": desc or "Coluna Prefeitura = label prefeitura da métrica (nome do município + UF).",
         "fieldConfig": {
-            "defaults": {"custom": {"align": "auto", "filterable": True}, "decimals": 0},
+            "defaults": {"custom": {"align": "left", "filterable": True}, "decimals": 0},
             "overrides": [
                 {
-                    "matcher": {"id": "byName", "options": label_name},
-                    "properties": [{"id": "custom.width", "value": 320}],
+                    "matcher": {"id": "byName", "options": "Prefeitura"},
+                    "properties": [{"id": "custom.width", "value": 360}],
                 },
                 {
-                    "matcher": {"id": "byName", "options": value_name},
-                    "properties": [{"id": "custom.width", "value": 100}],
+                    "matcher": {"id": "byName", "options": "Logins"},
+                    "properties": [{"id": "custom.width", "value": 90}, {"id": "custom.align", "value": "center"}],
                 },
             ],
         },
@@ -131,47 +172,10 @@ def prom_table_by_label(id_, title, y, x, w, h, expr, label_name: str, value_nam
             "cellHeight": "sm",
             "footer": {"show": False},
             "showHeader": True,
-            "sortBy": [{"desc": True, "displayName": value_name}],
+            "sortBy": [{"desc": True, "displayName": "Logins"}],
         },
-        "targets": [instant(expr, legend="{{" + label_name + "}}")],
-        "transformations": [
-            {
-                "id": "labelsToFields",
-                "options": {"mode": "columns", "keepLabels": [label_name]},
-            },
-            {
-                "id": "organize",
-                "options": {
-                    "excludeByName": {"Time": True, "__name__": True},
-                    "indexByName": {label_name: 0, "Value": 1},
-                    "renameByName": {label_name: label_name.replace("_", " ").title() if label_name == "package" else "Prefeitura", "Value": value_name},
-                },
-            },
-        ],
-        "title": title,
-        "type": "table",
-    }
-
-
-def prom_table_prefeitura(id_, title, y, x, w, h, expr, desc=""):
-    return {
-        "datasource": DS,
-        "description": desc,
-        "fieldConfig": {"defaults": {"decimals": 0}, "overrides": []},
-        "gridPos": {"h": h, "w": w, "x": x, "y": y},
-        "id": id_,
-        "options": {"showHeader": True, "sortBy": [{"desc": True, "displayName": "Logins"}]},
-        "targets": [instant(expr, legend="{{prefeitura}}")],
-        "transformations": [
-            {"id": "labelsToFields", "options": {"mode": "columns", "keepLabels": ["prefeitura"]}},
-            {
-                "id": "organize",
-                "options": {
-                    "excludeByName": {"Time": True},
-                    "renameByName": {"prefeitura": "Prefeitura", "Value": "Logins"},
-                },
-            },
-        ],
+        "targets": [instant(expr)],
+        "transformations": _table_transforms("prefeitura", "Prefeitura", "Logins"),
         "title": title,
         "type": "table",
     }
@@ -181,30 +185,33 @@ def prom_table_packages(id_, title, y, x, w, h, expr, desc=""):
     pkg_mappings = {"type": "value", "options": {k: {"text": v} for k, v in PACKAGE_LABELS.items()}}
     return {
         "datasource": DS,
-        "description": desc,
+        "description": desc or "Pacote = tipo de dispensa / fluxo de geração.",
         "fieldConfig": {
-            "defaults": {"decimals": 0},
+            "defaults": {"custom": {"align": "left", "filterable": True}, "decimals": 0},
             "overrides": [
                 {
                     "matcher": {"id": "byName", "options": "Pacote"},
-                    "properties": [{"id": "mappings", "value": [pkg_mappings]}],
-                }
+                    "properties": [
+                        {"id": "custom.width", "value": 360},
+                        {"id": "mappings", "value": [pkg_mappings]},
+                    ],
+                },
+                {
+                    "matcher": {"id": "byName", "options": "Gerações"},
+                    "properties": [{"id": "custom.width", "value": 90}, {"id": "custom.align", "value": "center"}],
+                },
             ],
         },
         "gridPos": {"h": h, "w": w, "x": x, "y": y},
         "id": id_,
-        "options": {"showHeader": True, "sortBy": [{"desc": True, "displayName": "Gerações"}]},
-        "targets": [instant(expr, legend="{{package}}")],
-        "transformations": [
-            {"id": "labelsToFields", "options": {"mode": "columns", "keepLabels": ["package"]}},
-            {
-                "id": "organize",
-                "options": {
-                    "excludeByName": {"Time": True},
-                    "renameByName": {"package": "Pacote", "Value": "Gerações"},
-                },
-            },
-        ],
+        "options": {
+            "cellHeight": "sm",
+            "footer": {"show": False},
+            "showHeader": True,
+            "sortBy": [{"desc": True, "displayName": "Gerações"}],
+        },
+        "targets": [instant(expr)],
+        "transformations": _table_transforms("package", "Pacote", "Gerações"),
         "title": title,
         "type": "table",
     }
@@ -477,7 +484,7 @@ panels.append(
 dash = {
     "annotations": {"list": []},
     "editable": False,
-    "description": "Layout v11 — período via delta de contador (coerente 16h ⊆ 24h).",
+    "description": "Layout v12 — tabelas prefeitura/pacote com format=table + seriesToRows.",
     "fiscalYearStartMonth": 0,
     "graphTooltip": 1,
     "id": None,
@@ -485,13 +492,13 @@ dash = {
     "panels": panels,
     "refresh": "1m",
     "schemaVersion": 39,
-    "tags": ["docmaster", "backend", "django", "layout-v11"],
+    "tags": ["docmaster", "backend", "django", "layout-v12"],
     "templating": {"list": []},
     "time": {"from": "now-24h", "to": "now"},
     "timezone": "browser",
     "title": "DocMaster — Backend Django",
     "uid": "docmaster-backend",
-    "version": 11,
+    "version": 12,
 }
 
 OUT.write_text(json.dumps(dash, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

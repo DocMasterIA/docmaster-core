@@ -7,6 +7,7 @@ e cabeçalhos/rodapés).
 """
 from __future__ import annotations
 
+import re
 from typing import Iterator
 
 from docx.document import Document
@@ -14,7 +15,26 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.table import Table
 from docx.text.paragraph import Paragraph
-from docx.shared import RGBColor
+from docx.shared import Pt, RGBColor
+
+_ROMAN_ITEM_LINE = re.compile(r"^[IVXLC]+\s*[–—\-]\s*.+", re.MULTILINE)
+
+
+def paragraph_is_roman_enumerated_list(text: str) -> bool:
+    """
+    Lista I – …; II – … no TR dispensa manutenção (§2.1).
+    Deve permanecer alinhada à esquerda, sem justificação (linhas curtas esticam).
+    """
+    t = (text or "").replace("\r\n", "\n").strip()
+    if not t:
+        return False
+    if "Manutenção preventiva" in t and "Manutenção corretiva" in t:
+        return True
+    lines = [ln.strip() for ln in t.split("\n") if ln.strip()]
+    if len(lines) < 3:
+        return False
+    roman = sum(1 for ln in lines if _ROMAN_ITEM_LINE.match(ln))
+    return roman >= 3
 
 STANDARD_BODY_FONT = "Times New Roman"
 STANDARD_FONT_COLOR = RGBColor(0, 0, 0)
@@ -145,6 +165,13 @@ def _justify_paragraphs_in_container(container, *, justify_heading_styles: bool)
                         continue
                 except Exception:
                     pass
+            if paragraph_is_roman_enumerated_list(p.text or ""):
+                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                pf = p.paragraph_format
+                pf.space_before = Pt(0)
+                pf.space_after = Pt(0)
+                pf.line_spacing = 1.0
+                continue
             al = p.alignment
             if al in (None, WD_ALIGN_PARAGRAPH.LEFT):
                 p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY

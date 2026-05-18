@@ -24,7 +24,11 @@ from docx.oxml.ns import qn
 from docx.table import Table as DocxTable
 from docx.text.paragraph import Paragraph
 
-from .docx_typography import apply_default_justify_to_document, apply_standard_body_font_to_document
+from .docx_typography import (
+    apply_default_justify_to_document,
+    apply_standard_body_font_to_document,
+    paragraph_is_roman_enumerated_list,
+)
 
 TR_ITEMS_TABLE_ANCHOR = "(TR_TABELA_ITENS)"
 
@@ -440,6 +444,8 @@ def split_paragraphs_on_double_newline(doc: Document, *, space_after_pt: float =
 
     def process_para(para: Paragraph) -> None:
         t = para.text or ""
+        if paragraph_is_roman_enumerated_list(t):
+            return
         if "\n\n" not in t:
             return
         parts = [p.strip() for p in t.split("\n\n") if p.strip()]

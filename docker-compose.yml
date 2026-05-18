@@ -11,7 +11,8 @@
 # No rag_service: LLM_ETP_GENERATION_BASE_URL=http://qwen_llm_service:8015 (Ollama/llm_api segue em LLM_ORCHESTRATION_BASE_URL).
 #
 # Prometheus: docker compose up -d prometheus  → http://localhost:9090
-# Config: ./config/prometheus.yml (relativo à pasta do compose)
+# Grafana:    docker compose up -d grafana     → http://localhost:3000  (admin / GRAFANA_ADMIN_PASSWORD)
+# Config: ./config/prometheus.yml e ./config/grafana/provisioning/
 
 services:
   ollama:
@@ -254,6 +255,23 @@ services:
     ports:
       - "9090:9090"
 
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost:3000}
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+
 volumes:
   chroma_data:
   ollama_data:
@@ -261,3 +279,4 @@ volumes:
   backend_media:  # MEDIA_ROOT do Django (templates/docx, previews, etc.)
   pncp_researcher_data:  # SQLite do pncp_researcher_service
   prometheus_data:     # TSDB do Prometheus
+  grafana_data:        # dashboards, utilizadores, plugins

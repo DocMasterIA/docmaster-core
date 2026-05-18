@@ -1,50 +1,101 @@
 #!/usr/bin/env bash
-# Força o Grafana a reler o dashboard provisionado (ficheiro JSON no repo).
-# Dashboards provisionados NÃO podem ser apagados/importados pela API.
+# Força o Grafana a reler o dashboard provisionado.
+# Funciona com docker compose na raiz do projeto OU stack em ~/ com config separado.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="${DOCMASTER_ROOT:-$SCRIPT_DIR/..}"
+REPO_ROOT="$(cd "$REPO_ROOT" && pwd)"
 
 GRAFANA_URL="${GRAFANA_URL:-http://127.0.0.1:3000}"
 GRAFANA_USER="${GRAFANA_USER:-admin}"
 GRAFANA_PASS="${GRAFANA_PASS:-changeme}"
 DASH_UID="docmaster-backend"
-DASH_FILE="config/grafana/provisioning/dashboards/json/docmaster-backend.json"
+REPO_DASH="${REPO_ROOT}/config/grafana/provisioning/dashboards/json/docmaster-backend.json"
 
-if [[ ! -f "$DASH_FILE" ]]; then
-  echo "ERRO: não encontrei ${DASH_FILE}"
+# Caminho que o contentor Grafana monta (pode ser ~/config, não ~/docmaster-core/config)
+PROVISION_MOUNT=""
+if docker inspect grafana >/dev/null 2>&1; then
+  PROVISION_MOUNT="$(docker inspect grafana --format '{{range .Mounts}}{{if eq .Destination "/etc/grafana/provisioning"}}{{.Source}}{{end}}{{end}}')"
+fi
+
+LIVE_DASH=""
+if [[ -n "$PROVISION_MOUNT" ]]; then
+  LIVE_DASH="${PROVISION_MOUNT}/dashboards/json/docmaster-backend.json"
+fi
+
+echo "Repo:              ${REPO_ROOT}"
+echo "JSON no repo:      ${REPO_DASH}"
+[[ -n "$PROVISION_MOUNT" ]] && echo "Grafana monta:     ${PROVISION_MOUNT}"
+[[ -n "$LIVE_DASH" ]] && echo "JSON no contentor: ${LIVE_DASH}"
+echo ""
+
+if [[ ! -f "$REPO_DASH" ]]; then
+  echo "ERRO: não encontrei o dashboard no repo."
   exit 1
 fi
 
-if ! grep -q 'layout-v6' "$DASH_FILE"; then
-  echo "ERRO: o JSON local está ANTIGO (sem tag layout-v6)."
-  echo ""
-  echo "Corra primeiro:"
-  echo "  cd ~/docmaster-core   # ou o caminho do clone no servidor"
-  echo "  git fetch origin main && git pull origin main"
-  echo "  grep layout-v6 ${DASH_FILE} && echo 'ficheiro OK'"
-  echo ""
-  echo "Só depois: ./scripts/grafana-reset-dashboard.sh"
+if ! grep -q 'layout-v6' "$REPO_DASH"; then
+  echo "ERRO: JSON no repo sem layout-v6. Faça git pull em ${REPO_ROOT}"
   exit 1
 fi
 
-echo "==> Ficheiro local OK ($(grep -o '"version": [0-9]*' "$DASH_FILE" | head -1), tag layout-v6)"
+# Diretório onde corre docker compose (label ou cwd do contentor)
+COMPOSE_DIR="${DOCMASTER_COMPOSE_DIR:-}"
+if [[ -z "$COMPOSE_DIR" ]] && docker inspect grafana >/dev/null 2>&1; then
+  COMPOSE_DIR="$(docker inspect grafana --format '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' 2>/dev/null || true)"
+fi
+if [[ -z "$COMPOSE_DIR" || ! -f "${COMPOSE_DIR}/docker-compose.yml" ]]; then
+  if [[ -f "${REPO_ROOT}/docker-compose.yml" ]]; then
+    COMPOSE_DIR="$REPO_ROOT"
+  elif [[ -f "${HOME}/docker-compose.yml" ]]; then
+    COMPOSE_DIR="$HOME"
+  else
+    COMPOSE_DIR="$REPO_ROOT"
+  fi
+fi
 
-echo "==> A recriar contentor Grafana (relê provisioning + overwrite)..."
-docker compose up -d --no-deps --force-recreate grafana
+echo "Docker Compose em: ${COMPOSE_DIR}"
+
+# Sincronizar provisioning do repo → pasta que o Grafana realmente lê
+if [[ -n "$PROVISION_MOUNT" && "$PROVISION_MOUNT" != "${REPO_ROOT}/config/grafana/provisioning" ]]; then
+  echo ""
+  echo "==> A copiar config Grafana do repo para a pasta do contentor..."
+  mkdir -p "${PROVISION_MOUNT}/dashboards/json" "${PROVISION_MOUNT}/datasources"
+  cp -f "${REPO_ROOT}/config/grafana/provisioning/dashboards/default.yml" \
+    "${PROVISION_MOUNT}/dashboards/default.yml"
+  cp -f "$REPO_DASH" "$LIVE_DASH"
+  if [[ -f "${REPO_ROOT}/config/grafana/provisioning/datasources/prometheus.yml" ]]; then
+    cp -f "${REPO_ROOT}/config/grafana/provisioning/datasources/prometheus.yml" \
+      "${PROVISION_MOUNT}/datasources/prometheus.yml"
+  fi
+  if grep -q 'layout-v6' "$LIVE_DASH"; then
+    echo "    Copiado OK (layout-v6 presente em ${LIVE_DASH})"
+  else
+    echo "ERRO: cópia falhou — ${LIVE_DASH} ainda sem layout-v6"
+    exit 1
+  fi
+elif [[ -f "$LIVE_DASH" ]] && ! grep -q 'layout-v6' "$LIVE_DASH"; then
+  echo "ERRO: ${LIVE_DASH} está antigo e não é o mesmo path do repo."
+  echo "Copie manualmente:"
+  echo "  mkdir -p $(dirname "$LIVE_DASH")"
+  echo "  cp -f ${REPO_DASH} ${LIVE_DASH}"
+  exit 1
+fi
+
+echo ""
+echo "==> A recriar contentor Grafana..."
+(cd "$COMPOSE_DIR" && docker compose up -d --no-deps --force-recreate grafana)
 
 echo "==> A aguardar Grafana..."
-for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
-  if curl -sf "${GRAFANA_URL}/api/health" >/dev/null 2>&1; then
-    break
-  fi
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+  curl -sf "${GRAFANA_URL}/api/health" >/dev/null 2>&1 && break
   sleep 2
 done
 
-for i in 1 2 3 4 5 6 7 8 9 10; do
-  if curl -sf -u "${GRAFANA_USER}:${GRAFANA_PASS}" \
-    "${GRAFANA_URL}/api/dashboards/uid/${DASH_UID}" >/tmp/grafana-dash.json 2>/dev/null; then
-    break
-  fi
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  curl -sf -u "${GRAFANA_USER}:${GRAFANA_PASS}" \
+    "${GRAFANA_URL}/api/dashboards/uid/${DASH_UID}" >/tmp/grafana-dash.json 2>/dev/null && break
   sleep 2
 done
 
@@ -56,40 +107,35 @@ import sys
 with open("/tmp/grafana-dash.json") as f:
     data = json.load(f)
 d = data.get("dashboard") or data
-meta = data.get("meta") or {}
 
 tags = d.get("tags") or []
 panels = d.get("panels") or []
 rows = [p.get("title") for p in panels if p.get("type") == "row"]
-titles = [p.get("title") for p in panels if p.get("type") != "row"][:5]
 
 print("Dashboard:", d.get("title"))
-print("Provisionado:", meta.get("provisioned"))
 print("Tags:", tags)
 print("Painéis:", len(panels))
 print("Secções:", rows[:3])
-print("Exemplos:", titles)
 
 if "layout-v6" not in tags:
-    print("\nO Grafana ainda não tem o layout novo.", file=sys.stderr)
-    sys.exit(1)
+    sys.exit("ERRO: Grafana ainda sem layout-v6.")
 if not any("Layout v6" in (r or "") for r in rows):
-    print("\nSecções sem 'Layout v6' — JSON no contentor pode estar desatualizado.", file=sys.stderr)
-    sys.exit(1)
+    sys.exit("ERRO: secções sem Layout v6.")
 print("\nOK — layout v6 activo.")
 PY
 
 if [[ "$VERIFY_OK" -ne 0 ]]; then
   echo ""
-  echo "O volume grafana_data pode ter bloqueado o overwrite. Último recurso:"
-  echo "  docker compose stop grafana"
-  echo "  docker rm grafana"
-  echo "  docker volume rm \$(docker volume ls -q | grep grafana_data)"
+  echo "Último recurso (apaga utilizadores/dashboards guardados no volume):"
+  echo "  cd ${COMPOSE_DIR}"
+  echo "  docker compose stop grafana && docker rm grafana"
+  echo "  docker volume ls | grep grafana"
+  echo "  docker volume rm <nome_do_volume_grafana_data>"
   echo "  docker compose up -d grafana"
-  echo "  ./scripts/grafana-reset-dashboard.sh"
+  echo "  DOCMASTER_ROOT=${REPO_ROOT} $0"
   exit 1
 fi
 
 echo ""
 echo "Abra: ${GRAFANA_URL}/d/${DASH_UID}"
-echo "Primeira secção deve ser: «Layout v6 — Visão geral — tráfego HTTP»"
+echo "Primeira secção: «Layout v6 — Visão geral — tráfego HTTP»"

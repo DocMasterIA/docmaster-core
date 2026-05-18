@@ -57,6 +57,30 @@ docmaster_document_instances_created_total = Counter(
     ["doc_type", "package", "tenant"],
 )
 
+docmaster_platform_events_total = Counter(
+    "docmaster_platform_events_total",
+    "Eventos de uso por módulo (LLM, PNCP, análise, etc.)",
+    ["module", "action", "result", "tenant"],
+)
+
+KNOWN_LLM_ACTIONS = frozenset(
+    {"health", "planner", "section", "analysis", "generate", "test-audit"}
+)
+
+KNOWN_PNCp_RESEARCH_ACTIONS = frozenset(
+    {
+        "health",
+        "market-search",
+        "market-search-stream",
+        "local-index-stats",
+        "local-index-search",
+        "local-index-search-items",
+        "research-sessions",
+        "research-cotacoes",
+        "other",
+    }
+)
+
 
 def normalize_package_key(key: str | None) -> str:
     k = (key or "").strip().lower()
@@ -145,6 +169,53 @@ def record_document_operation(
     ).observe(max(0.0, duration_seconds))
 
 
+def normalize_llm_action(path: str | None) -> str:
+    seg = (path or "").strip("/").split("/")[0].lower()
+    return seg if seg in KNOWN_LLM_ACTIONS else "other"
+
+
+def normalize_pncp_research_action(path: str | None) -> str:
+    parts = [p for p in (path or "").strip("/").split("/") if p]
+    if not parts:
+        return "health"
+    head = parts[0].lower()
+    if head == "market-search":
+        if len(parts) > 1 and parts[1].lower() == "stream":
+            return "market-search-stream"
+        if len(parts) > 2 and parts[2].lower() == "stream":
+            return "market-search-stream"
+        return "market-search"
+    if head == "local-index" and len(parts) > 1:
+        sub = parts[1].lower()
+        if sub in ("stats", "search", "search-items", "backfill"):
+            return f"local-index-{sub}"
+        return "local-index-search"
+    if head == "research" and len(parts) > 1:
+        return f"research-{parts[1].lower()[:24]}"
+    if head in KNOWN_PNCp_RESEARCH_ACTIONS:
+        return head
+    return "other"
+
+
+def record_platform_event(
+    *,
+    module: str,
+    action: str,
+    result: str,
+    tenant: str,
+) -> None:
+    mod = (module or "unknown")[:24]
+    act = (action or "unknown")[:32]
+    res = "success" if result == "success" else "error"
+    ten = (tenant or "anonymous")[:16]
+    docmaster_platform_events_total.labels(
+        module=mod,
+        action=act,
+        result=res,
+        tenant=ten,
+    ).inc()
+
+
 def record_document_instance_created(
     *,
     doc_type: str,
@@ -156,6 +227,34 @@ def record_document_instance_created(
         package=normalize_package_key(package),
         tenant=(tenant or "anonymous")[:16],
     ).inc()
+
+
+def track_platform(module: str, action: str | None = None):
+    """Decorator para módulos além do pipeline de documentos (PNCP, análise, etc.)."""
+
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapped(request, *args, **kwargs):
+            act = action or (getattr(request, "method", "GET") or "GET").lower()[:16]
+            result = "success"
+            try:
+                response = view_func(request, *args, **kwargs)
+                result = result_from_response(response)
+                return response
+            except Exception:
+                result = "error"
+                raise
+            finally:
+                record_platform_event(
+                    module=module,
+                    action=act,
+                    result=result,
+                    tenant=tenant_label_from_request(request),
+                )
+
+        return wrapped
+
+    return decorator
 
 
 def track_docmaster_view(operation: str):

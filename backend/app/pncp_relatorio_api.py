@@ -33,6 +33,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 from weasyprint import HTML
 
 from backend.app.api import api_login_required
+from backend.app.metrics import track_platform
 from backend.app.models import PncpCotacao, PncpCotacaoAnexo, PncpCotacaoAnexoArquivo
 from backend.app.services.pncp_relatorio_pdf import gerar_pdf_relatorio_cotacao, nome_arquivo_relatorio, nome_sistema_relatorio
 from backend.app.services.pncp_supplier_enrichment import enrich_missing_supplier_fields_for_cotacao
@@ -402,6 +403,7 @@ def _relatorio_pdf_request_body_validation(request) -> Tuple[Dict[str, Any] | No
 @api_login_required
 @csrf_exempt
 @require_http_methods(["POST", "OPTIONS"])
+@track_platform("pncp_cotacao", "relatorio_pdf")
 def pncp_cotacao_relatorio_pdf_start(request, sessao_id: int):
     if request.method == "OPTIONS":
         return JsonResponse({}, status=204)

@@ -35,8 +35,8 @@ if [[ ! -f "$REPO_DASH" ]]; then
   exit 1
 fi
 
-if ! grep -q 'layout-v6' "$REPO_DASH"; then
-  echo "ERRO: JSON no repo sem layout-v6. Faça git pull em ${REPO_ROOT}"
+if ! grep -qE 'layout-v(6|7|8)' "$REPO_DASH"; then
+  echo "ERRO: JSON no repo desatualizado. Faça git pull em ${REPO_ROOT}"
   exit 1
 fi
 
@@ -69,13 +69,13 @@ if [[ -n "$PROVISION_MOUNT" && "$PROVISION_MOUNT" != "${REPO_ROOT}/config/grafan
     cp -f "${REPO_ROOT}/config/grafana/provisioning/datasources/prometheus.yml" \
       "${PROVISION_MOUNT}/datasources/prometheus.yml"
   fi
-  if grep -q 'layout-v6' "$LIVE_DASH"; then
-    echo "    Copiado OK (layout-v6 presente em ${LIVE_DASH})"
+  if grep -qE 'layout-v(6|7|8)' "$LIVE_DASH"; then
+    echo "    Copiado OK ($(basename "$LIVE_DASH"))"
   else
-    echo "ERRO: cópia falhou — ${LIVE_DASH} ainda sem layout-v6"
+    echo "ERRO: cópia falhou — ${LIVE_DASH} ainda desatualizado"
     exit 1
   fi
-elif [[ -f "$LIVE_DASH" ]] && ! grep -q 'layout-v6' "$LIVE_DASH"; then
+elif [[ -f "$LIVE_DASH" ]] && ! grep -qE 'layout-v(6|7|8)' "$LIVE_DASH"; then
   echo "ERRO: ${LIVE_DASH} está antigo e não é o mesmo path do repo."
   echo "Copie manualmente:"
   echo "  mkdir -p $(dirname "$LIVE_DASH")"
@@ -117,11 +117,11 @@ print("Tags:", tags)
 print("Painéis:", len(panels))
 print("Secções:", rows[:3])
 
-if "layout-v6" not in tags:
-    sys.exit("ERRO: Grafana ainda sem layout-v6.")
-if not any("Layout v6" in (r or "") for r in rows):
-    sys.exit("ERRO: secções sem Layout v6.")
-print("\nOK — layout v6 activo.")
+if not any(t in tags for t in ("layout-v6", "layout-v7", "layout-v8")):
+    sys.exit("ERRO: Grafana ainda sem layout novo (layout-v8).")
+if len(panels) < 10:
+    sys.exit("ERRO: dashboard incompleto.")
+print("\nOK — layout v8 activo.")
 PY
 
 if [[ "$VERIFY_OK" -ne 0 ]]; then
@@ -138,4 +138,4 @@ fi
 
 echo ""
 echo "Abra: ${GRAFANA_URL}/d/${DASH_UID}"
-echo "Primeira secção: «Layout v6 — Visão geral — tráfego HTTP»"
+echo "Primeira secção: «Gestão — resumo do período» (layout-v8)"

@@ -28,6 +28,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from backend.app.api import api_login_required
+from backend.app.metrics import track_platform
 from backend.app.models import (
     PncpCotacao,
     PncpCotacaoAnexo,
@@ -981,6 +982,7 @@ def pncp_fornecedores_cadastrados(request):
 @csrf_exempt
 @require_http_methods(["GET", "POST", "OPTIONS"])
 @_pncp_json_errors
+@track_platform("pncp_cotacao")
 def pncp_research_sessions_list_create(request):
     if request.method == "OPTIONS":
         return JsonResponse({}, status=204)

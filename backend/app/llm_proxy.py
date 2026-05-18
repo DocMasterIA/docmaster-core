@@ -13,6 +13,11 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from backend.app.api import api_login_required
+from backend.app.metrics import (
+    normalize_llm_action,
+    record_platform_event,
+    tenant_label_from_request,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +40,9 @@ def llm_proxy(request, path):
     url = f"{base}/api/llm/{path}"
     headers = {"Content-Type": "application/json"}
 
+    action = normalize_llm_action(path)
+    tenant = tenant_label_from_request(request)
+    result = "error"
     try:
         if request.method == "GET":
             resp = requests.get(url, timeout=30)
@@ -47,7 +55,9 @@ def llm_proxy(request, path):
             data = resp.json()
         except Exception:
             data = {"raw": resp.text}
-        return JsonResponse(data, status=resp.status_code, safe=isinstance(data, dict))
+        response = JsonResponse(data, status=resp.status_code, safe=isinstance(data, dict))
+        result = "success" if resp.status_code < 400 else "error"
+        return response
     except requests.exceptions.Timeout:
         logger.warning("LLM proxy timeout: %s", url)
         return JsonResponse(
@@ -63,3 +73,10 @@ def llm_proxy(request, path):
     except Exception as e:
         logger.exception("LLM proxy error: %s", e)
         return JsonResponse({"error": "Erro ao comunicar com o serviço de IA."}, status=502)
+    finally:
+        record_platform_event(
+            module="llm",
+            action=action,
+            result=result,
+            tenant=tenant,
+        )

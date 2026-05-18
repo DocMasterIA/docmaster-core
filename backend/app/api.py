@@ -36,6 +36,7 @@ from backend.app.metrics import (
     tenant_label,
     tenant_label_from_request,
     track_docmaster_view,
+    track_platform,
 )
 
 def _rag_http_timeout_seconds() -> float:
@@ -993,6 +994,7 @@ def fill_tr_slots_api(request):
 
 @csrf_exempt
 @api_login_required
+@track_platform("analise", "documento")
 def analise_documentos_api(request):
     """
     Recebe um arquivo (PDF/DOCX) e delega a análise para o rag_service (/api/rag/analyze-document).

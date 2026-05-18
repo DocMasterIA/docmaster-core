@@ -31,7 +31,6 @@ from urllib.parse import urlparse
 
 from backend.app.metrics import (
     record_auth_login,
-    record_auth_logout,
     record_document_instance_created,
     set_request_metrics,
     tenant_label,
@@ -1131,7 +1130,6 @@ def api_auth_login(request):
         return JsonResponse({"ok": False, "error": "E-mail/usuário e senha são obrigatórios."}, status=400)
 
     if request.user.is_authenticated:
-        record_auth_login(result="success", tenant=tenant_label_from_request(request))
         return JsonResponse({"ok": True, "message": "Já autenticado."})
 
     prefeitura = None
@@ -1181,7 +1179,7 @@ def api_auth_login(request):
     else:
         request.session.set_expiry(0)
     resolved_prefeitura_url = prefeitura.url if prefeitura else getattr(getattr(user, "prefeitura", None), "url", "")
-    record_auth_login(result="success", tenant=tenant_label(user))
+    # Sucesso: user_logged_in (metrics.connect_auth_signals) incrementa docmaster_auth_login_total.
     return JsonResponse({"ok": True, "message": "Login realizado com sucesso.", "prefeitura_url": resolved_prefeitura_url})
 
 
@@ -1190,9 +1188,8 @@ def api_auth_login(request):
 def api_auth_logout(request):
     if request.method not in ("GET", "POST"):
         return JsonResponse({"ok": False, "error": "Use GET ou POST"}, status=405)
-    tenant = tenant_label_from_request(request)
     auth_logout(request)
-    record_auth_logout(tenant=tenant)
+    # user_logged_out (metrics.connect_auth_signals) incrementa docmaster_auth_logout_total.
     return JsonResponse({"ok": True, "message": "Logout realizado."})
 
 

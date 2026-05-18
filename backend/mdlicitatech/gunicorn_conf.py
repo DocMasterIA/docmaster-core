@@ -10,6 +10,11 @@ def on_starting(server):
         os.makedirs(multiproc_dir, exist_ok=True)
 
 
+def post_fork(server, worker):
+    # Cada worker Gunicorn precisa carregar métricas no próprio PID (mmap multiprocess).
+    import backend.app.metrics  # noqa: F401
+
+
 def child_exit(server, worker):
     from prometheus_client import multiprocess
 

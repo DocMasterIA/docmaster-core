@@ -10,7 +10,6 @@ from functools import wraps
 
 import json
 
-from django.http import JsonResponse
 from prometheus_client import Counter, Histogram
 
 # Pacotes de geração (mesmo conjunto do route_map em api._resolve_slot_package_key).
@@ -90,6 +89,8 @@ def result_from_response(response) -> str:
     status_code = getattr(response, "status_code", 200)
     if status_code >= 400:
         return "error"
+    from django.http import JsonResponse
+
     if isinstance(response, JsonResponse):
         try:
             data = json.loads(response.content.decode(response.charset or "utf-8"))
@@ -188,3 +189,24 @@ def track_docmaster_view(operation: str):
         return wrapped
 
     return decorator
+
+
+_auth_signals_connected = False
+
+
+def connect_auth_signals() -> None:
+    """Login/logout via Django auth (funciona mesmo se api.py ainda não foi importado no worker)."""
+    global _auth_signals_connected
+    if _auth_signals_connected:
+        return
+    from django.contrib.auth.signals import user_logged_in, user_logged_out
+
+    def _on_login(sender, request, user, **kwargs):
+        record_auth_login(result="success", tenant=tenant_label(user))
+
+    def _on_logout(sender, request, user, **kwargs):
+        record_auth_logout(tenant=tenant_label(user) if user else "anonymous")
+
+    user_logged_in.connect(_on_login, dispatch_uid="docmaster_metrics_login")
+    user_logged_out.connect(_on_logout, dispatch_uid="docmaster_metrics_logout")
+    _auth_signals_connected = True

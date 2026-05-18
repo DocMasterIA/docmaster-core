@@ -7,3 +7,5 @@ class AppConfig(AppConfig):
 
     def ready(self):
         import backend.app.signals
+        # Registra contadores/histogramas docmaster_* no processo (Gunicorn multiprocess).
+        import backend.app.metrics  # noqa: F401

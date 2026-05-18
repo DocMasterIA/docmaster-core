@@ -26,22 +26,27 @@ KNOWN_SLOT_PACKAGES = frozenset(
     }
 )
 
+# Gunicorn + PROMETHEUS_MULTIPROC_DIR: sem multiprocess_mode as métricas não
+# entram no /metrics (django_prometheus usa só MultiProcessCollector).
 docmaster_auth_login_total = Counter(
     "docmaster_auth_login_total",
     "Tentativas de login na API DocMaster",
     ["result", "tenant"],
+    multiprocess_mode="livesum",
 )
 
 docmaster_auth_logout_total = Counter(
     "docmaster_auth_logout_total",
     "Logouts na API DocMaster",
     ["tenant"],
+    multiprocess_mode="livesum",
 )
 
 docmaster_document_operations_total = Counter(
     "docmaster_document_operations_total",
     "Operações de geração / pipeline de documentos",
     ["operation", "result", "package", "output", "tenant"],
+    multiprocess_mode="livesum",
 )
 
 docmaster_document_operation_duration_seconds = Histogram(
@@ -49,12 +54,14 @@ docmaster_document_operation_duration_seconds = Histogram(
     "Duração das operações de documento (segundos)",
     ["operation", "result", "package", "tenant"],
     buckets=(0.5, 1, 2.5, 5, 10, 30, 60, 120, 300, 600, 900, 1200),
+    multiprocess_mode="liveall",
 )
 
 docmaster_document_instances_created_total = Counter(
     "docmaster_document_instances_created_total",
     "Documentos persistidos em Meus Documentos",
     ["doc_type", "package", "tenant"],
+    multiprocess_mode="livesum",
 )
 
 

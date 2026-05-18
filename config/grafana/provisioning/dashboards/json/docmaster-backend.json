@@ -3,7 +3,7 @@
     "list": []
   },
   "editable": false,
-  "description": "Layout v13 — prefeitura/pacote em barras horizontais (nome visível à esquerda).",
+  "description": "Layout v15 — textos em português brasileiro; logins por prefeitura em tabela.",
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
@@ -19,7 +19,7 @@
       "id": 299,
       "options": {
         "mode": "markdown",
-        "content": "**Totais acumulados** = contador actual (não depende do período do Grafana). **No período** = contador agora − contador no início do intervalo (16h ⊆ 24h → nunca maior em 16h). Se o backend **reiniciou** no meio do intervalo, o período pode subestimar. Uma geração TR+DFD pode contar várias *operações* (slots + zip); «documentos salvos» é outra métrica."
+        "content": "**Totais acumulados** = valor atual do contador (não depende do intervalo do Grafana). **No período** = contador agora menos contador no início do intervalo (16 h dentro de 24 h → nunca maior em 16 h). Se o backend **reiniciou** no meio do intervalo, o período pode subestimar. Uma geração TR+DFD pode contar várias *operações* (slots + zip); \"documentos salvos\" é outra métrica."
       },
       "title": "",
       "type": "text",
@@ -42,7 +42,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Query instantânea: total actual (ignora «últimas 24h»).",
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -92,7 +92,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Query instantânea: total actual (ignora «últimas 24h»).",
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -142,7 +142,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Query instantânea: total actual (ignora «últimas 24h»).",
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -192,7 +192,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Query instantânea: total actual (ignora «últimas 24h»).",
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -242,7 +242,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Query instantânea: total actual (ignora «últimas 24h»).",
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -292,7 +292,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Query instantânea: total actual (ignora «últimas 24h»).",
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -342,17 +342,42 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Nome à esquerda de cada barra = município (UF) ou «Equipe DocMaster (staff)».",
+      "description": "Métrica antiga: label tenant (ex.: staff). Nova: prefeitura com \"Município (UF)\". Após o deploy do backend, novos logins passam a aparecer com o nome completo.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
           "min": 0,
-          "unit": "none",
-          "color": {
-            "mode": "palette-classic"
-          }
+          "unit": "none"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Prefeitura"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "staff": {
+                        "text": "Equipe DocMaster (staff)"
+                      },
+                      "sem_prefeitura": {
+                        "text": "Sem prefeitura"
+                      },
+                      "anonymous": {
+                        "text": "Não identificado"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -362,24 +387,18 @@
       },
       "id": 332,
       "options": {
-        "displayMode": "basic",
-        "minVizHeight": 18,
-        "minVizWidth": 0,
-        "namePlacement": "left",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "show": false
         },
-        "showUnfilled": true,
-        "sizing": "manual",
-        "valueMode": "color",
-        "legend": {
-          "displayMode": "hidden"
-        }
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Logins"
+          }
+        ]
       },
       "targets": [
         {
@@ -387,23 +406,38 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(docmaster_auth_login_total{result=\"success\"}) by (prefeitura)",
+          "expr": "sum(\n  label_replace(\n    label_replace(\n      docmaster_auth_login_total{result=\"success\"},\n      \"nome\", \"$1\", \"prefeitura\", \"(.+)\"\n    ),\n    \"nome\", \"$1\", \"tenant\", \"(.+)\"\n  )\n) by (nome)",
           "refId": "A",
           "instant": true,
           "range": false,
-          "legendFormat": "{{prefeitura}}",
+          "format": "table",
           "editorMode": "code"
         }
       ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true
+            },
+            "renameByName": {
+              "nome": "Prefeitura",
+              "Value": "Logins"
+            }
+          }
+        }
+      ],
       "title": "Logins OK — por prefeitura (total acumulado)",
-      "type": "bargauge"
+      "type": "table"
     },
     {
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Cada barra = uma prefeitura/pacote. O nome vem da métrica Prometheus (label prefeitura ou package).",
+      "description": "Cada barra é uma prefeitura ou pacote. O nome vem dos labels da métrica no Prometheus (prefeitura ou package).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -508,7 +542,7 @@
         "y": 16
       },
       "id": 3010,
-      "title": "No período seleccionado no Grafana",
+      "title": "No período selecionado no Grafana",
       "type": "row"
     },
     {
@@ -516,7 +550,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Soma no período do Grafana.",
+      "description": "Soma no intervalo selecionado no Grafana.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -566,7 +600,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Soma no período do Grafana.",
+      "description": "Soma no intervalo selecionado no Grafana.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -616,7 +650,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Soma no período do Grafana.",
+      "description": "Soma no intervalo selecionado no Grafana.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -666,7 +700,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Soma no período do Grafana.",
+      "description": "Soma no intervalo selecionado no Grafana.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -716,7 +750,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Cada barra é um tipo de operação; um fluxo TR+DFD pode incluir slots antes.",
+      "description": "Cada barra é um tipo de operação; um fluxo TR+DFD pode incluir preenchimento de slots antes.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -787,7 +821,7 @@
           "legendFormat": "TR modelo"
         }
       ],
-      "title": "Operações no período (detalhe — não somar à mão)",
+      "title": "Operações no período (detalhe — não some manualmente)",
       "type": "barchart"
     },
     {
@@ -795,7 +829,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Cada ponto = gerações naquele bucket de tempo. Zero = nenhuma naquele minuto/hora.",
+      "description": "Cada ponto são gerações naquele intervalo de tempo. Zero = nenhuma naquele minuto ou hora.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -875,7 +909,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Query instantânea: total actual (ignora «últimas 24h»).",
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -925,7 +959,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Query instantânea: total actual (ignora «últimas 24h»).",
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -975,7 +1009,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Query instantânea: total actual (ignora «últimas 24h»).",
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -1025,7 +1059,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Query instantânea: total actual (ignora «últimas 24h»).",
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -1196,7 +1230,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Query instantânea: total actual (ignora «últimas 24h»).",
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -1246,7 +1280,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Query instantânea: total actual (ignora «últimas 24h»).",
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -1296,7 +1330,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Query instantânea: total actual (ignora «últimas 24h»).",
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -1415,7 +1449,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Query instantânea: total actual (ignora «últimas 24h»).",
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -1465,7 +1499,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Soma no período do Grafana.",
+      "description": "Soma no intervalo selecionado no Grafana.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -1515,7 +1549,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Soma no período do Grafana.",
+      "description": "Soma no intervalo selecionado no Grafana.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -1565,7 +1599,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Soma no período do Grafana.",
+      "description": "Soma no intervalo selecionado no Grafana.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -1615,7 +1649,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Query instantânea: total actual (ignora «últimas 24h»).",
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -1771,7 +1805,7 @@
     "docmaster",
     "backend",
     "django",
-    "layout-v13"
+    "layout-v15"
   ],
   "templating": {
     "list": []
@@ -1783,5 +1817,5 @@
   "timezone": "browser",
   "title": "DocMaster — Backend Django",
   "uid": "docmaster-backend",
-  "version": 13
+  "version": 15
 }

@@ -54,8 +54,8 @@ def range_query(expr, ref="A", legend=None):
 
 def period_delta(selector: str) -> str:
     """
-    Contagem exacta no intervalo do Grafana: valor agora − valor no início do período.
-    Monótono: 24h >= 16h (se o backend não reiniciou no meio).
+    Contagem exata no intervalo do Grafana: valor agora − valor no início do período.
+    Monotônico: 24h >= 16h (se o backend não reiniciou no meio).
     clamp_min trata restart (contador voltou a 0).
     """
     return f"""clamp_min(
@@ -78,11 +78,36 @@ def total_by(selector: str, label: str) -> str:
     return f"sum({selector}) by ({label})"
 
 
+# Métrica antiga em produção usa label `tenant`; a nova usa `prefeitura` (nome legível).
+# Normaliza para `nome` e agrupa — funciona antes e depois do deploy do backend.
+def login_by_prefeitura_display(selector: str = 'docmaster_auth_login_total{result="success"}') -> str:
+    return f"""sum(
+  label_replace(
+    label_replace(
+      {selector},
+      "nome", "$1", "prefeitura", "(.+)"
+    ),
+    "nome", "$1", "tenant", "(.+)"
+  )
+) by (nome)"""
+
+
+LOGIN_NOME_MAPPINGS = {
+    "staff": "Equipe DocMaster (staff)",
+    "sem_prefeitura": "Sem prefeitura",
+    "anonymous": "Não identificado",
+}
+
+DESC_STAT_TOTAL = (
+    "Consulta instantânea: total atual do contador (independente do intervalo do Grafana)."
+)
+DESC_STAT_PERIODO = "Soma no intervalo selecionado no Grafana."
+
+
 def stat(id_, title, y, x, w, expr, desc="", *, period=False):
     return {
         "datasource": DS,
-        "description": desc
-        or ("Soma no período do Grafana." if period else "Query instantânea: total actual (ignora «últimas 24h»)."),
+        "description": desc or (DESC_STAT_PERIODO if period else DESC_STAT_TOTAL),
         "fieldConfig": {"defaults": {"decimals": 0, "noValue": "0", "unit": "none"}, "overrides": []},
         "gridPos": {"h": 4, "w": w, "x": x, "y": y},
         "id": id_,
@@ -127,10 +152,63 @@ def ts_duration(id_, title, y, x, w, h, series, desc=""):
     }
 
 
+def prom_table_by_nome(id_, title, y, x, w, h, expr, value_col="Logins", desc=""):
+    """Tabela instantânea: coluna Prefeitura + contagem (compatível com tenant/prefeitura)."""
+    value_mappings = [
+        {"type": "value", "options": {k: {"text": v} for k, v in LOGIN_NOME_MAPPINGS.items()}}
+    ]
+    return {
+        "datasource": DS,
+        "description": desc
+        or (
+            "Compatível com métrica antiga (label tenant) e nova (prefeitura com nome do município)."
+        ),
+        "fieldConfig": {
+            "defaults": {"decimals": 0, "min": 0, "unit": "none"},
+            "overrides": [
+                {
+                    "matcher": {"id": "byName", "options": "Prefeitura"},
+                    "properties": [{"id": "mappings", "value": value_mappings}],
+                }
+            ],
+        },
+        "gridPos": {"h": h, "w": w, "x": x, "y": y},
+        "id": id_,
+        "options": {
+            "cellHeight": "sm",
+            "footer": {"countRows": False, "show": False},
+            "showHeader": True,
+            "sortBy": [{"desc": True, "displayName": value_col}],
+        },
+        "targets": [
+            {
+                "datasource": DS,
+                "expr": expr,
+                "refId": "A",
+                "instant": True,
+                "range": False,
+                "format": "table",
+                "editorMode": "code",
+            }
+        ],
+        "transformations": [
+            {
+                "id": "organize",
+                "options": {
+                    "excludeByName": {"Time": True, "__name__": True},
+                    "renameByName": {"nome": "Prefeitura", "Value": value_col},
+                },
+            }
+        ],
+        "title": title,
+        "type": "table",
+    }
+
+
 def bargauge_by_label(id_, title, y, x, w, h, expr, legend_format, value_mappings=None, desc=""):
     """
     Barras horizontais: nome da série = legendFormat (ex. {{prefeitura}}).
-    Mais fiável que tabela com transformações Prometheus no Grafana.
+    Mais confiável que tabela com transformações Prometheus no Grafana.
     """
     overrides = []
     if value_mappings:
@@ -143,7 +221,10 @@ def bargauge_by_label(id_, title, y, x, w, h, expr, legend_format, value_mapping
     return {
         "datasource": DS,
         "description": desc
-        or "Cada barra = uma prefeitura/pacote. O nome vem da métrica Prometheus (label prefeitura ou package).",
+        or (
+            "Cada barra é uma prefeitura ou pacote. "
+            "O nome vem dos labels da métrica no Prometheus (prefeitura ou package)."
+        ),
         "fieldConfig": {
             "defaults": {
                 "decimals": 0,
@@ -192,10 +273,12 @@ panels.append(
     text_panel(
         299,
         y,
-        "**Totais acumulados** = contador actual (não depende do período do Grafana). "
-        "**No período** = contador agora − contador no início do intervalo (16h ⊆ 24h → nunca maior em 16h). "
+        "**Totais acumulados** = valor atual do contador (não depende do intervalo do Grafana). "
+        "**No período** = contador agora menos contador no início do intervalo "
+        "(16 h dentro de 24 h → nunca maior em 16 h). "
         "Se o backend **reiniciou** no meio do intervalo, o período pode subestimar. "
-        "Uma geração TR+DFD pode contar várias *operações* (slots + zip); «documentos salvos» é outra métrica.",
+        'Uma geração TR+DFD pode contar várias *operações* (slots + zip); '
+        '"documentos salvos" é outra métrica.',
     )
 )
 y += 3
@@ -216,16 +299,18 @@ y += 4
 pkg_value_mappings = {"type": "value", "options": {k: {"text": v} for k, v in PACKAGE_LABELS.items()}}
 
 panels.append(
-    bargauge_by_label(
+    prom_table_by_nome(
         332,
         "Logins OK — por prefeitura (total acumulado)",
         y,
         0,
         12,
         8,
-        total_by('docmaster_auth_login_total{result="success"}', "prefeitura"),
-        "{{prefeitura}}",
-        desc="Nome à esquerda de cada barra = município (UF) ou «Equipe DocMaster (staff)».",
+        login_by_prefeitura_display(),
+        desc=(
+            "Métrica antiga: label tenant (ex.: staff). Nova: prefeitura com \"Município (UF)\". "
+            "Após o deploy do backend, novos logins passam a aparecer com o nome completo."
+        ),
     )
 )
 panels.append(
@@ -244,7 +329,7 @@ panels.append(
 y += 8
 
 # --- No período Grafana (delta de contador — coerente com o intervalo) ---
-panels.append(row(3010, "No período seleccionado no Grafana", y))
+panels.append(row(3010, "No período selecionado no Grafana", y))
 y += 1
 panels += [
     stat(
@@ -303,7 +388,7 @@ def bar_period_breakdown(id_, title, y, x, w, h, items, desc=""):
 panels.append(
     bar_period_breakdown(
         3071,
-        "Operações no período (detalhe — não somar à mão)",
+        "Operações no período (detalhe — não some manualmente)",
         y,
         0,
         24,
@@ -314,7 +399,7 @@ panels.append(
             ('docmaster_document_operations_total{operation="gerar_llm",result="success"}', "Gerar LLM"),
             ('docmaster_document_operations_total{operation="gerar_tr_modelo",result="success"}', "TR modelo"),
         ],
-        "Cada barra é um tipo de operação; um fluxo TR+DFD pode incluir slots antes.",
+        "Cada barra é um tipo de operação; um fluxo TR+DFD pode incluir preenchimento de slots antes.",
     )
 )
 y += 7
@@ -332,7 +417,7 @@ panels.append(
             (count_interval('docmaster_document_operations_total{operation="gerar_llm",result="success"}'), "LLM"),
             (count_interval('docmaster_document_operations_total{operation="gerar_tr_e_dfd",result="success"}'), "TR+DFD"),
         ],
-        "Cada ponto = gerações naquele bucket de tempo. Zero = nenhuma naquele minuto/hora.",
+        "Cada ponto são gerações naquele intervalo de tempo. Zero = nenhuma naquele minuto ou hora.",
     )
 )
 y += 8
@@ -445,7 +530,7 @@ panels.append(
 dash = {
     "annotations": {"list": []},
     "editable": False,
-    "description": "Layout v13 — prefeitura/pacote em barras horizontais (nome visível à esquerda).",
+    "description": "Layout v15 — textos em português brasileiro; logins por prefeitura em tabela.",
     "fiscalYearStartMonth": 0,
     "graphTooltip": 1,
     "id": None,
@@ -453,13 +538,13 @@ dash = {
     "panels": panels,
     "refresh": "1m",
     "schemaVersion": 39,
-    "tags": ["docmaster", "backend", "django", "layout-v13"],
+    "tags": ["docmaster", "backend", "django", "layout-v15"],
     "templating": {"list": []},
     "time": {"from": "now-24h", "to": "now"},
     "timezone": "browser",
     "title": "DocMaster — Backend Django",
     "uid": "docmaster-backend",
-    "version": 13,
+    "version": 15,
 }
 
 OUT.write_text(json.dumps(dash, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

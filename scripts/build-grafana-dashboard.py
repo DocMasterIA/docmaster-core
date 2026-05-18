@@ -23,13 +23,26 @@ def row(id_, title, y, collapsed=False):
 
 
 def instant(expr, ref="A"):
+    """Query instantânea para painéis Stat (valor único)."""
     return {
         "datasource": DS,
         "expr": expr,
         "refId": ref,
         "instant": True,
         "range": False,
-        "format": "table",
+        "editorMode": "code",
+    }
+
+
+def instant_vector(expr, ref="A", legend_format="__auto"):
+    """Várias séries com labels (prefeitura, package) — legendFormat define o nome visível."""
+    return {
+        "datasource": DS,
+        "expr": expr,
+        "refId": ref,
+        "instant": True,
+        "range": False,
+        "legendFormat": legend_format,
         "editorMode": "code",
     }
 
@@ -114,106 +127,49 @@ def ts_duration(id_, title, y, x, w, h, series, desc=""):
     }
 
 
-def _table_transforms(label_key: str, label_col: str, value_col: str):
-    """Prometheus format=table + séries em linhas com coluna de label visível."""
-    return [
-        {"id": "seriesToRows", "options": {}},
-        {
-            "id": "organize",
-            "options": {
-                "excludeByName": {
-                    "Time": True,
-                    "time": True,
-                    "__name__": True,
-                    "Metric": True,
-                    "job": True,
-                    "instance": True,
-                    "service": True,
-                    "result": True,
-                    "operation": True,
-                    "output": True,
-                    "tenant": True,
-                },
-                "indexByName": {label_key: 0, "Value": 1, "Value #A": 1},
-                "renameByName": {
-                    label_key: label_col,
-                    "Value": value_col,
-                    "Value #A": value_col,
-                },
+def bargauge_by_label(id_, title, y, x, w, h, expr, legend_format, value_mappings=None, desc=""):
+    """
+    Barras horizontais: nome da série = legendFormat (ex. {{prefeitura}}).
+    Mais fiável que tabela com transformações Prometheus no Grafana.
+    """
+    overrides = []
+    if value_mappings:
+        overrides.append(
+            {
+                "matcher": {"id": "byRegexp", "options": ".*"},
+                "properties": [{"id": "mappings", "value": [value_mappings]}],
+            }
+        )
+    return {
+        "datasource": DS,
+        "description": desc
+        or "Cada barra = uma prefeitura/pacote. O nome vem da métrica Prometheus (label prefeitura ou package).",
+        "fieldConfig": {
+            "defaults": {
+                "decimals": 0,
+                "min": 0,
+                "unit": "none",
+                "color": {"mode": "palette-classic"},
             },
-        },
-        {
-            "id": "filterFieldsByName",
-            "options": {"include": {"names": [label_col, value_col]}},
-        },
-    ]
-
-
-def prom_table_prefeitura(id_, title, y, x, w, h, expr, desc=""):
-    return {
-        "datasource": DS,
-        "description": desc or "Coluna Prefeitura = label prefeitura da métrica (nome do município + UF).",
-        "fieldConfig": {
-            "defaults": {"custom": {"align": "left", "filterable": True}, "decimals": 0},
-            "overrides": [
-                {
-                    "matcher": {"id": "byName", "options": "Prefeitura"},
-                    "properties": [{"id": "custom.width", "value": 360}],
-                },
-                {
-                    "matcher": {"id": "byName", "options": "Logins"},
-                    "properties": [{"id": "custom.width", "value": 90}, {"id": "custom.align", "value": "center"}],
-                },
-            ],
+            "overrides": overrides,
         },
         "gridPos": {"h": h, "w": w, "x": x, "y": y},
         "id": id_,
         "options": {
-            "cellHeight": "sm",
-            "footer": {"show": False},
-            "showHeader": True,
-            "sortBy": [{"desc": True, "displayName": "Logins"}],
+            "displayMode": "basic",
+            "minVizHeight": 18,
+            "minVizWidth": 0,
+            "namePlacement": "left",
+            "orientation": "horizontal",
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
+            "showUnfilled": True,
+            "sizing": "manual",
+            "valueMode": "color",
+            "legend": {"displayMode": "hidden"},
         },
-        "targets": [instant(expr)],
-        "transformations": _table_transforms("prefeitura", "Prefeitura", "Logins"),
+        "targets": [instant_vector(expr, legend_format=legend_format)],
         "title": title,
-        "type": "table",
-    }
-
-
-def prom_table_packages(id_, title, y, x, w, h, expr, desc=""):
-    pkg_mappings = {"type": "value", "options": {k: {"text": v} for k, v in PACKAGE_LABELS.items()}}
-    return {
-        "datasource": DS,
-        "description": desc or "Pacote = tipo de dispensa / fluxo de geração.",
-        "fieldConfig": {
-            "defaults": {"custom": {"align": "left", "filterable": True}, "decimals": 0},
-            "overrides": [
-                {
-                    "matcher": {"id": "byName", "options": "Pacote"},
-                    "properties": [
-                        {"id": "custom.width", "value": 360},
-                        {"id": "mappings", "value": [pkg_mappings]},
-                    ],
-                },
-                {
-                    "matcher": {"id": "byName", "options": "Gerações"},
-                    "properties": [{"id": "custom.width", "value": 90}, {"id": "custom.align", "value": "center"}],
-                },
-            ],
-        },
-        "gridPos": {"h": h, "w": w, "x": x, "y": y},
-        "id": id_,
-        "options": {
-            "cellHeight": "sm",
-            "footer": {"show": False},
-            "showHeader": True,
-            "sortBy": [{"desc": True, "displayName": "Gerações"}],
-        },
-        "targets": [instant(expr)],
-        "transformations": _table_transforms("package", "Pacote", "Gerações"),
-        "title": title,
-        "type": "table",
+        "type": "bargauge",
     }
 
 
@@ -257,8 +213,10 @@ panels += [
 ]
 y += 4
 
+pkg_value_mappings = {"type": "value", "options": {k: {"text": v} for k, v in PACKAGE_LABELS.items()}}
+
 panels.append(
-    prom_table_prefeitura(
+    bargauge_by_label(
         332,
         "Logins OK — por prefeitura (total acumulado)",
         y,
@@ -266,11 +224,12 @@ panels.append(
         12,
         8,
         total_by('docmaster_auth_login_total{result="success"}', "prefeitura"),
-        "Query instantânea. Coluna Prefeitura = nome do município no cadastro.",
+        "{{prefeitura}}",
+        desc="Nome à esquerda de cada barra = município (UF) ou «Equipe DocMaster (staff)».",
     )
 )
 panels.append(
-    prom_table_packages(
+    bargauge_by_label(
         341,
         "Gerações por pacote (total acumulado)",
         y,
@@ -278,6 +237,8 @@ panels.append(
         12,
         8,
         total_by('docmaster_document_operations_total{result="success",package!~"unknown|other"}', "package"),
+        "{{package}}",
+        value_mappings=pkg_value_mappings,
     )
 )
 y += 8
@@ -484,7 +445,7 @@ panels.append(
 dash = {
     "annotations": {"list": []},
     "editable": False,
-    "description": "Layout v12 — tabelas prefeitura/pacote com format=table + seriesToRows.",
+    "description": "Layout v13 — prefeitura/pacote em barras horizontais (nome visível à esquerda).",
     "fiscalYearStartMonth": 0,
     "graphTooltip": 1,
     "id": None,
@@ -492,13 +453,13 @@ dash = {
     "panels": panels,
     "refresh": "1m",
     "schemaVersion": 39,
-    "tags": ["docmaster", "backend", "django", "layout-v12"],
+    "tags": ["docmaster", "backend", "django", "layout-v13"],
     "templating": {"list": []},
     "time": {"from": "now-24h", "to": "now"},
     "timezone": "browser",
     "title": "DocMaster — Backend Django",
     "uid": "docmaster-backend",
-    "version": 12,
+    "version": 13,
 }
 
 OUT.write_text(json.dumps(dash, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

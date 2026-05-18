@@ -35,7 +35,7 @@ if [[ ! -f "$REPO_DASH" ]]; then
   exit 1
 fi
 
-if ! grep -qE 'layout-v(6|7|8|9|10|11|12)' "$REPO_DASH"; then
+if ! grep -qE 'layout-v(6|7|8|9|10|11|12|13)' "$REPO_DASH"; then
   echo "ERRO: JSON no repo desatualizado. Faça git pull em ${REPO_ROOT}"
   exit 1
 fi
@@ -69,13 +69,13 @@ if [[ -n "$PROVISION_MOUNT" && "$PROVISION_MOUNT" != "${REPO_ROOT}/config/grafan
     cp -f "${REPO_ROOT}/config/grafana/provisioning/datasources/prometheus.yml" \
       "${PROVISION_MOUNT}/datasources/prometheus.yml"
   fi
-  if grep -qE 'layout-v(6|7|8|9|10|11|12)' "$LIVE_DASH"; then
+  if grep -qE 'layout-v(6|7|8|9|10|11|12|13)' "$LIVE_DASH"; then
     echo "    Copiado OK ($(basename "$LIVE_DASH"))"
   else
     echo "ERRO: cópia falhou — ${LIVE_DASH} ainda desatualizado"
     exit 1
   fi
-elif [[ -f "$LIVE_DASH" ]] && ! grep -qE 'layout-v(6|7|8|9|10|11|12)' "$LIVE_DASH"; then
+elif [[ -f "$LIVE_DASH" ]] && ! grep -qE 'layout-v(6|7|8|9|10|11|12|13)' "$LIVE_DASH"; then
   echo "ERRO: ${LIVE_DASH} está antigo e não é o mesmo path do repo."
   echo "Copie manualmente:"
   echo "  mkdir -p $(dirname "$LIVE_DASH")"
@@ -117,11 +117,11 @@ print("Tags:", tags)
 print("Painéis:", len(panels))
 print("Secções:", rows[:3])
 
-if not any(t in tags for t in ("layout-v6", "layout-v7", "layout-v8", "layout-v9", "layout-v10", "layout-v11", "layout-v12")):
-    sys.exit("ERRO: Grafana ainda sem layout novo (layout-v12).")
+if not any(t in tags for t in ("layout-v6", "layout-v7", "layout-v8", "layout-v9", "layout-v10", "layout-v11", "layout-v12", "layout-v13")):
+    sys.exit("ERRO: Grafana ainda sem layout novo (layout-v13).")
 if len(panels) < 10:
     sys.exit("ERRO: dashboard incompleto.")
-print("\nOK — dashboard actualizado (layout-v12).")
+print("\nOK — dashboard actualizado (layout-v13).")
 PY
 
 if [[ "$VERIFY_OK" -ne 0 ]]; then
@@ -138,4 +138,4 @@ fi
 
 echo ""
 echo "Abra: ${GRAFANA_URL}/d/${DASH_UID}"
-echo "Tabelas Prefeitura + Pacote com 2 colunas (layout-v12)"
+echo "Barras horizontais com nome da prefeitura (layout-v13)"

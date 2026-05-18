@@ -3,7 +3,7 @@
     "list": []
   },
   "editable": false,
-  "description": "Layout v12 — tabelas prefeitura/pacote com format=table + seriesToRows.",
+  "description": "Layout v13 — prefeitura/pacote em barras horizontais (nome visível à esquerda).",
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
@@ -81,7 +81,6 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "format": "table",
           "editorMode": "code"
         }
       ],
@@ -132,7 +131,6 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "format": "table",
           "editorMode": "code"
         }
       ],
@@ -183,7 +181,6 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "format": "table",
           "editorMode": "code"
         }
       ],
@@ -234,7 +231,6 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "format": "table",
           "editorMode": "code"
         }
       ],
@@ -285,7 +281,6 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "format": "table",
           "editorMode": "code"
         }
       ],
@@ -336,7 +331,6 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "format": "table",
           "editorMode": "code"
         }
       ],
@@ -348,45 +342,17 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Query instantânea. Coluna Prefeitura = nome do município no cadastro.",
+      "description": "Nome à esquerda de cada barra = município (UF) ou «Equipe DocMaster (staff)».",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "align": "left",
-            "filterable": true
-          },
-          "decimals": 0
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Prefeitura"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 360
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Logins"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 90
-              },
-              {
-                "id": "custom.align",
-                "value": "center"
-              }
-            ]
+          "decimals": 0,
+          "min": 0,
+          "unit": "none",
+          "color": {
+            "mode": "palette-classic"
           }
-        ]
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
@@ -396,17 +362,24 @@
       },
       "id": 332,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "show": false
+        "displayMode": "basic",
+        "minVizHeight": 18,
+        "minVizWidth": 0,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Logins"
-          }
-        ]
+        "showUnfilled": true,
+        "sizing": "manual",
+        "valueMode": "color",
+        "legend": {
+          "displayMode": "hidden"
+        }
       },
       "targets": [
         {
@@ -418,83 +391,35 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "format": "table",
+          "legendFormat": "{{prefeitura}}",
           "editorMode": "code"
         }
       ],
-      "transformations": [
-        {
-          "id": "seriesToRows",
-          "options": {}
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "time": true,
-              "__name__": true,
-              "Metric": true,
-              "job": true,
-              "instance": true,
-              "service": true,
-              "result": true,
-              "operation": true,
-              "output": true,
-              "tenant": true
-            },
-            "indexByName": {
-              "prefeitura": 0,
-              "Value": 1,
-              "Value #A": 1
-            },
-            "renameByName": {
-              "prefeitura": "Prefeitura",
-              "Value": "Logins",
-              "Value #A": "Logins"
-            }
-          }
-        },
-        {
-          "id": "filterFieldsByName",
-          "options": {
-            "include": {
-              "names": [
-                "Prefeitura",
-                "Logins"
-              ]
-            }
-          }
-        }
-      ],
       "title": "Logins OK — por prefeitura (total acumulado)",
-      "type": "table"
+      "type": "bargauge"
     },
     {
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Pacote = tipo de dispensa / fluxo de geração.",
+      "description": "Cada barra = uma prefeitura/pacote. O nome vem da métrica Prometheus (label prefeitura ou package).",
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "align": "left",
-            "filterable": true
-          },
-          "decimals": 0
+          "decimals": 0,
+          "min": 0,
+          "unit": "none",
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": [
           {
             "matcher": {
-              "id": "byName",
-              "options": "Pacote"
+              "id": "byRegexp",
+              "options": ".*"
             },
             "properties": [
-              {
-                "id": "custom.width",
-                "value": 360
-              },
               {
                 "id": "mappings",
                 "value": [
@@ -527,22 +452,6 @@
                 ]
               }
             ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Gerações"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 90
-              },
-              {
-                "id": "custom.align",
-                "value": "center"
-              }
-            ]
           }
         ]
       },
@@ -554,17 +463,24 @@
       },
       "id": 341,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "show": false
+        "displayMode": "basic",
+        "minVizHeight": 18,
+        "minVizWidth": 0,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Gerações"
-          }
-        ]
+        "showUnfilled": true,
+        "sizing": "manual",
+        "valueMode": "color",
+        "legend": {
+          "displayMode": "hidden"
+        }
       },
       "targets": [
         {
@@ -576,57 +492,12 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "format": "table",
+          "legendFormat": "{{package}}",
           "editorMode": "code"
         }
       ],
-      "transformations": [
-        {
-          "id": "seriesToRows",
-          "options": {}
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "time": true,
-              "__name__": true,
-              "Metric": true,
-              "job": true,
-              "instance": true,
-              "service": true,
-              "result": true,
-              "operation": true,
-              "output": true,
-              "tenant": true
-            },
-            "indexByName": {
-              "package": 0,
-              "Value": 1,
-              "Value #A": 1
-            },
-            "renameByName": {
-              "package": "Pacote",
-              "Value": "Gerações",
-              "Value #A": "Gerações"
-            }
-          }
-        },
-        {
-          "id": "filterFieldsByName",
-          "options": {
-            "include": {
-              "names": [
-                "Pacote",
-                "Gerações"
-              ]
-            }
-          }
-        }
-      ],
       "title": "Gerações por pacote (total acumulado)",
-      "type": "table"
+      "type": "bargauge"
     },
     {
       "collapsed": false,
@@ -1043,7 +914,6 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "format": "table",
           "editorMode": "code"
         }
       ],
@@ -1094,7 +964,6 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "format": "table",
           "editorMode": "code"
         }
       ],
@@ -1145,7 +1014,6 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "format": "table",
           "editorMode": "code"
         }
       ],
@@ -1196,7 +1064,6 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "format": "table",
           "editorMode": "code"
         }
       ],
@@ -1368,7 +1235,6 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "format": "table",
           "editorMode": "code"
         }
       ],
@@ -1419,7 +1285,6 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "format": "table",
           "editorMode": "code"
         }
       ],
@@ -1470,7 +1335,6 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "format": "table",
           "editorMode": "code"
         }
       ],
@@ -1590,7 +1454,6 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "format": "table",
           "editorMode": "code"
         }
       ],
@@ -1791,7 +1654,6 @@
           "refId": "A",
           "instant": true,
           "range": false,
-          "format": "table",
           "editorMode": "code"
         }
       ],
@@ -1909,7 +1771,7 @@
     "docmaster",
     "backend",
     "django",
-    "layout-v12"
+    "layout-v13"
   ],
   "templating": {
     "list": []
@@ -1921,5 +1783,5 @@
   "timezone": "browser",
   "title": "DocMaster — Backend Django",
   "uid": "docmaster-backend",
-  "version": 12
+  "version": 13
 }

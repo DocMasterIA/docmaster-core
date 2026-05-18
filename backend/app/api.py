@@ -31,7 +31,9 @@ from urllib.parse import urlparse
 
 from backend.app.metrics import (
     prefeitura_label_from_instance,
+    prefeitura_label_from_request,
     record_auth_login,
+    record_llm_token_usage,
     record_document_instance_created,
     set_request_metrics,
     tenant_label,
@@ -80,16 +82,47 @@ def _rag_timeout_seconds_for_tr_dfd(body: dict) -> float:
     return min(cap, base + extra_items + extra_prompt)
 
 
-def _rag_post_json(url, body, *, params=None, timeout=None):
+def _rag_post_json(url, body, *, params=None, timeout=None, headers=None):
     """POST JSON único ao rag_service (sem retry — retry duplicava tempo de LLM/TR)."""
     params = params if params is not None else {}
     t = float(timeout) if timeout is not None else _rag_http_timeout_seconds()
+    hdrs = dict(headers or {})
     return requests.post(
         url,
         json=body,
         params=params,
+        headers=hdrs,
         timeout=max(5.0, t),
     )
+
+
+def _rag_prefeitura_headers(request) -> dict[str, str]:
+    return {"X-DocMaster-Prefeitura": prefeitura_label_from_request(request)}
+
+
+def _record_llm_usage_from_response(request, fluxo: str, *, usage=None, http_response=None) -> None:
+    """Grava métricas de tokens no backend (scrape /metrics do Django)."""
+    pref = prefeitura_label_from_request(request)
+    prompt_t = completion_t = 0
+    if isinstance(usage, dict):
+        prompt_t = int(usage.get("prompt_tokens") or 0)
+        completion_t = int(usage.get("completion_tokens") or 0)
+    elif http_response is not None:
+        raw = (http_response.headers.get("X-DocMaster-LLM-Token-Usage") or "").strip()
+        if raw:
+            try:
+                data = json.loads(raw)
+                prompt_t = int(data.get("prompt_tokens") or 0)
+                completion_t = int(data.get("completion_tokens") or 0)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass
+    if prompt_t or completion_t:
+        record_llm_token_usage(
+            fluxo=fluxo,
+            prefeitura=pref,
+            prompt_tokens=max(0, prompt_t),
+            completion_tokens=max(0, completion_t),
+        )
 
 
 def api_login_required(view_func):
@@ -764,7 +797,12 @@ def gerar_tr_e_dfd_api(request):
     }
 
     try:
-        resp = _rag_post_json(url, body, timeout=_rag_timeout_seconds_for_tr_dfd(body))
+        resp = _rag_post_json(
+            url,
+            body,
+            timeout=_rag_timeout_seconds_for_tr_dfd(body),
+            headers=_rag_prefeitura_headers(request),
+        )
     except requests.exceptions.ConnectionError:
         return JsonResponse({"ok": False, "error": "Serviço de geração de TR/DFD indisponível. Verifique se o rag_service está em execução."}, status=503)
     except requests.exceptions.Timeout:
@@ -788,6 +826,8 @@ def gerar_tr_e_dfd_api(request):
         except Exception:
             err = resp.text
         return JsonResponse({"ok": False, "error": err}, status=resp.status_code)
+
+    _record_llm_usage_from_response(request, "gerar_tr_e_dfd", http_response=resp)
 
     import base64
     import io
@@ -954,7 +994,12 @@ def fill_tr_slots_api(request):
     }
 
     try:
-        resp = _rag_post_json(url, body, timeout=_rag_timeout_seconds_for_tr_dfd(body))
+        resp = _rag_post_json(
+            url,
+            body,
+            timeout=_rag_timeout_seconds_for_tr_dfd(body),
+            headers=_rag_prefeitura_headers(request),
+        )
     except requests.exceptions.ConnectionError:
         return JsonResponse(
             {"ok": False, "error": "Serviço de geração indisponível. Verifique se o rag_service está em execução."},
@@ -989,6 +1034,9 @@ def fill_tr_slots_api(request):
         if err is None:
             err = str(out)
         return JsonResponse({"ok": False, "error": err}, status=resp.status_code)
+
+    if isinstance(out, dict):
+        _record_llm_usage_from_response(request, "fill_tr_slots", usage=out.get("llm_token_usage"))
 
     return JsonResponse(out)
 

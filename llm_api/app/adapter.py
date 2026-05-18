@@ -16,6 +16,8 @@ from typing import Any
 
 from app.audit import log_request_response
 from app.client import request
+from app.metrics import record_llm_tokens
+from app.request_context import get_prefeitura
 from app.config import (
     LLM_ENDPOINT_ANALYSIS,
     LLM_ENDPOINT_PLANNER,
@@ -45,6 +47,8 @@ async def _call(
     try:
         body, status_code = await request("POST", path, json_payload=payload)
         duration_ms = (time.perf_counter() - start) * 1000
+        prefeitura = (payload.get("prefeitura") if isinstance(payload, dict) else None) or get_prefeitura()
+        record_llm_tokens(call_type=call_type, prefeitura=prefeitura, body=body, result="success")
         log_request_response(
             call_type=call_type,
             request_payload=payload,
@@ -56,6 +60,8 @@ async def _call(
         return body
     except Exception as e:
         duration_ms = (time.perf_counter() - start) * 1000
+        prefeitura = (payload.get("prefeitura") if isinstance(payload, dict) else None) or get_prefeitura()
+        record_llm_tokens(call_type=call_type, prefeitura=prefeitura, body={}, result="error")
         log_request_response(
             call_type=call_type,
             request_payload=payload,
@@ -101,6 +107,7 @@ async def generate(
     prompt: str,
     model: str | None = None,
     stream: bool = False,
+    prefeitura: str | None = None,
 ) -> dict[str, Any] | str:
     """
     Chama o Ollama em /api/generate (API real do Ollama).
@@ -110,6 +117,11 @@ async def generate(
     - stream: se True, resposta em streaming (ainda retornamos o body como está).
     Retorna o JSON bruto do Ollama (ex.: response, model, done, etc.).
     """
+    # prefeitura só para métricas (ContextVar); não enviar ao Ollama (campos extras podem falhar).
+    if prefeitura:
+        from app.request_context import set_prefeitura
+
+        set_prefeitura(prefeitura)
     payload: dict[str, Any] = {
         "model": model or OLLAMA_MODEL,
         "prompt": prompt,

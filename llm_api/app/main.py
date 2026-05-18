@@ -7,8 +7,9 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from app.api.routes import router
 
@@ -39,3 +40,9 @@ app.include_router(router, prefix="/api")
 async def root() -> dict[str, str]:
     """Raiz do serviço."""
     return {"service": "llm-orchestration", "docs": "/docs"}
+
+
+@app.get("/metrics")
+async def metrics() -> Response:
+    """Prometheus scrape (tokens LLM)."""
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)

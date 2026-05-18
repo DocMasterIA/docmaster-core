@@ -26,6 +26,8 @@ def build_llm_context_from_request(request):
     pref = getattr(user, "prefeitura", None)
     sec = getattr(user, "secretaria", None)
 
+    from backend.app.metrics import prefeitura_label
+
     ctx["usuario"] = {
         "nome_completo": nome or None,
         "first_name": (user.first_name or "").strip() or None,
@@ -36,4 +38,5 @@ def build_llm_context_from_request(request):
         "estado_nome": pref.get_estado_display() if pref and hasattr(pref, "get_estado_display") else None,
         "orgao": f"Prefeitura Municipal de {pref.nome_municipio}" if pref else None,
     }
+    ctx["prefeitura_metric"] = prefeitura_label(user)
     return ctx

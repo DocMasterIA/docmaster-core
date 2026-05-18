@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from app.adapter import generate, planner, section
@@ -53,6 +53,7 @@ class GenerateRequest(BaseModel):
     prompt: str
     model: str | None = None
     stream: bool = False
+    prefeitura: str | None = None
 
 
 def _payload_from_planner_request(req: PlannerRequest) -> dict[str, Any]:
@@ -161,7 +162,7 @@ async def endpoint_analysis(body: AnalysisRequest) -> dict[str, Any]:
 
 
 @router.post("/generate")
-async def endpoint_generate(body: GenerateRequest) -> dict[str, Any]:
+async def endpoint_generate(body: GenerateRequest, request: Request) -> dict[str, Any]:
     """
     Chama o Ollama em /api/generate (modelo real).
 
@@ -174,14 +175,31 @@ async def endpoint_generate(body: GenerateRequest) -> dict[str, Any]:
   -H "Content-Type: application/json" \
   -d '{"prompt": "Quais são os tipos de editais de licitação?"}'
     """
+    from app.request_context import set_prefeitura
+
+    header_pref = (request.headers.get("X-DocMaster-Prefeitura") or "").strip()
+    prefeitura = body.prefeitura or header_pref or None
+    set_prefeitura(prefeitura)
     try:
         result = await generate(
             prompt=body.prompt,
             model=body.model,
             stream=body.stream,
+            prefeitura=prefeitura,
         )
         if isinstance(result, dict):
-            return {"ok": True, "data": result}
+            from app.token_usage import extract_token_usage
+
+            prompt_t, completion_t, _model = extract_token_usage(result)
+            return {
+                "ok": True,
+                "data": result,
+                "token_usage": {
+                    "prompt_tokens": prompt_t,
+                    "completion_tokens": completion_t,
+                    "total_tokens": prompt_t + completion_t,
+                },
+            }
         return {"ok": True, "data": {"raw": result}}
     except LLMUnauthorizedError as e:
         raise HTTPException(status_code=401, detail=e.message)

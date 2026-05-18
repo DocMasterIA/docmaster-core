@@ -18,10 +18,9 @@ import httpx
 from .config import (
     CHROMA_COLLECTION,
     LLM_AGENT_BASE_URL,
-    LLM_ORCHESTRATION_BASE_URL,
-    LLM_ORCHESTRATION_GENERATE_PATH,
     RAG_HTTP_TIMEOUT,
 )
+from .llm_orchestration import llm_post_generate
 from .retrieval import retrieve
 from .tr_template import (
     TRTemplateSlots,
@@ -271,7 +270,11 @@ def _parse_llm_json_response_resilient(text: str) -> Dict[str, Any]:
     return json.loads(fixed)
 
 
-async def _choose_art75_inciso(objeto: str, itens: List[ItemSlot]) -> str:
+async def _choose_art75_inciso(
+    objeto: str,
+    itens: List[ItemSlot],
+    user_context: Optional[Dict[str, Any]] = None,
+) -> str:
     """
     Chama a LLM especificamente para escolher o inciso do art. 75
     que melhor se aplica ao objeto (e, opcionalmente, aos itens).
@@ -318,14 +321,9 @@ REGRAS DE SAÍDA:
 
     full_prompt = f"<<SYSTEM>>\n{system_prompt.strip()}\n\n<<USER>>\n{user_prompt}"
 
-    url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
-    payload = {"prompt": full_prompt, "stream": False}
-
     try:
         async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
-            resp = await client.post(url, json=payload)
-            resp.raise_for_status()
-            body = resp.json()
+            body = await llm_post_generate(client, full_prompt, user_context=user_context)
     except Exception:
         return ""
 
@@ -364,6 +362,7 @@ async def _rewrite_objeto_clause(
     draft_objeto: str,
     itens: List[ItemSlot],
     max_items: int = 5,
+    user_context: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Reescreve a cláusula de objeto em chamada dedicada, curta e focada."""
     itens_lines: List[str] = []
@@ -382,14 +381,10 @@ async def _rewrite_objeto_clause(
         user_parts.append("Itens estruturados:\n" + "\n".join(itens_lines))
 
     full_prompt = f"<<SYSTEM>>\n{OBJETO_REWRITE_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n" + "\n".join(user_parts)
-    url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
-    payload = {"prompt": full_prompt, "stream": False}
 
     try:
         async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
-            resp = await client.post(url, json=payload)
-            resp.raise_for_status()
-            body = resp.json()
+            body = await llm_post_generate(client, full_prompt, user_context=user_context)
     except Exception:
         return draft_objeto
 
@@ -467,6 +462,7 @@ async def _ultra_compress_objeto_macro_groups(
     texto: str,
     itens: List[ItemSlot],
     user_prompt: str,
+    user_context: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Força núcleo 'Aquisição de …' com poucos macrogrupos (poucas vírgulas, sem itens nominalmente)."""
     return await _rewrite_objeto_clause(
@@ -485,6 +481,7 @@ async def _ultra_compress_objeto_macro_groups(
         draft_objeto=texto,
         itens=itens,
         max_items=12,
+        user_context=user_context,
     )
 
 
@@ -533,6 +530,7 @@ async def _enrich_macro_objeto_add_finalidade(
     texto: str,
     itens: List[ItemSlot],
     user_prompt: str,
+    user_context: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Amplia cláusula quando ficou curta demais após compressão por macrogrupos."""
     return await _rewrite_objeto_clause(
@@ -549,6 +547,7 @@ async def _enrich_macro_objeto_add_finalidade(
         draft_objeto=texto,
         itens=itens,
         max_items=12,
+        user_context=user_context,
     )
 
 
@@ -568,6 +567,7 @@ async def _summarize_objeto_many_aquisicao_items(
     objeto: str,
     itens: List[ItemSlot],
     user_prompt: str,
+    user_context: Optional[Dict[str, Any]] = None,
 ) -> str:
     """
     Em aquisições com lista extensa, pede à própria IA para resumir o objeto
@@ -600,6 +600,7 @@ async def _summarize_objeto_many_aquisicao_items(
         draft_objeto=t,
         itens=itens,
         max_items=12,
+        user_context=user_context,
     )
 
     for _ in range(2):
@@ -618,11 +619,16 @@ async def _summarize_objeto_many_aquisicao_items(
             draft_objeto=summarized,
             itens=itens,
             max_items=12,
+            user_context=user_context,
         )
     if _needs_ultra_macro_objeto_summary(summarized):
-        summarized = await _ultra_compress_objeto_macro_groups(summarized, itens, user_prompt)
+        summarized = await _ultra_compress_objeto_macro_groups(
+            summarized, itens, user_prompt, user_context=user_context
+        )
     if _macro_objeto_telegrafico_demais(summarized):
-        summarized = await _enrich_macro_objeto_add_finalidade(summarized, itens, user_prompt)
+        summarized = await _enrich_macro_objeto_add_finalidade(
+            summarized, itens, user_prompt, user_context=user_context
+        )
     return summarized
 
 
@@ -630,6 +636,7 @@ async def _strip_enumeration_from_summarized_objeto_if_needed(
     objeto: str,
     itens: List[ItemSlot],
     user_prompt: str,
+    user_context: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Após outras etapas, garante que listas longas de aquisição não voltem com quantidades no texto."""
     t = (objeto or "").strip()
@@ -655,6 +662,7 @@ async def _strip_enumeration_from_summarized_objeto_if_needed(
         draft_objeto=t,
         itens=itens,
         max_items=12,
+        user_context=user_context,
     )
 
 
@@ -1898,24 +1906,21 @@ async def fill_tr_slots_with_llm(
         )
     full_prompt = f"<<SYSTEM>>\n{TR_SLOTS_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{user_prompt_text}"
 
-    url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
-    payload = {"prompt": full_prompt, "stream": False}
-
     try:
         async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
-            resp = await client.post(url, json=payload)
-            if resp.status_code == 404:
-                raise ValueError(
-                    "Orquestração LLM retornou 404 (modelo não encontrado no Ollama). "
-                    "No host do Ollama execute: ollama pull <modelo> (ex.: ollama pull llama3.2)."
-                )
-            resp.raise_for_status()
-            body = resp.json()
+            body = await llm_post_generate(client, full_prompt, user_context=user_context)
     except httpx.ConnectError as e:
         raise ValueError(
-            f"Não foi possível conectar à orquestração LLM ({url}). "
+            "Não foi possível conectar à orquestração LLM. "
             "Verifique se llm_api está em execução (docker compose up -d llm_api ollama)."
         ) from e
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise ValueError(
+                "Orquestração LLM retornou 404 (modelo não encontrado no Ollama). "
+                "No host do Ollama execute: ollama pull <modelo> (ex.: ollama pull llama3.2)."
+            ) from e
+        raise
 
     if isinstance(body, dict) and body.get("detail"):
         detail = str(body["detail"]).strip()
@@ -1983,6 +1988,7 @@ async def fill_tr_slots_with_llm(
             user_prompt=user_prompt,
             draft_objeto=llm_slots.objeto,
             itens=llm_slots.itens,
+            user_context=user_context,
         )
         if _is_objeto_redacao_fraca(llm_slots.objeto):
             llm_slots.objeto = await _rewrite_objeto_clause(
@@ -1993,12 +1999,13 @@ async def fill_tr_slots_with_llm(
                 ),
                 draft_objeto=llm_slots.objeto,
                 itens=llm_slots.itens,
+                user_context=user_context,
             )
-        # Em aquisições com muitos itens, resume objeto por macrogrupos.
         llm_slots.objeto = await _summarize_objeto_many_aquisicao_items(
             llm_slots.objeto,
             llm_slots.itens,
             user_prompt,
+            user_context=user_context,
         )
     # Lapidação final para cenários de aquisição com quantidade explícita nos itens.
     llm_slots.objeto = _polish_objeto_with_itens(
@@ -2009,7 +2016,7 @@ async def fill_tr_slots_with_llm(
     )
     if TR_SLOTS_ENABLE_OBJETO_REWRITE:
         llm_slots.objeto = await _strip_enumeration_from_summarized_objeto_if_needed(
-            llm_slots.objeto, llm_slots.itens, user_prompt
+            llm_slots.objeto, llm_slots.itens, user_prompt, user_context=user_context
         )
     low_p = (user_prompt or "").lower()
     if TR_SLOTS_ENABLE_OBJETO_REWRITE:
@@ -2022,7 +2029,7 @@ async def fill_tr_slots_with_llm(
             and _needs_ultra_macro_objeto_summary(llm_slots.objeto)
         ):
             llm_slots.objeto = await _ultra_compress_objeto_macro_groups(
-                llm_slots.objeto, llm_slots.itens, user_prompt
+                llm_slots.objeto, llm_slots.itens, user_prompt, user_context=user_context
             )
         if (
             len(llm_slots.itens) >= 6
@@ -2033,7 +2040,7 @@ async def fill_tr_slots_with_llm(
             and _macro_objeto_telegrafico_demais(llm_slots.objeto)
         ):
             llm_slots.objeto = await _enrich_macro_objeto_add_finalidade(
-                llm_slots.objeto, llm_slots.itens, user_prompt
+                llm_slots.objeto, llm_slots.itens, user_prompt, user_context=user_context
             )
     # Sanidade mínima pós-LLM (sem engessar estilo).
     llm_slots.objeto = _enforce_objeto_semantic_consistency(_normalize_objeto(llm_slots.objeto))
@@ -2066,7 +2073,9 @@ async def fill_tr_slots_with_llm(
     chosen_inciso = ""
     if TR_SLOTS_ENABLE_INCISO_LLM:
         try:
-            chosen_inciso = await _choose_art75_inciso(llm_slots.objeto, llm_slots.itens)
+            chosen_inciso = await _choose_art75_inciso(
+                llm_slots.objeto, llm_slots.itens, user_context=user_context
+            )
         except Exception:
             chosen_inciso = ""
 

@@ -159,6 +159,24 @@ sum({selector}) by (result)
 0)"""
 
 
+def period_delta_by_fluxo(selector: str = "docmaster_llm_tokens_total") -> str:
+    return f"""clamp_min(
+sum({selector}) by (fluxo)
+- sum({selector} offset $__range) by (fluxo),
+0)"""
+
+
+def llm_tokens_by_fluxo_display(selector: str = "docmaster_llm_tokens_total") -> str:
+    """Agrupa tokens no período por fluxo com nomes legíveis."""
+    expr = f'label_replace({selector}, "tipo", "$1", "fluxo", "(.+)")'
+    for key, label in FLUXO_LABELS.items():
+        expr = f'label_replace({expr}, "tipo", "{_promql_escape(label)}", "fluxo", "{key}")'
+    return f"""clamp_min(
+sum({expr}) by (tipo)
+- sum({expr} offset $__range) by (tipo),
+0)"""
+
+
 def p95_duration(operation: str) -> str:
     return (
         f'histogram_quantile(0.95, sum(rate('
@@ -195,6 +213,14 @@ OPERATION_LABELS = {
     "gerar_llm": "Gerar via LLM",
     "gerar_tr_e_dfd": "TR + DFD + Ofício",
     "gerar_tr_modelo": "TR modelo",
+}
+
+FLUXO_LABELS = {
+    "fill_tr_slots": "Preencher slots (IA)",
+    "gerar_tr_e_dfd": "TR + DFD + Ofício",
+    "gerar_llm": "Gerar documento (LLM)",
+    "gerar_tr_modelo": "TR modelo",
+    "unknown": "Outro fluxo",
 }
 
 DESC_STAT_TOTAL = (
@@ -621,6 +647,79 @@ panels += [
 ]
 y += 4
 
+panels.append(row(275, "Tokens LLM — período selecionado", y))
+y += 1
+panels += [
+    stat(
+        276,
+        "Tokens entrada",
+        y,
+        0,
+        6,
+        period_delta('docmaster_llm_tokens_total{direction="entrada"}'),
+        period=True,
+        unit="short",
+    ),
+    stat(
+        277,
+        "Tokens saída",
+        y,
+        6,
+        6,
+        period_delta('docmaster_llm_tokens_total{direction="saida"}'),
+        period=True,
+        unit="short",
+    ),
+    stat(
+        278,
+        "Tokens total",
+        y,
+        12,
+        6,
+        period_delta("docmaster_llm_tokens_total"),
+        period=True,
+        unit="short",
+        desc="Soma de entrada + saída no intervalo (métrica docmaster_llm_tokens_total no backend).",
+    ),
+    stat(
+        279,
+        "Chamadas LLM (proxy)",
+        y,
+        18,
+        6,
+        period_delta('docmaster_platform_events_total{module="llm",result="success"}'),
+        period=True,
+        desc="Eventos do proxy Django → llm_api (não inclui chamadas internas rag→llm).",
+    ),
+]
+y += 4
+panels.append(
+    prom_table_by_nome(
+        271,
+        "Tokens por prefeitura (período)",
+        y,
+        0,
+        12,
+        7,
+        period_delta_by_nome("docmaster_llm_tokens_total"),
+        value_col="Tokens",
+        desc="Entrada + saída agregados por município no intervalo.",
+    )
+)
+panels.append(
+    prom_table_generations(
+        272,
+        "Tokens por fluxo (período)",
+        y,
+        12,
+        12,
+        7,
+        llm_tokens_by_fluxo_display(),
+        desc="Distribuição por operação (slots, TR+DFD, etc.). Requer backend com record_llm_token_usage.",
+    )
+)
+y += 7
+
 panels.append(
     prom_table_by_nome(
         287,
@@ -975,7 +1074,7 @@ panels.append(
 dash = {
     "annotations": {"list": []},
     "editable": False,
-    "description": "Layout v19 — corrige PromQL (offset em métrica, p95 em range query).",
+    "description": "Layout v20 — painéis de tokens LLM (entrada/saída por prefeitura e fluxo).",
     "fiscalYearStartMonth": 0,
     "graphTooltip": 1,
     "id": None,
@@ -983,13 +1082,13 @@ dash = {
     "panels": panels,
     "refresh": "1m",
     "schemaVersion": 39,
-    "tags": ["docmaster", "backend", "django", "layout-v19"],
+    "tags": ["docmaster", "backend", "django", "layout-v20"],
     "templating": {"list": []},
     "time": {"from": "now-24h", "to": "now"},
     "timezone": "browser",
     "title": "DocMaster — Backend Django",
     "uid": "docmaster-backend",
-    "version": 19,
+    "version": 20,
 }
 
 OUT.write_text(json.dumps(dash, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

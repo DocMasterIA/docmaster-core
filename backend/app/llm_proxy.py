@@ -17,6 +17,7 @@ from backend.app.metrics import (
     normalize_llm_action,
     record_platform_event,
     prefeitura_label_from_request,
+    record_llm_token_usage,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,7 +39,10 @@ def llm_proxy(request, path):
 
     base = _llm_base_url()
     url = f"{base}/api/llm/{path}"
-    headers = {"Content-Type": "application/json"}
+    headers = {
+        "Content-Type": "application/json",
+        "X-DocMaster-Prefeitura": prefeitura,
+    }
 
     action = normalize_llm_action(path)
     prefeitura = prefeitura_label_from_request(request)
@@ -57,6 +61,14 @@ def llm_proxy(request, path):
             data = {"raw": resp.text}
         response = JsonResponse(data, status=resp.status_code, safe=isinstance(data, dict))
         result = "success" if resp.status_code < 400 else "error"
+        if isinstance(data, dict) and data.get("ok") and isinstance(data.get("token_usage"), dict):
+            usage = data["token_usage"]
+            record_llm_token_usage(
+                fluxo=f"llm_proxy_{action}",
+                prefeitura=prefeitura,
+                prompt_tokens=int(usage.get("prompt_tokens") or 0),
+                completion_tokens=int(usage.get("completion_tokens") or 0),
+            )
         return response
     except requests.exceptions.Timeout:
         logger.warning("LLM proxy timeout: %s", url)

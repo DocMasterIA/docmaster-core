@@ -71,6 +71,12 @@ docmaster_platform_events_total = Counter(
     ["module", "action", "result", "prefeitura"],
 )
 
+docmaster_llm_tokens_total = Counter(
+    "docmaster_llm_tokens_total",
+    "Tokens LLM na geração de documentos (entrada e saída)",
+    ["prefeitura", "direction", "fluxo"],
+)
+
 KNOWN_LLM_ACTIONS = frozenset(
     {"health", "planner", "section", "analysis", "generate", "test-audit"}
 )
@@ -184,6 +190,26 @@ def record_auth_login(*, result: str, user=None, prefeitura: str | None = None) 
 def record_auth_logout(*, user=None, prefeitura: str | None = None) -> None:
     pref = prefeitura if prefeitura is not None else prefeitura_label(user)
     docmaster_auth_logout_total.labels(prefeitura=pref).inc()
+
+
+def record_llm_token_usage(
+    *,
+    fluxo: str,
+    prefeitura: str,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+) -> None:
+    """Registra tokens agregados de uma geração (valores vindos do rag_service ou llm_api)."""
+    pref = (prefeitura or "Não identificado")[:56]
+    fl = (fluxo or "unknown")[:24]
+    if prompt_tokens > 0:
+        docmaster_llm_tokens_total.labels(
+            prefeitura=pref, direction="entrada", fluxo=fl
+        ).inc(prompt_tokens)
+    if completion_tokens > 0:
+        docmaster_llm_tokens_total.labels(
+            prefeitura=pref, direction="saida", fluxo=fl
+        ).inc(completion_tokens)
 
 
 def record_document_operation(

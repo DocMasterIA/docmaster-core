@@ -27,3 +27,13 @@ scrape_configs:
   #     - targets: ["host.docker.internal:8001"]
   #       labels:
   #         service: backend
+
+  # Desenvolvimento (docker compose na mesma rede): métricas diretas do llm_api.
+  # Em produção os tokens por prefeitura/fluxo vêm do job backend (docmaster_llm_tokens_total).
+  # - job_name: llm_api
+  #   metrics_path: /metrics
+  #   scrape_interval: 30s
+  #   static_configs:
+  #     - targets: ["llm_api:8002"]
+  #       labels:
+  #         service: llm_api

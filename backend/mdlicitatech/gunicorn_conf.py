@@ -13,6 +13,9 @@ def on_starting(server):
 def post_fork(server, worker):
     # Cada worker Gunicorn precisa carregar métricas no próprio PID (mmap multiprocess).
     import backend.app.metrics  # noqa: F401
+    from backend.app.metrics import connect_auth_signals
+
+    connect_auth_signals()
 
 
 def child_exit(server, worker):

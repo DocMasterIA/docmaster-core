@@ -1181,7 +1181,7 @@ def api_auth_login(request):
     else:
         request.session.set_expiry(0)
     resolved_prefeitura_url = prefeitura.url if prefeitura else getattr(getattr(user, "prefeitura", None), "url", "")
-    # Sucesso: user_logged_in (metrics.connect_auth_signals) incrementa docmaster_auth_login_total.
+    record_auth_login(result="success", tenant=tenant_label(user))
     return JsonResponse({"ok": True, "message": "Login realizado com sucesso.", "prefeitura_url": resolved_prefeitura_url})
 
 

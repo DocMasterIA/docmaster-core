@@ -99,8 +99,13 @@ def tenant_label(user) -> str:
     if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
         return "staff"
     pref = getattr(user, "prefeitura", None)
-    estado = (getattr(pref, "estado", None) or "").strip().upper()[:8]
-    return estado or "sem_prefeitura"
+    if pref is None:
+        return "sem_prefeitura"
+    estado = (getattr(pref, "estado", None) or "").strip().upper()
+    if len(estado) == 2 and estado.isalpha():
+        return estado
+    url = (getattr(pref, "url", None) or "").strip().lower()[:16]
+    return url or "sem_prefeitura"
 
 
 def tenant_label_from_request(request) -> str:
@@ -298,14 +303,11 @@ def connect_auth_signals() -> None:
     global _auth_signals_connected
     if _auth_signals_connected:
         return
-    from django.contrib.auth.signals import user_logged_in, user_logged_out
-
-    def _on_login(sender, request, user, **kwargs):
-        record_auth_login(result="success", tenant=tenant_label(user))
+    from django.contrib.auth.signals import user_logged_out
 
     def _on_logout(sender, request, user, **kwargs):
         record_auth_logout(tenant=tenant_label(user) if user else "anonymous")
 
-    user_logged_in.connect(_on_login, dispatch_uid="docmaster_metrics_login")
+    # Login API: record_auth_login em api_auth_login (evita duplicar com sinal).
     user_logged_out.connect(_on_logout, dispatch_uid="docmaster_metrics_logout")
     _auth_signals_connected = True

@@ -3,22 +3,38 @@
     "list": []
   },
   "editable": false,
-  "description": "Layout v8 — gestão, IA, PNCP e saúde técnica. Após deploy do backend: métricas docmaster_platform_events_total.",
+  "description": "Layout v9 — stats acumulados + gráficos por período. Requer backend com docmaster_* e scrape Prometheus.",
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
   "links": [],
   "panels": [
     {
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 299,
+      "options": {
+        "mode": "markdown",
+        "content": "**Como ler:** cartões = total desde o último restart do backend. Gráficos = actividade no período do Grafana. Dados vêm do Prometheus (scrape `api.docmasteria.com.br`). Faça login/geração **nesse** ambiente."
+      },
+      "title": "",
+      "type": "text",
+      "transparent": true
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 0
+        "y": 3
       },
       "id": 300,
-      "title": "Gestão — resumo do período",
+      "title": "Gestão — resumo (totais acumulados)",
       "type": "row"
     },
     {
@@ -39,7 +55,7 @@
         "h": 4,
         "w": 4,
         "x": 0,
-        "y": 1
+        "y": 4
       },
       "id": 301,
       "options": {
@@ -58,11 +74,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"fill_tr_slots\",result=\"success\"}[$__range])) or vector(0)",
+          "expr": "sum(docmaster_document_operations_total{operation=\"fill_tr_slots\",result=\"success\"})",
           "refId": "A"
         }
       ],
-      "title": "Gerações com IA (slots)",
+      "title": "IA — preencher slots",
       "type": "stat"
     },
     {
@@ -83,7 +99,7 @@
         "h": 4,
         "w": 4,
         "x": 4,
-        "y": 1
+        "y": 4
       },
       "id": 302,
       "options": {
@@ -102,7 +118,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_llm\",result=\"success\"}[$__range])) or vector(0)",
+          "expr": "sum(docmaster_document_operations_total{operation=\"gerar_llm\",result=\"success\"})",
           "refId": "A"
         }
       ],
@@ -127,7 +143,7 @@
         "h": 4,
         "w": 4,
         "x": 8,
-        "y": 1
+        "y": 4
       },
       "id": 303,
       "options": {
@@ -146,7 +162,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"success\"}[$__range])) or vector(0)",
+          "expr": "sum(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"success\"})",
           "refId": "A"
         }
       ],
@@ -171,7 +187,7 @@
         "h": 4,
         "w": 4,
         "x": 12,
-        "y": 1
+        "y": 4
       },
       "id": 304,
       "options": {
@@ -190,7 +206,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_document_instances_created_total[$__range])) or vector(0)",
+          "expr": "sum(docmaster_document_instances_created_total)",
           "refId": "A"
         }
       ],
@@ -215,7 +231,7 @@
         "h": 4,
         "w": 4,
         "x": 16,
-        "y": 1
+        "y": 4
       },
       "id": 305,
       "options": {
@@ -234,7 +250,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_auth_login_total{result=\"success\"}[$__range])) or vector(0)",
+          "expr": "sum(docmaster_auth_login_total{result=\"success\"})",
           "refId": "A"
         }
       ],
@@ -259,7 +275,7 @@
         "h": 4,
         "w": 4,
         "x": 20,
-        "y": 1
+        "y": 4
       },
       "id": 306,
       "options": {
@@ -278,7 +294,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_document_operations_total{result=\"error\"}[$__range])) or vector(0)",
+          "expr": "sum(docmaster_document_operations_total{result=\"error\"})",
           "refId": "A"
         }
       ],
@@ -290,6 +306,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "unit": "short"
@@ -300,7 +317,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 5
+        "y": 8
       },
       "id": 307,
       "options": {
@@ -338,7 +355,7 @@
             "uid": "prometheus"
           },
           "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"success\"}[$__range]))",
-          "legendFormat": "TR + DFD + Ofício",
+          "legendFormat": "TR + DFD",
           "refId": "C"
         },
         {
@@ -349,18 +366,9 @@
           "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_modelo\",result=\"success\"}[$__range]))",
           "legendFormat": "TR modelo",
           "refId": "D"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"generate_values\",result=\"success\"}[$__range]))",
-          "legendFormat": "Modelo + valores",
-          "refId": "E"
         }
       ],
-      "title": "Gerações de documentos (sucesso no período)",
+      "title": "Gerações no período (incremento)",
       "type": "barchart"
     },
     {
@@ -368,6 +376,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "noValue": "0",
@@ -379,7 +388,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 5
+        "y": 8
       },
       "id": 308,
       "options": {
@@ -407,7 +416,7 @@
             "uid": "prometheus"
           },
           "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_llm\",result=\"success\"}[$__interval]))",
-          "legendFormat": "LLM doc",
+          "legendFormat": "LLM",
           "refId": "B"
         },
         {
@@ -429,10 +438,10 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 13
+        "y": 16
       },
       "id": 310,
-      "title": "Inteligência artificial e análise",
+      "title": "Inteligência artificial",
       "type": "row"
     },
     {
@@ -440,7 +449,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Requer backend com métricas platform_events",
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -453,7 +462,7 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 14
+        "y": 17
       },
       "id": 311,
       "options": {
@@ -472,7 +481,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",result=\"success\"}[$__range])) or vector(0)",
+          "expr": "sum(docmaster_platform_events_total{module=\"llm\",result=\"success\"})",
           "refId": "A"
         }
       ],
@@ -497,7 +506,7 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 14
+        "y": 17
       },
       "id": 312,
       "options": {
@@ -516,11 +525,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",action=~\"planner|section|generate\",result=\"success\"}[$__range])) or vector(0)",
+          "expr": "sum(docmaster_platform_events_total{module=\"llm\",action=~\"planner|section|generate\",result=\"success\"})",
           "refId": "A"
         }
       ],
-      "title": "Planner / section / generate",
+      "title": "Planner+section+generate",
       "type": "stat"
     },
     {
@@ -541,7 +550,7 @@
         "h": 4,
         "w": 6,
         "x": 12,
-        "y": 14
+        "y": 17
       },
       "id": 313,
       "options": {
@@ -560,11 +569,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"analise\",result=\"success\"}[$__range])) or vector(0)",
+          "expr": "sum(docmaster_platform_events_total{module=\"analise\",result=\"success\"})",
           "refId": "A"
         }
       ],
-      "title": "Análise de edital (RAG)",
+      "title": "Análise edital (RAG)",
       "type": "stat"
     },
     {
@@ -585,7 +594,7 @@
         "h": 4,
         "w": 6,
         "x": 18,
-        "y": 14
+        "y": 17
       },
       "id": 314,
       "options": {
@@ -604,11 +613,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=~\"llm|analise\",result=\"error\"}[$__range])) or vector(0)",
+          "expr": "sum(docmaster_platform_events_total{module=~\"llm|analise\",result=\"error\"})",
           "refId": "A"
         }
       ],
-      "title": "Erros serviços IA",
+      "title": "Erros IA/PNCP",
       "type": "stat"
     },
     {
@@ -616,6 +625,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "noValue": "0",
@@ -627,7 +637,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 18
+        "y": 21
       },
       "id": 315,
       "options": {
@@ -645,7 +655,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",action=\"planner\",result=\"success\"}[$__interval]))",
+          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",action=\"planner\"}[$__interval]))",
           "legendFormat": "Planner",
           "refId": "A"
         },
@@ -654,7 +664,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",action=\"section\",result=\"success\"}[$__interval]))",
+          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",action=\"section\"}[$__interval]))",
           "legendFormat": "Section",
           "refId": "B"
         },
@@ -663,7 +673,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",action=\"generate\",result=\"success\"}[$__interval]))",
+          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",action=\"generate\"}[$__interval]))",
           "legendFormat": "Generate",
           "refId": "C"
         },
@@ -672,12 +682,12 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",action=\"analysis\",result=\"success\"}[$__interval]))",
+          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",action=\"analysis\"}[$__interval]))",
           "legendFormat": "Analysis",
           "refId": "D"
         }
       ],
-      "title": "Proxy LLM — chamadas por tipo",
+      "title": "Proxy LLM por endpoint",
       "type": "timeseries"
     },
     {
@@ -685,6 +695,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "noValue": "0",
@@ -696,7 +707,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 18
+        "y": 21
       },
       "id": 316,
       "options": {
@@ -724,20 +735,11 @@
             "uid": "prometheus"
           },
           "expr": "histogram_quantile(0.95, sum(rate(docmaster_document_operation_duration_seconds_bucket{operation=\"gerar_llm\"}[$__rate_interval])) by (le))",
-          "legendFormat": "LLM doc p95",
+          "legendFormat": "LLM p95",
           "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "histogram_quantile(0.50, sum(rate(docmaster_document_operation_duration_seconds_bucket{operation=\"gerar_tr_e_dfd\"}[$__rate_interval])) by (le))",
-          "legendFormat": "TR+DFD mediana",
-          "refId": "C"
         }
       ],
-      "title": "Tempo das operações IA (p95)",
+      "title": "Duração operações IA (p95)",
       "type": "timeseries"
     },
     {
@@ -746,7 +748,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 25
+        "y": 28
       },
       "id": 320,
       "title": "PNCP — pesquisa de preços",
@@ -768,9 +770,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 6,
+        "w": 8,
         "x": 0,
-        "y": 26
+        "y": 29
       },
       "id": 321,
       "options": {
@@ -789,11 +791,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"pncp_cotacao\",action=\"post\",result=\"success\"}[$__range])) or sum(increase(django_http_requests_total_by_view_transport_method_total{view=\"api_pncp_cotacoes_sessions\",method=\"POST\"}[$__range])) or vector(0)",
+          "expr": "sum(docmaster_platform_events_total{module=\"pncp_cotacao\",result=\"success\"})",
           "refId": "A"
         }
       ],
-      "title": "Sessões cotação (API)",
+      "title": "Eventos cotação",
       "type": "stat"
     },
     {
@@ -812,9 +814,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 26
+        "w": 8,
+        "x": 8,
+        "y": 29
       },
       "id": 322,
       "options": {
@@ -833,7 +835,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"pncp_cotacao\",action=\"relatorio_pdf\",result=\"success\"}[$__range])) or vector(0)",
+          "expr": "sum(docmaster_platform_events_total{module=\"pncp_cotacao\",action=\"relatorio_pdf\",result=\"success\"})",
           "refId": "A"
         }
       ],
@@ -856,9 +858,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 26
+        "w": 8,
+        "x": 16,
+        "y": 29
       },
       "id": 323,
       "options": {
@@ -877,11 +879,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"pncp_research\",action=~\"market-search.*\",result=\"success\"}[$__range])) or vector(0)",
+          "expr": "sum(docmaster_platform_events_total{module=\"pncp_research\",result=\"success\"})",
           "refId": "A"
         }
       ],
-      "title": "Pesquisa mercado (proxy)",
+      "title": "Research proxy",
       "type": "stat"
     },
     {
@@ -890,49 +892,6 @@
         "uid": "prometheus"
       },
       "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 26
-      },
-      "id": 324,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_platform_events_total{module=~\"pncp_.*\",result=\"error\"}[$__range])) or vector(0)",
-          "refId": "A"
-        }
-      ],
-      "title": "Erros PNCP",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
       "fieldConfig": {
         "defaults": {
           "noValue": "0",
@@ -944,7 +903,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 30
+        "y": 33
       },
       "id": 325,
       "options": {
@@ -962,8 +921,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"pncp_cotacao\",result=\"success\"}[$__interval]))",
-          "legendFormat": "Cotações OK",
+          "expr": "sum(increase(docmaster_platform_events_total{module=\"pncp_cotacao\"}[$__interval]))",
+          "legendFormat": "Cotações",
           "refId": "A"
         },
         {
@@ -971,8 +930,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"pncp_research\",result=\"success\"}[$__interval]))",
-          "legendFormat": "Research OK",
+          "expr": "sum(increase(docmaster_platform_events_total{module=\"pncp_research\"}[$__interval]))",
+          "legendFormat": "Research",
           "refId": "B"
         },
         {
@@ -981,11 +940,11 @@
             "uid": "prometheus"
           },
           "expr": "sum(increase(django_http_requests_total_by_view_transport_method_total{view=~\"api_pncp.*\"}[$__interval]))",
-          "legendFormat": "HTTP PNCP (fallback)",
+          "legendFormat": "HTTP PNCP",
           "refId": "C"
         }
       ],
-      "title": "PNCP — actividade ao longo do tempo",
+      "title": "PNCP ao longo do tempo",
       "type": "timeseries"
     },
     {
@@ -994,10 +953,10 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 37
+        "y": 40
       },
       "id": 330,
-      "title": "Utilizadores e prefeituras",
+      "title": "Utilizadores",
       "type": "row"
     },
     {
@@ -1005,6 +964,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "noValue": "0",
@@ -1016,7 +976,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 38
+        "y": 41
       },
       "id": 331,
       "options": {
@@ -1061,12 +1021,12 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_auth_login_total{result=\"forbidden_prefeitura\"}[$__interval]))",
-          "legendFormat": "Prefeitura não autorizada",
+          "expr": "sum(increase(django_http_requests_total_by_view_transport_method_total{view=\"api_auth_login\"}[$__interval]))",
+          "legendFormat": "HTTP login (fallback)",
           "refId": "D"
         }
       ],
-      "title": "Logins por resultado",
+      "title": "Logins por resultado (período)",
       "type": "timeseries"
     },
     {
@@ -1074,9 +1034,29 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "tenant = UF (2 letras), staff, ou slug da prefeitura se UF ausente.",
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "staff": {
+                  "text": "Equipe DocMaster (staff)"
+                },
+                "anonymous": {
+                  "text": "Anônimo"
+                },
+                "sem_prefeitura": {
+                  "text": "Sem prefeitura"
+                },
+                "test": {
+                  "text": "Slug prefeitura «test»"
+                }
+              }
+            }
+          ]
         },
         "overrides": []
       },
@@ -1084,7 +1064,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 38
+        "y": 41
       },
       "id": 332,
       "options": {
@@ -1092,10 +1072,9 @@
           "displayMode": "table",
           "placement": "right",
           "calcs": [
-            "sum"
+            "lastNotNull"
           ]
-        },
-        "orientation": "horizontal"
+        }
       },
       "targets": [
         {
@@ -1103,12 +1082,12 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_auth_login_total{result=\"success\"}[$__range])) by (tenant)",
+          "expr": "sum(docmaster_auth_login_total{result=\"success\"}) by (tenant)",
           "legendFormat": "{{tenant}}",
           "refId": "A"
         }
       ],
-      "title": "Logins com sucesso por UF / tenant",
+      "title": "Logins OK — por tenant (total acumulado)",
       "type": "barchart"
     },
     {
@@ -1117,10 +1096,10 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 45
+        "y": 48
       },
       "id": 340,
-      "title": "Tipos de dispensa e pacotes",
+      "title": "Pacotes / dispensas",
       "type": "row"
     },
     {
@@ -1128,6 +1107,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "unit": "short"
@@ -1138,7 +1118,7 @@
         "h": 8,
         "w": 14,
         "x": 0,
-        "y": 46
+        "y": 49
       },
       "id": 341,
       "options": {
@@ -1162,7 +1142,7 @@
           "refId": "A"
         }
       ],
-      "title": "Gerações por pacote (sucesso)",
+      "title": "Gerações por pacote (período)",
       "type": "barchart"
     },
     {
@@ -1170,6 +1150,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "noValue": "0",
@@ -1181,7 +1162,7 @@
         "h": 8,
         "w": 10,
         "x": 14,
-        "y": 46
+        "y": 49
       },
       "id": 342,
       "options": {
@@ -1204,19 +1185,19 @@
           "refId": "A"
         }
       ],
-      "title": "Documentos persistidos por tipo",
+      "title": "Docs persistidos",
       "type": "timeseries"
     },
     {
-      "collapsed": false,
+      "collapsed": true,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 54
+        "y": 57
       },
       "id": 350,
-      "title": "Desenvolvimento — saúde do backend",
+      "title": "Desenvolvimento — saúde",
       "type": "row"
     },
     {
@@ -1237,7 +1218,7 @@
         "h": 4,
         "w": 4,
         "x": 0,
-        "y": 55
+        "y": 58
       },
       "id": 351,
       "options": {
@@ -1281,7 +1262,7 @@
         "h": 4,
         "w": 5,
         "x": 4,
-        "y": 55
+        "y": 58
       },
       "id": 352,
       "options": {
@@ -1304,7 +1285,7 @@
           "refId": "A"
         }
       ],
-      "title": "HTTP total",
+      "title": "HTTP total (período)",
       "type": "stat"
     },
     {
@@ -1325,7 +1306,7 @@
         "h": 4,
         "w": 5,
         "x": 9,
-        "y": 55
+        "y": 58
       },
       "id": 353,
       "options": {
@@ -1348,7 +1329,7 @@
           "refId": "A"
         }
       ],
-      "title": "5xx",
+      "title": "5xx (período)",
       "type": "stat"
     },
     {
@@ -1369,7 +1350,7 @@
         "h": 4,
         "w": 5,
         "x": 14,
-        "y": 55
+        "y": 58
       },
       "id": 354,
       "options": {
@@ -1392,7 +1373,7 @@
           "refId": "A"
         }
       ],
-      "title": "4xx",
+      "title": "4xx (período)",
       "type": "stat"
     },
     {
@@ -1405,7 +1386,7 @@
         "defaults": {
           "decimals": 0,
           "noValue": "0",
-          "unit": "bytes"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -1413,7 +1394,7 @@
         "h": 4,
         "w": 5,
         "x": 19,
-        "y": 55
+        "y": 58
       },
       "id": 355,
       "options": {
@@ -1436,7 +1417,7 @@
           "refId": "A"
         }
       ],
-      "title": "Memória RSS",
+      "title": "RSS",
       "type": "stat"
     },
     {
@@ -1444,6 +1425,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "noValue": "0",
@@ -1455,7 +1437,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 59
+        "y": 62
       },
       "id": 356,
       "options": {
@@ -1474,7 +1456,7 @@
             "uid": "prometheus"
           },
           "expr": "histogram_quantile(0.95, sum(rate(django_http_requests_latency_seconds_by_view_method_bucket{view=\"documentos_fill_tr_slots_api\"}[$__rate_interval])) by (le))",
-          "legendFormat": "Slots IA",
+          "legendFormat": "Slots",
           "refId": "A"
         },
         {
@@ -1494,18 +1476,9 @@
           "expr": "histogram_quantile(0.95, sum(rate(django_http_requests_latency_seconds_by_view_method_bucket{view=\"api_auth_login\"}[$__rate_interval])) by (le))",
           "legendFormat": "Login",
           "refId": "C"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "histogram_quantile(0.95, sum(rate(django_http_requests_latency_seconds_by_view_method_bucket{view=\"api_pncp_cotacoes_sessions\"}[$__rate_interval])) by (le))",
-          "legendFormat": "PNCP sessões",
-          "refId": "D"
         }
       ],
-      "title": "Latência p95 — rotas críticas",
+      "title": "Latência p95",
       "type": "timeseries"
     },
     {
@@ -1513,6 +1486,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "noValue": "0",
@@ -1524,7 +1498,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 59
+        "y": 62
       },
       "id": 357,
       "options": {
@@ -1552,11 +1526,11 @@
             "uid": "prometheus"
           },
           "expr": "sum(rate(django_db_execute_total{job=\"backend\"}[$__rate_interval])) by (vendor)",
-          "legendFormat": "DB {{vendor}}",
+          "legendFormat": "DB",
           "refId": "B"
         }
       ],
-      "title": "CPU e base de dados",
+      "title": "CPU / DB",
       "type": "timeseries"
     }
   ],
@@ -1566,17 +1540,17 @@
     "docmaster",
     "backend",
     "django",
-    "layout-v8"
+    "layout-v9"
   ],
   "templating": {
     "list": []
   },
   "time": {
-    "from": "now-7d",
+    "from": "now-24h",
     "to": "now"
   },
   "timezone": "browser",
   "title": "DocMaster — Backend Django",
   "uid": "docmaster-backend",
-  "version": 8
+  "version": 9
 }

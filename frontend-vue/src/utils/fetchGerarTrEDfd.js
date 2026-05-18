@@ -6,7 +6,7 @@ function defaultMaxAttempts() {
   const raw = String(import.meta.env.VITE_GERAR_TR_DFD_RETRIES || '').trim();
   const n = Number(raw);
   if (Number.isFinite(n) && n >= 1 && n <= 4) return Math.floor(n);
-  return 1;
+  return 2;
 }
 
 function backoffMs(attempt) {

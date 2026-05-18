@@ -1838,7 +1838,12 @@ async def fill_tr_slots_with_llm(
         merged = _build_tr_slots_from_override_prefilled(override, user_context)
         return _apply_o_manutencao_fix_to_tr_slots(merged)
 
-    context_from_agent = await fetch_context_from_agent(user_prompt)
+    # Dispensa rápida: o formulário já manda objeto/órgão no user_prompt; pular agent reduz ~30–60s.
+    _fluxo_ui_early = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
+    if _fluxo_ui_early == "rapida":
+        context_from_agent = None
+    else:
+        context_from_agent = await fetch_context_from_agent(user_prompt)
 
     # Busca exemplos RAG de cláusulas de objeto (como no fluxo generate_full_document) para enriquecer o prompt.
     # Estratégia: priorizar exemplos oriundos do PNCP (fonte="pncp") e, se necessário,

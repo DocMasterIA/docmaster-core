@@ -9,7 +9,20 @@
 # Cloudflare: no plano gratuito o limite de origem é ~100 s; pedidos longos precisam de
 # subdomínio «grey cloud» ou plano que permita mais tempo, ou fila assíncrona no futuro.
 
-# Opção A — só este endpoint (recomendado):
+# Opção A — endpoints lentos (recomendado; incluir fill-tr-slots — 1º passo da dispensa rápida):
+#
+# location = /api/documentos/fill-tr-slots {
+#     proxy_pass http://django_upstream;
+#     proxy_http_version 1.1;
+#     proxy_set_header Host $host;
+#     proxy_set_header X-Real-IP $remote_addr;
+#     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#     proxy_set_header X-Forwarded-Proto $scheme;
+#     proxy_connect_timeout 10s;
+#     proxy_send_timeout 900s;
+#     proxy_read_timeout 900s;
+#     client_max_body_size 32m;
+# }
 #
 # location = /api/documentos/gerar-tr-e-dfd {
 #     proxy_pass http://django_upstream;

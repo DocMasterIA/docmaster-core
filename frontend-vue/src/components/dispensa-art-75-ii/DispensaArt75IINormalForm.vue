@@ -277,7 +277,12 @@ import DispensaArt75IIDadosFixosDrawer from './DispensaArt75IIDadosFixosDrawer.v
 import DocGenIaLoaderBlock from '@/components/DocGenIaLoaderBlock.vue';
 import DispensaArt75IIItensValores from './DispensaArt75IIItensValores.vue';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
-import { buildGerarTrEDfdUrl, describeApiFetchNetworkFailure, getApiBase } from '@/utils/apiBase.js';
+import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
+import {
+  buildFillTrSlotsUrl,
+  describeFillTrSlotsNetworkFailure,
+  fetchFillTrSlotsWithRetry,
+} from '@/utils/fetchFillTrSlots.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { useDispensaArt75IIDadosFixos } from '@/composables/useDispensaArt75IIDadosFixos.js';
 
@@ -573,24 +578,24 @@ async function gerar() {
     return;
   }
   isGerandoClausulas.value = true;
-  const fillUrl = `${API_BASE}/api/documentos/fill-tr-slots`;
-  const requestInit = {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({
+  const fillUrl = buildFillTrSlotsUrl(API_BASE);
+  try {
+    const result = await fetchFillTrSlotsWithRetry(API_BASE, {
       user_prompt: buildUserPrompt(),
       slots_override: slotsOverrideWithoutClauseDraft(buildSlotsOverride()),
       slot_package_key: slotPackageKey.value,
-    }),
-  };
-  try {
-    const res = await fetch(fillUrl, requestInit);
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.ok) {
-      throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
+    });
+    if (!result.ok) {
+      if (result.kind === 'network') {
+        const m = String(result.errorMessage || '');
+        const looksNetwork = /fetch|network|failed|load|aborted|timed out|timeout/i.test(m);
+        throw new Error(
+          looksNetwork ? describeFillTrSlotsNetworkFailure(fillUrl) : m || describeFillTrSlotsNetworkFailure(fillUrl),
+        );
+      }
+      throw new Error(result.errorMessage || 'Erro ao preencher objeto/justificativa.');
     }
-    const slots = data.slots && typeof data.slots === 'object' ? data.slots : {};
+    const slots = result.data.slots && typeof result.data.slots === 'object' ? result.data.slots : {};
     const obj = String(slots.objeto || '').trim();
     const jus = String(slots.justificativa || '').trim();
     if (!obj || !jus) {
@@ -604,7 +609,7 @@ async function gerar() {
     const msg = String(base);
     const looksNet =
       err?.name === 'TypeError' || /failed to fetch|load failed|networkerror|err_failed/i.test(msg);
-    erroGeracaoClausulas.value = looksNet ? describeApiFetchNetworkFailure(fillUrl, 'fill-tr-slots') : base;
+    erroGeracaoClausulas.value = looksNet ? describeFillTrSlotsNetworkFailure(fillUrl) : base;
   } finally {
     isGerandoClausulas.value = false;
   }

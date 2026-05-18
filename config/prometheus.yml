@@ -8,10 +8,22 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
+  # Produção: API pública (mesmo endpoint que você abre no browser).
   - job_name: backend
+    scheme: https
     metrics_path: /metrics
-    scrape_interval: 15s
+    scrape_interval: 30s
     static_configs:
-      - targets: ["backend:8000"]
+      - targets: ["api.docmasteria.com.br"]
         labels:
           service: backend
+
+  # Alternativa — backend no mesmo host Docker, porta 8001 publicada.
+  # Descomente SOMENTE se NÃO usar o job HTTPS acima (evita métricas duplicadas).
+  # - job_name: backend
+  #   metrics_path: /metrics
+  #   scrape_interval: 15s
+  #   static_configs:
+  #     - targets: ["host.docker.internal:8001"]
+  #       labels:
+  #         service: backend

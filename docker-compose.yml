@@ -247,6 +247,9 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    # Scrape via host.docker.internal:8001 (config/prometheus.yml) quando backend publica 8001.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       # Volume nomeado evita «permission denied» em ./data no host (Prometheus roda como nobody).

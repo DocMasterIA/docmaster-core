@@ -1,0 +1,17 @@
+# Prometheus — DocMaster (ajuste targets conforme o ambiente).
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Descomente e adapte quando expuser métricas HTTP nos serviços:
+  # - job_name: docmaster
+  #   static_configs:
+  #     - targets:
+  #         - backend:8000
+  #         - rag_service:8004
+  #         - llm_api:8002

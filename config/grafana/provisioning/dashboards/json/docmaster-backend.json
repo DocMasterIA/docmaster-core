@@ -14,7 +14,7 @@
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
         {
-          "expr": "sum(rate(django_http_requests_total_by_method_transport{job=\"backend\"}[5m])) by (method)",
+          "expr": "sum(rate(django_http_requests_total_by_method_total{job=\"backend\"}[5m])) by (method)",
           "legendFormat": "{{method}}",
           "refId": "A"
         }
@@ -45,7 +45,7 @@
       "id": 3,
       "targets": [
         {
-          "expr": "sum(rate(django_http_responses_total_by_status_view_method_transport{job=\"backend\",status=~\"5..\"}[5m])) by (status)",
+          "expr": "sum(rate(django_http_responses_total_by_status_total{job=\"backend\",status=~\"5..\"}[5m])) by (status)",
           "legendFormat": "{{status}}",
           "refId": "A"
         }

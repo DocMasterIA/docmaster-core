@@ -1724,6 +1724,85 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
     )
 
 
+_ART75_INCISOS_ROMAN = frozenset(
+    {"I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV"}
+)
+
+
+def _resolve_dispensa_inciso_from_override(override: Dict[str, Any]) -> str:
+    """Inciso do art. 75 a partir de override (dispensa, ofício ou slot_package_key)."""
+    disp = override.get("dispensa")
+    if isinstance(disp, dict):
+        inc = str(disp.get("inciso") or "").strip().upper()
+        if inc in _ART75_INCISOS_ROMAN:
+            return inc
+    text = str(override.get("sol_oficio_artigo_inciso") or "")
+    m = re.search(r"Inciso\s+([IVXLC]+)", text, re.I)
+    if m:
+        cand = m.group(1).upper()
+        if cand in _ART75_INCISOS_ROMAN:
+            return cand
+    pkg = str(override.get("slot_package_key") or "").lower()
+    if "75_ii" in pkg or "75-ii" in pkg:
+        return "II"
+    if "75_i" in pkg or "75-i" in pkg:
+        return "I"
+    return "II"
+
+
+def _should_skip_llm_for_rapida_prefilled(override: Optional[Dict[str, Any]]) -> bool:
+    """
+    Dispensa rápida: após fill-tr-slots, gerar-tr-e-dfd reenvia objeto/justificativa no override.
+    Evita segunda passagem agent+LLM (principal causa de timeout ~100s no Cloudflare).
+    """
+    if not override:
+        return False
+    if str(override.get("dispensa_fluxo_ui") or "").strip().lower() != "rapida":
+        return False
+    obj = str(override.get("objeto") or "").strip()
+    jus = str(override.get("justificativa") or "").strip()
+    return len(obj) >= 15 and len(jus) >= 15
+
+
+def _build_tr_slots_from_override_prefilled(
+    override: Dict[str, Any],
+    user_context: Optional[Dict[str, Any]] = None,
+) -> TRTemplateSlots:
+    """Monta TRTemplateSlots só com override + defaults (sem agent/LLM)."""
+    data: Dict[str, Any] = dict(override)
+    data["dispensa"] = {
+        "artigo": "75",
+        "inciso": _resolve_dispensa_inciso_from_override(override),
+    }
+    jus = str(data.get("justificativa") or "").strip()
+    if not str(data.get("problema_administrativo") or "").strip():
+        data["problema_administrativo"] = jus
+    if not str(data.get("beneficio_esperado") or "").strip():
+        data["beneficio_esperado"] = jus
+    if not str(data.get("objeto_escopo") or "").strip():
+        data["objeto_escopo"] = (
+            "O escopo compreende as atividades técnicas e operacionais indispensáveis à execução do objeto, "
+            "incluindo planejamento, implementação, controle e validação dos resultados pactuados."
+        )
+    if not str(data.get("objeto_entregas") or "").strip():
+        data["objeto_entregas"] = (
+            "As entregas deverão ser definidas com critérios objetivos de qualidade, conformidade e desempenho, "
+            "acompanhadas da documentação comprobatória das etapas efetivamente realizadas."
+        )
+    if not str(data.get("objeto_resultados") or "").strip():
+        data["objeto_resultados"] = (
+            "Como resultados esperados, projeta-se a melhoria da eficiência operacional, o fortalecimento da "
+            "continuidade do serviço público e a mitigação de riscos de desatendimento ao interesse coletivo."
+        )
+    slots = _dict_to_tr_slots(data)
+    slots = _merge_slots(slots, override)
+    if isinstance(user_context, dict):
+        ctx_pk = str(user_context.get("slot_package_key") or "").strip()
+        if ctx_pk and not (slots.slot_package_key or "").strip():
+            slots = replace(slots, slot_package_key=ctx_pk)
+    return slots
+
+
 async def fetch_context_from_agent(user_prompt: str) -> Optional[Dict[str, Any]]:
     """Chama o llm_agent structure-from-prompt para obter context e especificacoes."""
     url = f"{LLM_AGENT_BASE_URL}/api/agent/structure-from-prompt"
@@ -1752,7 +1831,13 @@ async def fill_tr_slots_with_llm(
     - Chama o llm_agent (structure-from-prompt) para obter contexto e especificações.
     - Chama a LLM para gerar o JSON de slots (objeto, dispensa, itens, justificativa, fiscal, dotacao).
     - Mescla com slots_override (valores enviados pelo usuário têm prioridade). user_context (Django) enriquece o prompt com nome/secretaria/prefeitura, a menos que skip_context_in_prompt=True.
+  - Dispensa rápida com objeto/justificativa já no override: só monta slots e renderiza (sem segunda passagem LLM).
     """
+    override = slots_override if isinstance(slots_override, dict) else {}
+    if _should_skip_llm_for_rapida_prefilled(override):
+        merged = _build_tr_slots_from_override_prefilled(override, user_context)
+        return _apply_o_manutencao_fix_to_tr_slots(merged)
+
     context_from_agent = await fetch_context_from_agent(user_prompt)
 
     # Busca exemplos RAG de cláusulas de objeto (como no fluxo generate_full_document) para enriquecer o prompt.

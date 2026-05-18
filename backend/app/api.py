@@ -922,7 +922,7 @@ def fill_tr_slots_api(request):
     }
 
     try:
-        resp = _rag_post_json(url, body)
+        resp = _rag_post_json(url, body, timeout=_rag_timeout_seconds_for_tr_dfd(body))
     except requests.exceptions.ConnectionError:
         return JsonResponse(
             {"ok": False, "error": "Serviço de geração indisponível. Verifique se o rag_service está em execução."},
@@ -930,7 +930,13 @@ def fill_tr_slots_api(request):
         )
     except requests.exceptions.Timeout:
         return JsonResponse(
-            {"ok": False, "error": "Tempo limite na geração. O rag_service demorou para responder."},
+            {
+                "ok": False,
+                "error": (
+                    "Tempo limite na geração (fill-tr-slots). "
+                    "Verifique RAG_HTTP_TIMEOUT no Django, RAG_TIMEOUT no rag_service e LLM_TIMEOUT no llm_api."
+                ),
+            },
             status=504,
         )
     except Exception as e:

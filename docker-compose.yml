@@ -193,6 +193,9 @@ services:
       - LLM_API_BASE_URL=http://llm_api:8002
       - RAG_SERVICE_URL=http://rag_service:8004
       - PNCP_RESEARCHER_BASE_URL=http://pncp_researcher_service:8012
+      # Django → rag_service (TR/DFD): alinhar com proxy_read_timeout no nginx (ex. 900s).
+      - RAG_HTTP_TIMEOUT=${RAG_HTTP_TIMEOUT:-300}
+      - RAG_HTTP_TIMEOUT_TR_DFD_MAX=${RAG_HTTP_TIMEOUT_TR_DFD_MAX:-900}
       # PDF: Gunicorn padrão mata o worker após 30s; 0 = sem limite (ver Dockerfile).
       - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-0}
     depends_on:

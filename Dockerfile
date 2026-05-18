@@ -5,8 +5,7 @@ FROM python:3.11-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    DJANGO_SETTINGS_MODULE=backend.mdlicitatech.settings \
-    PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+    DJANGO_SETTINGS_MODULE=backend.mdlicitatech.settings
 
 WORKDIR /app
 
@@ -38,6 +37,9 @@ RUN python manage.py collectstatic --noinput --clear \
     && mkdir -p /tmp/prometheus_multiproc
 
 EXPOSE 8000
+
+# Multiprocess Prometheus (Gunicorn workers); definido após collectstatic para o build não falhar.
+ENV PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
 
 # Migrações na subida; Gunicorn. --timeout 0 = sem limite de tempo por requisição (PDF/WeasyPrint pode demorar muito).
 # Ajuste com env GUNICORN_TIMEOUT (segundos) se quiser um teto, ex.: 3600.

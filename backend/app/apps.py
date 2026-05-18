@@ -7,5 +7,9 @@ class AppConfig(AppConfig):
 
     def ready(self):
         import backend.app.signals
-        # Registra contadores/histogramas docmaster_* no processo (Gunicorn multiprocess).
+        import sys
+
+        # Evita registrar métricas durante collectstatic/migrate no build Docker.
+        if any(cmd in sys.argv for cmd in ("collectstatic", "makemigrations", "migrate")):
+            return
         import backend.app.metrics  # noqa: F401

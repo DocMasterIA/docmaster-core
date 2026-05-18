@@ -7,15 +7,38 @@ DS = {"type": "prometheus", "uid": "prometheus"}
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "config/grafana/provisioning/dashboards/json/docmaster-backend.json"
 
+# Chave Prometheus (label package) → nome legível no Grafana (pt-BR).
 PACKAGE_LABELS = {
-    "dispensa_75_i_manutencao_veiculos": "Dispensa 75-I — Veículos",
-    "dispensa_75_i_obras_engenharia": "Dispensa 75-I — Obras",
-    "dispensa_75_ii_compras": "Dispensa 75-II — Compras",
-    "dispensa_75_ii_servicos": "Dispensa 75-II — Serviços",
-    "dispensa_75_ii_compras_servicos_inclusos": "Dispensa 75-II — Compras+Serv.",
-    "inexigibilidade_74_i_manutencao_veiculos": "Inexig. 74-I — Veículos",
-    "inexigibilidade_74_i_fornecedor_exclusivo": "Inexig. 74-I — Exclusivo",
+    # Dispensa normal (formulário completo; chave legada dispensa_75_*)
+    "dispensa_75_i_manutencao_veiculos": "Dispensa normal · Art. 75-I · Veículos",
+    "dispensa_75_i_obras_engenharia": "Dispensa normal · Art. 75-I · Obras e engenharia",
+    "dispensa_75_ii_compras": "Dispensa normal · Art. 75-II · Compras",
+    "dispensa_75_ii_servicos": "Dispensa normal · Art. 75-II · Serviços",
+    "dispensa_75_ii_compras_servicos_inclusos": "Dispensa normal · Art. 75-II · Compras com serviços",
+    # Dispensa rápida (chaves novas)
+    "dispensa_rapida_75_i_manutencao_veiculos": "Dispensa rápida · Art. 75-I · Veículos",
+    "dispensa_rapida_75_i_obras_engenharia": "Dispensa rápida · Art. 75-I · Obras e engenharia",
+    "dispensa_rapida_75_ii_compras": "Dispensa rápida · Art. 75-II · Compras",
+    "dispensa_rapida_75_ii_servicos": "Dispensa rápida · Art. 75-II · Serviços",
+    "dispensa_rapida_75_ii_compras_servicos_inclusos": "Dispensa rápida · Art. 75-II · Compras com serviços",
+    # Inexigibilidade
+    "inexigibilidade_74_i_manutencao_veiculos": "Inexigibilidade · Art. 74-I · Show artístico / veículos",
+    "inexigibilidade_74_i_fornecedor_exclusivo": "Inexigibilidade · Art. 74-I · Fornecedor exclusivo",
 }
+
+
+def _promql_escape(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def generations_by_package_display(
+    selector: str = 'docmaster_document_operations_total{result="success",package!~"unknown|other"}',
+) -> str:
+    """Agrupa por nome legível (label tipo) a partir do package Prometheus."""
+    expr = f'label_replace({selector}, "tipo", "$1", "package", "(.+)")'
+    for key, label in PACKAGE_LABELS.items():
+        expr = f'label_replace({expr}, "tipo", "{_promql_escape(label)}", "package", "{key}")'
+    return f"sum({expr}) by (tipo)"
 
 
 def row(id_, title, y, collapsed=False):
@@ -80,6 +103,56 @@ def total_by(selector: str, label: str) -> str:
 
 # Métrica antiga: label `tenant` (só UF, ex. SC). Nova: `prefeitura` = "Joinville (SC)".
 # Ordem: tenant → prefeitura (prefeitura ganha). UF de 2 letras = dado antigo sem município.
+def metric_prefeitura_nome(selector: str) -> str:
+    """Unifica label prefeitura (novo) e tenant (legado) em nome."""
+    return f"""label_replace(
+  label_replace(
+    {selector},
+    "nome", "$1", "tenant", "(.+)"
+  ),
+  "nome", "$1", "prefeitura", "(.+)"
+)"""
+
+
+def period_delta_by_nome(selector: str) -> str:
+    inner = metric_prefeitura_nome(selector)
+    return f"""clamp_min(
+sum({inner}) by (nome)
+- sum({inner} offset $__range) by (nome),
+0)"""
+
+
+def period_delta_login_by_nome(selector: str) -> str:
+    inner = login_by_prefeitura_display(selector)
+    return f"""clamp_min(
+sum({inner}) by (nome)
+- sum({inner} offset $__range) by (nome),
+0)"""
+
+
+def period_delta_by_result(selector: str) -> str:
+    return f"""clamp_min(
+sum({selector}) by (result)
+- sum({selector} offset $__range) by (result),
+0)"""
+
+
+def p95_duration(operation: str) -> str:
+    return (
+        f'histogram_quantile(0.95, sum(rate('
+        f'docmaster_document_operation_duration_seconds_bucket{{operation="{operation}",result="success"}}'
+        f"[$__rate_interval])) by (le))"
+    )
+
+
+def p95_duration_by_prefeitura(operation: str) -> str:
+    return (
+        f"histogram_quantile(0.95, sum(rate("
+        f'docmaster_document_operation_duration_seconds_bucket{{operation="{operation}",result="success"}}'
+        f"[$__rate_interval])) by (le, prefeitura))"
+    )
+
+
 def login_by_prefeitura_display(selector: str = 'docmaster_auth_login_total{result="success"}') -> str:
     return f"""sum(
   label_replace(
@@ -101,17 +174,32 @@ LOGIN_NOME_MAPPINGS = {
     "anonymous": "Não identificado",
 }
 
+RESULT_LABELS = {
+    "success": "Sucesso",
+    "error": "Erro",
+}
+
+OPERATION_LABELS = {
+    "fill_tr_slots": "Preencher slots (IA)",
+    "gerar_llm": "Gerar via LLM",
+    "gerar_tr_e_dfd": "TR + DFD + Ofício",
+    "gerar_tr_modelo": "TR modelo",
+}
+
 DESC_STAT_TOTAL = (
     "Consulta instantânea: total atual do contador (independente do intervalo do Grafana)."
 )
 DESC_STAT_PERIODO = "Soma no intervalo selecionado no Grafana."
 
 
-def stat(id_, title, y, x, w, expr, desc="", *, period=False):
+def stat(id_, title, y, x, w, expr, desc="", *, period=False, unit="none", decimals=0):
     return {
         "datasource": DS,
         "description": desc or (DESC_STAT_PERIODO if period else DESC_STAT_TOTAL),
-        "fieldConfig": {"defaults": {"decimals": 0, "noValue": "0", "unit": "none"}, "overrides": []},
+        "fieldConfig": {
+            "defaults": {"decimals": decimals, "noValue": "0", "unit": unit},
+            "overrides": [],
+        },
         "gridPos": {"h": 4, "w": w, "x": x, "y": y},
         "id": id_,
         "options": {
@@ -124,6 +212,114 @@ def stat(id_, title, y, x, w, expr, desc="", *, period=False):
         "targets": [range_query(expr) if period else instant(expr)],
         "title": title,
         "type": "stat",
+    }
+
+
+def stat_duration(id_, title, y, x, w, expr, desc=""):
+    return stat(
+        id_,
+        title,
+        y,
+        x,
+        w,
+        expr,
+        desc=desc or "Percentil 95 da duração no intervalo do Grafana (requer tráfego recente).",
+        unit="s",
+        decimals=1,
+    )
+
+
+def prom_table_p95_prefeitura(id_, title, y, x, w, h, operation, desc=""):
+    value_mappings = [
+        {"type": "value", "options": {k: {"text": v} for k, v in LOGIN_NOME_MAPPINGS.items()}}
+    ]
+    return {
+        "datasource": DS,
+        "description": desc
+        or "Tempo até concluir a operação (p95). Quanto menor, mais rápido para o usuário.",
+        "fieldConfig": {
+            "defaults": {"decimals": 1, "unit": "s"},
+            "overrides": [
+                {
+                    "matcher": {"id": "byName", "options": "Prefeitura"},
+                    "properties": [{"id": "mappings", "value": value_mappings}],
+                },
+                {
+                    "matcher": {"id": "byName", "options": "p95"},
+                    "properties": [{"id": "custom.width", "value": 80}],
+                },
+            ],
+        },
+        "gridPos": {"h": h, "w": w, "x": x, "y": y},
+        "id": id_,
+        "options": {
+            "cellHeight": "sm",
+            "footer": {"countRows": False, "show": False},
+            "showHeader": True,
+            "sortBy": [{"desc": True, "displayName": "p95"}],
+        },
+        "targets": [
+            {
+                "datasource": DS,
+                "expr": p95_duration_by_prefeitura(operation),
+                "refId": "A",
+                "instant": True,
+                "range": False,
+                "format": "table",
+                "editorMode": "code",
+            }
+        ],
+        "transformations": [
+            {
+                "id": "organize",
+                "options": {
+                    "excludeByName": {"Time": True, "__name__": True, "le": True},
+                    "renameByName": {"prefeitura": "Prefeitura", "Value": "p95"},
+                },
+            }
+        ],
+        "title": title,
+        "type": "table",
+    }
+
+
+def pie_period(id_, title, y, x, w, h, expr, desc="", value_mappings=None):
+    overrides = []
+    if value_mappings:
+        overrides.append(
+            {
+                "matcher": {"id": "byRegexp", "options": ".*"},
+                "properties": [{"id": "mappings", "value": [value_mappings]}],
+            }
+        )
+    return {
+        "datasource": DS,
+        "description": desc,
+        "fieldConfig": {
+            "defaults": {"decimals": 0, "unit": "none"},
+            "overrides": overrides,
+        },
+        "gridPos": {"h": h, "w": w, "x": x, "y": y},
+        "id": id_,
+        "options": {
+            "legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"]},
+            "pieType": "donut",
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
+            "tooltip": {"mode": "single"},
+        },
+        "targets": [
+            {
+                "datasource": DS,
+                "expr": expr,
+                "refId": "A",
+                "instant": True,
+                "range": False,
+                "legendFormat": "{{result}}",
+                "editorMode": "code",
+            }
+        ],
+        "title": title,
+        "type": "piechart",
     }
 
 
@@ -208,6 +404,66 @@ def prom_table_by_nome(id_, title, y, x, w, h, expr, value_col="Logins", desc=""
     }
 
 
+def prom_table_generations(id_, title, y, x, w, h, expr, desc=""):
+    """Tabela compacta: tipo de geração legível + contagem."""
+    return {
+        "datasource": DS,
+        "description": desc
+        or "Nomes legíveis por tipo (dispensa normal, dispensa rápida, inexigibilidade).",
+        "fieldConfig": {
+            "defaults": {
+                "decimals": 0,
+                "min": 0,
+                "unit": "none",
+                "custom": {"align": "auto", "cellOptions": {"type": "auto"}, "inspect": False},
+            },
+            "overrides": [
+                {
+                    "matcher": {"id": "byName", "options": "Gerações"},
+                    "properties": [
+                        {"id": "custom.width", "value": 90},
+                        {"id": "custom.cellOptions", "value": {"type": "color-text"}},
+                    ],
+                },
+                {
+                    "matcher": {"id": "byName", "options": "Tipo de geração"},
+                    "properties": [{"id": "custom.width", "value": 420}],
+                },
+            ],
+        },
+        "gridPos": {"h": h, "w": w, "x": x, "y": y},
+        "id": id_,
+        "options": {
+            "cellHeight": "sm",
+            "footer": {"countRows": False, "show": False},
+            "showHeader": True,
+            "sortBy": [{"desc": True, "displayName": "Gerações"}],
+        },
+        "targets": [
+            {
+                "datasource": DS,
+                "expr": expr,
+                "refId": "A",
+                "instant": True,
+                "range": False,
+                "format": "table",
+                "editorMode": "code",
+            }
+        ],
+        "transformations": [
+            {
+                "id": "organize",
+                "options": {
+                    "excludeByName": {"Time": True, "__name__": True},
+                    "renameByName": {"tipo": "Tipo de geração", "Value": "Gerações"},
+                },
+            }
+        ],
+        "title": title,
+        "type": "table",
+    }
+
+
 def bargauge_by_label(id_, title, y, x, w, h, expr, legend_format, value_mappings=None, desc=""):
     """
     Barras horizontais: nome da série = legendFormat (ex. {{prefeitura}}).
@@ -270,21 +526,198 @@ def text_panel(id_, y, content):
 
 DOC = lambda op: total(f'docmaster_document_operations_total{{operation="{op}",result="success"}}')
 
+
+def bar_period_breakdown(id_, title, y, x, w, h, items, desc=""):
+    return {
+        "datasource": DS,
+        "description": desc,
+        "fieldConfig": {"defaults": {"decimals": 0, "unit": "none"}, "overrides": []},
+        "gridPos": {"h": h, "w": w, "x": x, "y": y},
+        "id": id_,
+        "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull"]}, "orientation": "horizontal"},
+        "targets": [range_query(period_delta(sel), chr(65 + i), leg) for i, (sel, leg) in enumerate(items)],
+        "title": title,
+        "type": "barchart",
+    }
+
+
 panels = []
 y = 0
 panels.append(
     text_panel(
         299,
         y,
-        "**Totais acumulados** = valor atual do contador (não depende do intervalo do Grafana). "
-        "**No período** = contador agora menos contador no início do intervalo "
-        "(16 h dentro de 24 h → nunca maior em 16 h). "
-        "Se o backend **reiniciou** no meio do intervalo, o período pode subestimar. "
-        'Uma geração TR+DFD pode contar várias *operações* (slots + zip); '
-        '"documentos salvos" é outra métrica.',
+        "**Operação (topo)** = foco no período do Grafana: erros, velocidade (p95) e prefeitura. "
+        "**Totais acumulados** = desde o último restart do backend. "
+        "Se o backend reiniciou no meio do intervalo, o período pode subestimar.",
     )
 )
 y += 3
+
+# --- Operação: erros, rapidez, prefeituras (prioridade gestão) ---
+panels.append(row(280, "Operação — período selecionado (erros, velocidade, prefeituras)", y))
+y += 1
+panels += [
+    stat(
+        281,
+        "Erros de geração",
+        y,
+        0,
+        4,
+        period_delta('docmaster_document_operations_total{result="error"}'),
+        period=True,
+    ),
+    stat(
+        282,
+        "Falhas de login",
+        y,
+        4,
+        4,
+        period_delta('docmaster_auth_login_total{result!="success"}'),
+        period=True,
+    ),
+    stat(
+        283,
+        "Erros IA / PNCP",
+        y,
+        8,
+        4,
+        period_delta('docmaster_platform_events_total{result="error"}'),
+        period=True,
+    ),
+    stat(
+        284,
+        "Gerações OK",
+        y,
+        12,
+        4,
+        period_delta('docmaster_document_operations_total{result="success"}'),
+        period=True,
+    ),
+    stat_duration(285, "p95 Slots IA", y, 16, 4, p95_duration("fill_tr_slots")),
+    stat_duration(286, "p95 TR + DFD", y, 20, 4, p95_duration("gerar_tr_e_dfd")),
+]
+y += 4
+
+panels.append(
+    prom_table_by_nome(
+        287,
+        "Gerações OK por prefeitura (período)",
+        y,
+        0,
+        8,
+        7,
+        period_delta_by_nome('docmaster_document_operations_total{result="success"}'),
+        value_col="Gerações",
+        desc="Operações concluídas com sucesso no intervalo, por município.",
+    )
+)
+panels.append(
+    prom_table_by_nome(
+        288,
+        "Erros de geração por prefeitura (período)",
+        y,
+        8,
+        8,
+        7,
+        period_delta_by_nome('docmaster_document_operations_total{result="error"}'),
+        value_col="Erros",
+        desc="Falhas ao gerar documentos (resposta ok=false ou exceção).",
+    )
+)
+panels.append(
+    prom_table_by_nome(
+        289,
+        "Falhas de login por prefeitura (período)",
+        y,
+        16,
+        8,
+        7,
+        period_delta_login_by_nome('docmaster_auth_login_total{result!="success"}'),
+        value_col="Falhas",
+        desc="Senha inválida, bloqueio, prefeitura incorreta, etc.",
+    )
+)
+y += 7
+
+result_pie_mappings = {"type": "value", "options": {k: {"text": v} for k, v in RESULT_LABELS.items()}}
+
+panels.append(
+    pie_period(
+        290,
+        "TR + DFD — sucesso vs erro (período)",
+        y,
+        0,
+        8,
+        7,
+        period_delta('docmaster_document_operations_total{operation="gerar_tr_e_dfd"}'),
+        desc="Proporção de gerações TR+DFD+Ofício que concluíram com sucesso no intervalo.",
+        value_mappings=result_pie_mappings,
+    )
+)
+panels.append(
+    bar_period_breakdown(
+        291,
+        "Erros por tipo de operação (período)",
+        y,
+        8,
+        16,
+        7,
+        [
+            ('docmaster_document_operations_total{operation="fill_tr_slots",result="error"}', "Slots IA"),
+            ('docmaster_document_operations_total{operation="gerar_tr_e_dfd",result="error"}', "TR + DFD"),
+            ('docmaster_document_operations_total{operation="gerar_llm",result="error"}', "Gerar LLM"),
+            ('docmaster_platform_events_total{module="llm",result="error"}', "Proxy LLM"),
+            ('docmaster_platform_events_total{module=~"pncp_.*",result="error"}', "PNCP"),
+        ],
+        desc="Onde mais falhou no intervalo — priorize correção nos maiores valores.",
+    )
+)
+y += 7
+
+panels.append(
+    prom_table_p95_prefeitura(
+        292,
+        "Rapidez TR + DFD por prefeitura (p95 no período)",
+        y,
+        0,
+        14,
+        6,
+        "gerar_tr_e_dfd",
+    )
+)
+panels.append(
+    prom_table_by_nome(
+        293,
+        "Erros IA / PNCP por prefeitura (período)",
+        y,
+        14,
+        10,
+        6,
+        period_delta_by_nome('docmaster_platform_events_total{result="error"}'),
+        value_col="Erros",
+        desc="Falhas em chamadas ao LLM, análise ou serviços PNCP.",
+    )
+)
+y += 6
+
+panels.append(
+    ts_duration(
+        294,
+        "Rapidez ao longo do tempo (p95)",
+        y,
+        0,
+        24,
+        7,
+        [
+            (p95_duration("fill_tr_slots"), "Slots IA"),
+            (p95_duration("gerar_tr_e_dfd"), "TR + DFD"),
+            (p95_duration("gerar_llm"), "Gerar LLM"),
+        ],
+        desc="Quanto menor a linha, mais rápido o fluxo naquele momento.",
+    )
+)
+y += 7
 
 # --- Totais acumulados (instant) ---
 panels.append(row(300, "Totais acumulados (desde o último restart do backend)", y))
@@ -298,8 +731,6 @@ panels += [
     stat(306, "Erros geração", y, 20, 4, total('docmaster_document_operations_total{result="error"}')),
 ]
 y += 4
-
-pkg_value_mappings = {"type": "value", "options": {k: {"text": v} for k, v in PACKAGE_LABELS.items()}}
 
 panels.append(
     prom_table_by_nome(
@@ -317,19 +748,22 @@ panels.append(
     )
 )
 panels.append(
-    bargauge_by_label(
+    prom_table_generations(
         341,
-        "Gerações por pacote (total acumulado)",
+        "Gerações por tipo de documento (total acumulado)",
         y,
         12,
         12,
-        8,
-        total_by('docmaster_document_operations_total{result="success",package!~"unknown|other"}', "package"),
-        "{{package}}",
-        value_mappings=pkg_value_mappings,
+        7,
+        generations_by_package_display(),
+        desc=(
+            "Dispensa normal, dispensa rápida e inexigibilidade com nomes legíveis. "
+            "Séries antigas sem distinção rápida/normal aparecem como «Dispensa · Art. …». "
+            "Após deploy do backend + frontend, novas gerações rápidas usam chave dispensa_rapida_*."
+        ),
     )
 )
-y += 8
+y += 7
 
 # --- No período Grafana (delta de contador — coerente com o intervalo) ---
 panels.append(row(3010, "No período selecionado no Grafana", y))
@@ -373,20 +807,6 @@ panels += [
     ),
 ]
 y += 4
-
-def bar_period_breakdown(id_, title, y, x, w, h, items, desc=""):
-    return {
-        "datasource": DS,
-        "description": desc,
-        "fieldConfig": {"defaults": {"decimals": 0, "unit": "none"}, "overrides": []},
-        "gridPos": {"h": h, "w": w, "x": x, "y": y},
-        "id": id_,
-        "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull"]}, "orientation": "horizontal"},
-        "targets": [range_query(period_delta(sel), chr(65 + i), leg) for i, (sel, leg) in enumerate(items)],
-        "title": title,
-        "type": "barchart",
-    }
-
 
 panels.append(
     bar_period_breakdown(
@@ -533,7 +953,7 @@ panels.append(
 dash = {
     "annotations": {"list": []},
     "editable": False,
-    "description": "Layout v16 — logins com município + UF; compatível com métrica antiga (só UF).",
+    "description": "Layout v18 — painel operacional (erros, p95, prefeituras) + totais acumulados.",
     "fiscalYearStartMonth": 0,
     "graphTooltip": 1,
     "id": None,
@@ -541,13 +961,13 @@ dash = {
     "panels": panels,
     "refresh": "1m",
     "schemaVersion": 39,
-    "tags": ["docmaster", "backend", "django", "layout-v16"],
+    "tags": ["docmaster", "backend", "django", "layout-v18"],
     "templating": {"list": []},
     "time": {"from": "now-24h", "to": "now"},
     "timezone": "browser",
     "title": "DocMaster — Backend Django",
     "uid": "docmaster-backend",
-    "version": 16,
+    "version": 18,
 }
 
 OUT.write_text(json.dumps(dash, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

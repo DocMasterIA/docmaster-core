@@ -16,11 +16,18 @@ from prometheus_client import Counter, Histogram
 # Pacotes de geração (mesmo conjunto do route_map em api._resolve_slot_package_key).
 KNOWN_SLOT_PACKAGES = frozenset(
     {
+        # Dispensa normal (formulário completo)
         "dispensa_75_i_manutencao_veiculos",
         "dispensa_75_i_obras_engenharia",
         "dispensa_75_ii_compras",
         "dispensa_75_ii_servicos",
         "dispensa_75_ii_compras_servicos_inclusos",
+        # Dispensa rápida (fluxo simplificado)
+        "dispensa_rapida_75_i_manutencao_veiculos",
+        "dispensa_rapida_75_i_obras_engenharia",
+        "dispensa_rapida_75_ii_compras",
+        "dispensa_rapida_75_ii_servicos",
+        "dispensa_rapida_75_ii_compras_servicos_inclusos",
         "inexigibilidade_74_i_manutencao_veiculos",
         "inexigibilidade_74_i_fornecedor_exclusivo",
     }
@@ -42,26 +49,26 @@ docmaster_auth_logout_total = Counter(
 docmaster_document_operations_total = Counter(
     "docmaster_document_operations_total",
     "Operações de geração / pipeline de documentos",
-    ["operation", "result", "package", "output", "tenant"],
+    ["operation", "result", "package", "output", "prefeitura"],
 )
 
 docmaster_document_operation_duration_seconds = Histogram(
     "docmaster_document_operation_duration_seconds",
     "Duração das operações de documento (segundos)",
-    ["operation", "result", "package", "tenant"],
+    ["operation", "result", "package", "prefeitura"],
     buckets=(0.5, 1, 2.5, 5, 10, 30, 60, 120, 300, 600, 900, 1200),
 )
 
 docmaster_document_instances_created_total = Counter(
     "docmaster_document_instances_created_total",
     "Documentos persistidos em Meus Documentos",
-    ["doc_type", "package", "tenant"],
+    ["doc_type", "package", "prefeitura"],
 )
 
 docmaster_platform_events_total = Counter(
     "docmaster_platform_events_total",
     "Eventos de uso por módulo (LLM, PNCP, análise, etc.)",
-    ["module", "action", "result", "tenant"],
+    ["module", "action", "result", "prefeitura"],
 )
 
 KNOWN_LLM_ACTIONS = frozenset(
@@ -185,26 +192,26 @@ def record_document_operation(
     result: str,
     package: str,
     output: str,
-    tenant: str,
+    prefeitura: str,
     duration_seconds: float,
 ) -> None:
     op = (operation or "unknown")[:32]
     pkg = normalize_package_key(package)
     out = (output or "n/a")[:16]
     res = "success" if result == "success" else "error"
-    ten = (tenant or "anonymous")[:16]
+    pref = (prefeitura or "Não identificado")[:56]
     docmaster_document_operations_total.labels(
         operation=op,
         result=res,
         package=pkg,
         output=out,
-        tenant=ten,
+        prefeitura=pref,
     ).inc()
     docmaster_document_operation_duration_seconds.labels(
         operation=op,
         result=res,
         package=pkg,
-        tenant=ten,
+        prefeitura=pref,
     ).observe(max(0.0, duration_seconds))
 
 
@@ -241,17 +248,17 @@ def record_platform_event(
     module: str,
     action: str,
     result: str,
-    tenant: str,
+    prefeitura: str,
 ) -> None:
     mod = (module or "unknown")[:24]
     act = (action or "unknown")[:32]
     res = "success" if result == "success" else "error"
-    ten = (tenant or "anonymous")[:16]
+    pref = (prefeitura or "Não identificado")[:56]
     docmaster_platform_events_total.labels(
         module=mod,
         action=act,
         result=res,
-        tenant=ten,
+        prefeitura=pref,
     ).inc()
 
 
@@ -259,12 +266,12 @@ def record_document_instance_created(
     *,
     doc_type: str,
     package: str,
-    tenant: str,
+    prefeitura: str,
 ) -> None:
     docmaster_document_instances_created_total.labels(
         doc_type=(doc_type or "unknown")[:24],
         package=normalize_package_key(package),
-        tenant=(tenant or "anonymous")[:16],
+        prefeitura=(prefeitura or "Não identificado")[:56],
     ).inc()
 
 
@@ -288,7 +295,7 @@ def track_platform(module: str, action: str | None = None):
                     module=module,
                     action=act,
                     result=result,
-                    tenant=tenant_label_from_request(request),
+                    prefeitura=prefeitura_label_from_request(request),
                 )
 
         return wrapped
@@ -320,7 +327,7 @@ def track_docmaster_view(operation: str):
                     result=result,
                     package=meta.get("package", "unknown"),
                     output=meta.get("output", "n/a"),
-                    tenant=tenant_label_from_request(request),
+                    prefeitura=prefeitura_label_from_request(request),
                     duration_seconds=time.perf_counter() - start,
                 )
 

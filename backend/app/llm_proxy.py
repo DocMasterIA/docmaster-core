@@ -16,7 +16,7 @@ from backend.app.api import api_login_required
 from backend.app.metrics import (
     normalize_llm_action,
     record_platform_event,
-    tenant_label_from_request,
+    prefeitura_label_from_request,
 )
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ def llm_proxy(request, path):
     headers = {"Content-Type": "application/json"}
 
     action = normalize_llm_action(path)
-    tenant = tenant_label_from_request(request)
+    prefeitura = prefeitura_label_from_request(request)
     result = "error"
     try:
         if request.method == "GET":
@@ -78,5 +78,5 @@ def llm_proxy(request, path):
             module="llm",
             action=action,
             result=result,
-            tenant=tenant,
+            prefeitura=prefeitura,
         )

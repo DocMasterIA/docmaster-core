@@ -126,11 +126,11 @@ def _resolve_slot_package_key(payload: dict, request) -> str:
         "/geracao/dispensa-art-75-ii/compras": "dispensa_75_ii_compras",
         "/geracao/dispensa-art-75-ii/servicos": "dispensa_75_ii_servicos",
         "/geracao/dispensa-art-75-ii/compras-servicos-inclusos": "dispensa_75_ii_compras_servicos_inclusos",
-        "/geracao/dispensa-rapida/art-75-i/manutencao-veiculos": "dispensa_75_i_manutencao_veiculos",
-        "/geracao/dispensa-rapida/art-75-i/obras-servicos-engenharia": "dispensa_75_i_obras_engenharia",
-        "/geracao/dispensa-rapida/art-75-ii/compras": "dispensa_75_ii_compras",
-        "/geracao/dispensa-rapida/art-75-ii/servicos": "dispensa_75_ii_servicos",
-        "/geracao/dispensa-rapida/art-75-ii/compras-servicos-inclusos": "dispensa_75_ii_compras_servicos_inclusos",
+        "/geracao/dispensa-rapida/art-75-i/manutencao-veiculos": "dispensa_rapida_75_i_manutencao_veiculos",
+        "/geracao/dispensa-rapida/art-75-i/obras-servicos-engenharia": "dispensa_rapida_75_i_obras_engenharia",
+        "/geracao/dispensa-rapida/art-75-ii/compras": "dispensa_rapida_75_ii_compras",
+        "/geracao/dispensa-rapida/art-75-ii/servicos": "dispensa_rapida_75_ii_servicos",
+        "/geracao/dispensa-rapida/art-75-ii/compras-servicos-inclusos": "dispensa_rapida_75_ii_compras_servicos_inclusos",
         "/geracao/inexigibilidade-art-74-i/show-artistico": "inexigibilidade_74_i_manutencao_veiculos",
         "/geracao/inexigibilidade-art-74-i/manutencao-veiculos": "inexigibilidade_74_i_manutencao_veiculos",
         "/geracao/inexigibilidade-art-74-i/fornecedor-exclusivo": "inexigibilidade_74_i_fornecedor_exclusivo",
@@ -686,7 +686,7 @@ def gerar_tr_modelo_api(request):
                         record_document_instance_created(
                             doc_type="tr_modelo",
                             package=slot_package_key,
-                            tenant=tenant_label_from_request(request),
+                            prefeitura=prefeitura_label_from_request(request),
                         )
                 except Exception:
                     pass
@@ -874,7 +874,7 @@ def gerar_tr_e_dfd_api(request):
             record_document_instance_created(
                 doc_type="tr_dfd",
                 package=slot_package_key,
-                tenant=tenant_label_from_request(request),
+                prefeitura=prefeitura_label_from_request(request),
             )
         except Exception:
             pass

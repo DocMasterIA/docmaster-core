@@ -267,11 +267,11 @@ const rapidaObjPlaceholder = computed(
 );
 
 const SLOT_PACKAGE_BY_ROUTE = {
-  DispensaRapidaArt75IObrasEngenharia: 'dispensa_75_i_obras_engenharia',
-  DispensaRapidaArt75IManutencaoVeiculos: 'dispensa_75_i_manutencao_veiculos',
-  DispensaRapidaArt75IICompras: 'dispensa_75_ii_compras',
-  DispensaRapidaArt75IIServicos: 'dispensa_75_ii_servicos',
-  DispensaRapidaArt75IIComprasServicosInclusos: 'dispensa_75_ii_compras_servicos_inclusos',
+  DispensaRapidaArt75IObrasEngenharia: 'dispensa_rapida_75_i_obras_engenharia',
+  DispensaRapidaArt75IManutencaoVeiculos: 'dispensa_rapida_75_i_manutencao_veiculos',
+  DispensaRapidaArt75IICompras: 'dispensa_rapida_75_ii_compras',
+  DispensaRapidaArt75IIServicos: 'dispensa_rapida_75_ii_servicos',
+  DispensaRapidaArt75IIComprasServicosInclusos: 'dispensa_rapida_75_ii_compras_servicos_inclusos',
 };
 /** Mesmo componente em várias rotas — ao mudar de modalidade, não manter rascunho da página anterior. */
 const DISPENSA_ART75_II_RAPIDA_SHARED_ROUTES = new Set(Object.keys(SLOT_PACKAGE_BY_ROUTE));

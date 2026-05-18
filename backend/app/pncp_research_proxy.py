@@ -19,7 +19,7 @@ from backend.app.api import api_login_required
 from backend.app.metrics import (
     normalize_pncp_research_action,
     record_platform_event,
-    tenant_label_from_request,
+    prefeitura_label_from_request,
 )
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ def pncp_research_proxy(request, path: str):
 
     url = _upstream_url(path)
     action = normalize_pncp_research_action(path)
-    tenant = tenant_label_from_request(request)
+    prefeitura = prefeitura_label_from_request(request)
     result = "error"
 
     try:
@@ -122,7 +122,7 @@ def pncp_research_proxy(request, path: str):
             module="pncp_research",
             action=action,
             result=result,
-            tenant=tenant,
+            prefeitura=prefeitura,
         )
 
 

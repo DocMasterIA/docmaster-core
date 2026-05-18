@@ -6,8 +6,9 @@ providers:
     folder: DocMaster
     type: file
     disableDeletion: false
-    updateIntervalSeconds: 10
-    allowUiUpdates: true
+    updateIntervalSeconds: 5
+    # false = ficheiro no repo ganha sempre; evita dashboard antigo preso no volume
+    allowUiUpdates: false
     overwrite: true
     options:
       path: /etc/grafana/provisioning/dashboards/json

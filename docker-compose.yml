@@ -14,6 +14,7 @@
 # Prometheus: docker compose up -d prometheus  → http://localhost:9090
 # Grafana:    docker compose up -d grafana     → http://localhost:3000  (admin / GRAFANA_ADMIN_PASSWORD)
 #             Dashboard provisionado: pasta DocMaster → «DocMaster — Backend Django»
+#             Após mudar o JSON do dashboard: ./scripts/grafana-reset-dashboard.sh
 # Config: ./config/prometheus.yml e ./config/grafana/provisioning/
 
 services:

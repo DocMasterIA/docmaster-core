@@ -1,6 +1,7 @@
 {
   "annotations": { "list": [] },
-  "editable": true,
+  "editable": false,
+  "description": "Layout v6 — topo: «Visão geral — tráfego HTTP». Se vir só latência por view, corra ./scripts/grafana-reset-dashboard.sh no servidor.",
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
@@ -10,7 +11,7 @@
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "id": 200,
-      "title": "Visão geral — tráfego HTTP",
+      "title": "Layout v6 — Visão geral — tráfego HTTP",
       "type": "row"
     },
     {
@@ -575,11 +576,11 @@
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["docmaster", "backend", "django"],
+  "tags": ["docmaster", "backend", "django", "layout-v6"],
   "templating": { "list": [] },
   "time": { "from": "now-24h", "to": "now" },
   "timezone": "browser",
   "title": "DocMaster — Backend Django",
   "uid": "docmaster-backend",
-  "version": 6
+  "version": 7
 }

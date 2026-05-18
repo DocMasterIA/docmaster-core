@@ -23,6 +23,7 @@ from backend.app.admin import dashboard_view
 # - rotas globais do app
 # - rotas multi-tenant com primeiro segmento como slug da prefeitura
 urlpatterns = [
+    path('', include('django_prometheus.urls')),
     path('admin/painel/', dashboard_view, name='admin-painel'),
     path('admin/', admin.site.urls),
     path("", include("backend.app.urls")), 

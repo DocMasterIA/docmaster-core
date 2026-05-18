@@ -9,6 +9,7 @@ charset-normalizer==3.4.3
 cssselect2==0.8.0
 distro==1.9.0
 Django==5.2.6
+django-prometheus==2.4.1
 django-autocomplete-light==3.12.1
 django-cors-headers==4.3.1
 django-crispy-forms==2.4

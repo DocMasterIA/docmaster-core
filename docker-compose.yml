@@ -10,8 +10,10 @@
 # Qwen só para ETP: docker compose --profile qwen up -d qwen_llm_service
 # No rag_service: LLM_ETP_GENERATION_BASE_URL=http://qwen_llm_service:8015 (Ollama/llm_api segue em LLM_ORCHESTRATION_BASE_URL).
 #
+# Métricas: backend expõe GET /metrics (django-prometheus); Prometheus scrape backend:8000
 # Prometheus: docker compose up -d prometheus  → http://localhost:9090
 # Grafana:    docker compose up -d grafana     → http://localhost:3000  (admin / GRAFANA_ADMIN_PASSWORD)
+#             Dashboard provisionado: pasta DocMaster → «DocMaster — Backend Django»
 # Config: ./config/prometheus.yml e ./config/grafana/provisioning/
 
 services:
@@ -202,6 +204,7 @@ services:
       - RAG_HTTP_TIMEOUT_TR_DFD_MAX=${RAG_HTTP_TIMEOUT_TR_DFD_MAX:-900}
       # PDF: Gunicorn padrão mata o worker após 30s; 0 = sem limite (ver Dockerfile).
       - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-0}
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
     depends_on:
       - llm_api
       - rag_service
@@ -242,6 +245,8 @@ services:
     image: prom/prometheus:latest
     container_name: prometheus
     restart: unless-stopped
+    depends_on:
+      - backend
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       # Volume nomeado evita «permission denied» em ./data no host (Prometheus roda como nobody).

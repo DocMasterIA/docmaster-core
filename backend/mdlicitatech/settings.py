@@ -111,6 +111,7 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 # Application definition (apps internos e terceiros usados pelo painel/admin/UX)
 
 INSTALLED_APPS = [
+    "django_prometheus",
     "corsheaders",
     "nested_admin",
     'dal',
@@ -134,6 +135,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'django_prometheus.middleware.PrometheusBeforeMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -144,6 +146,7 @@ MIDDLEWARE = [
     'backend.app.middleware.PrefeituraMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_prometheus.middleware.PrometheusAfterMiddleware',
 ]
 
 ROOT_URLCONF = 'backend.mdlicitatech.urls'
@@ -174,7 +177,7 @@ WSGI_APPLICATION = 'backend.mdlicitatech.wsgi.application'
 # SQLite: db em data/ para persistir quando usar volume Docker (./backend/data:/app/backend/data)
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
+        'ENGINE': 'django_prometheus.db.backends.sqlite3',
         'NAME': BASE_DIR / 'data' / 'db.sqlite3',
     }
 }

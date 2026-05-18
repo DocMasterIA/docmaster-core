@@ -14,6 +14,7 @@
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
         {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "expr": "sum(rate(django_http_requests_total_by_method_total{job=\"backend\"}[5m])) by (method)",
           "legendFormat": "{{method}}",
           "refId": "A"
@@ -30,6 +31,7 @@
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
       "targets": [
         {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "expr": "histogram_quantile(0.95, sum(rate(django_http_requests_latency_seconds_by_view_method_bucket{job=\"backend\"}[5m])) by (le, view))",
           "legendFormat": "{{view}}",
           "refId": "A"
@@ -45,6 +47,7 @@
       "id": 3,
       "targets": [
         {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "expr": "sum(rate(django_http_responses_total_by_status_total{job=\"backend\",status=~\"5..\"}[5m])) by (status)",
           "legendFormat": "{{status}}",
           "refId": "A"
@@ -60,6 +63,7 @@
       "id": 4,
       "targets": [
         {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "expr": "sum(rate(django_db_execute_total{job=\"backend\"}[5m])) by (vendor)",
           "legendFormat": "{{vendor}}",
           "refId": "A"
@@ -75,6 +79,7 @@
       "id": 5,
       "targets": [
         {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "expr": "process_resident_memory_bytes{job=\"backend\"}",
           "legendFormat": "RSS",
           "refId": "A"
@@ -90,6 +95,7 @@
       "id": 6,
       "targets": [
         {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "expr": "rate(process_cpu_seconds_total{job=\"backend\"}[5m])",
           "legendFormat": "CPU",
           "refId": "A"
@@ -106,6 +112,7 @@
       "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center" },
       "targets": [
         {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "expr": "up{job=\"backend\"}",
           "refId": "A"
         }
@@ -125,5 +132,5 @@
   "timezone": "browser",
   "title": "DocMaster — Backend Django",
   "uid": "docmaster-backend",
-  "version": 1
+  "version": 2
 }

@@ -3,7 +3,7 @@
     "list": []
   },
   "editable": false,
-  "description": "Layout v20 — painéis de tokens LLM (entrada/saída por prefeitura e fluxo).",
+  "description": "Layout v21 — increase() no período (contadores novos); tokens LLM por prefeitura/fluxo.",
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
@@ -77,11 +77,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_document_operations_total{result=\"error\"})\n- sum(docmaster_document_operations_total{result=\"error\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_document_operations_total{result=\"error\"}[$__range]))",
           "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": ""
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
         }
       ],
       "title": "Erros de geração",
@@ -127,11 +127,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_auth_login_total{result!=\"success\"})\n- sum(docmaster_auth_login_total{result!=\"success\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_auth_login_total{result!=\"success\"}[$__range]))",
           "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": ""
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
         }
       ],
       "title": "Falhas de login",
@@ -177,11 +177,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_platform_events_total{result=\"error\"})\n- sum(docmaster_platform_events_total{result=\"error\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_platform_events_total{result=\"error\"}[$__range]))",
           "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": ""
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
         }
       ],
       "title": "Erros IA / PNCP",
@@ -227,11 +227,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_document_operations_total{result=\"success\"})\n- sum(docmaster_document_operations_total{result=\"success\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_document_operations_total{result=\"success\"}[$__range]))",
           "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": ""
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
         }
       ],
       "title": "Gerações OK",
@@ -389,11 +389,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_llm_tokens_total{direction=\"entrada\"})\n- sum(docmaster_llm_tokens_total{direction=\"entrada\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_llm_tokens_total{direction=\"entrada\"}[$__range]))",
           "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": ""
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
         }
       ],
       "title": "Tokens entrada",
@@ -439,11 +439,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_llm_tokens_total{direction=\"saida\"})\n- sum(docmaster_llm_tokens_total{direction=\"saida\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_llm_tokens_total{direction=\"saida\"}[$__range]))",
           "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": ""
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
         }
       ],
       "title": "Tokens saída",
@@ -489,11 +489,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_llm_tokens_total)\n- sum(docmaster_llm_tokens_total offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_llm_tokens_total[$__range]))",
           "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": ""
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
         }
       ],
       "title": "Tokens total",
@@ -539,11 +539,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_platform_events_total{module=\"llm\",result=\"success\"})\n- sum(docmaster_platform_events_total{module=\"llm\",result=\"success\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",result=\"success\"}[$__range]))",
           "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": ""
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
         }
       ],
       "title": "Chamadas LLM (proxy)",
@@ -618,7 +618,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(label_replace(\n  label_replace(\n    docmaster_llm_tokens_total,\n    \"nome\", \"$1\", \"tenant\", \"(.+)\"\n  ),\n  \"nome\", \"$1\", \"prefeitura\", \"(.+)\"\n)) by (nome)\n- sum(label_replace(\n  label_replace(\n    docmaster_llm_tokens_total offset $__range,\n    \"nome\", \"$1\", \"tenant\", \"(.+)\"\n  ),\n  \"nome\", \"$1\", \"prefeitura\", \"(.+)\"\n)) by (nome),\n0)",
+          "expr": "sum(increase(docmaster_llm_tokens_total[$__range])) by (prefeitura)",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -635,6 +635,7 @@
               "__name__": true
             },
             "renameByName": {
+              "prefeitura": "Prefeitura",
               "nome": "Prefeitura",
               "Value": "Tokens"
             }
@@ -723,7 +724,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(docmaster_llm_tokens_total, \"tipo\", \"$1\", \"fluxo\", \"(.+)\"), \"tipo\", \"Preencher slots (IA)\", \"fluxo\", \"fill_tr_slots\"), \"tipo\", \"TR + DFD + Ofício\", \"fluxo\", \"gerar_tr_e_dfd\"), \"tipo\", \"Gerar documento (LLM)\", \"fluxo\", \"gerar_llm\"), \"tipo\", \"TR modelo\", \"fluxo\", \"gerar_tr_modelo\"), \"tipo\", \"Outro fluxo\", \"fluxo\", \"unknown\")) by (tipo)\n- sum(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(docmaster_llm_tokens_total, \"tipo\", \"$1\", \"fluxo\", \"(.+)\"), \"tipo\", \"Preencher slots (IA)\", \"fluxo\", \"fill_tr_slots\"), \"tipo\", \"TR + DFD + Ofício\", \"fluxo\", \"gerar_tr_e_dfd\"), \"tipo\", \"Gerar documento (LLM)\", \"fluxo\", \"gerar_llm\"), \"tipo\", \"TR modelo\", \"fluxo\", \"gerar_tr_modelo\"), \"tipo\", \"Outro fluxo\", \"fluxo\", \"unknown\") offset $__range) by (tipo),\n0)",
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum(increase(docmaster_llm_tokens_total[$__range])) by (fluxo), \"tipo\", \"Preencher slots (IA)\", \"fluxo\", \"fill_tr_slots\"), \"tipo\", \"TR + DFD + Ofício\", \"fluxo\", \"gerar_tr_e_dfd\"), \"tipo\", \"Gerar documento (LLM)\", \"fluxo\", \"gerar_llm\"), \"tipo\", \"TR modelo\", \"fluxo\", \"gerar_tr_modelo\"), \"tipo\", \"Outro fluxo\", \"fluxo\", \"unknown\"), \"tipo\", \"$1\", \"fluxo\", \"(.+)\")",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -818,7 +819,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(label_replace(\n  label_replace(\n    docmaster_document_operations_total{result=\"success\"},\n    \"nome\", \"$1\", \"tenant\", \"(.+)\"\n  ),\n  \"nome\", \"$1\", \"prefeitura\", \"(.+)\"\n)) by (nome)\n- sum(label_replace(\n  label_replace(\n    docmaster_document_operations_total{result=\"success\"} offset $__range,\n    \"nome\", \"$1\", \"tenant\", \"(.+)\"\n  ),\n  \"nome\", \"$1\", \"prefeitura\", \"(.+)\"\n)) by (nome),\n0)",
+          "expr": "sum(increase(docmaster_document_operations_total{result=\"success\"}[$__range])) by (prefeitura)",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -835,6 +836,7 @@
               "__name__": true
             },
             "renameByName": {
+              "prefeitura": "Prefeitura",
               "nome": "Prefeitura",
               "Value": "Gerações"
             }
@@ -913,7 +915,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(label_replace(\n  label_replace(\n    docmaster_document_operations_total{result=\"error\"},\n    \"nome\", \"$1\", \"tenant\", \"(.+)\"\n  ),\n  \"nome\", \"$1\", \"prefeitura\", \"(.+)\"\n)) by (nome)\n- sum(label_replace(\n  label_replace(\n    docmaster_document_operations_total{result=\"error\"} offset $__range,\n    \"nome\", \"$1\", \"tenant\", \"(.+)\"\n  ),\n  \"nome\", \"$1\", \"prefeitura\", \"(.+)\"\n)) by (nome),\n0)",
+          "expr": "sum(increase(docmaster_document_operations_total{result=\"error\"}[$__range])) by (prefeitura)",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -930,6 +932,7 @@
               "__name__": true
             },
             "renameByName": {
+              "prefeitura": "Prefeitura",
               "nome": "Prefeitura",
               "Value": "Erros"
             }
@@ -1008,7 +1011,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(label_replace(\n  label_replace(\n    label_replace(\n      docmaster_auth_login_total{result!=\"success\"},\n      \"nome\", \"$1\", \"tenant\", \"(.+)\"\n    ),\n    \"nome\", \"$1\", \"prefeitura\", \"(.+)\"\n  ),\n  \"nome\", \"Só UF ($1) — refaça login após deploy\", \"nome\", \"^([A-Z]{2})$\"\n)) by (nome)\n- sum(label_replace(\n  label_replace(\n    label_replace(\n      docmaster_auth_login_total{result!=\"success\"} offset $__range,\n      \"nome\", \"$1\", \"tenant\", \"(.+)\"\n    ),\n    \"nome\", \"$1\", \"prefeitura\", \"(.+)\"\n  ),\n  \"nome\", \"Só UF ($1) — refaça login após deploy\", \"nome\", \"^([A-Z]{2})$\"\n)) by (nome),\n0)",
+          "expr": "sum(increase(docmaster_auth_login_total{result!=\"success\"}[$__range])) by (prefeitura)",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -1025,6 +1028,7 @@
               "__name__": true
             },
             "renameByName": {
+              "prefeitura": "Prefeitura",
               "nome": "Prefeitura",
               "Value": "Falhas"
             }
@@ -1106,7 +1110,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\"})\n- sum(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\"}[$__range]))",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -1153,7 +1157,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_document_operations_total{operation=\"fill_tr_slots\",result=\"error\"})\n- sum(docmaster_document_operations_total{operation=\"fill_tr_slots\",result=\"error\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_document_operations_total{operation=\"fill_tr_slots\",result=\"error\"}[$__range]))",
           "refId": "A",
           "range": true,
           "editorMode": "code",
@@ -1164,7 +1168,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"error\"})\n- sum(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"error\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"error\"}[$__range]))",
           "refId": "B",
           "range": true,
           "editorMode": "code",
@@ -1175,7 +1179,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_document_operations_total{operation=\"gerar_llm\",result=\"error\"})\n- sum(docmaster_document_operations_total{operation=\"gerar_llm\",result=\"error\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_llm\",result=\"error\"}[$__range]))",
           "refId": "C",
           "range": true,
           "editorMode": "code",
@@ -1186,7 +1190,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_platform_events_total{module=\"llm\",result=\"error\"})\n- sum(docmaster_platform_events_total{module=\"llm\",result=\"error\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",result=\"error\"}[$__range]))",
           "refId": "D",
           "range": true,
           "editorMode": "code",
@@ -1197,7 +1201,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_platform_events_total{module=~\"pncp_.*\",result=\"error\"})\n- sum(docmaster_platform_events_total{module=~\"pncp_.*\",result=\"error\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_platform_events_total{module=~\"pncp_.*\",result=\"error\"}[$__range]))",
           "refId": "E",
           "range": true,
           "editorMode": "code",
@@ -1383,7 +1387,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(label_replace(\n  label_replace(\n    docmaster_platform_events_total{result=\"error\"},\n    \"nome\", \"$1\", \"tenant\", \"(.+)\"\n  ),\n  \"nome\", \"$1\", \"prefeitura\", \"(.+)\"\n)) by (nome)\n- sum(label_replace(\n  label_replace(\n    docmaster_platform_events_total{result=\"error\"} offset $__range,\n    \"nome\", \"$1\", \"tenant\", \"(.+)\"\n  ),\n  \"nome\", \"$1\", \"prefeitura\", \"(.+)\"\n)) by (nome),\n0)",
+          "expr": "sum(increase(docmaster_platform_events_total{result=\"error\"}[$__range])) by (prefeitura)",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -1400,6 +1404,7 @@
               "__name__": true
             },
             "renameByName": {
+              "prefeitura": "Prefeitura",
               "nome": "Prefeitura",
               "Value": "Erros"
             }
@@ -1870,6 +1875,7 @@
               "__name__": true
             },
             "renameByName": {
+              "prefeitura": "Prefeitura",
               "nome": "Prefeitura",
               "Value": "Logins"
             }
@@ -2036,11 +2042,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_document_instances_created_total)\n- sum(docmaster_document_instances_created_total offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_document_instances_created_total[$__range]))",
           "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": ""
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
         }
       ],
       "title": "Documentos salvos (período)",
@@ -2086,11 +2092,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_document_operations_total{result=\"success\"})\n- sum(docmaster_document_operations_total{result=\"success\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_document_operations_total{result=\"success\"}[$__range]))",
           "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": ""
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
         }
       ],
       "title": "Operações geração OK (período)",
@@ -2136,11 +2142,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_auth_login_total{result=\"success\"})\n- sum(docmaster_auth_login_total{result=\"success\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_auth_login_total{result=\"success\"}[$__range]))",
           "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": ""
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
         }
       ],
       "title": "Logins OK (período)",
@@ -2186,11 +2192,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"success\"})\n- sum(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"success\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"success\"}[$__range]))",
           "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": ""
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
         }
       ],
       "title": "TR+DFD no período",
@@ -2232,7 +2238,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_document_operations_total{operation=\"fill_tr_slots\",result=\"success\"})\n- sum(docmaster_document_operations_total{operation=\"fill_tr_slots\",result=\"success\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_document_operations_total{operation=\"fill_tr_slots\",result=\"success\"}[$__range]))",
           "refId": "A",
           "range": true,
           "editorMode": "code",
@@ -2243,7 +2249,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"success\"})\n- sum(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"success\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"success\"}[$__range]))",
           "refId": "B",
           "range": true,
           "editorMode": "code",
@@ -2254,7 +2260,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_document_operations_total{operation=\"gerar_llm\",result=\"success\"})\n- sum(docmaster_document_operations_total{operation=\"gerar_llm\",result=\"success\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_llm\",result=\"success\"}[$__range]))",
           "refId": "C",
           "range": true,
           "editorMode": "code",
@@ -2265,7 +2271,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(docmaster_document_operations_total{operation=\"gerar_tr_modelo\",result=\"success\"})\n- sum(docmaster_document_operations_total{operation=\"gerar_tr_modelo\",result=\"success\"} offset $__range),\n0)",
+          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_modelo\",result=\"success\"}[$__range]))",
           "refId": "D",
           "range": true,
           "editorMode": "code",
@@ -2985,11 +2991,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(django_http_requests_total_by_method_total{job=\"backend\"})\n- sum(django_http_requests_total_by_method_total{job=\"backend\"} offset $__range),\n0)",
+          "expr": "sum(increase(django_http_requests_total_by_method_total{job=\"backend\"}[$__range]))",
           "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": ""
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
         }
       ],
       "title": "HTTP (período)",
@@ -3035,11 +3041,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(django_http_responses_total_by_status_total{job=\"backend\",status=~\"5..\"})\n- sum(django_http_responses_total_by_status_total{job=\"backend\",status=~\"5..\"} offset $__range),\n0)",
+          "expr": "sum(increase(django_http_responses_total_by_status_total{job=\"backend\",status=~\"5..\"}[$__range]))",
           "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": ""
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
         }
       ],
       "title": "5xx (período)",
@@ -3085,11 +3091,11 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_min(\nsum(django_http_responses_total_by_status_total{job=\"backend\",status=~\"4..\"})\n- sum(django_http_responses_total_by_status_total{job=\"backend\",status=~\"4..\"} offset $__range),\n0)",
+          "expr": "sum(increase(django_http_responses_total_by_status_total{job=\"backend\",status=~\"4..\"}[$__range]))",
           "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": ""
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
         }
       ],
       "title": "4xx (período)",
@@ -3256,7 +3262,7 @@
     "docmaster",
     "backend",
     "django",
-    "layout-v20"
+    "layout-v21"
   ],
   "templating": {
     "list": []
@@ -3268,5 +3274,5 @@
   "timezone": "browser",
   "title": "DocMaster — Backend Django",
   "uid": "docmaster-backend",
-  "version": 20
+  "version": 21
 }

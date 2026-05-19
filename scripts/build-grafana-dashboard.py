@@ -77,14 +77,10 @@ def range_query(expr, ref="A", legend=None):
 
 def period_delta(selector: str) -> str:
     """
-    Contagem exata no intervalo do Grafana: valor agora − valor no início do período.
-    Monotônico: 24h >= 16h (se o backend não reiniciou no meio).
-    clamp_min trata restart (contador voltou a 0).
+    Soma no intervalo do Grafana. Usa increase() para funcionar com contadores novos
+    (offset $__range falha quando não há amostra no início do período).
     """
-    return f"""clamp_min(
-sum({selector})
-- sum({selector} offset $__range),
-0)"""
+    return f"sum(increase({selector}[$__range]))"
 
 
 def count_interval(selector: str) -> str:
@@ -122,12 +118,8 @@ def metric_prefeitura_nome(selector: str) -> str:
 
 
 def period_delta_by_nome(selector: str) -> str:
-    now = metric_prefeitura_nome(selector)
-    then = metric_prefeitura_nome(_selector_with_offset(selector, "$__range"))
-    return f"""clamp_min(
-sum({now}) by (nome)
-- sum({then}) by (nome),
-0)"""
+    """Tokens e gerações por prefeitura no intervalo (label prefeitura)."""
+    return f"sum(increase({selector}[$__range])) by (prefeitura)"
 
 
 def login_prefeitura_nome_chain(selector: str) -> str:
@@ -144,37 +136,23 @@ def login_prefeitura_nome_chain(selector: str) -> str:
 
 
 def period_delta_login_by_nome(selector: str) -> str:
-    now = login_prefeitura_nome_chain(selector)
-    then = login_prefeitura_nome_chain(_selector_with_offset(selector, "$__range"))
-    return f"""clamp_min(
-sum({now}) by (nome)
-- sum({then}) by (nome),
-0)"""
+    return f"sum(increase({selector}[$__range])) by (prefeitura)"
 
 
 def period_delta_by_result(selector: str) -> str:
-    return f"""clamp_min(
-sum({selector}) by (result)
-- sum({selector} offset $__range) by (result),
-0)"""
+    return f"sum(increase({selector}[$__range])) by (result)"
 
 
 def period_delta_by_fluxo(selector: str = "docmaster_llm_tokens_total") -> str:
-    return f"""clamp_min(
-sum({selector}) by (fluxo)
-- sum({selector} offset $__range) by (fluxo),
-0)"""
+    return f"sum(increase({selector}[$__range])) by (fluxo)"
 
 
 def llm_tokens_by_fluxo_display(selector: str = "docmaster_llm_tokens_total") -> str:
     """Agrupa tokens no período por fluxo com nomes legíveis."""
-    expr = f'label_replace({selector}, "tipo", "$1", "fluxo", "(.+)")'
+    expr = f"sum(increase({selector}[$__range])) by (fluxo)"
     for key, label in FLUXO_LABELS.items():
         expr = f'label_replace({expr}, "tipo", "{_promql_escape(label)}", "fluxo", "{key}")'
-    return f"""clamp_min(
-sum({expr}) by (tipo)
-- sum({expr} offset $__range) by (tipo),
-0)"""
+    return f'label_replace({expr}, "tipo", "$1", "fluxo", "(.+)")'
 
 
 def p95_duration(operation: str) -> str:
@@ -246,7 +224,7 @@ def stat(id_, title, y, x, w, expr, desc="", *, period=False, unit="none", decim
             "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
             "textMode": "auto",
         },
-        "targets": [range_query(expr) if period else instant(expr)],
+        "targets": [instant(expr)],
         "title": title,
         "type": "stat",
     }
@@ -443,7 +421,11 @@ def prom_table_by_nome(id_, title, y, x, w, h, expr, value_col="Logins", desc=""
                 "id": "organize",
                 "options": {
                     "excludeByName": {"Time": True, "__name__": True},
-                    "renameByName": {"nome": "Prefeitura", "Value": value_col},
+                    "renameByName": {
+                        "prefeitura": "Prefeitura",
+                        "nome": "Prefeitura",
+                        "Value": value_col,
+                    },
                 },
             }
         ],
@@ -1074,7 +1056,7 @@ panels.append(
 dash = {
     "annotations": {"list": []},
     "editable": False,
-    "description": "Layout v20 — painéis de tokens LLM (entrada/saída por prefeitura e fluxo).",
+    "description": "Layout v21 — increase() no período (contadores novos); tokens LLM por prefeitura/fluxo.",
     "fiscalYearStartMonth": 0,
     "graphTooltip": 1,
     "id": None,
@@ -1082,13 +1064,13 @@ dash = {
     "panels": panels,
     "refresh": "1m",
     "schemaVersion": 39,
-    "tags": ["docmaster", "backend", "django", "layout-v20"],
+    "tags": ["docmaster", "backend", "django", "layout-v21"],
     "templating": {"list": []},
     "time": {"from": "now-24h", "to": "now"},
     "timezone": "browser",
     "title": "DocMaster — Backend Django",
     "uid": "docmaster-backend",
-    "version": 20,
+    "version": 21,
 }
 
 OUT.write_text(json.dumps(dash, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

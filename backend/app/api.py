@@ -101,13 +101,13 @@ def _rag_prefeitura_headers(request) -> dict[str, str]:
 
 
 def _record_llm_usage_from_response(request, fluxo: str, *, usage=None, http_response=None) -> None:
-    """Grava métricas de tokens no backend (scrape /metrics do Django)."""
+    """Grava métricas de tokens (uma vez por request: JSON body ou header HTTP)."""
     pref = prefeitura_label_from_request(request)
     prompt_t = completion_t = 0
     if isinstance(usage, dict):
         prompt_t = int(usage.get("prompt_tokens") or 0)
         completion_t = int(usage.get("completion_tokens") or 0)
-    elif http_response is not None:
+    if (not prompt_t and not completion_t) and http_response is not None:
         raw = (http_response.headers.get("X-DocMaster-LLM-Token-Usage") or "").strip()
         if raw:
             try:
@@ -116,6 +116,18 @@ def _record_llm_usage_from_response(request, fluxo: str, *, usage=None, http_res
                 completion_t = int(data.get("completion_tokens") or 0)
             except (json.JSONDecodeError, TypeError, ValueError):
                 pass
+        if not prompt_t and not completion_t:
+            ctype = (http_response.headers.get("content-type") or "").lower()
+            if "json" in ctype:
+                try:
+                    body = http_response.json()
+                    if isinstance(body, dict):
+                        tu = body.get("llm_token_usage")
+                        if isinstance(tu, dict):
+                            prompt_t = int(tu.get("prompt_tokens") or 0)
+                            completion_t = int(tu.get("completion_tokens") or 0)
+                except Exception:
+                    pass
     if prompt_t or completion_t:
         meta = getattr(request, "docmaster_metrics", None) or {}
         record_llm_token_usage(
@@ -500,7 +512,6 @@ def gerar_via_llm_api(request):
     content_type = resp.headers.get("content-type", "")
     if "json" in content_type:
         data = resp.json()
-        _record_llm_usage_from_response(request, "gerar_llm", usage=data.get("llm_token_usage"))
         if not data.get("ok"):
             return JsonResponse({"ok": False, "error": data.get("error", "Erro na geração")}, status=500)
         # Caso especial: se no futuro usarmos docx_path compartilhado via volume, poderíamos salvar em DocumentInstance aqui.
@@ -760,6 +771,9 @@ def gerar_tr_e_dfd_api(request):
     except (json.JSONDecodeError, TypeError):
         return JsonResponse({"ok": False, "error": "Corpo JSON inválido"}, status=400)
 
+    slot_package_key = _resolve_slot_package_key(payload, request)
+    set_request_metrics(request, package=slot_package_key, output="zip")
+
     raw_template_id = payload.get("template_id")
     if raw_template_id not in (None, ""):
         tpl = Template.objects.filter(id=str(raw_template_id).strip()).first()
@@ -771,8 +785,6 @@ def gerar_tr_e_dfd_api(request):
     user_prompt = (payload.get("user_prompt") or "").strip()
     slots_override = payload.get("slots_override")  # opcional
     template_id = _resolve_merge_template_id(request, payload)
-    slot_package_key = _resolve_slot_package_key(payload, request)
-    set_request_metrics(request, package=slot_package_key, output="zip")
 
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
@@ -979,10 +991,11 @@ def fill_tr_slots_api(request):
     except (json.JSONDecodeError, TypeError):
         return JsonResponse({"ok": False, "error": "Corpo JSON inválido"}, status=400)
 
-    user_prompt = (payload.get("user_prompt") or "").strip()
-    slots_override = payload.get("slots_override")
     slot_package_key = _resolve_slot_package_key(payload, request)
     set_request_metrics(request, package=slot_package_key, output="json")
+
+    user_prompt = (payload.get("user_prompt") or "").strip()
+    slots_override = payload.get("slots_override")
 
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)

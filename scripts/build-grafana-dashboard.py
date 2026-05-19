@@ -189,6 +189,15 @@ _LLM_TOKEN_DENOM_OPERATIONS = "fill_tr_slots|gerar_llm"
 _LLM_TOKEN_DENOM_SELECTOR = (
     f'docmaster_document_operations_total{{result="success",operation=~"{_LLM_TOKEN_DENOM_OPERATIONS}"}}'
 )
+# Tokens: só fluxos do pipeline documento (exclui legado llm_proxy_* no TSDB).
+_LLM_TOKENS_METRIC = (
+    f'docmaster_llm_tokens_total{{fluxo=~"{_LLM_TOKEN_OPERATIONS}"}}'
+)
+# Tipos de geração com pacote conhecido (evita «other»/unknown de rotas antigas).
+_TIPO_GERACAO_FILTER = "dispensa_normal|dispensa_rapida|inexigibilidade|etp"
+_OPS_BY_TIPO_SELECTOR = (
+    f'docmaster_document_operations_total{{tipo_geracao=~"{_TIPO_GERACAO_FILTER}"}}'
+)
 
 TIPO_GERACAO_LABELS = {
     "dispensa_normal": "Dispensa normal",
@@ -208,17 +217,17 @@ def _llm_ops_selector(*, tipo_geracao: str | None = None, for_token_avg: bool = 
 
 def avg_tokens_for_tipo(tipo_geracao: str, *, direction: str | None = None) -> str:
     """Média de tokens por operação no período, para um tipo de geração."""
-    tok = f'docmaster_llm_tokens_total{{tipo_geracao="{tipo_geracao}"}}'
+    tok = f'{_LLM_TOKENS_METRIC[:-1]},tipo_geracao="{tipo_geracao}"}}'
     if direction:
-        tok = f'docmaster_llm_tokens_total{{tipo_geracao="{tipo_geracao}",direction="{direction}"}}'
+        tok = f'{_LLM_TOKENS_METRIC[:-1]},tipo_geracao="{tipo_geracao}",direction="{direction}"}}'
     ops = _llm_ops_selector(tipo_geracao=tipo_geracao, for_token_avg=True)
     return f"(sum(increase({tok}[$__range])) / clamp_min(sum(increase({ops}[$__range])), 1))"
 
 
 def avg_tokens_by_tipo_geracao(*, direction: str | None = None) -> str:
-    tok = "docmaster_llm_tokens_total"
+    tok = _LLM_TOKENS_METRIC
     if direction:
-        tok += f'{{direction="{direction}"}}'
+        tok = f'{_LLM_TOKENS_METRIC[:-1]},direction="{direction}"}}'
     ops = _llm_ops_selector(for_token_avg=True)
     return f"""(
 sum(increase({tok}[$__range])) by (tipo_geracao)
@@ -236,7 +245,7 @@ def avg_tokens_by_tipo_geracao_display(*, direction: str | None = None) -> str:
 
 def operations_by_tipo_geracao_period(*, result: str = "success") -> str:
     """Contagem de operações no período, agrupadas por tipo_geracao com nome legível."""
-    sel = f'docmaster_document_operations_total{{result="{result}"}}'
+    sel = f'{_OPS_BY_TIPO_SELECTOR[:-1]},result="{result}"}}'
     expr = f"sum(increase({sel}[$__range])) by (tipo_geracao)"
     for key, label in TIPO_GERACAO_LABELS.items():
         expr = f'label_replace({expr}, "tipo", "{_promql_escape(label)}", "tipo_geracao", "{key}")'
@@ -244,7 +253,7 @@ def operations_by_tipo_geracao_period(*, result: str = "success") -> str:
 
 
 def operations_by_tipo_geracao_total(*, result: str = "success") -> str:
-    sel = f'docmaster_document_operations_total{{result="{result}"}}'
+    sel = f'{_OPS_BY_TIPO_SELECTOR[:-1]},result="{result}"}}'
     expr = f"sum({sel}) by (tipo_geracao)"
     for key, label in TIPO_GERACAO_LABELS.items():
         expr = f'label_replace({expr}, "tipo", "{_promql_escape(label)}", "tipo_geracao", "{key}")'
@@ -280,6 +289,13 @@ LOGIN_NOME_MAPPINGS = {
 RESULT_LABELS = {
     "success": "Sucesso",
     "error": "Erro",
+}
+
+AUTH_LOGIN_RESULT_LABELS = {
+    "success": "Sucesso",
+    "failure": "Credenciais inválidas",
+    "locked": "Conta bloqueada",
+    "forbidden_prefeitura": "Prefeitura não permitida",
 }
 
 OPERATION_LABELS = {
@@ -674,8 +690,9 @@ panels.append(
         299,
         y,
         "**Operação (topo)** = foco no período do Grafana: erros, velocidade (p95) e prefeitura. "
-        "**Totais acumulados** = desde o último restart do backend. "
-        "Se o backend reiniciou no meio do intervalo, o período pode subestimar.",
+        "**Totais acumulados** = desde o último restart do backend (contadores zeram no deploy). "
+        "Tokens: só fill-tr-slots, gerar-tr-e-dfd e gerar_llm (não inclui /api/llm do formulário). "
+        "Tipos: dispensa normal/rápida, inexigibilidade, ETP — séries «other»/unknown ficam fora dos painéis por tipo.",
     )
 )
 y += 3
@@ -699,8 +716,11 @@ panels += [
         y,
         4,
         4,
-        period_delta('docmaster_auth_login_total{result!="success"}'),
+        period_delta(
+            'docmaster_auth_login_total{result=~"failure|locked|forbidden_prefeitura"}'
+        ),
         period=True,
+        desc="Tentativas de login sem sucesso (credenciais, bloqueio ou prefeitura).",
     ),
     stat(
         283,
@@ -880,7 +900,9 @@ panels.append(
         16,
         8,
         7,
-        period_delta_login_by_nome('docmaster_auth_login_total{result!="success"}'),
+        period_delta_login_by_nome(
+            'docmaster_auth_login_total{result=~"failure|locked|forbidden_prefeitura"}'
+        ),
         value_col="Falhas",
         desc="Senha inválida, bloqueio, prefeitura incorreta, etc.",
     )
@@ -1244,7 +1266,7 @@ panels.append(
 dash = {
     "annotations": {"list": []},
     "editable": False,
-    "description": "Layout v24 — tokens e gerações por tipo_geracao; denominador de média alinhado a ops com LLM.",
+    "description": "Layout v25 — métricas limpas: tokens só pipeline documento; tipos sem other/unknown; login normalizado.",
     "fiscalYearStartMonth": 0,
     "graphTooltip": 1,
     "id": None,
@@ -1252,13 +1274,13 @@ dash = {
     "panels": panels,
     "refresh": "1m",
     "schemaVersion": 39,
-    "tags": ["docmaster", "backend", "django", "layout-v24"],
+    "tags": ["docmaster", "backend", "django", "layout-v25"],
     "templating": {"list": []},
     "time": {"from": "now-24h", "to": "now"},
     "timezone": "browser",
     "title": "DocMaster — Backend Django",
     "uid": "docmaster-backend",
-    "version": 24,
+    "version": 25,
 }
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -1271,4 +1293,4 @@ if dupes:
     sys.exit(1)
 
 print(f"Repo:  {ROOT}")
-print(f"Wrote: {OUT} ({len(panels)} panels, layout-v24)")
+print(f"Wrote: {OUT} ({len(panels)} panels, layout-v25)")

@@ -3,7 +3,7 @@
     "list": []
   },
   "editable": false,
-  "description": "Layout v24 — tokens e gerações por tipo_geracao; denominador de média alinhado a ops com LLM.",
+  "description": "Layout v25 — métricas limpas: tokens só pipeline documento; tipos sem other/unknown; login normalizado.",
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
@@ -19,7 +19,7 @@
       "id": 299,
       "options": {
         "mode": "markdown",
-        "content": "**Operação (topo)** = foco no período do Grafana: erros, velocidade (p95) e prefeitura. **Totais acumulados** = desde o último restart do backend. Se o backend reiniciou no meio do intervalo, o período pode subestimar."
+        "content": "**Operação (topo)** = foco no período do Grafana: erros, velocidade (p95) e prefeitura. **Totais acumulados** = desde o último restart do backend (contadores zeram no deploy). Tokens: só fill-tr-slots, gerar-tr-e-dfd e gerar_llm (não inclui /api/llm do formulário). Tipos: dispensa normal/rápida, inexigibilidade, ETP — séries «other»/unknown ficam fora dos painéis por tipo."
       },
       "title": "",
       "type": "text",
@@ -92,7 +92,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Soma no intervalo selecionado no Grafana.",
+      "description": "Tentativas de login sem sucesso (credenciais, bloqueio ou prefeitura).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -127,7 +127,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_auth_login_total{result!=\"success\"}[$__range]))",
+          "expr": "sum(increase(docmaster_auth_login_total{result=~\"failure|locked|forbidden_prefeitura\"}[$__range]))",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -389,7 +389,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "(sum(increase(docmaster_llm_tokens_total{tipo_geracao=\"dispensa_normal\"}[$__range])) / clamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\",tipo_geracao=\"dispensa_normal\"}[$__range])), 1))",
+          "expr": "(sum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm\",tipo_geracao=\"dispensa_normal\"}[$__range])) / clamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\",tipo_geracao=\"dispensa_normal\"}[$__range])), 1))",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -439,7 +439,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "(sum(increase(docmaster_llm_tokens_total{tipo_geracao=\"dispensa_rapida\"}[$__range])) / clamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\",tipo_geracao=\"dispensa_rapida\"}[$__range])), 1))",
+          "expr": "(sum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm\",tipo_geracao=\"dispensa_rapida\"}[$__range])) / clamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\",tipo_geracao=\"dispensa_rapida\"}[$__range])), 1))",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -489,7 +489,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "(sum(increase(docmaster_llm_tokens_total{tipo_geracao=\"inexigibilidade\"}[$__range])) / clamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\",tipo_geracao=\"inexigibilidade\"}[$__range])), 1))",
+          "expr": "(sum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm\",tipo_geracao=\"inexigibilidade\"}[$__range])) / clamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\",tipo_geracao=\"inexigibilidade\"}[$__range])), 1))",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -539,7 +539,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "(sum(increase(docmaster_llm_tokens_total{tipo_geracao=\"etp\"}[$__range])) / clamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\",tipo_geracao=\"etp\"}[$__range])), 1))",
+          "expr": "(sum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm\",tipo_geracao=\"etp\"}[$__range])) / clamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\",tipo_geracao=\"etp\"}[$__range])), 1))",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -628,7 +628,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace((\nsum(increase(docmaster_llm_tokens_total[$__range])) by (tipo_geracao)\n/ on(tipo_geracao) group_left()\nclamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\"}[$__range])) by (tipo_geracao), 1)\n), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace((\nsum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm\"}[$__range])) by (tipo_geracao)\n/ on(tipo_geracao) group_left()\nclamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\"}[$__range])) by (tipo_geracao), 1)\n), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -733,7 +733,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace((\nsum(increase(docmaster_llm_tokens_total{direction=\"entrada\"}[$__range])) by (tipo_geracao)\n/ on(tipo_geracao) group_left()\nclamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\"}[$__range])) by (tipo_geracao), 1)\n), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace((\nsum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm\",direction=\"entrada\"}[$__range])) by (tipo_geracao)\n/ on(tipo_geracao) group_left()\nclamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\"}[$__range])) by (tipo_geracao), 1)\n), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -838,7 +838,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace((\nsum(increase(docmaster_llm_tokens_total{direction=\"saida\"}[$__range])) by (tipo_geracao)\n/ on(tipo_geracao) group_left()\nclamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\"}[$__range])) by (tipo_geracao), 1)\n), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace((\nsum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm\",direction=\"saida\"}[$__range])) by (tipo_geracao)\n/ on(tipo_geracao) group_left()\nclamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\"}[$__range])) by (tipo_geracao), 1)\n), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -943,7 +943,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum(increase(docmaster_document_operations_total{result=\"success\"}[$__range])) by (tipo_geracao), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum(increase(docmaster_document_operations_total{tipo_geracao=~\"dispensa_normal|dispensa_rapida|inexigibilidade|etp\",result=\"success\"}[$__range])) by (tipo_geracao), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -1048,7 +1048,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum(increase(docmaster_document_operations_total{result=\"error\"}[$__range])) by (tipo_geracao), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum(increase(docmaster_document_operations_total{tipo_geracao=~\"dispensa_normal|dispensa_rapida|inexigibilidade|etp\",result=\"error\"}[$__range])) by (tipo_geracao), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -1335,7 +1335,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_auth_login_total{result!=\"success\"}[$__range])) by (prefeitura)",
+          "expr": "sum(increase(docmaster_auth_login_total{result=~\"failure|locked|forbidden_prefeitura\"}[$__range])) by (prefeitura)",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -2393,7 +2393,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum(docmaster_document_operations_total{result=\"success\"}) by (tipo_geracao), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum(docmaster_document_operations_total{tipo_geracao=~\"dispensa_normal|dispensa_rapida|inexigibilidade|etp\",result=\"success\"}) by (tipo_geracao), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -3691,7 +3691,7 @@
     "docmaster",
     "backend",
     "django",
-    "layout-v24"
+    "layout-v25"
   ],
   "templating": {
     "list": []
@@ -3703,5 +3703,5 @@
   "timezone": "browser",
   "title": "DocMaster — Backend Django",
   "uid": "docmaster-backend",
-  "version": 24
+  "version": 25
 }

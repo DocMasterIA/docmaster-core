@@ -25,7 +25,11 @@ python3 scripts/build-grafana-dashboard.py
 DOCMASTER_ROOT=~/docmaster-core ./scripts/grafana-reset-dashboard.sh
 ```
 
-Dashboard: `DocMaster — Backend Django` (uid `docmaster-backend`, tag `layout-v24`).
+Dashboard: `DocMaster — Backend Django` (uid `docmaster-backend`, tag `layout-v25`).
+
+Validação local: `python3 scripts/build-grafana-dashboard.py && python3 scripts/validate-observability.py`
+
+**Limpeza de dados (v25):** `docmaster_llm_tokens_total` só aceita fluxos `fill_tr_slots`, `gerar_tr_e_dfd`, `gerar_llm`. Chamadas `/api/llm/*` não incrementam tokens. Painéis por tipo ignoram `other`/`unknown`. Contadores zeram no restart/deploy do backend.
 
 ## Explore (sanidade)
 

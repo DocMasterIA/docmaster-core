@@ -84,6 +84,13 @@ docmaster_metrics_active = Gauge(
     multiprocess_mode="livesum",
 )
 
+# Fluxos que alimentam docmaster_llm_tokens_total (pipeline documento). Exclui /api/llm/* proxy.
+ALLOWED_LLM_TOKEN_FLUXOS = frozenset({"fill_tr_slots", "gerar_tr_e_dfd", "gerar_llm"})
+
+KNOWN_AUTH_LOGIN_RESULTS = frozenset(
+    {"success", "failure", "locked", "forbidden_prefeitura"}
+)
+
 KNOWN_LLM_ACTIONS = frozenset(
     {"health", "planner", "section", "analysis", "generate", "test-audit"}
 )
@@ -210,9 +217,17 @@ def set_request_metrics(request, *, package: str = "", output: str = "") -> None
     }
 
 
+def normalize_auth_login_result(result: str) -> str:
+    r = (result or "failure").strip().lower()[:32]
+    return r if r in KNOWN_AUTH_LOGIN_RESULTS else "failure"
+
+
 def record_auth_login(*, result: str, user=None, prefeitura: str | None = None) -> None:
     pref = prefeitura if prefeitura is not None else prefeitura_label(user)
-    docmaster_auth_login_total.labels(result=result, prefeitura=pref).inc()
+    docmaster_auth_login_total.labels(
+        result=normalize_auth_login_result(result),
+        prefeitura=pref,
+    ).inc()
 
 
 def record_auth_logout(*, user=None, prefeitura: str | None = None) -> None:
@@ -228,9 +243,11 @@ def record_llm_token_usage(
     prompt_tokens: int = 0,
     completion_tokens: int = 0,
 ) -> None:
-    """Registra tokens agregados de uma geração (valores vindos do rag_service ou llm_api)."""
-    pref = (prefeitura or "Não identificado")[:56]
+    """Registra tokens do pipeline TR/DFD/ETP (não usar para /api/llm proxy do formulário)."""
     fl = (fluxo or "unknown")[:24]
+    if fl not in ALLOWED_LLM_TOKEN_FLUXOS:
+        return
+    pref = (prefeitura or "Não identificado")[:56]
     pkg = normalize_package_key(package)
     tipo = package_to_tipo_geracao(pkg, fluxo=fl)
     if prompt_tokens > 0:

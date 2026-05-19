@@ -4,6 +4,8 @@ from django.test import SimpleTestCase
 
 from app.metrics import (
     docmaster_llm_tokens_total,
+    normalize_auth_login_result,
+    normalize_package_key,
     package_to_tipo_geracao,
     prefeitura_label,
     prefeitura_label_from_instance,
@@ -48,7 +50,34 @@ class PackageTipoGeraçãoTests(SimpleTestCase):
         self.assertEqual(package_to_tipo_geracao("unknown", fluxo="gerar_llm"), "etp")
 
 
+class MetricsNormalizationTests(SimpleTestCase):
+    def test_unknown_package_becomes_other(self):
+        self.assertEqual(normalize_package_key("pacote_inventado_xyz"), "other")
+
+    def test_auth_login_result_clamped(self):
+        self.assertEqual(normalize_auth_login_result("SUCCESS"), "success")
+        self.assertEqual(normalize_auth_login_result("weird"), "failure")
+
+
 class LlmTokenMetricsTests(SimpleTestCase):
+    def test_llm_proxy_fluxo_not_recorded(self):
+        labels = dict(
+            prefeitura="X",
+            direction="entrada",
+            fluxo="llm_proxy_generate",
+            tipo_geracao="other",
+            package="unknown",
+        )
+        before = docmaster_llm_tokens_total.labels(**labels)._value.get()
+        record_llm_token_usage(
+            fluxo="llm_proxy_generate",
+            prefeitura="X",
+            prompt_tokens=100,
+            completion_tokens=50,
+        )
+        after = docmaster_llm_tokens_total.labels(**labels)._value.get()
+        self.assertEqual(before, after)
+
     def test_record_llm_token_usage_increments(self):
         labels_in = dict(
             prefeitura="Joinville (SC)",

@@ -1809,18 +1809,53 @@ def _resolve_dispensa_inciso_from_override(override: Dict[str, Any]) -> str:
     return "II"
 
 
-def _should_skip_llm_for_rapida_prefilled(override: Optional[Dict[str, Any]]) -> bool:
-    """
-    Dispensa rápida: após fill-tr-slots, gerar-tr-e-dfd reenvia objeto/justificativa no override.
-    Evita segunda passagem agent+LLM (principal causa de timeout ~100s no Cloudflare).
-    """
-    if not override:
-        return False
-    if str(override.get("dispensa_fluxo_ui") or "").strip().lower() != "rapida":
-        return False
+def _override_has_prefilled_clauses(override: Dict[str, Any]) -> bool:
     obj = str(override.get("objeto") or "").strip()
     jus = str(override.get("justificativa") or "").strip()
     return len(obj) >= 15 and len(jus) >= 15
+
+
+def _package_key_from_override_or_context(
+    override: Dict[str, Any],
+    user_context: Optional[Dict[str, Any]],
+) -> str:
+    pkg = str(override.get("slot_package_key") or "").strip().lower()
+    if pkg:
+        return pkg
+    if isinstance(user_context, dict):
+        return str(user_context.get("slot_package_key") or "").strip().lower()
+    return ""
+
+
+def _should_skip_llm_for_prefilled_override(
+    override: Optional[Dict[str, Any]],
+    user_context: Optional[Dict[str, Any]] = None,
+    *,
+    skip_context_in_prompt: bool = False,
+) -> bool:
+    """
+    Evita segunda passagem agent+RAG+LLM no gerar-tr-e-dfd quando o formulário já enviou
+    objeto e justificativa (dispensa rápida, inexigibilidade, dispensa normal com cláusulas).
+
+    Principal mitigação de timeout no nginx/Cloudflare (~100s) em produção.
+    """
+    if not override or not _override_has_prefilled_clauses(override):
+        return False
+    fluxo = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
+    if fluxo == "rapida":
+        return True
+    pkg = _package_key_from_override_or_context(override, user_context)
+    if pkg.startswith("inexigibilidade_"):
+        return True
+    # Django define skip_context_in_prompt=True só em /gerar-tr-e-dfd.
+    if skip_context_in_prompt:
+        return True
+    return False
+
+
+def _should_skip_llm_for_rapida_prefilled(override: Optional[Dict[str, Any]]) -> bool:
+    """Compat: dispensa rápida com cláusulas já no override."""
+    return _should_skip_llm_for_prefilled_override(override)
 
 
 def _is_objeto_justificativa_fill_mode(override: Dict[str, Any]) -> bool:
@@ -1910,10 +1945,14 @@ def _build_tr_slots_from_override_prefilled(
 ) -> TRTemplateSlots:
     """Monta TRTemplateSlots só com override + defaults (sem agent/LLM)."""
     data: Dict[str, Any] = dict(override)
-    data["dispensa"] = {
-        "artigo": "75",
-        "inciso": _resolve_dispensa_inciso_from_override(override),
-    }
+    pkg = _package_key_from_override_or_context(override, user_context)
+    if pkg.startswith("inexigibilidade_"):
+        data["dispensa"] = {"artigo": "74", "inciso": "I"}
+    else:
+        data["dispensa"] = {
+            "artigo": "75",
+            "inciso": _resolve_dispensa_inciso_from_override(override),
+        }
     jus = str(data.get("justificativa") or "").strip()
     if not str(data.get("problema_administrativo") or "").strip():
         data["problema_administrativo"] = jus
@@ -1973,13 +2012,17 @@ async def fill_tr_slots_with_llm(
     - Chama o llm_agent (structure-from-prompt) para obter contexto e especificações.
     - Chama a LLM para gerar o JSON de slots (objeto, dispensa, itens, justificativa, fiscal, dotacao).
     - Mescla com slots_override (valores enviados pelo usuário têm prioridade). user_context (Django) enriquece o prompt com nome/secretaria/prefeitura, a menos que skip_context_in_prompt=True.
-  - Dispensa rápida com objeto/justificativa já no override: só monta slots e renderiza (sem segunda passagem LLM).
+  - Com objeto/justificativa no override (dispensa rápida, inexigibilidade, gerar-tr-e-dfd): só monta slots e renderiza.
   - Dispensa normal/rápida sem objeto/justificativa no override (botão «Gerar»): prompt lite, sem llm_agent/RAG.
     """
     from .llm_orchestration import EMPTY_TOKEN_USAGE, llm_token_scope
 
     override = slots_override if isinstance(slots_override, dict) else {}
-    if _should_skip_llm_for_rapida_prefilled(override):
+    if _should_skip_llm_for_prefilled_override(
+        override,
+        user_context,
+        skip_context_in_prompt=skip_context_in_prompt,
+    ):
         merged = _build_tr_slots_from_override_prefilled(override, user_context)
         return _apply_o_manutencao_fix_to_tr_slots(merged), dict(EMPTY_TOKEN_USAGE)
 

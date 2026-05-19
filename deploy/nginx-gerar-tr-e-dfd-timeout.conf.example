@@ -1,5 +1,6 @@
 # Exemplo para nginx na frente do Django (api.docmasteria.com.br).
-# Se o browser mostra «Falha de rede» / «Failed to fetch» / HTTP 502 Bad Gateway ao gerar TR+DFD,
+# Se o browser mostra «Falha de rede» / «Failed to fetch» / HTTP 502 Bad Gateway ao gerar TR+DFD
+# (comum em inexigibilidade antes do atalho sem 2ª passagem LLM no rag_service),
 # o proxy costuma estar a cortar antes do Django devolver o JSON (resposta grande + LLM lenta).
 # 502 = nginx não obteve resposta válida do upstream a tempo (ou upstream resetou); confira error_log.
 #

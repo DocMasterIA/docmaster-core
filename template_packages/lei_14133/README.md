@@ -19,4 +19,5 @@ Pastas de pacote previstas:
 Observação:
 
 - O sistema usa `slot_package_key` para resolver o pacote.
+- Chaves `dispensa_rapida_*` (fluxo rápido no frontend) apontam para as mesmas pastas que `dispensa_75_*`.
 - Enquanto um pacote não tiver DOCX próprio, há fallback automático para `template_packages/tr_base/*.docx`.

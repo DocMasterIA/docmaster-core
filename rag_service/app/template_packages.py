@@ -26,6 +26,26 @@ PACKAGE_DIRS: Dict[str, str] = {
     "tr_dfd_generico": "tr_dfd_generico",
 }
 
+# Dispensa rápida usa as mesmas pastas DOCX da dispensa normal (métricas/UI mantêm chave distinta).
+PACKAGE_DIR_ALIASES: Dict[str, str] = {
+    "dispensa_rapida_75_i_manutencao_veiculos": "dispensa_75_i_manutencao_veiculos",
+    "dispensa_rapida_75_i_obras_engenharia": "dispensa_75_i_obras_engenharia",
+    "dispensa_rapida_75_ii_compras": "dispensa_75_ii_compras",
+    "dispensa_rapida_75_ii_servicos": "dispensa_75_ii_servicos",
+    "dispensa_rapida_75_ii_compras_servicos_inclusos": "dispensa_75_ii_compras_servicos_inclusos",
+}
+
+
+def resolve_package_folder(slot_package_key: str | None) -> str:
+    """Chave do pacote (slot_package_key) → nome da pasta em lei_14133/."""
+    key = (slot_package_key or "").strip().lower() or "tr_dfd_generico"
+    if key in PACKAGE_DIRS:
+        return PACKAGE_DIRS[key]
+    if key in PACKAGE_DIR_ALIASES:
+        return PACKAGE_DIR_ALIASES[key]
+    return PACKAGE_DIRS["tr_dfd_generico"]
+
+
 # Lista única de pastas físicas (para documentação / checklist de `DFD_modelo_base_v2.docx`).
 DFD_V2_ELIGIBLE_PACKAGE_DIRS: tuple[str, ...] = tuple(sorted(set(PACKAGE_DIRS.values())))
 
@@ -53,7 +73,7 @@ def get_package_template_paths(slot_package_key: str | None) -> Dict[str, Path]:
     Se o pacote não existir, cai em `tr_dfd_generico`.
     """
     key = (slot_package_key or "").strip().lower() or "tr_dfd_generico"
-    folder = PACKAGE_DIRS.get(key, PACKAGE_DIRS["tr_dfd_generico"])
+    folder = resolve_package_folder(key)
     base = LAW_14133_ROOT / folder
     tr_path = base / "TR_modelo_base.docx"
     custom_tr_filename = CUSTOM_TR_BASE_BY_PACKAGE.get(key)

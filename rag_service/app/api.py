@@ -588,27 +588,24 @@ async def endpoint_generate_tr_and_dfd(body: GenerateTRFromModelRequest):
     from .tr_template import render_tr_from_slots
     from .dfd_template import render_dfd_from_tr_slots
 
-    from .llm_orchestration import current_token_usage, llm_token_scope
-
     slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
     try:
-        async with llm_token_scope():
-            slots = await fill_tr_slots_with_llm(
-                user_prompt=body.user_prompt,
-                slots_override=slots_override,
-                user_context=body.context,
-            )
+        slots = await fill_tr_slots_with_llm(
+            user_prompt=body.user_prompt,
+            slots_override=slots_override,
+            user_context=body.context,
+        )
 
-            template_paths = _resolve_tr_dfd_template_paths(
+        template_paths = _resolve_tr_dfd_template_paths(
             body.context, slots, body.slots_override
         )
-            docx_tr_path = render_tr_from_slots(slots, template_path=template_paths["tr"])
-            if not Path(docx_tr_path).exists():
-                raise HTTPException(status_code=500, detail="DOCX do TR não foi gerado.")
+        docx_tr_path = render_tr_from_slots(slots, template_path=template_paths["tr"])
+        if not Path(docx_tr_path).exists():
+            raise HTTPException(status_code=500, detail="DOCX do TR não foi gerado.")
 
-            docx_dfd_path = render_dfd_from_tr_slots(slots, template_path=template_paths["dfd"])
-            if not Path(docx_dfd_path).exists():
-                raise HTTPException(status_code=500, detail="DOCX do DFD não foi gerado.")
+        docx_dfd_path = render_dfd_from_tr_slots(slots, template_path=template_paths["dfd"])
+        if not Path(docx_dfd_path).exists():
+            raise HTTPException(status_code=500, detail="DOCX do DFD não foi gerado.")
 
         import base64
         with open(docx_tr_path, "rb") as f:
@@ -622,7 +619,6 @@ async def endpoint_generate_tr_and_dfd(body: GenerateTRFromModelRequest):
             "dfd_docx_path": docx_dfd_path,
             "tr_docx_base64": tr_b64,
             "dfd_docx_base64": dfd_b64,
-            "llm_token_usage": current_token_usage(),
         }
     except ValueError as e:
         msg = str(e).strip()
@@ -654,56 +650,52 @@ async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
     from .dfd_template import render_dfd_from_tr_slots
     from .oficio_template import render_oficio_from_slots
 
-    from .llm_orchestration import llm_token_scope, token_usage_response_header
-
     slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
     skip_ctx = getattr(body, "skip_context_in_prompt", False)
     try:
-        async with llm_token_scope() as acc:
-            slots = await fill_tr_slots_with_llm(
-                user_prompt=body.user_prompt,
-                slots_override=slots_override,
-                user_context=body.context,
-                skip_context_in_prompt=skip_ctx,
-            )
+        slots = await fill_tr_slots_with_llm(
+            user_prompt=body.user_prompt,
+            slots_override=slots_override,
+            user_context=body.context,
+            skip_context_in_prompt=skip_ctx,
+        )
 
-            template_paths = _resolve_tr_dfd_template_paths(
+        template_paths = _resolve_tr_dfd_template_paths(
             body.context, slots, body.slots_override
         )
-            docx_tr_path = render_tr_from_slots(slots, template_path=template_paths["tr"])
-            if not Path(docx_tr_path).exists():
-                raise HTTPException(status_code=500, detail="DOCX do TR não foi gerado.")
+        docx_tr_path = render_tr_from_slots(slots, template_path=template_paths["tr"])
+        if not Path(docx_tr_path).exists():
+            raise HTTPException(status_code=500, detail="DOCX do TR não foi gerado.")
 
-            docx_dfd_path = render_dfd_from_tr_slots(slots, template_path=template_paths["dfd"])
-            if not Path(docx_dfd_path).exists():
-                raise HTTPException(status_code=500, detail="DOCX do DFD não foi gerado.")
-            docx_oficio_path = render_oficio_from_slots(
-                slots,
-                template_path=_resolve_oficio_template_path(body.context, body.slots_override),
+        docx_dfd_path = render_dfd_from_tr_slots(slots, template_path=template_paths["dfd"])
+        if not Path(docx_dfd_path).exists():
+            raise HTTPException(status_code=500, detail="DOCX do DFD não foi gerado.")
+        docx_oficio_path = render_oficio_from_slots(
+            slots,
+            template_path=_resolve_oficio_template_path(body.context, body.slots_override),
+        )
+        if not Path(docx_oficio_path).exists():
+            raise HTTPException(status_code=500, detail="DOCX da Solicitação/Ofício não foi gerado.")
+
+        with tempfile.NamedTemporaryFile(
+            prefix="tr_dfd_oficio_bundle_", suffix=".zip", delete=False
+        ) as tmp_zip:
+            zip_path = tmp_zip.name
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.write(docx_tr_path, arcname="termo_referencia.docx")
+            zf.write(docx_dfd_path, arcname="dfd.docx")
+            zf.write(docx_oficio_path, arcname="solicitacao_oficio.docx")
+
+        if not Path(zip_path).exists():
+            raise HTTPException(
+                status_code=500,
+                detail="ZIP com TR, DFD e Solicitação/Ofício não foi gerado.",
             )
-            if not Path(docx_oficio_path).exists():
-                raise HTTPException(status_code=500, detail="DOCX da Solicitação/Ofício não foi gerado.")
-
-            with tempfile.NamedTemporaryFile(
-                prefix="tr_dfd_oficio_bundle_", suffix=".zip", delete=False
-            ) as tmp_zip:
-                zip_path = tmp_zip.name
-            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-                zf.write(docx_tr_path, arcname="termo_referencia.docx")
-                zf.write(docx_dfd_path, arcname="dfd.docx")
-                zf.write(docx_oficio_path, arcname="solicitacao_oficio.docx")
-
-            if not Path(zip_path).exists():
-                raise HTTPException(
-                    status_code=500,
-                    detail="ZIP com TR, DFD e Solicitação/Ofício não foi gerado.",
-                )
 
         return FileResponse(
             zip_path,
             media_type="application/zip",
             filename="tr_dfd_oficio.zip",
-            headers=token_usage_response_header(acc),
         )
     except ValueError as e:
         msg = str(e).strip()
@@ -729,17 +721,14 @@ async def endpoint_fill_tr_slots(body: GenerateTRFromModelRequest):
 
     slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
     skip_ctx = bool(getattr(body, "skip_context_in_prompt", False))
-    from .llm_orchestration import current_token_usage, llm_token_scope
-
     try:
-        async with llm_token_scope():
-            slots = await fill_tr_slots_with_llm(
-                user_prompt=body.user_prompt,
-                slots_override=slots_override,
-                user_context=body.context,
-                skip_context_in_prompt=skip_ctx,
-            )
-        return {"ok": True, "slots": asdict(slots), "llm_token_usage": current_token_usage()}
+        slots = await fill_tr_slots_with_llm(
+            user_prompt=body.user_prompt,
+            slots_override=slots_override,
+            user_context=body.context,
+            skip_context_in_prompt=skip_ctx,
+        )
+        return {"ok": True, "slots": asdict(slots)}
     except ValueError as e:
         msg = str(e).strip()
         if any(x in msg for x in ("Orquestração", "LLM", "Resposta da LLM", "404", "modelo")):

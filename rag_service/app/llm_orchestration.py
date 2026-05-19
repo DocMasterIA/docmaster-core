@@ -73,10 +73,19 @@ def prefeitura_label_from_context(context: dict[str, Any] | None) -> str:
     return "Não identificado"
 
 
+def _http_header_ascii(value: str) -> str:
+    """Headers HTTP no Starlette/uvicorn exigem ASCII; municípios com acento quebram sem isso."""
+    import unicodedata
+
+    s = unicodedata.normalize("NFKD", (value or "").strip())
+    s = s.encode("ascii", "ignore").decode("ascii").strip()
+    return (s[:56] if s else "Nao identificado")
+
+
 def _headers(prefeitura: str) -> dict[str, str]:
     h: dict[str, str] = {}
-    if prefeitura and prefeitura != "Não identificado":
-        h["X-DocMaster-Prefeitura"] = prefeitura[:56]
+    if prefeitura and prefeitura not in ("Não identificado", "Nao identificado"):
+        h["X-DocMaster-Prefeitura"] = _http_header_ascii(prefeitura)
     return h
 
 
@@ -126,4 +135,4 @@ def token_usage_response_header(acc: TokenAccumulator | None = None) -> dict[str
     data = (acc or _TOKEN_ACC.get())
     if not data:
         return {}
-    return {"X-DocMaster-LLM-Token-Usage": json.dumps(data.to_dict(), ensure_ascii=False)}
+    return {"X-DocMaster-LLM-Token-Usage": json.dumps(data.to_dict(), ensure_ascii=True)}

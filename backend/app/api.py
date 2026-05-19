@@ -801,7 +801,6 @@ def gerar_tr_e_dfd_api(request):
             url,
             body,
             timeout=_rag_timeout_seconds_for_tr_dfd(body),
-            headers=_rag_prefeitura_headers(request),
         )
     except requests.exceptions.ConnectionError:
         return JsonResponse({"ok": False, "error": "Serviço de geração de TR/DFD indisponível. Verifique se o rag_service está em execução."}, status=503)
@@ -998,7 +997,6 @@ def fill_tr_slots_api(request):
             url,
             body,
             timeout=_rag_timeout_seconds_for_tr_dfd(body),
-            headers=_rag_prefeitura_headers(request),
         )
     except requests.exceptions.ConnectionError:
         return JsonResponse(

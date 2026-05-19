@@ -18,9 +18,10 @@ import httpx
 from .config import (
     CHROMA_COLLECTION,
     LLM_AGENT_BASE_URL,
+    LLM_ORCHESTRATION_BASE_URL,
+    LLM_ORCHESTRATION_GENERATE_PATH,
     RAG_HTTP_TIMEOUT,
 )
-from .llm_orchestration import llm_post_generate
 from .retrieval import retrieve
 from .tr_template import (
     TRTemplateSlots,
@@ -321,9 +322,14 @@ REGRAS DE SAÍDA:
 
     full_prompt = f"<<SYSTEM>>\n{system_prompt.strip()}\n\n<<USER>>\n{user_prompt}"
 
+    url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
+    payload = {"prompt": full_prompt, "stream": False}
+
     try:
         async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
-            body = await llm_post_generate(client, full_prompt, user_context=user_context)
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            body = resp.json()
     except Exception:
         return ""
 
@@ -382,9 +388,14 @@ async def _rewrite_objeto_clause(
 
     full_prompt = f"<<SYSTEM>>\n{OBJETO_REWRITE_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n" + "\n".join(user_parts)
 
+    url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
+    payload = {"prompt": full_prompt, "stream": False}
+
     try:
         async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
-            body = await llm_post_generate(client, full_prompt, user_context=user_context)
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            body = resp.json()
     except Exception:
         return draft_objeto
 
@@ -1906,9 +1917,14 @@ async def fill_tr_slots_with_llm(
         )
     full_prompt = f"<<SYSTEM>>\n{TR_SLOTS_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{user_prompt_text}"
 
+    url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
+    payload = {"prompt": full_prompt, "stream": False}
+
     try:
         async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
-            body = await llm_post_generate(client, full_prompt, user_context=user_context)
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            body = resp.json()
     except httpx.ConnectError as e:
         raise ValueError(
             "Não foi possível conectar à orquestração LLM. "

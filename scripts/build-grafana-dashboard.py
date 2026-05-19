@@ -183,62 +183,63 @@ def period_delta_by_fluxo(selector: str = "docmaster_llm_tokens_total") -> str:
     return f"sum(increase({selector}[$__range])) by (fluxo)"
 
 
-# Operações que gravam docmaster_llm_tokens_total (backend/api.py).
-_LLM_TOKEN_OPERATIONS = "fill_tr_slots|gerar_tr_e_dfd"
+# Operações com métrica de tokens LLM (backend/api.py).
+_LLM_TOKEN_OPERATIONS = "fill_tr_slots|gerar_tr_e_dfd|gerar_llm"
 _LLM_OPS_SELECTOR = (
     f'docmaster_document_operations_total{{result="success",operation=~"{_LLM_TOKEN_OPERATIONS}"}}'
 )
 
+TIPO_GERACAO_LABELS = {
+    "dispensa_normal": "Dispensa normal",
+    "dispensa_rapida": "Dispensa rápida",
+    "inexigibilidade": "Inexigibilidade",
+    "etp": "ETP",
+    "other": "Outros",
+}
 
-def _ops_count_period() -> str:
-    return f"clamp_min(sum(increase({_LLM_OPS_SELECTOR}[$__range])), 1)"
+
+def _llm_ops_selector(*, tipo_geracao: str | None = None) -> str:
+    base = f'docmaster_document_operations_total{{result="success",operation=~"{_LLM_TOKEN_OPERATIONS}"}}'
+    if tipo_geracao:
+        return f'{base[:-1]},tipo_geracao="{tipo_geracao}"}}'
+    return base
 
 
-def avg_tokens_period_global(*, direction: str | None = None) -> str:
-    """Média de tokens por operação com IA no intervalo (entrada, saída ou total)."""
+def avg_tokens_for_tipo(tipo_geracao: str, *, direction: str | None = None) -> str:
+    """Média de tokens por operação no período, para um tipo de geração."""
+    tok = f'docmaster_llm_tokens_total{{tipo_geracao="{tipo_geracao}"}}'
+    if direction:
+        tok = f'docmaster_llm_tokens_total{{tipo_geracao="{tipo_geracao}",direction="{direction}"}}'
+    ops = _llm_ops_selector(tipo_geracao=tipo_geracao)
+    return f"(sum(increase({tok}[$__range])) / clamp_min(sum(increase({ops}[$__range])), 1))"
+
+
+def avg_tokens_by_tipo_geracao(*, direction: str | None = None) -> str:
     tok = "docmaster_llm_tokens_total"
     if direction:
         tok += f'{{direction="{direction}"}}'
-    return f"(sum(increase({tok}[$__range])) / {_ops_count_period()})"
-
-
-def avg_tokens_per_fluxo(*, direction: str | None = None) -> str:
-    """Média de tokens por operação, por fluxo (fill_tr_slots, gerar_tr_e_dfd, …)."""
-    tok = "docmaster_llm_tokens_total"
-    if direction:
-        tok += f'{{direction="{direction}"}}'
-    ops = (
-        "clamp_min("
-        "label_replace("
-        f"sum(increase(docmaster_document_operations_total{{result=\"success\"}}[$__range])) by (operation), "
-        '"fluxo", "$1", "operation", "(.+)"'
-        "), 1)"
-    )
+    ops = _llm_ops_selector()
     return f"""(
-sum(increase({tok}[$__range])) by (fluxo)
-/ on(fluxo) group_left()
-{ops}
+sum(increase({tok}[$__range])) by (tipo_geracao)
+/ on(tipo_geracao) group_left()
+clamp_min(sum(increase({ops}[$__range])) by (tipo_geracao), 1)
 )"""
 
 
-def avg_tokens_by_prefeitura_period() -> str:
-    """Média de tokens (entrada+saída) por operação IA, por prefeitura."""
+def avg_tokens_by_tipo_geracao_display(*, direction: str | None = None) -> str:
+    expr = avg_tokens_by_tipo_geracao(direction=direction)
+    for key, label in TIPO_GERACAO_LABELS.items():
+        expr = f'label_replace({expr}, "tipo", "{_promql_escape(label)}", "tipo_geracao", "{key}")'
+    return f'label_replace({expr}, "tipo", "$1", "tipo_geracao", "(.+)")'
+
+
+def avg_tokens_by_prefeitura_and_tipo() -> str:
+    """Média total/op. por município e tipo de geração."""
     return f"""(
-sum(increase(docmaster_llm_tokens_total[$__range])) by (prefeitura)
-/ on(prefeitura) group_left()
-clamp_min(
-  sum(increase({_LLM_OPS_SELECTOR}[$__range])) by (prefeitura),
-  1
-)
+sum(increase(docmaster_llm_tokens_total[$__range])) by (prefeitura, tipo_geracao)
+/ on(prefeitura, tipo_geracao) group_left()
+clamp_min(sum(increase({_LLM_OPS_SELECTOR}[$__range])) by (prefeitura, tipo_geracao), 1)
 )"""
-
-
-def avg_tokens_by_fluxo_display() -> str:
-    """Média de tokens por operação, com nome legível do fluxo."""
-    expr = avg_tokens_per_fluxo()
-    for key, label in FLUXO_LABELS.items():
-        expr = f'label_replace({expr}, "tipo", "{_promql_escape(label)}", "fluxo", "{key}")'
-    return f'label_replace({expr}, "tipo", "$1", "fluxo", "(.+)")'
 
 
 def p95_duration(operation: str) -> str:
@@ -520,8 +521,8 @@ def prom_table_by_nome(id_, title, y, x, w, h, expr, value_col="Logins", desc=""
     }
 
 
-def prom_table_generations(id_, title, y, x, w, h, expr, desc=""):
-    """Tabela compacta: tipo de geração legível + contagem."""
+def prom_table_generations(id_, title, y, x, w, h, expr, desc="", *, value_col="Gerações"):
+    """Tabela compacta: tipo de geração legível + valor (contagem ou média)."""
     return {
         "datasource": DS,
         "description": desc
@@ -535,7 +536,7 @@ def prom_table_generations(id_, title, y, x, w, h, expr, desc=""):
             },
             "overrides": [
                 {
-                    "matcher": {"id": "byName", "options": "Gerações"},
+                    "matcher": {"id": "byName", "options": value_col},
                     "properties": [
                         {"id": "custom.width", "value": 90},
                         {"id": "custom.cellOptions", "value": {"type": "color-text"}},
@@ -553,7 +554,7 @@ def prom_table_generations(id_, title, y, x, w, h, expr, desc=""):
             "cellHeight": "sm",
             "footer": {"countRows": False, "show": False},
             "showHeader": True,
-            "sortBy": [{"desc": True, "displayName": "Gerações"}],
+            "sortBy": [{"desc": True, "displayName": value_col}],
         },
         "targets": [
             {
@@ -571,7 +572,7 @@ def prom_table_generations(id_, title, y, x, w, h, expr, desc=""):
                 "id": "organize",
                 "options": {
                     "excludeByName": {"Time": True, "__name__": True},
-                    "renameByName": {"tipo": "Tipo de geração", "Value": "Gerações"},
+                    "renameByName": {"tipo": "Tipo de geração", "Value": value_col},
                 },
             }
         ],
@@ -715,83 +716,99 @@ panels += [
 ]
 y += 4
 
-panels.append(row(275, "Tokens LLM — média por operação (período)", y))
+panels.append(row(275, "Tokens LLM — média por tipo de geração (período)", y))
 y += 1
 panels += [
     stat(
         276,
-        "Média entrada/op.",
+        "Dispensa normal",
         y,
         0,
         6,
-        avg_tokens_period_global(direction="entrada"),
+        avg_tokens_for_tipo("dispensa_normal"),
         period=True,
         unit="short",
         decimals=0,
-        desc="Média de tokens de prompt por geração com IA (fill-tr-slots + TR/DFD/Ofício) no intervalo.",
+        desc="Média de tokens (entrada+saída) por operação — formulário completo Art. 75.",
     ),
     stat(
         277,
-        "Média saída/op.",
+        "Dispensa rápida",
         y,
         6,
         6,
-        avg_tokens_period_global(direction="saida"),
+        avg_tokens_for_tipo("dispensa_rapida"),
         period=True,
         unit="short",
         decimals=0,
-        desc="Média de tokens gerados pelo modelo por operação com IA no intervalo.",
+        desc="Média de tokens por operação — fluxo simplificado Art. 75.",
     ),
     stat(
         278,
-        "Média total/op.",
+        "Inexigibilidade",
         y,
         12,
         6,
-        avg_tokens_period_global(),
+        avg_tokens_for_tipo("inexigibilidade"),
         period=True,
         unit="short",
         decimals=0,
-        desc="Média de entrada + saída por operação com IA (slots ou documento completo).",
+        desc="Média de tokens por operação — Art. 74.",
     ),
     stat(
         279,
-        "Operações IA (período)",
+        "ETP",
         y,
         18,
         6,
-        period_delta(_LLM_OPS_SELECTOR),
+        avg_tokens_for_tipo("etp"),
         period=True,
-        desc="Quantidade de fill-tr-slots e gerar-tr-e-dfd concluídos (denominador da média).",
+        unit="short",
+        decimals=0,
+        desc="Média de tokens por operação — geração ETP (gerar_llm / documento LLM).",
     ),
 ]
 y += 4
 panels.append(
-    prom_table_by_nome(
+    prom_table_generations(
         271,
-        "Média tokens por prefeitura",
+        "Média total por tipo",
         y,
         0,
-        12,
-        7,
-        avg_tokens_by_prefeitura_period(),
+        8,
+        5,
+        avg_tokens_by_tipo_geracao_display(),
         value_col="Tokens/op.",
-        desc="Média de tokens (entrada+saída) por operação IA, por município.",
+        desc="Comparativo entre tipos de geração no intervalo.",
     )
 )
 panels.append(
     prom_table_generations(
         272,
-        "Média tokens por fluxo",
+        "Média entrada por tipo",
         y,
-        12,
-        12,
-        7,
-        avg_tokens_by_fluxo_display(),
-        desc="Média de tokens por operação, por tipo (preencher slots vs. TR+DFD+Ofício).",
+        8,
+        8,
+        5,
+        avg_tokens_by_tipo_geracao_display(direction="entrada"),
+        value_col="Entrada/op.",
+        desc="Tokens de prompt (entrada) por operação.",
     )
 )
-y += 7
+panels.append(
+    prom_table_generations(
+        273,
+        "Média saída por tipo",
+        y,
+        16,
+        8,
+        5,
+        avg_tokens_by_tipo_geracao_display(direction="saida"),
+        value_col="Saída/op.",
+        desc="Tokens gerados pelo modelo (saída) por operação.",
+    )
+)
+y += 5
 
 panels.append(
     prom_table_by_nome(
@@ -1147,7 +1164,7 @@ panels.append(
 dash = {
     "annotations": {"list": []},
     "editable": False,
-    "description": "Layout v22 — tokens LLM como média por operação (não total); increase() no período.",
+    "description": "Layout v23 — tokens LLM: média/op. por tipo (dispensa normal/rápida, inexigibilidade, ETP).",
     "fiscalYearStartMonth": 0,
     "graphTooltip": 1,
     "id": None,
@@ -1155,16 +1172,16 @@ dash = {
     "panels": panels,
     "refresh": "1m",
     "schemaVersion": 39,
-    "tags": ["docmaster", "backend", "django", "layout-v22"],
+    "tags": ["docmaster", "backend", "django", "layout-v23"],
     "templating": {"list": []},
     "time": {"from": "now-24h", "to": "now"},
     "timezone": "browser",
     "title": "DocMaster — Backend Django",
     "uid": "docmaster-backend",
-    "version": 22,
+    "version": 23,
 }
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
 OUT.write_text(json.dumps(dash, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 print(f"Repo:  {ROOT}")
-print(f"Wrote: {OUT} ({len(panels)} panels, layout-v22)")
+print(f"Wrote: {OUT} ({len(panels)} panels, layout-v23)")

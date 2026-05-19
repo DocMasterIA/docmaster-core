@@ -4,6 +4,7 @@ from django.test import SimpleTestCase
 
 from app.metrics import (
     docmaster_llm_tokens_total,
+    package_to_tipo_geracao,
     prefeitura_label,
     prefeitura_label_from_instance,
     record_llm_token_usage,
@@ -30,15 +31,39 @@ class PrefeituraLabelTests(SimpleTestCase):
         self.assertEqual(prefeitura_label(user), "Equipe DocMaster (staff)")
 
 
+class PackageTipoGeraçãoTests(SimpleTestCase):
+    def test_dispensa_rapida(self):
+        self.assertEqual(
+            package_to_tipo_geracao("dispensa_rapida_75_ii_compras"),
+            "dispensa_rapida",
+        )
+
+    def test_dispensa_normal(self):
+        self.assertEqual(
+            package_to_tipo_geracao("dispensa_75_i_obras_engenharia"),
+            "dispensa_normal",
+        )
+
+    def test_etp_via_fluxo(self):
+        self.assertEqual(package_to_tipo_geracao("unknown", fluxo="gerar_llm"), "etp")
+
+
 class LlmTokenMetricsTests(SimpleTestCase):
     def test_record_llm_token_usage_increments(self):
-        labels_in = dict(prefeitura="Joinville (SC)", direction="entrada", fluxo="fill_tr_slots")
-        labels_out = dict(prefeitura="Joinville (SC)", direction="saida", fluxo="fill_tr_slots")
+        labels_in = dict(
+            prefeitura="Joinville (SC)",
+            direction="entrada",
+            fluxo="fill_tr_slots",
+            tipo_geracao="dispensa_normal",
+            package="dispensa_75_ii_compras",
+        )
+        labels_out = {**labels_in, "direction": "saida"}
         before_in = docmaster_llm_tokens_total.labels(**labels_in)._value.get()
         before_out = docmaster_llm_tokens_total.labels(**labels_out)._value.get()
         record_llm_token_usage(
             fluxo="fill_tr_slots",
             prefeitura="Joinville (SC)",
+            package="dispensa_75_ii_compras",
             prompt_tokens=120,
             completion_tokens=45,
         )

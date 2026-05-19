@@ -49,13 +49,13 @@ docmaster_auth_logout_total = Counter(
 docmaster_document_operations_total = Counter(
     "docmaster_document_operations_total",
     "Operações de geração / pipeline de documentos",
-    ["operation", "result", "package", "output", "prefeitura"],
+    ["operation", "result", "package", "tipo_geracao", "output", "prefeitura"],
 )
 
 docmaster_document_operation_duration_seconds = Histogram(
     "docmaster_document_operation_duration_seconds",
     "Duração das operações de documento (segundos)",
-    ["operation", "result", "package", "prefeitura"],
+    ["operation", "result", "package", "tipo_geracao", "prefeitura"],
     buckets=(0.5, 1, 2.5, 5, 10, 30, 60, 120, 300, 600, 900, 1200),
 )
 
@@ -74,7 +74,7 @@ docmaster_platform_events_total = Counter(
 docmaster_llm_tokens_total = Counter(
     "docmaster_llm_tokens_total",
     "Tokens LLM na geração de documentos (entrada e saída)",
-    ["prefeitura", "direction", "fluxo"],
+    ["prefeitura", "direction", "fluxo", "tipo_geracao", "package"],
 )
 
 # Sempre visível em /metrics após o worker subir (confirma deploy do módulo de métricas).
@@ -109,8 +109,29 @@ def normalize_package_key(key: str | None) -> str:
         return "unknown"
     if k in KNOWN_SLOT_PACKAGES:
         return k
+    if k in ("etp", "tr_dfd_generico"):
+        return k
     if len(k) > 64:
         return "other"
+    return "other"
+
+
+def package_to_tipo_geracao(package: str | None, *, fluxo: str = "") -> str:
+    """
+    Agrupa pacotes de slots / rotas em famílias para dashboards (Grafana).
+    Valores: dispensa_normal, dispensa_rapida, inexigibilidade, etp, other.
+    """
+    p = normalize_package_key(package)
+    if p.startswith("dispensa_rapida_"):
+        return "dispensa_rapida"
+    if p.startswith("dispensa_75_") or p.startswith("dispensa_"):
+        return "dispensa_normal"
+    if p.startswith("inexigibilidade_"):
+        return "inexigibilidade"
+    if p == "etp" or p.startswith("etp_"):
+        return "etp"
+    if (fluxo or "").strip().lower() == "gerar_llm":
+        return "etp"
     return "other"
 
 
@@ -203,19 +224,30 @@ def record_llm_token_usage(
     *,
     fluxo: str,
     prefeitura: str,
+    package: str = "unknown",
     prompt_tokens: int = 0,
     completion_tokens: int = 0,
 ) -> None:
     """Registra tokens agregados de uma geração (valores vindos do rag_service ou llm_api)."""
     pref = (prefeitura or "Não identificado")[:56]
     fl = (fluxo or "unknown")[:24]
+    pkg = normalize_package_key(package)
+    tipo = package_to_tipo_geracao(pkg, fluxo=fl)
     if prompt_tokens > 0:
         docmaster_llm_tokens_total.labels(
-            prefeitura=pref, direction="entrada", fluxo=fl
+            prefeitura=pref,
+            direction="entrada",
+            fluxo=fl,
+            tipo_geracao=tipo,
+            package=pkg,
         ).inc(prompt_tokens)
     if completion_tokens > 0:
         docmaster_llm_tokens_total.labels(
-            prefeitura=pref, direction="saida", fluxo=fl
+            prefeitura=pref,
+            direction="saida",
+            fluxo=fl,
+            tipo_geracao=tipo,
+            package=pkg,
         ).inc(completion_tokens)
 
 
@@ -230,6 +262,7 @@ def record_document_operation(
 ) -> None:
     op = (operation or "unknown")[:32]
     pkg = normalize_package_key(package)
+    tipo = package_to_tipo_geracao(pkg, fluxo=op)
     out = (output or "n/a")[:16]
     res = "success" if result == "success" else "error"
     pref = (prefeitura or "Não identificado")[:56]
@@ -237,6 +270,7 @@ def record_document_operation(
         operation=op,
         result=res,
         package=pkg,
+        tipo_geracao=tipo,
         output=out,
         prefeitura=pref,
     ).inc()
@@ -244,6 +278,7 @@ def record_document_operation(
         operation=op,
         result=res,
         package=pkg,
+        tipo_geracao=tipo,
         prefeitura=pref,
     ).observe(max(0.0, duration_seconds))
 

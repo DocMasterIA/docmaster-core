@@ -117,9 +117,11 @@ def _record_llm_usage_from_response(request, fluxo: str, *, usage=None, http_res
             except (json.JSONDecodeError, TypeError, ValueError):
                 pass
     if prompt_t or completion_t:
+        meta = getattr(request, "docmaster_metrics", None) or {}
         record_llm_token_usage(
             fluxo=fluxo,
             prefeitura=pref,
+            package=str(meta.get("package") or "unknown"),
             prompt_tokens=max(0, prompt_t),
             completion_tokens=max(0, completion_t),
         )
@@ -442,7 +444,10 @@ def gerar_via_llm_api(request):
     template_id = _resolve_merge_template_id(request, payload)
     output = (payload.get("output") or "docx").lower()
     slot_package_key = _resolve_slot_package_key(payload, request)
-    set_request_metrics(request, package=slot_package_key, output=output)
+    metrics_package = slot_package_key or "unknown"
+    if (payload.get("document_type_hint") or "").strip().lower() == "etp":
+        metrics_package = "etp"
+    set_request_metrics(request, package=metrics_package, output=output)
 
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
@@ -490,9 +495,12 @@ def gerar_via_llm_api(request):
             err = resp.text
         return JsonResponse({"ok": False, "error": err}, status=resp.status_code)
 
+    _record_llm_usage_from_response(request, "gerar_llm", http_response=resp)
+
     content_type = resp.headers.get("content-type", "")
     if "json" in content_type:
         data = resp.json()
+        _record_llm_usage_from_response(request, "gerar_llm", usage=data.get("llm_token_usage"))
         if not data.get("ok"):
             return JsonResponse({"ok": False, "error": data.get("error", "Erro na geração")}, status=500)
         # Caso especial: se no futuro usarmos docx_path compartilhado via volume, poderíamos salvar em DocumentInstance aqui.

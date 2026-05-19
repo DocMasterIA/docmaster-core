@@ -3,7 +3,7 @@
     "list": []
   },
   "editable": false,
-  "description": "Layout v25 — métricas limpas: tokens só pipeline documento; tipos sem other/unknown; login normalizado.",
+  "description": "Layout v26 — secção infra alinhada ao scrape Prometheus; tokens e tipos limpos.",
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
@@ -3319,7 +3319,7 @@
       "type": "timeseries"
     },
     {
-      "collapsed": true,
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -3327,15 +3327,31 @@
         "y": 106
       },
       "id": 350,
-      "title": "Desenvolvimento — saúde",
+      "title": "Infraestrutura — scrape Prometheus e API",
       "type": "row"
+    },
+    {
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 107
+      },
+      "id": 349,
+      "options": {
+        "mode": "markdown",
+        "content": "Esta secção usa o **mesmo job Prometheus `backend`** que o resto do dashboard (`config/prometheus.yml` → /metrics). **Backend UP** vem do Prometheus (`up`), não do Django. Pedidos HTTP excluem o scrape de `/metrics`. Duração p95 usa `docmaster_document_operation_duration_seconds` (igual à secção Operação). O endpoint Django **não** exporta CPU/RSS do processo."
+      },
+      "title": "",
+      "type": "text",
+      "transparent": true
     },
     {
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "1 = Prometheus consegue fazer scrape de https://api.docmasteria.com.br/metrics",
+      "description": "1 = Prometheus alcança https://api.docmasteria.com.br/metrics. 0 = target down.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -3348,7 +3364,7 @@
         "h": 4,
         "w": 4,
         "x": 0,
-        "y": 107
+        "y": 110
       },
       "id": 351,
       "options": {
@@ -3377,7 +3393,7 @@
           "editorMode": "code"
         }
       ],
-      "title": "Backend UP",
+      "title": "Scrape UP",
       "type": "stat"
     },
     {
@@ -3385,7 +3401,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Soma no intervalo selecionado no Grafana.",
+      "description": "Workers Gunicorn com docmaster_* (esperado ≈2).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -3396,9 +3412,59 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 5,
+        "w": 4,
         "x": 4,
-        "y": 107
+        "y": 110
+      },
+      "id": 355,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(docmaster_metrics_active{job=\"backend\"})",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        }
+      ],
+      "title": "Workers métricas",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Pedidos à API no intervalo, sem contar o scrape GET /metrics.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "noValue": "0",
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 110
       },
       "id": 352,
       "options": {
@@ -3420,14 +3486,14 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(sum(django_http_requests_total_by_method_total{job=\"backend\"})[$__range]))",
+          "expr": "sum(increase(sum(django_http_requests_total_by_view_transport_method_total{job=\"backend\",view!~\"prometheus-django-metrics|admin.*\"})[$__range]))",
           "refId": "A",
           "instant": true,
           "range": false,
           "editorMode": "code"
         }
       ],
-      "title": "HTTP (período)",
+      "title": "HTTP app (período)",
       "type": "stat"
     },
     {
@@ -3435,7 +3501,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Soma no intervalo selecionado no Grafana.",
+      "description": "Respostas HTTP 5xx (proxy timeout, crash, 502 do upstream).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -3446,9 +3512,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 5,
-        "x": 9,
-        "y": 107
+        "w": 4,
+        "x": 12,
+        "y": 110
       },
       "id": 353,
       "options": {
@@ -3485,7 +3551,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Soma no intervalo selecionado no Grafana.",
+      "description": "Respostas 401/403/404/405 etc.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -3496,9 +3562,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 5,
-        "x": 14,
-        "y": 107
+        "w": 4,
+        "x": 16,
+        "y": 110
       },
       "id": 354,
       "options": {
@@ -3535,7 +3601,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Número de workers Gunicorn com docmaster_* ativo (esperado ≈2). Confirma deploy do módulo de métricas.",
+      "description": "Falhas de geração contabilizadas pelo decorator (mesma fonte que «Erros de geração» no topo).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -3546,11 +3612,11 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 5,
-        "x": 19,
-        "y": 107
+        "w": 4,
+        "x": 20,
+        "y": 110
       },
-      "id": 355,
+      "id": 358,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -3570,14 +3636,14 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max(docmaster_metrics_active)",
+          "expr": "sum(increase(sum(docmaster_document_operations_total{job=\"backend\",result=\"error\"})[$__range]))",
           "refId": "A",
           "instant": true,
           "range": false,
           "editorMode": "code"
         }
       ],
-      "title": "Workers métricas",
+      "title": "Erros docmaster (período)",
       "type": "stat"
     },
     {
@@ -3585,7 +3651,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "",
+      "description": "Histograma de negócio — visível assim que houver tráfego real (não depende de django_http_latency).",
       "fieldConfig": {
         "defaults": {
           "unit": "s"
@@ -3594,9 +3660,9 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 12,
+        "w": 14,
         "x": 0,
-        "y": 111
+        "y": 114
       },
       "id": 356,
       "options": {
@@ -3611,25 +3677,36 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(django_http_requests_latency_seconds_by_view_method_bucket{view=\"documentos_fill_tr_slots_api\"}[$__rate_interval])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(docmaster_document_operation_duration_seconds_bucket{operation=\"fill_tr_slots\",result=\"success\"}[$__rate_interval])) by (le))",
           "refId": "A",
           "range": true,
           "editorMode": "code",
-          "legendFormat": "Slots"
+          "legendFormat": "Slots IA"
         },
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(django_http_requests_latency_seconds_by_view_method_bucket{view=\"documentos_gerar_tr_e_dfd_api\"}[$__rate_interval])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(docmaster_document_operation_duration_seconds_bucket{operation=\"gerar_tr_e_dfd\",result=\"success\"}[$__rate_interval])) by (le))",
           "refId": "B",
           "range": true,
           "editorMode": "code",
-          "legendFormat": "TR+DFD"
+          "legendFormat": "TR + DFD"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum(rate(docmaster_document_operation_duration_seconds_bucket{operation=\"gerar_llm\",result=\"success\"}[$__rate_interval])) by (le))",
+          "refId": "C",
+          "range": true,
+          "editorMode": "code",
+          "legendFormat": "Gerar LLM"
         }
       ],
-      "title": "Latência p95 HTTP",
+      "title": "Duração p95 geração (docmaster)",
       "type": "timeseries"
     },
     {
@@ -3637,24 +3714,29 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "",
+      "description": "Tendência no intervalo do Grafana (cada ponto = bucket $__interval).",
       "fieldConfig": {
         "defaults": {
-          "unit": "s"
+          "decimals": 0,
+          "noValue": "0",
+          "unit": "none"
         },
         "overrides": []
       },
       "gridPos": {
         "h": 7,
-        "w": 12,
-        "x": 12,
-        "y": 111
+        "w": 10,
+        "x": 14,
+        "y": 114
       },
       "id": 357,
       "options": {
         "legend": {
           "displayMode": "list",
           "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
         }
       },
       "targets": [
@@ -3663,25 +3745,36 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(process_cpu_seconds_total{job=\"backend\"}[$__rate_interval])",
+          "expr": "sum(increase(django_http_responses_total_by_status_total{job=\"backend\",status=~\"5..\"}[$__interval]))",
           "refId": "A",
           "range": true,
           "editorMode": "code",
-          "legendFormat": "CPU"
+          "legendFormat": "5xx"
         },
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(django_db_execute_total{job=\"backend\"}[$__rate_interval])) by (vendor)",
+          "expr": "sum(increase(django_http_responses_total_by_status_total{job=\"backend\",status=~\"4..\"}[$__interval]))",
           "refId": "B",
           "range": true,
           "editorMode": "code",
-          "legendFormat": "DB"
+          "legendFormat": "4xx"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(docmaster_document_operations_total{job=\"backend\",result=\"error\"}[$__interval]))",
+          "refId": "C",
+          "range": true,
+          "editorMode": "code",
+          "legendFormat": "Erros geração"
         }
       ],
-      "title": "CPU / DB",
+      "title": "HTTP e erros no tempo",
       "type": "timeseries"
     }
   ],
@@ -3691,7 +3784,7 @@
     "docmaster",
     "backend",
     "django",
-    "layout-v25"
+    "layout-v26"
   ],
   "templating": {
     "list": []
@@ -3703,5 +3796,5 @@
   "timezone": "browser",
   "title": "DocMaster — Backend Django",
   "uid": "docmaster-backend",
-  "version": 25
+  "version": 26
 }

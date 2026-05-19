@@ -1191,82 +1191,154 @@ panels.append(
 )
 y += 7
 
-# --- Dev ---
-panels.append(row(350, "Desenvolvimento — saúde", y, collapsed=True))
+# --- Infra / saúde (mesmo scrape Prometheus job=backend que alimenta docmaster_*) ---
+_JOB = "backend"
+_DJANGO_VIEWS_APP = 'view!~"prometheus-django-metrics|admin.*"'
+
+
+panels.append(
+    row(
+        350,
+        "Infraestrutura — scrape Prometheus e API",
+        y,
+        collapsed=False,
+    )
+)
 y += 1
+panels.append(
+    text_panel(
+        349,
+        y,
+        "Esta secção usa o **mesmo job Prometheus `backend`** que o resto do dashboard "
+        f"(`config/prometheus.yml` → /metrics). "
+        "**Backend UP** vem do Prometheus (`up`), não do Django. "
+        "Pedidos HTTP excluem o scrape de `/metrics`. "
+        "Duração p95 usa `docmaster_document_operation_duration_seconds` (igual à secção Operação). "
+        "O endpoint Django **não** exporta CPU/RSS do processo.",
+    )
+)
+y += 3
 panels += [
-    stat(351, "Backend UP", y, 0, 4, 'up{job="backend"}', desc="1 = Prometheus consegue fazer scrape de https://api.docmasteria.com.br/metrics"),
     stat(
-        352,
-        "HTTP (período)",
+        351,
+        "Scrape UP",
         y,
+        0,
         4,
-        5,
-        period_delta('sum(django_http_requests_total_by_method_total{job="backend"})'),
-        period=True,
-    ),
-    stat(
-        353,
-        "5xx (período)",
-        y,
-        9,
-        5,
-        period_delta('sum(django_http_responses_total_by_status_total{job="backend",status=~"5.."})'),
-        period=True,
-    ),
-    stat(
-        354,
-        "4xx (período)",
-        y,
-        14,
-        5,
-        period_delta('sum(django_http_responses_total_by_status_total{job="backend",status=~"4.."})'),
-        period=True,
+        f'up{{job="{_JOB}"}}',
+        desc="1 = Prometheus alcança https://api.docmasteria.com.br/metrics. 0 = target down.",
     ),
     stat(
         355,
         "Workers métricas",
         y,
-        19,
-        5,
-        "max(docmaster_metrics_active)",
-        desc="Número de workers Gunicorn com docmaster_* ativo (esperado ≈2). Confirma deploy do módulo de métricas.",
+        4,
+        4,
+        f'max(docmaster_metrics_active{{job="{_JOB}"}})',
+        desc="Workers Gunicorn com docmaster_* (esperado ≈2).",
+    ),
+    stat(
+        352,
+        "HTTP app (período)",
+        y,
+        8,
+        4,
+        period_delta(
+            f"sum(django_http_requests_total_by_view_transport_method_total{{job=\"{_JOB}\",{_DJANGO_VIEWS_APP}}})"
+        ),
+        period=True,
+        desc="Pedidos à API no intervalo, sem contar o scrape GET /metrics.",
+    ),
+    stat(
+        353,
+        "5xx (período)",
+        y,
+        12,
+        4,
+        period_delta(
+            f'sum(django_http_responses_total_by_status_total{{job="{_JOB}",status=~"5.."}})'
+        ),
+        period=True,
+        desc="Respostas HTTP 5xx (proxy timeout, crash, 502 do upstream).",
+    ),
+    stat(
+        354,
+        "4xx (período)",
+        y,
+        16,
+        4,
+        period_delta(
+            f'sum(django_http_responses_total_by_status_total{{job="{_JOB}",status=~"4.."}})'
+        ),
+        period=True,
+        desc="Respostas 401/403/404/405 etc.",
+    ),
+    stat(
+        358,
+        "Erros docmaster (período)",
+        y,
+        20,
+        4,
+        period_delta(
+            f'sum(docmaster_document_operations_total{{job="{_JOB}",result="error"}})'
+        ),
+        period=True,
+        desc="Falhas de geração contabilizadas pelo decorator (mesma fonte que «Erros de geração» no topo).",
     ),
 ]
 y += 4
 panels.append(
     ts_duration(
         356,
-        "Latência p95 HTTP",
+        "Duração p95 geração (docmaster)",
         y,
         0,
-        12,
+        14,
         7,
         [
-            ('histogram_quantile(0.95, sum(rate(django_http_requests_latency_seconds_by_view_method_bucket{view="documentos_fill_tr_slots_api"}[$__rate_interval])) by (le))', "Slots"),
-            ('histogram_quantile(0.95, sum(rate(django_http_requests_latency_seconds_by_view_method_bucket{view="documentos_gerar_tr_e_dfd_api"}[$__rate_interval])) by (le))', "TR+DFD"),
+            (p95_duration("fill_tr_slots"), "Slots IA"),
+            (p95_duration("gerar_tr_e_dfd"), "TR + DFD"),
+            (p95_duration("gerar_llm"), "Gerar LLM"),
         ],
+        desc="Histograma de negócio — visível assim que houver tráfego real (não depende de django_http_latency).",
     )
 )
 panels.append(
-    ts_duration(
+    ts_counts(
         357,
-        "CPU / DB",
+        "HTTP e erros no tempo",
         y,
-        12,
-        12,
+        14,
+        10,
         7,
         [
-            ('rate(process_cpu_seconds_total{job="backend"}[$__rate_interval])', "CPU"),
-            ('sum(rate(django_db_execute_total{job="backend"}[$__rate_interval])) by (vendor)', "DB"),
+            (
+                count_interval(
+                    f'django_http_responses_total_by_status_total{{job="{_JOB}",status=~"5.."}}'
+                ),
+                "5xx",
+            ),
+            (
+                count_interval(
+                    f'django_http_responses_total_by_status_total{{job="{_JOB}",status=~"4.."}}'
+                ),
+                "4xx",
+            ),
+            (
+                count_interval(
+                    f'docmaster_document_operations_total{{job="{_JOB}",result="error"}}'
+                ),
+                "Erros geração",
+            ),
         ],
+        desc="Tendência no intervalo do Grafana (cada ponto = bucket $__interval).",
     )
 )
 
 dash = {
     "annotations": {"list": []},
     "editable": False,
-    "description": "Layout v25 — métricas limpas: tokens só pipeline documento; tipos sem other/unknown; login normalizado.",
+    "description": "Layout v26 — secção infra alinhada ao scrape Prometheus; tokens e tipos limpos.",
     "fiscalYearStartMonth": 0,
     "graphTooltip": 1,
     "id": None,
@@ -1274,13 +1346,13 @@ dash = {
     "panels": panels,
     "refresh": "1m",
     "schemaVersion": 39,
-    "tags": ["docmaster", "backend", "django", "layout-v25"],
+    "tags": ["docmaster", "backend", "django", "layout-v26"],
     "templating": {"list": []},
     "time": {"from": "now-24h", "to": "now"},
     "timezone": "browser",
     "title": "DocMaster — Backend Django",
     "uid": "docmaster-backend",
-    "version": 25,
+    "version": 26,
 }
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -1293,4 +1365,4 @@ if dupes:
     sys.exit(1)
 
 print(f"Repo:  {ROOT}")
-print(f"Wrote: {OUT} ({len(panels)} panels, layout-v25)")
+print(f"Wrote: {OUT} ({len(panels)} panels, layout-v26)")

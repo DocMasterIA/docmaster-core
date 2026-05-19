@@ -35,9 +35,11 @@ def main() -> int:
     else:
         dash = json.loads(DASH.read_text(encoding="utf-8"))
         tags = dash.get("tags") or []
-        if "layout-v25" not in tags:
-            errors.append(f"Dashboard sem tag layout-v25 (tags={tags})")
         exprs = json.dumps(dash.get("panels") or [])
+        if "layout-v26" not in tags:
+            errors.append(f"Dashboard sem tag layout-v26 (tags={tags})")
+        if "process_cpu_seconds_total" in exprs:
+            errors.append("Dashboard ainda referencia process_cpu (métrica inexistente no Django)")
         if "llm_proxy" in exprs:
             errors.append("Dashboard referencia llm_proxy em PromQL (não deve)")
         if "fill_tr_slots|gerar_tr_e_dfd|gerar_llm" not in exprs:
@@ -64,7 +66,7 @@ def main() -> int:
             print(f"  - {e}", file=sys.stderr)
         return 1
 
-    print("OK — observabilidade consistente (layout-v25, métricas, llm_proxy limpo).")
+    print("OK — observabilidade consistente (layout-v26, métricas, llm_proxy limpo).")
     return 0
 
 

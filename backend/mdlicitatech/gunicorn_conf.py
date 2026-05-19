@@ -11,11 +11,11 @@ def on_starting(server):
 
 
 def post_fork(server, worker):
-    # Cada worker Gunicorn precisa carregar métricas no próprio PID (mmap multiprocess).
-    import backend.app.metrics  # noqa: F401
-    from backend.app.metrics import connect_auth_signals
+    # Antes do Django carregar no worker: mmap por PID (docmaster_* + django_*).
+    # Ver https://prometheus.github.io/client_python/multiprocess/
+    from prometheus_client import values
 
-    connect_auth_signals()
+    values.ValueClass = values.MultiProcessValue(process_identifier=lambda: worker.pid)
 
 
 def child_exit(server, worker):

@@ -10,10 +10,11 @@ class AppConfig(AppConfig):
         import sys
 
         # Evita registrar métricas durante collectstatic/migrate no build Docker.
-        if any(cmd in sys.argv for cmd in ("collectstatic", "makemigrations")):
+        if any(cmd in sys.argv for cmd in ("collectstatic", "makemigrations", "migrate")):
             return
-        from backend.app.metrics import connect_auth_signals
+        from backend.app.metrics import connect_auth_signals, mark_metrics_worker_ready
 
         import backend.app.metrics  # noqa: F401
 
         connect_auth_signals()
+        mark_metrics_worker_ready()

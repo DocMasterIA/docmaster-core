@@ -11,7 +11,7 @@ from functools import wraps
 
 import json
 
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Gauge, Histogram
 
 # Pacotes de geração (mesmo conjunto do route_map em api._resolve_slot_package_key).
 KNOWN_SLOT_PACKAGES = frozenset(
@@ -75,6 +75,13 @@ docmaster_llm_tokens_total = Counter(
     "docmaster_llm_tokens_total",
     "Tokens LLM na geração de documentos (entrada e saída)",
     ["prefeitura", "direction", "fluxo"],
+)
+
+# Sempre visível em /metrics após o worker subir (confirma deploy do módulo de métricas).
+docmaster_metrics_active = Gauge(
+    "docmaster_metrics_active",
+    "1 quando as métricas docmaster_* estão registradas neste worker",
+    multiprocess_mode="livesum",
 )
 
 KNOWN_LLM_ACTIONS = frozenset(
@@ -363,6 +370,14 @@ def track_docmaster_view(operation: str):
 
 
 _auth_signals_connected = False
+
+
+def mark_metrics_worker_ready() -> None:
+    """Chamado no AppConfig.ready de cada worker (após post_fork configurar mmap)."""
+    try:
+        docmaster_metrics_active.set(1)
+    except Exception:
+        pass
 
 
 def connect_auth_signals() -> None:

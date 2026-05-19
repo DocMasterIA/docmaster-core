@@ -17,13 +17,14 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include, re_path
 from backend.app.admin import dashboard_view
+from backend.app.metrics_export import export_metrics_view
 
 # Roteamento principal do projeto:
 # - /admin e /admin/painel (dashboard custom)
 # - rotas globais do app
 # - rotas multi-tenant com primeiro segmento como slug da prefeitura
 urlpatterns = [
-    path('', include('django_prometheus.urls')),
+    path("metrics", export_metrics_view, name="prometheus-django-metrics"),
     path('admin/painel/', dashboard_view, name='admin-painel'),
     path('admin/', admin.site.urls),
     path("", include("backend.app.urls")), 

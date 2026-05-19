@@ -469,9 +469,23 @@ def _merge_user_context_into_tr_slots(
     return slots
 
 
+def _slot_package_key_from_body(
+    context: Optional[Dict[str, Any]],
+    slots_override: Optional[Dict[str, Any]] = None,
+) -> str:
+    """slot_package_key pode vir do context Django ou do slots_override do frontend."""
+    for src in (context, slots_override):
+        if isinstance(src, dict):
+            k = str(src.get("slot_package_key") or "").strip()
+            if k:
+                return k
+    return ""
+
+
 def _resolve_tr_dfd_template_paths(
     context: Optional[Dict[str, Any]],
     slots: Optional[Any] = None,
+    slots_override: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Path]:
     """
     Resolve TR + DFD. O DFD usa `DFD_modelo_base_v2.docx` no pacote quando não há
@@ -479,26 +493,33 @@ def _resolve_tr_dfd_template_paths(
     """
     from .dfd_template import dfd_numero_processo_filled
 
-    slot_package_key = ""
-    if isinstance(context, dict):
-        slot_package_key = str(context.get("slot_package_key") or "").strip()
+    slot_package_key = _slot_package_key_from_body(context, slots_override)
     paths = get_package_template_paths(slot_package_key)
     dfd_chosen = pick_dfd_template_in_package(
         paths["base_dir"],
         has_numero_processo=dfd_numero_processo_filled(slots),
     )
     return {
-        "tr": ensure_fallback_path(paths["tr"], "TR_modelo_base.docx"),
-        "dfd": ensure_fallback_path(dfd_chosen, "DFD_modelo_base.docx"),
+        "tr": ensure_fallback_path(
+            paths["tr"], "TR_modelo_base.docx", slot_package_key=slot_package_key
+        ),
+        "dfd": ensure_fallback_path(
+            dfd_chosen, "DFD_modelo_base.docx", slot_package_key=slot_package_key
+        ),
     }
 
 
-def _resolve_oficio_template_path(context: Optional[Dict[str, Any]]) -> Path:
-    slot_package_key = ""
-    if isinstance(context, dict):
-        slot_package_key = str(context.get("slot_package_key") or "").strip()
+def _resolve_oficio_template_path(
+    context: Optional[Dict[str, Any]],
+    slots_override: Optional[Dict[str, Any]] = None,
+) -> Path:
+    slot_package_key = _slot_package_key_from_body(context, slots_override)
     paths = get_package_template_paths(slot_package_key)
-    return ensure_fallback_path(paths["oficio"], "OFICIO_modelo_base.docx")
+    return ensure_fallback_path(
+        paths["oficio"],
+        "OFICIO_modelo_base.docx",
+        slot_package_key=slot_package_key,
+    )
 
 
 @router.post("/generate-tr-from-model")
@@ -524,7 +545,9 @@ async def endpoint_generate_tr_from_model(body: GenerateTRFromModelRequest):
             slots_override=slots_override,
             user_context=body.context,
         )
-        template_paths = _resolve_tr_dfd_template_paths(body.context, slots)
+        template_paths = _resolve_tr_dfd_template_paths(
+            body.context, slots, body.slots_override
+        )
         # Gera TR
         docx_tr_path = render_tr_from_slots(slots, template_path=template_paths["tr"])
         if not Path(docx_tr_path).exists():
@@ -576,7 +599,9 @@ async def endpoint_generate_tr_and_dfd(body: GenerateTRFromModelRequest):
                 user_context=body.context,
             )
 
-            template_paths = _resolve_tr_dfd_template_paths(body.context, slots)
+            template_paths = _resolve_tr_dfd_template_paths(
+            body.context, slots, body.slots_override
+        )
             docx_tr_path = render_tr_from_slots(slots, template_path=template_paths["tr"])
             if not Path(docx_tr_path).exists():
                 raise HTTPException(status_code=500, detail="DOCX do TR não foi gerado.")
@@ -642,7 +667,9 @@ async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
                 skip_context_in_prompt=skip_ctx,
             )
 
-            template_paths = _resolve_tr_dfd_template_paths(body.context, slots)
+            template_paths = _resolve_tr_dfd_template_paths(
+            body.context, slots, body.slots_override
+        )
             docx_tr_path = render_tr_from_slots(slots, template_path=template_paths["tr"])
             if not Path(docx_tr_path).exists():
                 raise HTTPException(status_code=500, detail="DOCX do TR não foi gerado.")
@@ -651,7 +678,8 @@ async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
             if not Path(docx_dfd_path).exists():
                 raise HTTPException(status_code=500, detail="DOCX do DFD não foi gerado.")
             docx_oficio_path = render_oficio_from_slots(
-                slots, template_path=_resolve_oficio_template_path(body.context)
+                slots,
+                template_path=_resolve_oficio_template_path(body.context, body.slots_override),
             )
             if not Path(docx_oficio_path).exists():
                 raise HTTPException(status_code=500, detail="DOCX da Solicitação/Ofício não foi gerado.")

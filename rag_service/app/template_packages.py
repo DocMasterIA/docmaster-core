@@ -37,13 +37,55 @@ PACKAGE_DIR_ALIASES: Dict[str, str] = {
 
 
 def resolve_package_folder(slot_package_key: str | None) -> str:
-    """Chave do pacote (slot_package_key) → nome da pasta em lei_14133/."""
-    key = (slot_package_key or "").strip().lower() or "tr_dfd_generico"
+    """
+    Chave do pacote → pasta em lei_14133/.
+
+    Chave desconhecida ou vazia NÃO deve apontar para tr_dfd_generico (pasta vazia no repo):
+    isso fazia TR/DFD “funcionarem” via tr_base e Ofício falhar só no fim.
+    """
+    key = (slot_package_key or "").strip().lower()
+    if not key:
+        return PACKAGE_DIRS["tr_dfd_generico"]
     if key in PACKAGE_DIRS:
         return PACKAGE_DIRS[key]
     if key in PACKAGE_DIR_ALIASES:
         return PACKAGE_DIR_ALIASES[key]
+    if key.startswith("dispensa_rapida_"):
+        mapped = "dispensa_" + key[len("dispensa_rapida_") :]
+        if mapped in PACKAGE_DIRS:
+            return PACKAGE_DIRS[mapped]
     return PACKAGE_DIRS["tr_dfd_generico"]
+
+
+def _dir_has_any_template_docx(directory: Path) -> bool:
+    if not directory.is_dir():
+        return False
+    for name in ("TR_modelo_base.docx", DFD_MODELO_BASE, "OFICIO_modelo_base.docx"):
+        if (directory / name).exists():
+            return True
+    return False
+
+
+def package_base_dir_for_folder(folder: str) -> Path:
+    """
+    Pasta do pacote só se tiver DOCX; senão ancora em tr_base (evita tr_dfd_generico/.gitkeep).
+    """
+    pkg = LAW_14133_ROOT / folder
+    if _dir_has_any_template_docx(pkg):
+        return pkg
+    return LEGACY_TR_BASE_DIR
+
+
+def _package_dirs_for_search() -> tuple[Path, ...]:
+    """Pastas lei_14133 com modelos (ordem estável, sem duplicar)."""
+    seen: set[str] = set()
+    dirs: list[Path] = []
+    for folder in list(PACKAGE_DIRS.values()) + list(PACKAGE_DIR_ALIASES.values()):
+        if folder in seen:
+            continue
+        seen.add(folder)
+        dirs.append(LAW_14133_ROOT / folder)
+    return tuple(dirs)
 
 
 # Lista única de pastas físicas (para documentação / checklist de `DFD_modelo_base_v2.docx`).
@@ -68,13 +110,10 @@ def pick_dfd_template_in_package(base_dir: Path, *, has_numero_processo: bool) -
 
 
 def get_package_template_paths(slot_package_key: str | None) -> Dict[str, Path]:
-    """
-    Resolve caminhos de templates TR/DFD/Ofício para um pacote.
-    Se o pacote não existir, cai em `tr_dfd_generico`.
-    """
-    key = (slot_package_key or "").strip().lower() or "tr_dfd_generico"
+    """Resolve caminhos TR/DFD/Ofício; pasta vazia (ex. tr_dfd_generico) usa tr_base como base."""
+    key = (slot_package_key or "").strip().lower()
     folder = resolve_package_folder(key)
-    base = LAW_14133_ROOT / folder
+    base = package_base_dir_for_folder(folder)
     tr_path = base / "TR_modelo_base.docx"
     custom_tr_filename = CUSTOM_TR_BASE_BY_PACKAGE.get(key)
     if custom_tr_filename:
@@ -87,29 +126,43 @@ def get_package_template_paths(slot_package_key: str | None) -> Dict[str, Path]:
     }
 
 
-def ensure_fallback_path(path: Path, legacy_filename: str) -> Path:
+def ensure_fallback_path(path: Path, legacy_filename: str, *, slot_package_key: str | None = None) -> Path:
     """
-    Usa o arquivo do pacote quando existir; senão, retorna fallback legado em template_packages/tr_base.
+    Usa o arquivo do pacote quando existir; senão tr_base; senão qualquer pasta lei_14133 conhecida.
     """
-    if path.exists():
-        return path
+    checked: list[str] = []
 
-    # Fallback principal (/app/template_packages/tr_base/<arquivo>)
+    def _try(candidate: Path) -> Path | None:
+        checked.append(str(candidate))
+        return candidate if candidate.exists() else None
+
+    hit = _try(path)
+    if hit:
+        return hit
+
     legacy_default = LEGACY_TR_BASE_DIR / legacy_filename
-    if legacy_default.exists():
-        return legacy_default
+    hit = _try(legacy_default)
+    if hit:
+        return hit
 
-    # Fallback adicional para cenários de build/volume em caminhos alternativos.
+    for pkg_dir in _package_dirs_for_search():
+        hit = _try(pkg_dir / legacy_filename)
+        if hit:
+            return hit
+
     alt_candidates = [
-        Path(__file__).resolve().parents[1] / "template_packages" / "tr_base" / legacy_filename,  # /app/rag_service/template_packages/...
+        Path(__file__).resolve().parents[1] / "template_packages" / "tr_base" / legacy_filename,
         Path.cwd() / "template_packages" / "tr_base" / legacy_filename,
     ]
     for candidate in alt_candidates:
-        if candidate.exists():
-            return candidate
+        hit = _try(candidate)
+        if hit:
+            return hit
 
-    checked = [str(path), str(legacy_default)] + [str(c) for c in alt_candidates]
+    key = (slot_package_key or "").strip().lower()
+    folder = resolve_package_folder(key) if key else ""
     raise FileNotFoundError(
         "Template não encontrado em nenhum caminho esperado. "
-        f"arquivo={legacy_filename}; caminhos_verificados={checked}"
+        f"arquivo={legacy_filename}; slot_package_key={key or '(vazio)'}; "
+        f"pasta_resolvida={folder or 'tr_dfd_generico'}; caminhos_verificados={checked}"
     )

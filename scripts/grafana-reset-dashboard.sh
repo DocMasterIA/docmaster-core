@@ -1,15 +1,28 @@
 #!/usr/bin/env bash
-# Força o Grafana a recarregar o dashboard provisionado (layout-v27+).
+# grafana-reset-dashboard v3 — exige layout-v27 no repo e copia JSON para o volume do contentor.
 #
-# Use SEMPRE este ficheiro do repo (não uma cópia em ~/scripts/):
-#   cd ~/docmaster-core && python3 scripts/build-grafana-dashboard.py
-#   DOCMASTER_ROOT=~/docmaster-core ./scripts/grafana-reset-dashboard.sh
+#   cd ~/docmaster-core
+#   python3 scripts/build-grafana-dashboard.py
+#   ./scripts/grafana-reset-dashboard.sh
+#
+# NÃO use ~/scripts/grafana-reset-dashboard.sh (cópia antiga sem v27).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="${DOCMASTER_ROOT:-$SCRIPT_DIR/..}"
 REPO_ROOT="$(cd "$REPO_ROOT" && pwd)"
 REQUIRED_LAYOUT_TAG="${GRAFANA_REQUIRED_LAYOUT:-layout-v27}"
+
+if [[ "$SCRIPT_DIR" != *"docmaster-core"* ]]; then
+  echo "ERRO: este script está em ${SCRIPT_DIR}"
+  echo "Use o script DENTRO do repo (não uma cópia em ~/scripts/):"
+  echo ""
+  echo "  cd ~/docmaster-core"
+  echo "  python3 scripts/build-grafana-dashboard.py"
+  echo "  ./scripts/grafana-reset-dashboard.sh"
+  echo ""
+  exit 1
+fi
 
 GRAFANA_URL="${GRAFANA_URL:-http://127.0.0.1:3000}"
 GRAFANA_USER="${GRAFANA_USER:-admin}"
@@ -107,21 +120,28 @@ for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
   sleep 2
 done
 
+GRAFANA_DASH_TMP="$(mktemp "${TMPDIR:-/tmp}/grafana-dash-${USER:-user}.XXXXXX.json")"
+chmod 600 "$GRAFANA_DASH_TMP"
+trap 'rm -f "$GRAFANA_DASH_TMP"' EXIT
+
 for _ in 1 2 3 4 5 6 7 8 9 10 12 13 14 15; do
   curl -sf -u "${GRAFANA_USER}:${GRAFANA_PASS}" \
-    "${GRAFANA_URL}/api/dashboards/uid/${DASH_UID}" >/tmp/grafana-dash.json 2>/dev/null && break
+    "${GRAFANA_URL}/api/dashboards/uid/${DASH_UID}" >"$GRAFANA_DASH_TMP" 2>/dev/null && break
   sleep 2
 done
 
 VERIFY_OK=0
-REQUIRED_TAG="$REQUIRED_LAYOUT_TAG" python3 - <<'PY' || VERIFY_OK=1
+REQUIRED_TAG="$REQUIRED_LAYOUT_TAG" GRAFANA_DASH_TMP="$GRAFANA_DASH_TMP" python3 - <<'PY' || VERIFY_OK=1
 import json
 import os
 import sys
 
 required = os.environ.get("REQUIRED_TAG", "layout-v27")
+path = os.environ.get("GRAFANA_DASH_TMP", "")
+if not path or not os.path.isfile(path):
+    sys.exit("ERRO: não foi possível ler a resposta da API Grafana.")
 
-with open("/tmp/grafana-dash.json") as f:
+with open(path) as f:
     data = json.load(f)
 d = data.get("dashboard") or data
 

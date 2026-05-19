@@ -184,15 +184,10 @@ _LLM_TOKEN_OPERATIONS = "fill_tr_slots|gerar_tr_e_dfd|gerar_llm"
 _LLM_OPS_SELECTOR = (
     f'docmaster_document_operations_total{{result="success",operation=~"{_LLM_TOKEN_OPERATIONS}"}}'
 )
-# Média de tokens/op.: gerar_tr_e_dfd costuma não gravar tokens (render só com override).
-_LLM_TOKEN_DENOM_OPERATIONS = "fill_tr_slots|gerar_llm"
-_LLM_TOKEN_DENOM_SELECTOR = (
-    f'docmaster_document_operations_total{{result="success",operation=~"{_LLM_TOKEN_DENOM_OPERATIONS}"}}'
-)
-# Tokens: só fluxos do pipeline documento (exclui legado llm_proxy_* no TSDB).
-_LLM_TOKENS_METRIC = (
-    f'docmaster_llm_tokens_total{{fluxo=~"{_LLM_TOKEN_OPERATIONS}"}}'
-)
+# Tokens e invocações LLM (mesmos fluxos; média = tokens / invocações).
+_LLM_TOKEN_FLUXOS = "fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm"
+_LLM_TOKENS_METRIC = f'docmaster_llm_tokens_total{{fluxo=~"{_LLM_TOKEN_FLUXOS}"}}'
+_LLM_INVOCATIONS_METRIC = f'docmaster_llm_invocations_total{{fluxo=~"{_LLM_TOKEN_FLUXOS}"}}'
 # Tipos de geração com pacote conhecido (evita «other»/unknown de rotas antigas).
 _TIPO_GERACAO_FILTER = "dispensa_normal|dispensa_rapida|inexigibilidade|etp"
 _OPS_BY_TIPO_SELECTOR = (
@@ -208,31 +203,41 @@ TIPO_GERACAO_LABELS = {
 }
 
 
-def _llm_ops_selector(*, tipo_geracao: str | None = None, for_token_avg: bool = False) -> str:
-    base = _LLM_TOKEN_DENOM_SELECTOR if for_token_avg else _LLM_OPS_SELECTOR
+def _tokens_selector(*, tipo_geracao: str | None = None, direction: str | None = None) -> str:
+    parts = [f'fluxo=~"{_LLM_TOKEN_FLUXOS}"']
     if tipo_geracao:
-        return f'{base[:-1]},tipo_geracao="{tipo_geracao}"}}'
-    return base
+        parts.append(f'tipo_geracao="{tipo_geracao}"')
+    if direction:
+        parts.append(f'direction="{direction}"')
+    return f'docmaster_llm_tokens_total{{{",".join(parts)}}}'
+
+
+def _invocations_selector(*, tipo_geracao: str | None = None) -> str:
+    parts = [f'fluxo=~"{_LLM_TOKEN_FLUXOS}"']
+    if tipo_geracao:
+        parts.append(f'tipo_geracao="{tipo_geracao}"')
+    return f'docmaster_llm_invocations_total{{{",".join(parts)}}}'
+
+
+def total_tokens_for_tipo(tipo_geracao: str) -> str:
+    """Soma entrada+saída no período (sempre visível após gerar cláusulas ou fill-tr-slots)."""
+    return f"sum(increase({_tokens_selector(tipo_geracao=tipo_geracao)}[$__range]))"
 
 
 def avg_tokens_for_tipo(tipo_geracao: str, *, direction: str | None = None) -> str:
-    """Média de tokens por operação no período, para um tipo de geração."""
-    tok = f'{_LLM_TOKENS_METRIC[:-1]},tipo_geracao="{tipo_geracao}"}}'
-    if direction:
-        tok = f'{_LLM_TOKENS_METRIC[:-1]},tipo_geracao="{tipo_geracao}",direction="{direction}"}}'
-    ops = _llm_ops_selector(tipo_geracao=tipo_geracao, for_token_avg=True)
-    return f"(sum(increase({tok}[$__range])) / clamp_min(sum(increase({ops}[$__range])), 1))"
+    """Média tokens por chamada LLM (invocações = 1 por geração de cláusulas / fill-tr-slots / etc.)."""
+    tok = f"sum(increase({_tokens_selector(tipo_geracao=tipo_geracao, direction=direction)}[$__range]))"
+    inv = f"sum(increase({_invocations_selector(tipo_geracao=tipo_geracao)}[$__range]))"
+    return f"({tok} / clamp_min({inv}, 1))"
 
 
 def avg_tokens_by_tipo_geracao(*, direction: str | None = None) -> str:
-    tok = _LLM_TOKENS_METRIC
-    if direction:
-        tok = f'{_LLM_TOKENS_METRIC[:-1]},direction="{direction}"}}'
-    ops = _llm_ops_selector(for_token_avg=True)
+    tok = f"sum(increase({_tokens_selector(direction=direction)}[$__range])) by (tipo_geracao)"
+    inv = f"sum(increase({_LLM_INVOCATIONS_METRIC}[$__range])) by (tipo_geracao)"
     return f"""(
-sum(increase({tok}[$__range])) by (tipo_geracao)
+{tok}
 / on(tipo_geracao) group_left()
-clamp_min(sum(increase({ops}[$__range])) by (tipo_geracao), 1)
+clamp_min({inv}, 1)
 )"""
 
 
@@ -307,11 +312,19 @@ OPERATION_LABELS = {
 
 FLUXO_LABELS = {
     "fill_tr_slots": "Preencher slots (IA)",
+    "clausulas_llm": "Cláusulas (formulário /api/llm)",
     "gerar_tr_e_dfd": "TR + DFD + Ofício",
     "gerar_llm": "Gerar documento (LLM)",
     "gerar_tr_modelo": "TR modelo",
     "unknown": "Outro fluxo",
 }
+
+
+def tokens_by_fluxo_period() -> str:
+    expr = f"sum(increase({_LLM_TOKENS_METRIC}[$__range])) by (fluxo)"
+    for key, label in FLUXO_LABELS.items():
+        expr = f'label_replace({expr}, "fluxo_label", "{_promql_escape(label)}", "fluxo", "{key}")'
+    return f'label_replace({expr}, "fluxo_label", "$1", "fluxo", "(.+)")'
 
 DESC_STAT_TOTAL = (
     "Consulta instantânea: total atual do contador (independente do intervalo do Grafana)."
@@ -587,7 +600,7 @@ def prom_table_generations(id_, title, y, x, w, h, expr, desc="", *, value_col="
                 "expr": expr,
                 "refId": "A",
                 "instant": True,
-                "range": False,
+                "range": True,
                 "format": "table",
                 "editorMode": "code",
             }
@@ -597,13 +610,18 @@ def prom_table_generations(id_, title, y, x, w, h, expr, desc="", *, value_col="
                 "id": "organize",
                 "options": {
                     "excludeByName": {"Time": True, "__name__": True},
-                    "renameByName": {"tipo": "Tipo de geração", "Value": value_col},
+                    "renameByName": {"tipo": "Tipo de geração", "fluxo_label": "Fluxo", "Value": value_col},
                 },
             }
         ],
         "title": title,
         "type": "table",
     }
+
+
+def prom_table_period(id_, title, y, x, w, h, expr, *, value_col="Valor", desc=""):
+    """Tabela com increase no intervalo do Grafana (range + instant)."""
+    return prom_table_generations(id_, title, y, x, w, h, expr, desc=desc, value_col=value_col)
 
 
 def bargauge_by_label(id_, title, y, x, w, h, expr, legend_format, value_mappings=None, desc=""):
@@ -745,96 +763,149 @@ panels += [
 ]
 y += 4
 
-panels.append(row(275, "Tokens LLM — média por tipo de geração (período)", y))
+panels.append(row(275, "Tokens LLM — por tipo de geração (período)", y))
 y += 1
+panels.append(
+    text_panel(
+        2749,
+        y,
+        "**Total** = soma entrada+saída no intervalo. **Média/chamada** = tokens ÷ invocações LLM "
+        "(cada «Gerar cláusulas» inexigibilidade = `clausulas_llm`; dispensa usa `fill_tr_slots`). "
+        "TR+DFD sem 2ª passagem IA não gera tokens — use **Gerações OK por tipo** para contar documentos.",
+    )
+)
+y += 3
 panels += [
     stat(
-        276,
-        "Dispensa normal",
+        2761,
+        "Total — Dispensa normal",
         y,
         0,
-        6,
+        4,
+        total_tokens_for_tipo("dispensa_normal"),
+        period=True,
+        unit="short",
+        decimals=0,
+    ),
+    stat(
+        2762,
+        "Total — Dispensa rápida",
+        y,
+        4,
+        4,
+        total_tokens_for_tipo("dispensa_rapida"),
+        period=True,
+        unit="short",
+        decimals=0,
+    ),
+    stat(
+        2763,
+        "Total — Inexigibilidade",
+        y,
+        8,
+        4,
+        total_tokens_for_tipo("inexigibilidade"),
+        period=True,
+        unit="short",
+        decimals=0,
+        desc="Inclui cláusulas via /api/llm/generate (fluxo clausulas_llm) após deploy do backend.",
+    ),
+    stat(
+        2764,
+        "Total — ETP",
+        y,
+        12,
+        4,
+        total_tokens_for_tipo("etp"),
+        period=True,
+        unit="short",
+        decimals=0,
+    ),
+    stat(
+        276,
+        "Média/chamada — normal",
+        y,
+        16,
+        4,
         avg_tokens_for_tipo("dispensa_normal"),
         period=True,
         unit="short",
         decimals=0,
-        desc="Média de tokens (entrada+saída) por operação com LLM (fill-tr-slots / gerar_llm). TR+DFD sem 2ª passagem IA não entra no denominador.",
     ),
     stat(
         277,
-        "Dispensa rápida",
+        "Média/chamada — rápida",
         y,
-        6,
-        6,
+        20,
+        4,
         avg_tokens_for_tipo("dispensa_rapida"),
         period=True,
         unit="short",
         decimals=0,
-        desc="Média de tokens por operação — fluxo simplificado Art. 75.",
     ),
+]
+y += 4
+panels += [
     stat(
         278,
-        "Inexigibilidade",
+        "Média/chamada — inexig.",
         y,
-        12,
+        0,
         6,
         avg_tokens_for_tipo("inexigibilidade"),
         period=True,
         unit="short",
         decimals=0,
-        desc="Média de tokens por operação — Art. 74.",
     ),
     stat(
         279,
-        "ETP",
+        "Média/chamada — ETP",
         y,
-        18,
+        6,
         6,
         avg_tokens_for_tipo("etp"),
         period=True,
         unit="short",
         decimals=0,
-        desc="Média de tokens por operação — geração ETP (gerar_llm / documento LLM).",
     ),
 ]
 y += 4
 panels.append(
-    prom_table_generations(
+    prom_table_period(
         271,
-        "Média total por tipo",
+        "Média tokens por chamada LLM (tipo)",
         y,
         0,
         8,
-        5,
+        6,
         avg_tokens_by_tipo_geracao_display(),
-        value_col="Tokens/op.",
-        desc="Comparativo entre tipos de geração no intervalo.",
+        value_col="Tokens/chamada",
+        desc="Denominador: docmaster_llm_invocations_total (não confunde com gerar-tr-e-dfd sem LLM).",
     )
 )
 panels.append(
-    prom_table_generations(
+    prom_table_period(
         272,
-        "Média entrada por tipo",
+        "Tokens por fluxo (período)",
         y,
         8,
         8,
-        5,
-        avg_tokens_by_tipo_geracao_display(direction="entrada"),
-        value_col="Entrada/op.",
-        desc="Tokens de prompt (entrada) por operação.",
+        6,
+        tokens_by_fluxo_period(),
+        value_col="Tokens",
+        desc="clausulas_llm = botão Gerar cláusulas; fill_tr_slots = API fill-tr-slots; gerar_tr_e_dfd = tokens no ZIP se houver.",
     )
 )
 panels.append(
-    prom_table_generations(
+    prom_table_period(
         273,
-        "Média saída por tipo",
+        "Média entrada por tipo",
         y,
         16,
         8,
-        5,
-        avg_tokens_by_tipo_geracao_display(direction="saida"),
-        value_col="Saída/op.",
-        desc="Tokens gerados pelo modelo (saída) por operação.",
+        6,
+        avg_tokens_by_tipo_geracao_display(direction="entrada"),
+        value_col="Entrada/chamada",
     )
 )
 y += 5
@@ -1338,7 +1409,7 @@ panels.append(
 dash = {
     "annotations": {"list": []},
     "editable": False,
-    "description": "Layout v26 — secção infra alinhada ao scrape Prometheus; tokens e tipos limpos.",
+    "description": "Layout v27 — tokens inexigibilidade (clausulas_llm); média por invocações LLM; tabelas período corrigidas.",
     "fiscalYearStartMonth": 0,
     "graphTooltip": 1,
     "id": None,
@@ -1346,13 +1417,13 @@ dash = {
     "panels": panels,
     "refresh": "1m",
     "schemaVersion": 39,
-    "tags": ["docmaster", "backend", "django", "layout-v26"],
+    "tags": ["docmaster", "backend", "django", "layout-v27"],
     "templating": {"list": []},
     "time": {"from": "now-24h", "to": "now"},
     "timezone": "browser",
     "title": "DocMaster — Backend Django",
     "uid": "docmaster-backend",
-    "version": 26,
+    "version": 27,
 }
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -1365,4 +1436,4 @@ if dupes:
     sys.exit(1)
 
 print(f"Repo:  {ROOT}")
-print(f"Wrote: {OUT} ({len(panels)} panels, layout-v26)")
+print(f"Wrote: {OUT} ({len(panels)} panels, layout-v27)")

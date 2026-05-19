@@ -2,12 +2,14 @@
 Proxy para o serviço FastAPI de orquestração LLM.
 
 O frontend chama /api/llm/... no Django (com sessão/cookie). O Django valida
-a sessão e repassa a requisição ao FastAPI (localhost). Assim o FastAPI+IA
-só é acessível por usuários autenticados via sessão Django.
+a sessão e repassa a requisição ao FastAPI (localhost).
 
-Tokens de /api/llm/* não entram em docmaster_llm_tokens_total (evita poluir médias
-do pipeline TR/DFD); apenas docmaster_platform_events_total.
+Geração de cláusulas (POST /api/llm/generate) grava tokens com fluxo clausulas_llm
+e package inferido do Referer — necessário para inexigibilidade (não usa fill-tr-slots).
 """
+from __future__ import annotations
+
+import json
 import logging
 
 import requests
@@ -19,8 +21,10 @@ from backend.app.api import api_login_required
 from backend.app.metrics import (
     normalize_llm_action,
     prefeitura_label_from_request,
+    record_llm_token_usage,
     record_platform_event,
 )
+from backend.app.slot_package_keys import resolve_slot_package_key
 
 logger = logging.getLogger(__name__)
 
@@ -48,12 +52,20 @@ def llm_proxy(request, path):
         "X-DocMaster-Prefeitura": prefeitura,
     }
     result = "error"
+    payload: dict = {}
     try:
         if request.method == "GET":
             resp = requests.get(url, timeout=30)
         else:
-            body = request.body
-            resp = requests.post(url, data=body, headers=headers, timeout=120)
+            raw_body = request.body
+            if raw_body:
+                try:
+                    parsed = json.loads(raw_body)
+                    if isinstance(parsed, dict):
+                        payload = parsed
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    payload = {}
+            resp = requests.post(url, data=raw_body, headers=headers, timeout=120)
 
         try:
             data = resp.json()
@@ -63,6 +75,21 @@ def llm_proxy(request, path):
         result = "success" if resp.status_code < 400 else "error"
         if isinstance(data, dict) and data.get("ok") is False:
             result = "error"
+        if (
+            result == "success"
+            and action == "generate"
+            and isinstance(data, dict)
+            and isinstance(data.get("token_usage"), dict)
+        ):
+            usage = data["token_usage"]
+            pkg = resolve_slot_package_key(payload, request)
+            record_llm_token_usage(
+                fluxo="clausulas_llm",
+                prefeitura=prefeitura,
+                package=pkg or "unknown",
+                prompt_tokens=int(usage.get("prompt_tokens") or 0),
+                completion_tokens=int(usage.get("completion_tokens") or 0),
+            )
         return response
     except requests.exceptions.Timeout:
         logger.warning("LLM proxy timeout: %s", url)

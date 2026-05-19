@@ -60,6 +60,25 @@ class MetricsNormalizationTests(SimpleTestCase):
 
 
 class LlmTokenMetricsTests(SimpleTestCase):
+    def test_clausulas_llm_recorded(self):
+        labels = dict(
+            prefeitura="Joinville (SC)",
+            direction="entrada",
+            fluxo="clausulas_llm",
+            tipo_geracao="inexigibilidade",
+            package="inexigibilidade_74_i_manutencao_veiculos",
+        )
+        before = docmaster_llm_tokens_total.labels(**labels)._value.get()
+        record_llm_token_usage(
+            fluxo="clausulas_llm",
+            prefeitura="Joinville (SC)",
+            package="inexigibilidade_74_i_manutencao_veiculos",
+            prompt_tokens=80,
+            completion_tokens=40,
+        )
+        after = docmaster_llm_tokens_total.labels(**labels)._value.get()
+        self.assertEqual(after - before, 80.0)
+
     def test_llm_proxy_fluxo_not_recorded(self):
         labels = dict(
             prefeitura="X",

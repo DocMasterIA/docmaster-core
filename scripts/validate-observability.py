@@ -36,8 +36,12 @@ def main() -> int:
         dash = json.loads(DASH.read_text(encoding="utf-8"))
         tags = dash.get("tags") or []
         exprs = json.dumps(dash.get("panels") or [])
-        if "layout-v26" not in tags:
-            errors.append(f"Dashboard sem tag layout-v26 (tags={tags})")
+        if "layout-v27" not in tags:
+            errors.append(f"Dashboard sem tag layout-v27 (tags={tags})")
+        if "docmaster_llm_invocations_total" not in exprs:
+            errors.append("Dashboard sem métrica docmaster_llm_invocations_total nas queries")
+        if "clausulas_llm" not in exprs:
+            errors.append("Dashboard sem fluxo clausulas_llm")
         if "process_cpu_seconds_total" in exprs:
             errors.append("Dashboard ainda referencia process_cpu (métrica inexistente no Django)")
         if "llm_proxy" in exprs:
@@ -57,8 +61,10 @@ def main() -> int:
             errors.append(f"ALLOWED_LLM_TOKEN_FLUXOS={found} (esperado {ALLOWED_FLUXOS})")
 
     llm_proxy = (ROOT / "backend/app/llm_proxy.py").read_text(encoding="utf-8")
-    if "record_llm_token_usage" in llm_proxy:
-        errors.append("llm_proxy ainda chama record_llm_token_usage (polui tokens)")
+    if "clausulas_llm" not in llm_proxy:
+        errors.append("llm_proxy não grava fluxo clausulas_llm")
+    if "docmaster_llm_invocations_total" not in metrics_src:
+        errors.append("metrics.py sem docmaster_llm_invocations_total")
 
     if errors:
         print("FALHOU validação observabilidade:", file=sys.stderr)
@@ -66,7 +72,7 @@ def main() -> int:
             print(f"  - {e}", file=sys.stderr)
         return 1
 
-    print("OK — observabilidade consistente (layout-v26, métricas, llm_proxy limpo).")
+    print("OK — observabilidade consistente (layout-v27).")
     return 0
 
 

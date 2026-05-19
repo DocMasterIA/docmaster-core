@@ -77,6 +77,12 @@ docmaster_llm_tokens_total = Counter(
     ["prefeitura", "direction", "fluxo", "tipo_geracao", "package"],
 )
 
+docmaster_llm_invocations_total = Counter(
+    "docmaster_llm_invocations_total",
+    "Chamadas LLM contabilizadas (1 por record_llm_token_usage; base da média tokens/chamada)",
+    ["prefeitura", "fluxo", "tipo_geracao", "package"],
+)
+
 # Sempre visível em /metrics após o worker subir (confirma deploy do módulo de métricas).
 docmaster_metrics_active = Gauge(
     "docmaster_metrics_active",
@@ -84,8 +90,10 @@ docmaster_metrics_active = Gauge(
     multiprocess_mode="livesum",
 )
 
-# Fluxos que alimentam docmaster_llm_tokens_total (pipeline documento). Exclui /api/llm/* proxy.
-ALLOWED_LLM_TOKEN_FLUXOS = frozenset({"fill_tr_slots", "gerar_tr_e_dfd", "gerar_llm"})
+# Fluxos que alimentam docmaster_llm_tokens_total / invocations.
+ALLOWED_LLM_TOKEN_FLUXOS = frozenset(
+    {"fill_tr_slots", "gerar_tr_e_dfd", "gerar_llm", "clausulas_llm"}
+)
 
 KNOWN_AUTH_LOGIN_RESULTS = frozenset(
     {"success", "failure", "locked", "forbidden_prefeitura"}
@@ -250,6 +258,12 @@ def record_llm_token_usage(
     pref = (prefeitura or "Não identificado")[:56]
     pkg = normalize_package_key(package)
     tipo = package_to_tipo_geracao(pkg, fluxo=fl)
+    docmaster_llm_invocations_total.labels(
+        prefeitura=pref,
+        fluxo=fl,
+        tipo_geracao=tipo,
+        package=pkg,
+    ).inc()
     if prompt_tokens > 0:
         docmaster_llm_tokens_total.labels(
             prefeitura=pref,

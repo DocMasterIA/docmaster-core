@@ -469,6 +469,21 @@ def _merge_user_context_into_tr_slots(
     return slots
 
 
+def _file_response_with_llm_token_usage(
+    path: str | Path,
+    *,
+    usage: Dict[str, int],
+    **file_response_kwargs: Any,
+) -> FileResponse:
+    """FileResponse com header ASCII-safe de tokens para o backend Django."""
+    from .llm_orchestration import token_usage_response_header_from_dict
+
+    response = FileResponse(path, **file_response_kwargs)
+    for key, value in token_usage_response_header_from_dict(usage).items():
+        response.headers[key] = value
+    return response
+
+
 def _slot_package_key_from_body(
     context: Optional[Dict[str, Any]],
     slots_override: Optional[Dict[str, Any]] = None,
@@ -540,7 +555,7 @@ async def endpoint_generate_tr_from_model(body: GenerateTRFromModelRequest):
 
     slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
     try:
-        slots = await fill_tr_slots_with_llm(
+        slots, llm_usage = await fill_tr_slots_with_llm(
             user_prompt=body.user_prompt,
             slots_override=slots_override,
             user_context=body.context,
@@ -562,8 +577,9 @@ async def endpoint_generate_tr_from_model(body: GenerateTRFromModelRequest):
             # Falha na geração do DFD não deve impedir o TR; apenas registra em log.
             logger.exception("Falha ao gerar DFD complementar a partir do TR.")
 
-        return FileResponse(
+        return _file_response_with_llm_token_usage(
             docx_tr_path,
+            usage=llm_usage,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             filename="termo_referencia.docx",
         )
@@ -590,7 +606,7 @@ async def endpoint_generate_tr_and_dfd(body: GenerateTRFromModelRequest):
 
     slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
     try:
-        slots = await fill_tr_slots_with_llm(
+        slots, llm_usage = await fill_tr_slots_with_llm(
             user_prompt=body.user_prompt,
             slots_override=slots_override,
             user_context=body.context,
@@ -619,6 +635,7 @@ async def endpoint_generate_tr_and_dfd(body: GenerateTRFromModelRequest):
             "dfd_docx_path": docx_dfd_path,
             "tr_docx_base64": tr_b64,
             "dfd_docx_base64": dfd_b64,
+            "llm_token_usage": llm_usage,
         }
     except ValueError as e:
         msg = str(e).strip()
@@ -653,7 +670,7 @@ async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
     slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
     skip_ctx = getattr(body, "skip_context_in_prompt", False)
     try:
-        slots = await fill_tr_slots_with_llm(
+        slots, llm_usage = await fill_tr_slots_with_llm(
             user_prompt=body.user_prompt,
             slots_override=slots_override,
             user_context=body.context,
@@ -692,8 +709,9 @@ async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
                 detail="ZIP com TR, DFD e Solicitação/Ofício não foi gerado.",
             )
 
-        return FileResponse(
+        return _file_response_with_llm_token_usage(
             zip_path,
+            usage=llm_usage,
             media_type="application/zip",
             filename="tr_dfd_oficio.zip",
         )
@@ -722,13 +740,13 @@ async def endpoint_fill_tr_slots(body: GenerateTRFromModelRequest):
     slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
     skip_ctx = bool(getattr(body, "skip_context_in_prompt", False))
     try:
-        slots = await fill_tr_slots_with_llm(
+        slots, llm_usage = await fill_tr_slots_with_llm(
             user_prompt=body.user_prompt,
             slots_override=slots_override,
             user_context=body.context,
             skip_context_in_prompt=skip_ctx,
         )
-        return {"ok": True, "slots": asdict(slots)}
+        return {"ok": True, "slots": asdict(slots), "llm_token_usage": llm_usage}
     except ValueError as e:
         msg = str(e).strip()
         if any(x in msg for x in ("Orquestração", "LLM", "Resposta da LLM", "404", "modelo")):

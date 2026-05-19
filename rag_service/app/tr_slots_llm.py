@@ -11,7 +11,7 @@ import json
 import os
 import re
 from dataclasses import replace
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 
@@ -22,6 +22,7 @@ from .config import (
     LLM_ORCHESTRATION_GENERATE_PATH,
     RAG_HTTP_TIMEOUT,
 )
+from .llm_orchestration import llm_post_generate, token_scope_active
 from .retrieval import retrieve
 from .tr_template import (
     TRTemplateSlots,
@@ -33,6 +34,23 @@ from .tr_template import (
 TR_SLOTS_INCLUDE_RAG_EXAMPLES: bool = os.getenv("TR_SLOTS_INCLUDE_RAG_EXAMPLES", "0").strip() not in ("0", "false", "False", "no")
 TR_SLOTS_ENABLE_OBJETO_REWRITE: bool = os.getenv("TR_SLOTS_ENABLE_OBJETO_REWRITE", "0").strip() not in ("0", "false", "False", "no")
 TR_SLOTS_ENABLE_INCISO_LLM: bool = os.getenv("TR_SLOTS_ENABLE_INCISO_LLM", "0").strip() not in ("0", "false", "False", "no")
+
+
+async def _call_llm_generate(
+    full_prompt: str,
+    *,
+    user_context: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """POST na orquestração LLM; acumula tokens quando `llm_token_scope` está ativo."""
+    async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
+        if token_scope_active():
+            body = await llm_post_generate(client, full_prompt, user_context=user_context)
+            return body if isinstance(body, dict) else {}
+        url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
+        resp = await client.post(url, json={"prompt": full_prompt, "stream": False})
+        resp.raise_for_status()
+        body = resp.json()
+        return body if isinstance(body, dict) else {}
 
 
 TR_SLOTS_SYSTEM_PROMPT = """Você preenche os campos (slots) de um Termo de Referência com base no pedido do usuário e no contexto.
@@ -356,14 +374,8 @@ REGRAS DE SAÍDA:
 
     full_prompt = f"<<SYSTEM>>\n{system_prompt.strip()}\n\n<<USER>>\n{user_prompt}"
 
-    url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
-    payload = {"prompt": full_prompt, "stream": False}
-
     try:
-        async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
-            resp = await client.post(url, json=payload)
-            resp.raise_for_status()
-            body = resp.json()
+        body = await _call_llm_generate(full_prompt, user_context=user_context)
     except Exception:
         return ""
 
@@ -422,14 +434,8 @@ async def _rewrite_objeto_clause(
 
     full_prompt = f"<<SYSTEM>>\n{OBJETO_REWRITE_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n" + "\n".join(user_parts)
 
-    url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
-    payload = {"prompt": full_prompt, "stream": False}
-
     try:
-        async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
-            resp = await client.post(url, json=payload)
-            resp.raise_for_status()
-            body = resp.json()
+        body = await _call_llm_generate(full_prompt, user_context=user_context)
     except Exception:
         return draft_objeto
 
@@ -1958,9 +1964,11 @@ async def fill_tr_slots_with_llm(
     slots_override: Optional[Dict[str, Any]] = None,
     user_context: Optional[Dict[str, Any]] = None,
     skip_context_in_prompt: bool = False,
-) -> TRTemplateSlots:
+) -> Tuple[TRTemplateSlots, Dict[str, int]]:
     """
     Preenche os slots do TR usando IA.
+
+    Retorna (slots, uso de tokens LLM no pipeline). Sem chamadas LLM, o uso é zerado.
 
     - Chama o llm_agent (structure-from-prompt) para obter contexto e especificações.
     - Chama a LLM para gerar o JSON de slots (objeto, dispensa, itens, justificativa, fiscal, dotacao).
@@ -1968,11 +1976,32 @@ async def fill_tr_slots_with_llm(
   - Dispensa rápida com objeto/justificativa já no override: só monta slots e renderiza (sem segunda passagem LLM).
   - Dispensa normal/rápida sem objeto/justificativa no override (botão «Gerar»): prompt lite, sem llm_agent/RAG.
     """
+    from .llm_orchestration import EMPTY_TOKEN_USAGE, llm_token_scope
+
     override = slots_override if isinstance(slots_override, dict) else {}
     if _should_skip_llm_for_rapida_prefilled(override):
         merged = _build_tr_slots_from_override_prefilled(override, user_context)
-        return _apply_o_manutencao_fix_to_tr_slots(merged)
+        return _apply_o_manutencao_fix_to_tr_slots(merged), dict(EMPTY_TOKEN_USAGE)
 
+    async with llm_token_scope() as acc:
+        slots = await _fill_tr_slots_with_llm_work(
+            user_prompt=user_prompt,
+            slots_override=slots_override,
+            user_context=user_context,
+            skip_context_in_prompt=skip_context_in_prompt,
+            override=override,
+        )
+        return slots, acc.to_dict()
+
+
+async def _fill_tr_slots_with_llm_work(
+    *,
+    user_prompt: str,
+    slots_override: Optional[Dict[str, Any]],
+    user_context: Optional[Dict[str, Any]],
+    skip_context_in_prompt: bool,
+    override: Dict[str, Any],
+) -> TRTemplateSlots:
     lite_fill = _is_objeto_justificativa_fill_mode(override)
     if lite_fill:
         context_from_agent = None
@@ -2042,14 +2071,8 @@ async def fill_tr_slots_with_llm(
         system_prompt = TR_SLOTS_SYSTEM_PROMPT
     full_prompt = f"<<SYSTEM>>\n{system_prompt.strip()}\n\n<<USER>>\n{user_prompt_text}"
 
-    url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
-    payload = {"prompt": full_prompt, "stream": False}
-
     try:
-        async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
-            resp = await client.post(url, json=payload)
-            resp.raise_for_status()
-            body = resp.json()
+        body = await _call_llm_generate(full_prompt, user_context=user_context)
     except httpx.ConnectError as e:
         raise ValueError(
             "Não foi possível conectar à orquestração LLM. "

@@ -99,14 +99,21 @@ async def llm_token_scope():
         _TOKEN_ACC.reset(token)
 
 
+EMPTY_TOKEN_USAGE: dict[str, int] = {
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "llm_calls": 0,
+}
+
+
 def current_token_usage() -> dict[str, int]:
     acc = _TOKEN_ACC.get()
-    return acc.to_dict() if acc else {
-        "prompt_tokens": 0,
-        "completion_tokens": 0,
-        "total_tokens": 0,
-        "llm_calls": 0,
-    }
+    return acc.to_dict() if acc else dict(EMPTY_TOKEN_USAGE)
+
+
+def token_scope_active() -> bool:
+    return _TOKEN_ACC.get() is not None
 
 
 async def llm_post_generate(
@@ -135,4 +142,18 @@ def token_usage_response_header(acc: TokenAccumulator | None = None) -> dict[str
     data = (acc or _TOKEN_ACC.get())
     if not data:
         return {}
-    return {"X-DocMaster-LLM-Token-Usage": json.dumps(data.to_dict(), ensure_ascii=True)}
+    return token_usage_response_header_from_dict(data.to_dict())
+
+
+def token_usage_response_header_from_dict(usage: dict[str, int]) -> dict[str, str]:
+    prompt_t = _as_int(usage.get("prompt_tokens"))
+    completion_t = _as_int(usage.get("completion_tokens"))
+    if not prompt_t and not completion_t:
+        return {}
+    payload = {
+        "prompt_tokens": prompt_t,
+        "completion_tokens": completion_t,
+        "total_tokens": prompt_t + completion_t,
+        "llm_calls": _as_int(usage.get("llm_calls")),
+    }
+    return {"X-DocMaster-LLM-Token-Usage": json.dumps(payload, ensure_ascii=True)}

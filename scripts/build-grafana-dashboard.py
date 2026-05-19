@@ -1,10 +1,46 @@
 #!/usr/bin/env python3
 """Gera config/grafana/provisioning/dashboards/json/docmaster-backend.json"""
+from __future__ import annotations
+
 import json
+import os
+import sys
 from pathlib import Path
 
 DS = {"type": "prometheus", "uid": "prometheus"}
-ROOT = Path(__file__).resolve().parents[1]
+
+
+def _resolve_repo_root() -> Path:
+    """
+    Raiz do docmaster-core (pasta com config/grafana/...).
+
+    Use DOCMASTER_ROOT=~/docmaster-core se o script estiver copiado em ~/scripts/.
+    """
+    env = (os.environ.get("DOCMASTER_ROOT") or "").strip()
+    if env:
+        root = Path(env).expanduser().resolve()
+        if (root / "config/grafana").is_dir():
+            return root
+        print(f"ERRO: DOCMASTER_ROOT={root} não contém config/grafana/", file=sys.stderr)
+        sys.exit(1)
+
+    here = Path(__file__).resolve().parent
+    candidates = [here.parent, here.parent.parent, Path.cwd(), Path.cwd() / "docmaster-core"]
+    for root in candidates:
+        root = root.resolve()
+        if (root / "config/grafana").is_dir():
+            return root
+
+    print(
+        "ERRO: não encontrei a raiz do repo (config/grafana/).\n"
+        "  cd ~/docmaster-core && python3 scripts/build-grafana-dashboard.py\n"
+        "  ou: DOCMASTER_ROOT=~/docmaster-core python3 /caminho/build-grafana-dashboard.py",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
+ROOT = _resolve_repo_root()
 OUT = ROOT / "config/grafana/provisioning/dashboards/json/docmaster-backend.json"
 
 # Chave Prometheus (label package) → nome legível no Grafana (pt-BR).
@@ -147,9 +183,59 @@ def period_delta_by_fluxo(selector: str = "docmaster_llm_tokens_total") -> str:
     return f"sum(increase({selector}[$__range])) by (fluxo)"
 
 
-def llm_tokens_by_fluxo_display(selector: str = "docmaster_llm_tokens_total") -> str:
-    """Agrupa tokens no período por fluxo com nomes legíveis."""
-    expr = f"sum(increase({selector}[$__range])) by (fluxo)"
+# Operações que gravam docmaster_llm_tokens_total (backend/api.py).
+_LLM_TOKEN_OPERATIONS = "fill_tr_slots|gerar_tr_e_dfd"
+_LLM_OPS_SELECTOR = (
+    f'docmaster_document_operations_total{{result="success",operation=~"{_LLM_TOKEN_OPERATIONS}"}}'
+)
+
+
+def _ops_count_period() -> str:
+    return f"clamp_min(sum(increase({_LLM_OPS_SELECTOR}[$__range])), 1)"
+
+
+def avg_tokens_period_global(*, direction: str | None = None) -> str:
+    """Média de tokens por operação com IA no intervalo (entrada, saída ou total)."""
+    tok = "docmaster_llm_tokens_total"
+    if direction:
+        tok += f'{{direction="{direction}"}}'
+    return f"(sum(increase({tok}[$__range])) / {_ops_count_period()})"
+
+
+def avg_tokens_per_fluxo(*, direction: str | None = None) -> str:
+    """Média de tokens por operação, por fluxo (fill_tr_slots, gerar_tr_e_dfd, …)."""
+    tok = "docmaster_llm_tokens_total"
+    if direction:
+        tok += f'{{direction="{direction}"}}'
+    ops = (
+        "clamp_min("
+        "label_replace("
+        f"sum(increase(docmaster_document_operations_total{{result=\"success\"}}[$__range])) by (operation), "
+        '"fluxo", "$1", "operation", "(.+)"'
+        "), 1)"
+    )
+    return f"""(
+sum(increase({tok}[$__range])) by (fluxo)
+/ on(fluxo) group_left()
+{ops}
+)"""
+
+
+def avg_tokens_by_prefeitura_period() -> str:
+    """Média de tokens (entrada+saída) por operação IA, por prefeitura."""
+    return f"""(
+sum(increase(docmaster_llm_tokens_total[$__range])) by (prefeitura)
+/ on(prefeitura) group_left()
+clamp_min(
+  sum(increase({_LLM_OPS_SELECTOR}[$__range])) by (prefeitura),
+  1
+)
+)"""
+
+
+def avg_tokens_by_fluxo_display() -> str:
+    """Média de tokens por operação, com nome legível do fluxo."""
+    expr = avg_tokens_per_fluxo()
     for key, label in FLUXO_LABELS.items():
         expr = f'label_replace({expr}, "tipo", "{_promql_escape(label)}", "fluxo", "{key}")'
     return f'label_replace({expr}, "tipo", "$1", "fluxo", "(.+)")'
@@ -629,75 +715,80 @@ panels += [
 ]
 y += 4
 
-panels.append(row(275, "Tokens LLM — período selecionado", y))
+panels.append(row(275, "Tokens LLM — média por operação (período)", y))
 y += 1
 panels += [
     stat(
         276,
-        "Tokens entrada",
+        "Média entrada/op.",
         y,
         0,
         6,
-        period_delta('docmaster_llm_tokens_total{direction="entrada"}'),
+        avg_tokens_period_global(direction="entrada"),
         period=True,
         unit="short",
+        decimals=0,
+        desc="Média de tokens de prompt por geração com IA (fill-tr-slots + TR/DFD/Ofício) no intervalo.",
     ),
     stat(
         277,
-        "Tokens saída",
+        "Média saída/op.",
         y,
         6,
         6,
-        period_delta('docmaster_llm_tokens_total{direction="saida"}'),
+        avg_tokens_period_global(direction="saida"),
         period=True,
         unit="short",
+        decimals=0,
+        desc="Média de tokens gerados pelo modelo por operação com IA no intervalo.",
     ),
     stat(
         278,
-        "Tokens total",
+        "Média total/op.",
         y,
         12,
         6,
-        period_delta("docmaster_llm_tokens_total"),
+        avg_tokens_period_global(),
         period=True,
         unit="short",
-        desc="Soma de entrada + saída no intervalo (métrica docmaster_llm_tokens_total no backend).",
+        decimals=0,
+        desc="Média de entrada + saída por operação com IA (slots ou documento completo).",
     ),
     stat(
         279,
-        "Chamadas LLM (proxy)",
+        "Operações IA (período)",
         y,
         18,
         6,
-        period_delta('docmaster_platform_events_total{module="llm",result="success"}'),
+        period_delta(_LLM_OPS_SELECTOR),
         period=True,
-        desc="Eventos do proxy Django → llm_api (não inclui chamadas internas rag→llm).",
+        desc="Quantidade de fill-tr-slots e gerar-tr-e-dfd concluídos (denominador da média).",
     ),
 ]
 y += 4
 panels.append(
     prom_table_by_nome(
         271,
-        "Tokens por prefeitura (período)",
+        "Média tokens por prefeitura",
         y,
         0,
         12,
         7,
-        period_delta_by_nome("docmaster_llm_tokens_total"),
-        value_col="Tokens",
-        desc="Entrada + saída agregados por município no intervalo.",
+        avg_tokens_by_prefeitura_period(),
+        value_col="Tokens/op.",
+        desc="Média de tokens (entrada+saída) por operação IA, por município.",
     )
 )
 panels.append(
     prom_table_generations(
         272,
-        "Tokens por fluxo (período)",
+        "Média tokens por fluxo",
         y,
         12,
         12,
         7,
-        llm_tokens_by_fluxo_display(),
-        desc="Distribuição por operação (slots, TR+DFD, etc.). Requer backend com record_llm_token_usage.",
+        avg_tokens_by_fluxo_display(),
+        desc="Média de tokens por operação, por tipo (preencher slots vs. TR+DFD+Ofício).",
     )
 )
 y += 7
@@ -1056,7 +1147,7 @@ panels.append(
 dash = {
     "annotations": {"list": []},
     "editable": False,
-    "description": "Layout v21 — increase() no período (contadores novos); tokens LLM por prefeitura/fluxo.",
+    "description": "Layout v22 — tokens LLM como média por operação (não total); increase() no período.",
     "fiscalYearStartMonth": 0,
     "graphTooltip": 1,
     "id": None,
@@ -1064,14 +1155,16 @@ dash = {
     "panels": panels,
     "refresh": "1m",
     "schemaVersion": 39,
-    "tags": ["docmaster", "backend", "django", "layout-v21"],
+    "tags": ["docmaster", "backend", "django", "layout-v22"],
     "templating": {"list": []},
     "time": {"from": "now-24h", "to": "now"},
     "timezone": "browser",
     "title": "DocMaster — Backend Django",
     "uid": "docmaster-backend",
-    "version": 21,
+    "version": 22,
 }
 
+OUT.parent.mkdir(parents=True, exist_ok=True)
 OUT.write_text(json.dumps(dash, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-print(f"Wrote {OUT} ({len(panels)} panels)")
+print(f"Repo:  {ROOT}")
+print(f"Wrote: {OUT} ({len(panels)} panels, layout-v22)")

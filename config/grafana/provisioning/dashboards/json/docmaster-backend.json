@@ -3,7 +3,7 @@
     "list": []
   },
   "editable": false,
-  "description": "Layout v21 — increase() no período (contadores novos); tokens LLM por prefeitura/fluxo.",
+  "description": "Layout v22 — tokens LLM como média por operação (não total); increase() no período.",
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
@@ -346,7 +346,7 @@
         "y": 8
       },
       "id": 275,
-      "title": "Tokens LLM — período selecionado",
+      "title": "Tokens LLM — média por operação (período)",
       "type": "row"
     },
     {
@@ -354,7 +354,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Soma no intervalo selecionado no Grafana.",
+      "description": "Média de tokens de prompt por geração com IA (fill-tr-slots + TR/DFD/Ofício) no intervalo.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -389,14 +389,14 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_llm_tokens_total{direction=\"entrada\"}[$__range]))",
+          "expr": "(sum(increase(docmaster_llm_tokens_total{direction=\"entrada\"}[$__range])) / clamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_tr_e_dfd\"}[$__range])), 1))",
           "refId": "A",
           "instant": true,
           "range": false,
           "editorMode": "code"
         }
       ],
-      "title": "Tokens entrada",
+      "title": "Média entrada/op.",
       "type": "stat"
     },
     {
@@ -404,7 +404,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Soma no intervalo selecionado no Grafana.",
+      "description": "Média de tokens gerados pelo modelo por operação com IA no intervalo.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -439,14 +439,14 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_llm_tokens_total{direction=\"saida\"}[$__range]))",
+          "expr": "(sum(increase(docmaster_llm_tokens_total{direction=\"saida\"}[$__range])) / clamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_tr_e_dfd\"}[$__range])), 1))",
           "refId": "A",
           "instant": true,
           "range": false,
           "editorMode": "code"
         }
       ],
-      "title": "Tokens saída",
+      "title": "Média saída/op.",
       "type": "stat"
     },
     {
@@ -454,7 +454,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Soma de entrada + saída no intervalo (métrica docmaster_llm_tokens_total no backend).",
+      "description": "Média de entrada + saída por operação com IA (slots ou documento completo).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -489,14 +489,14 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_llm_tokens_total[$__range]))",
+          "expr": "(sum(increase(docmaster_llm_tokens_total[$__range])) / clamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_tr_e_dfd\"}[$__range])), 1))",
           "refId": "A",
           "instant": true,
           "range": false,
           "editorMode": "code"
         }
       ],
-      "title": "Tokens total",
+      "title": "Média total/op.",
       "type": "stat"
     },
     {
@@ -504,7 +504,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Eventos do proxy Django → llm_api (não inclui chamadas internas rag→llm).",
+      "description": "Quantidade de fill-tr-slots e gerar-tr-e-dfd concluídos (denominador da média).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -539,14 +539,14 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",result=\"success\"}[$__range]))",
+          "expr": "sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_tr_e_dfd\"}[$__range]))",
           "refId": "A",
           "instant": true,
           "range": false,
           "editorMode": "code"
         }
       ],
-      "title": "Chamadas LLM (proxy)",
+      "title": "Operações IA (período)",
       "type": "stat"
     },
     {
@@ -554,7 +554,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Entrada + saída agregados por município no intervalo.",
+      "description": "Média de tokens (entrada+saída) por operação IA, por município.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -608,7 +608,7 @@
         "sortBy": [
           {
             "desc": true,
-            "displayName": "Tokens"
+            "displayName": "Tokens/op."
           }
         ]
       },
@@ -618,7 +618,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_llm_tokens_total[$__range])) by (prefeitura)",
+          "expr": "(\nsum(increase(docmaster_llm_tokens_total[$__range])) by (prefeitura)\n/ on(prefeitura) group_left()\nclamp_min(\n  sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_tr_e_dfd\"}[$__range])) by (prefeitura),\n  1\n)\n)",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -637,12 +637,12 @@
             "renameByName": {
               "prefeitura": "Prefeitura",
               "nome": "Prefeitura",
-              "Value": "Tokens"
+              "Value": "Tokens/op."
             }
           }
         }
       ],
-      "title": "Tokens por prefeitura (período)",
+      "title": "Média tokens por prefeitura",
       "type": "table"
     },
     {
@@ -650,7 +650,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Distribuição por operação (slots, TR+DFD, etc.). Requer backend com record_llm_token_usage.",
+      "description": "Média de tokens por operação, por tipo (preencher slots vs. TR+DFD+Ofício).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -724,7 +724,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum(increase(docmaster_llm_tokens_total[$__range])) by (fluxo), \"tipo\", \"Preencher slots (IA)\", \"fluxo\", \"fill_tr_slots\"), \"tipo\", \"TR + DFD + Ofício\", \"fluxo\", \"gerar_tr_e_dfd\"), \"tipo\", \"Gerar documento (LLM)\", \"fluxo\", \"gerar_llm\"), \"tipo\", \"TR modelo\", \"fluxo\", \"gerar_tr_modelo\"), \"tipo\", \"Outro fluxo\", \"fluxo\", \"unknown\"), \"tipo\", \"$1\", \"fluxo\", \"(.+)\")",
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace((\nsum(increase(docmaster_llm_tokens_total[$__range])) by (fluxo)\n/ on(fluxo) group_left()\nclamp_min(label_replace(sum(increase(docmaster_document_operations_total{result=\"success\"}[$__range])) by (operation), \"fluxo\", \"$1\", \"operation\", \"(.+)\"), 1)\n), \"tipo\", \"Preencher slots (IA)\", \"fluxo\", \"fill_tr_slots\"), \"tipo\", \"TR + DFD + Ofício\", \"fluxo\", \"gerar_tr_e_dfd\"), \"tipo\", \"Gerar documento (LLM)\", \"fluxo\", \"gerar_llm\"), \"tipo\", \"TR modelo\", \"fluxo\", \"gerar_tr_modelo\"), \"tipo\", \"Outro fluxo\", \"fluxo\", \"unknown\"), \"tipo\", \"$1\", \"fluxo\", \"(.+)\")",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -747,7 +747,7 @@
           }
         }
       ],
-      "title": "Tokens por fluxo (período)",
+      "title": "Média tokens por fluxo",
       "type": "table"
     },
     {
@@ -3262,7 +3262,7 @@
     "docmaster",
     "backend",
     "django",
-    "layout-v21"
+    "layout-v22"
   ],
   "templating": {
     "list": []
@@ -3274,5 +3274,5 @@
   "timezone": "browser",
   "title": "DocMaster — Backend Django",
   "uid": "docmaster-backend",
-  "version": 21
+  "version": 22
 }

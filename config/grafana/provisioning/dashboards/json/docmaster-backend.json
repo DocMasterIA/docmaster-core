@@ -3,7 +3,7 @@
     "list": []
   },
   "editable": false,
-  "description": "Layout v23 — tokens LLM: média/op. por tipo (dispensa normal/rápida, inexigibilidade, ETP).",
+  "description": "Layout v24 — tokens e gerações por tipo_geracao; denominador de média alinhado a ops com LLM.",
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
@@ -354,7 +354,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Média de tokens (entrada+saída) por operação — formulário completo Art. 75.",
+      "description": "Média de tokens (entrada+saída) por operação com LLM (fill-tr-slots / gerar_llm). TR+DFD sem 2ª passagem IA não entra no denominador.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -389,7 +389,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "(sum(increase(docmaster_llm_tokens_total{tipo_geracao=\"dispensa_normal\"}[$__range])) / clamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm\",tipo_geracao=\"dispensa_normal\"}[$__range])), 1))",
+          "expr": "(sum(increase(docmaster_llm_tokens_total{tipo_geracao=\"dispensa_normal\"}[$__range])) / clamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\",tipo_geracao=\"dispensa_normal\"}[$__range])), 1))",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -439,7 +439,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "(sum(increase(docmaster_llm_tokens_total{tipo_geracao=\"dispensa_rapida\"}[$__range])) / clamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm\",tipo_geracao=\"dispensa_rapida\"}[$__range])), 1))",
+          "expr": "(sum(increase(docmaster_llm_tokens_total{tipo_geracao=\"dispensa_rapida\"}[$__range])) / clamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\",tipo_geracao=\"dispensa_rapida\"}[$__range])), 1))",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -489,7 +489,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "(sum(increase(docmaster_llm_tokens_total{tipo_geracao=\"inexigibilidade\"}[$__range])) / clamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm\",tipo_geracao=\"inexigibilidade\"}[$__range])), 1))",
+          "expr": "(sum(increase(docmaster_llm_tokens_total{tipo_geracao=\"inexigibilidade\"}[$__range])) / clamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\",tipo_geracao=\"inexigibilidade\"}[$__range])), 1))",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -539,7 +539,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "(sum(increase(docmaster_llm_tokens_total{tipo_geracao=\"etp\"}[$__range])) / clamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm\",tipo_geracao=\"etp\"}[$__range])), 1))",
+          "expr": "(sum(increase(docmaster_llm_tokens_total{tipo_geracao=\"etp\"}[$__range])) / clamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\",tipo_geracao=\"etp\"}[$__range])), 1))",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -628,7 +628,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace((\nsum(increase(docmaster_llm_tokens_total[$__range])) by (tipo_geracao)\n/ on(tipo_geracao) group_left()\nclamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm\"}[$__range])) by (tipo_geracao), 1)\n), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace((\nsum(increase(docmaster_llm_tokens_total[$__range])) by (tipo_geracao)\n/ on(tipo_geracao) group_left()\nclamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\"}[$__range])) by (tipo_geracao), 1)\n), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -733,7 +733,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace((\nsum(increase(docmaster_llm_tokens_total{direction=\"entrada\"}[$__range])) by (tipo_geracao)\n/ on(tipo_geracao) group_left()\nclamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm\"}[$__range])) by (tipo_geracao), 1)\n), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace((\nsum(increase(docmaster_llm_tokens_total{direction=\"entrada\"}[$__range])) by (tipo_geracao)\n/ on(tipo_geracao) group_left()\nclamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\"}[$__range])) by (tipo_geracao), 1)\n), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -838,7 +838,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace((\nsum(increase(docmaster_llm_tokens_total{direction=\"saida\"}[$__range])) by (tipo_geracao)\n/ on(tipo_geracao) group_left()\nclamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm\"}[$__range])) by (tipo_geracao), 1)\n), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace((\nsum(increase(docmaster_llm_tokens_total{direction=\"saida\"}[$__range])) by (tipo_geracao)\n/ on(tipo_geracao) group_left()\nclamp_min(sum(increase(docmaster_document_operations_total{result=\"success\",operation=~\"fill_tr_slots|gerar_llm\"}[$__range])) by (tipo_geracao), 1)\n), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -862,6 +862,216 @@
         }
       ],
       "title": "Média saída por tipo",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Contagem de operações de documento no intervalo, por família (dispensa normal/rápida, inexigibilidade, ETP).",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "min": 0,
+          "unit": "none",
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Gerações"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tipo de geração"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 420
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "id": 274,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Gerações"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum(increase(docmaster_document_operations_total{result=\"success\"}[$__range])) by (tipo_geracao), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true
+            },
+            "renameByName": {
+              "tipo": "Tipo de geração",
+              "Value": "Gerações"
+            }
+          }
+        }
+      ],
+      "title": "Gerações OK por tipo (período)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Falhas de geração agrupadas por tipo_geracao.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "min": 0,
+          "unit": "none",
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Erros"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tipo de geração"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 420
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "id": 2741,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Erros"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum(increase(docmaster_document_operations_total{result=\"error\"}[$__range])) by (tipo_geracao), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true
+            },
+            "renameByName": {
+              "tipo": "Tipo de geração",
+              "Value": "Erros"
+            }
+          }
+        }
+      ],
+      "title": "Erros por tipo (período)",
       "type": "table"
     },
     {
@@ -910,7 +1120,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 18
+        "y": 23
       },
       "id": 287,
       "options": {
@@ -1006,7 +1216,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 18
+        "y": 23
       },
       "id": 288,
       "options": {
@@ -1102,7 +1312,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 18
+        "y": 23
       },
       "id": 289,
       "options": {
@@ -1194,7 +1404,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 25
+        "y": 30
       },
       "id": 290,
       "options": {
@@ -1252,7 +1462,7 @@
         "h": 7,
         "w": 16,
         "x": 8,
-        "y": 25
+        "y": 30
       },
       "id": 291,
       "options": {
@@ -1382,7 +1592,7 @@
         "h": 6,
         "w": 14,
         "x": 0,
-        "y": 32
+        "y": 37
       },
       "id": 292,
       "options": {
@@ -1478,7 +1688,7 @@
         "h": 6,
         "w": 10,
         "x": 14,
-        "y": 32
+        "y": 37
       },
       "id": 293,
       "options": {
@@ -1544,7 +1754,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 38
+        "y": 43
       },
       "id": 294,
       "options": {
@@ -1597,7 +1807,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 45
+        "y": 50
       },
       "id": 300,
       "title": "Totais acumulados (desde o último restart do backend)",
@@ -1621,7 +1831,7 @@
         "h": 4,
         "w": 4,
         "x": 0,
-        "y": 46
+        "y": 51
       },
       "id": 301,
       "options": {
@@ -1671,7 +1881,7 @@
         "h": 4,
         "w": 4,
         "x": 4,
-        "y": 46
+        "y": 51
       },
       "id": 302,
       "options": {
@@ -1721,7 +1931,7 @@
         "h": 4,
         "w": 4,
         "x": 8,
-        "y": 46
+        "y": 51
       },
       "id": 303,
       "options": {
@@ -1771,7 +1981,7 @@
         "h": 4,
         "w": 4,
         "x": 12,
-        "y": 46
+        "y": 51
       },
       "id": 304,
       "options": {
@@ -1821,7 +2031,7 @@
         "h": 4,
         "w": 4,
         "x": 16,
-        "y": 46
+        "y": 51
       },
       "id": 305,
       "options": {
@@ -1871,7 +2081,7 @@
         "h": 4,
         "w": 4,
         "x": 20,
-        "y": 46
+        "y": 51
       },
       "id": 306,
       "options": {
@@ -1949,7 +2159,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 50
+        "y": 55
       },
       "id": 332,
       "options": {
@@ -2004,7 +2214,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Dispensa normal, dispensa rápida e inexigibilidade com nomes legíveis. Séries antigas sem distinção rápida/normal aparecem como «Dispensa · Art. …». Após deploy do backend + frontend, novas gerações rápidas usam chave dispensa_rapida_*.",
+      "description": "Detalhe por chave package (cada formulário). Séries antigas sem distinção rápida/normal podem aparecer só como chave técnica.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -2053,9 +2263,9 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 12,
+        "w": 8,
         "x": 12,
-        "y": 50
+        "y": 55
       },
       "id": 341,
       "options": {
@@ -2101,7 +2311,112 @@
           }
         }
       ],
-      "title": "Gerações por tipo de documento (total acumulado)",
+      "title": "Gerações por pacote (total acumulado)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Totais desde o último restart, agrupados por tipo_geracao.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "min": 0,
+          "unit": "none",
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tipo de geração"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 420
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 4,
+        "x": 20,
+        "y": 55
+      },
+      "id": 342,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Total"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum(docmaster_document_operations_total{result=\"success\"}) by (tipo_geracao), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true
+            },
+            "renameByName": {
+              "tipo": "Tipo de geração",
+              "Value": "Total"
+            }
+          }
+        }
+      ],
+      "title": "Gerações por tipo (total acumulado)",
       "type": "table"
     },
     {
@@ -2110,7 +2425,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 57
+        "y": 62
       },
       "id": 3010,
       "title": "No período selecionado no Grafana",
@@ -2134,7 +2449,7 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 58
+        "y": 63
       },
       "id": 309,
       "options": {
@@ -2184,7 +2499,7 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 58
+        "y": 63
       },
       "id": 307,
       "options": {
@@ -2234,7 +2549,7 @@
         "h": 4,
         "w": 6,
         "x": 12,
-        "y": 58
+        "y": 63
       },
       "id": 331,
       "options": {
@@ -2284,7 +2599,7 @@
         "h": 4,
         "w": 6,
         "x": 18,
-        "y": 58
+        "y": 63
       },
       "id": 3311,
       "options": {
@@ -2333,7 +2648,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 62
+        "y": 67
       },
       "id": 3071,
       "options": {
@@ -2413,7 +2728,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 69
+        "y": 74
       },
       "id": 308,
       "options": {
@@ -2469,7 +2784,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 77
+        "y": 82
       },
       "id": 310,
       "title": "Inteligência artificial",
@@ -2493,7 +2808,7 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 78
+        "y": 83
       },
       "id": 311,
       "options": {
@@ -2543,7 +2858,7 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 78
+        "y": 83
       },
       "id": 312,
       "options": {
@@ -2593,7 +2908,7 @@
         "h": 4,
         "w": 6,
         "x": 12,
-        "y": 78
+        "y": 83
       },
       "id": 313,
       "options": {
@@ -2643,7 +2958,7 @@
         "h": 4,
         "w": 6,
         "x": 18,
-        "y": 78
+        "y": 83
       },
       "id": 314,
       "options": {
@@ -2693,7 +3008,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 82
+        "y": 87
       },
       "id": 315,
       "options": {
@@ -2748,7 +3063,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 82
+        "y": 87
       },
       "id": 316,
       "options": {
@@ -2790,7 +3105,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 89
+        "y": 94
       },
       "id": 320,
       "title": "PNCP",
@@ -2814,7 +3129,7 @@
         "h": 4,
         "w": 8,
         "x": 0,
-        "y": 90
+        "y": 95
       },
       "id": 321,
       "options": {
@@ -2864,7 +3179,7 @@
         "h": 4,
         "w": 8,
         "x": 8,
-        "y": 90
+        "y": 95
       },
       "id": 322,
       "options": {
@@ -2914,7 +3229,7 @@
         "h": 4,
         "w": 8,
         "x": 16,
-        "y": 90
+        "y": 95
       },
       "id": 323,
       "options": {
@@ -2964,7 +3279,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 94
+        "y": 99
       },
       "id": 325,
       "options": {
@@ -3009,7 +3324,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 101
+        "y": 106
       },
       "id": 350,
       "title": "Desenvolvimento — saúde",
@@ -3020,7 +3335,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
+      "description": "1 = Prometheus consegue fazer scrape de https://api.docmasteria.com.br/metrics",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -3033,7 +3348,7 @@
         "h": 4,
         "w": 4,
         "x": 0,
-        "y": 102
+        "y": 107
       },
       "id": 351,
       "options": {
@@ -3083,7 +3398,7 @@
         "h": 4,
         "w": 5,
         "x": 4,
-        "y": 102
+        "y": 107
       },
       "id": 352,
       "options": {
@@ -3105,7 +3420,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(django_http_requests_total_by_method_total{job=\"backend\"}[$__range]))",
+          "expr": "sum(increase(sum(django_http_requests_total_by_method_total{job=\"backend\"})[$__range]))",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -3133,7 +3448,7 @@
         "h": 4,
         "w": 5,
         "x": 9,
-        "y": 102
+        "y": 107
       },
       "id": 353,
       "options": {
@@ -3155,7 +3470,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(django_http_responses_total_by_status_total{job=\"backend\",status=~\"5..\"}[$__range]))",
+          "expr": "sum(increase(sum(django_http_responses_total_by_status_total{job=\"backend\",status=~\"5..\"})[$__range]))",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -3183,7 +3498,7 @@
         "h": 4,
         "w": 5,
         "x": 14,
-        "y": 102
+        "y": 107
       },
       "id": 354,
       "options": {
@@ -3205,7 +3520,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(django_http_responses_total_by_status_total{job=\"backend\",status=~\"4..\"}[$__range]))",
+          "expr": "sum(increase(sum(django_http_responses_total_by_status_total{job=\"backend\",status=~\"4..\"})[$__range]))",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -3220,7 +3535,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
+      "description": "Número de workers Gunicorn com docmaster_* ativo (esperado ≈2). Confirma deploy do módulo de métricas.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -3233,7 +3548,7 @@
         "h": 4,
         "w": 5,
         "x": 19,
-        "y": 102
+        "y": 107
       },
       "id": 355,
       "options": {
@@ -3255,14 +3570,14 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max(process_resident_memory_bytes{job=\"backend\"})",
+          "expr": "max(docmaster_metrics_active)",
           "refId": "A",
           "instant": true,
           "range": false,
           "editorMode": "code"
         }
       ],
-      "title": "Memória RSS",
+      "title": "Workers métricas",
       "type": "stat"
     },
     {
@@ -3281,7 +3596,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 106
+        "y": 111
       },
       "id": 356,
       "options": {
@@ -3333,7 +3648,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 106
+        "y": 111
       },
       "id": 357,
       "options": {
@@ -3376,7 +3691,7 @@
     "docmaster",
     "backend",
     "django",
-    "layout-v23"
+    "layout-v24"
   ],
   "templating": {
     "list": []
@@ -3388,5 +3703,5 @@
   "timezone": "browser",
   "title": "DocMaster — Backend Django",
   "uid": "docmaster-backend",
-  "version": 23
+  "version": 24
 }

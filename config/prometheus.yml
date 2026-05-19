@@ -1,4 +1,6 @@
 # Prometheus — DocMaster
+# Dashboard: scripts/build-grafana-dashboard.py → layout-v24
+# Sanidade: docmaster_metrics_active, up{job="backend"}, docmaster_document_operations_total
 global:
   scrape_interval: 15s
   evaluation_interval: 15s

@@ -129,6 +129,25 @@ REGRAS:
 - Use Lei 14.133/2021. Não invente dados que não possam ser inferidos do pedido (ex.: fiscal deixe vazio se não informado; dotação sempre deixe vazia, pois não é responsabilidade da IA preencher).
 """
 
+TR_SLOTS_OBJETO_JUSTIFICATIVA_SYSTEM_PROMPT = """Você redige apenas duas cláusulas para um Termo de Referência (Lei 14.133/2021), com base no pedido do usuário.
+
+REGRAS:
+- Responda APENAS com JSON válido: {"objeto": "...", "justificativa": "..."}
+- Não inclua outros campos, listas, itens, fiscal, dotação ou dispensa.
+
+objeto:
+- Uma cláusula formal declarativa (preferir 1 período completo; até 2 se necessário).
+- Núcleo material + finalidade administrativa + fechamento ("conforme quantidades e demais condições estabelecidas neste Termo de Referência" ou equivalente).
+- NÃO liste itens, quantidades, marcas, modelos, bullets ou "Inclui:" — detalhes ficam na tabela do TR.
+- Em dispensa normal com características informadas: texto genérico institucional, sem nomear produto, dosagem ou marca.
+
+justificativa:
+- Parágrafo dissertativo de 3 a 6 frases, linguagem formal.
+- Necessidade para a Administração, riscos se não contratar, relação com competências do órgão.
+- Concordância correta (ex.: "a manutenção", não "o manutenção").
+- Não invente valores, prazos ou dados não fornecidos.
+"""
+
 OBJETO_REWRITE_SYSTEM_PROMPT = """Você é redator público especializado em cláusulas de OBJETO para Termo de Referência (Lei 14.133/2021).
 
 OBJETIVO:
@@ -223,6 +242,21 @@ def _build_tr_slots_user_prompt(
         )
     parts.append(
         "\nPreencha o JSON de slots do Termo de Referência (objeto, objeto_escopo, objeto_entregas, objeto_resultados, dispensa, itens, justificativa, problema_administrativo, beneficio_esperado, fiscal, dotacao). Saída: apenas o JSON."
+    )
+    return "\n".join(parts)
+
+
+def _build_objeto_justificativa_user_prompt(
+    user_prompt: str,
+    user_context: Optional[Dict[str, Any]] = None,
+    skip_context_in_prompt: bool = False,
+) -> str:
+    """Prompt enxuto para o botão «Gerar objeto e justificativa» (dispensa normal/rápida)."""
+    parts = [f"Pedido do usuário:\n{user_prompt}"]
+    if not skip_context_in_prompt:
+        parts.append(_format_user_context_for_tr_prompt(user_context))
+    parts.append(
+        '\nResponda somente com JSON válido: {"objeto": "...", "justificativa": "..."}'
     )
     return "\n".join(parts)
 
@@ -1783,6 +1817,87 @@ def _should_skip_llm_for_rapida_prefilled(override: Optional[Dict[str, Any]]) ->
     return len(obj) >= 15 and len(jus) >= 15
 
 
+def _is_objeto_justificativa_fill_mode(override: Dict[str, Any]) -> bool:
+    """
+    Modo rápido do fill-tr-slots (dispensa normal/rápida): só objeto + justificativa.
+    Geração completa TR/DFD/Ofício continua com pipeline integral quando objeto e
+    justificativa já vêm no override.
+    """
+    fluxo = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
+    if fluxo not in ("normal", "rapida"):
+        return False
+    obj = str(override.get("objeto") or "").strip()
+    jus = str(override.get("justificativa") or "").strip()
+    return not (len(obj) >= 15 and len(jus) >= 15)
+
+
+def _finalize_lite_objeto_justificativa_slots(
+    llm_slots: TRTemplateSlots,
+    *,
+    override: Dict[str, Any],
+    slots_override: Optional[Dict[str, Any]],
+    user_context: Optional[Dict[str, Any]],
+    user_prompt: str,
+) -> TRTemplateSlots:
+    """Pós-processamento mínimo após LLM lite (sem reescritas, inciso LLM ou itens)."""
+    llm_slots.itens = []
+    llm_slots.dispensa = DispensaSlots(
+        artigo="75",
+        inciso=_resolve_dispensa_inciso_from_override(override),
+    )
+
+    objeto_fallback = user_prompt.strip()[:400]
+
+    def _is_trivial(text: str) -> bool:
+        if not text:
+            return True
+        stripped = text.strip().strip(".;,")
+        if len(stripped) < 15:
+            return True
+        return len(stripped.split()) <= 3
+
+    if _is_trivial(llm_slots.objeto or "") and objeto_fallback:
+        low = objeto_fallback.strip().lower()
+        if low.startswith(("o objeto", "o presente termo", "a aquisição", "a contratação")):
+            llm_slots.objeto = _normalize_objeto(objeto_fallback) or objeto_fallback
+        else:
+            llm_slots.objeto = _normalize_objeto(
+                f"Aquisição de {objeto_fallback.strip().rstrip('.;')}, conforme especificações técnicas, "
+                "quantitativos e demais condições estabelecidas neste Termo de Referência."
+            ) or objeto_fallback
+
+    llm_slots.objeto = _enforce_objeto_semantic_consistency(
+        _normalize_objeto(llm_slots.objeto or "")
+    )
+
+    if not (llm_slots.objeto_escopo or "").strip():
+        llm_slots.objeto_escopo = (
+            "O escopo compreende as atividades técnicas e operacionais indispensáveis à execução do objeto, "
+            "incluindo planejamento, implementação, controle e validação dos resultados pactuados."
+        )
+    if not (llm_slots.objeto_entregas or "").strip():
+        llm_slots.objeto_entregas = (
+            "As entregas deverão ser definidas com critérios objetivos de qualidade, conformidade e desempenho, "
+            "acompanhadas da documentação comprobatória das etapas efetivamente realizadas."
+        )
+    if not (llm_slots.objeto_resultados or "").strip():
+        llm_slots.objeto_resultados = (
+            "Como resultados esperados, projeta-se a melhoria da eficiência operacional, o fortalecimento da "
+            "continuidade do serviço público e a mitigação de riscos de desatendimento ao interesse coletivo."
+        )
+    if not (llm_slots.problema_administrativo or "").strip():
+        llm_slots.problema_administrativo = (llm_slots.justificativa or "").strip()
+    if not (llm_slots.beneficio_esperado or "").strip():
+        llm_slots.beneficio_esperado = (llm_slots.justificativa or "").strip()
+
+    merged = _merge_slots(llm_slots, slots_override or {})
+    if isinstance(user_context, dict):
+        ctx_pk = str(user_context.get("slot_package_key") or "").strip()
+        if ctx_pk and not (merged.slot_package_key or "").strip():
+            merged = replace(merged, slot_package_key=ctx_pk)
+    return _apply_o_manutencao_fix_to_tr_slots(merged)
+
+
 def _build_tr_slots_from_override_prefilled(
     override: Dict[str, Any],
     user_context: Optional[Dict[str, Any]] = None,
@@ -1851,15 +1966,15 @@ async def fill_tr_slots_with_llm(
     - Chama a LLM para gerar o JSON de slots (objeto, dispensa, itens, justificativa, fiscal, dotacao).
     - Mescla com slots_override (valores enviados pelo usuário têm prioridade). user_context (Django) enriquece o prompt com nome/secretaria/prefeitura, a menos que skip_context_in_prompt=True.
   - Dispensa rápida com objeto/justificativa já no override: só monta slots e renderiza (sem segunda passagem LLM).
+  - Dispensa normal/rápida sem objeto/justificativa no override (botão «Gerar»): prompt lite, sem llm_agent/RAG.
     """
     override = slots_override if isinstance(slots_override, dict) else {}
     if _should_skip_llm_for_rapida_prefilled(override):
         merged = _build_tr_slots_from_override_prefilled(override, user_context)
         return _apply_o_manutencao_fix_to_tr_slots(merged)
 
-    # Dispensa rápida: o formulário já manda objeto/órgão no user_prompt; pular agent reduz ~30–60s.
-    _fluxo_ui_early = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
-    if _fluxo_ui_early == "rapida":
+    lite_fill = _is_objeto_justificativa_fill_mode(override)
+    if lite_fill:
         context_from_agent = None
     else:
         context_from_agent = await fetch_context_from_agent(user_prompt)
@@ -1868,7 +1983,7 @@ async def fill_tr_slots_with_llm(
     # Estratégia: priorizar exemplos oriundos do PNCP (fonte="pncp") e, se necessário,
     # complementar com outros TR já ingeridos.
     rag_objeto_examples = ""
-    if TR_SLOTS_INCLUDE_RAG_EXAMPLES:
+    if not lite_fill and TR_SLOTS_INCLUDE_RAG_EXAMPLES:
         try:
             query_objeto = f"{user_prompt[:200]} cláusula objeto termo de referência"
             # 1) PNCP primeiro
@@ -1903,19 +2018,29 @@ async def fill_tr_slots_with_llm(
         except Exception:
             pass
 
-    user_prompt_text = _build_tr_slots_user_prompt(
-        user_prompt, context_from_agent, user_context, skip_context_in_prompt, rag_objeto_examples or None
-    )
-    _fluxo_ui = str((slots_override or {}).get("dispensa_fluxo_ui") or "").strip().lower()
+    _fluxo_ui = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
     skip_item_injection = _fluxo_ui == "normal"
-    if skip_item_injection:
-        user_prompt_text += (
-            "\n\n[Dispensa normal — cláusula de objeto]\n"
-            "Uma única oração institucional genérica (ex.: aquisição de medicamentos para atendimento "
-            "às necessidades da saúde/suprimento municipal), sem nomear produto, apresentação, dosagem, "
-            "marca, nem quantidades (nada como «100 (cem) unidades de X»). Itens e quantidades ficam só na tabela do TR."
+    _normal_objeto_hint = (
+        "\n\n[Dispensa normal — cláusula de objeto]\n"
+        "Uma única oração institucional genérica (ex.: aquisição de medicamentos para atendimento "
+        "às necessidades da saúde/suprimento municipal), sem nomear produto, apresentação, dosagem, "
+        "marca, nem quantidades (nada como «100 (cem) unidades de X»). Itens e quantidades ficam só na tabela do TR."
+    )
+    if lite_fill:
+        user_prompt_text = _build_objeto_justificativa_user_prompt(
+            user_prompt, user_context, skip_context_in_prompt
         )
-    full_prompt = f"<<SYSTEM>>\n{TR_SLOTS_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{user_prompt_text}"
+        if skip_item_injection:
+            user_prompt_text += _normal_objeto_hint
+        system_prompt = TR_SLOTS_OBJETO_JUSTIFICATIVA_SYSTEM_PROMPT
+    else:
+        user_prompt_text = _build_tr_slots_user_prompt(
+            user_prompt, context_from_agent, user_context, skip_context_in_prompt, rag_objeto_examples or None
+        )
+        if skip_item_injection:
+            user_prompt_text += _normal_objeto_hint
+        system_prompt = TR_SLOTS_SYSTEM_PROMPT
+    full_prompt = f"<<SYSTEM>>\n{system_prompt.strip()}\n\n<<USER>>\n{user_prompt_text}"
 
     url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
     payload = {"prompt": full_prompt, "stream": False}
@@ -1957,6 +2082,14 @@ async def fill_tr_slots_with_llm(
             f"Detalhe do parser: {e.msg} (linha {e.lineno}, coluna {e.colno})."
         ) from e
     llm_slots = _dict_to_tr_slots(parsed)
+    if lite_fill:
+        return _finalize_lite_objeto_justificativa_slots(
+            llm_slots,
+            override=override,
+            slots_override=slots_override,
+            user_context=user_context,
+            user_prompt=user_prompt,
+        )
 
     # Se o objeto vier vazio ou praticamente sem conteúdo (ex.: só um "."),
     # tenta recuperar um objeto útil a partir do interpretador (context_from_agent)

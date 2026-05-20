@@ -11,12 +11,14 @@
 
 Do PC para a VPS: `ssh -L 3000:127.0.0.1:3000 user@vps` e abra http://127.0.0.1:3000
 
-## Deploy
+## Deploy / após reiniciar o PC
 
 ```bash
-cd DEPLOY   # pasta com docker-compose.yml + config/ copiados do repo
-docker compose up -d node_exporter prometheus grafana
+cd DEPLOY
+./scripts/ensure-observability.sh
 ```
+
+Ou: `docker compose up -d node_exporter prometheus grafana` (contentores com `restart: always`).
 
 Detalhes: [docs/deploy/OBSERVABILIDADE-VPS.md](../../docs/deploy/OBSERVABILIDADE-VPS.md)
 

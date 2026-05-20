@@ -61,6 +61,27 @@ Ficheiro de referência **não aplicado automaticamente**: [nginx-observability-
 
 Só use se souber **onde** o nginx do servidor define `api.docmasteria.com.br` (painel do host, `/etc/nginx/nginx.conf`, etc.). Erro no nginx pode derrubar o site — por isso o padrão do projeto é **túnel SSH**, não mexer no proxy.
 
+## Subir sozinho após reboot / queda
+
+Os três serviços usam `restart: always` no `docker-compose.yml` (Docker recria o contentor se cair).
+
+**1. Docker tem de arrancar com o sistema**
+
+- **VPS Linux:** `sudo systemctl enable docker`
+- **WSL / Windows:** Docker Desktop → Settings → **Start Docker Desktop when you sign in**
+
+**2. Uma vez por máquina (ou após `docker compose down`):**
+
+```bash
+cd DEPLOY
+chmod +x scripts/ensure-observability.sh
+./scripts/ensure-observability.sh
+```
+
+**3. VPS — opcional (systemd no boot):** [docmaster-observability.service.example](../../deploy/docmaster-observability.service.example)
+
+`unless-stopped` não voltava se o contentor tinha sido parado à mão; `always` + passo 2 garante a stack após ligar o PC/servidor.
+
 ## Erros comuns
 
 | Problema | Causa |

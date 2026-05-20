@@ -1,0 +1,25 @@
+# Opcional — Linux (VPS): sobe observabilidade quando o servidor liga.
+#
+# 1) Ajuste WorkingDirectory para a pasta DEPLOY (compose + config/).
+# 2) sudo cp deploy/docmaster-observability.service.example /etc/systemd/system/docmaster-observability.service
+# 3) sudo systemctl daemon-reload
+# 4) sudo systemctl enable --now docmaster-observability.service
+#
+# Não interfere no Django/nginx. Só: node_exporter, prometheus, grafana.
+
+[Unit]
+Description=DocMaster observability (Grafana, Prometheus, node_exporter)
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/docmaster/docmaster-core
+ExecStart=/usr/bin/docker compose up -d node_exporter prometheus grafana
+ExecStop=/usr/bin/docker compose stop grafana prometheus node_exporter
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+# Servidor da API em produção (Prometheus alcança o IP:9100 do host).
+# cp config/prometheus.d/20-node-prod.yml.example config/prometheus.d/20-node-prod.yml
+# Edite o IP e: docker compose restart prometheus
+
+scrape_configs:
+  - job_name: node
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["SEU_IP_DO_SERVIDOR_API:9100"]
+        labels:
+          instance: docmaster-prod-api

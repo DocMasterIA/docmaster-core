@@ -17,9 +17,22 @@ curl -s http://127.0.0.1:9090/targets   # node e backend devem estar UP
 
 ## Produção (servidor da API)
 
-1. Instale node_exporter no **mesmo host** que roda o backend (systemd ou container com `/proc`, `/sys` montados).
-2. Em `config/prometheus.yml`, adicione o target `SEU_IP:9100` no job `node` (veja exemplo comentado).
-3. Garanta que o Prometheus alcança a porta 9100 (firewall).
+Painéis Host **zerados** quase sempre = `up{job="node"}` é 0 (não é CPU/RAM a 0%).
+
+**Mesmo servidor (Compose):**
+
+```bash
+docker compose up -d node_exporter prometheus
+./scripts/check-host-metrics.sh
+```
+
+**Prometheus noutra máquina** (só scrape HTTPS da API hoje):
+
+1. No servidor da API: `docker compose up -d node_exporter` (porta `9100` no host).
+2. `cp config/prometheus.d/20-node-prod.yml.example config/prometheus.d/20-node-prod.yml` — edite o IP.
+3. No `docker-compose.yml` do Prometheus, acrescente ao `command`:
+   `--config.file=/etc/prometheus/prometheus.d/20-node-prod.yml`
+4. `docker compose restart prometheus` — em `/targets` o job `node` deve ficar **UP**.
 
 ## Grafana
 

@@ -827,12 +827,18 @@ def bargauge_period_breakdown(id_, title, y, x, w, h, items, desc=""):
     }
 
 
+_NODE_JOB = 'job="node"'
 _NODE_ROOT_FS = 'mountpoint="/",fstype!~"tmpfs|overlay|aufs|squashfs"'
-_NODE_CPU_BUSY = '100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[$__rate_interval])))'
-_NODE_RAM_PCT = "100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))"
+_NODE_CPU_BUSY = (
+    f'100 * (1 - avg(irate(node_cpu_seconds_total{{{_NODE_JOB},mode="idle"}}[5m])))'
+)
+_NODE_RAM_PCT = (
+    f"100 * (1 - (node_memory_MemAvailable_bytes{{{_NODE_JOB}}} "
+    f"/ node_memory_MemTotal_bytes{{{_NODE_JOB}}}))"
+)
 _NODE_DISK_FREE_PCT = (
-    f"100 * (node_filesystem_avail_bytes{{{_NODE_ROOT_FS}}} "
-    f"/ node_filesystem_size_bytes{{{_NODE_ROOT_FS}}})"
+    f"100 * (node_filesystem_avail_bytes{{{_NODE_JOB},{_NODE_ROOT_FS}}} "
+    f"/ node_filesystem_size_bytes{{{_NODE_JOB},{_NODE_ROOT_FS}}})"
 )
 _NODE_RAM_USED = "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes"
 
@@ -842,9 +848,8 @@ panels.append(
     text_panel(
         299,
         y,
-        "Contadores desde o último restart do backend. "
-        "ZIP = só `gerar_tr_e_dfd`. IA = `docmaster_llm_invocations_total`. "
-        "Host = job Prometheus `node`.",
+        "Host zerado = Prometheus sem scrape do `node_exporter` (painel «Node scrape» = 0). "
+        "No servidor: `docker compose up -d node_exporter prometheus` e `./scripts/check-host-metrics.sh`.",
     )
 )
 y += 3
@@ -853,49 +858,64 @@ panels.append(row(200, "Host (node_exporter)", y))
 y += 1
 panels += [
     stat(
+        2001,
+        "Node scrape",
+        y,
+        0,
+        4,
+        'max(up{job="node"})',
+        thresholds="good_high",
+        no_value="DOWN",
+        desc="0 ou vazio = Prometheus não alcança node_exporter:9100.",
+    ),
+    stat(
         201,
         "CPU em uso",
         y,
-        0,
-        6,
+        4,
+        5,
         _NODE_CPU_BUSY,
         unit="percent",
         decimals=1,
         color_mode="none",
-        desc="Média de todos os núcleos (100 − idle).",
+        no_value="—",
+        desc="Requer job node UP.",
     ),
     stat(
         202,
         "RAM em uso",
         y,
-        6,
-        6,
+        9,
+        5,
         _NODE_RAM_PCT,
         unit="percent",
         decimals=1,
         color_mode="none",
+        no_value="—",
     ),
     stat(
         203,
         "Disco livre (/)",
         y,
-        12,
-        6,
+        14,
+        5,
         _NODE_DISK_FREE_PCT,
         unit="percent",
         decimals=1,
         color_mode="none",
+        no_value="—",
     ),
     stat(
         204,
         "Load 1m",
         y,
-        18,
-        6,
-        "node_load1",
+        19,
+        5,
+        f"node_load1{{{_NODE_JOB}}}",
         unit="none",
         decimals=2,
         color_mode="none",
+        no_value="—",
     ),
 ]
 y += 4

@@ -1,0 +1,10 @@
+# Métricas do host — requer: docker compose up -d node_exporter
+# Produção (Prometheus noutro host): copie 20-node-prod.yml.example → 20-node-prod.yml
+
+scrape_configs:
+  - job_name: node
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["node_exporter:9100"]
+        labels:
+          instance: docmaster-host

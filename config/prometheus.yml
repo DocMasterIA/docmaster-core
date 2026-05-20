@@ -11,21 +11,7 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
-  # Servidor onde o Docker Compose roda (CPU, RAM, disco, load).
-  - job_name: node
-    scrape_interval: 15s
-    static_configs:
-      - targets: ["node_exporter:9100"]
-        labels:
-          instance: docmaster-host
-
-  # Produção remota: descomente e aponte para o IP:9100 do servidor (node_exporter no host).
-  # - job_name: node
-  #   scrape_interval: 15s
-  #   static_configs:
-  #     - targets: ["SEU_SERVIDOR:9100"]
-  #       labels:
-  #         instance: docmaster-prod
+  # Host (node_exporter): config/prometheus.d/10-node.yml (+ opcional 20-node-prod.yml)
 
   # API Django (métricas docmaster_* + django_*).
   - job_name: backend

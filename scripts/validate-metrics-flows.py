@@ -2,6 +2,8 @@
 """
 Valida o mapa fluxo → métricas Prometheus (código + opcional scrape ao vivo).
 
+Não exige Django nem prometheus_client — roda com o python3 do sistema.
+
 Fatores (o que cada contador significa):
   fill_tr_slots     — POST fill-tr-slots (cláusulas dispensa normal/rápida)
   gerar_tr_e_dfd    — POST gerar-tr-e-dfd (ZIP TR+DFD+Ofício; todas as modalidades)
@@ -14,6 +16,7 @@ Fatores (o que cada contador significa):
 """
 from __future__ import annotations
 
+import importlib.util
 import os
 import re
 import sys
@@ -22,29 +25,94 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
-
-from backend.app.metrics import (  # noqa: E402
-    ALLOWED_LLM_TOKEN_FLUXOS,
-    package_to_tipo_geracao,
-    record_document_operation,
-    record_llm_token_usage,
-)
-from backend.app.slot_package_keys import ROUTE_TO_SLOT_PACKAGE, resolve_slot_package_key
-
 METRICS_URL = (os.environ.get("METRICS_URL") or "").strip()
+
+
+def _load_module_from_path(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"não foi possível carregar {path}")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_slot_mod = _load_module_from_path(
+    "docmaster_slot_package_keys",
+    ROOT / "backend/app/slot_package_keys.py",
+)
+resolve_slot_package_key = _slot_mod.resolve_slot_package_key
+ROUTE_TO_SLOT_PACKAGE = _slot_mod.ROUTE_TO_SLOT_PACKAGE
+
+
+# Espelha backend/app/metrics.py (sem importar prometheus_client).
+_KNOWN_SLOT_PACKAGES = frozenset(
+    {
+        "dispensa_75_i_manutencao_veiculos",
+        "dispensa_75_i_obras_engenharia",
+        "dispensa_75_ii_compras",
+        "dispensa_75_ii_servicos",
+        "dispensa_75_ii_compras_servicos_inclusos",
+        "dispensa_rapida_75_i_manutencao_veiculos",
+        "dispensa_rapida_75_i_obras_engenharia",
+        "dispensa_rapida_75_ii_compras",
+        "dispensa_rapida_75_ii_servicos",
+        "dispensa_rapida_75_ii_compras_servicos_inclusos",
+        "inexigibilidade_74_i_manutencao_veiculos",
+        "inexigibilidade_74_i_fornecedor_exclusivo",
+    }
+)
+
+
+def normalize_package_key(key: str | None) -> str:
+    k = (key or "").strip().lower()
+    if not k:
+        return "unknown"
+    if k in _KNOWN_SLOT_PACKAGES:
+        return k
+    if k in ("etp", "etp_livre", "tr_dfd_generico"):
+        return k
+    if len(k) > 64:
+        return "other"
+    return "other"
+
+
+def package_to_tipo_geracao(package: str | None, *, fluxo: str = "") -> str:
+    p = normalize_package_key(package)
+    if p.startswith("dispensa_rapida_"):
+        return "dispensa_rapida"
+    if p.startswith("dispensa_75_") or p.startswith("dispensa_"):
+        return "dispensa_normal"
+    if p.startswith("inexigibilidade_"):
+        return "inexigibilidade"
+    if p == "etp" or p.startswith("etp_"):
+        return "etp"
+    if (fluxo or "").strip().lower() == "gerar_llm":
+        return "etp"
+    return "other"
+
+
+def _allowed_llm_fluxos_from_source() -> frozenset[str]:
+    src = (ROOT / "backend/app/metrics.py").read_text(encoding="utf-8")
+    m = re.search(r"ALLOWED_LLM_TOKEN_FLUXOS\s*=\s*frozenset\(\s*\{([^}]+)\}", src, re.S)
+    if not m:
+        return frozenset()
+    return frozenset(
+        x.strip().strip('"').strip("'")
+        for x in m.group(1).split(",")
+        if x.strip()
+    )
 
 
 @dataclass(frozen=True)
 class FlowSpec:
     name: str
     package: str
-    llm_fluxo: str | None  # None = sem tokens LLM neste passo
-    doc_operation: str | None  # operação em docmaster_document_operations_total
+    llm_fluxo: str | None
+    doc_operation: str | None
     frontend_hint: str
 
 
-# Mapa acordado com o produto (o que cada UI deve disparar).
 FLOWS: list[FlowSpec] = [
     FlowSpec(
         "Dispensa normal — cláusulas (IA antes do documento)",
@@ -118,7 +186,6 @@ def _metric_has_labels(
     metric: str,
     required: dict[str, str],
 ) -> bool:
-    """True se existir pelo menos uma série com labels exatos."""
     if not text:
         return False
     for line in text.splitlines():
@@ -141,18 +208,25 @@ def _code_checks() -> list[str]:
         if got != tipo:
             errors.append(f"package_to_tipo_geracao({pkg!r})={got!r}, esperado {tipo!r}")
 
-    if "clausulas_llm" not in ALLOWED_LLM_TOKEN_FLUXOS:
-        errors.append("ALLOWED_LLM_TOKEN_FLUXOS sem clausulas_llm")
+    allowed = _allowed_llm_fluxos_from_source()
+    if "clausulas_llm" not in allowed:
+        errors.append(f"ALLOWED_LLM_TOKEN_FLUXOS sem clausulas_llm (encontrado: {sorted(allowed)})")
 
-    mock_req = type("R", (), {"META": {"HTTP_REFERER": "https://app/geracao/inexigibilidade-art-74-i/fornecedor-exclusivo"}})()
-    key = resolve_slot_package_key({"slot_package_key": "inexigibilidade_74_i_fornecedor_exclusivo"}, mock_req)
+    mock_req = type(
+        "R",
+        (),
+        {"META": {"HTTP_REFERER": "https://app/geracao/inexigibilidade-art-74-i/fornecedor-exclusivo"}},
+    )()
+    key = resolve_slot_package_key(
+        {"slot_package_key": "inexigibilidade_74_i_fornecedor_exclusivo"},
+        mock_req,
+    )
     if key != "inexigibilidade_74_i_fornecedor_exclusivo":
         errors.append(f"resolve_slot_package_key inexig={key!r}")
 
     if len(ROUTE_TO_SLOT_PACKAGE) < 10:
         errors.append(f"ROUTE_TO_SLOT_PACKAGE incompleto ({len(ROUTE_TO_SLOT_PACKAGE)} rotas)")
 
-  # llm_proxy deve referenciar clausulas_llm
     proxy = (ROOT / "backend/app/llm_proxy.py").read_text(encoding="utf-8")
     if 'fluxo="clausulas_llm"' not in proxy:
         errors.append("llm_proxy.py não grava fluxo clausulas_llm")
@@ -165,7 +239,9 @@ def _code_checks() -> list[str]:
         if "fill-tr-slots" not in src and "fetchFillTrSlots" not in src:
             errors.append(f"{path} sem fill-tr-slots")
 
-    inex = (ROOT / "frontend-vue/src/views/InexigibilidadeManutencaoVeiculosPreview.vue").read_text(encoding="utf-8")
+    inex = (ROOT / "frontend-vue/src/views/InexigibilidadeManutencaoVeiculosPreview.vue").read_text(
+        encoding="utf-8"
+    )
     if "/api/llm/generate" not in inex:
         errors.append("InexigibilidadeManutencaoVeiculosPreview sem /api/llm/generate")
     if "slot_package_key: slotPackageKey" not in inex:
@@ -178,7 +254,9 @@ def _code_checks() -> list[str]:
             "(invocações ficam subcontadas)"
         )
 
-    dash = (ROOT / "config/grafana/provisioning/dashboards/json/docmaster-backend.json").read_text(encoding="utf-8")
+    dash = (ROOT / "config/grafana/provisioning/dashboards/json/docmaster-backend.json").read_text(
+        encoding="utf-8"
+    )
     if "ZIP TR+DFD por família" not in dash:
         errors.append("Dashboard sem tabela ZIP por tipo_geracao (build-grafana-dashboard.py)")
     if "Chamadas IA por família" not in dash:
@@ -248,7 +326,6 @@ def main() -> int:
         print(f"         {flow.frontend_hint}")
         print(f"         {' | '.join(parts)}")
 
-    # Resumo por tipo no scrape
     print("\n--- Resumo invocações LLM por tipo_geracao (valor no scrape) ---")
     for tipo in ("dispensa_normal", "dispensa_rapida", "inexigibilidade", "etp"):
         pat = re.compile(

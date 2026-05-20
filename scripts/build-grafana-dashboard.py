@@ -879,7 +879,8 @@ panels += [
         decimals=1,
         color_mode="none",
         no_value="—",
-        desc="Requer job node UP.",
+        period=True,
+        desc="Query em range (instant+irate ficava vazio no Grafana).",
     ),
     stat(
         202,
@@ -892,6 +893,7 @@ panels += [
         decimals=1,
         color_mode="none",
         no_value="—",
+        period=True,
     ),
     stat(
         203,
@@ -904,6 +906,7 @@ panels += [
         decimals=1,
         color_mode="none",
         no_value="—",
+        period=True,
     ),
     stat(
         204,
@@ -916,6 +919,7 @@ panels += [
         decimals=2,
         color_mode="none",
         no_value="—",
+        period=True,
     ),
 ]
 y += 4

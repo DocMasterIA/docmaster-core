@@ -109,7 +109,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Requer job node UP.",
+      "description": "Query em range (instant+irate ficava vazio no Grafana).",
       "fieldConfig": {
         "defaults": {
           "decimals": 1,
@@ -146,9 +146,10 @@
           },
           "expr": "100 * (1 - avg(irate(node_cpu_seconds_total{job=\"node\",mode=\"idle\"}[5m])))",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "CPU em uso",
@@ -159,7 +160,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
+      "description": "Soma no intervalo selecionado no Grafana.",
       "fieldConfig": {
         "defaults": {
           "decimals": 1,
@@ -196,9 +197,10 @@
           },
           "expr": "100 * (1 - (node_memory_MemAvailable_bytes{job=\"node\"} / node_memory_MemTotal_bytes{job=\"node\"}))",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "RAM em uso",
@@ -209,7 +211,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
+      "description": "Soma no intervalo selecionado no Grafana.",
       "fieldConfig": {
         "defaults": {
           "decimals": 1,
@@ -246,9 +248,10 @@
           },
           "expr": "100 * (node_filesystem_avail_bytes{job=\"node\",mountpoint=\"/\",fstype!~\"tmpfs|overlay|aufs|squashfs\"} / node_filesystem_size_bytes{job=\"node\",mountpoint=\"/\",fstype!~\"tmpfs|overlay|aufs|squashfs\"})",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "Disco livre (/)",
@@ -259,7 +262,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
+      "description": "Soma no intervalo selecionado no Grafana.",
       "fieldConfig": {
         "defaults": {
           "decimals": 2,
@@ -296,9 +299,10 @@
           },
           "expr": "node_load1{job=\"node\"}",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "Load 1m",

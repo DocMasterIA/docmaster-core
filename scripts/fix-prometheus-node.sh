@@ -82,8 +82,29 @@ reload_prometheus_config() {
   echo "AVISO: não foi possível reload; recrie uma vez: docker rm -f prometheus && ${COMPOSE[*]} up -d --no-deps prometheus"
 }
 
+link_node_exporter_to_prometheus_network() {
+  if ! docker container inspect prometheus node_exporter >/dev/null 2>&1; then
+    return 0
+  fi
+  local net
+  net="$(docker inspect prometheus --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' | awk '{print $1}')"
+  if [[ -z "$net" ]]; then
+    echo "AVISO: rede do prometheus não encontrada"
+    return 0
+  fi
+  if docker inspect node_exporter --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' | grep -qF "$net"; then
+    echo "node_exporter — já na rede $net (scrape node_exporter:9100)"
+  elif docker network connect "$net" node_exporter 2>/dev/null; then
+    echo "node_exporter — ligado à rede $net do prometheus"
+  else
+    echo "AVISO: não ligou à rede $net; scrape pode falhar (up=0)"
+  fi
+}
+
 ensure_node_exporter
 ensure_prometheus
+link_node_exporter_to_prometheus_network
+reload_prometheus_config 2>/dev/null || true
 
 echo ""
 echo "Aguardando Prometheus (até 45s)..."

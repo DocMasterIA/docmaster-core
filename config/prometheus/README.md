@@ -13,7 +13,8 @@
 docker compose up -d node_exporter
 docker compose up -d --force-recreate prometheus grafana
 curl -s http://127.0.0.1:9100/metrics | head
-curl -s 'http://127.0.0.1:9090/api/v1/query?query=up{job="node"}' | python3 -m json.tool
+curl -sG http://127.0.0.1:9090/api/v1/query --data-urlencode 'query=up{job="node"}' | python3 -m json.tool
+# "1" = scrape OK; "0" = ver http://127.0.0.1:9090/targets (erro de rede) e rode ./scripts/fix-prometheus-node.sh
 # Targets: http://127.0.0.1:9090/targets — job node e backend UP
 ```
 

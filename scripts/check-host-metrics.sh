@@ -28,8 +28,8 @@ if curl -sf --max-time 5 "$NODE_URL" 2>/dev/null | _metrics_has_node; then
   _node_ok=1
 elif docker ps --format '{{.Names}}' 2>/dev/null | grep -qx node_exporter; then
   echo "Container node_exporter existe; testando scrape pela rede Docker (prometheus → node_exporter)..."
-  if docker exec prometheus wget -qO- http://host.docker.internal:9100/metrics 2>/dev/null | _metrics_has_node; then
-    echo "OK — node_exporter alcançável como o Prometheus vê (host.docker.internal:9100)"
+  if docker exec prometheus wget -qO- http://node_exporter:9100/metrics 2>/dev/null | _metrics_has_node; then
+    echo "OK — node_exporter alcançável na rede Docker (node_exporter:9100)"
     _node_ok=1
   fi
 fi

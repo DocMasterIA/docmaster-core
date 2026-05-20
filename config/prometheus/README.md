@@ -20,6 +20,16 @@ curl -sG http://127.0.0.1:9090/api/v1/query --data-urlencode 'query=up{job="node
 
 `docker compose restart prometheus` **não** aplica mudanças no `command:` do compose; use `--force-recreate`.
 
+**Prometheus `Restarting` / :9090 fechado:** quase sempre compose corrido em `~` (monta `./config` errado). Só:
+
+```bash
+cd ~/docmaster-core
+./scripts/diagnose-prometheus.sh
+docker rm -f prometheus
+docker compose -f ~/docmaster-core/docker-compose.yml up -d --no-deps prometheus
+docker logs prometheus --tail 30
+```
+
 **Conflito** `container name "/prometheus" is already in use`: misturou `docker compose` em `~` e em `docmaster-core`. Use **só um**:
 
 ```bash

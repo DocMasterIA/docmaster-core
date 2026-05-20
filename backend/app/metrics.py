@@ -124,7 +124,7 @@ def normalize_package_key(key: str | None) -> str:
         return "unknown"
     if k in KNOWN_SLOT_PACKAGES:
         return k
-    if k in ("etp", "tr_dfd_generico"):
+    if k in ("etp", "etp_livre", "tr_dfd_generico"):
         return k
     if len(k) > 64:
         return "other"

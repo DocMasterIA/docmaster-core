@@ -268,9 +268,18 @@ def operations_by_operation_period(*, result: str = "success") -> str:
     return f'label_replace({expr}, "op_label", "$1", "operation", "(.+)")'
 
 
+def tr_dfd_ok_by_tipo_period() -> str:
+    """ZIPs TR+DFD+Ofício gerados no período (1 por clique em gerar documento)."""
+    sel = 'docmaster_document_operations_total{operation="gerar_tr_e_dfd",result="success"}'
+    expr = f"sum(increase({sel}[$__range])) by (tipo_geracao)"
+    for key, label in TIPO_GERACAO_LABELS.items():
+        expr = f'label_replace({expr}, "tipo", "{_promql_escape(label)}", "tipo_geracao", "{key}")'
+    return f'label_replace({expr}, "tipo", "$1", "tipo_geracao", "(.+)"'
+
+
 def operations_by_tipo_geracao_period(*, result: str = "success") -> str:
     """Contagem de operações no período, agrupadas por tipo_geracao com nome legível."""
-    sel = f'{_OPS_BY_TIPO_SELECTOR[:-1]},result="{result}"}}'
+    sel = f'docmaster_document_operations_total{{result="{result}"}}'
     expr = f"sum(increase({sel}[$__range])) by (tipo_geracao)"
     for key, label in TIPO_GERACAO_LABELS.items():
         expr = f'label_replace({expr}, "tipo", "{_promql_escape(label)}", "tipo_geracao", "{key}")'
@@ -278,7 +287,7 @@ def operations_by_tipo_geracao_period(*, result: str = "success") -> str:
 
 
 def operations_by_tipo_geracao_total(*, result: str = "success") -> str:
-    sel = f'{_OPS_BY_TIPO_SELECTOR[:-1]},result="{result}"}}'
+    sel = f'docmaster_document_operations_total{{result="{result}"}}'
     expr = f"sum({sel}) by (tipo_geracao)"
     for key, label in TIPO_GERACAO_LABELS.items():
         expr = f'label_replace({expr}, "tipo", "{_promql_escape(label)}", "tipo_geracao", "{key}")'
@@ -857,9 +866,9 @@ panels.append(
     text_panel(
         2749,
         y,
-        "**Total** = soma entrada+saída no intervalo. **Média/chamada** = tokens ÷ invocações LLM "
-        "(cada «Gerar cláusulas» inexigibilidade = `clausulas_llm`; dispensa usa `fill_tr_slots`). "
-        "TR+DFD sem 2ª passagem IA não gera tokens — use **Gerações OK por tipo** para contar documentos.",
+        "**Tokens** vêm de `fill_tr_slots` (dispensa) ou `clausulas_llm` (inexigibilidade /api/llm). "
+        "Se só «Dispensa rápida» tem tokens, normal/inexig podem não ter usado IA no período ou inexig "
+        "ainda sem deploy de `clausulas_llm`. **ZIPs por tipo** (tabela abaixo) conta documentos de todos os fluxos.",
     )
 )
 y += 3
@@ -972,6 +981,23 @@ panels += [
         decimals=0,
     ),
 ]
+y += 4
+panels.append(
+    prom_table_period(
+        2709,
+        "ZIPs TR+DFD gerados por tipo (período)",
+        y,
+        0,
+        24,
+        4,
+        tr_dfd_ok_by_tipo_period(),
+        value_col="ZIPs",
+        desc=(
+            "Só operation=gerar_tr_e_dfd — 1 por documento. Inclui dispensa normal, rápida e inexigibilidade "
+            "(não depende de tokens LLM)."
+        ),
+    )
+)
 y += 4
 panels.append(
     prom_table_period(
@@ -1504,7 +1530,7 @@ panels.append(
 dash = {
     "annotations": {"list": []},
     "editable": False,
-    "description": "Layout v30 — Gerações OK = operações API; TR+DFD OK ≈ documentos; PromQL período corrigido.",
+    "description": "Layout v31 — ZIPs por tipo; operações sem filtrar other; inexig envia package no LLM.",
     "fiscalYearStartMonth": 0,
     "graphTooltip": 1,
     "id": None,
@@ -1512,13 +1538,13 @@ dash = {
     "panels": panels,
     "refresh": "1m",
     "schemaVersion": 39,
-    "tags": ["docmaster", "backend", "django", "layout-v30"],
+    "tags": ["docmaster", "backend", "django", "layout-v31"],
     "templating": {"list": []},
     "time": {"from": "now-24h", "to": "now"},
     "timezone": "browser",
     "title": "DocMaster — Backend Django",
     "uid": "docmaster-backend",
-    "version": 30,
+    "version": 31,
 }
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -1531,4 +1557,4 @@ if dupes:
     sys.exit(1)
 
 print(f"Repo:  {ROOT}")
-print(f"Wrote: {OUT} ({len(panels)} panels, layout-v30)")
+print(f"Wrote: {OUT} ({len(panels)} panels, layout-v31)")

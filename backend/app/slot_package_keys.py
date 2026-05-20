@@ -24,8 +24,12 @@ ROUTE_TO_SLOT_PACKAGE: dict[str, str] = {
 
 
 def resolve_slot_package_key(payload: dict | None, request) -> str:
-    """Chave explícita no JSON ou inferida pelo Referer do browser."""
-    explicit = str((payload or {}).get("slot_package_key") or "").strip().lower()
+    """Chave explícita no JSON, header ou inferida pelo Referer do browser."""
+    p = payload or {}
+    explicit = str(p.get("slot_package_key") or p.get("package") or "").strip().lower()
+    if not explicit:
+        meta = getattr(request, "META", None) or {}
+        explicit = str(meta.get("HTTP_X_DOCMASTER_PACKAGE") or "").strip().lower()
     if explicit:
         return explicit
     referer = str(getattr(request, "META", {}).get("HTTP_REFERER") or "").strip()

@@ -1656,7 +1656,11 @@ async function onGenerateClauses() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ prompt: fastPrompt, stream: false }),
+        body: JSON.stringify({
+          prompt: fastPrompt,
+          stream: false,
+          slot_package_key: slotPackageKey.value,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       const text = data?.data?.response || data?.data?.text || data?.response || data?.text || '';

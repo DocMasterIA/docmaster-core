@@ -36,8 +36,8 @@ def main() -> int:
         dash = json.loads(DASH.read_text(encoding="utf-8"))
         tags = dash.get("tags") or []
         exprs = json.dumps(dash.get("panels") or [])
-        if "layout-v30" not in tags:
-            errors.append(f"Dashboard sem tag layout-v30 (tags={tags})")
+        if "layout-v31" not in tags:
+            errors.append(f"Dashboard sem tag layout-v31 (tags={tags})")
         if "docmaster_llm_invocations_total" not in exprs:
             errors.append("Dashboard sem métrica docmaster_llm_invocations_total nas queries")
         if "clausulas_llm" not in exprs:
@@ -72,7 +72,7 @@ def main() -> int:
             print(f"  - {e}", file=sys.stderr)
         return 1
 
-    print("OK — observabilidade consistente (layout-v30).")
+    print("OK — observabilidade consistente (layout-v31).")
     return 0
 
 

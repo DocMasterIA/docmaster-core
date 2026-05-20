@@ -56,6 +56,20 @@ docker compose -f docker-compose.pncp.yml logs -f
 curl -s http://127.0.0.1:8012/api/pncp-research/health
 ```
 
+### 4. Backfill do índice local
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8012/api/pncp-research/local-index/backfill" \
+  -H "Content-Type: application/json" \
+  -d '{"months": 12, "max_paginas": null, "tamanho_pagina": 50, "uf": null, "codigo_municipio_ibge": null, "include_items": true}'
+```
+
+Se aparecer `unable to open database file`, reconstrua a imagem (entrypoint corrige permissões em `/data/pncp`):
+
+```bash
+docker compose -f docker-compose.pncp.yml up -d --build --force-recreate
+```
+
 ## Rede
 
 | Contentor | Rede |

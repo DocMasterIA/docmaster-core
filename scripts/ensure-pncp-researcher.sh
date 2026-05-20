@@ -59,5 +59,5 @@ else
 fi
 
 echo ""
-echo "Backfill: POST http://127.0.0.1:8012/local-index/backfill"
+echo "Backfill: POST http://127.0.0.1:8012/api/pncp-research/local-index/backfill"
 echo "Outros serviços: docker compose up -d --no-recreate backend  (não recria o PNCP)"

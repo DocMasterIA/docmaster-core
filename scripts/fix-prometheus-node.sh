@@ -43,8 +43,8 @@ ensure_node_exporter || {
   exit 1
 }
 
-echo "Prometheus — recriar para carregar config/prometheus.yml (job node)..."
-docker compose up -d --force-recreate prometheus
+echo "Prometheus — recriar só o prometheus (--no-deps; não mexe no node_exporter existente)..."
+docker compose up -d --force-recreate --no-deps prometheus
 
 echo "Aguardando API do Prometheus (até 45s)..."
 ready=0

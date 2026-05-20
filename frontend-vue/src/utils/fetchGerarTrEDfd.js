@@ -35,9 +35,13 @@ function errorMessageSuggestsRetry(msg) {
 export async function fetchGerarTrEDfdWithRetry(apiBase, bodyObj, options = {}) {
   const maxAttempts = Math.max(1, Math.min(5, options.maxAttempts ?? defaultMaxAttempts()));
   const url = buildGerarTrEDfdUrl(apiBase);
+  const headers = { 'Content-Type': 'application/json' };
+  const pkg = String(bodyObj?.slot_package_key || bodyObj?.package || '').trim();
+  if (pkg) headers['X-DocMaster-Package'] = pkg;
+
   const requestInit = {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     credentials: 'include',
     body: JSON.stringify(bodyObj),
     signal: options.signal,

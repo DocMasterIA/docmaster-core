@@ -1,41 +1,31 @@
 # Prometheus — DocMaster
 
-## Scrape
+## O que é scrapeado
 
-- **Produção:** `config/prometheus.yml` → job `backend` → `https://api.docmasteria.com.br/metrics` (30s).
-- Não ative dois jobs `backend` ao mesmo tempo (métricas duplicadas).
+| Job | Origem | Métricas |
+|-----|--------|----------|
+| `node` | [node_exporter](https://github.com/prometheus/node_exporter) no host (`:9100`) | CPU, RAM, disco, load, rede |
+| `backend` | `https://api.docmasteria.com.br/metrics` | `docmaster_*`, `django_*` |
 
-## Métricas de negócio (`docmaster_*`)
+## Subir com Docker Compose
 
-| Métrica | Uso |
-|---------|-----|
-| `docmaster_auth_login_total` | Logins por `prefeitura` + `result` |
-| `docmaster_document_operations_total` | Gerações por `operation`, `package`, `tipo_geracao`, `result` |
-| `docmaster_document_operation_duration_seconds` | Histograma de duração (p95 no Grafana) |
-| `docmaster_llm_tokens_total` | Tokens por `tipo_geracao`, `fluxo`, `direction` |
-| `docmaster_metrics_active` | Workers Gunicorn com métricas ativas (~2) |
+```bash
+docker compose up -d node_exporter prometheus grafana
+curl -s http://127.0.0.1:9100/metrics | head
+curl -s http://127.0.0.1:9090/targets   # node e backend devem estar UP
+```
 
-Labels `tipo_geracao`: `dispensa_normal`, `dispensa_rapida`, `inexigibilidade`, `etp`, `other`.
+## Produção (servidor da API)
+
+1. Instale node_exporter no **mesmo host** que roda o backend (systemd ou container com `/proc`, `/sys` montados).
+2. Em `config/prometheus.yml`, adicione o target `SEU_IP:9100` no job `node` (veja exemplo comentado).
+3. Garanta que o Prometheus alcança a porta 9100 (firewall).
 
 ## Grafana
 
 ```bash
-cd ~/docmaster-core
 python3 scripts/build-grafana-dashboard.py
-DOCMASTER_ROOT=~/docmaster-core ./scripts/grafana-reset-dashboard.sh
+./scripts/grafana-reset-dashboard.sh   # tag layout-v41-host
 ```
 
-Dashboard: `DocMaster — Backend Django` (uid `docmaster-backend`, tag `layout-v25`).
-
-Validação local: `python3 scripts/build-grafana-dashboard.py && python3 scripts/validate-observability.py`
-
-**Limpeza de dados (v25):** `docmaster_llm_tokens_total` só aceita fluxos `fill_tr_slots`, `gerar_tr_e_dfd`, `gerar_llm`. Chamadas `/api/llm/*` não incrementam tokens. Painéis por tipo ignoram `other`/`unknown`. Contadores zeram no restart/deploy do backend.
-
-## Explore (sanidade)
-
-```promql
-docmaster_metrics_active
-sum by (tipo_geracao) (docmaster_document_operations_total)
-sum by (tipo_geracao) (increase(docmaster_llm_tokens_total[1h]))
-up{job="backend"}
-```
+Explore: queries em `config/prometheus/explore-queries.md`.

@@ -2,10 +2,15 @@
 """
 Valida o mapa fluxo → métricas Prometheus (código + opcional scrape ao vivo).
 
+Fatores (o que cada contador significa):
+  fill_tr_slots     — POST fill-tr-slots (cláusulas dispensa normal/rápida)
+  gerar_tr_e_dfd    — POST gerar-tr-e-dfd (ZIP TR+DFD+Ofício; todas as modalidades)
+  clausulas_llm     — POST /api/llm/generate (cláusulas inexigibilidade)
+  gerar_llm         — POST gerar-via-llm (ETP livre)
+  tipo_geracao      — label derivado de slot_package_key (não confundir com operation)
+
   python3 scripts/validate-metrics-flows.py
   METRICS_URL=https://api.docmasteria.com.br/metrics python3 scripts/validate-metrics-flows.py
-
-Saída: OK/FALHOU por fluxo de negócio com evidência do /metrics quando URL definida.
 """
 from __future__ import annotations
 
@@ -166,13 +171,24 @@ def _code_checks() -> list[str]:
     if "slot_package_key: slotPackageKey" not in inex:
         errors.append("Inexigibilidade sem slot_package_key no POST /api/llm/generate")
 
-    dash = (ROOT / "config/grafana/provisioning/dashboards/json/docmaster-backend.json").read_text(encoding="utf-8")
-    if "layout-v33" not in dash:
-        errors.append("Dashboard sem tag layout-v33 (corra build-grafana-dashboard.py)")
+    api_src = (ROOT / "backend/app/api.py").read_text(encoding="utf-8")
+    if "if prompt_t or completion_t:" in api_src:
+        errors.append(
+            "api._record_llm_usage_from_response só grava LLM com tokens>0 "
+            "(invocações ficam subcontadas)"
+        )
 
-    for label in ("Média — Dispensa normal", "Média — Dispensa rápida", "Média — Inexigibilidade", "Média — ETP"):
-        if label not in dash:
-            errors.append(f"Dashboard sem painel «{label}»")
+    dash = (ROOT / "config/grafana/provisioning/dashboards/json/docmaster-backend.json").read_text(encoding="utf-8")
+    if "ZIP TR+DFD por família" not in dash:
+        errors.append("Dashboard sem tabela ZIP por tipo_geracao (build-grafana-dashboard.py)")
+    if "Chamadas IA por família" not in dash:
+        errors.append("Dashboard sem tabela IA por tipo_geracao")
+    if "Média — Dispensa" in dash:
+        errors.append("Dashboard ainda tem painéis de média de tokens")
+
+    metrics_src = (ROOT / "backend/app/metrics.py").read_text(encoding="utf-8")
+    if "resolve_slot_package_key({}, request)" not in metrics_src:
+        errors.append("set_request_metrics sem fallback Referer para package genérico")
 
     return errors
 
@@ -185,7 +201,7 @@ def main() -> int:
         for e in code_errors:
             print(f"  ✗ {e}")
     else:
-        print("CÓDIGO — OK (mapa package→tipo, clausulas_llm, rotas frontend, layout-v33)")
+        print("CÓDIGO — OK (instrumentação, mapa fluxos, dashboard ZIP/IA separados)")
 
     metrics_text = _fetch_metrics_text()
     if not metrics_text:

@@ -128,15 +128,15 @@ def _record_llm_usage_from_response(request, fluxo: str, *, usage=None, http_res
                             completion_t = int(tu.get("completion_tokens") or 0)
                 except Exception:
                     pass
-    if prompt_t or completion_t:
-        meta = getattr(request, "docmaster_metrics", None) or {}
-        record_llm_token_usage(
-            fluxo=fluxo,
-            prefeitura=pref,
-            package=str(meta.get("package") or "unknown"),
-            prompt_tokens=max(0, prompt_t),
-            completion_tokens=max(0, completion_t),
-        )
+    meta = getattr(request, "docmaster_metrics", None) or {}
+    # Sempre conta 1 invocação LLM (mesmo sem token_usage no JSON) — média tokens/chamada no Grafana.
+    record_llm_token_usage(
+        fluxo=fluxo,
+        prefeitura=pref,
+        package=str(meta.get("package") or "unknown"),
+        prompt_tokens=max(0, prompt_t),
+        completion_tokens=max(0, completion_t),
+    )
 
 
 def api_login_required(view_func):
@@ -477,13 +477,12 @@ def gerar_via_llm_api(request):
             err = resp.text
         return JsonResponse({"ok": False, "error": err}, status=resp.status_code)
 
-    _record_llm_usage_from_response(request, "gerar_llm", http_response=resp)
-
     content_type = resp.headers.get("content-type", "")
     if "json" in content_type:
         data = resp.json()
         if not data.get("ok"):
             return JsonResponse({"ok": False, "error": data.get("error", "Erro na geração")}, status=500)
+        _record_llm_usage_from_response(request, "gerar_llm", http_response=resp)
         # Caso especial: se no futuro usarmos docx_path compartilhado via volume, poderíamos salvar em DocumentInstance aqui.
         if output == "docx" and data.get("docx_path") and os.path.isfile(data["docx_path"]):
             return FileResponse(
@@ -570,6 +569,7 @@ def gerar_via_llm_api(request):
                 # Não quebra a geração se falhar ao salvar o histórico
                 pass
 
+        _record_llm_usage_from_response(request, "gerar_llm", http_response=resp)
         r = HttpResponse(
             final_path_bytes,
             content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -816,8 +816,6 @@ def gerar_tr_e_dfd_api(request):
             err = resp.text
         return JsonResponse({"ok": False, "error": err}, status=resp.status_code)
 
-    _record_llm_usage_from_response(request, "gerar_tr_e_dfd", http_response=resp)
-
     import base64
     import io
     import zipfile
@@ -850,6 +848,8 @@ def gerar_tr_e_dfd_api(request):
         return JsonResponse({"ok": False, "error": f"ZIP sem arquivo esperado: {e}"}, status=502)
     except Exception as e:
         return JsonResponse({"ok": False, "error": f"ZIP inválido: {e}"}, status=502)
+
+    _record_llm_usage_from_response(request, "gerar_tr_e_dfd", http_response=resp)
 
     tpl = Template.objects.filter(id=template_id).first() if template_id is not None else None
 

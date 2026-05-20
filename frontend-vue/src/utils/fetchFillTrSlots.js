@@ -43,9 +43,13 @@ export function buildFillTrSlotsUrl(apiBase) {
 export async function fetchFillTrSlotsWithRetry(apiBase, bodyObj, options = {}) {
   const maxAttempts = Math.max(1, Math.min(4, options.maxAttempts ?? defaultMaxAttempts()));
   const url = buildFillTrSlotsUrl(apiBase);
+  const headers = { 'Content-Type': 'application/json' };
+  const pkg = String(bodyObj?.slot_package_key || bodyObj?.package || '').trim();
+  if (pkg) headers['X-DocMaster-Package'] = pkg;
+
   const requestInit = {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     credentials: 'include',
     body: JSON.stringify(bodyObj),
     signal: options.signal,

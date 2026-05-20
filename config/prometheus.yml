@@ -1,6 +1,7 @@
 # Prometheus — DocMaster
-# Dashboard: scripts/build-grafana-dashboard.py → layout-v24
-# Sanidade: docmaster_metrics_active, up{job="backend"}, docmaster_document_operations_total
+# Host: job node (node_exporter). App: job backend (/metrics Django).
+# Dashboard: scripts/build-grafana-dashboard.py → layout-v41-host
+
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
@@ -10,7 +11,23 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
-  # Produção: API pública (mesmo endpoint que você abre no browser).
+  # Servidor onde o Docker Compose roda (CPU, RAM, disco, load).
+  - job_name: node
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["node_exporter:9100"]
+        labels:
+          instance: docmaster-host
+
+  # Produção remota: descomente e aponte para o IP:9100 do servidor (node_exporter no host).
+  # - job_name: node
+  #   scrape_interval: 15s
+  #   static_configs:
+  #     - targets: ["SEU_SERVIDOR:9100"]
+  #       labels:
+  #         instance: docmaster-prod
+
+  # API Django (métricas docmaster_* + django_*).
   - job_name: backend
     scheme: https
     metrics_path: /metrics
@@ -20,8 +37,7 @@ scrape_configs:
         labels:
           service: backend
 
-  # Alternativa — backend no mesmo host Docker, porta 8001 publicada.
-  # Descomente SOMENTE se NÃO usar o job HTTPS acima (evita métricas duplicadas).
+  # Backend local (compose com porta 8001 publicada) — não use junto com o job HTTPS acima.
   # - job_name: backend
   #   metrics_path: /metrics
   #   scrape_interval: 15s
@@ -29,13 +45,3 @@ scrape_configs:
   #     - targets: ["host.docker.internal:8001"]
   #       labels:
   #         service: backend
-
-  # Desenvolvimento (docker compose na mesma rede): métricas diretas do llm_api.
-  # Em produção os tokens por prefeitura/fluxo vêm do job backend (docmaster_llm_tokens_total).
-  # - job_name: llm_api
-  #   metrics_path: /metrics
-  #   scrape_interval: 30s
-  #   static_configs:
-  #     - targets: ["llm_api:8002"]
-  #       labels:
-  #         service: llm_api

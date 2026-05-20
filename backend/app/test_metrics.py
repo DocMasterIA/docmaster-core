@@ -1,7 +1,8 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
-from django.test import SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase
 
+from app.api import _record_llm_usage_from_response
 from app.metrics import (
     docmaster_llm_invocations_total,
     docmaster_llm_tokens_total,
@@ -11,6 +12,7 @@ from app.metrics import (
     prefeitura_label,
     prefeitura_label_from_instance,
     record_llm_token_usage,
+    set_request_metrics,
     tenant_label,
 )
 
@@ -147,3 +149,29 @@ class LlmTokenMetricsTests(SimpleTestCase):
         )
         after = docmaster_llm_invocations_total.labels(**labels)._value.get()
         self.assertEqual(after - before, 1.0)
+
+
+class SetRequestMetricsTests(SimpleTestCase):
+    def test_referer_fills_tr_dfd_generico(self):
+        req = RequestFactory().post(
+            "/api/documentos/fill-tr-slots",
+            HTTP_REFERER="https://app.docmasteria.com.br/geracao/dispensa-art-75-ii/compras",
+        )
+        set_request_metrics(req, package="tr_dfd_generico")
+        self.assertEqual(req.docmaster_metrics["package"], "dispensa_75_ii_compras")
+
+
+class RecordLlmUsageFromResponseTests(SimpleTestCase):
+    @patch("app.api.record_llm_token_usage")
+    def test_records_invocation_without_tokens(self, mock_record):
+        request = Mock()
+        request.docmaster_metrics = {"package": "dispensa_75_ii_compras"}
+        with patch("app.api.prefeitura_label_from_request", return_value="Joinville (SC)"):
+            _record_llm_usage_from_response(request, "fill_tr_slots", usage=None)
+        mock_record.assert_called_once_with(
+            fluxo="fill_tr_slots",
+            prefeitura="Joinville (SC)",
+            package="dispensa_75_ii_compras",
+            prompt_tokens=0,
+            completion_tokens=0,
+        )

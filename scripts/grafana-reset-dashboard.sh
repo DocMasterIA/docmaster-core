@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# grafana-reset-dashboard v3 — exige layout-v29 no repo e copia JSON para o volume do contentor.
+# grafana-reset-dashboard v3 — exige layout-v40-minimal no repo.
 #
 #   cd ~/docmaster-core
 #   python3 scripts/build-grafana-dashboard.py
 #   ./scripts/grafana-reset-dashboard.sh
 #
-# NÃO use ~/scripts/grafana-reset-dashboard.sh (cópia antiga sem v29).
+# NÃO use ~/scripts/grafana-reset-dashboard.sh (cópia antiga).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="${DOCMASTER_ROOT:-$SCRIPT_DIR/..}"
 REPO_ROOT="$(cd "$REPO_ROOT" && pwd)"
-REQUIRED_LAYOUT_TAG="${GRAFANA_REQUIRED_LAYOUT:-layout-v33}"
+REQUIRED_LAYOUT_TAG="${GRAFANA_REQUIRED_LAYOUT:-layout-v41-host}"
 
 if [[ "$SCRIPT_DIR" != *"docmaster-core"* ]]; then
   echo "ERRO: este script está em ${SCRIPT_DIR}"
@@ -49,8 +49,8 @@ if ! grep -q "\"${REQUIRED_LAYOUT_TAG}\"" "$REPO_DASH"; then
   exit 1
 fi
 
-if ! grep -q 'clausulas_llm' "$REPO_DASH"; then
-  echo "ERRO: JSON antigo (sem fluxo clausulas_llm). Corra build-grafana-dashboard.py após git pull."
+if ! grep -q 'node_memory_MemAvailable_bytes' "$REPO_DASH"; then
+  echo "ERRO: JSON antigo (sem métricas node_exporter). Corra build-grafana-dashboard.py após git pull."
   exit 1
 fi
 
@@ -160,11 +160,11 @@ if required not in tags:
         "Confirme: git pull, python3 scripts/build-grafana-dashboard.py, "
         "e use docmaster-core/scripts/grafana-reset-dashboard.sh (não cópia em ~/scripts)."
     )
-if len(panels) < 60:
+if len(panels) < 14:
     sys.exit(f"ERRO: dashboard incompleto ({len(panels)} painéis).")
 blob = json.dumps(panels)
-if "clausulas_llm" not in blob:
-    sys.exit("ERRO: painéis sem clausulas_llm — JSON provisionado ainda é antigo.")
+if "node_memory_MemAvailable_bytes" not in blob:
+    sys.exit("ERRO: painéis sem node_exporter — JSON provisionado ainda é antigo.")
 print(f"\nOK — dashboard atualizado ({required}, {len(panels)} painéis).")
 PY
 

@@ -3,7 +3,7 @@
     "list": []
   },
   "editable": false,
-  "description": "Layout v33 — média tokens: query range (fix instant+$__range vazio).",
+  "description": "Métricas host (node) + API docmaster_* (ZIP/IA separados).",
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
@@ -19,7 +19,7 @@
       "id": 299,
       "options": {
         "mode": "markdown",
-        "content": "**Operação (topo)** = foco no período do Grafana: erros, velocidade (p95) e prefeitura. **Totais acumulados** = desde o último restart do backend (contadores zeram no deploy). Tokens LLM: painéis de **média por chamada** (entrada+saída). Zeros em erros/5xx/4xx = verde (sem alerta falso)."
+        "content": "Contadores desde o último restart do backend. ZIP = só `gerar_tr_e_dfd`. IA = `docmaster_llm_invocations_total`. Host = job Prometheus `node`."
       },
       "title": "",
       "type": "text",
@@ -33,8 +33,279 @@
         "x": 0,
         "y": 3
       },
+      "id": 200,
+      "title": "Host (node_exporter)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Média de todos os núcleos (100 − idle).",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 1,
+          "noValue": "0",
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 4
+      },
+      "id": 201,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "100 * (1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[$__rate_interval])))",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        }
+      ],
+      "title": "CPU em uso",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 1,
+          "noValue": "0",
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 4
+      },
+      "id": 202,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        }
+      ],
+      "title": "RAM em uso",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 1,
+          "noValue": "0",
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 4
+      },
+      "id": 203,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "100 * (node_filesystem_avail_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay|aufs|squashfs\"} / node_filesystem_size_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay|aufs|squashfs\"})",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        }
+      ],
+      "title": "Disco livre (/)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "noValue": "0",
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 4
+      },
+      "id": 204,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "node_load1",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        }
+      ],
+      "title": "Load 1m",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Requer scrape do job node ativo.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 1,
+          "noValue": "0",
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 205,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "100 * (1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[$__rate_interval])))",
+          "refId": "A",
+          "range": true,
+          "editorMode": "code",
+          "legendFormat": "CPU %"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))",
+          "refId": "B",
+          "range": true,
+          "editorMode": "code",
+          "legendFormat": "RAM %"
+        }
+      ],
+      "title": "CPU e RAM no tempo",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
       "id": 280,
-      "title": "Operação — período selecionado (erros, velocidade, prefeituras)",
+      "title": "API DocMaster — período",
       "type": "row"
     },
     {
@@ -70,9 +341,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
+        "w": 6,
         "x": 0,
-        "y": 4
+        "y": 17
       },
       "id": 281,
       "options": {
@@ -102,1813 +373,6 @@
           "legendFormat": ""
         }
       ],
-      "title": "Erros de geração",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Tentativas de login sem sucesso (credenciais, bloqueio ou prefeitura).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 10
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 4,
-        "y": 4
-      },
-      "id": 282,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_auth_login_total{result=~\"failure|locked|forbidden_prefeitura\"}[$__range]))",
-          "refId": "A",
-          "range": true,
-          "instant": false,
-          "editorMode": "code",
-          "legendFormat": ""
-        }
-      ],
-      "title": "Falhas de login",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Soma no intervalo selecionado no Grafana.",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 10
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 4
-      },
-      "id": 283,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_platform_events_total{result=\"error\"}[$__range]))",
-          "refId": "A",
-          "range": true,
-          "instant": false,
-          "editorMode": "code",
-          "legendFormat": ""
-        }
-      ],
-      "title": "Erros IA / PNCP",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Cada chamada API com sucesso: fill_tr_slots (Gerar objeto), gerar_tr_e_dfd (ZIP), gerar_llm, etc. Um documento completo costuma somar 2 (slots + TR+DFD). Para contar só ZIPs use «TR+DFD no período» abaixo ou o painel TR+DFD+Ofício nos totais.",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 4
-      },
-      "id": 284,
-      "options": {
-        "colorMode": "none",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_document_operations_total{result=\"success\"}[$__range]))",
-          "refId": "A",
-          "range": true,
-          "instant": false,
-          "editorMode": "code",
-          "legendFormat": ""
-        }
-      ],
-      "title": "Operações OK (período)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Percentil 95 da duração no intervalo do Grafana (requer tráfego recente).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 1,
-          "noValue": "—",
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 4
-      },
-      "id": 285,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "histogram_quantile(0.95, sum(rate(docmaster_document_operation_duration_seconds_bucket{operation=\"fill_tr_slots\",result=\"success\"}[$__rate_interval])) by (le))",
-          "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": ""
-        }
-      ],
-      "title": "p95 Slots IA",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Percentil 95 da duração no intervalo do Grafana (requer tráfego recente).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 1,
-          "noValue": "—",
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 4
-      },
-      "id": 286,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "histogram_quantile(0.95, sum(rate(docmaster_document_operation_duration_seconds_bucket{operation=\"gerar_tr_e_dfd\",result=\"success\"}[$__rate_interval])) by (le))",
-          "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": ""
-        }
-      ],
-      "title": "p95 TR + DFD",
-      "type": "stat"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 8
-      },
-      "id": 275,
-      "title": "Tokens LLM — média por chamada (período)",
-      "type": "row"
-    },
-    {
-      "gridPos": {
-        "h": 3,
-        "w": 24,
-        "x": 0,
-        "y": 9
-      },
-      "id": 2749,
-      "options": {
-        "mode": "markdown",
-        "content": "**Média** = (entrada + saída) ÷ número de chamadas LLM no intervalo. Dispensa: `fill_tr_slots`. Inexigibilidade: `clausulas_llm` (Gerar cláusulas). 0 = nenhuma chamada desse tipo no período selecionado."
-      },
-      "title": "",
-      "type": "text",
-      "transparent": true
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Tokens totais (entrada+saída) ÷ invocações fill_tr_slots / clausulas_llm com tipo dispensa_normal.",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 12
-      },
-      "id": 2761,
-      "options": {
-        "colorMode": "none",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "(sum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"dispensa_normal\"}[$__range])) / clamp_min(sum(increase(docmaster_llm_invocations_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"dispensa_normal\"}[$__range])), 1))",
-          "refId": "A",
-          "range": true,
-          "instant": false,
-          "editorMode": "code",
-          "legendFormat": ""
-        }
-      ],
-      "title": "Média — Dispensa normal",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Ex.: duas gerações com 200 e 400 tokens → média 300.",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 12
-      },
-      "id": 2762,
-      "options": {
-        "colorMode": "none",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "(sum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"dispensa_rapida\"}[$__range])) / clamp_min(sum(increase(docmaster_llm_invocations_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"dispensa_rapida\"}[$__range])), 1))",
-          "refId": "A",
-          "range": true,
-          "instant": false,
-          "editorMode": "code",
-          "legendFormat": ""
-        }
-      ],
-      "title": "Média — Dispensa rápida",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Só após «Gerar cláusulas» (/api/llm, fluxo clausulas_llm). TR+DFD não entra na média.",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 12
-      },
-      "id": 2763,
-      "options": {
-        "colorMode": "none",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "(sum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"inexigibilidade\"}[$__range])) / clamp_min(sum(increase(docmaster_llm_invocations_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"inexigibilidade\"}[$__range])), 1))",
-          "refId": "A",
-          "range": true,
-          "instant": false,
-          "editorMode": "code",
-          "legendFormat": ""
-        }
-      ],
-      "title": "Média — Inexigibilidade",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Soma no intervalo selecionado no Grafana.",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 12
-      },
-      "id": 2764,
-      "options": {
-        "colorMode": "none",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "(sum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"etp\"}[$__range])) / clamp_min(sum(increase(docmaster_llm_invocations_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"etp\"}[$__range])), 1))",
-          "refId": "A",
-          "range": true,
-          "instant": false,
-          "editorMode": "code",
-          "legendFormat": ""
-        }
-      ],
-      "title": "Média — ETP",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Contagem de operações de documento no intervalo, por família (dispensa normal/rápida, inexigibilidade, ETP).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "min": 0,
-          "unit": "none",
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Gerações"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 90
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Tipo de geração"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 420
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 12,
-        "x": 0,
-        "y": 16
-      },
-      "id": 274,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Gerações"
-          }
-        ]
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum(increase(docmaster_document_operations_total{result=\"success\"}[$__range])) by (tipo_geracao), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "format": "table",
-          "editorMode": "code"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true,
-              "tipo_geracao": true,
-              "fluxo": true,
-              "fluxo_label": true,
-              "package": true,
-              "prefeitura": true,
-              "direction": true,
-              "operation": true,
-              "result": true,
-              "output": true,
-              "le": true
-            },
-            "renameByName": {
-              "tipo": "Tipo de geração",
-              "fluxo_label": "Fluxo",
-              "Value": "Gerações"
-            }
-          }
-        }
-      ],
-      "title": "Gerações OK por tipo (período)",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Falhas de geração agrupadas por tipo_geracao.",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "min": 0,
-          "unit": "none",
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Erros"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 90
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Tipo de geração"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 420
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 12,
-        "x": 12,
-        "y": 16
-      },
-      "id": 2741,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Erros"
-          }
-        ]
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum(increase(docmaster_document_operations_total{result=\"error\"}[$__range])) by (tipo_geracao), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "format": "table",
-          "editorMode": "code"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true,
-              "tipo_geracao": true,
-              "fluxo": true,
-              "fluxo_label": true,
-              "package": true,
-              "prefeitura": true,
-              "direction": true,
-              "operation": true,
-              "result": true,
-              "output": true,
-              "le": true
-            },
-            "renameByName": {
-              "tipo": "Tipo de geração",
-              "fluxo_label": "Fluxo",
-              "Value": "Erros"
-            }
-          }
-        }
-      ],
-      "title": "Erros por tipo (período)",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Operações concluídas com sucesso no intervalo, por município.",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "min": 0,
-          "unit": "none"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Prefeitura"
-            },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "staff": {
-                        "text": "Equipe DocMaster (staff)"
-                      },
-                      "sem_prefeitura": {
-                        "text": "Sem prefeitura"
-                      },
-                      "anonymous": {
-                        "text": "Não identificado"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 8,
-        "x": 0,
-        "y": 21
-      },
-      "id": 287,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Gerações"
-          }
-        ]
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_document_operations_total{result=\"success\"}[$__range])) by (prefeitura)",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "format": "table",
-          "editorMode": "code"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true
-            },
-            "renameByName": {
-              "prefeitura": "Prefeitura",
-              "nome": "Prefeitura",
-              "Value": "Gerações"
-            }
-          }
-        }
-      ],
-      "title": "Gerações OK por prefeitura (período)",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Falhas ao gerar documentos (resposta ok=false ou exceção).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "min": 0,
-          "unit": "none"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Prefeitura"
-            },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "staff": {
-                        "text": "Equipe DocMaster (staff)"
-                      },
-                      "sem_prefeitura": {
-                        "text": "Sem prefeitura"
-                      },
-                      "anonymous": {
-                        "text": "Não identificado"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 8,
-        "x": 8,
-        "y": 21
-      },
-      "id": 288,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Erros"
-          }
-        ]
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_document_operations_total{result=\"error\"}[$__range])) by (prefeitura)",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "format": "table",
-          "editorMode": "code"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true
-            },
-            "renameByName": {
-              "prefeitura": "Prefeitura",
-              "nome": "Prefeitura",
-              "Value": "Erros"
-            }
-          }
-        }
-      ],
-      "title": "Erros de geração por prefeitura (período)",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Senha inválida, bloqueio, prefeitura incorreta, etc.",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "min": 0,
-          "unit": "none"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Prefeitura"
-            },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "staff": {
-                        "text": "Equipe DocMaster (staff)"
-                      },
-                      "sem_prefeitura": {
-                        "text": "Sem prefeitura"
-                      },
-                      "anonymous": {
-                        "text": "Não identificado"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 8,
-        "x": 16,
-        "y": 21
-      },
-      "id": 289,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Falhas"
-          }
-        ]
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_auth_login_total{result=~\"failure|locked|forbidden_prefeitura\"}[$__range])) by (prefeitura)",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "format": "table",
-          "editorMode": "code"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true
-            },
-            "renameByName": {
-              "prefeitura": "Prefeitura",
-              "nome": "Prefeitura",
-              "Value": "Falhas"
-            }
-          }
-        }
-      ],
-      "title": "Falhas de login por prefeitura (período)",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Proporção de gerações TR+DFD+Ofício que concluíram com sucesso no intervalo.",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "unit": "none"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byRegexp",
-              "options": ".*"
-            },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "success": {
-                        "text": "Sucesso"
-                      },
-                      "error": {
-                        "text": "Erro"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 8,
-        "x": 0,
-        "y": 28
-      },
-      "id": 290,
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "values": [
-            "value",
-            "percent"
-          ]
-        },
-        "pieType": "donut",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "tooltip": {
-          "mode": "single"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\"}[$__range]))",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "legendFormat": "{{result}}",
-          "editorMode": "code"
-        }
-      ],
-      "title": "TR + DFD — sucesso vs erro (período)",
-      "type": "piechart"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Onde mais falhou no intervalo — priorize correção nos maiores valores.",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "min": 0,
-          "unit": "none",
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 16,
-        "x": 8,
-        "y": 28
-      },
-      "id": 291,
-      "options": {
-        "displayMode": "gradient",
-        "minVizHeight": 16,
-        "namePlacement": "left",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showUnfilled": true,
-        "valueMode": "color",
-        "legend": {
-          "displayMode": "hidden"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"fill_tr_slots\",result=\"error\"}[$__range]))",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code",
-          "legendFormat": "Slots IA"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"error\"}[$__range]))",
-          "refId": "B",
-          "instant": true,
-          "range": false,
-          "editorMode": "code",
-          "legendFormat": "TR + DFD"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_llm\",result=\"error\"}[$__range]))",
-          "refId": "C",
-          "instant": true,
-          "range": false,
-          "editorMode": "code",
-          "legendFormat": "Gerar LLM"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",result=\"error\"}[$__range]))",
-          "refId": "D",
-          "instant": true,
-          "range": false,
-          "editorMode": "code",
-          "legendFormat": "Proxy LLM"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_platform_events_total{module=~\"pncp_.*\",result=\"error\"}[$__range]))",
-          "refId": "E",
-          "instant": true,
-          "range": false,
-          "editorMode": "code",
-          "legendFormat": "PNCP"
-        }
-      ],
-      "title": "Erros por tipo de operação (período)",
-      "type": "bargauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Tempo até concluir a operação (p95). Quanto menor, mais rápido para o usuário.",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 1,
-          "unit": "s"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Prefeitura"
-            },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "staff": {
-                        "text": "Equipe DocMaster (staff)"
-                      },
-                      "sem_prefeitura": {
-                        "text": "Sem prefeitura"
-                      },
-                      "anonymous": {
-                        "text": "Não identificado"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "p95"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 80
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 14,
-        "x": 0,
-        "y": 35
-      },
-      "id": 292,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "p95"
-          }
-        ]
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "histogram_quantile(0.95, sum(rate(docmaster_document_operation_duration_seconds_bucket{operation=\"gerar_tr_e_dfd\",result=\"success\"}[$__rate_interval])) by (le, prefeitura))",
-          "refId": "A",
-          "instant": false,
-          "range": true,
-          "format": "table",
-          "editorMode": "code"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true,
-              "le": true
-            },
-            "renameByName": {
-              "prefeitura": "Prefeitura",
-              "Value": "p95"
-            }
-          }
-        }
-      ],
-      "title": "Rapidez TR + DFD por prefeitura (p95 no período)",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Falhas em chamadas ao LLM, análise ou serviços PNCP.",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "min": 0,
-          "unit": "none"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Prefeitura"
-            },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "staff": {
-                        "text": "Equipe DocMaster (staff)"
-                      },
-                      "sem_prefeitura": {
-                        "text": "Sem prefeitura"
-                      },
-                      "anonymous": {
-                        "text": "Não identificado"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 10,
-        "x": 14,
-        "y": 35
-      },
-      "id": 293,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Erros"
-          }
-        ]
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_platform_events_total{result=\"error\"}[$__range])) by (prefeitura)",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "format": "table",
-          "editorMode": "code"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true
-            },
-            "renameByName": {
-              "prefeitura": "Prefeitura",
-              "nome": "Prefeitura",
-              "Value": "Erros"
-            }
-          }
-        }
-      ],
-      "title": "Erros IA / PNCP por prefeitura (período)",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Quanto menor a linha, mais rápido o fluxo naquele momento.",
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 24,
-        "x": 0,
-        "y": 41
-      },
-      "id": 294,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "histogram_quantile(0.95, sum(rate(docmaster_document_operation_duration_seconds_bucket{operation=\"fill_tr_slots\",result=\"success\"}[$__rate_interval])) by (le))",
-          "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "Slots IA"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "histogram_quantile(0.95, sum(rate(docmaster_document_operation_duration_seconds_bucket{operation=\"gerar_tr_e_dfd\",result=\"success\"}[$__rate_interval])) by (le))",
-          "refId": "B",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "TR + DFD"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "histogram_quantile(0.95, sum(rate(docmaster_document_operation_duration_seconds_bucket{operation=\"gerar_llm\",result=\"success\"}[$__rate_interval])) by (le))",
-          "refId": "C",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "Gerar LLM"
-        }
-      ],
-      "title": "Rapidez ao longo do tempo (p95)",
-      "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 48
-      },
-      "id": 300,
-      "title": "Totais acumulados (desde o último restart do backend)",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 0,
-        "y": 49
-      },
-      "id": 301,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(docmaster_document_operations_total{operation=\"fill_tr_slots\",result=\"success\"})",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
-        }
-      ],
-      "title": "IA — preencher slots",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 4,
-        "y": 49
-      },
-      "id": 302,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(docmaster_document_operations_total{operation=\"gerar_llm\",result=\"success\"})",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
-        }
-      ],
-      "title": "Gerar via LLM",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 49
-      },
-      "id": 303,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"success\"})",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
-        }
-      ],
-      "title": "TR + DFD + Ofício",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 49
-      },
-      "id": 304,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(docmaster_document_instances_created_total)",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
-        }
-      ],
-      "title": "Docs salvos",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 49
-      },
-      "id": 305,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(docmaster_auth_login_total{result=\"success\"})",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
-        }
-      ],
-      "title": "Logins OK",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 49
-      },
-      "id": 306,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(docmaster_document_operations_total{result=\"error\"})",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
-        }
-      ],
       "title": "Erros geração",
       "type": "stat"
     },
@@ -1917,398 +381,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Exige backend com label prefeitura (nome + UF). Métrica antiga gravava só a UF (ex.: SC). Após deploy do backend, faça login de novo para aparecer \"Joinville (SC)\".",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "min": 0,
-          "unit": "none"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Prefeitura"
-            },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "staff": {
-                        "text": "Equipe DocMaster (staff)"
-                      },
-                      "sem_prefeitura": {
-                        "text": "Sem prefeitura"
-                      },
-                      "anonymous": {
-                        "text": "Não identificado"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 53
-      },
-      "id": 332,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Logins"
-          }
-        ]
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(label_replace(\n  label_replace(\n    label_replace(\n      docmaster_auth_login_total{result=\"success\"},\n      \"nome\", \"$1\", \"tenant\", \"(.+)\"\n    ),\n    \"nome\", \"$1\", \"prefeitura\", \"(.+)\"\n  ),\n  \"nome\", \"Só UF ($1) — refaça login após deploy\", \"nome\", \"^([A-Z]{2})$\"\n)) by (nome)",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "format": "table",
-          "editorMode": "code"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true
-            },
-            "renameByName": {
-              "prefeitura": "Prefeitura",
-              "nome": "Prefeitura",
-              "Value": "Logins"
-            }
-          }
-        }
-      ],
-      "title": "Logins OK — por prefeitura (total acumulado)",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Detalhe por chave package (cada formulário). Séries antigas sem distinção rápida/normal podem aparecer só como chave técnica.",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "min": 0,
-          "unit": "none",
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Gerações"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 90
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Tipo de geração"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 420
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 8,
-        "x": 12,
-        "y": 53
-      },
-      "id": 341,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Gerações"
-          }
-        ]
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(docmaster_document_operations_total{result=\"success\",package!~\"unknown|other\"}, \"tipo\", \"$1\", \"package\", \"(.+)\"), \"tipo\", \"Dispensa normal · Art. 75-I · Veículos\", \"package\", \"dispensa_75_i_manutencao_veiculos\"), \"tipo\", \"Dispensa normal · Art. 75-I · Obras e engenharia\", \"package\", \"dispensa_75_i_obras_engenharia\"), \"tipo\", \"Dispensa normal · Art. 75-II · Compras\", \"package\", \"dispensa_75_ii_compras\"), \"tipo\", \"Dispensa normal · Art. 75-II · Serviços\", \"package\", \"dispensa_75_ii_servicos\"), \"tipo\", \"Dispensa normal · Art. 75-II · Compras com serviços\", \"package\", \"dispensa_75_ii_compras_servicos_inclusos\"), \"tipo\", \"Dispensa rápida · Art. 75-I · Veículos\", \"package\", \"dispensa_rapida_75_i_manutencao_veiculos\"), \"tipo\", \"Dispensa rápida · Art. 75-I · Obras e engenharia\", \"package\", \"dispensa_rapida_75_i_obras_engenharia\"), \"tipo\", \"Dispensa rápida · Art. 75-II · Compras\", \"package\", \"dispensa_rapida_75_ii_compras\"), \"tipo\", \"Dispensa rápida · Art. 75-II · Serviços\", \"package\", \"dispensa_rapida_75_ii_servicos\"), \"tipo\", \"Dispensa rápida · Art. 75-II · Compras com serviços\", \"package\", \"dispensa_rapida_75_ii_compras_servicos_inclusos\"), \"tipo\", \"Inexigibilidade · Art. 74-I · Show artístico / veículos\", \"package\", \"inexigibilidade_74_i_manutencao_veiculos\"), \"tipo\", \"Inexigibilidade · Art. 74-I · Fornecedor exclusivo\", \"package\", \"inexigibilidade_74_i_fornecedor_exclusivo\")) by (tipo)",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "format": "table",
-          "editorMode": "code"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true,
-              "tipo_geracao": true,
-              "fluxo": true,
-              "fluxo_label": true,
-              "package": true,
-              "prefeitura": true,
-              "direction": true,
-              "operation": true,
-              "result": true,
-              "output": true,
-              "le": true
-            },
-            "renameByName": {
-              "tipo": "Tipo de geração",
-              "fluxo_label": "Fluxo",
-              "Value": "Gerações"
-            }
-          }
-        }
-      ],
-      "title": "Gerações por pacote (total acumulado)",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Totais desde o último restart, agrupados por tipo_geracao.",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "min": 0,
-          "unit": "none",
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Total"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 90
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Tipo de geração"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 420
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 4,
-        "x": 20,
-        "y": 53
-      },
-      "id": 342,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Total"
-          }
-        ]
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum(docmaster_document_operations_total{result=\"success\"}) by (tipo_geracao), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "format": "table",
-          "editorMode": "code"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true,
-              "tipo_geracao": true,
-              "fluxo": true,
-              "fluxo_label": true,
-              "package": true,
-              "prefeitura": true,
-              "direction": true,
-              "operation": true,
-              "result": true,
-              "output": true,
-              "le": true
-            },
-            "renameByName": {
-              "tipo": "Tipo de geração",
-              "fluxo_label": "Fluxo",
-              "Value": "Total"
-            }
-          }
-        }
-      ],
-      "title": "Gerações por tipo (total acumulado)",
-      "type": "table"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 60
-      },
-      "id": 3010,
-      "title": "No período selecionado no Grafana",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Soma no intervalo selecionado no Grafana.",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 61
-      },
-      "id": 309,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_document_instances_created_total[$__range]))",
-          "refId": "A",
-          "range": true,
-          "instant": false,
-          "editorMode": "code",
-          "legendFormat": ""
-        }
-      ],
-      "title": "Documentos salvos (período)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Igual ao painel «Operações OK» no topo da secção Operação.",
+      "description": "Dispensa normal/rápida/inexig. — 1 por geração de documento (ZIP).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -2321,113 +394,11 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 61
+        "y": 17
       },
-      "id": 307,
+      "id": 282,
       "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_document_operations_total{result=\"success\"}[$__range]))",
-          "refId": "A",
-          "range": true,
-          "instant": false,
-          "editorMode": "code",
-          "legendFormat": ""
-        }
-      ],
-      "title": "Operações API OK (período)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Soma no intervalo selecionado no Grafana.",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 61
-      },
-      "id": 331,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_auth_login_total{result=\"success\"}[$__range]))",
-          "refId": "A",
-          "range": true,
-          "instant": false,
-          "editorMode": "code",
-          "legendFormat": ""
-        }
-      ],
-      "title": "Logins OK (período)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "≈ número de ZIPs TR+DFD+Ofício gerados com sucesso (1 por clique em gerar documento).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 61
-      },
-      "id": 3311,
-      "options": {
-        "colorMode": "value",
+        "colorMode": "none",
         "graphMode": "none",
         "justifyMode": "center",
         "reduceOptions": {
@@ -2453,7 +424,7 @@
           "legendFormat": ""
         }
       ],
-      "title": "TR+DFD OK (período)",
+      "title": "ZIP TR+DFD OK",
       "type": "stat"
     },
     {
@@ -2461,7 +432,121 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Uma barra por tipo de operação no intervalo do Grafana. A soma pode ser maior que «Operações geração OK»: um TR+DFD costuma contar também fill_tr_slots.",
+      "description": "Só dispensa (normal/rápida) — botão Gerar cláusulas via fill-tr-slots.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "noValue": "0",
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 17
+      },
+      "id": 283,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(docmaster_document_operations_total{operation=\"fill_tr_slots\",result=\"success\"}[$__range]))",
+          "refId": "A",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
+        }
+      ],
+      "title": "Fill-tr-slots OK",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Soma no intervalo selecionado no Grafana.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "noValue": "0",
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 17
+      },
+      "id": 284,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(docmaster_auth_login_total{result=\"success\"}[$__range]))",
+          "refId": "A",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
+        }
+      ],
+      "title": "Logins OK",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "id": 275,
+      "title": "Detalhe no período",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "fill_tr_slots = cláusulas (dispensa). gerar_tr_e_dfd = ZIP. gerar_llm = ETP.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -2474,10 +559,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
-        "w": 24,
+        "h": 5,
+        "w": 12,
         "x": 0,
-        "y": 65
+        "y": 22
       },
       "id": 3071,
       "options": {
@@ -2514,7 +599,7 @@
           "editorMode": "code"
         }
       ],
-      "title": "Operações no período (por tipo)",
+      "title": "Sucesso por operação API",
       "type": "bargauge"
     },
     {
@@ -2522,214 +607,73 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Cada ponto são gerações naquele intervalo de tempo. Zero = nenhuma naquele minuto ou hora.",
+      "description": "Uma linha por modalidade — só geração de documento (gerar_tr_e_dfd), não fill-tr-slots.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
+          "min": 0,
+          "unit": "none",
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ZIP"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tipo de geração"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 420
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 72
-      },
-      "id": 308,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"fill_tr_slots\",result=\"success\"}[$__interval]))",
-          "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "Slots IA"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_llm\",result=\"success\"}[$__interval]))",
-          "refId": "B",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "LLM"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"success\"}[$__interval]))",
-          "refId": "C",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "TR+DFD"
-        }
-      ],
-      "title": "Gerações ao longo do tempo (por intervalo)",
-      "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 80
-      },
-      "id": 310,
-      "title": "Inteligência artificial",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 81
-      },
-      "id": 311,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(docmaster_platform_events_total{module=\"llm\",result=\"success\"})",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
-        }
-      ],
-      "title": "LLM OK (total)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 81
-      },
-      "id": 312,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(docmaster_platform_events_total{module=\"analise\",result=\"success\"})",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
-        }
-      ],
-      "title": "Análise RAG (total)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
+        "h": 5,
         "w": 6,
         "x": 12,
-        "y": 81
+        "y": 22
       },
-      "id": 313,
+      "id": 274,
       "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "show": false
         },
-        "textMode": "auto"
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "ZIP"
+          }
+        ]
       },
       "targets": [
         {
@@ -2737,49 +681,115 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(docmaster_platform_events_total{module=~\"llm|analise\",result=\"error\"})",
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum(increase(docmaster_document_operations_total{result=\"success\",operation=\"gerar_tr_e_dfd\"}[$__range])) by (tipo_geracao), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
           "refId": "A",
           "instant": true,
           "range": false,
+          "format": "table",
           "editorMode": "code"
         }
       ],
-      "title": "Erros IA (total)",
-      "type": "stat"
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "tipo_geracao": true,
+              "fluxo": true,
+              "fluxo_label": true,
+              "package": true,
+              "prefeitura": true,
+              "direction": true,
+              "operation": true,
+              "result": true,
+              "output": true,
+              "le": true
+            },
+            "renameByName": {
+              "tipo": "Tipo de geração",
+              "fluxo_label": "Fluxo",
+              "Value": "ZIP"
+            }
+          }
+        }
+      ],
+      "title": "ZIP TR+DFD por família",
+      "type": "table"
     },
     {
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
+      "description": "fill_tr_slots (dispensa), clausulas_llm (inexig.), gerar_llm (ETP).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
+          "min": 0,
+          "unit": "none",
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IA"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tipo de geração"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 420
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
-        "h": 4,
+        "h": 5,
         "w": 6,
         "x": 18,
-        "y": 81
+        "y": 22
       },
-      "id": 314,
+      "id": 276,
       "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "show": false
         },
-        "textMode": "auto"
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "IA"
+          }
+        ]
       },
       "targets": [
         {
@@ -2787,124 +797,42 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(docmaster_platform_events_total{module=~\"pncp_.*\",result=\"success\"})",
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum(increase(docmaster_llm_invocations_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\"}[$__range])) by (tipo_geracao), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
           "refId": "A",
           "instant": true,
           "range": false,
+          "format": "table",
           "editorMode": "code"
         }
       ],
-      "title": "PNCP OK (total)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 0,
-        "y": 85
-      },
-      "id": 315,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
+      "transformations": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",action=\"planner\"}[$__interval]))",
-          "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "Planner"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",action=\"generate\"}[$__interval]))",
-          "refId": "B",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "Generate"
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "tipo_geracao": true,
+              "fluxo": true,
+              "fluxo_label": true,
+              "package": true,
+              "prefeitura": true,
+              "direction": true,
+              "operation": true,
+              "result": true,
+              "output": true,
+              "le": true
+            },
+            "renameByName": {
+              "tipo": "Tipo de geração",
+              "fluxo_label": "Fluxo",
+              "Value": "IA"
+            }
+          }
         }
       ],
-      "title": "LLM no período",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 12,
-        "y": 85
-      },
-      "id": 316,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "histogram_quantile(0.95, sum(rate(docmaster_document_operation_duration_seconds_bucket{operation=\"fill_tr_slots\"}[$__rate_interval])) by (le))",
-          "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "Slots"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "histogram_quantile(0.95, sum(rate(docmaster_document_operation_duration_seconds_bucket{operation=\"gerar_llm\"}[$__rate_interval])) by (le))",
-          "refId": "B",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "LLM"
-        }
-      ],
-      "title": "Duração IA p95",
-      "type": "timeseries"
+      "title": "Chamadas IA por família",
+      "type": "table"
     },
     {
       "collapsed": false,
@@ -2912,253 +840,18 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 92
-      },
-      "id": 320,
-      "title": "PNCP",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 8,
-        "x": 0,
-        "y": 93
-      },
-      "id": 321,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(docmaster_platform_events_total{module=\"pncp_cotacao\",result=\"success\"})",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
-        }
-      ],
-      "title": "Cotações OK",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 8,
-        "x": 8,
-        "y": 93
-      },
-      "id": 322,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(docmaster_platform_events_total{module=\"pncp_cotacao\",action=\"relatorio_pdf\",result=\"success\"})",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
-        }
-      ],
-      "title": "PDF relatório",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 8,
-        "x": 16,
-        "y": 93
-      },
-      "id": 323,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(docmaster_platform_events_total{module=\"pncp_research\",result=\"success\"})",
-          "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
-        }
-      ],
-      "title": "Research OK",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 24,
-        "x": 0,
-        "y": 97
-      },
-      "id": 325,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"pncp_cotacao\"}[$__interval]))",
-          "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "Cotações"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_platform_events_total{module=\"pncp_research\"}[$__interval]))",
-          "refId": "B",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "Research"
-        }
-      ],
-      "title": "PNCP no período",
-      "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 104
+        "y": 27
       },
       "id": 350,
-      "title": "Infraestrutura — scrape Prometheus e API",
+      "title": "Saúde",
       "type": "row"
-    },
-    {
-      "gridPos": {
-        "h": 3,
-        "w": 24,
-        "x": 0,
-        "y": 105
-      },
-      "id": 349,
-      "options": {
-        "mode": "markdown",
-        "content": "Esta secção usa o **mesmo job Prometheus `backend`** que o resto do dashboard (`config/prometheus.yml` → /metrics). **Backend UP** vem do Prometheus (`up`), não do Django. Pedidos HTTP excluem o scrape de `/metrics`. Duração p95 usa `docmaster_document_operation_duration_seconds` (igual à secção Operação). O endpoint Django **não** exporta CPU/RSS do processo."
-      },
-      "title": "",
-      "type": "text",
-      "transparent": true
     },
     {
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "1 = Prometheus alcança o target /metrics. 0 = scrape em baixo.",
+      "description": "1 = node_exporter alcançável.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -3186,9 +879,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
+        "w": 6,
         "x": 0,
-        "y": 108
+        "y": 28
       },
       "id": 351,
       "options": {
@@ -3210,14 +903,14 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max(up)",
+          "expr": "max(up{job=\"node\"})",
           "refId": "A",
           "instant": true,
           "range": false,
           "editorMode": "code"
         }
       ],
-      "title": "Scrape UP",
+      "title": "Node scrape",
       "type": "stat"
     },
     {
@@ -3225,7 +918,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Workers Gunicorn com docmaster_* (esperado ≈2).",
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -3253,9 +946,76 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 4,
-        "y": 108
+        "w": 6,
+        "x": 6,
+        "y": 28
+      },
+      "id": 352,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(up{job=\"backend\"})",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        }
+      ],
+      "title": "API scrape",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Consulta instantânea: total atual do contador (independente do intervalo do Grafana).",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "noValue": "0",
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 28
       },
       "id": 355,
       "options": {
@@ -3292,58 +1052,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Mesma métrica do topo: soma de operações API OK (pode ser > nº de documentos).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 108
-      },
-      "id": 352,
-      "options": {
-        "colorMode": "none",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_document_operations_total{result=\"success\"}[$__range]))",
-          "refId": "A",
-          "range": true,
-          "instant": false,
-          "editorMode": "code",
-          "legendFormat": ""
-        }
-      ],
-      "title": "Gerações OK (período)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Zero é bom. Sobe com timeout proxy, 502, crash.",
+      "description": "Soma no intervalo selecionado no Grafana.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -3371,9 +1080,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 108
+        "w": 6,
+        "x": 18,
+        "y": 28
       },
       "id": 353,
       "options": {
@@ -3403,275 +1112,8 @@
           "legendFormat": ""
         }
       ],
-      "title": "5xx (período)",
+      "title": "HTTP 5xx",
       "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Zero é bom. Inclui 401/403/404.",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 10
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 108
-      },
-      "id": 354,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(django_http_responses_total_by_status_total{status=~\"4..\"}[$__range]))",
-          "refId": "A",
-          "range": true,
-          "instant": false,
-          "editorMode": "code",
-          "legendFormat": ""
-        }
-      ],
-      "title": "4xx (período)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Zero é bom. Falhas em gerar-tr-e-dfd, fill-tr-slots, etc.",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 10
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 108
-      },
-      "id": 358,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_document_operations_total{result=\"error\"}[$__range]))",
-          "refId": "A",
-          "range": true,
-          "instant": false,
-          "editorMode": "code",
-          "legendFormat": ""
-        }
-      ],
-      "title": "Erros docmaster (período)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Histograma de negócio — visível assim que houver tráfego real (não depende de django_http_latency).",
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 14,
-        "x": 0,
-        "y": 112
-      },
-      "id": 356,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "histogram_quantile(0.95, sum(rate(docmaster_document_operation_duration_seconds_bucket{operation=\"fill_tr_slots\",result=\"success\"}[$__rate_interval])) by (le))",
-          "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "Slots IA"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "histogram_quantile(0.95, sum(rate(docmaster_document_operation_duration_seconds_bucket{operation=\"gerar_tr_e_dfd\",result=\"success\"}[$__rate_interval])) by (le))",
-          "refId": "B",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "TR + DFD"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "histogram_quantile(0.95, sum(rate(docmaster_document_operation_duration_seconds_bucket{operation=\"gerar_llm\",result=\"success\"}[$__rate_interval])) by (le))",
-          "refId": "C",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "Gerar LLM"
-        }
-      ],
-      "title": "Duração p95 geração (docmaster)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Tendência no intervalo do Grafana (cada ponto = bucket $__interval).",
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0,
-          "noValue": "0",
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 10,
-        "x": 14,
-        "y": 112
-      },
-      "id": 357,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(django_http_responses_total_by_status_total{status=~\"5..\"}[$__interval]))",
-          "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "5xx"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(django_http_responses_total_by_status_total{status=~\"4..\"}[$__interval]))",
-          "refId": "B",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "4xx"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_document_operations_total{result=\"error\"}[$__interval]))",
-          "refId": "C",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "Erros geração"
-        }
-      ],
-      "title": "HTTP e erros no tempo",
-      "type": "timeseries"
     }
   ],
   "refresh": "1m",
@@ -3680,7 +1122,7 @@
     "docmaster",
     "backend",
     "django",
-    "layout-v33"
+    "layout-v41-host"
   ],
   "templating": {
     "list": []
@@ -3692,5 +1134,5 @@
   "timezone": "browser",
   "title": "DocMaster — Backend Django",
   "uid": "docmaster-backend",
-  "version": 33
+  "version": 41
 }

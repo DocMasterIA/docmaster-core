@@ -219,8 +219,15 @@ def result_from_response(response) -> str:
 
 
 def set_request_metrics(request, *, package: str = "", output: str = "") -> None:
+    pkg = normalize_package_key(package)
+    if pkg in ("unknown", "other", "tr_dfd_generico"):
+        from backend.app.slot_package_keys import resolve_slot_package_key
+
+        resolved = resolve_slot_package_key({}, request)
+        if resolved:
+            pkg = normalize_package_key(resolved)
     request.docmaster_metrics = {
-        "package": normalize_package_key(package),
+        "package": pkg,
         "output": (output or "n/a").strip().lower()[:16],
     }
 

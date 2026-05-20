@@ -3,7 +3,7 @@
     "list": []
   },
   "editable": false,
-  "description": "Layout v32 — só média tokens/chamada por tipo; sem tabelas ZIP/fluxo duplicadas.",
+  "description": "Layout v33 — média tokens: query range (fix instant+$__range vazio).",
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
@@ -96,9 +96,10 @@
           },
           "expr": "sum(increase(docmaster_document_operations_total{result=\"error\"}[$__range]))",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "Erros de geração",
@@ -163,9 +164,10 @@
           },
           "expr": "sum(increase(docmaster_auth_login_total{result=~\"failure|locked|forbidden_prefeitura\"}[$__range]))",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "Falhas de login",
@@ -230,9 +232,10 @@
           },
           "expr": "sum(increase(docmaster_platform_events_total{result=\"error\"}[$__range]))",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "Erros IA / PNCP",
@@ -280,9 +283,10 @@
           },
           "expr": "sum(increase(docmaster_document_operations_total{result=\"success\"}[$__range]))",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "Operações OK (período)",
@@ -458,9 +462,10 @@
           },
           "expr": "(sum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"dispensa_normal\"}[$__range])) / clamp_min(sum(increase(docmaster_llm_invocations_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"dispensa_normal\"}[$__range])), 1))",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "Média — Dispensa normal",
@@ -508,9 +513,10 @@
           },
           "expr": "(sum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"dispensa_rapida\"}[$__range])) / clamp_min(sum(increase(docmaster_llm_invocations_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"dispensa_rapida\"}[$__range])), 1))",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "Média — Dispensa rápida",
@@ -558,9 +564,10 @@
           },
           "expr": "(sum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"inexigibilidade\"}[$__range])) / clamp_min(sum(increase(docmaster_llm_invocations_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"inexigibilidade\"}[$__range])), 1))",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "Média — Inexigibilidade",
@@ -608,9 +615,10 @@
           },
           "expr": "(sum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"etp\"}[$__range])) / clamp_min(sum(increase(docmaster_llm_invocations_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"etp\"}[$__range])), 1))",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "Média — ETP",
@@ -2286,9 +2294,10 @@
           },
           "expr": "sum(increase(docmaster_document_instances_created_total[$__range]))",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "Documentos salvos (período)",
@@ -2336,9 +2345,10 @@
           },
           "expr": "sum(increase(docmaster_document_operations_total{result=\"success\"}[$__range]))",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "Operações API OK (período)",
@@ -2386,9 +2396,10 @@
           },
           "expr": "sum(increase(docmaster_auth_login_total{result=\"success\"}[$__range]))",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "Logins OK (período)",
@@ -2436,9 +2447,10 @@
           },
           "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"success\"}[$__range]))",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "TR+DFD OK (período)",
@@ -3317,9 +3329,10 @@
           },
           "expr": "sum(increase(docmaster_document_operations_total{result=\"success\"}[$__range]))",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "Gerações OK (período)",
@@ -3384,9 +3397,10 @@
           },
           "expr": "sum(increase(django_http_responses_total_by_status_total{status=~\"5..\"}[$__range]))",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "5xx (período)",
@@ -3451,9 +3465,10 @@
           },
           "expr": "sum(increase(django_http_responses_total_by_status_total{status=~\"4..\"}[$__range]))",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "4xx (período)",
@@ -3518,9 +3533,10 @@
           },
           "expr": "sum(increase(docmaster_document_operations_total{result=\"error\"}[$__range]))",
           "refId": "A",
-          "instant": true,
-          "range": false,
-          "editorMode": "code"
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
         }
       ],
       "title": "Erros docmaster (período)",
@@ -3664,7 +3680,7 @@
     "docmaster",
     "backend",
     "django",
-    "layout-v32"
+    "layout-v33"
   ],
   "templating": {
     "list": []
@@ -3676,5 +3692,5 @@
   "timezone": "browser",
   "title": "DocMaster — Backend Django",
   "uid": "docmaster-backend",
-  "version": 32
+  "version": 33
 }

@@ -96,6 +96,24 @@ def instant(expr, ref="A", legend: str | None = None):
     return t
 
 
+def period_range(expr, ref="A"):
+    """
+    Soma/média no intervalo do dashboard — query em modo range (não instant).
+
+    instant + increase[$__range] em painéis Stat costuma devolver vazio no Grafana 10+;
+    range + reduceOptions lastNotNull usa o último ponto (= increase no $__range).
+    """
+    return {
+        "datasource": DS,
+        "expr": expr,
+        "refId": ref,
+        "range": True,
+        "instant": False,
+        "editorMode": "code",
+        "legendFormat": "",
+    }
+
+
 def instant_vector(expr, ref="A", legend_format="__auto"):
     """Várias séries com labels (prefeitura, package) — legendFormat define o nome visível."""
     return {
@@ -408,7 +426,7 @@ def stat(
             "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
             "textMode": "auto",
         },
-        "targets": [instant(expr)],
+        "targets": [period_range(expr) if period else instant(expr)],
         "title": title,
         "type": "stat",
     }
@@ -692,8 +710,10 @@ def prom_table_generations(id_, title, y, x, w, h, expr, desc="", *, value_col="
 
 
 def prom_table_period(id_, title, y, x, w, h, expr, *, value_col="Valor", desc=""):
-    """Tabela com increase no intervalo do Grafana (range + instant)."""
-    return prom_table_generations(id_, title, y, x, w, h, expr, desc=desc, value_col=value_col)
+    """Tabela com increase no intervalo — instant no fim do range (não range+reduce)."""
+    tbl = prom_table_generations(id_, title, y, x, w, h, expr, desc=desc, value_col=value_col)
+    tbl["targets"] = [instant(expr)]
+    return tbl
 
 
 def bargauge_by_label(id_, title, y, x, w, h, expr, legend_format, value_mappings=None, desc=""):
@@ -1426,7 +1446,7 @@ panels.append(
 dash = {
     "annotations": {"list": []},
     "editable": False,
-    "description": "Layout v32 — só média tokens/chamada por tipo; sem tabelas ZIP/fluxo duplicadas.",
+    "description": "Layout v33 — média tokens: query range (fix instant+$__range vazio).",
     "fiscalYearStartMonth": 0,
     "graphTooltip": 1,
     "id": None,
@@ -1434,13 +1454,13 @@ dash = {
     "panels": panels,
     "refresh": "1m",
     "schemaVersion": 39,
-    "tags": ["docmaster", "backend", "django", "layout-v32"],
+    "tags": ["docmaster", "backend", "django", "layout-v33"],
     "templating": {"list": []},
     "time": {"from": "now-24h", "to": "now"},
     "timezone": "browser",
     "title": "DocMaster — Backend Django",
     "uid": "docmaster-backend",
-    "version": 32,
+    "version": 33,
 }
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -1453,4 +1473,4 @@ if dupes:
     sys.exit(1)
 
 print(f"Repo:  {ROOT}")
-print(f"Wrote: {OUT} ({len(panels)} panels, layout-v32)")
+print(f"Wrote: {OUT} ({len(panels)} panels, layout-v33)")

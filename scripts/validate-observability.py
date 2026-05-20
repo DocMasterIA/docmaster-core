@@ -36,8 +36,8 @@ def main() -> int:
         dash = json.loads(DASH.read_text(encoding="utf-8"))
         tags = dash.get("tags") or []
         exprs = json.dumps(dash.get("panels") or [])
-        if "layout-v32" not in tags:
-            errors.append(f"Dashboard sem tag layout-v32 (tags={tags})")
+        if "layout-v33" not in tags:
+            errors.append(f"Dashboard sem tag layout-v33 (tags={tags})")
         if "docmaster_llm_invocations_total" not in exprs:
             errors.append("Dashboard sem métrica docmaster_llm_invocations_total nas queries")
         if "clausulas_llm" not in exprs:
@@ -48,6 +48,14 @@ def main() -> int:
             errors.append("Dashboard referencia llm_proxy em PromQL (não deve)")
         if "fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm" not in exprs:
             errors.append("Dashboard sem filtro de fluxo nos tokens LLM")
+        idx = dash.find('"title": "Média — Dispensa normal"')
+        if idx > 0:
+            chunk = dash[idx : idx + 900]
+            if '"range": false' in chunk and '"instant": true' in chunk:
+                errors.append(
+                    "Média — Dispensa normal usa instant+$__range (vazio no Grafana); "
+                    "rebuild com period_range (layout-v33+)"
+                )
 
     metrics_src = METRICS_PY.read_text(encoding="utf-8")
     for name in REQUIRED_DOCMASTER:
@@ -72,7 +80,7 @@ def main() -> int:
             print(f"  - {e}", file=sys.stderr)
         return 1
 
-    print("OK — observabilidade consistente (layout-v32).")
+    print("OK — observabilidade consistente (layout-v33).")
     return 0
 
 

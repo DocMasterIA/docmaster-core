@@ -167,8 +167,8 @@ def _code_checks() -> list[str]:
         errors.append("Inexigibilidade sem slot_package_key no POST /api/llm/generate")
 
     dash = (ROOT / "config/grafana/provisioning/dashboards/json/docmaster-backend.json").read_text(encoding="utf-8")
-    if "layout-v32" not in dash:
-        errors.append("Dashboard sem tag layout-v32 (corra build-grafana-dashboard.py)")
+    if "layout-v33" not in dash:
+        errors.append("Dashboard sem tag layout-v33 (corra build-grafana-dashboard.py)")
 
     for label in ("Média — Dispensa normal", "Média — Dispensa rápida", "Média — Inexigibilidade", "Média — ETP"):
         if label not in dash:
@@ -185,7 +185,7 @@ def main() -> int:
         for e in code_errors:
             print(f"  ✗ {e}")
     else:
-        print("CÓDIGO — OK (mapa package→tipo, clausulas_llm, rotas frontend, layout-v32)")
+        print("CÓDIGO — OK (mapa package→tipo, clausulas_llm, rotas frontend, layout-v33)")
 
     metrics_text = _fetch_metrics_text()
     if not metrics_text:

@@ -66,3 +66,5 @@ python3 scripts/build-grafana-dashboard.py
 ```
 
 Explore: queries em `config/prometheus/explore-queries.md`.
+
+**Grafana Host vazio mas Prometheus OK:** `./scripts/verify-host-grafana.sh` — se falhar passo 3: `./scripts/fix-grafana-prometheus.sh` (Grafana não estava na rede do Prometheus / datasource `prometheus:9090` não resolvia).

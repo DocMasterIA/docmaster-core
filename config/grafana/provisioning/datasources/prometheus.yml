@@ -10,6 +10,7 @@ datasources:
     type: prometheus
     uid: prometheus
     access: proxy
-    url: http://prometheus:9090
+    # host.docker.internal:9090 — Grafana e Prometheus em projetos compose diferentes (~ vs docmaster-core).
+    url: http://host.docker.internal:9090
     isDefault: true
     editable: true

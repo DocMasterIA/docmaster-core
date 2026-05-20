@@ -46,25 +46,31 @@ print(len(d.get('data',{}).get('result') or []))
 done
 
 echo ""
-echo "3) Grafana → Prometheus (se grafana no compose):"
+echo "3) Grafana → Prometheus:"
 if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx grafana; then
-  if docker exec grafana wget -qO- -T 3 http://prometheus:9090/-/ready 2>/dev/null | grep -q Ready; then
-    echo "   OK — grafana alcança http://prometheus:9090"
-  else
-    echo "   FALHOU — grafana não alcança prometheus:9090 (rede Docker)"
+  _g_ok=0
+  for url in http://host.docker.internal:9090/-/ready http://prometheus:9090/-/ready; do
+    if docker exec grafana wget -qO- -T 3 "$url" 2>/dev/null | grep -q Ready; then
+      echo "   OK — grafana alcança $url"
+      _g_ok=1
+      break
+    fi
+  done
+  if [[ "$_g_ok" -ne 1 ]]; then
+    echo "   FALHOU — grafana não alcança Prometheus (rede/DNS)"
+    echo "   Rode: ./scripts/fix-grafana-prometheus.sh"
   fi
 else
-  echo "   (contentor grafana não encontrado — ignore se Grafana é remoto)"
+  echo "   (contentor grafana não encontrado)"
 fi
 
 echo ""
 echo "4) Dashboard provisionado:"
 DASH="$REPO_ROOT/config/grafana/provisioning/dashboards/json/docmaster-backend.json"
-if grep -q 'period": true' "$DASH" && grep -q 'node_memory_MemAvailable_bytes' "$DASH"; then
-  echo "   OK — JSON com queries node (range nos Stats)"
+if grep -q 'node_memory_MemAvailable_bytes' "$DASH" && grep -q '"range": true' "$DASH"; then
+  echo "   OK — JSON com queries node + Stats em modo range"
 else
-  echo "   AVISO — regenere: python3 scripts/build-grafana-dashboard.py"
-  echo "           depois: ./scripts/grafana-reset-dashboard.sh"
+  echo "   AVISO — python3 scripts/build-grafana-dashboard.py && ./scripts/grafana-reset-dashboard.sh"
 fi
 
 echo ""

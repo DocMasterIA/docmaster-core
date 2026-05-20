@@ -104,7 +104,51 @@ link_node_exporter_to_prometheus_network() {
 ensure_node_exporter
 ensure_prometheus
 link_node_exporter_to_prometheus_network
-reload_prometheus_config 2>/dev/null || true
+
+verify_prometheus_node_target() {
+  local in_container
+  in_container="$(docker exec prometheus cat /etc/prometheus/prometheus.yml 2>/dev/null || true)"
+  if echo "$in_container" | grep -q 'host.docker.internal:9100'; then
+    echo "ERRO: dentro do contentor ainda há host.docker.internal:9100"
+    echo "  git pull && confira config/prometheus.yml no host:"
+    grep -A2 'job_name: node' "$PROM_CFG" || true
+    return 1
+  fi
+  if ! echo "$in_container" | grep -q 'node_exporter:9100'; then
+    echo "ERRO: config no contentor sem node_exporter:9100"
+    return 1
+  fi
+  return 0
+}
+
+apply_prometheus_config() {
+  if ! verify_prometheus_node_target; then
+    echo "prometheus — recriar contentor para montar config atual..."
+    docker rm -f prometheus
+    "${COMPOSE[@]}" up -d --no-deps prometheus
+    sleep 3
+    verify_prometheus_node_target || exit 1
+  fi
+  reload_prometheus_config 2>/dev/null || true
+  sleep 2
+  local scrape_url
+  scrape_url="$(curl -sf http://127.0.0.1:9090/api/v1/targets 2>/dev/null | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for t in d.get('data',{}).get('activeTargets',[]):
+    if t.get('labels',{}).get('job')=='node':
+        print(t.get('scrapeUrl',''))
+        break
+" 2>/dev/null || true)"
+  if [[ "$scrape_url" == *host.docker.internal* ]]; then
+    echo "ERRO: target node ainda aponta para $scrape_url"
+    echo "  docker rm -f prometheus && docker compose -f $REPO_ROOT/docker-compose.yml up -d --no-deps prometheus"
+    exit 1
+  fi
+  echo "prometheus — scrape node: ${scrape_url:-?}"
+}
+
+apply_prometheus_config
 
 echo ""
 echo "Aguardando Prometheus (até 45s)..."

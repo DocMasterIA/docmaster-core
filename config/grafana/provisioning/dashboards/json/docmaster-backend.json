@@ -3,7 +3,7 @@
     "list": []
   },
   "editable": false,
-  "description": "Layout v27 — tokens inexigibilidade (clausulas_llm); média por invocações LLM; tabelas período corrigidas.",
+  "description": "Layout v30 — Gerações OK = operações API; TR+DFD OK ≈ documentos; PromQL período corrigido.",
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
@@ -19,7 +19,7 @@
       "id": 299,
       "options": {
         "mode": "markdown",
-        "content": "**Operação (topo)** = foco no período do Grafana: erros, velocidade (p95) e prefeitura. **Totais acumulados** = desde o último restart do backend (contadores zeram no deploy). Tokens: só fill-tr-slots, gerar-tr-e-dfd e gerar_llm (não inclui /api/llm do formulário). Tipos: dispensa normal/rápida, inexigibilidade, ETP — séries «other»/unknown ficam fora dos painéis por tipo."
+        "content": "**Operação (topo)** = foco no período do Grafana: erros, velocidade (p95) e prefeitura. **Totais acumulados** = desde o último restart do backend (contadores zeram no deploy). Tokens: fill-tr-slots, gerar-tr-e-dfd, gerar_llm e clausulas_llm (Gerar cláusulas). Inexigibilidade: «Gerações» conta TR+DFD; «Tokens» só após Gerar cláusulas. Zeros em erros/5xx/4xx = verde (sem alerta falso)."
       },
       "title": "",
       "type": "text",
@@ -47,7 +47,24 @@
         "defaults": {
           "decimals": 0,
           "noValue": "0",
-          "unit": "none"
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          }
         },
         "overrides": []
       },
@@ -97,7 +114,24 @@
         "defaults": {
           "decimals": 0,
           "noValue": "0",
-          "unit": "none"
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          }
         },
         "overrides": []
       },
@@ -147,7 +181,24 @@
         "defaults": {
           "decimals": 0,
           "noValue": "0",
-          "unit": "none"
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          }
         },
         "overrides": []
       },
@@ -192,7 +243,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Soma no intervalo selecionado no Grafana.",
+      "description": "Cada chamada API com sucesso: fill_tr_slots (Gerar objeto), gerar_tr_e_dfd (ZIP), gerar_llm, etc. Um documento completo costuma somar 2 (slots + TR+DFD). Para contar só ZIPs use «TR+DFD no período» abaixo ou o painel TR+DFD+Ofício nos totais.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -209,7 +260,7 @@
       },
       "id": 284,
       "options": {
-        "colorMode": "value",
+        "colorMode": "none",
         "graphMode": "none",
         "justifyMode": "center",
         "reduceOptions": {
@@ -234,7 +285,7 @@
           "editorMode": "code"
         }
       ],
-      "title": "Gerações OK",
+      "title": "Operações OK (período)",
       "type": "stat"
     },
     {
@@ -470,7 +521,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Inclui cláusulas via /api/llm/generate (fluxo clausulas_llm) após deploy do backend.",
+      "description": "Só sobe após «Gerar cláusulas» (fluxo clausulas_llm) com backend atualizado. TR+DFD não conta tokens.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -487,7 +538,7 @@
       },
       "id": 2763,
       "options": {
-        "colorMode": "value",
+        "colorMode": "none",
         "graphMode": "none",
         "justifyMode": "center",
         "reduceOptions": {
@@ -512,7 +563,57 @@
           "editorMode": "code"
         }
       ],
-      "title": "Total — Inexigibilidade",
+      "title": "Tokens — Inexigibilidade",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Documentos gerados com sucesso (gerar-tr-e-dfd), mesmo sem tokens na métrica LLM.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "noValue": "0",
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 12
+      },
+      "id": 2765,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(docmaster_document_operations_total{result=\"success\",tipo_geracao=\"inexigibilidade\"}[$__range]))",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        }
+      ],
+      "title": "Gerações — Inexigibilidade",
       "type": "stat"
     },
     {
@@ -532,12 +633,12 @@
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 12,
+        "x": 16,
         "y": 12
       },
       "id": 2764,
       "options": {
-        "colorMode": "value",
+        "colorMode": "none",
         "graphMode": "none",
         "justifyMode": "center",
         "reduceOptions": {
@@ -562,7 +663,7 @@
           "editorMode": "code"
         }
       ],
-      "title": "Total — ETP",
+      "title": "Tokens — ETP",
       "type": "stat"
     },
     {
@@ -1675,7 +1776,11 @@
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
-          "unit": "none"
+          "min": 0,
+          "unit": "none",
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": []
       },
@@ -1687,14 +1792,22 @@
       },
       "id": 291,
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
+        "displayMode": "gradient",
+        "minVizHeight": 16,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
           "calcs": [
             "lastNotNull"
-          ]
+          ],
+          "fields": "",
+          "values": false
         },
-        "orientation": "horizontal"
+        "showUnfilled": true,
+        "valueMode": "color",
+        "legend": {
+          "displayMode": "hidden"
+        }
       },
       "targets": [
         {
@@ -1704,7 +1817,8 @@
           },
           "expr": "sum(increase(docmaster_document_operations_total{operation=\"fill_tr_slots\",result=\"error\"}[$__range]))",
           "refId": "A",
-          "range": true,
+          "instant": true,
+          "range": false,
           "editorMode": "code",
           "legendFormat": "Slots IA"
         },
@@ -1715,7 +1829,8 @@
           },
           "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"error\"}[$__range]))",
           "refId": "B",
-          "range": true,
+          "instant": true,
+          "range": false,
           "editorMode": "code",
           "legendFormat": "TR + DFD"
         },
@@ -1726,7 +1841,8 @@
           },
           "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_llm\",result=\"error\"}[$__range]))",
           "refId": "C",
-          "range": true,
+          "instant": true,
+          "range": false,
           "editorMode": "code",
           "legendFormat": "Gerar LLM"
         },
@@ -1737,7 +1853,8 @@
           },
           "expr": "sum(increase(docmaster_platform_events_total{module=\"llm\",result=\"error\"}[$__range]))",
           "refId": "D",
-          "range": true,
+          "instant": true,
+          "range": false,
           "editorMode": "code",
           "legendFormat": "Proxy LLM"
         },
@@ -1748,13 +1865,14 @@
           },
           "expr": "sum(increase(docmaster_platform_events_total{module=~\"pncp_.*\",result=\"error\"}[$__range]))",
           "refId": "E",
-          "range": true,
+          "instant": true,
+          "range": false,
           "editorMode": "code",
           "legendFormat": "PNCP"
         }
       ],
       "title": "Erros por tipo de operação (período)",
-      "type": "barchart"
+      "type": "bargauge"
     },
     {
       "datasource": {
@@ -2709,7 +2827,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Soma no intervalo selecionado no Grafana.",
+      "description": "Igual ao painel «Operações OK» no topo da secção Operação.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -2751,7 +2869,7 @@
           "editorMode": "code"
         }
       ],
-      "title": "Operações geração OK (período)",
+      "title": "Operações API OK (período)",
       "type": "stat"
     },
     {
@@ -2809,7 +2927,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Soma no intervalo selecionado no Grafana.",
+      "description": "≈ número de ZIPs TR+DFD+Ofício gerados com sucesso (1 por clique em gerar documento).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -2851,7 +2969,7 @@
           "editorMode": "code"
         }
       ],
-      "title": "TR+DFD no período",
+      "title": "TR+DFD OK (período)",
       "type": "stat"
     },
     {
@@ -2859,30 +2977,44 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Cada barra é um tipo de operação; um fluxo TR+DFD pode incluir preenchimento de slots antes.",
+      "description": "Uma barra por tipo de operação no intervalo do Grafana. A soma pode ser maior que «Operações geração OK»: um TR+DFD costuma contar também fill_tr_slots.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
-          "unit": "none"
+          "min": 0,
+          "unit": "none",
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 7,
+        "h": 6,
         "w": 24,
         "x": 0,
         "y": 74
       },
       "id": 3071,
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
+        "displayMode": "basic",
+        "minVizHeight": 18,
+        "minVizWidth": 0,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
           "calcs": [
             "lastNotNull"
-          ]
+          ],
+          "fields": "",
+          "values": false
         },
-        "orientation": "horizontal"
+        "showUnfilled": true,
+        "sizing": "manual",
+        "valueMode": "color",
+        "legend": {
+          "displayMode": "hidden"
+        }
       },
       "targets": [
         {
@@ -2890,48 +3022,16 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"fill_tr_slots\",result=\"success\"}[$__range]))",
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(sum(increase(docmaster_document_operations_total{result=\"success\"}[$__range])) by (operation), \"op_label\", \"Preencher slots (IA)\", \"operation\", \"fill_tr_slots\"), \"op_label\", \"Gerar via LLM\", \"operation\", \"gerar_llm\"), \"op_label\", \"TR + DFD + Ofício\", \"operation\", \"gerar_tr_e_dfd\"), \"op_label\", \"TR modelo\", \"operation\", \"gerar_tr_modelo\"), \"op_label\", \"$1\", \"operation\", \"(.+)\")",
           "refId": "A",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "Preencher slots"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_e_dfd\",result=\"success\"}[$__range]))",
-          "refId": "B",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "TR + DFD + Ofício"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_llm\",result=\"success\"}[$__range]))",
-          "refId": "C",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "Gerar LLM"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(increase(docmaster_document_operations_total{operation=\"gerar_tr_modelo\",result=\"success\"}[$__range]))",
-          "refId": "D",
-          "range": true,
-          "editorMode": "code",
-          "legendFormat": "TR modelo"
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{op_label}}",
+          "editorMode": "code"
         }
       ],
-      "title": "Operações no período (detalhe — não some manualmente)",
-      "type": "barchart"
+      "title": "Operações no período (por tipo)",
+      "type": "bargauge"
     },
     {
       "datasource": {
@@ -3574,12 +3674,29 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "1 = Prometheus alcança https://api.docmasteria.com.br/metrics. 0 = target down.",
+      "description": "1 = Prometheus alcança o target /metrics. 0 = scrape em baixo.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
           "noValue": "0",
-          "unit": "none"
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
         },
         "overrides": []
       },
@@ -3609,7 +3726,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "up{job=\"backend\"}",
+          "expr": "max(up)",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -3629,7 +3746,24 @@
         "defaults": {
           "decimals": 0,
           "noValue": "0",
-          "unit": "none"
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
         },
         "overrides": []
       },
@@ -3659,7 +3793,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max(docmaster_metrics_active{job=\"backend\"})",
+          "expr": "max(docmaster_metrics_active)",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -3674,7 +3808,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Pedidos à API no intervalo, sem contar o scrape GET /metrics.",
+      "description": "Mesma métrica do topo: soma de operações API OK (pode ser > nº de documentos).",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -3691,7 +3825,7 @@
       },
       "id": 352,
       "options": {
-        "colorMode": "value",
+        "colorMode": "none",
         "graphMode": "none",
         "justifyMode": "center",
         "reduceOptions": {
@@ -3709,14 +3843,14 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(sum(django_http_requests_total_by_view_transport_method_total{job=\"backend\",view!~\"prometheus-django-metrics|admin.*\"})[$__range]))",
+          "expr": "sum(increase(docmaster_document_operations_total{result=\"success\"}[$__range]))",
           "refId": "A",
           "instant": true,
           "range": false,
           "editorMode": "code"
         }
       ],
-      "title": "HTTP app (período)",
+      "title": "Gerações OK (período)",
       "type": "stat"
     },
     {
@@ -3724,12 +3858,29 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Respostas HTTP 5xx (proxy timeout, crash, 502 do upstream).",
+      "description": "Zero é bom. Sobe com timeout proxy, 502, crash.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
           "noValue": "0",
-          "unit": "none"
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          }
         },
         "overrides": []
       },
@@ -3759,7 +3910,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(sum(django_http_responses_total_by_status_total{job=\"backend\",status=~\"5..\"})[$__range]))",
+          "expr": "sum(increase(django_http_responses_total_by_status_total{status=~\"5..\"}[$__range]))",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -3774,12 +3925,29 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Respostas 401/403/404/405 etc.",
+      "description": "Zero é bom. Inclui 401/403/404.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
           "noValue": "0",
-          "unit": "none"
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          }
         },
         "overrides": []
       },
@@ -3809,7 +3977,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(sum(django_http_responses_total_by_status_total{job=\"backend\",status=~\"4..\"})[$__range]))",
+          "expr": "sum(increase(django_http_responses_total_by_status_total{status=~\"4..\"}[$__range]))",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -3824,12 +3992,29 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Falhas de geração contabilizadas pelo decorator (mesma fonte que «Erros de geração» no topo).",
+      "description": "Zero é bom. Falhas em gerar-tr-e-dfd, fill-tr-slots, etc.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
           "noValue": "0",
-          "unit": "none"
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          }
         },
         "overrides": []
       },
@@ -3859,7 +4044,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(sum(docmaster_document_operations_total{job=\"backend\",result=\"error\"})[$__range]))",
+          "expr": "sum(increase(docmaster_document_operations_total{result=\"error\"}[$__range]))",
           "refId": "A",
           "instant": true,
           "range": false,
@@ -3968,7 +4153,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(django_http_responses_total_by_status_total{job=\"backend\",status=~\"5..\"}[$__interval]))",
+          "expr": "sum(increase(django_http_responses_total_by_status_total{status=~\"5..\"}[$__interval]))",
           "refId": "A",
           "range": true,
           "editorMode": "code",
@@ -3979,7 +4164,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(django_http_responses_total_by_status_total{job=\"backend\",status=~\"4..\"}[$__interval]))",
+          "expr": "sum(increase(django_http_responses_total_by_status_total{status=~\"4..\"}[$__interval]))",
           "refId": "B",
           "range": true,
           "editorMode": "code",
@@ -3990,7 +4175,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(docmaster_document_operations_total{job=\"backend\",result=\"error\"}[$__interval]))",
+          "expr": "sum(increase(docmaster_document_operations_total{result=\"error\"}[$__interval]))",
           "refId": "C",
           "range": true,
           "editorMode": "code",
@@ -4007,7 +4192,7 @@
     "docmaster",
     "backend",
     "django",
-    "layout-v27"
+    "layout-v30"
   ],
   "templating": {
     "list": []
@@ -4019,5 +4204,5 @@
   "timezone": "browser",
   "title": "DocMaster — Backend Django",
   "uid": "docmaster-backend",
-  "version": 27
+  "version": 30
 }

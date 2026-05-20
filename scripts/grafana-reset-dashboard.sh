@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# grafana-reset-dashboard v3 — exige layout-v27 no repo e copia JSON para o volume do contentor.
+# grafana-reset-dashboard v3 — exige layout-v29 no repo e copia JSON para o volume do contentor.
 #
 #   cd ~/docmaster-core
 #   python3 scripts/build-grafana-dashboard.py
 #   ./scripts/grafana-reset-dashboard.sh
 #
-# NÃO use ~/scripts/grafana-reset-dashboard.sh (cópia antiga sem v27).
+# NÃO use ~/scripts/grafana-reset-dashboard.sh (cópia antiga sem v29).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="${DOCMASTER_ROOT:-$SCRIPT_DIR/..}"
 REPO_ROOT="$(cd "$REPO_ROOT" && pwd)"
-REQUIRED_LAYOUT_TAG="${GRAFANA_REQUIRED_LAYOUT:-layout-v27}"
+REQUIRED_LAYOUT_TAG="${GRAFANA_REQUIRED_LAYOUT:-layout-v30}"
 
 if [[ "$SCRIPT_DIR" != *"docmaster-core"* ]]; then
   echo "ERRO: este script está em ${SCRIPT_DIR}"

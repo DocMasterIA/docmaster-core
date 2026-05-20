@@ -81,9 +81,9 @@ def row(id_, title, y, collapsed=False):
     return {"collapsed": collapsed, "gridPos": {"h": 1, "w": 24, "x": 0, "y": y}, "id": id_, "title": title, "type": "row"}
 
 
-def instant(expr, ref="A"):
-    """Query instantânea para painéis Stat (valor único)."""
-    return {
+def instant(expr, ref="A", legend: str | None = None):
+    """Query instantânea para painéis Stat / bargauge (valor único por série)."""
+    t = {
         "datasource": DS,
         "expr": expr,
         "refId": ref,
@@ -91,6 +91,9 @@ def instant(expr, ref="A"):
         "range": False,
         "editorMode": "code",
     }
+    if legend is not None:
+        t["legendFormat"] = legend
+    return t
 
 
 def instant_vector(expr, ref="A", legend_format="__auto"):
@@ -224,6 +227,14 @@ def total_tokens_for_tipo(tipo_geracao: str) -> str:
     return f"sum(increase({_tokens_selector(tipo_geracao=tipo_geracao)}[$__range]))"
 
 
+def generations_ok_for_tipo(tipo_geracao: str) -> str:
+    """Gerações de documento OK no período (inclui TR+DFD sem tokens LLM)."""
+    return (
+        f'sum(increase(docmaster_document_operations_total{{result="success",'
+        f'tipo_geracao="{tipo_geracao}"}}[$__range]))'
+    )
+
+
 def avg_tokens_for_tipo(tipo_geracao: str, *, direction: str | None = None) -> str:
     """Média tokens por chamada LLM (invocações = 1 por geração de cláusulas / fill-tr-slots / etc.)."""
     tok = f"sum(increase({_tokens_selector(tipo_geracao=tipo_geracao, direction=direction)}[$__range]))"
@@ -246,6 +257,15 @@ def avg_tokens_by_tipo_geracao_display(*, direction: str | None = None) -> str:
     for key, label in TIPO_GERACAO_LABELS.items():
         expr = f'label_replace({expr}, "tipo", "{_promql_escape(label)}", "tipo_geracao", "{key}")'
     return f'label_replace({expr}, "tipo", "$1", "tipo_geracao", "(.+)")'
+
+
+def operations_by_operation_period(*, result: str = "success") -> str:
+    """Contagem no período por operation com rótulo legível (uma query → bargauge estável)."""
+    sel = f'docmaster_document_operations_total{{result="{result}"}}'
+    expr = f"sum(increase({sel}[$__range])) by (operation)"
+    for key, label in OPERATION_LABELS.items():
+        expr = f'label_replace({expr}, "op_label", "{_promql_escape(label)}", "operation", "{key}")'
+    return f'label_replace({expr}, "op_label", "$1", "operation", "(.+)")'
 
 
 def operations_by_tipo_geracao_period(*, result: str = "success") -> str:
@@ -332,18 +352,56 @@ DESC_STAT_TOTAL = (
 DESC_STAT_PERIODO = "Soma no intervalo selecionado no Grafana."
 
 
-def stat(id_, title, y, x, w, expr, desc="", *, period=False, unit="none", decimals=0):
+def _thresholds(mode: str):
+    """Evita «alerta» vermelho quando 0 é o valor bom (erros) ou quando sem dados."""
+    if mode == "good_low":
+        return {
+            "mode": "absolute",
+            "steps": [
+                {"color": "green", "value": None},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 10},
+            ],
+        }
+    if mode == "good_high":
+        return {
+            "mode": "absolute",
+            "steps": [
+                {"color": "red", "value": None},
+                {"color": "yellow", "value": 1},
+                {"color": "green", "value": 1},
+            ],
+        }
+    return None
+
+
+def stat(
+    id_,
+    title,
+    y,
+    x,
+    w,
+    expr,
+    desc="",
+    *,
+    period=False,
+    unit="none",
+    decimals=0,
+    thresholds=None,
+    color_mode="value",
+    no_value="0",
+):
+    defaults = {"decimals": decimals, "noValue": no_value, "unit": unit}
+    if thresholds:
+        defaults["thresholds"] = _thresholds(thresholds)
     return {
         "datasource": DS,
         "description": desc or (DESC_STAT_PERIODO if period else DESC_STAT_TOTAL),
-        "fieldConfig": {
-            "defaults": {"decimals": decimals, "noValue": "0", "unit": unit},
-            "overrides": [],
-        },
+        "fieldConfig": {"defaults": defaults, "overrides": []},
         "gridPos": {"h": 4, "w": w, "x": x, "y": y},
         "id": id_,
         "options": {
-            "colorMode": "value",
+            "colorMode": color_mode,
             "graphMode": "none",
             "justifyMode": "center",
             "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
@@ -687,17 +745,37 @@ def text_panel(id_, y, content):
 DOC = lambda op: total(f'docmaster_document_operations_total{{operation="{op}",result="success"}}')
 
 
-def bar_period_breakdown(id_, title, y, x, w, h, items, desc=""):
+def bargauge_period_breakdown(id_, title, y, x, w, h, items, desc=""):
+    """Barras horizontais no período — instant + increase (evita barchart com série temporal quebrada)."""
     return {
         "datasource": DS,
         "description": desc,
-        "fieldConfig": {"defaults": {"decimals": 0, "unit": "none"}, "overrides": []},
+        "fieldConfig": {
+            "defaults": {
+                "decimals": 0,
+                "min": 0,
+                "unit": "none",
+                "color": {"mode": "palette-classic"},
+            },
+            "overrides": [],
+        },
         "gridPos": {"h": h, "w": w, "x": x, "y": y},
         "id": id_,
-        "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull"]}, "orientation": "horizontal"},
-        "targets": [range_query(period_delta(sel), chr(65 + i), leg) for i, (sel, leg) in enumerate(items)],
+        "options": {
+            "displayMode": "gradient",
+            "minVizHeight": 16,
+            "namePlacement": "left",
+            "orientation": "horizontal",
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
+            "showUnfilled": True,
+            "valueMode": "color",
+            "legend": {"displayMode": "hidden"},
+        },
+        "targets": [
+            instant(period_delta(sel), chr(65 + i), leg) for i, (sel, leg) in enumerate(items)
+        ],
         "title": title,
-        "type": "barchart",
+        "type": "bargauge",
     }
 
 
@@ -709,8 +787,9 @@ panels.append(
         y,
         "**Operação (topo)** = foco no período do Grafana: erros, velocidade (p95) e prefeitura. "
         "**Totais acumulados** = desde o último restart do backend (contadores zeram no deploy). "
-        "Tokens: só fill-tr-slots, gerar-tr-e-dfd e gerar_llm (não inclui /api/llm do formulário). "
-        "Tipos: dispensa normal/rápida, inexigibilidade, ETP — séries «other»/unknown ficam fora dos painéis por tipo.",
+        "Tokens: fill-tr-slots, gerar-tr-e-dfd, gerar_llm e clausulas_llm (Gerar cláusulas). "
+        "Inexigibilidade: «Gerações» conta TR+DFD; «Tokens» só após Gerar cláusulas. "
+        "Zeros em erros/5xx/4xx = verde (sem alerta falso).",
     )
 )
 y += 3
@@ -727,6 +806,7 @@ panels += [
         4,
         period_delta('docmaster_document_operations_total{result="error"}'),
         period=True,
+        thresholds="good_low",
     ),
     stat(
         282,
@@ -738,6 +818,7 @@ panels += [
             'docmaster_auth_login_total{result=~"failure|locked|forbidden_prefeitura"}'
         ),
         period=True,
+        thresholds="good_low",
         desc="Tentativas de login sem sucesso (credenciais, bloqueio ou prefeitura).",
     ),
     stat(
@@ -748,15 +829,22 @@ panels += [
         4,
         period_delta('docmaster_platform_events_total{result="error"}'),
         period=True,
+        thresholds="good_low",
     ),
     stat(
         284,
-        "Gerações OK",
+        "Operações OK (período)",
         y,
         12,
         4,
         period_delta('docmaster_document_operations_total{result="success"}'),
         period=True,
+        color_mode="none",
+        desc=(
+            "Cada chamada API com sucesso: fill_tr_slots (Gerar objeto), gerar_tr_e_dfd (ZIP), "
+            "gerar_llm, etc. Um documento completo costuma somar 2 (slots + TR+DFD). "
+            "Para contar só ZIPs use «TR+DFD no período» abaixo ou o painel TR+DFD+Ofício nos totais."
+        ),
     ),
     stat_duration(285, "p95 Slots IA", y, 16, 4, p95_duration("fill_tr_slots")),
     stat_duration(286, "p95 TR + DFD", y, 20, 4, p95_duration("gerar_tr_e_dfd")),
@@ -800,7 +888,7 @@ panels += [
     ),
     stat(
         2763,
-        "Total — Inexigibilidade",
+        "Tokens — Inexigibilidade",
         y,
         8,
         4,
@@ -808,18 +896,33 @@ panels += [
         period=True,
         unit="short",
         decimals=0,
-        desc="Inclui cláusulas via /api/llm/generate (fluxo clausulas_llm) após deploy do backend.",
+        color_mode="none",
+        desc="Só sobe após «Gerar cláusulas» (fluxo clausulas_llm) com backend atualizado. TR+DFD não conta tokens.",
+    ),
+    stat(
+        2765,
+        "Gerações — Inexigibilidade",
+        y,
+        12,
+        4,
+        generations_ok_for_tipo("inexigibilidade"),
+        period=True,
+        unit="short",
+        decimals=0,
+        color_mode="none",
+        desc="Documentos gerados com sucesso (gerar-tr-e-dfd), mesmo sem tokens na métrica LLM.",
     ),
     stat(
         2764,
-        "Total — ETP",
+        "Tokens — ETP",
         y,
-        12,
+        16,
         4,
         total_tokens_for_tipo("etp"),
         period=True,
         unit="short",
         decimals=0,
+        color_mode="none",
     ),
     stat(
         276,
@@ -996,7 +1099,7 @@ panels.append(
     )
 )
 panels.append(
-    bar_period_breakdown(
+    bargauge_period_breakdown(
         291,
         "Erros por tipo de operação (período)",
         y,
@@ -1132,12 +1235,13 @@ panels += [
     ),
     stat(
         307,
-        "Operações geração OK (período)",
+        "Operações API OK (período)",
         y,
         6,
         6,
         period_delta('docmaster_document_operations_total{result="success"}'),
         period=True,
+        desc="Igual ao painel «Operações OK» no topo da secção Operação.",
     ),
     stat(
         331,
@@ -1150,31 +1254,31 @@ panels += [
     ),
     stat(
         3311,
-        "TR+DFD no período",
+        "TR+DFD OK (período)",
         y,
         18,
         6,
         period_delta('docmaster_document_operations_total{operation="gerar_tr_e_dfd",result="success"}'),
         period=True,
+        desc="≈ número de ZIPs TR+DFD+Ofício gerados com sucesso (1 por clique em gerar documento).",
     ),
 ]
 y += 4
 
 panels.append(
-    bar_period_breakdown(
+    bargauge_by_label(
         3071,
-        "Operações no período (detalhe — não some manualmente)",
+        "Operações no período (por tipo)",
         y,
         0,
         24,
-        7,
-        [
-            ('docmaster_document_operations_total{operation="fill_tr_slots",result="success"}', "Preencher slots"),
-            ('docmaster_document_operations_total{operation="gerar_tr_e_dfd",result="success"}', "TR + DFD + Ofício"),
-            ('docmaster_document_operations_total{operation="gerar_llm",result="success"}', "Gerar LLM"),
-            ('docmaster_document_operations_total{operation="gerar_tr_modelo",result="success"}', "TR modelo"),
-        ],
-        "Cada barra é um tipo de operação; um fluxo TR+DFD pode incluir preenchimento de slots antes.",
+        6,
+        operations_by_operation_period(result="success"),
+        "{{op_label}}",
+        desc=(
+            "Uma barra por tipo de operação no intervalo do Grafana. "
+            "A soma pode ser maior que «Operações geração OK»: um TR+DFD costuma contar também fill_tr_slots."
+        ),
     )
 )
 y += 7
@@ -1262,8 +1366,7 @@ panels.append(
 )
 y += 7
 
-# --- Infra / saúde (mesmo scrape Prometheus job=backend que alimenta docmaster_*) ---
-_JOB = "backend"
+# --- Infra / saúde (sem filtro job= — evita 0 falso se o job Prometheus tiver outro nome) ---
 _DJANGO_VIEWS_APP = 'view!~"prometheus-django-metrics|admin.*"'
 
 
@@ -1296,8 +1399,9 @@ panels += [
         y,
         0,
         4,
-        f'up{{job="{_JOB}"}}',
-        desc="1 = Prometheus alcança https://api.docmasteria.com.br/metrics. 0 = target down.",
+        "max(up)",
+        thresholds="good_high",
+        desc="1 = Prometheus alcança o target /metrics. 0 = scrape em baixo.",
     ),
     stat(
         355,
@@ -1305,20 +1409,20 @@ panels += [
         y,
         4,
         4,
-        f'max(docmaster_metrics_active{{job="{_JOB}"}})',
+        "max(docmaster_metrics_active)",
+        thresholds="good_high",
         desc="Workers Gunicorn com docmaster_* (esperado ≈2).",
     ),
     stat(
         352,
-        "HTTP app (período)",
+        "Gerações OK (período)",
         y,
         8,
         4,
-        period_delta(
-            f"sum(django_http_requests_total_by_view_transport_method_total{{job=\"{_JOB}\",{_DJANGO_VIEWS_APP}}})"
-        ),
+        period_delta('docmaster_document_operations_total{result="success"}'),
         period=True,
-        desc="Pedidos à API no intervalo, sem contar o scrape GET /metrics.",
+        color_mode="none",
+        desc="Mesma métrica do topo: soma de operações API OK (pode ser > nº de documentos).",
     ),
     stat(
         353,
@@ -1326,11 +1430,10 @@ panels += [
         y,
         12,
         4,
-        period_delta(
-            f'sum(django_http_responses_total_by_status_total{{job="{_JOB}",status=~"5.."}})'
-        ),
+        period_delta('django_http_responses_total_by_status_total{status=~"5.."}'),
         period=True,
-        desc="Respostas HTTP 5xx (proxy timeout, crash, 502 do upstream).",
+        thresholds="good_low",
+        desc="Zero é bom. Sobe com timeout proxy, 502, crash.",
     ),
     stat(
         354,
@@ -1338,11 +1441,10 @@ panels += [
         y,
         16,
         4,
-        period_delta(
-            f'sum(django_http_responses_total_by_status_total{{job="{_JOB}",status=~"4.."}})'
-        ),
+        period_delta('django_http_responses_total_by_status_total{status=~"4.."}'),
         period=True,
-        desc="Respostas 401/403/404/405 etc.",
+        thresholds="good_low",
+        desc="Zero é bom. Inclui 401/403/404.",
     ),
     stat(
         358,
@@ -1350,11 +1452,10 @@ panels += [
         y,
         20,
         4,
-        period_delta(
-            f'sum(docmaster_document_operations_total{{job="{_JOB}",result="error"}})'
-        ),
+        period_delta('docmaster_document_operations_total{result="error"}'),
         period=True,
-        desc="Falhas de geração contabilizadas pelo decorator (mesma fonte que «Erros de geração» no topo).",
+        thresholds="good_low",
+        desc="Zero é bom. Falhas em gerar-tr-e-dfd, fill-tr-slots, etc.",
     ),
 ]
 y += 4
@@ -1384,21 +1485,15 @@ panels.append(
         7,
         [
             (
-                count_interval(
-                    f'django_http_responses_total_by_status_total{{job="{_JOB}",status=~"5.."}}'
-                ),
+                count_interval('django_http_responses_total_by_status_total{status=~"5.."}'),
                 "5xx",
             ),
             (
-                count_interval(
-                    f'django_http_responses_total_by_status_total{{job="{_JOB}",status=~"4.."}}'
-                ),
+                count_interval('django_http_responses_total_by_status_total{status=~"4.."}'),
                 "4xx",
             ),
             (
-                count_interval(
-                    f'docmaster_document_operations_total{{job="{_JOB}",result="error"}}'
-                ),
+                count_interval('docmaster_document_operations_total{result="error"}'),
                 "Erros geração",
             ),
         ],
@@ -1409,7 +1504,7 @@ panels.append(
 dash = {
     "annotations": {"list": []},
     "editable": False,
-    "description": "Layout v27 — tokens inexigibilidade (clausulas_llm); média por invocações LLM; tabelas período corrigidas.",
+    "description": "Layout v30 — Gerações OK = operações API; TR+DFD OK ≈ documentos; PromQL período corrigido.",
     "fiscalYearStartMonth": 0,
     "graphTooltip": 1,
     "id": None,
@@ -1417,13 +1512,13 @@ dash = {
     "panels": panels,
     "refresh": "1m",
     "schemaVersion": 39,
-    "tags": ["docmaster", "backend", "django", "layout-v27"],
+    "tags": ["docmaster", "backend", "django", "layout-v30"],
     "templating": {"list": []},
     "time": {"from": "now-24h", "to": "now"},
     "timezone": "browser",
     "title": "DocMaster — Backend Django",
     "uid": "docmaster-backend",
-    "version": 27,
+    "version": 30,
 }
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -1436,4 +1531,4 @@ if dupes:
     sys.exit(1)
 
 print(f"Repo:  {ROOT}")
-print(f"Wrote: {OUT} ({len(panels)} panels, layout-v27)")
+print(f"Wrote: {OUT} ({len(panels)} panels, layout-v30)")

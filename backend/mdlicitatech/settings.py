@@ -93,6 +93,8 @@ CORS_ALLOW_HEADERS = [
     "user-agent",
     "x-csrftoken",
     "x-requested-with",
+    # Só se o frontend enviar (opcional); métricas usam slot_package_key no JSON body.
+    "x-docmaster-package",
 ]
 
 # Cookies: necessários para usar sessão/CSRF com frontend em origem diferente via ngrok (HTTPS)

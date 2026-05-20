@@ -91,6 +91,45 @@ build:
 
 e execute os comandos `-f docker-compose.pncp.yml` **a partir de `~`**, ou copie o ficheiro `.pncp.yml` para a mesma pasta do compose principal.
 
+## Recuperar índice antigo (800k+ itens → volume novo vazio)
+
+Ao mudar para `docker-compose.pncp.yml` (projeto `docmaster-pncp`), o Docker criou um **volume novo** vazio. O SQLite grande ficou no volume **antigo** (outro nome).
+
+### 1. Achar o volume certo
+
+```bash
+./scripts/find-pncp-db-volumes.sh
+```
+
+Procure o volume com **centenas de MB** (ex.: `docmaster_pncp_researcher_data`, `docmaster-core_pncp_researcher_data`, `docmaster-pncp_pncp_researcher_data`).
+
+### 2. Ligar o PNCP a esse volume
+
+```bash
+# troque pelo nome que o script mostrou com o .db grande
+PNCP_DATA_VOLUME=docmaster_pncp_researcher_data ./scripts/attach-pncp-volume.sh
+```
+
+Confira:
+
+```bash
+curl -s http://127.0.0.1:8012/api/pncp-research/local-index/stats
+```
+
+`total_itens` / `total_contratos` devem voltar perto do que tinha antes.
+
+### 3. Não apague volumes sem olhar
+
+```bash
+docker volume ls | grep pncp
+```
+
+O volume pequeno novo pode ser `docmaster-pncp_pncp_researcher_data` (2100 contratos) — pode remover **depois** de confirmar que o grande está montado.
+
+### 4. Se nenhum volume tiver o .db grande
+
+O índice só volta com **novo backfill** (demora) ou **restauro de backup** `.db` copiado para `/data/pncp/pncp_researcher_local.db` no volume.
+
 ## Reinício automático
 
 `restart: always` no ficheiro PNCP — após reboot do Docker, suba de novo só o PNCP:

@@ -75,13 +75,10 @@ def llm_proxy(request, path):
         result = "success" if resp.status_code < 400 else "error"
         if isinstance(data, dict) and data.get("ok") is False:
             result = "error"
-        if (
-            result == "success"
-            and action == "generate"
-            and isinstance(data, dict)
-            and isinstance(data.get("token_usage"), dict)
-        ):
-            usage = data["token_usage"]
+        if result == "success" and action == "generate" and isinstance(data, dict):
+            usage = data.get("token_usage")
+            if not isinstance(usage, dict):
+                usage = {}
             pkg = resolve_slot_package_key(payload, request)
             record_llm_token_usage(
                 fluxo="clausulas_llm",

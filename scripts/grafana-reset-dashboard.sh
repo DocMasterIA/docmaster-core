@@ -11,7 +11,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="${DOCMASTER_ROOT:-$SCRIPT_DIR/..}"
 REPO_ROOT="$(cd "$REPO_ROOT" && pwd)"
-REQUIRED_LAYOUT_TAG="${GRAFANA_REQUIRED_LAYOUT:-layout-v31}"
+REQUIRED_LAYOUT_TAG="${GRAFANA_REQUIRED_LAYOUT:-layout-v32}"
 
 if [[ "$SCRIPT_DIR" != *"docmaster-core"* ]]; then
   echo "ERRO: este script está em ${SCRIPT_DIR}"

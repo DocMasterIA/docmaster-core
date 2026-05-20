@@ -268,14 +268,6 @@ def operations_by_operation_period(*, result: str = "success") -> str:
     return f'label_replace({expr}, "op_label", "$1", "operation", "(.+)")'
 
 
-def tr_dfd_ok_by_tipo_period() -> str:
-    """ZIPs TR+DFD+Ofício gerados no período (1 por clique em gerar documento)."""
-    sel = 'docmaster_document_operations_total{operation="gerar_tr_e_dfd",result="success"}'
-    expr = f"sum(increase({sel}[$__range])) by (tipo_geracao)"
-    for key, label in TIPO_GERACAO_LABELS.items():
-        expr = f'label_replace({expr}, "tipo", "{_promql_escape(label)}", "tipo_geracao", "{key}")'
-    return f'label_replace({expr}, "tipo", "$1", "tipo_geracao", "(.+)"'
-
 
 def operations_by_tipo_geracao_period(*, result: str = "success") -> str:
     """Contagem de operações no período, agrupadas por tipo_geracao com nome legível."""
@@ -667,7 +659,7 @@ def prom_table_generations(id_, title, y, x, w, h, expr, desc="", *, value_col="
                 "expr": expr,
                 "refId": "A",
                 "instant": True,
-                "range": True,
+                "range": False,
                 "format": "table",
                 "editorMode": "code",
             }
@@ -676,7 +668,20 @@ def prom_table_generations(id_, title, y, x, w, h, expr, desc="", *, value_col="
             {
                 "id": "organize",
                 "options": {
-                    "excludeByName": {"Time": True, "__name__": True},
+                    "excludeByName": {
+                        "Time": True,
+                        "__name__": True,
+                        "tipo_geracao": True,
+                        "fluxo": True,
+                        "fluxo_label": True,
+                        "package": True,
+                        "prefeitura": True,
+                        "direction": True,
+                        "operation": True,
+                        "result": True,
+                        "output": True,
+                        "le": True,
+                    },
                     "renameByName": {"tipo": "Tipo de geração", "fluxo_label": "Fluxo", "Value": value_col},
                 },
             }
@@ -796,8 +801,7 @@ panels.append(
         y,
         "**Operação (topo)** = foco no período do Grafana: erros, velocidade (p95) e prefeitura. "
         "**Totais acumulados** = desde o último restart do backend (contadores zeram no deploy). "
-        "Tokens: fill-tr-slots, gerar-tr-e-dfd, gerar_llm e clausulas_llm (Gerar cláusulas). "
-        "Inexigibilidade: «Gerações» conta TR+DFD; «Tokens» só após Gerar cláusulas. "
+        "Tokens LLM: painéis de **média por chamada** (entrada+saída). "
         "Zeros em erros/5xx/4xx = verde (sem alerta falso).",
     )
 )
@@ -860,184 +864,76 @@ panels += [
 ]
 y += 4
 
-panels.append(row(275, "Tokens LLM — por tipo de geração (período)", y))
+panels.append(row(275, "Tokens LLM — média por chamada (período)", y))
 y += 1
 panels.append(
     text_panel(
         2749,
         y,
-        "**Tokens** vêm de `fill_tr_slots` (dispensa) ou `clausulas_llm` (inexigibilidade /api/llm). "
-        "Se só «Dispensa rápida» tem tokens, normal/inexig podem não ter usado IA no período ou inexig "
-        "ainda sem deploy de `clausulas_llm`. **ZIPs por tipo** (tabela abaixo) conta documentos de todos os fluxos.",
+        "**Média** = (entrada + saída) ÷ número de chamadas LLM no intervalo. "
+        "Dispensa: `fill_tr_slots`. Inexigibilidade: `clausulas_llm` (Gerar cláusulas). "
+        "0 = nenhuma chamada desse tipo no período selecionado.",
     )
 )
 y += 3
 panels += [
     stat(
         2761,
-        "Total — Dispensa normal",
+        "Média — Dispensa normal",
         y,
         0,
-        4,
-        total_tokens_for_tipo("dispensa_normal"),
-        period=True,
-        unit="short",
-        decimals=0,
-    ),
-    stat(
-        2762,
-        "Total — Dispensa rápida",
-        y,
-        4,
-        4,
-        total_tokens_for_tipo("dispensa_rapida"),
-        period=True,
-        unit="short",
-        decimals=0,
-    ),
-    stat(
-        2763,
-        "Tokens — Inexigibilidade",
-        y,
-        8,
-        4,
-        total_tokens_for_tipo("inexigibilidade"),
-        period=True,
-        unit="short",
-        decimals=0,
-        color_mode="none",
-        desc="Só sobe após «Gerar cláusulas» (fluxo clausulas_llm) com backend atualizado. TR+DFD não conta tokens.",
-    ),
-    stat(
-        2765,
-        "Gerações — Inexigibilidade",
-        y,
-        12,
-        4,
-        generations_ok_for_tipo("inexigibilidade"),
-        period=True,
-        unit="short",
-        decimals=0,
-        color_mode="none",
-        desc="Documentos gerados com sucesso (gerar-tr-e-dfd), mesmo sem tokens na métrica LLM.",
-    ),
-    stat(
-        2764,
-        "Tokens — ETP",
-        y,
-        16,
-        4,
-        total_tokens_for_tipo("etp"),
-        period=True,
-        unit="short",
-        decimals=0,
-        color_mode="none",
-    ),
-    stat(
-        276,
-        "Média/chamada — normal",
-        y,
-        16,
-        4,
+        6,
         avg_tokens_for_tipo("dispensa_normal"),
         period=True,
         unit="short",
         decimals=0,
+        color_mode="none",
+        no_value="0",
+        desc="Tokens totais (entrada+saída) ÷ invocações fill_tr_slots / clausulas_llm com tipo dispensa_normal.",
     ),
     stat(
-        277,
-        "Média/chamada — rápida",
+        2762,
+        "Média — Dispensa rápida",
         y,
-        20,
-        4,
+        6,
+        6,
         avg_tokens_for_tipo("dispensa_rapida"),
         period=True,
         unit="short",
         decimals=0,
+        color_mode="none",
+        no_value="0",
+        desc="Ex.: duas gerações com 200 e 400 tokens → média 300.",
     ),
-]
-y += 4
-panels += [
     stat(
-        278,
-        "Média/chamada — inexig.",
+        2763,
+        "Média — Inexigibilidade",
         y,
-        0,
+        12,
         6,
         avg_tokens_for_tipo("inexigibilidade"),
         period=True,
         unit="short",
         decimals=0,
+        color_mode="none",
+        no_value="0",
+        desc="Só após «Gerar cláusulas» (/api/llm, fluxo clausulas_llm). TR+DFD não entra na média.",
     ),
     stat(
-        279,
-        "Média/chamada — ETP",
+        2764,
+        "Média — ETP",
         y,
-        6,
+        18,
         6,
         avg_tokens_for_tipo("etp"),
         period=True,
         unit="short",
         decimals=0,
+        color_mode="none",
+        no_value="0",
     ),
 ]
 y += 4
-panels.append(
-    prom_table_period(
-        2709,
-        "ZIPs TR+DFD gerados por tipo (período)",
-        y,
-        0,
-        24,
-        4,
-        tr_dfd_ok_by_tipo_period(),
-        value_col="ZIPs",
-        desc=(
-            "Só operation=gerar_tr_e_dfd — 1 por documento. Inclui dispensa normal, rápida e inexigibilidade "
-            "(não depende de tokens LLM)."
-        ),
-    )
-)
-y += 4
-panels.append(
-    prom_table_period(
-        271,
-        "Média tokens por chamada LLM (tipo)",
-        y,
-        0,
-        8,
-        6,
-        avg_tokens_by_tipo_geracao_display(),
-        value_col="Tokens/chamada",
-        desc="Denominador: docmaster_llm_invocations_total (não confunde com gerar-tr-e-dfd sem LLM).",
-    )
-)
-panels.append(
-    prom_table_period(
-        272,
-        "Tokens por fluxo (período)",
-        y,
-        8,
-        8,
-        6,
-        tokens_by_fluxo_period(),
-        value_col="Tokens",
-        desc="clausulas_llm = botão Gerar cláusulas; fill_tr_slots = API fill-tr-slots; gerar_tr_e_dfd = tokens no ZIP se houver.",
-    )
-)
-panels.append(
-    prom_table_period(
-        273,
-        "Média entrada por tipo",
-        y,
-        16,
-        8,
-        6,
-        avg_tokens_by_tipo_geracao_display(direction="entrada"),
-        value_col="Entrada/chamada",
-    )
-)
-y += 5
 panels.append(
     prom_table_generations(
         274,
@@ -1530,7 +1426,7 @@ panels.append(
 dash = {
     "annotations": {"list": []},
     "editable": False,
-    "description": "Layout v31 — ZIPs por tipo; operações sem filtrar other; inexig envia package no LLM.",
+    "description": "Layout v32 — só média tokens/chamada por tipo; sem tabelas ZIP/fluxo duplicadas.",
     "fiscalYearStartMonth": 0,
     "graphTooltip": 1,
     "id": None,
@@ -1538,13 +1434,13 @@ dash = {
     "panels": panels,
     "refresh": "1m",
     "schemaVersion": 39,
-    "tags": ["docmaster", "backend", "django", "layout-v31"],
+    "tags": ["docmaster", "backend", "django", "layout-v32"],
     "templating": {"list": []},
     "time": {"from": "now-24h", "to": "now"},
     "timezone": "browser",
     "title": "DocMaster — Backend Django",
     "uid": "docmaster-backend",
-    "version": 31,
+    "version": 32,
 }
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -1557,4 +1453,4 @@ if dupes:
     sys.exit(1)
 
 print(f"Repo:  {ROOT}")
-print(f"Wrote: {OUT} ({len(panels)} panels, layout-v31)")
+print(f"Wrote: {OUT} ({len(panels)} panels, layout-v32)")

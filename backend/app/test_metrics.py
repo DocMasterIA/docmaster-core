@@ -3,6 +3,7 @@ from unittest.mock import Mock
 from django.test import SimpleTestCase
 
 from app.metrics import (
+    docmaster_llm_invocations_total,
     docmaster_llm_tokens_total,
     normalize_auth_login_result,
     normalize_package_key,
@@ -48,6 +49,15 @@ class PackageTipoGeraçãoTests(SimpleTestCase):
 
     def test_etp_via_fluxo(self):
         self.assertEqual(package_to_tipo_geracao("unknown", fluxo="gerar_llm"), "etp")
+
+    def test_etp_livre_package(self):
+        self.assertEqual(package_to_tipo_geracao("etp_livre"), "etp")
+
+    def test_inexigibilidade_package(self):
+        self.assertEqual(
+            package_to_tipo_geracao("inexigibilidade_74_i_fornecedor_exclusivo"),
+            "inexigibilidade",
+        )
 
 
 class MetricsNormalizationTests(SimpleTestCase):
@@ -119,3 +129,21 @@ class LlmTokenMetricsTests(SimpleTestCase):
         after_out = docmaster_llm_tokens_total.labels(**labels_out)._value.get()
         self.assertEqual(after_in - before_in, 120.0)
         self.assertEqual(after_out - before_out, 45.0)
+
+    def test_clausulas_llm_increments_invocation_without_tokens(self):
+        labels = dict(
+            prefeitura="P",
+            fluxo="clausulas_llm",
+            tipo_geracao="inexigibilidade",
+            package="inexigibilidade_74_i_manutencao_veiculos",
+        )
+        before = docmaster_llm_invocations_total.labels(**labels)._value.get()
+        record_llm_token_usage(
+            fluxo="clausulas_llm",
+            prefeitura="P",
+            package="inexigibilidade_74_i_manutencao_veiculos",
+            prompt_tokens=0,
+            completion_tokens=0,
+        )
+        after = docmaster_llm_invocations_total.labels(**labels)._value.get()
+        self.assertEqual(after - before, 1.0)

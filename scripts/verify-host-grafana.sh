@@ -57,8 +57,8 @@ if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx grafana; then
     fi
   done
   if [[ "$_g_ok" -ne 1 ]]; then
-    echo "   FALHOU — grafana não alcança Prometheus (rede/DNS)"
-    echo "   Rode: ./scripts/fix-grafana-prometheus.sh"
+    echo "   FALHOU — recrie Grafana só de docmaster-core:"
+    echo "   docker rm -f grafana && docker compose -f ~/docmaster-core/docker-compose.yml up -d --no-deps grafana"
   fi
 else
   echo "   (contentor grafana não encontrado)"

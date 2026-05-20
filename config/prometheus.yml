@@ -1,6 +1,11 @@
 # Prometheus — DocMaster
-# Host: job node (node_exporter). App: job backend (/metrics Django).
-# Dashboard: scripts/build-grafana-dashboard.py → layout-v41-host
+#
+# Dois tipos de métrica (não misturar):
+#   backend  → https://api.docmasteria.com.br/metrics  (docmaster_*, django_*)
+#   node     → node_exporter na porta 9100 da MÁQUINA (CPU, RAM, disco)
+#              NÃO existe em /metrics da API.
+#
+# Grafana (produção): https://api.docmasteria.com.br/prometheus/ — não confundir com /metrics da API.
 
 global:
   scrape_interval: 15s
@@ -8,18 +13,11 @@ global:
 
 scrape_configs:
   - job_name: prometheus
+    metrics_path: /prometheus/metrics
     static_configs:
       - targets: ["localhost:9090"]
 
-  # Host — node_exporter:9100 na rede Docker (fix-prometheus-node.sh faz network connect se preciso).
-  - job_name: node
-    scrape_interval: 15s
-    static_configs:
-      - targets: ["node_exporter:9100"]
-        labels:
-          instance: docmaster-host
-
-  # API Django (métricas docmaster_* + django_*).
+  # App (produção) — o que você já usa com sucesso.
   - job_name: backend
     scheme: https
     metrics_path: /metrics
@@ -29,11 +27,10 @@ scrape_configs:
         labels:
           service: backend
 
-  # Backend local (compose com porta 8001 publicada) — não use junto com o job HTTPS acima.
-  # - job_name: backend
-  #   metrics_path: /metrics
-  #   scrape_interval: 15s
-  #   static_configs:
-  #     - targets: ["host.docker.internal:8001"]
-  #       labels:
-  #         service: backend
+  # Host — node_exporter no servidor (compose local: porta 9100 publicada no host).
+  - job_name: node
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["node_exporter:9100"]
+        labels:
+          instance: docmaster-host

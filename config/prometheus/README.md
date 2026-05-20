@@ -1,70 +1,39 @@
-# Prometheus — DocMaster
+# Prometheus + Grafana
 
-## O que é scrapeado
+## URLs (produção)
 
-| Job | Origem | Métricas |
-|-----|--------|----------|
-| `node` | [node_exporter](https://github.com/prometheus/node_exporter) no host (`:9100`) | CPU, RAM, disco, load, rede |
-| `backend` | `https://api.docmasteria.com.br/metrics` | `docmaster_*`, `django_*` |
+- Prometheus: **https://api.docmasteria.com.br/prometheus/**
+- Grafana: **https://api.docmasteria.com.br/grafana/**
+- Métricas app: **https://api.docmasteria.com.br/metrics**
 
-## Subir com Docker Compose
+Nginx: [deploy/nginx-observability-api.conf.example](../../deploy/nginx-observability-api.conf.example)
 
-```bash
-docker compose up -d node_exporter
-docker compose up -d --force-recreate prometheus grafana
-curl -s http://127.0.0.1:9100/metrics | head
-curl -sG http://127.0.0.1:9090/api/v1/query --data-urlencode 'query=up{job="node"}' | python3 -m json.tool
-# "1" = scrape OK; "0" = ver http://127.0.0.1:9090/targets (erro de rede) e rode ./scripts/fix-prometheus-node.sh
-# Targets: http://127.0.0.1:9090/targets — job node e backend UP
-```
+## Deploy na VPS
 
-`docker compose restart prometheus` **não** aplica mudanças no `command:` do compose; use `--force-recreate`.
+1. Copie `docker-compose.yml` + `config/` para `DEPLOY`.
+2. Aplique o nginx na VPS e recarregue.
+3. `cd DEPLOY && docker compose up -d node_exporter prometheus grafana`
 
-**Prometheus `Restarting` / :9090 fechado:** quase sempre compose corrido em `~` (monta `./config` errado). Só:
+## Métricas
 
-```bash
-cd ~/docmaster-core
-./scripts/diagnose-prometheus.sh
-docker rm -f prometheus
-docker compose -f ~/docmaster-core/docker-compose.yml up -d --no-deps prometheus
-docker logs prometheus --tail 30
-```
+| Job | Alvo | Conteúdo |
+|-----|------|----------|
+| `backend` | `https://api.docmasteria.com.br/metrics` | `docmaster_*`, Django |
+| `node` | `node_exporter:9100` (mesmo compose) | CPU, RAM, disco |
 
-**Conflito** `container name "/prometheus" is already in use`: misturou `docker compose` em `~` e em `docmaster-core`. Use **só um**:
+Grafana datasource: `https://api.docmasteria.com.br/prometheus`
+
+## Comandos
+
+**Na VPS:**
 
 ```bash
-cd ~/docmaster-core
-./scripts/fix-prometheus-node.sh
+curl -s 'http://127.0.0.1:9090/prometheus/api/v1/query' --data-urlencode 'query=up{job="node"}'
 ```
 
-Ou sempre: `docker compose -f ~/docmaster-core/docker-compose.yml …` (nunca só `docker compose` em `~`).
-
-## Produção (servidor da API)
-
-Painéis Host **zerados** quase sempre = `up{job="node"}` é 0 (não é CPU/RAM a 0%).
-
-**Mesmo servidor (Compose):**
-
-```bash
-docker compose up -d node_exporter prometheus
-./scripts/check-host-metrics.sh
-```
-
-**Prometheus noutra máquina** (só scrape HTTPS da API hoje):
-
-1. No servidor da API: `docker compose up -d node_exporter` (porta `9100` no host).
-2. `cp config/prometheus.d/20-node-prod.yml.example config/prometheus.d/20-node-prod.yml` — edite o IP.
-3. No `docker-compose.yml` do Prometheus, acrescente ao `command`:
-   `--config.file=/etc/prometheus/prometheus.d/20-node-prod.yml`
-4. `docker compose restart prometheus` — em `/targets` o job `node` deve ficar **UP**.
-
-## Grafana
+**No PC:**
 
 ```bash
 python3 scripts/build-grafana-dashboard.py
-./scripts/grafana-reset-dashboard.sh   # tag layout-v41-host
+GRAFANA_SKIP_COMPOSE=1 ./scripts/grafana-reset-dashboard.sh
 ```
-
-Explore: queries em `config/prometheus/explore-queries.md`.
-
-**Grafana Host vazio mas Prometheus OK:** `./scripts/verify-host-grafana.sh` — se falhar passo 3: `./scripts/fix-grafana-prometheus.sh` (Grafana não estava na rede do Prometheus / datasource `prometheus:9090` não resolvia).

@@ -1,6 +1,5 @@
 apiVersion: 1
 
-# Recria o datasource com uid fixo (evita painéis órfãos após primeiro provisionamento manual).
 deleteDatasources:
   - name: Prometheus
     orgId: 1
@@ -10,7 +9,6 @@ datasources:
     type: prometheus
     uid: prometheus
     access: proxy
-    # host.docker.internal:9090 — Grafana e Prometheus em projetos compose diferentes (~ vs docmaster-core).
-    url: http://host.docker.internal:9090
+    url: https://api.docmasteria.com.br/prometheus
     isDefault: true
     editable: true

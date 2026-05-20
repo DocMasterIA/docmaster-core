@@ -848,8 +848,9 @@ panels.append(
     text_panel(
         299,
         y,
-        "Host zerado = Prometheus sem scrape do `node_exporter` (painel «Node scrape» = 0). "
-        "No servidor: `docker compose up -d node_exporter prometheus` e `./scripts/check-host-metrics.sh`.",
+        "**API** (`api.docmasteria.com.br/metrics`) = DocMaster (ZIP, logins, LLM). "
+        "**Host** = CPU/RAM via node_exporter na porta **9100** do servidor (não vem da API). "
+        "Grafana consulta o Prometheus local (:9090), não a API no browser.",
     )
 )
 y += 3

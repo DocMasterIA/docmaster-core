@@ -11,11 +11,12 @@
 # No rag_service: LLM_ETP_GENERATION_BASE_URL=http://qwen_llm_service:8015 (Ollama/llm_api segue em LLM_ORCHESTRATION_BASE_URL).
 #
 # Métricas: GET /metrics — django-prometheus + docmaster_* (logins, gerações TR/DFD, pacotes)
-# Prometheus: docker compose up -d prometheus  → http://localhost:9090
-# Grafana:    docker compose up -d grafana     → http://localhost:3000  (admin / GRAFANA_ADMIN_PASSWORD)
+# Prometheus: https://api.docmasteria.com.br/prometheus/  (nginx → 127.0.0.1:9090)
+# Grafana:    https://api.docmasteria.com.br/grafana/     (nginx → 127.0.0.1:3000)
 #             Dashboard provisionado: pasta DocMaster → «DocMaster — Backend Django»
-#             Após mudar o JSON do dashboard: ./scripts/grafana-reset-dashboard.sh
-# Config: ./config/prometheus.yml e ./config/grafana/provisioning/
+#             Dashboard: python3 scripts/build-grafana-dashboard.py (no repo)
+#             VPS: copie config/ + compose para DEPLOY; ver docs/deploy/OBSERVABILIDADE-VPS.md
+# Config: ./config/prometheus.yml e ./config/grafana/provisioning/ (paths relativos a DEPLOY)
 
 services:
   ollama:
@@ -280,8 +281,10 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--web.console.libraries=/usr/share/prometheus/console_libraries"
       - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.route-prefix=/prometheus"
+      - "--web.external-url=${PROMETHEUS_EXTERNAL_URL:-https://api.docmasteria.com.br/prometheus/}"
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
 
   grafana:
     image: grafana/grafana:latest
@@ -295,12 +298,13 @@ services:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme}
       - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost:3000}
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-https://api.docmasteria.com.br/grafana/}
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
     volumes:
       - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
       - grafana_data:/var/lib/grafana
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
 
 volumes:
   chroma_data:

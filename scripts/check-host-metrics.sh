@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # Diagnóstico: node_exporter + scrape Prometheus (painéis Host no Grafana).
+#
+# URL padrão 127.0.0.1:9100 = porta publicada em docker-compose.yml:
+#   ports: "127.0.0.1:9100:9100"  (9100 é a porta padrão do node_exporter)
+# O Prometheus no Compose scrape node_exporter:9100 (rede Docker), não 127.0.0.1.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -9,15 +13,29 @@ NODE_URL="${NODE_METRICS_URL:-http://127.0.0.1:9100/metrics}"
 PROM_URL="${PROMETHEUS_URL:-http://127.0.0.1:9090}"
 
 echo "=== Host metrics (node_exporter) ==="
-echo "node_exporter: $NODE_URL"
+echo "Teste no host: $NODE_URL"
+echo "  (definido em docker-compose.yml → ports: \"127.0.0.1:9100:9100\")"
+echo "  Outra URL: NODE_METRICS_URL=http://IP:9100/metrics $0"
 echo ""
 
-if curl -sf --max-time 5 "$NODE_URL" | head -3 | grep -q node_memory; then
-  echo "OK — node_exporter responde (node_memory_* no /metrics)"
-else
-  echo "FALHOU — node_exporter inacessível em $NODE_URL"
-  echo "  Suba: docker compose up -d node_exporter"
-  echo "  Ou no servidor da API: curl -s http://127.0.0.1:9100/metrics | head"
+_node_ok=0
+if curl -sf --max-time 5 "$NODE_URL" 2>/dev/null | head -3 | grep -q node_memory; then
+  echo "OK — node_exporter responde no host ($NODE_URL)"
+  _node_ok=1
+elif docker ps --format '{{.Names}}' 2>/dev/null | grep -qx node_exporter; then
+  echo "Container node_exporter existe; testando pela rede Docker..."
+  if docker exec node_exporter wget -qO- http://127.0.0.1:9100/metrics 2>/dev/null | head -3 | grep -q node_memory; then
+    echo "OK — node_exporter responde dentro do container"
+    echo "  Se curl no host falhou: confira ports em docker-compose.yml (127.0.0.1:9100:9100)"
+    _node_ok=1
+  fi
+fi
+
+if [[ "$_node_ok" -ne 1 ]]; then
+  echo "FALHOU — nada em $NODE_URL"
+  echo "  docker compose ps node_exporter"
+  echo "  docker compose up -d node_exporter"
+  echo "  docker compose logs --tail 30 node_exporter"
 fi
 
 echo ""

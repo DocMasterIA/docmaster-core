@@ -19,7 +19,14 @@ curl -s 'http://127.0.0.1:9090/api/v1/query?query=up{job="node"}' | python3 -m j
 
 `docker compose restart prometheus` **não** aplica mudanças no `command:` do compose; use `--force-recreate`.
 
-**Conflito** `container name "/node_exporter" is already in use`: o exporter já existe — `docker start node_exporter`. Para só atualizar o Prometheus: `docker compose up -d --force-recreate --no-deps prometheus` (não use recreate sem `--no-deps`, senão o Compose tenta recriar o node_exporter).
+**Conflito** `container name "/prometheus" is already in use`: misturou `docker compose` em `~` e em `docmaster-core`. Use **só um**:
+
+```bash
+cd ~/docmaster-core
+./scripts/fix-prometheus-node.sh
+```
+
+Ou sempre: `docker compose -f ~/docmaster-core/docker-compose.yml …` (nunca só `docker compose` em `~`).
 
 ## Produção (servidor da API)
 

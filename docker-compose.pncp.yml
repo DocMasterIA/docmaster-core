@@ -1,0 +1,46 @@
+# PNCP Researcher — stack isolada (24/7, alimentação do índice local).
+#
+# Não misturar com «docker compose up -d backend»: este ficheiro é separado para o
+# contentor NÃO ser recriado quando outros serviços sobem.
+#
+# Uso (na pasta DEPLOY / docmaster-core):
+#   docker compose -f docker-compose.pncp.yml up -d
+#   docker compose -f docker-compose.pncp.yml logs -f
+#
+# Rede partilhada com o compose principal: docmaster_net (backend fala em pncp_researcher_service:8012).
+
+services:
+  pncp_researcher_service:
+    build:
+      context: .
+      dockerfile: pncp_researcher_service/Dockerfile
+    image: docmaster-pncp_researcher_service
+    container_name: pncp_researcher_service
+    ports:
+      - "127.0.0.1:8012:8012"
+    environment:
+      - PORT=8012
+      - PNCP_BASE_URL=https://pncp.gov.br/api/consulta
+      - PNCP_TIMEOUT=60
+      - PNCP_DEFAULT_LOOKBACK_DAYS=180
+      - PNCP_MAX_PAGINAS_PER_REQUEST=${PNCP_MAX_PAGINAS_PER_REQUEST:-120}
+      - PNCP_LOCAL_DB_PATH=/data/pncp/pncp_researcher_local.db
+    volumes:
+      - pncp_researcher_data:/data/pncp
+    networks:
+      - docmaster_net
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8012/health', timeout=5)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  pncp_researcher_data:
+
+networks:
+  docmaster_net:
+    name: docmaster_net
+    driver: bridge

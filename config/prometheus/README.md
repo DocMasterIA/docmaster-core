@@ -19,6 +19,8 @@ curl -s 'http://127.0.0.1:9090/api/v1/query?query=up{job="node"}' | python3 -m j
 
 `docker compose restart prometheus` **não** aplica mudanças no `command:` do compose; use `--force-recreate`.
 
+**Conflito** `container name "/node_exporter" is already in use`: o exporter já existe (ex. subiu `docker compose` em `~`). Use `docker start node_exporter` ou `./scripts/fix-prometheus-node.sh` (reutiliza o contentor). Scrape usa `host.docker.internal:9100`, não precisa recriar o exporter.
+
 ## Produção (servidor da API)
 
 Painéis Host **zerados** quase sempre = `up{job="node"}` é 0 (não é CPU/RAM a 0%).

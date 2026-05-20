@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Recria Prometheus com job node + valida scrape (correr SEM sudo, em docmaster-core).
+# Recria Prometheus com job node + valida scrape (correr SEM sudo, a partir de docmaster-core).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -17,27 +17,55 @@ if ! grep -q 'job_name: node' "$PROM_YML"; then
 fi
 
 echo "Repo: $REPO_ROOT"
-echo "Subindo node_exporter + recriando prometheus..."
-docker compose up -d node_exporter
+echo ""
+
+ensure_node_exporter() {
+  if docker container inspect node_exporter >/dev/null 2>&1; then
+    local state
+    state="$(docker inspect -f '{{.State.Status}}' node_exporter)"
+    if [[ "$state" == "running" ]]; then
+      echo "node_exporter — contentor já em execução (reutilizado; evita conflito de nome)."
+    else
+      echo "node_exporter — a arrancar contentor existente..."
+      docker start node_exporter
+    fi
+    return 0
+  fi
+  echo "node_exporter — a criar via docker compose..."
+  docker compose up -d node_exporter
+}
+
+ensure_node_exporter || {
+  echo ""
+  echo "Conflito de nome: outro projeto Docker já criou «node_exporter»."
+  echo "  Opção A (recomendado): docker start node_exporter"
+  echo "  Opção B: docker rm -f node_exporter && docker compose up -d node_exporter"
+  exit 1
+}
+
+echo "Prometheus — recriar para carregar config/prometheus.yml (job node)..."
 docker compose up -d --force-recreate prometheus
 
-echo "Aguardando API do Prometheus (até 30s)..."
-for i in $(seq 1 30); do
+echo "Aguardando API do Prometheus (até 45s)..."
+ready=0
+for i in $(seq 1 45); do
   if curl -sf --max-time 2 http://127.0.0.1:9090/-/ready >/dev/null 2>&1; then
     echo "Prometheus ready (${i}s)"
+    ready=1
     break
   fi
   sleep 1
-  if [[ "$i" -eq 30 ]]; then
-    echo "ERRO: Prometheus não responde em :9090"
-    docker compose ps prometheus
-    docker compose logs prometheus --tail 40
-    exit 1
-  fi
 done
+if [[ "$ready" -ne 1 ]]; then
+  echo "ERRO: Prometheus não responde em :9090"
+  docker compose ps prometheus
+  docker compose logs prometheus --tail 40
+  exit 1
+fi
 
 echo ""
-echo "Command do contentor:"
+echo "Scrape node → $(grep -A2 'job_name: node' "$PROM_YML" | grep targets || true)"
+echo "Command do contentor prometheus:"
 docker inspect prometheus --format '{{range .Config.Cmd}}{{.}} {{end}}' 2>/dev/null || true
 echo ""
 
@@ -51,9 +79,18 @@ for t in d.get('data',{}).get('activeTargets',[]):
 
 echo ""
 echo "up{job=\"node\"}:"
-curl -sf 'http://127.0.0.1:9090/api/v1/query?query=up%7Bjob%3D%22node%22%7D' | python3 -m json.tool
+if curl -sf 'http://127.0.0.1:9090/api/v1/query?query=up%7Bjob%3D%22node%22%7D' | python3 -m json.tool; then
+  :
+else
+  echo "AVISO: job node ainda DOWN — veja http://127.0.0.1:9090/targets"
+fi
 
 echo ""
-curl -sf --max-time 3 http://127.0.0.1:9100/metrics 2>/dev/null | grep -m1 '^node_memory' \
-  && echo "OK — node_exporter no host :9100" \
-  || echo "AVISO — curl 127.0.0.1:9100 falhou no host (no WSL tente sem sudo; scrape Docker pode funcionar mesmo assim)"
+if curl -sf --max-time 3 http://127.0.0.1:9100/metrics 2>/dev/null | grep -q '^node_memory_'; then
+  echo "OK — node_exporter no host :9100"
+else
+  echo "AVISO — curl 127.0.0.1:9100 falhou no host (sem sudo). Scrape usa host.docker.internal:9100."
+fi
+
+echo ""
+echo "Próximo: ./scripts/check-host-metrics.sh"

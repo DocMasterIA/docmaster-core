@@ -11,11 +11,12 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
-  # Host — node_exporter no mesmo docker compose (CPU, RAM, disco, load).
+  # Host — node_exporter publica 127.0.0.1:9100 no host (docker-compose ports).
+  # host.docker.internal evita conflito quando o contentor foi criado noutro `docker compose` (~ vs docmaster-core).
   - job_name: node
     scrape_interval: 15s
     static_configs:
-      - targets: ["node_exporter:9100"]
+      - targets: ["host.docker.internal:9100"]
         labels:
           instance: docmaster-host
 

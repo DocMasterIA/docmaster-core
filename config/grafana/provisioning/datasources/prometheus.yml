@@ -9,6 +9,8 @@ datasources:
     type: prometheus
     uid: prometheus
     access: proxy
-    url: https://api.docmasteria.com.br/prometheus
+    # Padrão: Prometheus no mesmo host (porta 9090 publicada em 127.0.0.1).
+    # Não usa api.docmasteria.com.br — isso exigiria nginx extra (opcional).
+    url: http://host.docker.internal:9090
     isDefault: true
     editable: true

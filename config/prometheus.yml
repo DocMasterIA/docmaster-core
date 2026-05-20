@@ -5,7 +5,7 @@
 #   node     → node_exporter na porta 9100 da MÁQUINA (CPU, RAM, disco)
 #              NÃO existe em /metrics da API.
 #
-# Grafana (produção): https://api.docmasteria.com.br/prometheus/ — não confundir com /metrics da API.
+# Grafana lê Prometheus em http://host.docker.internal:9090 (compose local). /metrics da API = job backend.
 
 global:
   scrape_interval: 15s
@@ -13,7 +13,6 @@ global:
 
 scrape_configs:
   - job_name: prometheus
-    metrics_path: /prometheus/metrics
     static_configs:
       - targets: ["localhost:9090"]
 

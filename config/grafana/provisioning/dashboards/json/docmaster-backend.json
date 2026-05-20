@@ -19,7 +19,7 @@
       "id": 299,
       "options": {
         "mode": "markdown",
-        "content": "**API** (`api.docmasteria.com.br/metrics`) = DocMaster (ZIP, logins, LLM). **Host** = CPU/RAM via node_exporter na porta **9100** do servidor (não vem da API). Grafana consulta o Prometheus local (:9090), não a API no browser."
+        "content": "**API** (`api.docmasteria.com.br/metrics`) = DocMaster (ZIP, logins, LLM). **Tokens IA** = `docmaster_llm_tokens_total` + `docmaster_llm_invocations_total` (média = tokens ÷ chamadas). **Host** = node_exporter :9100. Grafana lê o Prometheus, não a API no browser."
       },
       "title": "",
       "type": "text",
@@ -608,6 +608,415 @@
         "x": 0,
         "y": 21
       },
+      "id": 265,
+      "title": "Tokens IA (período)",
+      "type": "row"
+    },
+    {
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "id": 266,
+      "options": {
+        "mode": "markdown",
+        "content": "**Média** = (entrada + saída) ÷ chamadas LLM (`docmaster_llm_invocations_total`). Dispensa: `fill_tr_slots`. Inexigibilidade: `clausulas_llm`. ETP: `gerar_llm`. 0 = nenhuma chamada desse tipo no intervalo."
+      },
+      "title": "",
+      "type": "text",
+      "transparent": true
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "docmaster_llm_tokens_total ÷ invocações (dispensa_normal).",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "noValue": "0",
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 25
+      },
+      "id": 361,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"dispensa_normal\"}[$__range])) / clamp_min(sum(increase(docmaster_llm_invocations_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"dispensa_normal\"}[$__range])), 1))",
+          "refId": "A",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
+        }
+      ],
+      "title": "Média — Dispensa normal",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Soma no intervalo selecionado no Grafana.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "noValue": "0",
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 25
+      },
+      "id": 362,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"dispensa_rapida\"}[$__range])) / clamp_min(sum(increase(docmaster_llm_invocations_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"dispensa_rapida\"}[$__range])), 1))",
+          "refId": "A",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
+        }
+      ],
+      "title": "Média — Dispensa rápida",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Cláusulas via /api/llm (fluxo clausulas_llm).",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "noValue": "0",
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 25
+      },
+      "id": 363,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"inexigibilidade\"}[$__range])) / clamp_min(sum(increase(docmaster_llm_invocations_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"inexigibilidade\"}[$__range])), 1))",
+          "refId": "A",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
+        }
+      ],
+      "title": "Média — Inexigibilidade",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Soma no intervalo selecionado no Grafana.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "noValue": "0",
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 25
+      },
+      "id": 364,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"etp\"}[$__range])) / clamp_min(sum(increase(docmaster_llm_invocations_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\",tipo_geracao=\"etp\"}[$__range])), 1))",
+          "refId": "A",
+          "range": true,
+          "instant": false,
+          "editorMode": "code",
+          "legendFormat": ""
+        }
+      ],
+      "title": "Média — ETP",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Soma entrada+saída no período (docmaster_llm_tokens_total).",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "min": 0,
+          "unit": "none",
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tokens"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tipo de geração"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 420
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 0,
+        "y": 29
+      },
+      "id": 365,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Tokens"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\"}[$__range])) by (tipo_geracao), \"tipo\", \"Dispensa normal\", \"tipo_geracao\", \"dispensa_normal\"), \"tipo\", \"Dispensa rápida\", \"tipo_geracao\", \"dispensa_rapida\"), \"tipo\", \"Inexigibilidade\", \"tipo_geracao\", \"inexigibilidade\"), \"tipo\", \"ETP\", \"tipo_geracao\", \"etp\"), \"tipo\", \"Outros\", \"tipo_geracao\", \"other\"), \"tipo\", \"$1\", \"tipo_geracao\", \"(.+)\")",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "format": "table",
+          "editorMode": "code"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "tipo_geracao": true,
+              "fluxo": true,
+              "fluxo_label": true,
+              "package": true,
+              "prefeitura": true,
+              "direction": true,
+              "operation": true,
+              "result": true,
+              "output": true,
+              "le": true
+            },
+            "renameByName": {
+              "tipo": "Tipo de geração",
+              "fluxo_label": "Fluxo",
+              "Value": "Tokens"
+            }
+          }
+        }
+      ],
+      "title": "Tokens totais por família",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "fill_tr_slots, clausulas_llm, gerar_llm, gerar_tr_e_dfd.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "min": 0,
+          "unit": "none",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 29
+      },
+      "id": 366,
+      "options": {
+        "displayMode": "basic",
+        "minVizHeight": 18,
+        "minVizWidth": 0,
+        "namePlacement": "left",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "manual",
+        "valueMode": "color",
+        "legend": {
+          "displayMode": "hidden"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(sum(increase(docmaster_llm_tokens_total{fluxo=~\"fill_tr_slots|gerar_tr_e_dfd|gerar_llm|clausulas_llm\"}[$__range])) by (fluxo), \"fluxo_label\", \"Preencher slots (IA)\", \"fluxo\", \"fill_tr_slots\"), \"fluxo_label\", \"Cláusulas (formulário /api/llm)\", \"fluxo\", \"clausulas_llm\"), \"fluxo_label\", \"TR + DFD + Ofício\", \"fluxo\", \"gerar_tr_e_dfd\"), \"fluxo_label\", \"Gerar documento (LLM)\", \"fluxo\", \"gerar_llm\"), \"fluxo_label\", \"TR modelo\", \"fluxo\", \"gerar_tr_modelo\"), \"fluxo_label\", \"Outro fluxo\", \"fluxo\", \"unknown\"), \"fluxo_label\", \"$1\", \"fluxo\", \"(.+)\")",
+          "refId": "A",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{fluxo_label}}",
+          "editorMode": "code"
+        }
+      ],
+      "title": "Tokens por fluxo",
+      "type": "bargauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
       "id": 275,
       "title": "Detalhe no período",
       "type": "row"
@@ -633,7 +1042,7 @@
         "h": 5,
         "w": 12,
         "x": 0,
-        "y": 22
+        "y": 35
       },
       "id": 3071,
       "options": {
@@ -729,7 +1138,7 @@
         "h": 5,
         "w": 6,
         "x": 12,
-        "y": 22
+        "y": 35
       },
       "id": 274,
       "options": {
@@ -845,7 +1254,7 @@
         "h": 5,
         "w": 6,
         "x": 18,
-        "y": 22
+        "y": 35
       },
       "id": 276,
       "options": {
@@ -911,7 +1320,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 27
+        "y": 40
       },
       "id": 350,
       "title": "Saúde",
@@ -952,7 +1361,7 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 28
+        "y": 41
       },
       "id": 351,
       "options": {
@@ -1019,7 +1428,7 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 28
+        "y": 41
       },
       "id": 352,
       "options": {
@@ -1086,7 +1495,7 @@
         "h": 4,
         "w": 6,
         "x": 12,
-        "y": 28
+        "y": 41
       },
       "id": 355,
       "options": {
@@ -1153,7 +1562,7 @@
         "h": 4,
         "w": 6,
         "x": 18,
-        "y": 28
+        "y": 41
       },
       "id": 353,
       "options": {
@@ -1193,7 +1602,8 @@
     "docmaster",
     "backend",
     "django",
-    "layout-v41-host"
+    "layout-v41-host",
+    "layout-v42-tokens"
   ],
   "templating": {
     "list": []
@@ -1205,5 +1615,5 @@
   "timezone": "browser",
   "title": "DocMaster — Backend Django",
   "uid": "docmaster-backend",
-  "version": 41
+  "version": 42
 }

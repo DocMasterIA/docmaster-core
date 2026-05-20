@@ -1,55 +1,70 @@
-# Observabilidade na VPS (fluxo real)
+# Observabilidade na VPS (sem mexer no nginx)
 
-O `docker-compose.yml` e a pasta `config/` vêm **do repositório** e são **copiados** para a pasta de deploy na VPS (`DEPLOY`). O que importa é **onde o compose roda na VPS**, não o caminho do clone no PC.
+O `docker-compose.yml` e `config/` são **copiados** para a pasta de deploy (`DEPLOY`). Comandos: **`cd DEPLOY`**, nunca só `docker compose` em `~` sem a pasta `config/`.
 
-## URLs públicas (api.docmasteria.com.br)
+## Não precisa de sites-available / nginx custom
 
-| Serviço | URL | Upstream local |
-|---------|-----|----------------|
-| **Prometheus** | https://api.docmasteria.com.br/prometheus/ | `127.0.0.1:9090` |
-| **Grafana** | https://api.docmasteria.com.br/grafana/ | `127.0.0.1:3000` |
-| **Métricas Django** | https://api.docmasteria.com.br/metrics | backend (job `backend` no Prometheus) |
+O **api.docmasteria.com.br** continua só com o Django (como hoje). Grafana e Prometheus **não** entram nesse domínio por padrão.
 
-Não use `http://IP_DA_VPS:3000` nem `:9090` na internet — só localhost + nginx.
+Por isso **https://api.docmasteria.com.br/grafana/** dá **404** — é o Django, não o Grafana. Isso é normal **sem** configurar proxy no nginx (que não é obrigatório).
 
-Config nginx: [deploy/nginx-observability-api.conf.example](../../deploy/nginx-observability-api.conf.example)
+## Como acessar o Grafana (recomendado)
 
-## Na VPS (depois de copiar o pacote)
+### Na própria VPS (SSH)
 
 ```bash
 cd DEPLOY
-# 1) Incluir bloco nginx no server api.docmasteria.com.br e: sudo nginx -t && sudo systemctl reload nginx
-# 2) Subir stack
+docker compose up -d node_exporter prometheus grafana
+curl -s http://127.0.0.1:3000/api/health
+```
+
+No browser **na VPS** (ou com túnel): **http://127.0.0.1:3000**
+
+Dashboard: **http://127.0.0.1:3000/d/docmaster-backend**
+
+Login: `admin` + senha do `.env` (`GRAFANA_ADMIN_PASSWORD`, default `changeme`).
+
+### Do seu PC (túnel SSH — o mais simples)
+
+```bash
+ssh -L 3000:127.0.0.1:3000 docmaster@SUA_VPS
+```
+
+No PC: **http://127.0.0.1:3000/d/docmaster-backend**
+
+Nada de nginx, Cloudflare ou `sites-enabled`.
+
+### WSL / máquina local (docmaster-core no desktop)
+
+```bash
+cd ~/docmaster-core
 docker compose up -d node_exporter prometheus grafana
 ```
 
-Confirme:
+**http://127.0.0.1:3000/d/docmaster-backend**
+
+## Prometheus
+
+- Na VPS: `http://127.0.0.1:9090` (só localhost)
+- Métricas da API: o Prometheus **já** scrape `https://api.docmasteria.com.br/metrics` (job `backend`) — isso **não** muda o nginx do site.
+
+## Atualizar dashboard
 
 ```bash
-curl -sI https://api.docmasteria.com.br/prometheus/-/ready | head -1
-curl -sI https://api.docmasteria.com.br/grafana/api/health | head -1
-curl -s 'http://127.0.0.1:9090/prometheus/api/v1/query' --data-urlencode 'query=up{job="node"}'
-```
-
-## No PC (atualizar dashboard / datasource)
-
-```bash
-cd /caminho/do/docmaster-core
 python3 scripts/build-grafana-dashboard.py
-GRAFANA_SKIP_COMPOSE=1 ./scripts/grafana-reset-dashboard.sh
+cd DEPLOY && docker compose restart grafana
 ```
 
-Defaults: `GRAFANA_URL=https://api.docmasteria.com.br/grafana`, datasource `https://api.docmasteria.com.br/prometheus`.
+## Opcional (só se um dia quiser URL pública)
 
-## Sincronizar ficheiros na VPS
+Ficheiro de referência **não aplicado automaticamente**: [nginx-observability-api.conf.example](../../deploy/nginx-observability-api.conf.example)
 
-```bash
-rsync -av config/ docker-compose.yml DEPLOY_USER@VPS:DEPLOY/
-ssh VPS 'cd DEPLOY && docker compose up -d --force-recreate prometheus grafana'
-```
+Só use se souber **onde** o nginx do servidor define `api.docmasteria.com.br` (painel do host, `/etc/nginx/nginx.conf`, etc.). Erro no nginx pode derrubar o site — por isso o padrão do projeto é **túnel SSH**, não mexer no proxy.
 
 ## Erros comuns
 
-1. **404 em /prometheus/** — falta o bloco nginx; Django responde 404.
-2. **Grafana sem dados** — datasource deve ser `https://api.docmasteria.com.br/prometheus`, não `http://prometheus:9090`.
-3. **`docker compose` em `~` sem `config/`** — monta paths errados; use `cd DEPLOY`.
+| Problema | Causa |
+|----------|--------|
+| 404 em `api.docmasteria.com.br/grafana` | Esperado sem nginx; use `127.0.0.1:3000` ou túnel |
+| Conflito `container name prometheus` | Dois `docker compose` em pastas diferentes; use só `cd DEPLOY` |
+| Grafana sem dados | Datasource deve ser `http://host.docker.internal:9090` (já no provisioning) |

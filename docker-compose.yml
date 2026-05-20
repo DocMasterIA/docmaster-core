@@ -11,8 +11,9 @@
 # No rag_service: LLM_ETP_GENERATION_BASE_URL=http://qwen_llm_service:8015 (Ollama/llm_api segue em LLM_ORCHESTRATION_BASE_URL).
 #
 # Métricas: GET /metrics — django-prometheus + docmaster_* (logins, gerações TR/DFD, pacotes)
-# Prometheus: https://api.docmasteria.com.br/prometheus/  (nginx → 127.0.0.1:9090)
-# Grafana:    https://api.docmasteria.com.br/grafana/     (nginx → 127.0.0.1:3000)
+# Grafana:    http://127.0.0.1:3000  (na VPS; do PC use túnel SSH — ver docs/deploy/OBSERVABILIDADE-VPS.md)
+# Prometheus: http://127.0.0.1:9090  (só na máquina do compose)
+# URL pública em api.docmasteria.com.br/grafana é OPCIONAL (exige nginx manual — não é o padrão).
 #             Dashboard provisionado: pasta DocMaster → «DocMaster — Backend Django»
 #             Dashboard: python3 scripts/build-grafana-dashboard.py (no repo)
 #             VPS: copie config/ + compose para DEPLOY; ver docs/deploy/OBSERVABILIDADE-VPS.md
@@ -281,8 +282,6 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--web.console.libraries=/usr/share/prometheus/console_libraries"
       - "--web.console.templates=/usr/share/prometheus/consoles"
-      - "--web.route-prefix=/prometheus"
-      - "--web.external-url=${PROMETHEUS_EXTERNAL_URL:-https://api.docmasteria.com.br/prometheus/}"
     ports:
       - "127.0.0.1:9090:9090"
 
@@ -298,8 +297,8 @@ services:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme}
       - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-https://api.docmasteria.com.br/grafana/}
-      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://127.0.0.1:3000/}
+      - GF_SERVER_SERVE_FROM_SUB_PATH=${GRAFANA_SERVE_FROM_SUB_PATH:-false}
     volumes:
       - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
       - grafana_data:/var/lib/grafana

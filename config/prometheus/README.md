@@ -1,39 +1,30 @@
 # Prometheus + Grafana
 
-## URLs (produção)
+## Acesso (padrão — sem nginx)
 
-- Prometheus: **https://api.docmasteria.com.br/prometheus/**
-- Grafana: **https://api.docmasteria.com.br/grafana/**
-- Métricas app: **https://api.docmasteria.com.br/metrics**
+| O quê | URL |
+|-------|-----|
+| Grafana | http://127.0.0.1:3000 |
+| Dashboard | http://127.0.0.1:3000/d/docmaster-backend |
+| Prometheus | http://127.0.0.1:9090 |
+| Métricas API | https://api.docmasteria.com.br/metrics (scrape automático) |
 
-Nginx: [deploy/nginx-observability-api.conf.example](../../deploy/nginx-observability-api.conf.example)
+Do PC para a VPS: `ssh -L 3000:127.0.0.1:3000 user@vps` e abra http://127.0.0.1:3000
 
-## Deploy na VPS
+## Deploy
 
-1. Copie `docker-compose.yml` + `config/` para `DEPLOY`.
-2. Aplique o nginx na VPS e recarregue.
-3. `cd DEPLOY && docker compose up -d node_exporter prometheus grafana`
+```bash
+cd DEPLOY   # pasta com docker-compose.yml + config/ copiados do repo
+docker compose up -d node_exporter prometheus grafana
+```
+
+Detalhes: [docs/deploy/OBSERVABILIDADE-VPS.md](../../docs/deploy/OBSERVABILIDADE-VPS.md)
 
 ## Métricas
 
-| Job | Alvo | Conteúdo |
-|-----|------|----------|
-| `backend` | `https://api.docmasteria.com.br/metrics` | `docmaster_*`, Django |
-| `node` | `node_exporter:9100` (mesmo compose) | CPU, RAM, disco |
+| Job | Alvo |
+|-----|------|
+| `backend` | `https://api.docmasteria.com.br/metrics` |
+| `node` | `node_exporter:9100` |
 
-Grafana datasource: `https://api.docmasteria.com.br/prometheus`
-
-## Comandos
-
-**Na VPS:**
-
-```bash
-curl -s 'http://127.0.0.1:9090/prometheus/api/v1/query' --data-urlencode 'query=up{job="node"}'
-```
-
-**No PC:**
-
-```bash
-python3 scripts/build-grafana-dashboard.py
-GRAFANA_SKIP_COMPOSE=1 ./scripts/grafana-reset-dashboard.sh
-```
+Grafana datasource (provisioning): `http://host.docker.internal:9090`

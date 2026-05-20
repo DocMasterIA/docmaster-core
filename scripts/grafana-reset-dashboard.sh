@@ -8,9 +8,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${DOCMASTER_ROOT:-$SCRIPT_DIR/..}" && pwd)"
-REQUIRED_LAYOUT_TAG="${GRAFANA_REQUIRED_LAYOUT:-layout-v41-host}"
+REQUIRED_LAYOUT_TAG="${GRAFANA_REQUIRED_LAYOUT:-layout-v42-tokens}"
 
-GRAFANA_URL="${GRAFANA_URL:-https://api.docmasteria.com.br/grafana}"
+GRAFANA_URL="${GRAFANA_URL:-http://127.0.0.1:3000}"
 GRAFANA_USER="${GRAFANA_USER:-admin}"
 GRAFANA_PASS="${GRAFANA_PASS:-changeme}"
 DASH_UID="docmaster-backend"
@@ -43,11 +43,7 @@ if [[ -z "$SKIP_COMPOSE" ]]; then
   fi
 fi
 
-if _grafana_local; then
-  PROM_PUBLIC_URL="${GRAFANA_PROMETHEUS_URL:-http://127.0.0.1:9090/prometheus}"
-else
-  PROM_PUBLIC_URL="${GRAFANA_PROMETHEUS_URL:-https://api.docmasteria.com.br/prometheus}"
-fi
+PROM_PUBLIC_URL="${GRAFANA_PROMETHEUS_URL:-http://host.docker.internal:9090}"
 
 echo "Script:            ${SCRIPT_DIR}/$(basename "$0")"
 echo "Repo (JSON):       ${REPO_ROOT}"
@@ -134,7 +130,7 @@ if echo "$DS_HEALTH" | grep -q '"status":"ERROR"'; then
   if [[ -n "$GRAFANA_HOST" && "$GRAFANA_HOST" != "127.0.0.1" && "$GRAFANA_HOST" != "localhost" ]]; then
     PROM_URLS+=("https://${GRAFANA_HOST}/prometheus" "http://${GRAFANA_HOST}:9090")
   fi
-  PROM_URLS+=("http://host.docker.internal:9090/prometheus" "http://prometheus:9090/prometheus")
+  PROM_URLS+=("http://127.0.0.1:9090" "http://prometheus:9090")
   for prom_url in "${PROM_URLS[@]}"; do
     echo "    tentativa: ${prom_url}"
     curl -sf -u "${GRAFANA_USER}:${GRAFANA_PASS}" -X PUT \
@@ -218,6 +214,8 @@ if len(panels) < 14:
     sys.exit(f"ERRO: só {len(panels)} painéis")
 if "node_memory_MemAvailable_bytes" not in json.dumps(panels):
     sys.exit("ERRO: sem queries node_exporter")
+if "docmaster_llm_tokens_total" not in json.dumps(panels):
+    sys.exit("ERRO: sem docmaster_llm_tokens_total — corra build-grafana-dashboard.py")
 print(f"OK — {len(panels)} painéis, tags={tags}")
 PY
 

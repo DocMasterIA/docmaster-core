@@ -307,6 +307,14 @@ def llm_invocations_by_tipo_geracao_period() -> str:
     return f'label_replace({expr}, "tipo", "$1", "tipo_geracao", "(.+)")'
 
 
+def total_tokens_by_tipo_geracao_period() -> str:
+    """Soma entrada+saída no período por família (docmaster_llm_tokens_total)."""
+    expr = f"sum(increase({_LLM_TOKENS_METRIC}[$__range])) by (tipo_geracao)"
+    for key, label in TIPO_GERACAO_LABELS.items():
+        expr = f'label_replace({expr}, "tipo", "{_promql_escape(label)}", "tipo_geracao", "{key}")'
+    return f'label_replace({expr}, "tipo", "$1", "tipo_geracao", "(.+)")'
+
+
 def operations_by_tipo_geracao_total(*, result: str = "success") -> str:
     sel = f'docmaster_document_operations_total{{result="{result}"}}'
     expr = f"sum({sel}) by (tipo_geracao)"
@@ -848,9 +856,9 @@ panels.append(
     text_panel(
         299,
         y,
-        "**API** (`api.docmasteria.com.br/metrics`) = DocMaster (ZIP, logins, LLM). "
-        "**Host** = CPU/RAM via node_exporter na porta **9100** do servidor (não vem da API). "
-        "Grafana consulta o Prometheus local (:9090), não a API no browser.",
+        "**API** (`/metrics` remoto) = DocMaster (ZIP, logins, LLM). "
+        "**Tokens IA** = `docmaster_llm_tokens_total` + `docmaster_llm_invocations_total` (média = tokens ÷ chamadas). "
+        "**Host** = node_exporter :9100. Grafana lê o Prometheus, não a API no browser.",
     )
 )
 y += 3
@@ -993,6 +1001,103 @@ panels += [
 ]
 y += 4
 
+panels.append(row(265, "Tokens IA (período)", y))
+y += 1
+panels.append(
+    text_panel(
+        266,
+        y,
+        "**Média** = (entrada + saída) ÷ chamadas LLM (`docmaster_llm_invocations_total`). "
+        "Dispensa: `fill_tr_slots`. Inexigibilidade: `clausulas_llm`. ETP: `gerar_llm`. "
+        "0 = nenhuma chamada desse tipo no intervalo.",
+    )
+)
+y += 3
+panels += [
+    stat(
+        361,
+        "Média — Dispensa normal",
+        y,
+        0,
+        6,
+        avg_tokens_for_tipo("dispensa_normal"),
+        period=True,
+        unit="short",
+        decimals=0,
+        color_mode="none",
+        no_value="0",
+        desc="docmaster_llm_tokens_total ÷ invocações (dispensa_normal).",
+    ),
+    stat(
+        362,
+        "Média — Dispensa rápida",
+        y,
+        6,
+        6,
+        avg_tokens_for_tipo("dispensa_rapida"),
+        period=True,
+        unit="short",
+        decimals=0,
+        color_mode="none",
+        no_value="0",
+    ),
+    stat(
+        363,
+        "Média — Inexigibilidade",
+        y,
+        12,
+        6,
+        avg_tokens_for_tipo("inexigibilidade"),
+        period=True,
+        unit="short",
+        decimals=0,
+        color_mode="none",
+        no_value="0",
+        desc="Cláusulas via /api/llm (fluxo clausulas_llm).",
+    ),
+    stat(
+        364,
+        "Média — ETP",
+        y,
+        18,
+        6,
+        avg_tokens_for_tipo("etp"),
+        period=True,
+        unit="short",
+        decimals=0,
+        color_mode="none",
+        no_value="0",
+    ),
+]
+y += 4
+panels.append(
+    prom_table_generations(
+        365,
+        "Tokens totais por família",
+        y,
+        0,
+        12,
+        5,
+        total_tokens_by_tipo_geracao_period(),
+        value_col="Tokens",
+        desc="Soma entrada+saída no período (docmaster_llm_tokens_total).",
+    )
+)
+panels.append(
+    bargauge_by_label(
+        366,
+        "Tokens por fluxo",
+        y,
+        12,
+        12,
+        5,
+        tokens_by_fluxo_period(),
+        "{{fluxo_label}}",
+        desc="fill_tr_slots, clausulas_llm, gerar_llm, gerar_tr_e_dfd.",
+    )
+)
+y += 5
+
 panels.append(row(275, "Detalhe no período", y))
 y += 1
 panels.append(
@@ -1091,13 +1196,13 @@ dash = {
     "panels": panels,
     "refresh": "1m",
     "schemaVersion": 39,
-    "tags": ["docmaster", "backend", "django", "layout-v41-host"],
+    "tags": ["docmaster", "backend", "django", "layout-v41-host", "layout-v42-tokens"],
     "templating": {"list": []},
     "time": {"from": "now-24h", "to": "now"},
     "timezone": "browser",
     "title": "DocMaster — Backend Django",
     "uid": "docmaster-backend",
-    "version": 41,
+    "version": 42,
 }
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -1110,4 +1215,4 @@ if dupes:
     sys.exit(1)
 
 print(f"Repo:  {ROOT}")
-print(f"Wrote: {OUT} ({len(panels)} panels, layout-v41-host)")
+print(f"Wrote: {OUT} ({len(panels)} panels, layout-v42-tokens)")

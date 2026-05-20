@@ -1,13 +1,19 @@
-# Observabilidade em api.docmasteria.com.br (nginx no host da VPS).
-# Prometheus: https://api.docmasteria.com.br/prometheus/
-# Grafana:    https://api.docmasteria.com.br/grafana/
+# OPCIONAL — NÃO é necessário para usar Grafana no dia a dia.
 #
-# Pré-requisitos (compose na pasta DEPLOY):
-#   - Prometheus com --web.route-prefix=/prometheus (ver docker-compose.yml)
-#   - Grafana com GF_SERVER_ROOT_URL e GF_SERVER_SERVE_FROM_SUB_PATH
-#   - Portas 9090 e 3000 só em 127.0.0.1 (não expor IP:3000 / IP:9090 na internet)
+# O projeto usa por padrão: http://127.0.0.1:3000 na VPS + túnel SSH do PC.
+# Sem este ficheiro, api.docmasteria.com.br/grafana dá 404 (Django) — isso é esperado.
 #
-# Inclua este bloco no server { } de api.docmasteria.com.br, ANTES do location / do Django.
+# Só aplique se souber exatamente onde o nginx do servidor define api.docmasteria.com.br
+# (não há "sites-enabled" obrigatório; cada servidor é diferente).
+# Teste sempre: sudo nginx -t && sudo systemctl reload nginx
+#
+# Se usar este bloco, no .env do DEPLOY também defina:
+#   PROMETHEUS_ROUTE_PREFIX=/prometheus
+#   PROMETHEUS_EXTERNAL_URL=https://api.docmasteria.com.br/prometheus/
+#   GRAFANA_ROOT_URL=https://api.docmasteria.com.br/grafana/
+#   GRAFANA_SERVE_FROM_SUB_PATH=true
+#
+# Inclua ANTES do location / do Django.
 
 location /prometheus/ {
     proxy_pass http://127.0.0.1:9090;

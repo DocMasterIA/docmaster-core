@@ -53,7 +53,7 @@ docker compose stop backend
 
 ```bash
 docker compose -f docker-compose.pncp.yml logs -f
-curl -s http://127.0.0.1:8012/health
+curl -s http://127.0.0.1:8012/api/pncp-research/health
 ```
 
 ## Rede

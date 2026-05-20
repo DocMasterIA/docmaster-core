@@ -23,6 +23,13 @@ else
 fi
 
 cd "$DEPLOY"
+PNCP_HEALTH_URL="${PNCP_HEALTH_URL:-http://127.0.0.1:8012/api/pncp-research/health}"
+
+if ! docker network inspect docmaster_net >/dev/null 2>&1; then
+  echo "==> A criar rede docmaster_net..."
+  docker network create docmaster_net
+fi
+
 echo "==> PNCP Researcher (projeto docmaster-pncp)"
 echo "    compose: $COMPOSE_FILE"
 echo "    build context: $PNCP_BUILD_CONTEXT"
@@ -35,7 +42,7 @@ echo ""
 echo "==> A aguardar /health (até ~45s na 1ª subida)..."
 ok=0
 for _ in $(seq 1 15); do
-  if curl -sf --max-time 5 http://127.0.0.1:8012/health >/dev/null 2>&1; then
+  if curl -sf --max-time 5 "$PNCP_HEALTH_URL" >/dev/null 2>&1; then
     ok=1
     break
   fi
@@ -43,11 +50,11 @@ for _ in $(seq 1 15); do
 done
 
 if [[ "$ok" -eq 1 ]]; then
-  curl -sf http://127.0.0.1:8012/health | head -c 200
+  curl -sf "$PNCP_HEALTH_URL" | head -c 200
   echo ""
-  echo "OK  http://127.0.0.1:8012/health"
+  echo "OK  $PNCP_HEALTH_URL"
 else
-  echo "OFF http://127.0.0.1:8012/health"
+  echo "OFF $PNCP_HEALTH_URL"
   echo "Logs: docker compose -f $COMPOSE_FILE logs --tail 50"
 fi
 

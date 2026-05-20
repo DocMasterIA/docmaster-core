@@ -33,6 +33,7 @@ fi
 
 if [[ "$_node_ok" -ne 1 ]]; then
   echo "FALHOU — nada em $NODE_URL"
+  echo "  Não use sudo (docker do root ≠ docker do user docmaster)."
   echo "  docker compose ps node_exporter"
   echo "  docker compose up -d node_exporter"
   echo "  docker compose logs --tail 30 node_exporter"
@@ -58,12 +59,11 @@ sys.exit(0 if v>=1 else 2)
   else
     echo "FALHOU — up{job=\"node\"} ausente ou 0"
     echo "  Targets: ${PROM_URL}/targets (procure job node)"
-    echo "  Compose: docker compose up -d node_exporter prometheus"
-    echo "  Produção remota: cp config/prometheus.d/20-node-prod.yml.example \\"
-    echo "      config/prometheus.d/20-node-prod.yml  # IP:9100 do servidor API"
-    echo "    Edite docker-compose.yml command do prometheus para incluir esse ficheiro:"
-    echo "      --config.file=/etc/prometheus/prometheus.d/20-node-prod.yml"
-    echo "    docker compose restart prometheus"
+    echo "  O contentor prometheus precisa RECRIAR para ler config nova (restart não basta):"
+    echo "    cd $REPO_ROOT && docker compose up -d node_exporter"
+    echo "    docker compose up -d --force-recreate prometheus"
+    echo "  Confirme: docker inspect prometheus --format '{{.Config.Cmd}}' | grep node_exporter"
+    echo "  Query: curl -s '${PROM_URL}/api/v1/query?query=up' | python3 -m json.tool"
   fi
 else
   curl -sf "${PROM_URL}/api/v1/query?query=up%7Bjob%3D%22node%22%7D" || echo "(sem python3/curl para validar query)"

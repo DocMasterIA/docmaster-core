@@ -11,7 +11,13 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
-  # Host (node_exporter): config/prometheus.d/10-node.yml (+ opcional 20-node-prod.yml)
+  # Host — node_exporter no mesmo docker compose (CPU, RAM, disco, load).
+  - job_name: node
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["node_exporter:9100"]
+        labels:
+          instance: docmaster-host
 
   # API Django (métricas docmaster_* + django_*).
   - job_name: backend

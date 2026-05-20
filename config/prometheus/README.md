@@ -10,10 +10,14 @@
 ## Subir com Docker Compose
 
 ```bash
-docker compose up -d node_exporter prometheus grafana
+docker compose up -d node_exporter
+docker compose up -d --force-recreate prometheus grafana
 curl -s http://127.0.0.1:9100/metrics | head
-curl -s http://127.0.0.1:9090/targets   # node e backend devem estar UP
+curl -s 'http://127.0.0.1:9090/api/v1/query?query=up{job="node"}' | python3 -m json.tool
+# Targets: http://127.0.0.1:9090/targets — job node e backend UP
 ```
+
+`docker compose restart prometheus` **não** aplica mudanças no `command:` do compose; use `--force-recreate`.
 
 ## Produção (servidor da API)
 

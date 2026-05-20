@@ -18,15 +18,18 @@ echo "  (definido em docker-compose.yml → ports: \"127.0.0.1:9100:9100\")"
 echo "  Outra URL: NODE_METRICS_URL=http://IP:9100/metrics $0"
 echo ""
 
+_metrics_has_node() {
+  grep -q '^node_memory_' 2>/dev/null
+}
+
 _node_ok=0
-if curl -sf --max-time 5 "$NODE_URL" 2>/dev/null | head -3 | grep -q node_memory; then
+if curl -sf --max-time 5 "$NODE_URL" 2>/dev/null | _metrics_has_node; then
   echo "OK — node_exporter responde no host ($NODE_URL)"
   _node_ok=1
 elif docker ps --format '{{.Names}}' 2>/dev/null | grep -qx node_exporter; then
-  echo "Container node_exporter existe; testando pela rede Docker..."
-  if docker exec node_exporter wget -qO- http://127.0.0.1:9100/metrics 2>/dev/null | head -3 | grep -q node_memory; then
-    echo "OK — node_exporter responde dentro do container"
-    echo "  Se curl no host falhou: confira ports em docker-compose.yml (127.0.0.1:9100:9100)"
+  echo "Container node_exporter existe; testando scrape pela rede Docker (prometheus → node_exporter)..."
+  if docker exec prometheus wget -qO- http://node_exporter:9100/metrics 2>/dev/null | _metrics_has_node; then
+    echo "OK — node_exporter alcançável como o Prometheus vê (node_exporter:9100)"
     _node_ok=1
   fi
 fi
@@ -44,7 +47,12 @@ echo "=== Prometheus scrape (job node) ==="
 echo "Prometheus: $PROM_URL"
 echo ""
 
-if command -v python3 >/dev/null 2>&1; then
+if ! curl -sf --max-time 3 "${PROM_URL}/-/ready" >/dev/null 2>&1; then
+  echo "FALHOU — Prometheus não responde em ${PROM_URL} (API vazia = ainda a subir ou crash)"
+  echo "  cd $(pwd) && docker compose ps prometheus"
+  echo "  docker compose logs prometheus --tail 50"
+  echo "  ./scripts/fix-prometheus-node.sh"
+elif command -v python3 >/dev/null 2>&1; then
   UP="$(curl -sf --max-time 8 "${PROM_URL}/api/v1/query?query=up%7Bjob%3D%22node%22%7D" 2>/dev/null || true)"
   if echo "$UP" | python3 -c "
 import json,sys
@@ -62,8 +70,8 @@ sys.exit(0 if v>=1 else 2)
     echo "  O contentor prometheus precisa RECRIAR para ler config nova (restart não basta):"
     echo "    cd $REPO_ROOT && docker compose up -d node_exporter"
     echo "    docker compose up -d --force-recreate prometheus"
-    echo "  Confirme: docker inspect prometheus --format '{{.Config.Cmd}}' | grep node_exporter"
-    echo "  Query: curl -s '${PROM_URL}/api/v1/query?query=up' | python3 -m json.tool"
+    echo "  ./scripts/fix-prometheus-node.sh"
+    echo "  Confirme job node em config/prometheus.yml e git pull"
   fi
 else
   curl -sf "${PROM_URL}/api/v1/query?query=up%7Bjob%3D%22node%22%7D" || echo "(sem python3/curl para validar query)"

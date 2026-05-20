@@ -14,17 +14,25 @@ O compose principal (`docker-compose.yml`) **não** define mais o serviço PNCP;
 
 ### 1. Subir o PNCP (uma vez após reboot / deploy)
 
+A partir de **`~`** (compose na home, código em `~/docmaster-core/`):
+
 ```bash
-cd DEPLOY   # docmaster-core ou cópia na VPS
-chmod +x scripts/ensure-pncp-researcher.sh
+# Copie/atualize para ~: docker-compose.pncp.yml e scripts/ensure-pncp-researcher.sh
 ./scripts/ensure-pncp-researcher.sh
 ```
 
-Ou:
+O script define `PNCP_BUILD_CONTEXT=docmaster-core` automaticamente.
+
+A partir de **`~/docmaster-core`**:
 
 ```bash
-docker compose -f docker-compose.pncp.yml up -d
+cd ~/docmaster-core
+./scripts/ensure-pncp-researcher.sh
 ```
+
+O aviso `orphan containers` **não aparece** com o projeto `name: docmaster-pncp` (ficheiro atualizado). Se ainda aparecer, ignore — são os outros serviços no projeto `docmaster`, não erro do PNCP.
+
+Na primeira subida, `OFF` no health por 10–30s é normal (`health: starting`).
 
 ### 2. Subir outros serviços **sem mexer no PNCP**
 

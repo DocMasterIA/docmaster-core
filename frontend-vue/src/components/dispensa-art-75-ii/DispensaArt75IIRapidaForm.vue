@@ -196,6 +196,11 @@ import DotacaoOrcamentariaBlock from '@/components/DotacaoOrcamentariaBlock.vue'
 import DocGenIaLoaderBlock from '@/components/DocGenIaLoaderBlock.vue';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
 import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
+import {
+  buildFillTrSlotsUrl,
+  describeFillTrSlotsNetworkFailure,
+  fetchFillTrSlotsWithRetry,
+} from '@/utils/fetchFillTrSlots.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { useDispensaArt75IIDadosFixos } from '@/composables/useDispensaArt75IIDadosFixos.js';
 
@@ -431,17 +436,43 @@ function onModoData(valor) {
   if (valor !== 'Data manual') dataManual.value = '';
 }
 
-/**
- * Cláusulas locais (sem LLM). O gerar-tr-e-dfd com dispensa_fluxo_ui=rapida e objeto/justificativa
- * no override evita segunda passagem de IA no rag_service (~2s no total).
- */
-function preencherObjetoEJustificativaInterno() {
+function slotsOverrideWithoutClauseDraft(raw) {
+  if (!raw || typeof raw !== 'object') return raw;
+  const o = { ...raw };
+  delete o.objeto;
+  delete o.justificativa;
+  delete o.sol_oficio_objeto;
+  delete o.sol_oficio_justificativa;
+  return Object.keys(o).length ? o : null;
+}
+
+/** Preenche objeto e justificativa via RAG, para o merge nos DOCX. */
+async function preencherObjetoEJustificativaInterno() {
   const contratado = String(objetoContratado.value || '').trim();
-  if (!contratado) {
-    throw new Error('Informe o que será contratado.');
+  objetoGerado.value = '';
+  justificativa.value = '';
+  const fillUrl = buildFillTrSlotsUrl(API_BASE);
+  const result = await fetchFillTrSlotsWithRetry(API_BASE, {
+    user_prompt: buildUserPrompt(),
+    slots_override: slotsOverrideWithoutClauseDraft(buildSlotsOverride()),
+    slot_package_key: slotPackageKey.value,
+  });
+  if (!result.ok) {
+    if (result.kind === 'network') {
+      const m = String(result.errorMessage || '');
+      const looksNetwork = /fetch|network|failed|load|aborted|timed out|timeout/i.test(m);
+      throw new Error(looksNetwork ? describeFillTrSlotsNetworkFailure(fillUrl) : m || describeFillTrSlotsNetworkFailure(fillUrl));
+    }
+    throw new Error(result.errorMessage || 'Erro ao preencher objeto/justificativa.');
   }
-  objetoGerado.value = gerarObjetoTexto(contratado, '', '');
-  justificativa.value = gerarJustificativaTexto(contratado, '', '');
+  const slots = result.data.slots && typeof result.data.slots === 'object' ? result.data.slots : {};
+  const obj = String(slots.objeto || '').trim();
+  const jus = String(slots.justificativa || '').trim();
+  if (!obj || !jus) {
+    throw new Error('IA não retornou objeto/justificativa completos.');
+  }
+  objetoGerado.value = obj;
+  justificativa.value = jus;
 }
 
 function toBlobUrl(base64, mimeType) {
@@ -499,6 +530,7 @@ function buildSlotsOverride() {
   if (String(dadosFixos.fixoEmailPropostas || '').trim()) o.email_envio_propostas = String(dadosFixos.fixoEmailPropostas).trim();
   if (String(dadosFixos.fixoTrResponsavelNome || '').trim()) o.nome_assinante_termo = String(dadosFixos.fixoTrResponsavelNome).trim();
   if (String(dadosFixos.fixoTrResponsavelCargo || '').trim()) o.cargo_assinante_termo = String(dadosFixos.fixoTrResponsavelCargo).trim();
+  if (String(dadosFixos.fixoTrResponsavelCargo || '').trim()) o.secretaria_usuario = String(dadosFixos.fixoTrResponsavelCargo).trim();
   const modoNormalizado = String(modoData.value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -552,7 +584,18 @@ async function onSubmit() {
   }
   isSubmitting.value = true;
   try {
-    preencherObjetoEJustificativaInterno();
+    try {
+      await preencherObjetoEJustificativaInterno();
+    } catch (e) {
+      const fillUrl = buildFillTrSlotsUrl(API_BASE);
+      const m = String(e?.message || '');
+      const looksNet =
+        e?.name === 'TypeError' || /failed to fetch|load failed|networkerror|err_failed/i.test(m);
+      generateError.value = looksNet
+        ? describeFillTrSlotsNetworkFailure(fillUrl)
+        : m || 'Erro ao pedir objeto e justificativa (fill-tr-slots).';
+      return;
+    }
 
     const payload = {
       user_prompt: buildUserPrompt(),

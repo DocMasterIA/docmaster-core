@@ -122,6 +122,8 @@ async def llm_post_generate(
     *,
     user_context: dict[str, Any] | None = None,
     model: str | None = None,
+    fast: bool = False,
+    options: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """POST /api/llm/generate com prefeitura e acumulação de tokens."""
     prefeitura = prefeitura_label_from_context(user_context)
@@ -129,6 +131,10 @@ async def llm_post_generate(
     payload: dict[str, Any] = {"prompt": prompt, "stream": False, "prefeitura": prefeitura}
     if model:
         payload["model"] = model
+    if fast:
+        payload["fast"] = True
+    if options:
+        payload["options"] = options
     resp = await client.post(url, json=payload, headers=_headers(prefeitura))
     resp.raise_for_status()
     body = resp.json()

@@ -981,6 +981,7 @@ def fill_tr_slots_api(request):
         "slots_override": slots_override or None,
         "context": context if context else None,
         "skip_context_in_prompt": True,
+        "clausulas_only": True,
     }
 
     try:

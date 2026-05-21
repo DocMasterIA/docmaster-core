@@ -2,8 +2,10 @@
 import unittest
 
 from app.tr_slots_llm import (
+    _is_objeto_justificativa_fill_mode,
     _override_has_prefilled_clauses,
     _should_skip_llm_for_prefilled_override,
+    _strip_clause_draft_from_override,
 )
 
 
@@ -43,6 +45,18 @@ class TrSlotsSkipLlmTests(unittest.TestCase):
     def test_short_clauses_never_skip(self):
         override = {"objeto": "curto", "justificativa": "curta"}
         self.assertFalse(_override_has_prefilled_clauses(override))
+
+    def test_clausulas_only_forces_lite_even_with_draft_objeto(self):
+        override = {
+            "clausulas_only": True,
+            "objeto": "Aquisição de medicamentos para a rede municipal de saúde.",
+            "justificativa": "Texto longo que existiria no override por engano.",
+            "dispensa_fluxo_ui": "normal",
+        }
+        self.assertTrue(_is_objeto_justificativa_fill_mode(override))
+        stripped = _strip_clause_draft_from_override(override)
+        self.assertNotIn("objeto", stripped)
+        self.assertNotIn("clausulas_only", stripped)
 
 
 if __name__ == "__main__":

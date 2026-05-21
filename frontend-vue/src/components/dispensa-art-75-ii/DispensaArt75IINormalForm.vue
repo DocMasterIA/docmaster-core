@@ -544,17 +544,24 @@ const completos = computed(() => secoes.value.filter((s) => s.completo).length);
 const progresso = computed(() => Math.round((completos.value / secoes.value.length) * 100));
 const podeGerarDocumentos = computed(() => secoes.value.every((s) => s.completo));
 
-/** Igual à rápida: sem objeto/justificativa no override → rag_service modo lite (1 LLM). */
-function slotsOverrideWithoutClauseDraft(raw) {
-  if (!raw || typeof raw !== 'object') return raw;
-  const o = { ...raw };
-  delete o.objeto;
-  delete o.justificativa;
-  delete o.sol_oficio_objeto;
-  delete o.sol_oficio_justificativa;
-  delete o.secretaria_usuario;
-  delete o.dfd_setor_requisitante;
-  return Object.keys(o).length ? o : null;
+/** Payload mínimo para fill-tr-slots (sem itens/tabela — evita POST pesado e confusão no RAG). */
+function buildSlotsOverrideForClausulas() {
+  const o = { dispensa_fluxo_ui: 'normal', clausulas_only: true };
+  const fundamentoLegal = resolveSolOficioFundamentoLegal(String(route.name || ''));
+  if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;
+  return o;
+}
+
+function buildUserPromptClausulas() {
+  const car = String(objetoCaracteristicas.value || '').trim();
+  return [
+    `Contratação: ${objetoContratado.value || 'Não informado'}`,
+    `Setor/secretaria: ${objetoSetor.value || 'Não informado'}`,
+    car ? `Características: ${car}` : '',
+    'Objeto genérico (sem itens da tabela). Justificativa: 2–3 frases.',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 async function gerar() {
@@ -574,8 +581,8 @@ async function gerar() {
     const result = await fetchFillTrSlotsWithRetry(
       API_BASE,
       {
-        user_prompt: buildUserPrompt(),
-        slots_override: slotsOverrideWithoutClauseDraft(buildSlotsOverride()),
+        user_prompt: buildUserPromptClausulas(),
+        slots_override: buildSlotsOverrideForClausulas(),
         slot_package_key: slotPackageKey.value,
       },
       { maxAttempts: 1 },

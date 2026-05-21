@@ -114,11 +114,11 @@ export function buildClausulasObjetoJustificativaPrompt(fields) {
   return lines.join('\n');
 }
 
-/** Limites Ollama para cláusulas curtas (objeto + justificativa). */
+/** Limites Ollama para cláusulas curtas (objeto + justificativa) — alvo ~3s. */
 export const CLAUSULAS_LLM_OPTIONS = {
-  num_predict: 420,
-  temperature: 0.25,
-  top_p: 0.9,
+  num_predict: 280,
+  temperature: 0.2,
+  top_p: 0.85,
 };
 
 /**

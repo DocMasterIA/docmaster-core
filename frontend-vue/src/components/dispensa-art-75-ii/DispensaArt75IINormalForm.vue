@@ -85,21 +85,13 @@
                         @input="objetoCaracteristicas = primeiraMaiuscula(($event.target).value)"
                       />
                     </div>
-                    <button type="button" class="da75-btn da75-btn--primary da75-btn--block" @click="gerar">
+                    <button type="button" class="da75-btn da75-btn--primary da75-btn--block" :disabled="isGerandoClausulas" @click="gerar">
                       Gerar objeto e justificativa
                     </button>
-                    <button
-                      type="button"
-                      class="da75-btn da75-btn--block"
-                      :disabled="isRefinandoClausulas || !podeGerarClausulasBase"
-                      @click="refinarClausulasComIa"
-                    >
-                      Refinar com IA (opcional)
-                    </button>
                     <DocGenIaLoaderBlock
-                      v-if="isRefinandoClausulas"
+                      v-if="isGerandoClausulas"
                       compact
-                      message="Refinando redação com IA…"
+                      message="Gerando objeto e justificativa…"
                     />
                     <p v-if="erroGeracaoClausulas" class="da75-helper">{{ erroGeracaoClausulas }}</p>
                   </div>
@@ -299,7 +291,7 @@ const dotacaoAtiva = ref(false);
 const dotacao = ref('');
 const modoData = ref('');
 const dataManual = ref('');
-const isRefinandoClausulas = ref(false);
+const isGerandoClausulas = ref(false);
 const erroGeracaoClausulas = ref('');
 const isSubmitting = ref(false);
 const generateError = ref('');
@@ -422,7 +414,7 @@ async function resetFormStateForNewRoute() {
   dotacao.value = '';
   modoData.value = '';
   dataManual.value = '';
-  isRefinandoClausulas.value = false;
+  isGerandoClausulas.value = false;
   erroGeracaoClausulas.value = '';
   isSubmitting.value = false;
   generateError.value = '';
@@ -548,25 +540,8 @@ const secoes = computed(() => {
 const completos = computed(() => secoes.value.filter((s) => s.completo).length);
 const progresso = computed(() => Math.round((completos.value / secoes.value.length) * 100));
 const podeGerarDocumentos = computed(() => secoes.value.every((s) => s.completo));
-const podeGerarClausulasBase = computed(
-  () => campoPreenchido(objetoContratado.value) && campoPreenchido(objetoSetor.value),
-);
 
-function gerar() {
-  erroGeracaoClausulas.value = '';
-  const contratado = String(objetoContratado.value || '').trim();
-  const setor = String(objetoSetor.value || '').trim();
-  const caracteristicas = String(objetoCaracteristicas.value || '').trim();
-  if (!contratado || !setor) {
-    erroGeracaoClausulas.value = 'Preencha "O que será contratado?" e "Qual setor/secretaria será atendido?".';
-    return;
-  }
-  const local = aplicarClausulasLocaisDispensaNormal(contratado, setor, caracteristicas);
-  objetoGerado.value = local.objeto;
-  justificativa.value = local.justificativa;
-}
-
-async function refinarClausulasComIa() {
+async function gerar() {
   erroGeracaoClausulas.value = '';
   const contratado = String(objetoContratado.value || '').trim();
   const setor = String(objetoSetor.value || '').trim();
@@ -576,7 +551,7 @@ async function refinarClausulasComIa() {
     return;
   }
 
-  isRefinandoClausulas.value = true;
+  isGerandoClausulas.value = true;
   try {
     const result = await requestClausulasObjetoJustificativaFast(API_BASE, {
       contratado,
@@ -593,17 +568,18 @@ async function refinarClausulasComIa() {
       return;
     }
 
-    if (!result.ok) {
-      erroGeracaoClausulas.value =
-        result.errorMessage || 'Não foi possível refinar com IA; mantemos o texto padrão.';
-      return;
-    }
-
-    erroGeracaoClausulas.value = 'IA retornou texto incompleto; mantemos o texto atual.';
+    const local = aplicarClausulasLocaisDispensaNormal(contratado, setor, caracteristicas);
+    objetoGerado.value = local.objeto;
+    justificativa.value = local.justificativa;
+    erroGeracaoClausulas.value =
+      result.errorMessage || 'IA retornou texto incompleto; aplicamos a versão padrão.';
   } catch (err) {
-    erroGeracaoClausulas.value = err?.message || 'Não foi possível refinar com IA.';
+    const local = aplicarClausulasLocaisDispensaNormal(contratado, setor, caracteristicas);
+    objetoGerado.value = local.objeto;
+    justificativa.value = local.justificativa;
+    erroGeracaoClausulas.value = err?.message || 'Não foi possível gerar via IA; aplicamos a versão padrão.';
   } finally {
-    isRefinandoClausulas.value = false;
+    isGerandoClausulas.value = false;
   }
 }
 

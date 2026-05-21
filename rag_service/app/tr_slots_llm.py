@@ -2148,9 +2148,22 @@ async def _fill_tr_slots_with_llm_work(
 
     _fluxo_ui = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
     if lite_fill:
-        full_prompt = _build_lite_objeto_justificativa_llm_prompt(
-            user_prompt, fluxo_ui=_fluxo_ui
+        # System prompt completo (redação TR); pedido vem só do formulário (sem dados fixos/perfil).
+        user_prompt_text = _build_objeto_justificativa_user_prompt(
+            user_prompt, None, skip_context_in_prompt=True
         )
+        user_prompt_text += (
+            "\nUse somente o texto em «Pedido do usuário». "
+            "Não use órgão, prefeitura, secretaria do perfil, cabeçalho, processo nem dados fixos. "
+            "Não invente nome de órgão, entidade ou município."
+        )
+        if _fluxo_ui == "normal":
+            user_prompt_text += (
+                "\nDispensa normal: objeto em 1 período genérico; use o setor informado no pedido; "
+                "não cite itens, quantidades ou valores de tabela."
+            )
+        system_prompt = TR_SLOTS_OBJETO_JUSTIFICATIVA_SYSTEM_PROMPT
+        full_prompt = f"<<SYSTEM>>\n{system_prompt.strip()}\n\n<<USER>>\n{user_prompt_text}"
     else:
         user_prompt_text = _build_tr_slots_user_prompt(
             user_prompt, context_from_agent, user_context, skip_context_in_prompt, rag_objeto_examples or None

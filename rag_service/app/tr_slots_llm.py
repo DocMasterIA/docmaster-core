@@ -293,6 +293,27 @@ def _build_objeto_justificativa_user_prompt(
     return "\n".join(parts)
 
 
+def _build_lite_objeto_justificativa_llm_prompt(
+    user_prompt: str,
+    *,
+    fluxo_ui: str = "",
+) -> str:
+    """
+    Prompt único e curto para fill-tr-slots lite (~3–5s com num_predict).
+    Evita <<SYSTEM>>/<<USER>> longos — o gargalo era prefill, não só saída.
+    """
+    fluxo = str(fluxo_ui or "").strip().lower()
+    lines = [
+        "Pt-BR, formal. Responda SOMENTE JSON: {\"objeto\":\"...\",\"justificativa\":\"...\"}",
+        "Objeto: 1 período; justificativa: parágrafo curto (3–6 frases). Só dados do pedido.",
+        "Não invente órgão/município; não liste itens nem quantidades.",
+    ]
+    if fluxo == "normal":
+        lines.append("Dispensa normal: objeto genérico; sem tabela de itens.")
+    lines.extend(["", f"Pedido:\n{user_prompt.strip()}"])
+    return "\n".join(lines)
+
+
 def _parse_llm_json_response(text: str) -> Dict[str, Any]:
     """Extrai JSON da resposta da LLM (pode vir com markdown ou texto antes/depois)."""
     text = (text or "").strip()
@@ -2127,25 +2148,15 @@ async def _fill_tr_slots_with_llm_work(
 
     _fluxo_ui = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
     if lite_fill:
-        user_prompt_text = _build_objeto_justificativa_user_prompt(
-            user_prompt, None, skip_context_in_prompt=True
+        full_prompt = _build_lite_objeto_justificativa_llm_prompt(
+            user_prompt, fluxo_ui=_fluxo_ui
         )
-        user_prompt_text += (
-            "\nUse somente o texto em «Pedido do usuário». "
-            "Proibido citar órgão, prefeitura ou município que não estejam nesse pedido."
-        )
-        if _fluxo_ui == "normal":
-            user_prompt_text += (
-                "\nDispensa normal: objeto em 1 período genérico; use o setor informado; "
-                "não cite itens/quantidades/valores da tabela."
-            )
-        system_prompt = TR_SLOTS_OBJETO_JUSTIFICATIVA_SYSTEM_PROMPT
     else:
         user_prompt_text = _build_tr_slots_user_prompt(
             user_prompt, context_from_agent, user_context, skip_context_in_prompt, rag_objeto_examples or None
         )
         system_prompt = TR_SLOTS_SYSTEM_PROMPT
-    full_prompt = f"<<SYSTEM>>\n{system_prompt.strip()}\n\n<<USER>>\n{user_prompt_text}"
+        full_prompt = f"<<SYSTEM>>\n{system_prompt.strip()}\n\n<<USER>>\n{user_prompt_text}"
 
     llm_options = TR_SLOTS_OBJETO_JUSTIFICATIVA_LLM_OPTIONS if lite_fill else None
     try:

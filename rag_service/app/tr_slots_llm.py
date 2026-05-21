@@ -40,25 +40,14 @@ async def _call_llm_generate(
     full_prompt: str,
     *,
     user_context: Optional[Dict[str, Any]] = None,
-    clausulas_lite: bool = False,
 ) -> Dict[str, Any]:
     """POST na orquestração LLM; acumula tokens quando `llm_token_scope` está ativo."""
-    llm_payload: Dict[str, Any] = {"prompt": full_prompt, "stream": False}
-    if clausulas_lite:
-        llm_payload["fast"] = True
-        llm_payload["options"] = dict(CLAUSULAS_LITE_LLM_OPTIONS)
     async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
         if token_scope_active():
-            body = await llm_post_generate(
-                client,
-                full_prompt,
-                user_context=user_context,
-                fast=clausulas_lite,
-                options=CLAUSULAS_LITE_LLM_OPTIONS if clausulas_lite else None,
-            )
+            body = await llm_post_generate(client, full_prompt, user_context=user_context)
             return body if isinstance(body, dict) else {}
         url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
-        resp = await client.post(url, json=llm_payload)
+        resp = await client.post(url, json={"prompt": full_prompt, "stream": False})
         resp.raise_for_status()
         body = resp.json()
         return body if isinstance(body, dict) else {}
@@ -176,18 +165,6 @@ justificativa:
 - Concordância correta (ex.: "a manutenção", não "o manutenção").
 - Não invente valores, prazos ou dados não fornecidos.
 """
-
-# Modo botão «Gerar» (dispensa normal/rápida): resposta curta = menos tokens = ~3s no Ollama.
-TR_SLOTS_CLAUSULAS_LITE_SYSTEM_PROMPT = """Redija em pt-BR formal. Responda SOMENTE JSON: {"objeto":"...","justificativa":"..."}
-
-objeto: 1 período genérico; use o setor informado; sem itens/quantidades/valores/marcas.
-justificativa: 2 ou 3 frases curtas; necessidade administrativa; sem inventar dados."""
-
-CLAUSULAS_LITE_LLM_OPTIONS: Dict[str, Any] = {
-    "num_predict": 240,
-    "temperature": 0.2,
-    "top_p": 0.85,
-}
 
 OBJETO_REWRITE_SYSTEM_PROMPT = """Você é redator público especializado em cláusulas de OBJETO para Termo de Referência (Lei 14.133/2021).
 
@@ -1893,7 +1870,6 @@ def _strip_clause_draft_from_override(override: Dict[str, Any]) -> Dict[str, Any
         "beneficio_esperado",
     ):
         o.pop(key, None)
-    o.pop("clausulas_only", None)
     return o
 
 
@@ -1903,8 +1879,6 @@ def _is_objeto_justificativa_fill_mode(override: Dict[str, Any]) -> bool:
     Geração completa TR/DFD/Ofício continua com pipeline integral quando objeto e
     justificativa já vêm no override.
     """
-    if override.get("clausulas_only"):
-        return True
     fluxo = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
     if fluxo not in ("normal", "rapida"):
         return False
@@ -2059,8 +2033,6 @@ async def fill_tr_slots_with_llm(
     from .llm_orchestration import EMPTY_TOKEN_USAGE, llm_token_scope
 
     override = slots_override if isinstance(slots_override, dict) else {}
-    if override.get("clausulas_only"):
-        override = _strip_clause_draft_from_override(override)
     if _should_skip_llm_for_prefilled_override(
         override,
         user_context,
@@ -2135,58 +2107,35 @@ async def _fill_tr_slots_with_llm_work(
             pass
 
     _fluxo_ui = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
-    skip_item_injection = _fluxo_ui == "normal"
-    _normal_objeto_hint = (
-        "\n\n[Dispensa normal — cláusula de objeto]\n"
-        "Uma única oração institucional genérica (ex.: aquisição de medicamentos para atendimento "
-        "às necessidades da saúde/suprimento municipal), sem nomear produto, apresentação, dosagem, "
-        "marca, nem quantidades (nada como «100 (cem) unidades de X»). Itens e quantidades ficam só na tabela do TR."
-    )
     if lite_fill:
         user_prompt_text = _build_objeto_justificativa_user_prompt(
-            user_prompt, user_context, skip_context_in_prompt=True
+            user_prompt, user_context, skip_context_in_prompt
         )
-        if skip_item_injection:
+        if _fluxo_ui == "normal":
             user_prompt_text += (
-                "\nDispensa normal: objeto genérico (1 período); não cite itens da tabela."
+                "\nDispensa normal: objeto em 1 período genérico; use o setor informado; "
+                "não cite itens/quantidades/valores da tabela."
             )
-        system_prompt = TR_SLOTS_CLAUSULAS_LITE_SYSTEM_PROMPT
+        system_prompt = TR_SLOTS_OBJETO_JUSTIFICATIVA_SYSTEM_PROMPT
     else:
         user_prompt_text = _build_tr_slots_user_prompt(
             user_prompt, context_from_agent, user_context, skip_context_in_prompt, rag_objeto_examples or None
         )
-        if skip_item_injection:
-            user_prompt_text += _normal_objeto_hint
         system_prompt = TR_SLOTS_SYSTEM_PROMPT
     full_prompt = f"<<SYSTEM>>\n{system_prompt.strip()}\n\n<<USER>>\n{user_prompt_text}"
 
     try:
-        body = await _call_llm_generate(
-            full_prompt,
-            user_context=user_context,
-            clausulas_lite=lite_fill,
-        )
+        body = await _call_llm_generate(full_prompt, user_context=user_context)
     except httpx.ConnectError as e:
         raise ValueError(
             "Não foi possível conectar à orquestração LLM. "
             "Verifique se llm_api está em execução (docker compose up -d llm_api ollama)."
         ) from e
     except httpx.HTTPStatusError as e:
-        status = e.response.status_code
-        detail = ""
-        try:
-            detail = str(e.response.json().get("detail") or "")
-        except Exception:
-            detail = e.response.text or ""
-        if status in (400, 404, 502) and "modelo" in detail.lower():
-            raise ValueError(
-                f"Orquestração LLM: {detail or 'modelo não encontrado no Ollama'}. "
-                "No servidor: docker exec ollama ollama list && docker exec ollama ollama pull qwen2.5:7b"
-            ) from e
-        if status == 404:
+        if e.response.status_code == 404:
             raise ValueError(
                 "Orquestração LLM retornou 404 (modelo não encontrado no Ollama). "
-                "No host do Ollama execute: ollama pull <modelo> (ex.: ollama pull qwen2.5:7b)."
+                "No host do Ollama execute: ollama pull <modelo> (ex.: ollama pull llama3.2)."
             ) from e
         raise
 

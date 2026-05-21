@@ -51,5 +51,3 @@ LLM_ENDPOINT_ANALYSIS: str = os.environ.get("LLM_ENDPOINT_ANALYSIS", "/v1/analys
 # Ollama: endpoint e modelo padrão para /api/generate
 OLLAMA_GENERATE_PATH: str = os.getenv("OLLAMA_GENERATE_PATH", "/api/generate")
 OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
-# Opcional (ex.: qwen2.5:3b). Vazio = usa OLLAMA_MODEL — evita 502 se o 3B não foi baixado no Ollama.
-OLLAMA_MODEL_FAST: str = (os.getenv("OLLAMA_MODEL_FAST") or "").strip()

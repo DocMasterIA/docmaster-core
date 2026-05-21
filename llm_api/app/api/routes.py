@@ -55,8 +55,6 @@ class GenerateRequest(BaseModel):
     stream: bool = False
     prefeitura: str | None = None
     options: dict[str, Any] | None = None
-    # True → usa OLLAMA_MODEL_FAST (ex.: qwen2.5:3b) em vez do modelo pesado do TR.
-    fast: bool = False
 
 
 def _payload_from_planner_request(req: PlannerRequest) -> dict[str, Any]:
@@ -178,23 +176,15 @@ async def endpoint_generate(body: GenerateRequest, request: Request) -> dict[str
   -H "Content-Type: application/json" \
   -d '{"prompt": "Quais são os tipos de editais de licitação?"}'
     """
-    from app.config import OLLAMA_MODEL, OLLAMA_MODEL_FAST
     from app.request_context import set_prefeitura
 
     header_pref = (request.headers.get("X-DocMaster-Prefeitura") or "").strip()
     prefeitura = body.prefeitura or header_pref or None
     set_prefeitura(prefeitura)
-    model = body.model
-    if not model:
-        if body.fast and OLLAMA_MODEL_FAST:
-            model = OLLAMA_MODEL_FAST
-        else:
-            model = OLLAMA_MODEL
-    used_fast = bool(body.fast and model == OLLAMA_MODEL_FAST)
     try:
         result = await generate(
             prompt=body.prompt,
-            model=model,
+            model=body.model,
             stream=body.stream,
             prefeitura=prefeitura,
             options=body.options,
@@ -214,31 +204,6 @@ async def endpoint_generate(body: GenerateRequest, request: Request) -> dict[str
             }
         return {"ok": True, "data": {"raw": result}}
     except LLMClientError as e:
-        if used_fast and (e.status_code == 404 or "não encontrado" in (e.message or "").lower()):
-            try:
-                result = await generate(
-                    prompt=body.prompt,
-                    model=OLLAMA_MODEL,
-                    stream=body.stream,
-                    prefeitura=prefeitura,
-                    options=body.options,
-                )
-                if isinstance(result, dict):
-                    from app.token_usage import extract_token_usage
-
-                    prompt_t, completion_t, _model = extract_token_usage(result)
-                    return {
-                        "ok": True,
-                        "data": result,
-                        "token_usage": {
-                            "prompt_tokens": prompt_t,
-                            "completion_tokens": completion_t,
-                            "total_tokens": prompt_t + completion_t,
-                        },
-                    }
-                return {"ok": True, "data": {"raw": result}}
-            except Exception:
-                pass
         raise HTTPException(status_code=e.status_code or 400, detail=e.message)
     except LLMUnauthorizedError as e:
         raise HTTPException(status_code=401, detail=e.message)

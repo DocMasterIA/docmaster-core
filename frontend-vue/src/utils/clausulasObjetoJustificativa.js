@@ -138,13 +138,7 @@ export async function requestClausulasObjetoJustificativaFast(apiBase, options =
   const body = {
     prompt,
     stream: false,
-    fast: true,
-    options: options.llmOptions || CLAUSULAS_LLM_OPTIONS,
   };
-  const modelOverride = String(
-    options.model || import.meta.env.VITE_CLAUSULAS_OLLAMA_MODEL || '',
-  ).trim();
-  if (modelOverride) body.model = modelOverride;
   const pkg = String(options.slotPackageKey || '').trim();
   if (pkg) body.slot_package_key = pkg;
 

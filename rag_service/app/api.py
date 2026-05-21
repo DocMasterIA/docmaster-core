@@ -138,11 +138,6 @@ class GenerateTRFromModelRequest(BaseModel):
         False,
         description="Se True, não inclui 'Contexto do solicitante' no prompt da LLM (evita objeto vir como palavra/item); fiscal e cidade continuam vindos do context.",
     )
-    clausulas_only: Optional[bool] = Field(
-        False,
-        description="Botão Gerar objeto/justificativa: força modo lite (1 LLM curta), ignora rascunho de objeto no override.",
-    )
-
     @field_validator("user_prompt")
     @classmethod
     def _user_prompt_not_empty(cls, v: str) -> str:
@@ -742,10 +737,6 @@ async def endpoint_fill_tr_slots(body: GenerateTRFromModelRequest):
     from .tr_slots_llm import fill_tr_slots_with_llm
 
     slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
-    if bool(getattr(body, "clausulas_only", False)):
-        ov = dict(slots_override or {})
-        ov["clausulas_only"] = True
-        slots_override = ov
     skip_ctx = bool(getattr(body, "skip_context_in_prompt", False))
     try:
         slots, llm_usage = await fill_tr_slots_with_llm(

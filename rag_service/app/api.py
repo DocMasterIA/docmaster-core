@@ -666,13 +666,16 @@ async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
     from .dfd_template import render_dfd_from_tr_slots
     from .oficio_template import render_oficio_from_slots
 
-    slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
-    skip_ctx = getattr(body, "skip_context_in_prompt", False)
+    skip_ctx = bool(getattr(body, "skip_context_in_prompt", False))
+    if skip_ctx:
+        slots_override = body.slots_override
+    else:
+        slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
     try:
         slots, llm_usage = await fill_tr_slots_with_llm(
             user_prompt=body.user_prompt,
             slots_override=slots_override,
-            user_context=body.context,
+            user_context=body.context if not skip_ctx else None,
             skip_context_in_prompt=skip_ctx,
         )
 

@@ -35,19 +35,32 @@ TR_SLOTS_INCLUDE_RAG_EXAMPLES: bool = os.getenv("TR_SLOTS_INCLUDE_RAG_EXAMPLES",
 TR_SLOTS_ENABLE_OBJETO_REWRITE: bool = os.getenv("TR_SLOTS_ENABLE_OBJETO_REWRITE", "0").strip() not in ("0", "false", "False", "no")
 TR_SLOTS_ENABLE_INCISO_LLM: bool = os.getenv("TR_SLOTS_ENABLE_INCISO_LLM", "0").strip() not in ("0", "false", "False", "no")
 
+# Botão «Gerar» objeto/justificativa (lite): mesmo teto que clausulasObjetoJustificativa.js (~3–5s).
+TR_SLOTS_OBJETO_JUSTIFICATIVA_LLM_OPTIONS: Dict[str, Any] = {
+    "num_predict": 220,
+    "temperature": 0.2,
+    "top_p": 0.85,
+}
+
 
 async def _call_llm_generate(
     full_prompt: str,
     *,
     user_context: Optional[Dict[str, Any]] = None,
+    options: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """POST na orquestração LLM; acumula tokens quando `llm_token_scope` está ativo."""
     async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
         if token_scope_active():
-            body = await llm_post_generate(client, full_prompt, user_context=user_context)
+            body = await llm_post_generate(
+                client, full_prompt, user_context=user_context, options=options
+            )
             return body if isinstance(body, dict) else {}
         url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
-        resp = await client.post(url, json={"prompt": full_prompt, "stream": False})
+        payload: Dict[str, Any] = {"prompt": full_prompt, "stream": False}
+        if options:
+            payload["options"] = options
+        resp = await client.post(url, json=payload)
         resp.raise_for_status()
         body = resp.json()
         return body if isinstance(body, dict) else {}
@@ -1843,7 +1856,7 @@ def _should_skip_llm_for_prefilled_override(
     if not override or not _override_has_prefilled_clauses(override):
         return False
     fluxo = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
-    if fluxo == "rapida":
+    if fluxo in ("rapida", "normal"):
         return True
     pkg = _package_key_from_override_or_context(override, user_context)
     if pkg.startswith("inexigibilidade_"):
@@ -2134,8 +2147,11 @@ async def _fill_tr_slots_with_llm_work(
         system_prompt = TR_SLOTS_SYSTEM_PROMPT
     full_prompt = f"<<SYSTEM>>\n{system_prompt.strip()}\n\n<<USER>>\n{user_prompt_text}"
 
+    llm_options = TR_SLOTS_OBJETO_JUSTIFICATIVA_LLM_OPTIONS if lite_fill else None
     try:
-        body = await _call_llm_generate(full_prompt, user_context=user_context)
+        body = await _call_llm_generate(
+            full_prompt, user_context=user_context, options=llm_options
+        )
     except httpx.ConnectError as e:
         raise ValueError(
             "Não foi possível conectar à orquestração LLM. "

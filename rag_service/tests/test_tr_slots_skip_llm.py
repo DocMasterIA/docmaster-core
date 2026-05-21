@@ -30,16 +30,19 @@ class TrSlotsSkipLlmTests(unittest.TestCase):
         }
         self.assertTrue(_should_skip_llm_for_prefilled_override(override, None))
 
-    def test_fill_tr_slots_does_not_skip_without_context_flag_or_inexig_package(self):
+    def test_dispensa_normal_prefilled_skips_on_gerar_tr_e_dfd(self):
         override = {
             "objeto": "Objeto longo o suficiente para o teste de skip.",
             "justificativa": "Justificativa longa o suficiente para o teste de skip.",
             "dispensa_fluxo_ui": "normal",
         }
-        self.assertFalse(
+        self.assertTrue(
             _should_skip_llm_for_prefilled_override(
-                override, None, skip_context_in_prompt=False
+                override, None, skip_context_in_prompt=True
             )
+        )
+        self.assertTrue(
+            _should_skip_llm_for_prefilled_override(override, None, skip_context_in_prompt=False)
         )
 
     def test_short_clauses_never_skip(self):

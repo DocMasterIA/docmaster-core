@@ -571,8 +571,8 @@
           <p class="pncp-modal__text">
             O PDF é <strong>gerado a partir desta cotação</strong> (itens e dados guardados no sistema). Ao confirmar,
             o ficheiro é produzido no servidor e o <strong>download começa automaticamente</strong>. Inclui título
-            personalizado, resumo, detalhamento por fontes, CNPJs quando existirem, marca d’água e QR para abrir esta
-            mesma cotação no site (com sessão iniciada).
+            personalizado, resumo, detalhamento por fontes, CNPJs quando existirem, marca d’água e QR para
+            <strong>baixar uma cópia idêntica deste PDF</strong> (verificação e validação do documento impresso).
             <template v-if="hasSupplierPdfAttachment || supplierPdfFilenames.length">
               Os <strong>PDFs de cotação do fornecedor</strong> anexados a esta sessão são
               <strong>fundidos no final</strong> do relatório (capa + documento por ficheiro).

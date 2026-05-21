@@ -6,7 +6,7 @@ Objetivo do módulo (especificação institucional):
   organizada e padronizada para uso institucional.
 - Estrutura clara: título personalizado (definido na geração), data da pesquisa,
   itens consolidados, CNPJs extraídos das fontes quando disponíveis.
-- QR Code com URL do SPA para abrir a cotação no sistema (utilizador autenticado).
+- QR Code com URL pública para baixar a cópia de verificação do mesmo PDF (módulo ``app.qr``).
 - Padronização visual base (tipografia, margens, tabela de itens) — evolução
   futura: templates institucionais, assinatura digital, versionamento.
 
@@ -25,6 +25,7 @@ from django.utils import timezone
 from jinja2 import Environment, BaseLoader, select_autoescape
 from weasyprint import HTML
 
+from backend.app.qr import qr_png_data_url
 from backend.app.services.pncp_relatorio_itens import (
     FORMULA_LABELS,
     _formatar_moeda_br,
@@ -195,23 +196,6 @@ def extrair_cnpjs_das_fontes_grupos(grupos: List[Dict[str, Any]]) -> List[str]:
             if len(digits) == 14:
                 acc.add(_normalize_cnpj(digits))
     return sorted(acc)
-
-
-# ---------------------------------------------------------------------------
-# QR Code (PNG em data URL para embutir no HTML)
-# ---------------------------------------------------------------------------
-def _qr_png_data_url(payload: str) -> str:
-    import qrcode
-
-    # PNG mais leve (menos pixels) — o HTML do PDF fica menor e gera mais rápido.
-    qr = qrcode.QRCode(version=None, box_size=3, border=1, error_correction=qrcode.constants.ERROR_CORRECT_L)
-    qr.add_data(payload)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="#1f4e79", back_color="white")
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
-    return f"data:image/png;base64,{b64}"
 
 
 def _png_bytes_for_pdf_header(raw: bytes) -> bytes:
@@ -467,7 +451,7 @@ def montar_contexto_relatorio(
         total_linhas_cotacao=total_linhas,
         grupos=grupos,
         cnpjs_fontes=cnpjs,
-        qr_data_url=_qr_png_data_url(url_verificacao),
+        qr_data_url=qr_png_data_url(url_verificacao),
         logo_data_url=_logo_png_data_url(),
         marca_agua_texto=nome_sistema_relatorio(),
         anexo_fornecedor_url=(anexo_fornecedor_url or "").strip(),

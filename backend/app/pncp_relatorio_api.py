@@ -9,10 +9,10 @@ GET  …/relatorio/pdf/jobs/<uuid> — enquanto pendente devolve 202 JSON; quand
 
 GET  …/relatorio/pdf/jobs/<uuid>/file — devolve o PDF (evita misturar JSON e binário no mesmo URL, o que confunde proxies).
 
-O QR codifica a URL do SPA para abrir a cotação com usuário autenticado
-(/pesquisador-pncp/cotacoes/<id>). Base fixa: PNCP_RELATORIO_QR_FRONTEND_BASE_URL (default docmasteria.com.br).
+O QR codifica URL pública de download da cópia de verificação do PDF gerado
+(GET …/relatorio/verificacao/<token>/download). Base: DOCMASTER_QR_PUBLIC_BASE_URL.
 
-GET  …/relatorio/verificar — metadados JSON (mesma sessão); o QR não aponta mais aqui.
+GET  …/relatorio/verificar — metadados JSON (sessão autenticada; o QR não aponta aqui).
 """
 from __future__ import annotations
 
@@ -35,7 +35,14 @@ from weasyprint import HTML
 from backend.app.api import api_login_required
 from backend.app.metrics import track_platform
 from backend.app.models import PncpCotacao, PncpCotacaoAnexo, PncpCotacaoAnexoArquivo
+from backend.app.qr import build_public_absolute_url, resolve_public_api_base_url
 from backend.app.services.pncp_relatorio_pdf import gerar_pdf_relatorio_cotacao, nome_arquivo_relatorio, nome_sistema_relatorio
+from backend.app.services.pncp_relatorio_verification_store import (
+    issue_verification_token,
+    load_verification_pdf,
+    save_verification_pdf,
+    verification_download_path,
+)
 from backend.app.services.pncp_supplier_enrichment import enrich_missing_supplier_fields_for_cotacao
 
 DEFAULT_FORMULA_CALCULO = "media_aritmetica_precos_obtidos"
@@ -66,11 +73,9 @@ def _parse_json(request) -> Dict[str, Any]:
         return {}
 
 
-def _url_qr_acesso_cotacao_no_sistema(sessao_id: int) -> str:
-    """URL do Vue para abrir a cotação com sessão no domínio do app (PNCP_RELATORIO_QR_FRONTEND_BASE_URL)."""
-    base = getattr(settings, "PNCP_RELATORIO_QR_FRONTEND_BASE_URL", "https://docmasteria.com.br")
-    base = str(base).strip().rstrip("/") or "https://docmasteria.com.br"
-    return f"{base}/pesquisador-pncp/cotacoes/{int(sessao_id)}"
+def _url_qr_download_pdf_verificacao(api_base_url: str, sessao_id: int, token: str) -> str:
+    """URL absoluta no QR: baixa a mesma cópia do PDF gravada na geração."""
+    return build_public_absolute_url(api_base_url, verification_download_path(sessao_id, token))
 
 
 def _url_download_anexo_fornecedor(request, sessao_id: int) -> str:
@@ -224,9 +229,12 @@ def _generate_relatorio_pdf_bytes(
     sessao_id: int,
     anexos_merge: List[Tuple[str, bytes]],
     anexo_fornecedor_url: str,
+    api_base_url: str,
+    verification_filename: str,
 ) -> bytes:
     formula_id = _resolve_formula_calculo_id(cotacao.filtros or {})
-    url_qr = _url_qr_acesso_cotacao_no_sistema(sessao_id)
+    verification_token = issue_verification_token()
+    url_qr = _url_qr_download_pdf_verificacao(api_base_url, sessao_id, verification_token)
     # Enriquecimento PNCP/BrasilAPI: ligado por omissão; desligar com PNCP_RELATORIO_PDF_SKIP_ENRICH.
     if not settings.PNCP_RELATORIO_PDF_SKIP_ENRICH:
         try:
@@ -258,6 +266,12 @@ def _generate_relatorio_pdf_bytes(
             pdf_bytes = _merge_pdf_bytes(merge_parts)
         except Exception:
             pass
+    save_verification_pdf(
+        sessao_id=sessao_id,
+        token=verification_token,
+        pdf_bytes=pdf_bytes,
+        filename=verification_filename,
+    )
     return pdf_bytes
 
 
@@ -333,6 +347,7 @@ def _run_relatorio_pdf_job(
     titulo_rel: str,
     incluir_anexos: bool,
     anexo_fornecedor_url: str,
+    api_base_url: str,
 ) -> None:
     close_old_connections()
     jobs_dir = _relatorio_pdf_jobs_dir()
@@ -355,14 +370,6 @@ def _run_relatorio_pdf_job(
         if incluir_anexos:
             anexos_merge = _collect_anexos_merge_files_only(c.id)
             eff_anexo_url = anexo_fornecedor_url or ""
-        pdf_bytes = _generate_relatorio_pdf_bytes(
-            cotacao=c,
-            itens_qs=itens_qs,
-            titulo_rel=titulo_rel,
-            sessao_id=sessao_id,
-            anexos_merge=anexos_merge,
-            anexo_fornecedor_url=eff_anexo_url,
-        )
         u = c.usuario
         user_name = (
             (getattr(c, "criado_por_nome", None) or "").strip()
@@ -376,6 +383,16 @@ def _run_relatorio_pdf_job(
             sistema_nome=nome_sistema_relatorio(),
             usuario_nome=user_name,
             dt=timezone.now(),
+        )
+        pdf_bytes = _generate_relatorio_pdf_bytes(
+            cotacao=c,
+            itens_qs=itens_qs,
+            titulo_rel=titulo_rel,
+            sessao_id=sessao_id,
+            anexos_merge=anexos_merge,
+            anexo_fornecedor_url=eff_anexo_url,
+            api_base_url=api_base_url,
+            verification_filename=fname,
         )
         pdf_path.write_bytes(pdf_bytes)
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
@@ -447,6 +464,7 @@ def pncp_cotacao_relatorio_pdf_start(request, sessao_id: int):
     meta_path = jobs_dir / f"{job_id}.meta.json"
     meta_path.write_text(json.dumps(meta), encoding="utf-8")
 
+    api_base = resolve_public_api_base_url(request)
     threading.Thread(
         target=_run_relatorio_pdf_job,
         kwargs={
@@ -457,6 +475,7 @@ def pncp_cotacao_relatorio_pdf_start(request, sessao_id: int):
             "titulo_rel": titulo_rel,
             "incluir_anexos": incluir_anexos,
             "anexo_fornecedor_url": anexo_url,
+            "api_base_url": api_base,
         },
         daemon=True,
     ).start()
@@ -587,21 +606,6 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
 
     anexos_merge, anexo_url = _collect_anexos_for_pdf(request, sessao_id, c.id, incluir_anexos)
 
-    try:
-        pdf_bytes = _generate_relatorio_pdf_bytes(
-            cotacao=c,
-            itens_qs=itens_qs,
-            titulo_rel=titulo_rel,
-            sessao_id=sessao_id,
-            anexos_merge=anexos_merge,
-            anexo_fornecedor_url=anexo_url,
-        )
-    except Exception as e:
-        return JsonResponse(
-            {"detail": f"Falha ao gerar PDF ({e}). Verifique se WeasyPrint e dependências estão instaladas."},
-            status=500,
-        )
-
     u = c.usuario
     user_name = (
         (getattr(c, "criado_por_nome", None) or "").strip()
@@ -616,6 +620,24 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
         usuario_nome=user_name,
         dt=timezone.now(),
     )
+    api_base = resolve_public_api_base_url(request)
+
+    try:
+        pdf_bytes = _generate_relatorio_pdf_bytes(
+            cotacao=c,
+            itens_qs=itens_qs,
+            titulo_rel=titulo_rel,
+            sessao_id=sessao_id,
+            anexos_merge=anexos_merge,
+            anexo_fornecedor_url=anexo_url,
+            api_base_url=api_base,
+            verification_filename=fname,
+        )
+    except Exception as e:
+        return JsonResponse(
+            {"detail": f"Falha ao gerar PDF ({e}). Verifique se WeasyPrint e dependências estão instaladas."},
+            status=500,
+        )
     buf = io.BytesIO(pdf_bytes)
     resp = FileResponse(buf, as_attachment=True, filename=fname, content_type="application/pdf")
     # Permite ao frontend ler o nome do arquivo via Content-Disposition em cenários CORS.
@@ -629,10 +651,31 @@ def pncp_cotacao_relatorio_pdf(request, sessao_id: int):
     return resp
 
 
+@csrf_exempt
+@require_GET
+def pncp_cotacao_relatorio_verificacao_download(request, sessao_id: int, token: UUID):
+    """
+    Download público da cópia de verificação (URL codificada no QR do PDF).
+
+    Não exige login: o token UUID na URL é o segredo de acesso.
+    """
+    loaded = load_verification_pdf(sessao_id, str(token))
+    if not loaded:
+        return JsonResponse({"detail": "Cópia de verificação não encontrada ou expirada."}, status=404)
+    pdf_bytes, fname = loaded
+    buf = io.BytesIO(pdf_bytes)
+    resp = FileResponse(buf, as_attachment=True, filename=fname, content_type="application/pdf")
+    resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp["Pragma"] = "no-cache"
+    resp["Expires"] = "0"
+    resp["X-Relatorio-Verificacao"] = "1"
+    return resp
+
+
 @api_login_required
 @require_GET
 def pncp_cotacao_relatorio_verificar(request, sessao_id: int):
-    """Resposta leve para validação digital (conteúdo apontado pelo QR)."""
+    """Metadados da cotação (sessão autenticada); o QR aponta para o download de verificação."""
     c = (
         _cotacao_qs_for_user(request.user)
         .select_related("usuario", "prefeitura", "usuario__prefeitura")
@@ -652,10 +695,13 @@ def pncp_cotacao_relatorio_verificar(request, sessao_id: int):
             "titulo_cotacao": c.titulo,
             "registrado_em": criado.isoformat() if criado else None,
             "total_itens": c.itens.count(),
-            "url_cotacao_spa": _url_qr_acesso_cotacao_no_sistema(sessao_id),
+            "url_verificacao_padrao": build_public_absolute_url(
+                resolve_public_api_base_url(request),
+                verification_download_path(sessao_id, "<token-da-geracao>"),
+            ),
             "mensagem": (
-                "O QR do PDF abre esta cotação no aplicativo (rota /pesquisador-pncp/cotacoes/) "
-                "quando há sessão autenticada. Este endpoint só devolve metadados em JSON."
+                "O QR do PDF aponta para …/relatorio/verificacao/<token>/download e entrega a mesma "
+                "cópia do relatório gerada naquele momento. Este endpoint só devolve metadados em JSON."
             ),
         }
     )

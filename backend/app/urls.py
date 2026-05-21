@@ -44,6 +44,7 @@ from .pncp_relatorio_api import (
     pncp_cotacao_relatorio_pdf_job_file,
     pncp_cotacao_relatorio_pdf_job_poll,
     pncp_cotacao_relatorio_pdf_start,
+    pncp_cotacao_relatorio_verificacao_download,
     pncp_cotacao_relatorio_verificar,
 )
 from .ajax import area_do_usuario_ajax
@@ -162,6 +163,11 @@ urlpatterns = [
         'api/pncp/cotacoes/research/sessions/<int:sessao_id>/relatorio/pdf',
         pncp_cotacao_relatorio_pdf,
         name='api_pncp_cotacao_relatorio_pdf',
+    ),
+    path(
+        'api/pncp/cotacoes/research/sessions/<int:sessao_id>/relatorio/verificacao/<uuid:token>/download',
+        pncp_cotacao_relatorio_verificacao_download,
+        name='api_pncp_cotacao_relatorio_verificacao_download',
     ),
     path(
         'api/pncp/cotacoes/research/sessions/<int:sessao_id>/relatorio/verificar',

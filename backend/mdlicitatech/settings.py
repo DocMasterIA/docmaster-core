@@ -458,11 +458,13 @@ PNCP_RELATORIO_SISTEMA_NOME = os.environ.get(
     "PNCP_RELATORIO_SISTEMA_NOME",
     "DocMaster — Pesquisador PNCP",
 )
-# Base do SPA (sem barra final). QR do PDF: {base}/pesquisador-pncp/cotacoes/<id> (acesso logado).
-PNCP_RELATORIO_QR_FRONTEND_BASE_URL = os.environ.get(
-    "PNCP_RELATORIO_QR_FRONTEND_BASE_URL",
-    "https://docmasteria.com.br",
-).strip().rstrip("/") or "https://docmasteria.com.br"
+# Base pública da API para URLs no QR (sem barra final). Ex.: https://api.docmasteria.com.br
+DOCMASTER_QR_PUBLIC_BASE_URL = os.environ.get(
+    "DOCMASTER_QR_PUBLIC_BASE_URL",
+    os.environ.get("SITE_URL", "https://api.docmasteria.com.br"),
+).strip().rstrip("/") or "https://api.docmasteria.com.br"
+# Máximo de cópias de verificação guardadas por cotação (QR antigos deixam de funcionar ao expurgar).
+PNCP_RELATORIO_VERIFICATION_MAX_COPIES = int(os.environ.get("PNCP_RELATORIO_VERIFICATION_MAX_COPIES", "8"))
 # Antes do PDF: enriquecer fornecedor/CNPJ faltante (HTTP PNCP + BrasilAPI). Ligado por omissão.
 # Para desligar (ex.: timeout em cotações muito grandes): PNCP_RELATORIO_PDF_SKIP_ENRICH=1 ou true.
 PNCP_RELATORIO_PDF_SKIP_ENRICH = os.environ.get("PNCP_RELATORIO_PDF_SKIP_ENRICH", "false").strip().lower() not in (

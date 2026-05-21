@@ -197,7 +197,7 @@ Conteudo institucional atual inclui:
 - Conclusao Tecnica
 - Resultado consolidado e detalhamento por fontes
 - CNPJs identificados
-- QR code para abrir a cotacao no sistema
+- QR code para baixar copia de verificacao do mesmo PDF (URL publica com token)
 
 ## 11) Anexo da cotacao do fornecedor (PDF)
 

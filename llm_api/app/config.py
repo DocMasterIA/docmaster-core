@@ -51,3 +51,5 @@ LLM_ENDPOINT_ANALYSIS: str = os.environ.get("LLM_ENDPOINT_ANALYSIS", "/v1/analys
 # Ollama: endpoint e modelo padrão para /api/generate
 OLLAMA_GENERATE_PATH: str = os.getenv("OLLAMA_GENERATE_PATH", "/api/generate")
 OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+# Modelo menor para cláusulas curtas (objeto/justificativa). Alvo ~2–4s em CPU com 3B.
+OLLAMA_MODEL_FAST: str = os.getenv("OLLAMA_MODEL_FAST", "qwen2.5:3b")

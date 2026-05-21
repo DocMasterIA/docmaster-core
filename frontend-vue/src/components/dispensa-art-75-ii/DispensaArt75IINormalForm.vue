@@ -267,11 +267,6 @@ import DispensaArt75IIItensValores from './DispensaArt75IIItensValores.vue';
 import DotacaoOrcamentariaBlock from '@/components/DotacaoOrcamentariaBlock.vue';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
 import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
-import {
-  buildFillTrSlotsUrl,
-  describeFillTrSlotsNetworkFailure,
-  fetchFillTrSlotsWithRetry,
-} from '@/utils/fetchFillTrSlots.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { useDispensaArt75IIDadosFixos } from '@/composables/useDispensaArt75IIDadosFixos.js';
 
@@ -546,16 +541,36 @@ const completos = computed(() => secoes.value.filter((s) => s.completo).length);
 const progresso = computed(() => Math.round((completos.value / secoes.value.length) * 100));
 const podeGerarDocumentos = computed(() => secoes.value.every((s) => s.completo));
 
-/** Remove rascunho de objeto/justificativa e secretaria_usuario (cargo TR dos dados fixos) no fill-tr-slots. */
-function slotsOverrideWithoutClauseDraft(raw) {
-  if (!raw || typeof raw !== 'object') return raw;
-  const o = { ...raw };
-  delete o.objeto;
-  delete o.justificativa;
-  delete o.sol_oficio_objeto;
-  delete o.sol_oficio_justificativa;
-  delete o.secretaria_usuario;
-  return Object.keys(o).length ? o : null;
+function parseObjetoJustificativa(text) {
+  const raw = String(text || '').replace(/\r/g, '').trim();
+  if (!raw) return { objeto: '', justificativa: '' };
+  const matchObjeto = raw.match(/Objeto:\s*([\s\S]*?)(?:\n+Justificativa:|$)/i);
+  const matchJust = raw.match(/Justificativa:\s*([\s\S]*?)$/i);
+  return {
+    objeto: (matchObjeto?.[1] || '').trim(),
+    justificativa: (matchJust?.[1] || '').trim(),
+  };
+}
+
+function buildGerarClausulasPrompt() {
+  const contratado = String(objetoContratado.value || '').trim();
+  const setor = String(objetoSetor.value || '').trim();
+  const caracteristicas = String(objetoCaracteristicas.value || '').trim();
+  return [
+    'Gerar APENAS duas seções em português:',
+    'Objeto: <texto>',
+    'Justificativa: <texto>',
+    '',
+    'Regras:',
+    '- Use o setor/secretaria informado nas cláusulas (não substitua por outro órgão dos dados fixos).',
+    '- Não inventar dados fora do informado.',
+    '- Não incluir seções extras.',
+    '- Em objeto e justificativa não liste itens da tabela (quantidades, valores, marcas).',
+    '',
+    `O que será contratado: ${contratado}`,
+    `Setor/secretaria atendido: ${setor}`,
+    `Características mínimas (opcional): ${caracteristicas || 'não informado'}`,
+  ].join('\n');
 }
 
 async function gerar() {
@@ -568,38 +583,30 @@ async function gerar() {
     return;
   }
   isGerandoClausulas.value = true;
-  const fillUrl = buildFillTrSlotsUrl(API_BASE);
   try {
-    const result = await fetchFillTrSlotsWithRetry(API_BASE, {
-      user_prompt: buildUserPrompt(),
-      slots_override: slotsOverrideWithoutClauseDraft(buildSlotsOverride()),
-      slot_package_key: slotPackageKey.value,
+    const res = await fetch(`${API_BASE}/api/llm/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ prompt: buildGerarClausulasPrompt(), stream: false }),
     });
-    if (!result.ok) {
-      if (result.kind === 'network') {
-        const m = String(result.errorMessage || '');
-        const looksNetwork = /fetch|network|failed|load|aborted|timed out|timeout/i.test(m);
-        throw new Error(
-          looksNetwork ? describeFillTrSlotsNetworkFailure(fillUrl) : m || describeFillTrSlotsNetworkFailure(fillUrl),
-        );
-      }
-      throw new Error(result.errorMessage || 'Erro ao preencher objeto/justificativa.');
+    const data = await res.json().catch(() => ({}));
+    const text = data?.data?.response || data?.data?.text || data?.response || data?.text || '';
+    if (!res.ok || !String(text || '').trim()) {
+      throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
     }
-    const slots = result.data.slots && typeof result.data.slots === 'object' ? result.data.slots : {};
-    const obj = String(slots.objeto || '').trim();
-    const jus = String(slots.justificativa || '').trim();
-    if (!obj || !jus) {
-      throw new Error('IA não retornou objeto/justificativa completos.');
-    }
-    objetoGerado.value = obj;
-    justificativa.value = jus;
-    return;
+    const parsed = parseObjetoJustificativa(text);
+    objetoGerado.value = parsed.objeto || gerarObjetoTexto(contratado, setor, caracteristicas);
+    justificativa.value = parsed.justificativa || gerarJustificativaTexto(contratado, setor, caracteristicas);
   } catch (err) {
-    const base = err?.message || 'Falha ao gerar cláusulas via IA.';
-    const msg = String(base);
+    objetoGerado.value = gerarObjetoTexto(contratado, setor, caracteristicas);
+    justificativa.value = gerarJustificativaTexto(contratado, setor, caracteristicas);
+    const msg = String(err?.message || '');
     const looksNet =
       err?.name === 'TypeError' || /failed to fetch|load failed|networkerror|err_failed/i.test(msg);
-    erroGeracaoClausulas.value = looksNet ? describeFillTrSlotsNetworkFailure(fillUrl) : base;
+    erroGeracaoClausulas.value = looksNet
+      ? 'Falha de rede ao gerar cláusulas. Verifique se o serviço de IA está em execução e tente novamente.'
+      : msg || 'Falha ao gerar cláusulas via IA.';
   } finally {
     isGerandoClausulas.value = false;
   }

@@ -554,8 +554,6 @@ function slotsOverrideWithoutClauseDraft(raw) {
   delete o.justificativa;
   delete o.sol_oficio_objeto;
   delete o.sol_oficio_justificativa;
-  delete o.secretaria_usuario;
-  delete o.dfd_setor_requisitante;
   return Object.keys(o).length ? o : null;
 }
 
@@ -650,12 +648,7 @@ function buildSlotsOverride() {
   if (respCargo) o.sol_oficio_responsavel_cargo = respCargo;
   if (tratNome) o.ao_senhor_genero = tratNome;
   if (tratCargo) o.senhor_senhora_genero = tratCargo;
-  const setorFormulario = String(objetoSetor.value || '').trim();
-  if (setorFormulario) {
-    o.dfd_setor_requisitante = setorFormulario;
-  } else if (String(dadosFixos.fixoSetor || '').trim()) {
-    o.dfd_setor_requisitante = String(dadosFixos.fixoSetor).trim();
-  }
+  if (String(dadosFixos.fixoSetor || '').trim()) o.dfd_setor_requisitante = String(dadosFixos.fixoSetor).trim();
   if (String(dadosFixos.fixoDemanda || '').trim()) o.dfd_responsavel_demanda = String(dadosFixos.fixoDemanda).trim();
   if (String(dadosFixos.fixoEmail || '').trim()) o.dfd_email = String(dadosFixos.fixoEmail).trim();
   if (String(dadosFixos.fixoGestor || '').trim()) o.dfd_gestor_contratos = String(dadosFixos.fixoGestor).trim();
@@ -675,6 +668,7 @@ function buildSlotsOverride() {
   if (String(dadosFixos.fixoEmailPropostas || '').trim()) o.email_envio_propostas = String(dadosFixos.fixoEmailPropostas).trim();
   if (String(dadosFixos.fixoTrResponsavelNome || '').trim()) o.nome_assinante_termo = String(dadosFixos.fixoTrResponsavelNome).trim();
   if (String(dadosFixos.fixoTrResponsavelCargo || '').trim()) o.cargo_assinante_termo = String(dadosFixos.fixoTrResponsavelCargo).trim();
+  if (String(dadosFixos.fixoTrResponsavelCargo || '').trim()) o.secretaria_usuario = String(dadosFixos.fixoTrResponsavelCargo).trim();
   if (dotacaoAtiva.value && String(dotacao.value || '').trim()) {
     const dotacaoTexto = String(dotacao.value).trim();
     o.dotacao = dotacaoTexto;
@@ -726,7 +720,7 @@ function buildUserPrompt() {
     `Órgão: ${orgao.value || 'Não informado'}`,
     `Processo: ${processoAtivo.value ? (processo.value || 'Não informado') : 'Não se aplica'}`,
     `Objeto base: ${objetoContratado.value || 'Não informado'}`,
-    `Setor/secretaria atendido (usar nas cláusulas de objeto e justificativa): ${objetoSetor.value || 'Não informado'}`,
+    `Setor atendido: ${objetoSetor.value || 'Não informado'}`,
     `Características mínimas: ${objetoCaracteristicas.value || 'Não informado'}`,
     'Em objeto e justificativa não liste nem discuta itens da tabela (descrições, quantidades, valores); mantenha texto genérico.',
   ].join('\n');

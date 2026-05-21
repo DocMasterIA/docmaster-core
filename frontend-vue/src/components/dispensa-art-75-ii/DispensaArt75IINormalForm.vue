@@ -267,11 +267,7 @@ import DispensaArt75IIItensValores from './DispensaArt75IIItensValores.vue';
 import DotacaoOrcamentariaBlock from '@/components/DotacaoOrcamentariaBlock.vue';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
 import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
-import {
-  buildFillTrSlotsUrl,
-  describeFillTrSlotsNetworkFailure,
-  fetchFillTrSlotsWithRetry,
-} from '@/utils/fetchFillTrSlots.js';
+import { requestClausulasObjetoJustificativaFast } from '@/utils/clausulasObjetoJustificativa.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { useDispensaArt75IIDadosFixos } from '@/composables/useDispensaArt75IIDadosFixos.js';
 
@@ -547,18 +543,6 @@ const progresso = computed(() => Math.round((completos.value / secoes.value.leng
 const podeGerarDocumentos = computed(() => secoes.value.every((s) => s.completo));
 
 /** Remove rascunho de objeto/justificativa para fill_tr_slots_with_llm (rag_service). */
-function slotsOverrideWithoutClauseDraft(raw) {
-  if (!raw || typeof raw !== 'object') return raw;
-  const o = { ...raw };
-  delete o.objeto;
-  delete o.justificativa;
-  delete o.sol_oficio_objeto;
-  delete o.sol_oficio_justificativa;
-  delete o.secretaria_usuario;
-  delete o.dfd_setor_requisitante;
-  return Object.keys(o).length ? o : null;
-}
-
 async function gerar() {
   erroGeracaoClausulas.value = '';
   const contratado = String(objetoContratado.value || '').trim();
@@ -568,39 +552,43 @@ async function gerar() {
     erroGeracaoClausulas.value = 'Preencha "O que será contratado?" e "Qual setor/secretaria será atendido?".';
     return;
   }
+
+  const aplicarTemplatesLocais = () => {
+    objetoGerado.value = gerarObjetoTexto(contratado, setor, caracteristicas);
+    justificativa.value = gerarJustificativaTexto(contratado, setor, caracteristicas);
+  };
+
   isGerandoClausulas.value = true;
-  const fillUrl = buildFillTrSlotsUrl(API_BASE);
   try {
-    const result = await fetchFillTrSlotsWithRetry(API_BASE, {
-      user_prompt: buildUserPrompt(),
-      slots_override: slotsOverrideWithoutClauseDraft(buildSlotsOverride()),
-      slot_package_key: slotPackageKey.value,
+    const result = await requestClausulasObjetoJustificativaFast(API_BASE, {
+      contratado,
+      setor,
+      caracteristicas,
+      slotPackageKey: slotPackageKey.value,
+      variant: 'dispensa_normal',
     });
+
+    if (result.ok && result.objeto && result.justificativa) {
+      objetoGerado.value = result.objeto;
+      justificativa.value = result.justificativa;
+      return;
+    }
+
     if (!result.ok) {
-      if (result.kind === 'network') {
-        const m = String(result.errorMessage || '');
-        const looksNetwork = /fetch|network|failed|load|aborted|timed out|timeout/i.test(m);
-        throw new Error(
-          looksNetwork ? describeFillTrSlotsNetworkFailure(fillUrl) : m || describeFillTrSlotsNetworkFailure(fillUrl),
-        );
-      }
-      throw new Error(result.errorMessage || 'Erro ao preencher objeto/justificativa.');
+      aplicarTemplatesLocais();
+      erroGeracaoClausulas.value =
+        result.errorMessage || 'Não foi possível gerar via IA; aplicamos a versão padrão local.';
+      return;
     }
-    const slots = result.data.slots && typeof result.data.slots === 'object' ? result.data.slots : {};
-    const obj = String(slots.objeto || '').trim();
-    const jus = String(slots.justificativa || '').trim();
-    if (!obj || !jus) {
-      throw new Error('IA não retornou objeto/justificativa completos.');
+
+    aplicarTemplatesLocais();
+    if (!result.objeto || !result.justificativa) {
+      erroGeracaoClausulas.value = 'IA retornou texto incompleto; aplicamos a versão padrão local.';
     }
-    objetoGerado.value = obj;
-    justificativa.value = jus;
-    return;
   } catch (err) {
-    const base = err?.message || 'Falha ao gerar cláusulas via IA.';
-    const msg = String(base);
-    const looksNet =
-      err?.name === 'TypeError' || /failed to fetch|load failed|networkerror|err_failed/i.test(msg);
-    erroGeracaoClausulas.value = looksNet ? describeFillTrSlotsNetworkFailure(fillUrl) : base;
+    aplicarTemplatesLocais();
+    erroGeracaoClausulas.value =
+      err?.message || 'Não foi possível gerar via IA; aplicamos a versão padrão local.';
   } finally {
     isGerandoClausulas.value = false;
   }

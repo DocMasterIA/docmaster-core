@@ -96,3 +96,21 @@ export function gerarJustificativaTexto(contratado, setor, caracteristicas) {
     : '';
   return `A presente contratação justifica-se pela necessidade de assegurar ${objeto} para atendimento das demandas${destino}, garantindo a continuidade, eficiência e adequada prestação dos serviços públicos.${detalhes}`;
 }
+
+/** Objeto institucional genérico (dispensa normal) — sem detalhar itens da tabela. */
+export function gerarObjetoTextoDispensaNormal(contratado, setor, caracteristicas) {
+  const tema = String(contratado || '').trim().toLowerCase() || 'bens e serviços';
+  const s = String(setor || '').trim();
+  const k = String(caracteristicas || '').trim();
+  let texto = `Aquisição de ${tema}`;
+  if (s) texto += `, visando atender às demandas de ${s}`;
+  if (k) texto += ', observadas as características mínimas informadas';
+  return `${primeiraMaiuscula(texto)}.`;
+}
+
+export function aplicarClausulasLocaisDispensaNormal(contratado, setor, caracteristicas) {
+  return {
+    objeto: gerarObjetoTextoDispensaNormal(contratado, setor, caracteristicas),
+    justificativa: gerarJustificativaTexto(contratado, setor, caracteristicas),
+  };
+}

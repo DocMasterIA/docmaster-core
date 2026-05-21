@@ -64,6 +64,20 @@ export function buildClausulasObjetoJustificativaPrompt(fields) {
   const setor = String(fields.setor || '').trim();
   const caracteristicas = String(fields.caracteristicas || '').trim();
   const variant = fields.variant || 'generic';
+  const compact = !!fields.compact;
+
+  if (compact && variant === 'dispensa_normal') {
+    return [
+      'Redija em pt-BR, formal, só duas linhas rotuladas:',
+      'Objeto: uma oração genérica (sem itens/quantidades/valores).',
+      'Justificativa: um parágrafo curto.',
+      `Contratação: ${contratado}`,
+      `Setor: ${setor}`,
+      caracteristicas ? `Características: ${caracteristicas}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
 
   const lines = [
     'Com base EXCLUSIVAMENTE nos dados abaixo, gere APENAS duas seções:',
@@ -100,6 +114,13 @@ export function buildClausulasObjetoJustificativaPrompt(fields) {
   return lines.join('\n');
 }
 
+/** Limites Ollama para cláusulas curtas (objeto + justificativa). */
+export const CLAUSULAS_LLM_OPTIONS = {
+  num_predict: 420,
+  temperature: 0.25,
+  top_p: 0.9,
+};
+
 /**
  * @returns {Promise<{ ok: boolean, objeto: string, justificativa: string, status: number, errorMessage: string }>}
  */
@@ -111,11 +132,13 @@ export async function requestClausulasObjetoJustificativaFast(apiBase, options =
     setor: options.setor,
     caracteristicas: options.caracteristicas,
     variant: options.variant || 'generic',
+    compact: options.compact !== false,
   });
 
   const body = {
     prompt,
     stream: false,
+    options: options.llmOptions || CLAUSULAS_LLM_OPTIONS,
   };
   const pkg = String(options.slotPackageKey || '').trim();
   if (pkg) body.slot_package_key = pkg;

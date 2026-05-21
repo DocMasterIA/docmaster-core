@@ -54,6 +54,7 @@ class GenerateRequest(BaseModel):
     model: str | None = None
     stream: bool = False
     prefeitura: str | None = None
+    options: dict[str, Any] | None = None
 
 
 def _payload_from_planner_request(req: PlannerRequest) -> dict[str, Any]:
@@ -186,6 +187,7 @@ async def endpoint_generate(body: GenerateRequest, request: Request) -> dict[str
             model=body.model,
             stream=body.stream,
             prefeitura=prefeitura,
+            options=body.options,
         )
         if isinstance(result, dict):
             from app.token_usage import extract_token_usage

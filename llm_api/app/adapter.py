@@ -108,6 +108,7 @@ async def generate(
     model: str | None = None,
     stream: bool = False,
     prefeitura: str | None = None,
+    options: dict[str, Any] | None = None,
 ) -> dict[str, Any] | str:
     """
     Chama o Ollama em /api/generate (API real do Ollama).
@@ -127,4 +128,6 @@ async def generate(
         "prompt": prompt,
         "stream": stream,
     }
+    if options:
+        payload["options"] = options
     return await _call("generate", OLLAMA_GENERATE_PATH, payload)

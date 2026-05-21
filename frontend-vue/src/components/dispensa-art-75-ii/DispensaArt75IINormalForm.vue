@@ -85,13 +85,21 @@
                         @input="objetoCaracteristicas = primeiraMaiuscula(($event.target).value)"
                       />
                     </div>
-                    <button type="button" class="da75-btn da75-btn--primary da75-btn--block" :disabled="isGerandoClausulas" @click="gerar">
+                    <button type="button" class="da75-btn da75-btn--primary da75-btn--block" @click="gerar">
                       Gerar objeto e justificativa
                     </button>
+                    <button
+                      type="button"
+                      class="da75-btn da75-btn--block"
+                      :disabled="isRefinandoClausulas || !podeGerarClausulasBase"
+                      @click="refinarClausulasComIa"
+                    >
+                      Refinar com IA (opcional)
+                    </button>
                     <DocGenIaLoaderBlock
-                      v-if="isGerandoClausulas"
+                      v-if="isRefinandoClausulas"
                       compact
-                      message="Gerando objeto e justificativa…"
+                      message="Refinando redação com IA…"
                     />
                     <p v-if="erroGeracaoClausulas" class="da75-helper">{{ erroGeracaoClausulas }}</p>
                   </div>
@@ -254,8 +262,7 @@ import {
   calcularValorTotalEstimado,
   campoPreenchido,
   formatarData,
-  gerarJustificativaTexto,
-  gerarObjetoTexto,
+  aplicarClausulasLocaisDispensaNormal,
   moedaParaNumero,
   quantidadeParaNumero,
   primeiraMaiuscula,
@@ -292,7 +299,7 @@ const dotacaoAtiva = ref(false);
 const dotacao = ref('');
 const modoData = ref('');
 const dataManual = ref('');
-const isGerandoClausulas = ref(false);
+const isRefinandoClausulas = ref(false);
 const erroGeracaoClausulas = ref('');
 const isSubmitting = ref(false);
 const generateError = ref('');
@@ -415,7 +422,7 @@ async function resetFormStateForNewRoute() {
   dotacao.value = '';
   modoData.value = '';
   dataManual.value = '';
-  isGerandoClausulas.value = false;
+  isRefinandoClausulas.value = false;
   erroGeracaoClausulas.value = '';
   isSubmitting.value = false;
   generateError.value = '';
@@ -541,9 +548,25 @@ const secoes = computed(() => {
 const completos = computed(() => secoes.value.filter((s) => s.completo).length);
 const progresso = computed(() => Math.round((completos.value / secoes.value.length) * 100));
 const podeGerarDocumentos = computed(() => secoes.value.every((s) => s.completo));
+const podeGerarClausulasBase = computed(
+  () => campoPreenchido(objetoContratado.value) && campoPreenchido(objetoSetor.value),
+);
 
-/** Remove rascunho de objeto/justificativa para fill_tr_slots_with_llm (rag_service). */
-async function gerar() {
+function gerar() {
+  erroGeracaoClausulas.value = '';
+  const contratado = String(objetoContratado.value || '').trim();
+  const setor = String(objetoSetor.value || '').trim();
+  const caracteristicas = String(objetoCaracteristicas.value || '').trim();
+  if (!contratado || !setor) {
+    erroGeracaoClausulas.value = 'Preencha "O que será contratado?" e "Qual setor/secretaria será atendido?".';
+    return;
+  }
+  const local = aplicarClausulasLocaisDispensaNormal(contratado, setor, caracteristicas);
+  objetoGerado.value = local.objeto;
+  justificativa.value = local.justificativa;
+}
+
+async function refinarClausulasComIa() {
   erroGeracaoClausulas.value = '';
   const contratado = String(objetoContratado.value || '').trim();
   const setor = String(objetoSetor.value || '').trim();
@@ -553,12 +576,7 @@ async function gerar() {
     return;
   }
 
-  const aplicarTemplatesLocais = () => {
-    objetoGerado.value = gerarObjetoTexto(contratado, setor, caracteristicas);
-    justificativa.value = gerarJustificativaTexto(contratado, setor, caracteristicas);
-  };
-
-  isGerandoClausulas.value = true;
+  isRefinandoClausulas.value = true;
   try {
     const result = await requestClausulasObjetoJustificativaFast(API_BASE, {
       contratado,
@@ -566,6 +584,7 @@ async function gerar() {
       caracteristicas,
       slotPackageKey: slotPackageKey.value,
       variant: 'dispensa_normal',
+      compact: true,
     });
 
     if (result.ok && result.objeto && result.justificativa) {
@@ -575,22 +594,16 @@ async function gerar() {
     }
 
     if (!result.ok) {
-      aplicarTemplatesLocais();
       erroGeracaoClausulas.value =
-        result.errorMessage || 'Não foi possível gerar via IA; aplicamos a versão padrão local.';
+        result.errorMessage || 'Não foi possível refinar com IA; mantemos o texto padrão.';
       return;
     }
 
-    aplicarTemplatesLocais();
-    if (!result.objeto || !result.justificativa) {
-      erroGeracaoClausulas.value = 'IA retornou texto incompleto; aplicamos a versão padrão local.';
-    }
+    erroGeracaoClausulas.value = 'IA retornou texto incompleto; mantemos o texto atual.';
   } catch (err) {
-    aplicarTemplatesLocais();
-    erroGeracaoClausulas.value =
-      err?.message || 'Não foi possível gerar via IA; aplicamos a versão padrão local.';
+    erroGeracaoClausulas.value = err?.message || 'Não foi possível refinar com IA.';
   } finally {
-    isGerandoClausulas.value = false;
+    isRefinandoClausulas.value = false;
   }
 }
 

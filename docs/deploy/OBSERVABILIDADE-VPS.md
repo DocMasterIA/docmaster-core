@@ -82,10 +82,50 @@ chmod +x scripts/ensure-observability.sh
 
 `unless-stopped` não voltava se o contentor tinha sido parado à mão; `always` + passo 2 garante a stack após ligar o PC/servidor.
 
+## Grafana “down” ou sem dados por horas
+
+Rode na pasta do compose (`DEPLOY` ou `~/docmaster-core`):
+
+```bash
+docker ps -a --format 'table {{.Names}}\t{{.Status}}' | grep -E 'grafana|prometheus|node_exporter'
+curl -sf --max-time 5 http://127.0.0.1:3000/api/health && echo " grafana OK" || echo " grafana OFF"
+curl -sf --max-time 5 http://127.0.0.1:9090/-/ready && echo " prometheus OK" || echo " prometheus OFF"
+docker logs prometheus --tail 40
+docker logs grafana --tail 40
+df -h /var/lib/docker
+```
+
+| Sintoma | Causa provável | Ação |
+|---------|----------------|------|
+| `grafana` / `prometheus` **Exited** | Não subiu após reboot ou `compose up` sem esses serviços | `./scripts/ensure-observability.sh` |
+| Prometheus **Restarting** | Disco cheio no volume `prometheus_data` | `df -h`; compose já limita retenção 30d — se volume antigo enorme: ver nota abaixo |
+| Grafana abre, painéis vazios / loading | Datasource não alcançava Prometheus | Provisioning usa `http://prometheus:9090` (rede Docker) |
+| Demora 10–15 min e aparece | Prometheus a recompactar TSDB ou 1º scrape após cold start | Normal após longa queda; espere ou `docker compose restart prometheus grafana` |
+| Só no DESKTOP, backend vazio | Scrape aponta para `api.docmasteria.com.br` (produção) | Normal localmente; métricas de host (`node`) ainda devem aparecer |
+
+Recuperação rápida:
+
+```bash
+cd DEPLOY   # ou ~/docmaster-core
+docker compose up -d node_exporter prometheus grafana
+docker compose restart prometheus grafana
+sleep 20
+curl -s http://127.0.0.1:9090/-/ready
+curl -s http://127.0.0.1:3000/api/health
+```
+
+Se Prometheus não voltar por disco (logs `no space left`):
+
+```bash
+docker compose stop prometheus
+docker volume rm $(docker volume ls -q | grep prometheus_data)   # APAGA histórico de métricas
+docker compose up -d prometheus grafana
+```
+
 ## Erros comuns
 
 | Problema | Causa |
 |----------|--------|
 | 404 em `api.docmasteria.com.br/grafana` | Esperado sem nginx; use `127.0.0.1:3000` ou túnel |
 | Conflito `container name prometheus` | Dois `docker compose` em pastas diferentes; use só `cd DEPLOY` |
-| Grafana sem dados | Datasource deve ser `http://host.docker.internal:9090` (já no provisioning) |
+| Grafana sem dados | Datasource: `http://prometheus:9090` (provisioning) |

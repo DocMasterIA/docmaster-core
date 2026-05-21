@@ -546,15 +546,7 @@ const completos = computed(() => secoes.value.filter((s) => s.completo).length);
 const progresso = computed(() => Math.round((completos.value / secoes.value.length) * 100));
 const podeGerarDocumentos = computed(() => secoes.value.every((s) => s.completo));
 
-/** Setor/secretaria do formulário (prompt) — tem prioridade sobre dados fixos nas cláusulas. */
-function setorAtendidoDoPrompt() {
-  return String(objetoSetor.value || '').trim();
-}
-
-/**
- * Remove rascunho e campos de setor/órgão dos dados fixos para o fill-tr-slots gerar só
- * objeto/justificativa a partir do prompt (evita a IA misturar com fixoSetor/secretaria_usuario).
- */
+/** Remove rascunho de objeto/justificativa e secretaria_usuario (cargo TR dos dados fixos) no fill-tr-slots. */
 function slotsOverrideWithoutClauseDraft(raw) {
   if (!raw || typeof raw !== 'object') return raw;
   const o = { ...raw };
@@ -562,11 +554,7 @@ function slotsOverrideWithoutClauseDraft(raw) {
   delete o.justificativa;
   delete o.sol_oficio_objeto;
   delete o.sol_oficio_justificativa;
-  delete o.dfd_setor_requisitante;
   delete o.secretaria_usuario;
-  delete o.orgao;
-  delete o.sol_oficio_destinatario_orgao;
-  delete o.sol_oficio_responsavel_setor;
   return Object.keys(o).length ? o : null;
 }
 
@@ -661,13 +649,7 @@ function buildSlotsOverride() {
   if (respCargo) o.sol_oficio_responsavel_cargo = respCargo;
   if (tratNome) o.ao_senhor_genero = tratNome;
   if (tratCargo) o.senhor_senhora_genero = tratCargo;
-  const setorPrompt = setorAtendidoDoPrompt();
-  if (setorPrompt) {
-    o.dfd_setor_requisitante = setorPrompt;
-  } else if (String(dadosFixos.fixoSetor || '').trim()) {
-    o.dfd_setor_requisitante = String(dadosFixos.fixoSetor).trim();
-  }
-  if (String(orgao.value || '').trim()) o.orgao = String(orgao.value).trim();
+  if (String(dadosFixos.fixoSetor || '').trim()) o.dfd_setor_requisitante = String(dadosFixos.fixoSetor).trim();
   if (String(dadosFixos.fixoDemanda || '').trim()) o.dfd_responsavel_demanda = String(dadosFixos.fixoDemanda).trim();
   if (String(dadosFixos.fixoEmail || '').trim()) o.dfd_email = String(dadosFixos.fixoEmail).trim();
   if (String(dadosFixos.fixoGestor || '').trim()) o.dfd_gestor_contratos = String(dadosFixos.fixoGestor).trim();
@@ -732,27 +714,16 @@ function buildSlotsOverride() {
 }
 
 function buildUserPrompt() {
-  const setor = setorAtendidoDoPrompt();
   return [
     `Gerar documento com base nos dados preenchidos para ${String(route.meta?.title || 'dispensa normal')}.`,
     `Cabeçalho do documento: ${cabecalho.value || 'Não informado'}`,
+    `Órgão: ${orgao.value || 'Não informado'}`,
     `Processo: ${processoAtivo.value ? (processo.value || 'Não informado') : 'Não se aplica'}`,
-    `Objeto base (o que será contratado): ${objetoContratado.value || 'Não informado'}`,
-    `Setor/secretaria atendido (OBRIGATÓRIO nas cláusulas de objeto e justificativa): ${setor || 'Não informado'}`,
+    `Objeto base: ${objetoContratado.value || 'Não informado'}`,
+    `Setor atendido: ${objetoSetor.value || 'Não informado'}`,
     `Características mínimas: ${objetoCaracteristicas.value || 'Não informado'}`,
-    orgao.value
-      ? `Órgão administrativo (apenas contexto de cabeçalho; NÃO substitua o setor atendido acima): ${orgao.value}`
-      : '',
-    [
-      'Regras para objeto e justificativa:',
-      `- Use exclusivamente o setor/secretaria da linha «Setor/secretaria atendido» (${setor || 'não informado'}) ao indicar quem será atendido, demandas do setor ou unidade beneficiada.`,
-      '- Não use setor requisitante, órgão de cadastro nem dados fixos do formulário oculto em lugar do setor atendido.',
-      '- Não misture dois setores/secretarias diferentes no mesmo texto.',
-      'Não liste nem discuta itens da tabela (descrições, quantidades, valores); mantenha texto genérico.',
-    ].join('\n'),
-  ]
-    .filter(Boolean)
-    .join('\n');
+    'Em objeto e justificativa não liste nem discuta itens da tabela (descrições, quantidades, valores); mantenha texto genérico.',
+  ].join('\n');
 }
 
 function sanitizeJsonBody(obj) {

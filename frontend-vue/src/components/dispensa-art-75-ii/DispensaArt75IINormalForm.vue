@@ -557,21 +557,26 @@ function slotsOverrideWithoutClauseDraft(raw) {
   return Object.keys(o).length ? o : null;
 }
 
-/** Mesmo padrão da dispensa rápida: dados fixos no override, sem cláusulas nem tabela de itens. */
+/** Só os campos do bloco «Objeto da contratação» — sem Dados básicos, dados fixos ou tabela de itens. */
+function buildSlotsOverrideForGerarClausulas() {
+  const setor = String(objetoSetor.value || '').trim();
+  const o = { dispensa_fluxo_ui: 'normal' };
+  if (setor) o.dfd_setor_requisitante = setor;
+  return o;
+}
+
 function buildUserPromptGerarClausulas() {
   const car = String(objetoCaracteristicas.value || '').trim();
   return [
-    `Gerar documento com base nos dados preenchidos para ${String(route.meta?.title || 'dispensa normal')}.`,
-    `Cabeçalho do documento: ${cabecalho.value || 'Não informado'}`,
-    `Órgão: ${orgao.value || 'Não informado'}`,
-    `Processo: ${processoAtivo.value ? (processo.value || 'Não informado') : 'Não se aplica'}`,
-    `O que será contratado: ${objetoContratado.value || 'Não informado'}`,
-    `Setor/secretaria atendido: ${objetoSetor.value || 'Não informado'}`,
-    car ? `Características mínimas: ${car}` : '',
-    'Em objeto e justificativa não liste itens, quantidades ou valores da tabela.',
-  ]
-    .filter(Boolean)
-    .join('\n');
+    'Gere objeto e justificativa usando EXCLUSIVAMENTE os três campos abaixo.',
+    'Não use órgão, prefeitura, secretaria do perfil, cabeçalho, processo, dados fixos nem qualquer outro dado.',
+    'Não invente nome de órgão, entidade ou município.',
+    '',
+    `O que será contratado: ${objetoContratado.value}`,
+    `Setor/secretaria atendido: ${objetoSetor.value}`,
+    car ? `Características mínimas: ${car}` : 'Características mínimas: não informado',
+    'Não liste itens, quantidades ou valores de tabela no objeto nem na justificativa.',
+  ].join('\n');
 }
 
 async function gerar() {
@@ -592,7 +597,7 @@ async function gerar() {
       API_BASE,
       {
         user_prompt: buildUserPromptGerarClausulas(),
-        slots_override: slotsOverrideWithoutClauseDraft(buildSlotsOverride()),
+        slots_override: buildSlotsOverrideForGerarClausulas(),
         slot_package_key: slotPackageKey.value,
       },
       { maxAttempts: 1 },

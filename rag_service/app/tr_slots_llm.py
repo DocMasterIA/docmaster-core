@@ -161,9 +161,10 @@ objeto:
 
 justificativa:
 - Parágrafo dissertativo de 3 a 6 frases, linguagem formal.
-- Necessidade para a Administração, riscos se não contratar, relação com competências do órgão.
+- Necessidade para a Administração e para o setor/destino informados no pedido; riscos se não contratar.
+- Use SOMENTE nomes de órgão, município ou entidade que apareçam literalmente no pedido do usuário.
 - Concordância correta (ex.: "a manutenção", não "o manutenção").
-- Não invente valores, prazos ou dados não fornecidos.
+- Não invente valores, prazos, órgãos ou localidades além do pedido.
 """
 
 OBJETO_REWRITE_SYSTEM_PROMPT = """Você é redator público especializado em cláusulas de OBJETO para Termo de Referência (Lei 14.133/2021).
@@ -1868,6 +1869,11 @@ def _strip_clause_draft_from_override(override: Dict[str, Any]) -> Dict[str, Any
         "sol_oficio_justificativa",
         "problema_administrativo",
         "beneficio_esperado",
+        "secretaria_usuario",
+        "nome_usuario",
+        "cidade",
+        "cidade_estado",
+        "codigo_uf",
     ):
         o.pop(key, None)
     return o
@@ -2109,7 +2115,11 @@ async def _fill_tr_slots_with_llm_work(
     _fluxo_ui = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
     if lite_fill:
         user_prompt_text = _build_objeto_justificativa_user_prompt(
-            user_prompt, user_context, skip_context_in_prompt
+            user_prompt, None, skip_context_in_prompt=True
+        )
+        user_prompt_text += (
+            "\nUse somente o texto em «Pedido do usuário». "
+            "Proibido citar órgão, prefeitura ou município que não estejam nesse pedido."
         )
         if _fluxo_ui == "normal":
             user_prompt_text += (

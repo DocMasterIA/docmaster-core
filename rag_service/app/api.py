@@ -736,13 +736,17 @@ async def endpoint_fill_tr_slots(body: GenerateTRFromModelRequest):
 
     from .tr_slots_llm import fill_tr_slots_with_llm
 
-    slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
     skip_ctx = bool(getattr(body, "skip_context_in_prompt", False))
+    # Botão «Gerar» objeto/justificativa: não injeta secretaria/prefeitura do perfil no override.
+    if skip_ctx:
+        slots_override = body.slots_override
+    else:
+        slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
     try:
         slots, llm_usage = await fill_tr_slots_with_llm(
             user_prompt=body.user_prompt,
             slots_override=slots_override,
-            user_context=body.context,
+            user_context=body.context if not skip_ctx else None,
             skip_context_in_prompt=skip_ctx,
         )
         return {"ok": True, "slots": asdict(slots), "llm_token_usage": llm_usage}

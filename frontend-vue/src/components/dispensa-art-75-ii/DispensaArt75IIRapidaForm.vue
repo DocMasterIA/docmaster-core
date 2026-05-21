@@ -452,11 +452,15 @@ async function preencherObjetoEJustificativaInterno() {
   objetoGerado.value = '';
   justificativa.value = '';
   const fillUrl = buildFillTrSlotsUrl(API_BASE);
-  const result = await fetchFillTrSlotsWithRetry(API_BASE, {
-    user_prompt: buildUserPrompt(),
-    slots_override: slotsOverrideWithoutClauseDraft(buildSlotsOverride()),
-    slot_package_key: slotPackageKey.value,
-  });
+  const result = await fetchFillTrSlotsWithRetry(
+    API_BASE,
+    {
+      user_prompt: buildUserPromptFillTrSlots(),
+      slots_override: slotsOverrideWithoutClauseDraft(buildSlotsOverride()),
+      slot_package_key: slotPackageKey.value,
+    },
+    { maxAttempts: 1 },
+  );
   if (!result.ok) {
     if (result.kind === 'network') {
       const m = String(result.errorMessage || '');
@@ -562,6 +566,13 @@ function buildSlotsOverride() {
   return Object.keys(o).length ? o : null;
 }
 
+/** Só para fill-tr-slots (objeto/justificativa) — prompt curto ≈ curl ~4s no RAG. */
+function buildUserPromptFillTrSlots() {
+  const contratado = String(objetoContratado.value || '').trim();
+  return `O que será contratado: ${contratado || 'Não informado'}`;
+}
+
+/** Metadados no payload de gerar-tr-e-dfd; com cláusulas no override a 2ª LLM é pulada. */
 function buildUserPrompt() {
   return [
     `Gerar documento com base nos dados preenchidos para ${String(route.meta?.title || 'dispensa rapida')}.`,

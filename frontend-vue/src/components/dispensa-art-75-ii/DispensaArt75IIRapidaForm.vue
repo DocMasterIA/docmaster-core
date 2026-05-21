@@ -67,24 +67,13 @@
               </div>
             </section>
 
-            <section class="da75-block">
-              <h3>Dotação orçamentária</h3>
-              <div class="da75-block__body">
-                <label class="da75-check">
-                  <input v-model="dotacaoAtiva" type="checkbox" />
-                  Informar dotação orçamentária (opcional)
-                </label>
-                <div v-if="dotacaoAtiva" class="da75-mt">
-                  <label class="da75-label">Dotação orçamentária</label>
-                  <textarea
-                    class="da75-textarea"
-                    :value="dotacao"
-                    :placeholder="PLACEHOLDER_DOTACAO"
-                    @input="dotacao = primeiraMaiuscula(($event.target).value)"
-                  />
-                </div>
-              </div>
-            </section>
+            <DotacaoOrcamentariaBlock
+              v-model:dotacao-ativa="dotacaoAtiva"
+              v-model:dotacao="dotacao"
+              :api-base="API_BASE"
+              variant="da75"
+              wrapper="section"
+            />
 
 
             <section class="da75-block">
@@ -194,7 +183,6 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   DATA_OPTIONS,
-  PLACEHOLDER_DOTACAO,
   TEXTO_PADRAO_ENDERECO_PROPOSTAS,
   campoPreenchido,
   formatarData,
@@ -204,6 +192,7 @@ import {
 } from './dispensaArt75iiShared.js';
 import './dispensaArt75ii.css';
 import DispensaArt75IIDadosFixosDrawer from './DispensaArt75IIDadosFixosDrawer.vue';
+import DotacaoOrcamentariaBlock from '@/components/DotacaoOrcamentariaBlock.vue';
 import DocGenIaLoaderBlock from '@/components/DocGenIaLoaderBlock.vue';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
 import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';

@@ -6,8 +6,7 @@ export const TRATAMENTO_CARGO = ['Senhor', 'Senhora'];
 export const TEXTO_PADRAO_ENDERECO_PROPOSTAS =
   'Nome Município - UF, localizado na rua xxxxxxxxxxxxx, Nº xx, bairro xxx, no horário das 07h00min às 11h00min e das 13h00min às 17h00min, de segunda a sexta-feira.';
 
-export const PLACEHOLDER_DOTACAO =
-  'Ex:\nÓrgão: 02\nUnidade: 05\nProjeto/Atividade: 2.045\nElemento de despesa: 3.3.90.39.00\nFonte: 1.500';
+export { PLACEHOLDER_DOTACAO } from '@/constants/dotacaoOrcamentaria.js';
 
 export const EMPTY_ITEM = { descricao: '', quantidade: '', unidade: '', mediaValor: '' };
 

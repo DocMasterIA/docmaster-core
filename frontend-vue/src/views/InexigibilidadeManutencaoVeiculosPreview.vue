@@ -150,19 +150,14 @@
               </div>
             </article>
 
-            <article class="ixp-card">
-              <h3>Dotação orçamentária</h3>
-              <div class="ixp-body">
-                <label class="ixp-check">
-                  <input v-model="dotacaoAtiva" type="checkbox" />
-                  Informar dotação orçamentária (opcional)
-                </label>
-                <div v-if="dotacaoAtiva" class="ixp-field">
-                  <label>Dotação orçamentária</label>
-                  <textarea v-model="dotacao" rows="3" :placeholder="placeholderDotacao" />
-                </div>
-              </div>
-            </article>
+            <DotacaoOrcamentariaBlock
+              v-model:dotacao-ativa="dotacaoAtiva"
+              v-model:dotacao="dotacao"
+              :api-base="API_BASE"
+              variant="ixp"
+              wrapper="article"
+              :format-on-input="false"
+            />
 
             <article class="ixp-card">
               <h3>Itens e valores</h3>
@@ -557,6 +552,7 @@ const PLACEHOLDER_ORGAO_UNIDADE_RESP_EQUIP = capitalizeEachWordLeadingPt(
 );
 import '@/components/dispensa-art-75-ii/dispensaArt75ii.css';
 import DocGenIaLoaderBlock from '@/components/DocGenIaLoaderBlock.vue';
+import DotacaoOrcamentariaBlock from '@/components/DotacaoOrcamentariaBlock.vue';
 
 const API_BASE = getApiBase();
 const route = useRoute();
@@ -579,7 +575,6 @@ const objetoEspecificoOptions = [
   'Outro',
 ];
 const emptyItem = { descricao: '', quantidade: '', unidade: '', valorUnitario: '', valorTotal: '' };
-const placeholderDotacao = ['Ex:', 'Órgão: 02', 'Unidade: 05', 'Projeto/Atividade: 2.045', 'Elemento de despesa: 3.3.90.39.00', 'Fonte: 1.500'].join('\n');
 const DISPENSA_RAPIDA_TO_LOGICAL = {
   DispensaRapidaArt75IObrasEngenharia: 'DispensaArt75IObrasEngenharia',
   DispensaRapidaArt75IManutencaoVeiculos: 'DispensaArt75IManutencaoVeiculos',

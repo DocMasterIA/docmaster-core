@@ -90,19 +90,14 @@
               </div>
             </article>
 
-            <article class="fe-card">
-              <h3>Dotação orçamentária</h3>
-              <div class="fe-body">
-                <label class="fe-check">
-                  <input v-model="dotacaoAtiva" type="checkbox" />
-                  Informar dotação orçamentária (opcional)
-                </label>
-                <div v-if="dotacaoAtiva" class="fe-field">
-                  <label>Dotação orçamentária</label>
-                  <textarea v-model="dotacao" rows="3" :placeholder="placeholderDotacao" />
-                </div>
-              </div>
-            </article>
+            <DotacaoOrcamentariaBlock
+              v-model:dotacao-ativa="dotacaoAtiva"
+              v-model:dotacao="dotacao"
+              :api-base="API_BASE"
+              variant="fe"
+              wrapper="article"
+              :format-on-input="false"
+            />
 
             <article class="fe-card">
               <h3>Itens e valores</h3>
@@ -415,6 +410,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import '@/components/dispensa-art-75-ii/dispensaArt75ii.css';
 import DocGenIaLoaderBlock from '@/components/DocGenIaLoaderBlock.vue';
+import DotacaoOrcamentariaBlock from '@/components/DotacaoOrcamentariaBlock.vue';
 import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
@@ -440,7 +436,6 @@ const objetoOptions = [
   'Manutenção corretiva', 'Manutenção preventiva e corretiva', 'Assistência técnica autorizada',
   'Suporte técnico especializado', 'Outro',
 ];
-const placeholderDotacao = 'Ex:\nÓrgão: 02\nUnidade: 05\nProjeto/Atividade: 2.045\nElemento de despesa: 3.3.90.39.00\nFonte: 1.500';
 
 const drawerOpen = ref(false);
 const processoAtivo = ref(false);

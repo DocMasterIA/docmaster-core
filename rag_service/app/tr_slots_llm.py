@@ -164,6 +164,11 @@ justificativa:
 - Necessidade para a Administração, riscos se não contratar, relação com competências do órgão.
 - Concordância correta (ex.: "a manutenção", não "o manutenção").
 - Não invente valores, prazos ou dados não fornecidos.
+
+Dispensa normal (quando o pedido trouxer «Setor/secretaria atendido» ou «Setor atendido»):
+- Objeto e justificativa devem referir o setor/secretaria dessa linha como unidade atendida.
+- Não substitua pelo «Órgão administrativo» nem por outro setor mencionado só como contexto de cabeçalho.
+- Não misture dois setores/secretarias no mesmo texto.
 """
 
 OBJETO_REWRITE_SYSTEM_PROMPT = """Você é redator público especializado em cláusulas de OBJETO para Termo de Referência (Lei 14.133/2021).
@@ -2096,7 +2101,9 @@ async def _fill_tr_slots_with_llm_work(
         "\n\n[Dispensa normal — cláusula de objeto]\n"
         "Uma única oração institucional genérica (ex.: aquisição de medicamentos para atendimento "
         "às necessidades da saúde/suprimento municipal), sem nomear produto, apresentação, dosagem, "
-        "marca, nem quantidades (nada como «100 (cem) unidades de X»). Itens e quantidades ficam só na tabela do TR."
+        "marca, nem quantidades (nada como «100 (cem) unidades de X»). Itens e quantidades ficam só na tabela do TR.\n"
+        "O setor/secretaria beneficiário é o da linha «Setor/secretaria atendido» ou «Setor atendido» do pedido — "
+        "não use outro setor nem o órgão de cabeçalho no lugar dele."
     )
     if lite_fill:
         user_prompt_text = _build_objeto_justificativa_user_prompt(

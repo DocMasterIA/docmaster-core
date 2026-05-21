@@ -38,10 +38,13 @@ No `.env` na pasta do `docker compose` (home do deploy):
 
 ```env
 OLLAMA_MODEL=qwen2.5:7b
-OLLAMA_MODEL_FAST=qwen2.5:3b
+# Opcional — só defina depois de: docker exec ollama ollama pull qwen2.5:3b
+# OLLAMA_MODEL_FAST=qwen2.5:3b
 ```
 
-Baixar o modelo rápido (uma vez):
+Se `OLLAMA_MODEL_FAST` apontar para um modelo **não baixado**, o `fill-tr-slots` devolvia **502**. Com o fix atual, o sistema volta para `OLLAMA_MODEL` automaticamente.
+
+Baixar o modelo rápido (opcional, uma vez):
 
 ```bash
 docker exec ollama ollama pull qwen2.5:3b

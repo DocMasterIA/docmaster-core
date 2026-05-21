@@ -17,7 +17,8 @@ function backoffMs(attempt) {
 }
 
 function isTransientHttpStatus(status) {
-  return [429, 502, 503, 520, 521, 522, 524].includes(status);
+  // 502 costuma ser erro de app (ex.: modelo Ollama ausente), não vale retry.
+  return [429, 503, 520, 521, 522, 524].includes(status);
 }
 
 function errorMessageSuggestsRetry(msg) {

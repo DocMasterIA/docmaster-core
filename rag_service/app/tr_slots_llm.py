@@ -2172,10 +2172,21 @@ async def _fill_tr_slots_with_llm_work(
             "Verifique se llm_api está em execução (docker compose up -d llm_api ollama)."
         ) from e
     except httpx.HTTPStatusError as e:
-        if e.response.status_code == 404:
+        status = e.response.status_code
+        detail = ""
+        try:
+            detail = str(e.response.json().get("detail") or "")
+        except Exception:
+            detail = e.response.text or ""
+        if status in (400, 404, 502) and "modelo" in detail.lower():
+            raise ValueError(
+                f"Orquestração LLM: {detail or 'modelo não encontrado no Ollama'}. "
+                "No servidor: docker exec ollama ollama list && docker exec ollama ollama pull qwen2.5:7b"
+            ) from e
+        if status == 404:
             raise ValueError(
                 "Orquestração LLM retornou 404 (modelo não encontrado no Ollama). "
-                "No host do Ollama execute: ollama pull <modelo> (ex.: ollama pull llama3.2)."
+                "No host do Ollama execute: ollama pull <modelo> (ex.: ollama pull qwen2.5:7b)."
             ) from e
         raise
 

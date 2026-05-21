@@ -185,10 +185,12 @@ async def endpoint_generate(body: GenerateRequest, request: Request) -> dict[str
     prefeitura = body.prefeitura or header_pref or None
     set_prefeitura(prefeitura)
     model = body.model
-    if not model and body.fast and OLLAMA_MODEL_FAST:
-        model = OLLAMA_MODEL_FAST
-    elif not model:
-        model = OLLAMA_MODEL
+    if not model:
+        if body.fast and OLLAMA_MODEL_FAST:
+            model = OLLAMA_MODEL_FAST
+        else:
+            model = OLLAMA_MODEL
+    used_fast = bool(body.fast and model == OLLAMA_MODEL_FAST)
     try:
         result = await generate(
             prompt=body.prompt,
@@ -211,6 +213,33 @@ async def endpoint_generate(body: GenerateRequest, request: Request) -> dict[str
                 },
             }
         return {"ok": True, "data": {"raw": result}}
+    except LLMClientError as e:
+        if used_fast and (e.status_code == 404 or "não encontrado" in (e.message or "").lower()):
+            try:
+                result = await generate(
+                    prompt=body.prompt,
+                    model=OLLAMA_MODEL,
+                    stream=body.stream,
+                    prefeitura=prefeitura,
+                    options=body.options,
+                )
+                if isinstance(result, dict):
+                    from app.token_usage import extract_token_usage
+
+                    prompt_t, completion_t, _model = extract_token_usage(result)
+                    return {
+                        "ok": True,
+                        "data": result,
+                        "token_usage": {
+                            "prompt_tokens": prompt_t,
+                            "completion_tokens": completion_t,
+                            "total_tokens": prompt_t + completion_t,
+                        },
+                    }
+                return {"ok": True, "data": {"raw": result}}
+            except Exception:
+                pass
+        raise HTTPException(status_code=e.status_code or 400, detail=e.message)
     except LLMUnauthorizedError as e:
         raise HTTPException(status_code=401, detail=e.message)
     except LLMRateLimitError as e:
@@ -219,8 +248,6 @@ async def endpoint_generate(body: GenerateRequest, request: Request) -> dict[str
         raise HTTPException(status_code=e.status_code or 502, detail=e.message)
     except LLMTimeoutError as e:
         raise HTTPException(status_code=504, detail=e.message)
-    except LLMClientError as e:
-        raise HTTPException(status_code=e.status_code or 400, detail=e.message)
 
 
 @router.get("/test-audit")

@@ -57,8 +57,8 @@ services:
       - PORT=8002
       - OLLAMA_BASE_URL=http://ollama:11434
       - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:7b}
-      # Cláusulas curtas (dispensa normal, inexig.): modelo 3B — muito mais rápido que 7B em CPU.
-      - OLLAMA_MODEL_FAST=${OLLAMA_MODEL_FAST:-qwen2.5:3b}
+      # Opcional: modelo menor para cláusulas (ex. qwen2.5:3b). Vazio = mesmo que OLLAMA_MODEL.
+      - OLLAMA_MODEL_FAST=${OLLAMA_MODEL_FAST:-}
       - LLM_TIMEOUT=300
       - LLM_MAX_RETRIES=1
       # LLM_AUDIT_LOG_DIR opcional; se vazio, o app usa /app/logs automaticamente

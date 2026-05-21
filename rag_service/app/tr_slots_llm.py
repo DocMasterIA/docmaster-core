@@ -171,10 +171,12 @@ objeto:
 - Núcleo material + finalidade administrativa + fechamento ("conforme quantidades e demais condições estabelecidas neste Termo de Referência" ou equivalente).
 - NÃO liste itens, quantidades, marcas, modelos, bullets ou "Inclui:" — detalhes ficam na tabela do TR.
 - Em dispensa normal com características informadas: texto genérico institucional, sem nomear produto, dosagem ou marca.
+- Se o pedido trouxer «Setor/secretaria atendido», inclua esse destino no objeto (finalidade/vinculação ao setor).
 
 justificativa:
 - Parágrafo dissertativo de 3 a 6 frases, linguagem formal.
 - Necessidade para a Administração e para o setor/destino informados no pedido; riscos se não contratar.
+- Se o pedido trouxer «Setor/secretaria atendido», cite esse setor/secretaria explicitamente no objeto e na justificativa (use a redação do pedido).
 - Use SOMENTE nomes de órgão, município ou entidade que apareçam literalmente no pedido do usuário.
 - Concordância correta (ex.: "a manutenção", não "o manutenção").
 - Não invente valores, prazos, órgãos ou localidades além do pedido.
@@ -2159,7 +2161,8 @@ async def _fill_tr_slots_with_llm_work(
         )
         if _fluxo_ui == "normal":
             user_prompt_text += (
-                "\nDispensa normal: objeto em 1 período genérico; use o setor informado no pedido; "
+                "\nDispensa normal: objeto em 1 período genérico; "
+                "mencione obrigatoriamente o setor/secretaria do campo «Setor/secretaria atendido» no objeto e na justificativa; "
                 "não cite itens, quantidades ou valores de tabela."
             )
         system_prompt = TR_SLOTS_OBJETO_JUSTIFICATIVA_SYSTEM_PROMPT

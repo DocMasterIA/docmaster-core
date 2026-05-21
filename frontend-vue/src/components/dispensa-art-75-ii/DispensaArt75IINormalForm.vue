@@ -575,6 +575,7 @@ function buildUserPromptGerarClausulas() {
     `O que será contratado: ${objetoContratado.value}`,
     `Setor/secretaria atendido: ${objetoSetor.value}`,
     car ? `Características mínimas: ${car}` : 'Características mínimas: não informado',
+    'Obrigatório citar o setor/secretaria atendido (texto acima) no objeto e na justificativa, com a redação informada pelo usuário.',
     'Não liste itens, quantidades ou valores de tabela no objeto nem na justificativa.',
   ].join('\n');
 }

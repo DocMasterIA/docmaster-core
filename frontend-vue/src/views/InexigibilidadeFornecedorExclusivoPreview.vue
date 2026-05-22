@@ -94,9 +94,8 @@
               v-model:dotacao-ativa="dotacaoAtiva"
               v-model:dotacao="dotacao"
               :api-base="API_BASE"
-              variant="fe"
-              wrapper="article"
-              :format-on-input="false"
+              variant="da75"
+              wrapper="section"
             />
 
             <article class="fe-card">
@@ -1121,7 +1120,7 @@ const secoes = computed(() => [
     titulo: 'Dotação orçamentária',
     completo: !dotacaoAtiva.value || campoPreenchido(dotacao.value),
     linhas: [
-      ['Situação', dotacaoAtiva.value ? 'Informada' : 'Não informada', !dotacaoAtiva.value || campoPreenchido(dotacao.value)],
+      ['Situação', dotacaoAtiva.value ? 'Informar dotação' : 'Não informada', true],
       ['Dotação', dotacaoAtiva.value ? (dotacao.value || 'Não informada') : 'Não se aplica', !dotacaoAtiva.value || campoPreenchido(dotacao.value)],
     ],
   },

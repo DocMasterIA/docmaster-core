@@ -154,9 +154,8 @@
               v-model:dotacao-ativa="dotacaoAtiva"
               v-model:dotacao="dotacao"
               :api-base="API_BASE"
-              variant="ixp"
-              wrapper="article"
-              :format-on-input="false"
+              variant="da75"
+              wrapper="section"
             />
 
             <article class="ixp-card">

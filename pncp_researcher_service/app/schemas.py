@@ -10,6 +10,10 @@ from .config import PNCP_MAX_PAGINAS_PER_REQUEST
 class HealthResponse(BaseModel):
     ok: bool = True
     service: str = "pncp_researcher_service"
+    db_path: str = ""
+    db_bytes: int = 0
+    db_on_data_volume: bool = False
+    index_hint: str = ""
 
 
 class GeoRecorte(BaseModel):

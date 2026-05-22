@@ -36,5 +36,12 @@ cd "$DEPLOY"
 docker compose -f "$COMPOSE_FILE" -f "$OVERRIDE_FILE" up -d --force-recreate
 
 sleep 3
+echo "==> /health"
+curl -sf http://127.0.0.1:8012/api/pncp-research/health | python3 -m json.tool 2>/dev/null || \
+  curl -sf http://127.0.0.1:8012/api/pncp-research/health
+echo ""
+echo "==> /local-index/stats"
 curl -sf http://127.0.0.1:8012/api/pncp-research/local-index/stats | python3 -m json.tool 2>/dev/null || \
   curl -sf http://127.0.0.1:8012/api/pncp-research/local-index/stats
+echo ""
+echo "Mantenha 24/7: ./scripts/ensure-pncp-researcher.sh  (não use down -v)"

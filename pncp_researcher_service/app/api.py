@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 
@@ -15,6 +16,7 @@ from .schemas import (
     MarketSearchResponse,
 )
 from .service import market_search, market_search_intelligent, market_search_stream
+from .config import PNCP_LOCAL_DB_PATH
 from .local_index import (
     add_items_to_research_session,
     backfill_local_index,
@@ -32,7 +34,28 @@ router = APIRouter(prefix="/pncp-research", tags=["pncp-research"])
 
 @router.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
-    return HealthResponse(ok=True)
+    db_path = (PNCP_LOCAL_DB_PATH or "").strip()
+    on_volume = db_path.startswith("/data/pncp/")
+    db_bytes = 0
+    hint = ""
+    if db_path and os.path.isfile(db_path):
+        try:
+            db_bytes = int(os.path.getsize(db_path))
+        except OSError:
+            db_bytes = 0
+    if db_path.startswith("/tmp/"):
+        hint = "AVISO: SQLite em /tmp — use PNCP_LOCAL_DB_PATH=/data/pncp/pncp_researcher_local.db e volume Docker."
+    elif not on_volume:
+        hint = "AVISO: db_path fora de /data/pncp — confira volume e docker-compose.pncp.override.yml."
+    elif db_bytes < 5_000_000:
+        hint = "Índice pequeno ou vazio (<5 MB) — confira volume correto (attach-pncp-volume.sh)."
+    return HealthResponse(
+        ok=True,
+        db_path=db_path,
+        db_bytes=db_bytes,
+        db_on_data_volume=on_volume,
+        index_hint=hint,
+    )
 
 
 @router.post("/market-search", response_model=MarketSearchResponse)

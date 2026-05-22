@@ -1,0 +1,10 @@
+# Copie ou gere com attach-pncp-volume.sh — NÃO apague o volume com «docker compose down -v».
+#
+#   PNCP_DATA_VOLUME=docmaster_pncp_researcher_data ./scripts/attach-pncp-volume.sh
+#
+# Isso fixa o índice grande (ex. 2.8 GB) mesmo após rebuild da imagem.
+
+volumes:
+  pncp_researcher_data:
+    external: true
+    name: docmaster_pncp_researcher_data

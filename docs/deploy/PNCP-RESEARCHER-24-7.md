@@ -1,5 +1,36 @@
 # PNCP Researcher — rodar 24h sem cair no `up -d`
 
+## Checklist 24/7 (produção)
+
+1. **Volume fixo** (uma vez, com o `.db` grande):
+   ```bash
+   ./scripts/find-pncp-db-volumes.sh
+   PNCP_DATA_VOLUME=docmaster_pncp_researcher_data ./scripts/attach-pncp-volume.sh
+   ```
+   Isso cria `docker-compose.pncp.override.yml` (volume `external`). **Não apague** esse ficheiro.
+
+2. **Subir / manter** (após reboot, deploy de código, etc.):
+   ```bash
+   ./scripts/ensure-pncp-researcher.sh
+   ```
+   Usa `up -d --no-recreate` — não mata o contentor nem o backfill em curso.
+
+3. **Rebuild de imagem** (só quando mudar código):
+   ```bash
+   PNCP_BUILD=1 ./scripts/ensure-pncp-researcher.sh
+   ```
+   Evite `down -v`. O índice fica no volume, não na imagem.
+
+4. **Nunca** `docker compose -f docker-compose.pncp.yml down -v` (apaga o SQLite).
+
+5. **Backfill** é job longo: não deixe `max_paginas: null` + Brasil inteiro + `include_items: true` preso no mesmo processo da API. Use `max_paginas`, `uf` e janelas; o serviço continua respondendo buscas no índice já carregado.
+
+6. **Monitorar**:
+   ```bash
+   curl -s http://127.0.0.1:8012/api/pncp-research/health | python3 -m json.tool
+   ```
+   `db_bytes` deve ser centenas de MB; `index_hint` vazio. Se avisar `/tmp` ou índice pequeno → volume errado.
+
 ## Por que caía antes
 
 Com `pncp_researcher_service` no **mesmo** `docker-compose.yml`, um `docker compose up -d backend` (ou grafana, etc.) **reconcilia o projeto inteiro** e pode **recriar** o contentor PNCP. Qualquer backfill/alimentação longa morre no meio.
@@ -132,7 +163,17 @@ O índice só volta com **novo backfill** (demora) ou **restauro de backup** `.d
 
 ## Reinício automático
 
-`restart: always` no ficheiro PNCP — após reboot do Docker, suba de novo só o PNCP:
+`restart: always` no compose PNCP — o Docker **reinicia o contentor** após crash.
+
+Após **reboot do servidor**, o daemon Docker sobe contentores com `restart: always` automaticamente **se** o volume override já estiver configurado.
+
+Se o host não tiver Docker a iniciar no boot, agende no cron (ex. a cada 5 min):
+
+```bash
+*/5 * * * * /caminho/docmaster-core/scripts/ensure-pncp-researcher.sh >> /var/log/pncp-ensure.log 2>&1
+```
+
+Ou rode manualmente após reboot:
 
 ```bash
 ./scripts/ensure-pncp-researcher.sh

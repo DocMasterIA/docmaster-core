@@ -29,7 +29,9 @@ services:
       - pncp_researcher_data:/data/pncp
     networks:
       - docmaster_net
+    # 24/7: reinicia após reboot do Docker ou crash do processo (não depende do compose principal).
     restart: always
+    stop_grace_period: 30s
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8012/api/pncp-research/health', timeout=5)\""]
       interval: 30s
@@ -38,6 +40,9 @@ services:
       start_period: 30s
 
 volumes:
+  # Volume nomeado do projeto docmaster-pncp. Para reutilizar índice antigo após down/up:
+  #   PNCP_DATA_VOLUME=nome_do_volume_grande ./scripts/attach-pncp-volume.sh
+  # (gera docker-compose.pncp.override.yml com volume external).
   pncp_researcher_data:
 
 networks:

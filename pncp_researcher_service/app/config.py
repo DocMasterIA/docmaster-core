@@ -111,9 +111,10 @@ PNCP_REQUIRE_TABLE_MATCH_WHEN_ITENS_EXIST: bool = os.getenv(
 ).strip().lower() in {"1", "true", "yes", "on"}
 
 # Índice local PNCP (SQLite) para reduzir dependência de chamadas externas.
+# Padrão = volume Docker em docker-compose.pncp.yml (/data/pncp). Evita 2º .db em /tmp no container.
 PNCP_LOCAL_DB_PATH: str = os.getenv(
     "PNCP_LOCAL_DB_PATH",
-    "/tmp/pncp_researcher_local.db",
+    "/data/pncp/pncp_researcher_local.db",
 ).strip()
 PNCP_LOCAL_AUTO_INGEST: bool = os.getenv(
     "PNCP_LOCAL_AUTO_INGEST", "true"

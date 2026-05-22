@@ -41,6 +41,7 @@ mobile/ios/
 # Docker / PID
 *.pid
 *.sock
+docker-compose.pncp.override.yml
 
 # LLM API – logs de auditoria (volume Docker)
 /llm_audit/

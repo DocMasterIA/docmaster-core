@@ -17,6 +17,7 @@ from docx import Document
 
 from .docx_typography import (
     apply_default_justify_to_document,
+    apply_dfd_inclusive_role_labels,
     apply_standard_body_font_to_document,
     clamp_docx_paragraph_indents,
 )
@@ -298,6 +299,7 @@ def render_dfd_from_tr_slots(
         mapping = {**process_cleanup, **mapping}
 
     _replace_placeholders(doc, mapping)
+    apply_dfd_inclusive_role_labels(doc)
     split_paragraphs_on_double_newline(doc)
     if not num_proc:
         _remove_processo_visual_block_when_empty(doc)

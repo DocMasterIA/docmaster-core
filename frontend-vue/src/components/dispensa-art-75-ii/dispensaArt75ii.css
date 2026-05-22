@@ -678,6 +678,46 @@
   margin-top: 0.75rem;
 }
 
+.da75-btn--xs {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  border-radius: 0.625rem;
+}
+
+.da75-dotacao-catalog {
+  border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
+  background: rgb(248 250 252 / 0.95);
+  padding: 0.875rem 1rem;
+}
+
+.da75-dotacao-catalog .da75-subblock-title {
+  margin: 0 0 0.25rem;
+}
+
+.da75-dotacao-catalog__actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 0.75rem;
+}
+
+.da75-dotacao-catalog__actions .da75-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.da75-dotacao-catalog__hint {
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .da75-dotacao-catalog__actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 .da75-mt-sm {
   margin-top: 0.5rem;
 }
@@ -788,6 +828,12 @@
 .dm-dark .da75-block h3,
 .dm-dark-theme .da75-block h3 {
   color: #f1f5f9;
+}
+
+.dm-dark .da75-dotacao-catalog,
+.dm-dark-theme .da75-dotacao-catalog {
+  border-color: #334155;
+  background: rgb(15 23 42 / 0.55);
 }
 
 .dm-dark .da75-block--muted,

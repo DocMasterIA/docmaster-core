@@ -240,3 +240,70 @@ def apply_standard_body_font_to_document(doc: Document) -> None:
             _apply_font_to_header_footer_part(section.even_page_footer)
         except Exception:
             pass
+
+
+# Rótulos fixos nos modelos DFD (não são placeholders).
+DFD_INCLUSIVE_ROLE_LABEL_REPLACEMENTS: tuple[tuple[str, str], ...] = (
+    ("Gestor de Contratos", "Gestor(a) de Contratos"),
+    ("GESTOR DE CONTRATOS", "GESTOR(A) DE CONTRATOS"),
+    ("Gestor Contratos", "Gestor(a) de Contratos"),
+)
+
+
+def _replace_substring_in_paragraph_runs(paragraph, needle: str, replacement: str) -> bool:
+    """Substitui `needle` em um parágrafo mesmo quando o texto está dividido em vários runs."""
+    runs = paragraph.runs
+    if not runs or not needle:
+        return False
+    full_text = "".join(run.text or "" for run in runs)
+    start = full_text.find(needle)
+    if start < 0:
+        return False
+    end = start + len(needle)
+
+    cursor = 0
+    start_idx = start_off = end_idx = end_off = None
+    for idx, run in enumerate(runs):
+        txt = run.text or ""
+        next_cursor = cursor + len(txt)
+        if start_idx is None and start < next_cursor:
+            start_idx = idx
+            start_off = start - cursor
+        if end_idx is None and end <= next_cursor:
+            end_idx = idx
+            end_off = end - cursor
+            break
+        cursor = next_cursor
+
+    if start_idx is None or end_idx is None or start_off is None or end_off is None:
+        return False
+
+    if start_idx == end_idx:
+        txt = runs[start_idx].text or ""
+        runs[start_idx].text = txt[:start_off] + replacement + txt[end_off:]
+    else:
+        prefix = (runs[start_idx].text or "")[:start_off]
+        suffix = (runs[end_idx].text or "")[end_off:]
+        runs[start_idx].text = prefix + replacement + suffix
+        for idx in range(start_idx + 1, end_idx + 1):
+            runs[idx].text = ""
+    return True
+
+
+def apply_literal_text_replacements_in_document(
+    doc: Document,
+    replacements: tuple[tuple[str, str], ...] | list[tuple[str, str]],
+) -> None:
+    """Aplica substituições literais em parágrafos do corpo e tabelas (preserva formatação por run)."""
+    for paragraph in _iter_paragraphs_deep(doc):
+        for needle, repl in replacements:
+            max_iters = 20
+            while max_iters > 0 and _replace_substring_in_paragraph_runs(paragraph, needle, repl):
+                max_iters -= 1
+                if needle and needle in repl:
+                    break
+
+
+def apply_dfd_inclusive_role_labels(doc: Document) -> None:
+    """Normaliza rótulos de cargo no DFD (ex.: Gestor de Contratos → Gestor(a) de Contratos)."""
+    apply_literal_text_replacements_in_document(doc, DFD_INCLUSIVE_ROLE_LABEL_REPLACEMENTS)

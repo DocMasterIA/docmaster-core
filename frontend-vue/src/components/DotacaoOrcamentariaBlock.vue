@@ -7,47 +7,56 @@
         Informar dotação orçamentária (opcional)
       </label>
 
-      <div v-if="dotacaoAtiva" :class="profilesClass">
-        <div :class="fieldClass">
-          <label :class="labelClass">Dotação salva</label>
-          <select :class="selectClass" :value="selectedProfileId" @change="onSelectProfile($event.target.value)">
-            <option value="">Selecione uma dotação salva</option>
-            <option v-for="p in profiles" :key="p.id" :value="p.id">{{ p.name }}</option>
-          </select>
+      <template v-if="dotacaoAtiva">
+        <div :class="profilesClass">
+          <p v-if="isDa75" class="da75-subblock-title">Cadastros salvos</p>
+          <div :class="profilesFieldsClass">
+            <div :class="fieldClass">
+              <label :class="labelClass">Dotação salva</label>
+              <select
+                :class="selectClass"
+                :value="selectedProfileId"
+                @change="onSelectProfile($event.target.value)"
+              >
+                <option value="">Selecione uma dotação salva</option>
+                <option v-for="p in profiles" :key="p.id" :value="p.id">{{ p.name }}</option>
+              </select>
+            </div>
+            <div :class="fieldClass">
+              <label :class="labelClass">Nome do cadastro</label>
+              <input
+                v-model="profileName"
+                :class="inputClass"
+                placeholder="Ex.: Dotação Secretaria de Obras 2026"
+              />
+            </div>
+          </div>
+          <div :class="actionsClass">
+            <button type="button" :class="btnNewClass" @click="onNewProfile">Novo cadastro</button>
+            <button type="button" :class="btnSaveClass" @click="onSaveProfile">Salvar dotação</button>
+            <button
+              type="button"
+              :class="btnDeleteClass"
+              :disabled="!selectedProfileId"
+              @click="onDeleteProfile"
+            >
+              Excluir cadastro
+            </button>
+          </div>
+          <p v-if="saveHint" :class="hintClass">{{ saveHint }}</p>
         </div>
+
         <div :class="fieldClass">
-          <label :class="labelClass">Nome do cadastro</label>
-          <input
-            v-model="profileName"
-            :class="inputClass"
-            placeholder="Ex.: Dotação Secretaria de Obras 2026"
+          <label :class="labelClass">Dotação orçamentária</label>
+          <textarea
+            :class="textareaClass"
+            :value="dotacao"
+            :rows="isDa75 ? 4 : 3"
+            :placeholder="placeholder"
+            @input="onDotacaoInput($event)"
           />
         </div>
-        <div :class="actionsClass">
-          <button type="button" :class="btnSecondaryClass" @click="onNewProfile">Novo</button>
-          <button type="button" :class="btnPrimaryClass" @click="onSaveProfile">Salvar dotação orçamentária</button>
-          <button
-            type="button"
-            :class="btnSecondaryClass"
-            :disabled="!selectedProfileId"
-            @click="onDeleteProfile"
-          >
-            Excluir
-          </button>
-        </div>
-        <p v-if="saveHint" :class="hintClass">{{ saveHint }}</p>
-      </div>
-
-      <div v-if="dotacaoAtiva" :class="fieldClass">
-        <label :class="labelClass">Dotação orçamentária</label>
-        <textarea
-          :class="textareaClass"
-          :value="dotacao"
-          rows="3"
-          :placeholder="placeholder"
-          @input="onDotacaoInput($event)"
-        />
-      </div>
+      </template>
     </div>
   </component>
 </template>
@@ -91,6 +100,8 @@ const saveHint = computed(() => {
   return 'As dotações salvas ficam disponíveis em dispensa, inexigibilidade e demais módulos que usam este campo.';
 });
 
+const isDa75 = computed(() => props.variant === 'da75');
+
 const wrapperTag = computed(() => (props.wrapper === 'article' ? 'article' : 'section'));
 
 const rootClass = computed(() => {
@@ -102,7 +113,7 @@ const rootClass = computed(() => {
 const bodyClass = computed(() => {
   if (props.variant === 'ixp') return 'ixp-body';
   if (props.variant === 'fe') return 'fe-body';
-  return 'da75-block__body';
+  return 'da75-block__body da75-stack';
 });
 
 const checkClass = computed(() => {
@@ -117,36 +128,56 @@ const fieldClass = computed(() => {
   return 'da75-field';
 });
 
-const labelClass = computed(() => (props.variant === 'da75' ? 'da75-label' : ''));
-const selectClass = computed(() => (props.variant === 'da75' ? 'da75-select' : ''));
-const inputClass = computed(() => (props.variant === 'da75' ? 'da75-input' : ''));
+const labelClass = computed(() => {
+  if (props.variant === 'da75') return 'da75-label';
+  return '';
+});
+
+const selectClass = computed(() => {
+  if (props.variant === 'da75') return 'da75-select da75-select--sm';
+  return '';
+});
+
+const inputClass = computed(() => {
+  if (props.variant === 'da75') return 'da75-input da75-input--sm';
+  return '';
+});
+
 const textareaClass = computed(() => (props.variant === 'da75' ? 'da75-textarea' : ''));
 
 const profilesClass = computed(() => {
-  if (props.variant === 'da75') return 'da75-mt';
+  if (props.variant === 'da75') return 'da75-dotacao-catalog';
   return 'dotacao-profiles';
 });
 
+const profilesFieldsClass = computed(() => (props.variant === 'da75' ? 'da75-stack' : 'dotacao-profiles-fields'));
+
 const actionsClass = computed(() => {
   if (props.variant === 'ixp') return 'ixp-inline-actions ixp-orgao-profile-actions';
-  if (props.variant === 'fe') return 'fe-inline-actions';
-  return 'da75-inline-actions dotacao-profile-actions';
+  if (props.variant === 'fe') return 'fe-inline-actions dotacao-profile-actions';
+  return 'da75-dotacao-catalog__actions';
 });
 
-const btnSecondaryClass = computed(() => {
+const btnNewClass = computed(() => {
   if (props.variant === 'ixp') return 'ixp-btn-secondary ixp-btn-xs';
   if (props.variant === 'fe') return 'fe-btn-secondary fe-btn-xs';
-  return 'da75-btn-secondary da75-btn-xs';
+  return 'da75-btn da75-btn--xs';
 });
 
-const btnPrimaryClass = computed(() => {
+const btnSaveClass = computed(() => {
   if (props.variant === 'ixp') return 'ixp-btn-secondary ixp-btn-xs ixp-orgao-btn-save';
   if (props.variant === 'fe') return 'fe-btn-secondary fe-btn-xs';
-  return 'da75-btn-secondary da75-btn-xs dotacao-btn-save';
+  return 'da75-btn da75-btn--xs da75-btn--primary';
+});
+
+const btnDeleteClass = computed(() => {
+  if (props.variant === 'ixp') return 'ixp-btn-secondary ixp-btn-xs ixp-orgao-btn-delete';
+  if (props.variant === 'fe') return 'fe-btn-secondary fe-btn-xs';
+  return 'da75-btn da75-btn--xs da75-btn--danger';
 });
 
 const hintClass = computed(() => {
-  if (props.variant === 'da75') return 'da75-hint';
+  if (props.variant === 'da75') return 'da75-helper da75-dotacao-catalog__hint';
   return 'gov-text-soft';
 });
 
@@ -191,7 +222,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.dotacao-profiles {
+.dotacao-profiles,
+.dotacao-profiles-fields {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
@@ -199,20 +231,10 @@ onMounted(() => {
 }
 
 .dotacao-profile-actions,
-.da75-inline-actions {
+.fe-inline-actions.dotacao-profile-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
-}
-
-.da75-hint {
-  margin: 0.25rem 0 0;
-  font-size: 0.8rem;
-  color: var(--gov-text-soft, #64748b);
-}
-
-.dotacao-btn-save {
-  font-weight: 600;
 }
 </style>

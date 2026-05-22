@@ -12,6 +12,17 @@
           <p v-if="isDa75" class="da75-subblock-title">Cadastros salvos</p>
           <div :class="profilesFieldsClass">
             <div :class="fieldClass">
+              <label :class="labelClass">Nome do cadastro</label>
+              <input
+                ref="profileNameInputRef"
+                :value="profileName"
+                :class="inputClass"
+                placeholder="Ex.: Dotação Secretaria de Obras 2026"
+                autocomplete="off"
+                @input="onProfileNameInput"
+              />
+            </div>
+            <div :class="fieldClass">
               <label :class="labelClass">Dotação salva</label>
               <select
                 :class="selectClass"
@@ -21,14 +32,6 @@
                 <option value="">Selecione uma dotação salva</option>
                 <option v-for="p in profiles" :key="p.id" :value="p.id">{{ p.name }}</option>
               </select>
-            </div>
-            <div :class="fieldClass">
-              <label :class="labelClass">Nome do cadastro</label>
-              <input
-                v-model="profileName"
-                :class="inputClass"
-                placeholder="Ex.: Dotação Secretaria de Obras 2026"
-              />
             </div>
           </div>
           <div :class="actionsClass">
@@ -90,9 +93,10 @@ const {
   newProfile,
   saveProfile,
   deleteProfile,
-} = useDotacaoOrcamentariaProfiles(props.apiBase);
+} = useDotacaoOrcamentariaProfiles(() => props.apiBase);
 
 const saveMessage = ref('');
+const profileNameInputRef = ref(null);
 
 const saveHint = computed(() => {
   if (saveMessage.value) return saveMessage.value;
@@ -186,6 +190,17 @@ function onDotacaoInput(event) {
   dotacao.value = props.formatOnInput ? primeiraMaiuscula(raw) : raw;
 }
 
+function onProfileNameInput(event) {
+  profileName.value = String(event?.target?.value ?? '');
+}
+
+function readProfileNameFromDom() {
+  const el = profileNameInputRef.value;
+  const dom = String(el?.value ?? '').trim();
+  const state = String(profileName.value ?? '').trim();
+  return dom || state;
+}
+
 function onSelectProfile(id) {
   const texto = loadProfile(id);
   if (texto != null) {
@@ -201,10 +216,12 @@ function onNewProfile() {
 }
 
 async function onSaveProfile() {
-  const ok = await saveProfile(dotacao.value);
-  saveMessage.value = ok
+  const name = readProfileNameFromDom();
+  const texto = String(dotacao.value ?? '').trim();
+  const result = await saveProfile(texto, { name });
+  saveMessage.value = result.ok
     ? 'Dotação salva. Já pode reutilizar nos outros módulos.'
-    : 'Informe o nome do cadastro e o texto da dotação antes de salvar.';
+    : result.error || 'Não foi possível salvar o cadastro.';
 }
 
 async function onDeleteProfile() {

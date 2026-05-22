@@ -23,7 +23,17 @@
 
 4. **Nunca** `docker compose -f docker-compose.pncp.yml down -v` (apaga o SQLite).
 
-5. **Backfill** é job longo: não deixe `max_paginas: null` + Brasil inteiro + `include_items: true` preso no mesmo processo da API. Use `max_paginas`, `uf` e janelas; o serviço continua respondendo buscas no índice já carregado.
+5. **Alimentar o índice (fazer `total_itens` subir)** é outro processo do que «manter API 24/7»:
+   - `ensure-pncp-researcher.sh` → só sobe o contentor.
+   - `run-pncp-index-ingest-loop.sh` → busca no PNCP e grava contratos/itens no SQLite (rode em `nohup` ou cron).
+   - Não use um único `curl` com `max_paginas: null` no Brasil inteiro (trava dias sem subir o count).
+
+```bash
+nohup ./scripts/run-pncp-index-ingest-loop.sh >> ~/pncp-ingest.log 2>&1 &
+tail -f ~/pncp-ingest.log
+# Ver progresso no Docker:
+docker logs -f pncp_researcher_service 2>&1 | grep backfill
+```
 
 6. **Monitorar**:
    ```bash

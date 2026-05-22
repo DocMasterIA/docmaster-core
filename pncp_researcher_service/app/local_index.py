@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 import re
 import sqlite3
 import zlib
@@ -9,11 +11,14 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, List, Optional
 
 from .config import (
+    PNCP_BACKFILL_ITEM_TIMEOUT_SECONDS,
     PNCP_LOCAL_BACKFILL_MONTHS,
     PNCP_LOCAL_DB_PATH,
     PNCP_LOCAL_INCLUDE_ITEMS,
     PNCP_MODALIDADES_DEFAULT,
 )
+
+logger = logging.getLogger(__name__)
 from .pncp_client import PNCPClientError, create_pncp_http_client, get_contract_items, search_contracts
 from .search_text_clean import apply_item_display_cleanup, normalize_for_search
 
@@ -931,9 +936,17 @@ async def backfill_local_index(
                     break
                 total_paginas += 1
                 if not batch:
+                    logger.info(
+                        "backfill fim lote vazio modalidade=%s pagina=%s uf=%s",
+                        modalidade,
+                        pagina,
+                        uf or "*",
+                    )
                     break
                 total_upserts += upsert_contracts(batch)
+                page_item_upserts = 0
                 if use_items:
+                    item_timeout = max(5.0, float(PNCP_BACKFILL_ITEM_TIMEOUT_SECONDS or 45))
                     for raw in batch:
                         cnpj = (
                             (raw.get("orgaoEntidade") or {}).get("cnpj")
@@ -948,11 +961,43 @@ async def backfill_local_index(
                         if not cnpj or ano is None or seq is None:
                             continue
                         try:
-                            rows = await get_contract_items(str(cnpj), ano, seq, client=http)
-                        except Exception:
+                            rows = await asyncio.wait_for(
+                                get_contract_items(str(cnpj), ano, seq, client=http),
+                                timeout=item_timeout,
+                            )
+                        except asyncio.TimeoutError:
+                            logger.warning(
+                                "backfill timeout itens cnpj=%s ano=%s seq=%s (>%.0fs)",
+                                cnpj,
+                                ano,
+                                seq,
+                                item_timeout,
+                            )
+                            rows = []
+                        except Exception as exc:
+                            logger.warning(
+                                "backfill erro itens cnpj=%s ano=%s seq=%s: %s",
+                                cnpj,
+                                ano,
+                                seq,
+                                exc,
+                            )
                             rows = []
                         if rows:
-                            total_upserts_itens += upsert_contract_items(raw, rows)
+                            n = upsert_contract_items(raw, rows)
+                            page_item_upserts += n
+                            total_upserts_itens += n
+                logger.info(
+                    "backfill modalidade=%s pagina=%s uf=%s contratos=%s itens_pagina=%s "
+                    "acum_contratos=%s acum_itens=%s",
+                    modalidade,
+                    pagina,
+                    uf or "*",
+                    len(batch),
+                    page_item_upserts,
+                    total_upserts,
+                    total_upserts_itens,
+                )
                 if len(batch) < 10:
                     break
                 if (not unlimited_pages) and pagina >= paginas_limite:

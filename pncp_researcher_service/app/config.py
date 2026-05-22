@@ -120,6 +120,10 @@ PNCP_LOCAL_AUTO_INGEST: bool = os.getenv(
     "PNCP_LOCAL_AUTO_INGEST", "true"
 ).strip().lower() in {"1", "true", "yes", "on"}
 PNCP_LOCAL_BACKFILL_MONTHS: int = _env_int("PNCP_LOCAL_BACKFILL_MONTHS", 12)
+# Timeout por contratação no backfill (evita travar a ingestão num único GET de itens).
+PNCP_BACKFILL_ITEM_TIMEOUT_SECONDS: float = float(
+    os.getenv("PNCP_BACKFILL_ITEM_TIMEOUT_SECONDS", "45")
+)
 PNCP_LOCAL_INCLUDE_ITEMS: bool = os.getenv(
     "PNCP_LOCAL_INCLUDE_ITEMS", "true"
 ).strip().lower() in {"1", "true", "yes", "on"}

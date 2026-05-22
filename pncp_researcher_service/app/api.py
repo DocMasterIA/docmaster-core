@@ -224,6 +224,12 @@ async def research_session_update_endpoint(sessao_id: int, body: ResearchSession
 
 
 def create_app() -> FastAPI:
+    import logging
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     app = FastAPI(title="PNCP Researcher Service", version="1.0.0")
     app.include_router(router, prefix="/api")
     return app

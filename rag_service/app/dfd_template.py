@@ -21,6 +21,7 @@ from .docx_typography import (
     apply_standard_body_font_to_document,
     clamp_docx_paragraph_indents,
 )
+from .tr_deixis import adapt_text_for_dfd_or_oficio
 from .tr_template import (
     TRTemplateSlots,
     numero_processo_valor_placeholder_tr,
@@ -239,8 +240,12 @@ def render_dfd_from_tr_slots(
 
     dfd_data_text = slots.dfd_data or slots.data_termo or ""
 
-    dfd_obj = (slots.dfd_objeto_referencia or slots.objeto or "").strip()
-    dfd_just = (slots.dfd_justificativa or slots.justificativa or "").strip()
+    dfd_obj = adapt_text_for_dfd_or_oficio(
+        (slots.dfd_objeto_referencia or slots.objeto or "").strip()
+    )
+    dfd_just = adapt_text_for_dfd_or_oficio(
+        (slots.dfd_justificativa or slots.justificativa or "").strip()
+    )
     num_proc = _dfd_numero_processo_display(slots)
     num_proc_tr_style = numero_processo_valor_placeholder_tr(num_proc)
     mapping = {

@@ -1376,14 +1376,17 @@ def _fix_o_manutencao_para_a_manutencao(text: str) -> str:
 
 def _apply_o_manutencao_fix_to_tr_slots(slots: TRTemplateSlots) -> TRTemplateSlots:
     """Normaliza concordância «é o manutenção» → «é a manutenção» nos campos de texto dos slots."""
+    from .tr_deixis import adapt_text_for_tr
+
     mf = _fix_o_manutencao_para_a_manutencao
+    tr_deixis = adapt_text_for_tr
     return replace(
         slots,
-        objeto=mf(slots.objeto or ""),
+        objeto=tr_deixis(mf(slots.objeto or "")),
         objeto_escopo=mf(slots.objeto_escopo or ""),
         objeto_entregas=mf(slots.objeto_entregas or ""),
         objeto_resultados=mf(slots.objeto_resultados or ""),
-        justificativa=mf(slots.justificativa or ""),
+        justificativa=tr_deixis(mf(slots.justificativa or "")),
         problema_administrativo=mf(slots.problema_administrativo or ""),
         beneficio_esperado=mf(slots.beneficio_esperado or ""),
         sol_oficio_objeto=mf(slots.sol_oficio_objeto or ""),

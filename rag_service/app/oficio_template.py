@@ -13,7 +13,7 @@ from typing import Optional
 from docx import Document
 
 from .docx_typography import apply_default_justify_to_document, apply_standard_body_font_to_document
-
+from .tr_deixis import adapt_text_for_dfd_or_oficio
 from .tr_template import (
     TRTemplateSlots,
     numero_processo_valor_placeholder_tr,
@@ -163,8 +163,12 @@ def render_oficio_from_slots(
         "(SOL_OFICIO_DESTINATARIO_CARGO)": slots.sol_oficio_destinatario_cargo or "",
         "(SOL_OFICIO_DESTINATARIO_ORGAO)": slots.sol_oficio_destinatario_orgao or "",
         "(SOL_OFICIO_ASSUNTO)": slots.sol_oficio_assunto or "",
-        "(SOL_OFICIO_OBJETO)": slots.sol_oficio_objeto or slots.objeto or "",
-        "(SOL_OFICIO_JUSTIFICATIVA)": slots.sol_oficio_justificativa or slots.justificativa or "",
+        "(SOL_OFICIO_OBJETO)": adapt_text_for_dfd_or_oficio(
+            (slots.sol_oficio_objeto or slots.objeto or "").strip()
+        ),
+        "(SOL_OFICIO_JUSTIFICATIVA)": adapt_text_for_dfd_or_oficio(
+            (slots.sol_oficio_justificativa or slots.justificativa or "").strip()
+        ),
         "(SOL_OFICIO_PRAZO_RESPOSTA)": slots.sol_oficio_prazo_resposta or "",
         "(SOL_OFICIO_RESPONSAVEL_NOME)": slots.sol_oficio_responsavel_nome or "",
         "(SOL_OFICIO_RESPONSAVEL_CARGO)": slots.sol_oficio_responsavel_cargo or "",

@@ -150,7 +150,7 @@ export function useDotacaoOrcamentariaProfiles(apiBase) {
       return {
         ok: false,
         field: 'texto',
-        error: 'Informe o texto da dotação no campo «Dotação orçamentária» abaixo.',
+        error: 'Informe o texto da dotação no campo «Dotação orçamentária».',
       };
     }
 

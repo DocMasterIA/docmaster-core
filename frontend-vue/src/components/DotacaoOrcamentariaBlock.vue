@@ -34,6 +34,17 @@
               </select>
             </div>
           </div>
+          <div :class="fieldClass">
+            <label :class="labelClass">Dotação orçamentária</label>
+            <textarea
+              ref="dotacaoTextareaRef"
+              v-model="dotacao"
+              :class="textareaClass"
+              :rows="isDa75 ? 4 : 3"
+              :placeholder="placeholder"
+            />
+          </div>
+
           <div :class="actionsClass">
             <button type="button" :class="btnNewClass" @click="onNewProfile">Novo cadastro</button>
             <button type="button" :class="btnSaveClass" @click="onSaveProfile">Salvar dotação</button>
@@ -47,17 +58,6 @@
             </button>
           </div>
           <p v-if="saveHint" :class="hintClass">{{ saveHint }}</p>
-        </div>
-
-        <div :class="fieldClass">
-          <label :class="labelClass">Dotação orçamentária</label>
-          <textarea
-            :class="textareaClass"
-            :value="dotacao"
-            :rows="isDa75 ? 4 : 3"
-            :placeholder="placeholder"
-            @input="onDotacaoInput($event)"
-          />
         </div>
       </template>
     </div>
@@ -78,7 +78,8 @@ const props = defineProps({
   wrapper: { type: String, default: 'section' },
   showTitle: { type: Boolean, default: true },
   placeholder: { type: String, default: PLACEHOLDER_DOTACAO },
-  formatOnInput: { type: Boolean, default: true },
+  /** false = preserva o texto multilinha (recomendado para dotação). */
+  formatOnInput: { type: Boolean, default: false },
 });
 
 const dotacaoAtiva = defineModel('dotacaoAtiva', { type: Boolean, default: false });
@@ -97,6 +98,7 @@ const {
 
 const saveMessage = ref('');
 const profileNameInputRef = ref(null);
+const dotacaoTextareaRef = ref(null);
 
 const saveHint = computed(() => {
   if (saveMessage.value) return saveMessage.value;
@@ -185,11 +187,6 @@ const hintClass = computed(() => {
   return 'gov-text-soft';
 });
 
-function onDotacaoInput(event) {
-  const raw = String(event?.target?.value ?? '');
-  dotacao.value = props.formatOnInput ? primeiraMaiuscula(raw) : raw;
-}
-
 function onProfileNameInput(event) {
   profileName.value = String(event?.target?.value ?? '');
 }
@@ -199,6 +196,21 @@ function readProfileNameFromDom() {
   const dom = String(el?.value ?? '').trim();
   const state = String(profileName.value ?? '').trim();
   return dom || state;
+}
+
+function readDotacaoTexto() {
+  const el = dotacaoTextareaRef.value;
+  const dom = String(el?.value ?? '');
+  const state = String(dotacao.value ?? '');
+  const raw = (dom || state).trim();
+  if (!raw) return '';
+  return props.formatOnInput ? primeiraMaiuscula(raw).trim() : raw;
+}
+
+function syncDotacaoFromDom() {
+  const texto = readDotacaoTexto();
+  if (texto) dotacao.value = texto;
+  return texto;
 }
 
 function onSelectProfile(id) {
@@ -217,7 +229,7 @@ function onNewProfile() {
 
 async function onSaveProfile() {
   const name = readProfileNameFromDom();
-  const texto = String(dotacao.value ?? '').trim();
+  const texto = syncDotacaoFromDom();
   const result = await saveProfile(texto, { name });
   saveMessage.value = result.ok
     ? 'Dotação salva. Já pode reutilizar nos outros módulos.'
@@ -228,10 +240,6 @@ async function onDeleteProfile() {
   await deleteProfile();
   saveMessage.value = '';
 }
-
-watch(dotacaoAtiva, (v) => {
-  if (!v) dotacao.value = '';
-});
 
 onMounted(() => {
   loadProfiles();

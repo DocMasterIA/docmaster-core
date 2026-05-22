@@ -1353,6 +1353,7 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
         objeto_especifico=str(data.get("objeto_especifico", "")).strip(),
         equipamento=str(data.get("equipamento", "")).strip(),
         slot_package_key=str(data.get("slot_package_key", "")).strip(),
+        dispensa_fluxo_ui=str(data.get("dispensa_fluxo_ui", "")).strip().lower(),
     )
 
 
@@ -1685,6 +1686,11 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         if override.get("slot_package_key") is not None
         else llm_slots.slot_package_key
     ).strip()
+    dispensa_fluxo_ui = str(
+        (override.get("dispensa_fluxo_ui") or llm_slots.dispensa_fluxo_ui)
+        if override.get("dispensa_fluxo_ui") is not None
+        else llm_slots.dispensa_fluxo_ui
+    ).strip().lower()
 
     itens_override = override.get("itens")
     if isinstance(itens_override, list) and len(itens_override) > 0:
@@ -1759,6 +1765,7 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
                 objeto_especifico=objeto_especifico,
                 equipamento=equipamento,
                 slot_package_key=slot_package_key,
+                dispensa_fluxo_ui=dispensa_fluxo_ui,
             )
     itens = llm_slots.itens
 
@@ -1820,6 +1827,7 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         objeto_especifico=objeto_especifico,
         equipamento=equipamento,
         slot_package_key=slot_package_key,
+        dispensa_fluxo_ui=dispensa_fluxo_ui,
     )
 
 
@@ -1882,8 +1890,12 @@ def _should_skip_llm_for_prefilled_override(
     if not override or not _override_has_prefilled_clauses(override):
         return False
     fluxo = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
-    if fluxo in ("rapida", "normal"):
+    # Dispensa normal: cláusulas do formulário bastam — evita timeout e não triplica justificativa.
+    if fluxo == "normal":
         return True
+    # Dispensa rápida: segue pipeline integral para a IA gerar justificativa + problema + benefício.
+    if fluxo == "rapida":
+        return False
     pkg = _package_key_from_override_or_context(override, user_context)
     if pkg.startswith("inexigibilidade_"):
         return True
@@ -2023,6 +2035,9 @@ def _build_tr_slots_from_override_prefilled(
             "Como resultados esperados, projeta-se a melhoria da eficiência operacional, o fortalecimento da "
             "continuidade do serviço público e a mitigação de riscos de desatendimento ao interesse coletivo."
         )
+    fluxo_ui = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
+    if fluxo_ui:
+        data["dispensa_fluxo_ui"] = fluxo_ui
     slots = _dict_to_tr_slots(data)
     slots = _merge_slots(slots, override)
     if isinstance(user_context, dict):

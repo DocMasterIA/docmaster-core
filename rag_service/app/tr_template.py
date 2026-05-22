@@ -196,6 +196,18 @@ class TRTemplateSlots:
     # Pacote Django (ex.: inexigibilidade_74_i_fornecedor_exclusivo) — usado quando o caminho do .docx
     # é genérico (fallback tr_base) e as regras Art. 74.I ainda devem aplicar-se.
     slot_package_key: str = ""
+    # UI: "normal" | "rapida" — controla seção 4 do TR (1 vs 3 blocos de justificativa).
+    dispensa_fluxo_ui: str = ""
+
+
+def _resolve_dispensa_fluxo_ui(slots: TRTemplateSlots) -> str:
+    fluxo = str(getattr(slots, "dispensa_fluxo_ui", "") or "").strip().lower()
+    if fluxo:
+        return fluxo
+    pkg = str(getattr(slots, "slot_package_key", "") or "").strip().lower()
+    if pkg.startswith("dispensa_rapida_"):
+        return "rapida"
+    return ""
 
 
 def _style_items_table(table) -> None:
@@ -999,13 +1011,28 @@ def render_tr_from_slots(
         t = re.sub(r"\n{3,}", "\n\n", t)
         return t
 
+    fluxo_ui = _resolve_dispensa_fluxo_ui(slots)
     justificativa_text = _normalize_slot_block(slots.justificativa or "")
     problema_text = _normalize_slot_block(slots.problema_administrativo or "")
     beneficio_text = _normalize_slot_block(slots.beneficio_esperado or "")
+
+    # Dispensa normal: só o texto do usuário em (TR_JUSTIFICATIVA); demais tokens ficam vazios.
+    if fluxo_ui == "normal":
+        problema_text = ""
+        beneficio_text = ""
+    elif fluxo_ui == "rapida":
+        jus_cmp = justificativa_text.strip()
+        if problema_text.strip() == jus_cmp:
+            problema_text = ""
+        if beneficio_text.strip() == jus_cmp:
+            beneficio_text = ""
+
     valor_total_placeholder = _valor_total_sem_rs(slots.valor_total or "")
 
-    # Dá um respiro visual após a justificativa no TR.
-    if justificativa_text:
+    # Dispensa rápida: até três blocos (justificativa + problema + benefício), com respiro entre eles.
+    if justificativa_text and (problema_text or beneficio_text):
+        justificativa_text = f"{justificativa_text}\n"
+    elif justificativa_text and fluxo_ui != "rapida":
         justificativa_text = f"{justificativa_text}\n"
     if problema_text and beneficio_text:
         problema_text = f"{problema_text}\n"

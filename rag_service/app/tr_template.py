@@ -1000,8 +1000,8 @@ def render_tr_from_slots(
         return t
 
     justificativa_text = _normalize_slot_block(slots.justificativa or "")
-    problema_text = _normalize_slot_block(slots.problema_administrativo or slots.justificativa or "")
-    beneficio_text = _normalize_slot_block(slots.beneficio_esperado or slots.justificativa or "")
+    problema_text = _normalize_slot_block(slots.problema_administrativo or "")
+    beneficio_text = _normalize_slot_block(slots.beneficio_esperado or "")
     valor_total_placeholder = _valor_total_sem_rs(slots.valor_total or "")
 
     # Dá um respiro visual após a justificativa no TR.

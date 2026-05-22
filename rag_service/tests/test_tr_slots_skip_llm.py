@@ -2,6 +2,7 @@
 import unittest
 
 from app.tr_slots_llm import (
+    _build_tr_slots_from_override_prefilled,
     _is_objeto_justificativa_fill_mode,
     _override_has_prefilled_clauses,
     _should_skip_llm_for_prefilled_override,
@@ -48,6 +49,18 @@ class TrSlotsSkipLlmTests(unittest.TestCase):
     def test_short_clauses_never_skip(self):
         override = {"objeto": "curto", "justificativa": "curta"}
         self.assertFalse(_override_has_prefilled_clauses(override))
+
+    def test_prefilled_does_not_duplicate_justificativa_into_problema_beneficio(self):
+        jus = (
+            "É necessário garantir a disponibilidade adequada de medicamentos nas unidades básicas de saúde."
+        )
+        slots = _build_tr_slots_from_override_prefilled(
+            {"objeto": "Objeto longo o suficiente para o teste de skip.", "justificativa": jus},
+            None,
+        )
+        self.assertEqual(slots.justificativa, jus)
+        self.assertEqual(slots.problema_administrativo, "")
+        self.assertEqual(slots.beneficio_esperado, "")
 
     def test_strip_clause_draft_removes_objeto_from_override(self):
         override = {

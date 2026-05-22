@@ -1986,11 +1986,6 @@ def _finalize_lite_objeto_justificativa_slots(
             "Como resultados esperados, projeta-se a melhoria da eficiência operacional, o fortalecimento da "
             "continuidade do serviço público e a mitigação de riscos de desatendimento ao interesse coletivo."
         )
-    if not (llm_slots.problema_administrativo or "").strip():
-        llm_slots.problema_administrativo = (llm_slots.justificativa or "").strip()
-    if not (llm_slots.beneficio_esperado or "").strip():
-        llm_slots.beneficio_esperado = (llm_slots.justificativa or "").strip()
-
     merged = _merge_slots(llm_slots, slots_override or {})
     if isinstance(user_context, dict):
         ctx_pk = str(user_context.get("slot_package_key") or "").strip()
@@ -2013,11 +2008,6 @@ def _build_tr_slots_from_override_prefilled(
             "artigo": "75",
             "inciso": _resolve_dispensa_inciso_from_override(override),
         }
-    jus = str(data.get("justificativa") or "").strip()
-    if not str(data.get("problema_administrativo") or "").strip():
-        data["problema_administrativo"] = jus
-    if not str(data.get("beneficio_esperado") or "").strip():
-        data["beneficio_esperado"] = jus
     if not str(data.get("objeto_escopo") or "").strip():
         data["objeto_escopo"] = (
             "O escopo compreende as atividades técnicas e operacionais indispensáveis à execução do objeto, "
@@ -2339,13 +2329,6 @@ async def _fill_tr_slots_with_llm_work(
         llm_slots.objeto_resultados = (
             "Como resultados esperados, projeta-se a melhoria da eficiência operacional, o fortalecimento da continuidade do serviço público e a mitigação de riscos de desatendimento ao interesse coletivo."
         )
-
-    # Campos adicionais do TR: se a LLM não retornar textos dedicados,
-    # usa a justificativa como fallback para não deixar placeholder vazio.
-    if not (llm_slots.problema_administrativo or "").strip():
-        llm_slots.problema_administrativo = (llm_slots.justificativa or "").strip()
-    if not (llm_slots.beneficio_esperado or "").strip():
-        llm_slots.beneficio_esperado = (llm_slots.justificativa or "").strip()
 
     # Escolha do inciso do art. 75:
     # - SEMPRE delegada à LLM especializada em _choose_art75_inciso,

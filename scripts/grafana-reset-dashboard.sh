@@ -43,7 +43,8 @@ if [[ -z "$SKIP_COMPOSE" ]]; then
   fi
 fi
 
-PROM_PUBLIC_URL="${GRAFANA_PROMETHEUS_URL:-http://host.docker.internal:9090}"
+# host.docker.internal:9090 → 172.17.0.1 no Linux; Prometheus publica 127.0.0.1:9090 no host → connection refused.
+PROM_PUBLIC_URL="${GRAFANA_PROMETHEUS_URL:-http://prometheus:9090}"
 
 echo "Script:            ${SCRIPT_DIR}/$(basename "$0")"
 echo "Repo (JSON):       ${REPO_ROOT}"

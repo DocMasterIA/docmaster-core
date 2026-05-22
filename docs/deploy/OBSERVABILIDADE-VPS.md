@@ -128,4 +128,21 @@ docker compose up -d prometheus grafana
 |----------|--------|
 | 404 em `api.docmasteria.com.br/grafana` | Esperado sem nginx; use `127.0.0.1:3000` ou túnel |
 | Conflito `container name prometheus` | Dois `docker compose` em pastas diferentes; use só `cd DEPLOY` |
+| `172.17.0.1:9090 connection refused` | Datasource antigo `host.docker.internal` — use `http://prometheus:9090` (ver abaixo) |
 | Grafana sem dados | Datasource: `http://prometheus:9090` (provisioning) |
+
+### Corrigir datasource preso em `172.17.0.1:9090`
+
+O script antigo `grafana-reset-dashboard.sh` gravava `http://host.docker.internal:9090` (no Linux vira `172.17.0.1`). O Prometheus no compose só publica `127.0.0.1:9090` no **host**; do container Grafana isso dá **connection refused**. URL correta: **`http://prometheus:9090`** (nome do serviço na rede Docker).
+
+```bash
+cd DEPLOY
+docker compose up -d prometheus grafana
+# Atualizar datasource na API (admin / senha do .env):
+curl -sf -u 'admin:changeme' -X PUT 'http://127.0.0.1:3000/api/datasources/uid/prometheus' \
+  -H 'Content-Type: application/json' \
+  -d '{"uid":"prometheus","name":"Prometheus","type":"prometheus","access":"proxy","url":"http://prometheus:9090","isDefault":true}'
+# Ou, com repo atualizado:
+GRAFANA_PROMETHEUS_URL=http://prometheus:9090 ./scripts/grafana-reset-dashboard.sh
+docker compose restart grafana
+```

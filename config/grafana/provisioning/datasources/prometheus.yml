@@ -12,4 +12,4 @@ datasources:
     # Mesmo compose: nome do serviço (mais estável que host.docker.internal:9090).
     url: http://prometheus:9090
     isDefault: true
-    editable: true
+    editable: false

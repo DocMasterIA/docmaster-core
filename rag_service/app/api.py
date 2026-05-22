@@ -667,10 +667,8 @@ async def endpoint_generate_tr_and_dfd_zip(body: GenerateTRFromModelRequest):
     from .oficio_template import render_oficio_from_slots
 
     skip_ctx = bool(getattr(body, "skip_context_in_prompt", False))
-    if skip_ctx:
-        slots_override = body.slots_override
-    else:
-        slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
+    # Cidade/UF/fiscal vêm do context Django mesmo quando o prompt da LLM não usa perfil.
+    slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
     try:
         slots, llm_usage = await fill_tr_slots_with_llm(
             user_prompt=body.user_prompt,
@@ -740,11 +738,7 @@ async def endpoint_fill_tr_slots(body: GenerateTRFromModelRequest):
     from .tr_slots_llm import fill_tr_slots_with_llm
 
     skip_ctx = bool(getattr(body, "skip_context_in_prompt", False))
-    # Botão «Gerar» objeto/justificativa: não injeta secretaria/prefeitura do perfil no override.
-    if skip_ctx:
-        slots_override = body.slots_override
-    else:
-        slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
+    slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
     try:
         slots, llm_usage = await fill_tr_slots_with_llm(
             user_prompt=body.user_prompt,

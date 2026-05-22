@@ -1013,6 +1013,9 @@ def render_tr_from_slots(
     num_proc_display = slots_numero_processo_display(slots)
     num_proc_tr_placeholder = numero_processo_valor_placeholder_tr(num_proc_display)
 
+    # Modelos dispensa: cargo abaixo do nome na assinatura = (TR_SECRETARIA_USUARIO), não só (TR_CARGO_*).
+    cargo_assinatura_tr = (slots.cargo_assinante_termo or "").strip()
+
     mapping = {
         # Placeholders padronizados (preferenciais)
         "(TR_OBJETO)": slots.objeto or "",
@@ -1032,7 +1035,7 @@ def render_tr_from_slots(
         "(TR_DOTACAO)": slots.dotacao or "",
         "(DOTACAO_NUMERO)": slots.dotacao or "",
         "( DOTACAO_NUMERO )": slots.dotacao or "",
-        "(TR_SECRETARIA_USUARIO)": slots.secretaria_usuario or "",
+        "(TR_SECRETARIA_USUARIO)": cargo_assinatura_tr or slots.secretaria_usuario or "",
         "(TR_NOME_USUARIO)": slots.nome_usuario or "",
         "(TR_CIDADE_ESTADO)": slots.cidade_estado or "",
         "(TR_CIDADE)": slots.cidade or "",
@@ -1041,7 +1044,7 @@ def render_tr_from_slots(
         "(TR_EMAIL_ENVIO_PROPOSTAS)": slots.email_envio_propostas or "",
         "(TR_DATA_TERMO)": slots.data_termo or "",
         "(TR_NOME_ASSINANTE_TERMO)": slots.nome_assinante_termo or "",
-        "(TR_CARGO_ASSINANTE_TERMO)": slots.cargo_assinante_termo or "",
+        "(TR_CARGO_ASSINANTE_TERMO)": cargo_assinatura_tr,
         "(NUMERO_PROCESSO)": num_proc_tr_placeholder,
         "( NUMERO_PROCESSO )": num_proc_tr_placeholder,
         "(NUMERO PROCESSO)": num_proc_tr_placeholder,
@@ -1097,7 +1100,7 @@ def render_tr_from_slots(
         "(E-mail de envio de propostas)": slots.email_envio_propostas or "",
         "(DATA DO TERMO)": slots.data_termo or "",
         "(NOME DO ASSINANTE DO TERMO)": slots.nome_assinante_termo or "",
-        "(CARGO DO ASSINANTE DO TERMO)": slots.cargo_assinante_termo or "",
+        "(CARGO DO ASSINANTE DO TERMO)": cargo_assinatura_tr,
     }
 
     _replace_placeholders_in_paragraphs(doc, mapping)

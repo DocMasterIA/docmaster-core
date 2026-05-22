@@ -202,6 +202,10 @@ import {
   fetchFillTrSlotsWithRetry,
 } from '@/utils/fetchFillTrSlots.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
+import {
+  applyUsuarioLocalidadeToSlots,
+  fetchUsuarioLocalidadeParaTr,
+} from '@/utils/usuarioLocalidadeSlots.js';
 import { useDispensaArt75IIDadosFixos } from '@/composables/useDispensaArt75IIDadosFixos.js';
 
 const API_BASE = getApiBase();
@@ -220,6 +224,7 @@ const objetoGerado = ref('');
 const justificativa = ref('');
 const dotacaoAtiva = ref(false);
 const dotacao = ref('');
+const usuarioLocalidade = ref(null);
 const modoData = ref('');
 const dataManual = ref('');
 const isSubmitting = ref(false);
@@ -279,6 +284,7 @@ function sanitizeOrgaoValue() {
 async function reloadPresetCabecalhosOrgao() {
   await dadosFixos.loadUserGlobalPreset();
   await dadosFixos.loadSlotCatalogSuggestions();
+  usuarioLocalidade.value = await fetchUsuarioLocalidadeParaTr(API_BASE);
   sanitizeOrgaoValue();
   cabecalhosLoading.value = true;
   try {
@@ -501,6 +507,7 @@ function revokeDocumentUrls() {
 
 function buildSlotsOverride() {
   const o = {};
+  applyUsuarioLocalidadeToSlots(o, usuarioLocalidade.value);
   o.dispensa_fluxo_ui = 'rapida';
   const destNome = String(dadosFixos.fixoNome || '').trim();
   const destCargo = String(dadosFixos.fixoCargo || '').trim();

@@ -271,6 +271,10 @@ import {
   fetchFillTrSlotsWithRetry,
 } from '@/utils/fetchFillTrSlots.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
+import {
+  applyUsuarioLocalidadeToSlots,
+  fetchUsuarioLocalidadeParaTr,
+} from '@/utils/usuarioLocalidadeSlots.js';
 import { useDispensaArt75IIDadosFixos } from '@/composables/useDispensaArt75IIDadosFixos.js';
 
 const API_BASE = getApiBase();
@@ -292,6 +296,8 @@ const justificativa = ref('');
 const itens = ref([{ ...EMPTY_ITEM }]);
 const dotacaoAtiva = ref(false);
 const dotacao = ref('');
+/** Município + UF do /api/me para linha de assinatura do TR. */
+const usuarioLocalidade = ref(null);
 const modoData = ref('');
 const dataManual = ref('');
 const isGerandoClausulas = ref(false);
@@ -389,6 +395,7 @@ function sanitizeOrgaoValue() {
 async function reloadPresetCabecalhosOrgao() {
   await dadosFixos.loadUserGlobalPreset();
   await dadosFixos.loadSlotCatalogSuggestions();
+  usuarioLocalidade.value = await fetchUsuarioLocalidadeParaTr(API_BASE);
   sanitizeOrgaoValue();
   cabecalhosLoading.value = true;
   try {
@@ -662,6 +669,7 @@ function formatCurrencyBr(value) {
 
 function buildSlotsOverride() {
   const o = {};
+  applyUsuarioLocalidadeToSlots(o, usuarioLocalidade.value);
   o.dispensa_fluxo_ui = 'normal';
   const destNome = String(dadosFixos.fixoNome || '').trim();
   const destCargo = String(dadosFixos.fixoCargo || '').trim();
@@ -699,7 +707,12 @@ function buildSlotsOverride() {
   if (String(dadosFixos.fixoEnderecoEntrega || '').trim()) o.endereco_entrega = String(dadosFixos.fixoEnderecoEntrega).trim();
   if (String(dadosFixos.fixoEmailPropostas || '').trim()) o.email_envio_propostas = String(dadosFixos.fixoEmailPropostas).trim();
   if (String(dadosFixos.fixoTrResponsavelNome || '').trim()) o.nome_assinante_termo = String(dadosFixos.fixoTrResponsavelNome).trim();
-  if (String(dadosFixos.fixoTrResponsavelCargo || '').trim()) o.cargo_assinante_termo = String(dadosFixos.fixoTrResponsavelCargo).trim();
+  const trCargoAssinatura = String(dadosFixos.fixoTrResponsavelCargo || '').trim();
+  if (trCargoAssinatura) {
+    o.cargo_assinante_termo = trCargoAssinatura;
+    // Modelo TR (dispensa): linha abaixo do nome = (TR_SECRETARIA_USUARIO).
+    o.secretaria_usuario = trCargoAssinatura;
+  }
   if (dotacaoAtiva.value && String(dotacao.value || '').trim()) {
     const dotacaoTexto = String(dotacao.value).trim();
     o.dotacao = dotacaoTexto;

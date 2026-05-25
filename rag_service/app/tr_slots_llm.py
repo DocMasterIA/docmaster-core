@@ -2199,7 +2199,7 @@ async def fill_tr_slots_with_llm(
                     merged, override, user_prompt, user_context
                 )
             merged = _apply_o_manutencao_fix_to_tr_slots(merged)
-            return merged, dict(acc.usage())
+            return merged, acc.to_dict()
 
     async with llm_token_scope() as acc:
         slots = await _fill_tr_slots_with_llm_work(

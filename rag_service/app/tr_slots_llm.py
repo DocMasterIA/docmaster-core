@@ -2404,6 +2404,7 @@ async def _fill_tr_slots_with_llm_work(
             user_context=user_context,
         )
     # Lapidação final para cenários de aquisição com quantidade explícita nos itens.
+    skip_item_injection = _fluxo_ui == "normal"
     llm_slots.objeto = _polish_objeto_with_itens(
         llm_slots.objeto,
         llm_slots.itens,

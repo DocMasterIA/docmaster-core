@@ -1914,12 +1914,9 @@ def _should_skip_llm_for_prefilled_override(
     if not override or not _override_has_prefilled_clauses(override):
         return False
     fluxo = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
-    # Dispensa normal: cláusulas do formulário bastam — evita timeout e não triplica justificativa.
-    if fluxo == "normal":
+    # Dispensa normal/rápida (opção A): cláusulas do formulário bastam no gerar-tr-e-dfd — sem agent/LLM integral.
+    if fluxo in ("rapida", "normal"):
         return True
-    # Dispensa rápida: segue pipeline integral para a IA gerar justificativa + problema + benefício.
-    if fluxo == "rapida":
-        return False
     pkg = _package_key_from_override_or_context(override, user_context)
     if pkg.startswith("inexigibilidade_"):
         return True
@@ -1957,8 +1954,7 @@ def _strip_clause_draft_from_override(override: Dict[str, Any]) -> Dict[str, Any
 def _is_objeto_justificativa_fill_mode(override: Dict[str, Any]) -> bool:
     """
     Modo rápido do fill-tr-slots (dispensa normal/rápida): só objeto + justificativa.
-    Geração completa TR/DFD/Ofício continua com pipeline integral quando objeto e
-    justificativa já vêm no override.
+    Gerar TR/DFD/Ofício com cláusulas já no override usa atalho (sem pipeline integral).
     """
     fluxo = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
     if fluxo not in ("normal", "rapida"):
@@ -2179,9 +2175,9 @@ async def fill_tr_slots_with_llm(
     - Chama o llm_agent (structure-from-prompt) para obter contexto e especificações.
     - Chama a LLM para gerar o JSON de slots (objeto, dispensa, itens, justificativa, fiscal, dotacao).
     - Mescla com slots_override (valores enviados pelo usuário têm prioridade). user_context (Django) enriquece o prompt com nome/secretaria/prefeitura, a menos que skip_context_in_prompt=True.
-  - Com objeto/justificativa no override (inexigibilidade, gerar-tr-e-dfd): monta slots do formulário; dispensa normal
-    chama LLM leve só para problema_administrativo + beneficio_esperado (3 parágrafos no TR, sem repetir justificativa).
-  - Dispensa rápida prefilled: pipeline integral (3 blocos distintos). Botão «Gerar» objeto/justificativa: prompt lite.
+  - Com objeto/justificativa no override (inexigibilidade, dispensa normal/rápida, gerar-tr-e-dfd): monta slots do
+    formulário; dispensa normal chama LLM leve só para problema_administrativo + beneficio_esperado.
+  - Dispensa rápida prefilled (opção A): atalho no gerar, sem LLM integral. Botão «Gerar» cláusulas: prompt lite.
     """
     from .llm_orchestration import EMPTY_TOKEN_USAGE, llm_token_scope
 

@@ -5,6 +5,7 @@ from app.tr_slots_llm import (
     _build_tr_slots_from_override_prefilled,
     _is_objeto_justificativa_fill_mode,
     _override_has_prefilled_clauses,
+    _parse_secao4_normal_llm_payload,
     _should_skip_llm_for_prefilled_override,
     _strip_clause_draft_from_override,
 )
@@ -73,6 +74,15 @@ class TrSlotsSkipLlmTests(unittest.TestCase):
         self.assertEqual(slots.justificativa, jus)
         self.assertEqual(slots.problema_administrativo, "")
         self.assertEqual(slots.beneficio_esperado, "")
+
+    def test_parse_secao4_normal_llm_payload(self):
+        raw = (
+            '{"problema_administrativo": "Risco de descontinuidade.", '
+            '"beneficio_esperado": "Melhoria da eficiência."}'
+        )
+        parsed = _parse_secao4_normal_llm_payload(raw)
+        self.assertEqual(parsed["problema_administrativo"], "Risco de descontinuidade.")
+        self.assertEqual(parsed["beneficio_esperado"], "Melhoria da eficiência.")
 
     def test_strip_clause_draft_removes_objeto_from_override(self):
         override = {

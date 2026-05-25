@@ -42,6 +42,30 @@ TR_SLOTS_OBJETO_JUSTIFICATIVA_LLM_OPTIONS: Dict[str, Any] = {
     "top_p": 0.85,
 }
 
+# Dispensa normal — gerar-tr-e-dfd: só problema + benefício (justificativa/objeto vêm do formulário).
+TR_SLOTS_SECAO4_NORMAL_LLM_OPTIONS: Dict[str, Any] = {
+    "num_predict": 280,
+    "temperature": 0.25,
+    "top_p": 0.9,
+}
+
+TR_SLOTS_SECAO4_NORMAL_SYSTEM_PROMPT = """Você redige dois blocos complementares da seção 4 (justificativa) de um Termo de Referência (Lei 14.133/2021).
+
+O usuário já definiu objeto e justificativa no formulário — NÃO reescreva a justificativa principal.
+
+Responda APENAS JSON válido:
+{"problema_administrativo": "...", "beneficio_esperado": "..."}
+
+problema_administrativo (2 a 4 frases):
+- Dor operacional / risco / impacto se a contratação não ocorrer.
+- Texto distinto da justificativa fornecida (não copie nem parafraseie o mesmo parágrafo).
+
+beneficio_esperado (2 a 4 frases):
+- Resultados esperados (eficiência, continuidade, qualidade, redução de riscos).
+- Texto distinto dos outros dois blocos.
+
+Use só dados do pedido. Pt-BR formal. Sem listas com marcadores."""
+
 
 async def _call_llm_generate(
     full_prompt: str,
@@ -2047,6 +2071,84 @@ def _build_tr_slots_from_override_prefilled(
     return slots
 
 
+def _parse_secao4_normal_llm_payload(raw: str) -> Dict[str, str]:
+    """Extrai problema_administrativo e beneficio_esperado do JSON da LLM."""
+    try:
+        parsed = _parse_llm_json_response_resilient(raw)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    out: Dict[str, str] = {}
+    for key in ("problema_administrativo", "beneficio_esperado"):
+        val = str(parsed.get(key) or "").strip()
+        if val:
+            out[key] = val
+    return out
+
+
+async def _enrich_dispensa_normal_tr_secao4(
+    slots: TRTemplateSlots,
+    override: Dict[str, Any],
+    user_prompt: str,
+    user_context: Optional[Dict[str, Any]] = None,
+) -> TRTemplateSlots:
+    """
+    Dispensa normal: mantém objeto/justificativa do formulário e gera 2 parágrafos extras
+    para (TR_PROBLEMA_ADMINISTRATIVO) e (TR_BENEFICIO_ESPERADO) — comportamento antigo do TR
+    sem rodar o pipeline integral (timeout).
+    """
+    jus = (slots.justificativa or "").strip()
+    if not jus:
+        return slots
+    if (slots.problema_administrativo or "").strip() and (slots.beneficio_esperado or "").strip():
+        return slots
+
+    user_bits = [
+        "Use somente o texto abaixo (cláusulas já aprovadas no formulário).",
+        f"Objeto: {slots.objeto or ''}",
+        f"Justificativa (não reescrever): {jus}",
+    ]
+    up = (user_prompt or "").strip()
+    if up:
+        user_bits.append(f"Contexto do pedido:\n{up[:3500]}")
+    full_prompt = (
+        f"<<SYSTEM>>\n{TR_SLOTS_SECAO4_NORMAL_SYSTEM_PROMPT.strip()}\n\n"
+        f"<<USER>>\n" + "\n".join(user_bits)
+    )
+    try:
+        body = await _call_llm_generate(
+            full_prompt,
+            user_context=user_context,
+            options=TR_SLOTS_SECAO4_NORMAL_LLM_OPTIONS,
+        )
+    except Exception:
+        return slots
+
+    data = body.get("data", body) if isinstance(body, dict) else {}
+    text = str(data.get("response", data.get("text", "")) or "").strip()
+    if not text:
+        return slots
+
+    extra = _parse_secao4_normal_llm_payload(text)
+    problema = extra.get("problema_administrativo") or slots.problema_administrativo
+    beneficio = extra.get("beneficio_esperado") or slots.beneficio_esperado
+    if not (problema or "").strip() or not (beneficio or "").strip():
+        return slots
+
+    def _norm(t: str) -> str:
+        return re.sub(r"\s+", " ", (t or "").strip().lower())
+
+    if _norm(problema) == _norm(jus) or _norm(beneficio) == _norm(jus):
+        return slots
+
+    return replace(
+        slots,
+        problema_administrativo=problema.strip(),
+        beneficio_esperado=beneficio.strip(),
+    )
+
+
 async def fetch_context_from_agent(user_prompt: str) -> Optional[Dict[str, Any]]:
     """Chama o llm_agent structure-from-prompt para obter context e especificacoes."""
     url = f"{LLM_AGENT_BASE_URL}/api/agent/structure-from-prompt"
@@ -2077,8 +2179,9 @@ async def fill_tr_slots_with_llm(
     - Chama o llm_agent (structure-from-prompt) para obter contexto e especificações.
     - Chama a LLM para gerar o JSON de slots (objeto, dispensa, itens, justificativa, fiscal, dotacao).
     - Mescla com slots_override (valores enviados pelo usuário têm prioridade). user_context (Django) enriquece o prompt com nome/secretaria/prefeitura, a menos que skip_context_in_prompt=True.
-  - Com objeto/justificativa no override (dispensa rápida, inexigibilidade, gerar-tr-e-dfd): só monta slots e renderiza.
-  - Dispensa normal/rápida sem objeto/justificativa no override (botão «Gerar»): prompt lite, sem llm_agent/RAG.
+  - Com objeto/justificativa no override (inexigibilidade, gerar-tr-e-dfd): monta slots do formulário; dispensa normal
+    chama LLM leve só para problema_administrativo + beneficio_esperado (3 parágrafos no TR, sem repetir justificativa).
+  - Dispensa rápida prefilled: pipeline integral (3 blocos distintos). Botão «Gerar» objeto/justificativa: prompt lite.
     """
     from .llm_orchestration import EMPTY_TOKEN_USAGE, llm_token_scope
 
@@ -2088,8 +2191,15 @@ async def fill_tr_slots_with_llm(
         user_context,
         skip_context_in_prompt=skip_context_in_prompt,
     ):
-        merged = _build_tr_slots_from_override_prefilled(override, user_context)
-        return _apply_o_manutencao_fix_to_tr_slots(merged), dict(EMPTY_TOKEN_USAGE)
+        async with llm_token_scope() as acc:
+            merged = _build_tr_slots_from_override_prefilled(override, user_context)
+            fluxo = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
+            if fluxo == "normal":
+                merged = await _enrich_dispensa_normal_tr_secao4(
+                    merged, override, user_prompt, user_context
+                )
+            merged = _apply_o_manutencao_fix_to_tr_slots(merged)
+            return merged, dict(acc.usage())
 
     async with llm_token_scope() as acc:
         slots = await _fill_tr_slots_with_llm_work(

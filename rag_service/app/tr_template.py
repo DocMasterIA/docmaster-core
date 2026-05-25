@@ -1016,11 +1016,8 @@ def render_tr_from_slots(
     problema_text = _normalize_slot_block(slots.problema_administrativo or "")
     beneficio_text = _normalize_slot_block(slots.beneficio_esperado or "")
 
-    # Dispensa normal: só o texto do usuário em (TR_JUSTIFICATIVA); demais tokens ficam vazios.
-    if fluxo_ui == "normal":
-        problema_text = ""
-        beneficio_text = ""
-    elif fluxo_ui == "rapida":
+    # Evita repetir o mesmo parágrafo 3× no Word (placeholders no mesmo fluxo).
+    if fluxo_ui in ("normal", "rapida"):
         jus_cmp = justificativa_text.strip()
         if problema_text.strip() == jus_cmp:
             problema_text = ""
@@ -1029,10 +1026,9 @@ def render_tr_from_slots(
 
     valor_total_placeholder = _valor_total_sem_rs(slots.valor_total or "")
 
-    # Dispensa rápida: até três blocos (justificativa + problema + benefício), com respiro entre eles.
     if justificativa_text and (problema_text or beneficio_text):
         justificativa_text = f"{justificativa_text}\n"
-    elif justificativa_text and fluxo_ui != "rapida":
+    elif justificativa_text:
         justificativa_text = f"{justificativa_text}\n"
     if problema_text and beneficio_text:
         problema_text = f"{problema_text}\n"

@@ -12,6 +12,15 @@
 #
 set -euo pipefail
 
+LOCK_FILE="${PNCP_INGEST_LOCK_FILE:-${HOME}/.pncp-index-ingest.lock}"
+exec 9>"${LOCK_FILE}"
+if ! flock -n 9; then
+  echo "$(date -Is) ERRO: ingestão PNCP já em execução (lock: ${LOCK_FILE})."
+  echo "  ps aux | grep run-pncp-index-ingest"
+  echo "  kill <pid>  # ou: rm -f ${LOCK_FILE}  (só se tiver certeza)"
+  exit 1
+fi
+
 BASE_URL="${PNCP_BASE_URL:-http://127.0.0.1:8012}"
 MONTHS="${PNCP_INGEST_MONTHS:-12}"
 MAX_PAGINAS="${PNCP_INGEST_MAX_PAGINAS:-25}"
@@ -54,7 +63,7 @@ print(json.dumps({
 }))
 PY
 )
-  log "INGEST START uf=${uf} max_paginas=${MAX_PAGINAS}"
+  log "INGEST START uf=${uf} max_paginas=${MAX_PAGINAS} (curl max ${CURL_MAX_TIME}s — aguarde)"
   if curl -sS --max-time "${CURL_MAX_TIME}" -X POST "${BASE_URL}/api/pncp-research/local-index/backfill" \
     -H "Content-Type: application/json" \
     -d "${body}" >>"${PNCP_INGEST_LOG:-/dev/stdout}" 2>&1; then

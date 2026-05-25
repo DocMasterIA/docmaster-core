@@ -45,6 +45,20 @@ class TrSlotsSkipLlmTests(unittest.TestCase):
         )
         self.assertTrue(_should_skip_llm_for_prefilled_override(override, None))
 
+    def test_dispensa_rapida_prefilled_skip_leaves_problema_beneficio_empty_until_enrich(self):
+        jus = "Justificativa da contratação para atender demanda da secretaria de saúde municipal."
+        slots = _build_tr_slots_from_override_prefilled(
+            {
+                "objeto": "Objeto longo o suficiente para o teste de skip.",
+                "justificativa": jus,
+                "dispensa_fluxo_ui": "rapida",
+            },
+            None,
+        )
+        self.assertEqual(slots.justificativa, jus)
+        self.assertEqual(slots.problema_administrativo, "")
+        self.assertEqual(slots.beneficio_esperado, "")
+
     def test_dispensa_normal_prefilled_skips_on_gerar_tr_e_dfd(self):
         override = {
             "objeto": "Objeto longo o suficiente para o teste de skip.",

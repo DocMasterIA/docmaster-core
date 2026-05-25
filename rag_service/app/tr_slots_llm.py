@@ -42,7 +42,7 @@ TR_SLOTS_OBJETO_JUSTIFICATIVA_LLM_OPTIONS: Dict[str, Any] = {
     "top_p": 0.85,
 }
 
-# Dispensa normal — gerar-tr-e-dfd: só problema + benefício (justificativa/objeto vêm do formulário).
+# Dispensa normal/rápida — gerar-tr-e-dfd: só problema + benefício (justificativa/objeto vêm do formulário).
 TR_SLOTS_SECAO4_NORMAL_LLM_OPTIONS: Dict[str, Any] = {
     "num_predict": 280,
     "temperature": 0.25,
@@ -2090,8 +2090,8 @@ async def _enrich_dispensa_normal_tr_secao4(
     user_context: Optional[Dict[str, Any]] = None,
 ) -> TRTemplateSlots:
     """
-    Dispensa normal: mantém objeto/justificativa do formulário e gera 2 parágrafos extras
-    para (TR_PROBLEMA_ADMINISTRATIVO) e (TR_BENEFICIO_ESPERADO) — comportamento antigo do TR
+    Dispensa normal/rápida: mantém objeto/justificativa do formulário e gera 2 parágrafos extras
+    para (TR_PROBLEMA_ADMINISTRATIVO) e (TR_BENEFICIO_ESPERADO) — 3 blocos na seção 4 do TR
     sem rodar o pipeline integral (timeout).
     """
     jus = (slots.justificativa or "").strip()
@@ -2176,8 +2176,8 @@ async def fill_tr_slots_with_llm(
     - Chama a LLM para gerar o JSON de slots (objeto, dispensa, itens, justificativa, fiscal, dotacao).
     - Mescla com slots_override (valores enviados pelo usuário têm prioridade). user_context (Django) enriquece o prompt com nome/secretaria/prefeitura, a menos que skip_context_in_prompt=True.
   - Com objeto/justificativa no override (inexigibilidade, dispensa normal/rápida, gerar-tr-e-dfd): monta slots do
-    formulário; dispensa normal chama LLM leve só para problema_administrativo + beneficio_esperado.
-  - Dispensa rápida prefilled (opção A): atalho no gerar, sem LLM integral. Botão «Gerar» cláusulas: prompt lite.
+    formulário; normal/rápida chamam LLM leve só para problema_administrativo + beneficio_esperado (3 parágrafos).
+  - Botão «Gerar» cláusulas: prompt lite (fill-tr-slots).
     """
     from .llm_orchestration import EMPTY_TOKEN_USAGE, llm_token_scope
 
@@ -2190,7 +2190,7 @@ async def fill_tr_slots_with_llm(
         async with llm_token_scope() as acc:
             merged = _build_tr_slots_from_override_prefilled(override, user_context)
             fluxo = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
-            if fluxo == "normal":
+            if fluxo in ("normal", "rapida"):
                 merged = await _enrich_dispensa_normal_tr_secao4(
                     merged, override, user_prompt, user_context
                 )

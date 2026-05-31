@@ -1,0 +1,32 @@
+# Boot automático da stack DocMaster (app + túnel + PNCP + observabilidade).
+#
+# Instalação:
+#   cd /home/adryan/docmaster-core
+#   sudo ./scripts/install-docmaster-boot-service.sh
+#
+# Ou manualmente:
+#   1) Ajuste User, WorkingDirectory e EnvironmentFile abaixo.
+#   2) sudo cp deploy/docmaster-stack.service.example /etc/systemd/system/docmaster-stack.service
+#   3) sudo systemctl daemon-reload
+#   4) sudo systemctl enable --now docmaster-stack.service
+
+[Unit]
+Description=DocMaster stack (Docker: backend, frontend, tunnel, PNCP, Grafana)
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=adryan
+Group=adryan
+WorkingDirectory=/home/adryan/docmaster-core
+Environment=DOCMASTER_DEPLOY_DIR=/home/adryan/docmaster-core
+Environment=HOME=/home/adryan
+EnvironmentFile=-/home/adryan/docmaster-core/.env
+ExecStart=/home/adryan/docmaster-core/scripts/ensure-docmaster-stack.sh
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target

@@ -92,7 +92,8 @@ else
 fi
 
 echo ""
-echo "24/7: restart=always no compose. Após reboot do host: rode este script de novo."
+echo "24/7: restart=always no compose. Boot automático: sudo ./scripts/install-docmaster-boot-service.sh"
+echo "Ou manualmente após reboot: ./scripts/ensure-docmaster-stack.sh"
 echo "NÃO use: docker compose -f docker-compose.pncp.yml down -v"
 echo "Backend/outros: docker compose up -d --no-recreate backend  (não recria o PNCP)"
 echo "Para total_itens SUBIR (ingestão): nohup ./scripts/run-pncp-index-ingest-loop.sh >> ~/pncp-ingest.log 2>&1 &"

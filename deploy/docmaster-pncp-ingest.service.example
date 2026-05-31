@@ -1,0 +1,28 @@
+# Loop contínuo de ingestão PNCP (opcional — só se quiser índice a crescer 24/7).
+# Depende de docmaster-stack.service (API PNCP no ar).
+#
+# Instalação:
+#   sudo ./scripts/install-docmaster-boot-service.sh --with-pncp-ingest
+
+[Unit]
+Description=DocMaster PNCP index ingest loop
+After=docmaster-stack.service docker.service
+Wants=docmaster-stack.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=adryan
+Group=adryan
+WorkingDirectory=/home/adryan/docmaster-core
+Environment=DOCMASTER_DEPLOY_DIR=/home/adryan/docmaster-core
+Environment=HOME=/home/adryan
+Environment=PNCP_INGEST_LOG=/home/adryan/pncp-ingest.log
+EnvironmentFile=-/home/adryan/docmaster-core/.env
+ExecStart=/home/adryan/docmaster-core/scripts/run-pncp-index-ingest-loop.sh
+Restart=on-failure
+RestartSec=60
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target

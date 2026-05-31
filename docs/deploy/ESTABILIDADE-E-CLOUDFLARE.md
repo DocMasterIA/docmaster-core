@@ -135,13 +135,19 @@ docker run --rm -v DEPLOY_backend_data:/data -v $(pwd):/backup alpine \
 
 Trocar `cloudflared:latest` / `grafana:latest` por tag fixa após um deploy estável evita surpresa em `docker compose pull`.
 
-## Script sugerido pós-reboot (produção)
+## Boot automático após reinício (recomendado)
 
 ```bash
-#!/bin/bash
-cd /home/docmaster/docmaster-core
-docker compose up -d ollama llm_api rag_service pncp_researcher_service backend frontend-vue cloudflared-tunnel
-./scripts/ensure-observability.sh
+cd ~/docmaster-core
+sudo ./scripts/install-docmaster-boot-service.sh
+```
+
+Isso instala `docmaster-stack.service` (systemd), que sobe app + túnel Cloudflare + PNCP + observabilidade no boot. Ver [BOOT-AUTOMATICO.md](BOOT-AUTOMATICO.md).
+
+Subida manual (sem reboot):
+
+```bash
+./scripts/ensure-docmaster-stack.sh
 ```
 
 ## PNCP Researcher (alimentação 24h)

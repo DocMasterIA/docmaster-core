@@ -7,6 +7,7 @@ Os valores enviados pelo usuário (slots_override) têm prioridade sobre a IA.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import re
@@ -65,6 +66,25 @@ beneficio_esperado (2 a 4 frases):
 - Texto distinto dos outros dois blocos.
 
 Use só dados do pedido. Pt-BR formal. Sem listas com marcadores."""
+
+# Dispensa normal/rápida — gerar-tr-e-dfd: só tabela de itens (objeto/justificativa vêm do formulário).
+TR_SLOTS_ITENS_LLM_OPTIONS: Dict[str, Any] = {
+    "num_predict": 320,
+    "temperature": 0.2,
+    "top_p": 0.85,
+}
+
+TR_SLOTS_ITENS_SYSTEM_PROMPT = """Extraia itens para a tabela quantitativa de um Termo de Referência (Lei 14.133/2021).
+
+Responda APENAS JSON válido:
+{"itens": [{"descricao": "...", "unidade": "un", "quantidade": 1, "valor_unitario": "", "valor_total": ""}]}
+
+Regras:
+- Cada produto ou serviço distinto = um item (descrição técnica mínima, não uma palavra solta).
+- Se o pedido mencionar quantidades, preserve-as; se não, quantidade=1 e unidade coerente (un, sv, m², etc.).
+- valor_unitario e valor_total: deixe "" se não houver preço no pedido.
+- Serviço único (manutenção, obra, reforma): 1 item descrevendo o serviço.
+- Não invente itens fora do pedido. Pt-BR formal."""
 
 
 async def _call_llm_generate(
@@ -2145,6 +2165,131 @@ async def _enrich_dispensa_normal_tr_secao4(
     )
 
 
+def _itens_list_from_raw(raw: Any) -> List[ItemSlot]:
+    """Converte lista bruta (override ou JSON LLM) em ItemSlot."""
+    if not isinstance(raw, list):
+        return []
+    itens: List[ItemSlot] = []
+    for elem in raw:
+        if isinstance(elem, dict):
+            desc = str(elem.get("descricao", "")).strip()
+            if not desc:
+                continue
+            itens.append(
+                ItemSlot(
+                    descricao=desc,
+                    unidade=str(elem.get("unidade", "")).strip(),
+                    quantidade=elem.get("quantidade"),
+                    valor_unitario=elem.get("valor_unitario", ""),
+                    valor_total=elem.get("valor_total", ""),
+                )
+            )
+        elif isinstance(elem, (list, tuple)) and len(elem) >= 3:
+            desc = str(elem[0]).strip()
+            if not desc:
+                continue
+            itens.append(
+                ItemSlot(
+                    descricao=desc,
+                    unidade=str(elem[1]).strip(),
+                    quantidade=elem[2],
+                    valor_unitario=elem[3] if len(elem) > 3 else "",
+                    valor_total=elem[4] if len(elem) > 4 else "",
+                )
+            )
+    return itens
+
+
+def _override_has_prefilled_itens(override: Dict[str, Any]) -> bool:
+    return bool(_itens_list_from_raw(override.get("itens")))
+
+
+def _is_dispensa_tr_flow(
+    override: Dict[str, Any],
+    user_context: Optional[Dict[str, Any]] = None,
+) -> bool:
+    fluxo = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
+    if fluxo in ("normal", "rapida"):
+        return True
+    pkg = _package_key_from_override_or_context(override, user_context)
+    return pkg.startswith("dispensa_")
+
+
+def _should_enrich_itens_llm(
+    override: Dict[str, Any],
+    user_context: Optional[Dict[str, Any]],
+    slots: TRTemplateSlots,
+) -> bool:
+    if not _is_dispensa_tr_flow(override, user_context):
+        return False
+    pkg = _package_key_from_override_or_context(override, user_context)
+    if pkg.startswith("inexigibilidade_"):
+        return False
+    if _override_has_prefilled_itens(override):
+        return False
+    if slots.itens and any((i.descricao or "").strip() for i in slots.itens):
+        return False
+    return bool((slots.objeto or "").strip())
+
+
+def _parse_itens_llm_payload(raw: str) -> List[ItemSlot]:
+    """Extrai itens[] do JSON da LLM."""
+    try:
+        parsed = _parse_llm_json_response_resilient(raw)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(parsed, dict):
+        return []
+    return _itens_list_from_raw(parsed.get("itens"))
+
+
+async def _enrich_tr_itens_from_prompt(
+    slots: TRTemplateSlots,
+    override: Dict[str, Any],
+    user_prompt: str,
+    user_context: Optional[Dict[str, Any]] = None,
+) -> TRTemplateSlots:
+    """
+    Dispensa normal/rápida: gera itens[] para (TR_TABELA_ITENS) sem rodar o pipeline integral.
+    Respeita itens já enviados no override (formulário).
+    """
+    if not _should_enrich_itens_llm(override, user_context, slots):
+        return slots
+
+    user_bits = [
+        "Use somente o texto abaixo (objeto já aprovado no formulário).",
+        f"Objeto: {slots.objeto or ''}",
+    ]
+    jus = (slots.justificativa or "").strip()
+    if jus:
+        user_bits.append(f"Justificativa (contexto, não reescrever): {jus[:1200]}")
+    up = (user_prompt or "").strip()
+    if up:
+        user_bits.append(f"Contexto do pedido:\n{up[:3500]}")
+    full_prompt = (
+        f"<<SYSTEM>>\n{TR_SLOTS_ITENS_SYSTEM_PROMPT.strip()}\n\n"
+        f"<<USER>>\n" + "\n".join(user_bits)
+    )
+    try:
+        body = await _call_llm_generate(
+            full_prompt,
+            user_context=user_context,
+            options=TR_SLOTS_ITENS_LLM_OPTIONS,
+        )
+    except Exception:
+        return slots
+
+    data = body.get("data", body) if isinstance(body, dict) else {}
+    text = str(data.get("response", data.get("text", "")) or "").strip()
+    if not text:
+        return slots
+
+    itens = _parse_itens_llm_payload(text)
+    if not itens:
+        return slots
+    return replace(slots, itens=itens)
+
+
 async def fetch_context_from_agent(user_prompt: str) -> Optional[Dict[str, Any]]:
     """Chama o llm_agent structure-from-prompt para obter context e especificacoes."""
     url = f"{LLM_AGENT_BASE_URL}/api/agent/structure-from-prompt"
@@ -2176,7 +2321,7 @@ async def fill_tr_slots_with_llm(
     - Chama a LLM para gerar o JSON de slots (objeto, dispensa, itens, justificativa, fiscal, dotacao).
     - Mescla com slots_override (valores enviados pelo usuário têm prioridade). user_context (Django) enriquece o prompt com nome/secretaria/prefeitura, a menos que skip_context_in_prompt=True.
   - Com objeto/justificativa no override (inexigibilidade, dispensa normal/rápida, gerar-tr-e-dfd): monta slots do
-    formulário; normal/rápida chamam LLM leve só para problema_administrativo + beneficio_esperado (3 parágrafos).
+    formulário; dispensa normal/rápida chamam LLM leve em paralelo para itens[] + problema/benefício (seção 4).
   - Botão «Gerar» cláusulas: prompt lite (fill-tr-slots).
     """
     from .llm_orchestration import EMPTY_TOKEN_USAGE, llm_token_scope
@@ -2189,10 +2334,26 @@ async def fill_tr_slots_with_llm(
     ):
         async with llm_token_scope() as acc:
             merged = _build_tr_slots_from_override_prefilled(override, user_context)
-            fluxo = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
-            if fluxo in ("normal", "rapida"):
-                merged = await _enrich_dispensa_normal_tr_secao4(
-                    merged, override, user_prompt, user_context
+            if _is_dispensa_tr_flow(override, user_context) and not _package_key_from_override_or_context(
+                override, user_context
+            ).startswith("inexigibilidade_"):
+                slots_itens, slots_secao4 = await asyncio.gather(
+                    _enrich_tr_itens_from_prompt(
+                        merged, override, user_prompt, user_context
+                    ),
+                    _enrich_dispensa_normal_tr_secao4(
+                        merged, override, user_prompt, user_context
+                    ),
+                )
+                merged = replace(
+                    merged,
+                    itens=slots_itens.itens if slots_itens.itens else merged.itens,
+                    problema_administrativo=(
+                        slots_secao4.problema_administrativo or merged.problema_administrativo
+                    ),
+                    beneficio_esperado=(
+                        slots_secao4.beneficio_esperado or merged.beneficio_esperado
+                    ),
                 )
             merged = _apply_o_manutencao_fix_to_tr_slots(merged)
             return merged, acc.to_dict()

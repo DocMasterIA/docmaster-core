@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Acorda a stack DocMaster quando o Windows inicia a sessão WSL (Task Scheduler).
-# Não substitui docmaster-stack.service — chama-o depois do Docker estar pronto.
+# Usa ensure-docmaster-stack.sh (docker compose como docmaster) — systemctl start
+# do unit de sistema exige polkit/sudo e falha na tarefa agendada.
 set -euo pipefail
 
 DEPLOY="${DOCMASTER_DEPLOY_DIR:-/home/docmaster}"
@@ -27,19 +28,26 @@ if ! docker info >/dev/null 2>&1; then
   exit 1
 fi
 
-if command -v systemctl >/dev/null 2>&1 && systemctl is-system-running >/dev/null 2>&1; then
-  log "systemctl start docmaster-stack.service"
-  systemctl start docmaster-stack.service || true
-else
-  log "systemd indisponível — ensure-docmaster-stack.sh"
-  export DOCMASTER_DEPLOY_DIR="$DEPLOY"
-  "$SCRIPT_DIR/ensure-docmaster-stack.sh" || exit 1
+ENSURE="$SCRIPT_DIR/ensure-docmaster-stack.sh"
+if [[ ! -x "$ENSURE" ]]; then
+  ENSURE="$DEPLOY/scripts/ensure-docmaster-stack.sh"
+fi
+if [[ ! -x "$ENSURE" ]]; then
+  log "ERRO: ensure-docmaster-stack.sh não encontrado"
+  exit 1
 fi
 
-if docker ps --format '{{.Names}}' | grep -qx cloudflared-tunnel; then
-  log "OK cloudflared-tunnel"
-else
-  log "AVISO cloudflared-tunnel não está Up"
-fi
+log "ensure-docmaster-stack.sh (sem systemctl — evita «Interactive authentication required»)"
+export DOCMASTER_DEPLOY_DIR="$DEPLOY"
+"$ENSURE" || exit 1
+
+for name in cloudflared-tunnel backend frontend-vue; do
+  if docker ps --format '{{.Names}}' | grep -qx "$name"; then
+    log "OK  $name"
+  else
+    log "ERRO $name não está Up"
+    exit 1
+  fi
+done
 
 log "Concluído"

@@ -77,6 +77,28 @@ systemd=true
 
 Se alterar, `wsl --shutdown` no Windows e reabrir.
 
+## Erro «ports are not available» na porta 9100
+
+O `node_exporter` (métricas) disputa `127.0.0.1:9100` no WSL. Isso **não** deve impedir o site.
+
+```bash
+docker rm -f node_exporter 2>/dev/null || true
+ss -tlnp | grep 9100 || true
+cd /home/docmaster && ./scripts/ensure-docmaster-stack.sh
+```
+
+Scripts recentes sobem **backend + cloudflared** antes de Grafana/Prometheus.
+
+## Erro «Interactive authentication required» no log
+
+Se `wsl-boot.log` mostrar falha em `systemctl start docmaster-stack.service`, a tarefa Windows corre como `docmaster` sem sudo. O script `wsl-boot-docmaster.sh` atualizado chama **`ensure-docmaster-stack.sh`** diretamente (mesmo efeito, sem polkit). Atualize o ficheiro em `/home/docmaster/scripts/` e rode de novo:
+
+```powershell
+Start-ScheduledTask -TaskName "DocMaster-WSL-Stack"
+```
+
+O `docmaster-stack.service` no boot **Linux puro** (VPS) continua válido; no WSL a tarefa Windows substitui o arranque via `ensure-*`.
+
 ## Teste real
 
 1. Reinicie o **Windows** (não só `wsl --shutdown`).

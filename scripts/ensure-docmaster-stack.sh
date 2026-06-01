@@ -87,12 +87,20 @@ main_compose_up() {
     up_flags+=(--build)
   fi
 
-  log "Stack principal em $DEPLOY"
-  docker compose -f "$COMPOSE_FILE" up "${up_flags[@]}"
+  # Site + túnel primeiro — observabilidade não pode bloquear cloudflared (porta 9100 no WSL).
+  local core=(
+    ollama llm_api llm_agent chromadb languagetool text_corrector_service
+    rag_service backend frontend-vue cloudflared-tunnel
+  )
+  local obs=(node_exporter prometheus grafana)
 
-  # Serviços críticos para o site (túnel + origem HTTP)
-  log "Garantindo backend, frontend e cloudflared..."
-  docker compose -f "$COMPOSE_FILE" up -d backend frontend-vue cloudflared-tunnel
+  log "Stack principal (site + túnel) em $DEPLOY"
+  docker compose -f "$COMPOSE_FILE" up "${up_flags[@]}" "${core[@]}"
+
+  log "Observabilidade (opcional; falha de porta 9100 não derruba o site)"
+  if ! docker compose -f "$COMPOSE_FILE" up -d "${obs[@]}"; then
+    log "AVISO: node_exporter/prometheus/grafana não subiram — verifique porta 127.0.0.1:9100"
+  fi
 }
 
 wait_http() {

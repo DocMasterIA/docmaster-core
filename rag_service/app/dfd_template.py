@@ -24,6 +24,7 @@ from .docx_typography import (
 from .tr_deixis import adapt_text_for_dfd_or_oficio
 from .tr_template import (
     TRTemplateSlots,
+    format_date_pt_br_extenso,
     numero_processo_valor_placeholder_tr,
     slots_numero_processo_display,
     split_paragraphs_on_double_newline,
@@ -238,7 +239,7 @@ def render_dfd_from_tr_slots(
 
     doc = Document(str(tpl_path))
 
-    dfd_data_text = slots.dfd_data or slots.data_termo or ""
+    dfd_data_text = format_date_pt_br_extenso(slots.dfd_data or slots.data_termo or "")
 
     dfd_obj = adapt_text_for_dfd_or_oficio(
         (slots.dfd_objeto_referencia or slots.objeto or "").strip()

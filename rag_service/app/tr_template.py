@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from datetime import date, datetime
 
 """
 Geração de Termo de Referência a partir do modelo fixo
@@ -31,6 +32,69 @@ from .docx_typography import (
 )
 
 TR_ITEMS_TABLE_ANCHOR = "(TR_TABELA_ITENS)"
+
+
+_MESES_PT_BR = (
+    "janeiro",
+    "fevereiro",
+    "março",
+    "abril",
+    "maio",
+    "junho",
+    "julho",
+    "agosto",
+    "setembro",
+    "outubro",
+    "novembro",
+    "dezembro",
+)
+
+
+def format_date_pt_br_extenso(value: Any) -> str:
+    """
+    Converte datas numéricas para «29 de maio de 2026».
+    Mantém texto original quando não reconhecer um formato de data.
+    """
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+
+    parsed: Optional[date] = None
+
+    try:
+        if "T" in raw:
+            parsed = datetime.fromisoformat(raw).date()
+        else:
+            parsed = datetime.fromisoformat(raw).date()
+    except ValueError:
+        parsed = None
+
+    if parsed is None:
+        m = re.fullmatch(r"(\d{1,4})[/-](\d{1,2})[/-](\d{1,4})", raw)
+        if m:
+            a, b, c = (int(x) for x in m.groups())
+            year = month = day = 0
+            if a >= 1000:
+                year, month, day = a, b, c
+            elif c >= 1000:
+                year = c
+                # Aceita dd/mm e mm/dd. Quando ambíguo (<=12), prioriza dd/mm.
+                if a > 12 and b <= 12:
+                    day, month = a, b
+                elif b > 12 and a <= 12:
+                    day, month = b, a
+                else:
+                    day, month = a, b
+            try:
+                parsed = date(year, month, day)
+            except ValueError:
+                parsed = None
+
+    if parsed is None:
+        return raw
+
+    mes = _MESES_PT_BR[parsed.month - 1]
+    return f"{parsed.day} de {mes} de {parsed.year}"
 
 
 def _valor_total_sem_rs(valor: str) -> str:
@@ -1039,6 +1103,8 @@ def render_tr_from_slots(
     # Modelos dispensa: cargo abaixo do nome na assinatura = (TR_SECRETARIA_USUARIO), não só (TR_CARGO_*).
     cargo_assinatura_tr = (slots.cargo_assinante_termo or "").strip()
 
+    data_termo_extenso = format_date_pt_br_extenso(slots.data_termo)
+
     mapping = {
         # Placeholders padronizados (preferenciais)
         "(TR_OBJETO)": slots.objeto or "",
@@ -1065,7 +1131,7 @@ def render_tr_from_slots(
         "(TR_CODIGO_UF)": slots.codigo_uf or "",
         "(TR_ENDERECO_ENTREGA)": slots.endereco_entrega or "",
         "(TR_EMAIL_ENVIO_PROPOSTAS)": slots.email_envio_propostas or "",
-        "(TR_DATA_TERMO)": slots.data_termo or "",
+        "(TR_DATA_TERMO)": data_termo_extenso,
         "(TR_NOME_ASSINANTE_TERMO)": slots.nome_assinante_termo or "",
         "(TR_CARGO_ASSINANTE_TERMO)": cargo_assinatura_tr,
         "(NUMERO_PROCESSO)": num_proc_tr_placeholder,
@@ -1121,7 +1187,7 @@ def render_tr_from_slots(
         "(CÓDIGO UF)": slots.codigo_uf or "",
         "(ENDERECO ENTREGA)": slots.endereco_entrega or "",
         "(E-mail de envio de propostas)": slots.email_envio_propostas or "",
-        "(DATA DO TERMO)": slots.data_termo or "",
+        "(DATA DO TERMO)": data_termo_extenso,
         "(NOME DO ASSINANTE DO TERMO)": slots.nome_assinante_termo or "",
         "(CARGO DO ASSINANTE DO TERMO)": cargo_assinatura_tr,
     }

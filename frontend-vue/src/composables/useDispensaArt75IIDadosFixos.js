@@ -131,7 +131,8 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     if ('dfd_assinatura_nome' in data) fixoAssinatura.value = normNomeTitulo(data.dfd_assinatura_nome);
     if ('dfd_assinatura_cargo' in data) fixoAssinaturaCargo.value = normNomeTitulo(data.dfd_assinatura_cargo);
     if ('tr_endereco_entrega_propostas' in data) {
-      fixoEnderecoEntrega.value = String(data.tr_endereco_entrega_propostas || '');
+      const endereco = String(data.tr_endereco_entrega_propostas || '').trim();
+      fixoEnderecoEntrega.value = endereco || TEXTO_PADRAO_ENDERECO_PROPOSTAS;
     }
     if ('tr_email_recebimento_propostas' in data) {
       fixoEmailPropostas.value = String(data.tr_email_recebimento_propostas || '');

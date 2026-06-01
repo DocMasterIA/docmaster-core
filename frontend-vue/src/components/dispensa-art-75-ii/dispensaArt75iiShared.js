@@ -4,7 +4,7 @@ export const DATA_OPTIONS = ['Data automática', 'Datado e assinado digitalmente
 export const TRATAMENTO_NOME = ['Ao senhor', 'A senhora'];
 export const TRATAMENTO_CARGO = ['Senhor', 'Senhora'];
 export const TEXTO_PADRAO_ENDERECO_PROPOSTAS =
-  'Nome Município - UF, localizado na rua xxxxxxxxxxxxx, Nº xx, bairro xxx, no horário das 07h00min às 11h00min e das 13h00min às 17h00min, de segunda a sexta-feira.';
+  'As propostas poderão ser entregues no Setor de Compras Central da XXXXXXXXX - XX, localizado na rua XXXXXXXXXXX, Nº XXX, XXXXX, no horário das 07h00min às 11h00min e das 13h00min às 17h00min, de segunda a sexta-feira.';
 
 export { PLACEHOLDER_DOTACAO } from '@/constants/dotacaoOrcamentaria.js';
 

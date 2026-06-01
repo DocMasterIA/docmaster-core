@@ -16,6 +16,7 @@ from .docx_typography import apply_default_justify_to_document, apply_standard_b
 from .tr_deixis import adapt_text_for_dfd_or_oficio
 from .tr_template import (
     TRTemplateSlots,
+    format_date_pt_br_extenso,
     numero_processo_valor_placeholder_tr,
     slots_numero_processo_display,
     split_paragraphs_on_double_newline,
@@ -149,6 +150,8 @@ def render_oficio_from_slots(
     num_proc = slots_numero_processo_display(slots)
     num_proc_tr_placeholder = numero_processo_valor_placeholder_tr(num_proc)
 
+    data_oficio_extenso = format_date_pt_br_extenso(slots.data_termo)
+
     mapping = {
         "(NUMERO_PROCESSO)": num_proc_tr_placeholder,
         "( NUMERO_PROCESSO )": num_proc_tr_placeholder,
@@ -174,7 +177,7 @@ def render_oficio_from_slots(
         "(SOL_OFICIO_RESPONSAVEL_CARGO)": slots.sol_oficio_responsavel_cargo or "",
         "(SOL_OFICIO_RESPONSAVEL_SETOR)": slots.sol_oficio_responsavel_setor or slots.secretaria_usuario or "",
         "(SOL_OFICIO_CIDADE)": slots.cidade or "",
-        "(SOL_OFICIO_DATA)": slots.data_termo or "",
+        "(SOL_OFICIO_DATA)": data_oficio_extenso,
     }
 
     _replace_placeholders(doc, mapping)

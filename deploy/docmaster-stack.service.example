@@ -27,6 +27,9 @@ Environment=HOME=/home/adryan
 EnvironmentFile=-/home/adryan/docmaster-core/.env
 ExecStart=/home/adryan/docmaster-core/scripts/ensure-docmaster-stack.sh
 TimeoutStartSec=600
+# Se o boot falhar (Docker lento, rede), tenta de novo em 2 min
+Restart=on-failure
+RestartSec=120
 
 [Install]
 WantedBy=multi-user.target

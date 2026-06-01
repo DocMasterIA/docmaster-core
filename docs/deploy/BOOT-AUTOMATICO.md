@@ -27,9 +27,15 @@ Script único + serviço **systemd** no boot:
 Na pasta do projeto (ex.: `~/docmaster-core`):
 
 ```bash
-chmod +x scripts/ensure-docmaster-stack.sh scripts/install-docmaster-boot-service.sh
+# 1) Token do túnel (obrigatório — sem isto = erro 1033)
+cp .env.example .env
+nano .env   # CLOUDFLARE_TUNNEL_TOKEN=eyJ...  (Dashboard Cloudflare → Tunnels → token)
 
-# Stack completa no boot (recomendado)
+# 2) Verificar antes do systemd
+chmod +x scripts/*.sh
+./scripts/check-docmaster-boot-prereqs.sh
+
+# 3) Stack completa no boot (recomendado)
 sudo ./scripts/install-docmaster-boot-service.sh
 
 # Com ingestão PNCP contínua (índice a crescer sozinho)
@@ -41,6 +47,17 @@ sudo ./scripts/install-docmaster-boot-service.sh --with-pncp-ingest
 - `.env` na raiz do DEPLOY com `CLOUDFLARE_TUNNEL_TOKEN=...` (e demais vars do compose).
 - Utilizador no grupo `docker` (ex.: `sudo usermod -aG docker adryan` + relogar).
 - Volume PNCP configurado se aplicável (`attach-pncp-volume.sh`).
+
+## Estado actual deste servidor (checklist)
+
+| Item | Comando / acção |
+|------|-----------------|
+| `.env` com token | `grep CLOUDFLARE_TUNNEL_TOKEN .env` (não commitar) |
+| Pré-requisitos | `./scripts/check-docmaster-boot-prereqs.sh` |
+| systemd instalado | `systemctl is-enabled docmaster-stack` → `enabled` |
+| Túnel no ar | `docker ps \| grep cloudflared` → `Up` |
+
+Se só Grafana/Prometheus estiverem `Up` e não `backend`/`cloudflared`, o site fica **1033** até `./scripts/ensure-docmaster-stack.sh`.
 
 ## Verificação
 

@@ -49,7 +49,18 @@ render_unit() {
     "$src" >"$dest"
 }
 
-chmod +x "$REPO/scripts/ensure-docmaster-stack.sh" "$REPO/scripts/ensure-pncp-ingest-loop.sh"
+chmod +x \
+  "$REPO/scripts/ensure-docmaster-stack.sh" \
+  "$REPO/scripts/ensure-pncp-ingest-loop.sh" \
+  "$REPO/scripts/check-docmaster-boot-prereqs.sh"
+
+echo "==> Pré-requisitos"
+if ! sudo -u "$RUN_USER" env HOME="$RUN_HOME" "$REPO/scripts/check-docmaster-boot-prereqs.sh"; then
+  echo ""
+  echo "Corrija os itens acima (principalmente .env + CLOUDFLARE_TUNNEL_TOKEN) e volte a correr:"
+  echo "  sudo $0"
+  exit 1
+fi
 
 echo "==> Docker no boot"
 systemctl enable docker.service

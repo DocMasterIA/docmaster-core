@@ -44,8 +44,20 @@ load_env_file() {
     # shellcheck disable=SC1090
     source "$f"
     set +a
+    export DOCMASTER_ENV_LOADED="$f"
     return 0
   done
+  log "AVISO: nenhum .env encontrado em $DEPLOY — defina CLOUDFLARE_TUNNEL_TOKEN no ambiente"
+}
+
+require_tunnel_token() {
+  if [[ -n "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]]; then
+    return 0
+  fi
+  log "ERRO: CLOUDFLARE_TUNNEL_TOKEN não definido."
+  log "      Crie $DEPLOY/.env com o token (cp .env.example .env) ou exporte a variável."
+  log "      Sem token o cloudflared não sobe → erro 1033 na Cloudflare."
+  return 1
 }
 
 ensure_network() {
@@ -62,7 +74,11 @@ main_compose_up() {
   fi
 
   cd "$DEPLOY"
-  local up_flags=(-d --no-recreate)
+  local up_flags=(-d)
+  if [[ "${DOCMASTER_NO_RECREATE:-0}" == "1" ]]; then
+    up_flags+=(--no-recreate)
+    log "DOCMASTER_NO_RECREATE=1 — não recria contentores existentes"
+  fi
   if [[ "${DOCMASTER_FORCE_RECREATE:-0}" == "1" ]]; then
     up_flags=(-d --force-recreate)
     log "DOCMASTER_FORCE_RECREATE=1 — a recriar contentores"
@@ -73,6 +89,10 @@ main_compose_up() {
 
   log "Stack principal em $DEPLOY"
   docker compose -f "$COMPOSE_FILE" up "${up_flags[@]}"
+
+  # Serviços críticos para o site (túnel + origem HTTP)
+  log "Garantindo backend, frontend e cloudflared..."
+  docker compose -f "$COMPOSE_FILE" up -d backend frontend-vue cloudflared-tunnel
 }
 
 wait_http() {
@@ -101,6 +121,7 @@ report_status() {
 log "==> DocMaster stack ensure (DEPLOY=$DEPLOY)"
 wait_for_docker
 load_env_file
+require_tunnel_token || exit 1
 ensure_network
 main_compose_up
 

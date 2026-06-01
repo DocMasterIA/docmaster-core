@@ -18,6 +18,15 @@ from docx.text.paragraph import Paragraph
 from docx.shared import Pt, RGBColor
 
 _ROMAN_ITEM_LINE = re.compile(r"^[IVXLC]+\s*[–—\-]\s*.+", re.MULTILINE)
+_ROMAN_ITEM_LINE_START = re.compile(r"^\s*[IVXLC]+\s*[–—\-]\s*.+")
+
+
+def paragraph_is_roman_item_line(text: str) -> bool:
+    """Um inciso I – … / II – … em parágrafo próprio (comum no §15.1 e listas do TR)."""
+    t = (text or "").replace("\r\n", "\n").strip()
+    if not t:
+        return False
+    return bool(_ROMAN_ITEM_LINE_START.match(t))
 
 
 def paragraph_is_roman_enumerated_list(text: str) -> bool:
@@ -28,6 +37,8 @@ def paragraph_is_roman_enumerated_list(text: str) -> bool:
     t = (text or "").replace("\r\n", "\n").strip()
     if not t:
         return False
+    if paragraph_is_roman_item_line(t):
+        return True
     if "Manutenção preventiva" in t and "Manutenção corretiva" in t:
         return True
     lines = [ln.strip() for ln in t.split("\n") if ln.strip()]
@@ -35,6 +46,39 @@ def paragraph_is_roman_enumerated_list(text: str) -> bool:
         return False
     roman = sum(1 for ln in lines if _ROMAN_ITEM_LINE.match(ln))
     return roman >= 3
+
+
+def paragraph_is_contract_instrument_substitution_block(text: str) -> bool:
+    """
+    §15.1 (e equivalentes): instrumento de contrato / carta-contrato / nota de empenho.
+    No modelo .docx costuma vir alinhado à esquerda; não justificar.
+    """
+    t = (text or "").replace("\r\n", "\n").strip()
+    if not t:
+        return False
+    tl = t.lower()
+    if "instrumento de contrato" in tl and (
+        "carta-contrato" in tl
+        or "nota de empenho" in tl
+        or "substituído por instrumento equivalente" in tl
+        or "substituido por instrumento equivalente" in tl
+    ):
+        return True
+    if re.search(r"^\s*15\s*\.\s*1\s*\.", t, re.IGNORECASE) and "instrumento" in tl:
+        return True
+    if re.search(r"^\s*13\s*\.\s*1\s*\.", t, re.IGNORECASE) and "instrumento" in tl:
+        return True
+    tail = tl.rstrip(":")
+    if tail.endswith("nos casos de"):
+        return True
+    return False
+
+
+def paragraph_should_remain_left_aligned(text: str) -> bool:
+    """Parágrafos que não devem receber justificação automática."""
+    return paragraph_is_roman_enumerated_list(text) or paragraph_is_contract_instrument_substitution_block(
+        text
+    )
 
 STANDARD_BODY_FONT = "Times New Roman"
 STANDARD_FONT_COLOR = RGBColor(0, 0, 0)
@@ -153,7 +197,10 @@ def _apply_font_to_header_footer_part(part) -> None:
 
 
 def _justify_paragraphs_in_container(container, *, justify_heading_styles: bool) -> None:
-    """Justifica parágrafos alinhados à esquerda (ou sem alinhamento explícito); preserva centro/direita."""
+    """
+    Justifica parágrafos sem alinhamento explícito (None).
+    Preserva esquerda explícita do modelo, centro/direita e blocos de lista (§15.1, I/II/III).
+    """
     if container is None:
         return
     try:
@@ -165,7 +212,7 @@ def _justify_paragraphs_in_container(container, *, justify_heading_styles: bool)
                         continue
                 except Exception:
                     pass
-            if paragraph_is_roman_enumerated_list(p.text or ""):
+            if paragraph_should_remain_left_aligned(p.text or ""):
                 p.alignment = WD_ALIGN_PARAGRAPH.LEFT
                 pf = p.paragraph_format
                 pf.space_before = Pt(0)
@@ -173,7 +220,7 @@ def _justify_paragraphs_in_container(container, *, justify_heading_styles: bool)
                 pf.line_spacing = 1.0
                 continue
             al = p.alignment
-            if al in (None, WD_ALIGN_PARAGRAPH.LEFT):
+            if al is None:
                 p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
     except Exception:
         pass
@@ -181,8 +228,8 @@ def _justify_paragraphs_in_container(container, *, justify_heading_styles: bool)
 
 def apply_default_justify_to_document(doc: Document, *, justify_heading_styles: bool = False) -> None:
     """
-    Alinha em justificado o texto corrido (blocos que estavam à esquerda).
-    Mantém CENTRO e DIREITA (títulos, algumas células de tabela).
+    Alinha em justificado o texto corrido sem alinhamento explícito no parágrafo.
+    Mantém esquerda explícita do .docx, CENTRO/DIREITA, listas romanas e o bloco §15.1.
     Por omissão não altera estilos «Heading N» (títulos gerados por add_heading no JSON→DOCX).
     """
     _justify_paragraphs_in_container(doc, justify_heading_styles=justify_heading_styles)

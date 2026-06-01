@@ -196,6 +196,19 @@ class ItemSlot:
     valor_total: Any = ""
 
 
+def normalize_item_unidade(unidade: Any) -> str:
+    """Garante inicial maiúscula na unidade (ex.: un → Un, m² → M²)."""
+    s = str(unidade or "").strip()
+    if not s:
+        return s
+    lower = s.lower()
+    m = re.search(r"[a-zà-ÿ]", lower)
+    if not m:
+        return s
+    i = m.start()
+    return lower[:i] + lower[i].upper() + lower[i + 1:]
+
+
 @dataclass
 class TRTemplateSlots:
     objeto: str = ""
@@ -717,7 +730,7 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
                 if cells[1].paragraphs:
                     cells[1].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
             if len(cells) > 2:
-                _set_cell(cells[2], str(item.unidade) or "")
+                _set_cell(cells[2], normalize_item_unidade(item.unidade))
                 if cells[2].paragraphs:
                     cells[2].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
             if len(cells) > 3:
@@ -743,7 +756,7 @@ def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
                 _set_cell(cells[1], str(item.descricao) or "")
             # Coluna 2: unidade
             if len(cells) > 2:
-                _set_cell(cells[2], str(item.unidade) or "")
+                _set_cell(cells[2], normalize_item_unidade(item.unidade))
                 if cells[2].paragraphs:
                     cells[2].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
             # Coluna 3: quantidade

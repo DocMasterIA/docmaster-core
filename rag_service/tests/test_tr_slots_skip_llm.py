@@ -1,6 +1,7 @@
 """Testes do atalho sem LLM em gerar-tr-e-dfd (timeout nginx/Cloudflare)."""
 import unittest
 
+from app.tr_template import normalize_item_unidade
 from app.tr_slots_llm import (
     _build_tr_slots_from_override_prefilled,
     _is_dispensa_tr_flow,
@@ -168,6 +169,14 @@ class TrSlotsSkipLlmTests(unittest.TestCase):
         )
         self.assertFalse(_should_enrich_itens_llm(override, None, slots))
 
+    def test_normalize_item_unidade(self):
+        self.assertEqual(normalize_item_unidade("un"), "Un")
+        self.assertEqual(normalize_item_unidade("UN"), "Un")
+        self.assertEqual(normalize_item_unidade("sv"), "Sv")
+        self.assertEqual(normalize_item_unidade("m²"), "M²")
+        self.assertEqual(normalize_item_unidade("  kg  "), "Kg")
+        self.assertEqual(normalize_item_unidade(""), "")
+
     def test_parse_itens_llm_payload(self):
         raw = (
             '{"itens": [{"descricao": "Manutenção preventiva de veículos", '
@@ -176,7 +185,7 @@ class TrSlotsSkipLlmTests(unittest.TestCase):
         items = _parse_itens_llm_payload(raw)
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0].descricao, "Manutenção preventiva de veículos")
-        self.assertEqual(items[0].unidade, "sv")
+        self.assertEqual(items[0].unidade, "Sv")
         self.assertEqual(items[0].quantidade, 1)
 
 

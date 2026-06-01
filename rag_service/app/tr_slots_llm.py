@@ -30,6 +30,7 @@ from .tr_template import (
     DispensaSlots,
     FiscalSlots,
     ItemSlot,
+    normalize_item_unidade,
 )
 
 TR_SLOTS_INCLUDE_RAG_EXAMPLES: bool = os.getenv("TR_SLOTS_INCLUDE_RAG_EXAMPLES", "0").strip() not in ("0", "false", "False", "no")
@@ -1311,7 +1312,7 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
             itens.append(
                 ItemSlot(
                     descricao=str(elem.get("descricao", "")).strip(),
-                    unidade=str(elem.get("unidade", "")).strip(),
+                    unidade=normalize_item_unidade(elem.get("unidade", "")),
                     quantidade=elem.get("quantidade"),
                     valor_unitario=elem.get("valor_unitario", ""),
                     valor_total=elem.get("valor_total", ""),
@@ -1321,7 +1322,7 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
             itens.append(
                 ItemSlot(
                     descricao=str(elem[0]).strip(),
-                    unidade=str(elem[1]).strip(),
+                    unidade=normalize_item_unidade(elem[1]),
                     quantidade=elem[2],
                     valor_unitario=elem[3] if len(elem) > 3 else "",
                     valor_total=elem[4] if len(elem) > 4 else "",
@@ -1744,7 +1745,7 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
                 itens.append(
                     ItemSlot(
                         descricao=str(elem.get("descricao", "")).strip(),
-                        unidade=str(elem.get("unidade", "")).strip(),
+                        unidade=normalize_item_unidade(elem.get("unidade", "")),
                         quantidade=elem.get("quantidade"),
                         valor_unitario=elem.get("valor_unitario", ""),
                         valor_total=elem.get("valor_total", ""),
@@ -2178,7 +2179,7 @@ def _itens_list_from_raw(raw: Any) -> List[ItemSlot]:
             itens.append(
                 ItemSlot(
                     descricao=desc,
-                    unidade=str(elem.get("unidade", "")).strip(),
+                    unidade=normalize_item_unidade(elem.get("unidade", "")),
                     quantidade=elem.get("quantidade"),
                     valor_unitario=elem.get("valor_unitario", ""),
                     valor_total=elem.get("valor_total", ""),
@@ -2191,7 +2192,7 @@ def _itens_list_from_raw(raw: Any) -> List[ItemSlot]:
             itens.append(
                 ItemSlot(
                     descricao=desc,
-                    unidade=str(elem[1]).strip(),
+                    unidade=normalize_item_unidade(elem[1]),
                     quantidade=elem[2],
                     valor_unitario=elem[3] if len(elem) > 3 else "",
                     valor_total=elem[4] if len(elem) > 4 else "",

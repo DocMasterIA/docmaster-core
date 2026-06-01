@@ -101,8 +101,21 @@ DOCMASTER_BUILD=1 ./scripts/ensure-docmaster-stack.sh
 3. **ensure-pncp-researcher.sh** — stack isolada `docker-compose.pncp.yml`.
 4. **docmaster-pncp-ingest.service** (opcional) — loop `run-pncp-index-ingest-loop.sh`.
 
-## WSL / PC de desenvolvimento
+## WSL / PC Windows (DESKTOP — o seu caso)
 
-No WSL, além disto, configure Docker Desktop para iniciar com o Windows e, se usar túnel local, `vmIdleTimeout=-1` em `.wslconfig` — ver [ESTABILIDADE-E-CLOUDFLARE.md](ESTABILIDADE-E-CLOUDFLARE.md).
+Se o `docmaster-stack.service` está **OK** no WSL mas o site só volta **depois de abrir o terminal**, o systemd Linux está certo — falta **acordar o WSL no login do Windows**.
 
-Produção 24/7 ideal: **VPS Linux** com este systemd ativo.
+| Camada | O que faz |
+|--------|-----------|
+| `docmaster-stack.service` (Linux) | Sobe Docker **quando o WSL já está ligado** |
+| Tarefa Windows `DocMaster-WSL-Stack` | **Liga o WSL** após login / boot |
+| `.wslconfig` `vmIdleTimeout=-1` | Evita a VM dormir com o PC ligado |
+
+**Guia passo a passo:** [WSL-BOOT-WINDOWS.md](WSL-BOOT-WINDOWS.md)
+
+```powershell
+# PowerShell no Windows (ajuste a distro se não for Debian: wsl -l -v)
+powershell -ExecutionPolicy Bypass -File \\wsl$\Debian\home\docmaster\scripts\windows-register-wsl-boot.ps1
+```
+
+Produção 24/7 ideal: **VPS Linux** (sem WSL) — só o systemd deste documento.

@@ -4,8 +4,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=lib/resolve-run-user.sh
+source "$SCRIPT_DIR/lib/resolve-run-user.sh"
 ENV_FILE="${DOCMASTER_ENV_FILE:-$REPO/.env}"
-RUN_USER="${SUDO_USER:-${USER:-adryan}}"
+RUN_USER="$(docmaster_resolve_run_user "$REPO")"
 
 ok=0
 warn=0
@@ -15,7 +17,7 @@ pass() { echo "  OK   $*"; ok=$((ok + 1)); }
 note() { echo "  AVISO $*"; warn=$((warn + 1)); }
 bad()  { echo "  ERRO $*"; fail=$((fail + 1)); }
 
-echo "==> DocMaster boot — pré-requisitos (REPO=$REPO)"
+echo "==> DocMaster boot — pré-requisitos (REPO=$REPO, USER=$RUN_USER)"
 echo ""
 
 if command -v docker >/dev/null 2>&1; then

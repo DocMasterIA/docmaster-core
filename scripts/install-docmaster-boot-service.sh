@@ -29,7 +29,9 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
-RUN_USER="${SUDO_USER:-${DOCMASTER_RUN_USER:-adryan}}"
+# shellcheck source=lib/resolve-run-user.sh
+source "$SCRIPT_DIR/lib/resolve-run-user.sh"
+RUN_USER="$(docmaster_resolve_run_user "$REPO")"
 RUN_GROUP="$(id -gn "$RUN_USER")"
 RUN_HOME="$(getent passwd "$RUN_USER" | cut -d: -f6)"
 
@@ -55,7 +57,11 @@ chmod +x \
   "$REPO/scripts/check-docmaster-boot-prereqs.sh"
 
 echo "==> Pré-requisitos"
-if ! sudo -u "$RUN_USER" env HOME="$RUN_HOME" "$REPO/scripts/check-docmaster-boot-prereqs.sh"; then
+if ! sudo -u "$RUN_USER" env \
+  HOME="$RUN_HOME" \
+  DOCMASTER_RUN_USER="$RUN_USER" \
+  DOCMASTER_ENV_FILE="$REPO/.env" \
+  "$REPO/scripts/check-docmaster-boot-prereqs.sh"; then
   echo ""
   echo "Corrija os itens acima (principalmente .env + CLOUDFLARE_TUNNEL_TOKEN) e volte a correr:"
   echo "  sudo $0"

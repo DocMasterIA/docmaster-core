@@ -45,7 +45,8 @@ sudo ./scripts/install-docmaster-boot-service.sh --with-pncp-ingest
 **Pré-requisitos:**
 
 - `.env` na raiz do DEPLOY com `CLOUDFLARE_TUNNEL_TOKEN=...` (e demais vars do compose).
-- Utilizador no grupo `docker` (ex.: `sudo usermod -aG docker adryan` + relogar).
+- Utilizador no grupo `docker` (ex.: `sudo usermod -aG docker docmaster` + relogar).
+- O serviço corre como o dono da pasta do projeto (não como `root`). Se `sudo` acusar «root fora do grupo docker», atualize os scripts e volte a instalar.
 - Volume PNCP configurado se aplicável (`attach-pncp-volume.sh`).
 
 ## Estado actual deste servidor (checklist)

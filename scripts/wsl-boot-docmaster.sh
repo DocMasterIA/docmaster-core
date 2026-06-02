@@ -50,4 +50,14 @@ for name in cloudflared-tunnel backend frontend-vue; do
   fi
 done
 
+if docker ps --format '{{.Names}}' | grep -qx 'pncp_researcher_service'; then
+  if curl -sf --max-time 5 http://127.0.0.1:8012/api/pncp-research/health >/dev/null 2>&1; then
+    log "OK  pncp_researcher_service (/health)"
+  else
+    log "AVISO pncp_researcher_service Up mas /health falhou — logs: docker logs pncp_researcher_service --tail 80"
+  fi
+else
+  log "AVISO pncp_researcher_service não está Up — rode: DOCMASTER_DEPLOY_DIR=$DEPLOY $SCRIPT_DIR/ensure-pncp-researcher.sh"
+fi
+
 log "Concluído"

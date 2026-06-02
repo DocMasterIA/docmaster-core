@@ -31,6 +31,21 @@ COMPOSE_ARGS=(-f "$COMPOSE_FILE")
 if [[ -f "$OVERRIDE_FILE" ]]; then
   COMPOSE_ARGS+=(-f "$OVERRIDE_FILE")
   echo "==> Usando override: $OVERRIDE_FILE (volume external)"
+  ext_vol="$(grep -E '^[[:space:]]*name:[[:space:]]*' "$OVERRIDE_FILE" | tail -1 | sed -E 's/^[[:space:]]*name:[[:space:]]*//; s/[[:space:]]+$//')"
+  if [[ -n "${ext_vol:-}" ]] && ! docker volume inspect "$ext_vol" >/dev/null 2>&1; then
+    echo ""
+    echo "ERRO: volume Docker «$ext_vol» não existe (referenciado em $OVERRIDE_FILE)."
+    echo "  A) Achar o índice antigo e religar:"
+    echo "       ./scripts/find-pncp-db-volumes.sh"
+    echo "       PNCP_DATA_VOLUME=<nome_do_volume_grande> ./scripts/attach-pncp-volume.sh"
+    echo "  B) Subir com volume novo (índice vazio — reingestão depois):"
+    echo "       mv $OVERRIDE_FILE ${OVERRIDE_FILE}.bak"
+    echo "       ./scripts/ensure-pncp-researcher.sh"
+    echo "  C) Recriar só o nome do volume (vazio; use se não houver backup):"
+    echo "       docker volume create $ext_vol"
+    echo "Doc: docs/deploy/PNCP-RESEARCHER-24-7.md"
+    exit 1
+  fi
 else
   echo "==> Sem override — volume padrão do projeto docmaster-pncp"
   echo "    Se o índice sumiu após down/up: ./scripts/find-pncp-db-volumes.sh"

@@ -12,6 +12,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from .config import (
     PNCP_BACKFILL_ITEM_TIMEOUT_SECONDS,
+    PNCP_FTS5_ENABLED,
     PNCP_INGEST_AUTOPAUSE_BASE_SECONDS,
     PNCP_INGEST_AUTOPAUSE_ENABLED,
     PNCP_INGEST_AUTOPAUSE_JSON_INVALID_SECONDS,
@@ -183,6 +184,121 @@ def ensure_local_index() -> None:
         c.execute(
             "CREATE INDEX IF NOT EXISTS idx_ingest_state_status ON pncp_ingest_state(status, paused_until)"
         )
+        _ensure_fts5_schema(c)
+
+
+def _ensure_fts5_schema(c: sqlite3.Cursor) -> None:
+    """Índice FTS5 em descrição/material (content= pncp_itens). Triggers mantêm sincronia."""
+    c.execute(
+        """
+        CREATE VIRTUAL TABLE IF NOT EXISTS pncp_itens_fts USING fts5(
+            descricao,
+            material_servico,
+            content='pncp_itens',
+            content_rowid='id',
+            tokenize='unicode61 remove_diacritics 2'
+        )
+        """
+    )
+    c.execute("DROP TRIGGER IF EXISTS pncp_itens_fts_ai")
+    c.execute("DROP TRIGGER IF EXISTS pncp_itens_fts_ad")
+    c.execute("DROP TRIGGER IF EXISTS pncp_itens_fts_au")
+    c.execute(
+        """
+        CREATE TRIGGER pncp_itens_fts_ai AFTER INSERT ON pncp_itens BEGIN
+            INSERT INTO pncp_itens_fts(rowid, descricao, material_servico)
+            VALUES (new.id, new.descricao, new.material_servico);
+        END
+        """
+    )
+    c.execute(
+        """
+        CREATE TRIGGER pncp_itens_fts_ad AFTER DELETE ON pncp_itens BEGIN
+            INSERT INTO pncp_itens_fts(pncp_itens_fts, rowid, descricao, material_servico)
+            VALUES ('delete', old.id, old.descricao, old.material_servico);
+        END
+        """
+    )
+    c.execute(
+        """
+        CREATE TRIGGER pncp_itens_fts_au AFTER UPDATE ON pncp_itens BEGIN
+            INSERT INTO pncp_itens_fts(pncp_itens_fts, rowid, descricao, material_servico)
+            VALUES ('delete', old.id, old.descricao, old.material_servico);
+            INSERT INTO pncp_itens_fts(rowid, descricao, material_servico)
+            VALUES (new.id, new.descricao, new.material_servico);
+        END
+        """
+    )
+
+
+def _escape_fts_token(token: str) -> str:
+    return re.sub(r'["*]', " ", (token or "")).strip()
+
+
+def _build_fts_match_query(termo_busca: str) -> Optional[str]:
+    token_groups = _build_search_tokens(termo_busca)
+    if not token_groups:
+        return None
+    parts: List[str] = []
+    for variants in token_groups:
+        opts = [_escape_fts_token(v) for v in variants if _escape_fts_token(v)]
+        if not opts:
+            continue
+        if len(opts) == 1:
+            parts.append(f'"{opts[0]}"*')
+        else:
+            inner = " OR ".join(f'"{o}"*' for o in opts[:4])
+            parts.append(f"({inner})")
+    if not parts:
+        return None
+    return " AND ".join(parts)
+
+
+def fts_index_status() -> Dict[str, Any]:
+    ensure_local_index()
+    with _conn() as c:
+        items_total = int(c.execute("SELECT COUNT(*) AS n FROM pncp_itens").fetchone()["n"] or 0)
+        try:
+            fts_total = int(c.execute("SELECT COUNT(*) AS n FROM pncp_itens_fts").fetchone()["n"] or 0)
+            fts_ready = True
+        except sqlite3.OperationalError:
+            fts_total = 0
+            fts_ready = False
+    needs_rebuild = fts_ready and items_total > 0 and fts_total < int(items_total * 0.85)
+    return {
+        "enabled": bool(PNCP_FTS5_ENABLED),
+        "ready": fts_ready,
+        "items_total": items_total,
+        "fts_rows": fts_total,
+        "needs_rebuild": needs_rebuild,
+    }
+
+
+def rebuild_fts_index() -> Dict[str, Any]:
+    """Reconstrói FTS5 a partir de pncp_itens (pode demorar em bases grandes)."""
+    ensure_local_index()
+    with _conn() as c:
+        items_total = int(c.execute("SELECT COUNT(*) AS n FROM pncp_itens").fetchone()["n"] or 0)
+        c.execute("INSERT INTO pncp_itens_fts(pncp_itens_fts) VALUES('rebuild')")
+        fts_total = int(c.execute("SELECT COUNT(*) AS n FROM pncp_itens_fts").fetchone()["n"] or 0)
+    return {
+        "ok": True,
+        "items_total": items_total,
+        "fts_rows": fts_total,
+        "rebuilt_at": _utc_now_iso(),
+    }
+
+
+def local_index_operational_status(*, uf: Optional[str] = None) -> Dict[str, Any]:
+    stats = local_index_stats()
+    ingest = ingest_operational_status(uf=uf)
+    fts = fts_index_status()
+    return {
+        "ok": True,
+        "index": stats,
+        "ingest": ingest,
+        "fts": fts,
+    }
 
 
 def _ingest_scope_uf(uf: Optional[str]) -> str:
@@ -830,24 +946,15 @@ def _normalize_recortes_geograficos(recortes_geograficos: Optional[List[Any]]) -
     return out
 
 
-def local_item_search(
-    termo_busca: str,
+def _local_item_filter_clauses(
     *,
-    uf: Optional[str] = None,
-    municipio: Optional[str] = None,
-    recortes_geograficos: Optional[List[Any]] = None,
-    codigo_modalidade: Optional[int] = None,
-    limit: int = 500,
-    cleanup_for_display: bool = True,
-) -> Dict[str, Any]:
-    ensure_local_index()
-    token_groups = _build_search_tokens(termo_busca)
-    if not token_groups:
-        return {"ok": True, "itens": [], "stats": {"total_registros": 0}}
-    # Anchor no SQL para reduzir leitura; match final é feito em Python com variações de token.
-    anchor = token_groups[0][0]
-    where = ["i.descricao LIKE ?"]
-    params: List[Any] = [f"%{anchor}%"]
+    uf: Optional[str],
+    municipio: Optional[str],
+    recortes_geograficos: Optional[List[Any]],
+    codigo_modalidade: Optional[int],
+) -> tuple[List[str], List[Any]]:
+    where: List[str] = []
+    params: List[Any] = []
     rec_norm = _normalize_recortes_geograficos(recortes_geograficos)
     if rec_norm:
         geo_parts: List[str] = []
@@ -890,57 +997,153 @@ def local_item_search(
                 "(" + " OR ".join(["LOWER(COALESCE(i.modalidade_nome, '')) LIKE ?" for _ in modalidade_patterns]) + ")"
             )
             params.extend([f"%{pattern}%" for pattern in modalidade_patterns])
-    sql = f"""
+    return where, params
+
+
+def _row_to_local_item(
+    r: sqlite3.Row,
+    *,
+    cleanup_for_display: bool,
+    origem: str = "base_local_itens",
+) -> Dict[str, Any]:
+    esfera_id, esfera_adm, poder_id = _extract_esfera_from_raw_blob(r["raw_json_zlib"])
+    if not esfera_id:
+        esfera_id, esfera_adm, poder_id = _extract_esfera_from_contract_raw_json(r["contrato_raw_json"])
+    entry: Dict[str, Any] = {
+        "numero_pncp": r["numero_pncp"],
+        "ano_compra": r["ano_compra"],
+        "sequencial_compra": r["sequencial_compra"],
+        "numero_item": r["numero_item"],
+        "descricao_item": r["descricao"],
+        "material_servico": r["material_servico"],
+        "quantidade": r["quantidade"],
+        "unidade_medida": r["unidade_medida"],
+        "valor_unitario": r["valor_unitario"],
+        "valor_total": r["valor_total"],
+        "orgao": r["orgao"],
+        "municipio": r["municipio"],
+        "uf": r["uf"],
+        "modalidade": r["modalidade_nome"],
+        "data_publicacao": r["data_publicacao"],
+        "esfera_id": esfera_id,
+        "esfera_administrativa": esfera_adm,
+        "poder_id": poder_id,
+        "origem": origem,
+    }
+    if cleanup_for_display:
+        apply_item_display_cleanup(entry)
+    return entry
+
+
+def local_item_search(
+    termo_busca: str,
+    *,
+    uf: Optional[str] = None,
+    municipio: Optional[str] = None,
+    recortes_geograficos: Optional[List[Any]] = None,
+    codigo_modalidade: Optional[int] = None,
+    limit: int = 500,
+    cleanup_for_display: bool = True,
+) -> Dict[str, Any]:
+    ensure_local_index()
+    token_groups = _build_search_tokens(termo_busca)
+    if not token_groups:
+        return {"ok": True, "itens": [], "stats": {"total_registros": 0, "search_engine": "none"}}
+
+    filter_where, filter_params = _local_item_filter_clauses(
+        uf=uf,
+        municipio=municipio,
+        recortes_geograficos=recortes_geograficos,
+        codigo_modalidade=codigo_modalidade,
+    )
+    sql_limit = max(1, min(int(limit) * 8, 20000))
+    fts_meta = fts_index_status()
+    fts_match = _build_fts_match_query(termo_busca) if PNCP_FTS5_ENABLED else None
+    use_fts = bool(
+        PNCP_FTS5_ENABLED
+        and fts_meta.get("ready")
+        and fts_match
+        and not fts_meta.get("needs_rebuild")
+    )
+    search_engine = "fts5" if use_fts else "like_anchor"
+
+    select_cols = """
         SELECT i.numero_pncp, i.ano_compra, i.sequencial_compra, i.numero_item, i.descricao, i.material_servico,
                i.quantidade, i.unidade_medida, i.valor_unitario, i.valor_total, i.orgao, i.municipio, i.uf,
                i.modalidade_nome, i.data_publicacao, i.raw_json_zlib, c.raw_json AS contrato_raw_json
-        FROM pncp_itens i
-        LEFT JOIN pncp_contratos c ON c.numero_pncp = i.numero_pncp
-        WHERE {' AND '.join(where)}
-        ORDER BY i.updated_at DESC
-        LIMIT ?
     """
-    sql_limit = max(1, min(int(limit) * 8, 20000))
+    if use_fts:
+        where = ["pncp_itens_fts MATCH ?"]
+        params: List[Any] = [fts_match]
+        where.extend(filter_where)
+        sql = f"""
+            {select_cols}, bm25(pncp_itens_fts) AS fts_rank
+            FROM pncp_itens_fts
+            JOIN pncp_itens i ON i.id = pncp_itens_fts.rowid
+            LEFT JOIN pncp_contratos c ON c.numero_pncp = i.numero_pncp
+            WHERE {' AND '.join(where)}
+            ORDER BY fts_rank
+            LIMIT ?
+        """
+    else:
+        anchor = token_groups[0][0]
+        where = ["i.descricao LIKE ?"]
+        params = [f"%{anchor}%"]
+        where.extend(filter_where)
+        sql = f"""
+            {select_cols}
+            FROM pncp_itens i
+            LEFT JOIN pncp_contratos c ON c.numero_pncp = i.numero_pncp
+            WHERE {' AND '.join(where)}
+            ORDER BY i.updated_at DESC
+            LIMIT ?
+        """
+    params = list(params) + list(filter_params)
     params.append(sql_limit)
-    with _conn() as c:
-        rows = c.execute(sql, params).fetchall()
-    itens = []
+
+    rows: List[sqlite3.Row] = []
+    try:
+        with _conn() as c:
+            rows = c.execute(sql, params).fetchall()
+    except sqlite3.OperationalError as e:
+        logger.warning("local_item_search %s falhou (%s); fallback LIKE", search_engine, e)
+        use_fts = False
+        search_engine = "like_anchor"
+        anchor = token_groups[0][0]
+        where = ["i.descricao LIKE ?"]
+        params_fb: List[Any] = [f"%{anchor}%"]
+        where.extend(filter_where)
+        sql_fb = f"""
+            {select_cols}
+            FROM pncp_itens i
+            LEFT JOIN pncp_contratos c ON c.numero_pncp = i.numero_pncp
+            WHERE {' AND '.join(where)}
+            ORDER BY i.updated_at DESC
+            LIMIT ?
+        """
+        params_fb = params_fb + list(filter_params) + [sql_limit]
+        with _conn() as c:
+            rows = c.execute(sql_fb, params_fb).fetchall()
+
+    itens: List[Dict[str, Any]] = []
     for r in rows:
         desc = r["descricao"] or ""
         mat = r["material_servico"] or ""
         texto_item = f"{desc} {mat}".strip()
         if not _row_matches_search_tokens(texto_item, token_groups):
             continue
-        esfera_id, esfera_adm, poder_id = _extract_esfera_from_raw_blob(r["raw_json_zlib"])
-        if not esfera_id:
-            esfera_id, esfera_adm, poder_id = _extract_esfera_from_contract_raw_json(r["contrato_raw_json"])
-        entry: Dict[str, Any] = {
-            "numero_pncp": r["numero_pncp"],
-            "ano_compra": r["ano_compra"],
-            "sequencial_compra": r["sequencial_compra"],
-            "numero_item": r["numero_item"],
-            "descricao_item": r["descricao"],
-            "material_servico": r["material_servico"],
-            "quantidade": r["quantidade"],
-            "unidade_medida": r["unidade_medida"],
-            "valor_unitario": r["valor_unitario"],
-            "valor_total": r["valor_total"],
-            "orgao": r["orgao"],
-            "municipio": r["municipio"],
-            "uf": r["uf"],
-            "modalidade": r["modalidade_nome"],
-            "data_publicacao": r["data_publicacao"],
-            "esfera_id": esfera_id,
-            "esfera_administrativa": esfera_adm,
-            "poder_id": poder_id,
-            "origem": "base_local_itens",
-        }
-        if cleanup_for_display:
-            apply_item_display_cleanup(entry)
-        itens.append(entry)
+        itens.append(_row_to_local_item(r, cleanup_for_display=cleanup_for_display))
         if len(itens) >= max(1, min(int(limit), 5000)):
             break
-    return {"ok": True, "itens": itens, "stats": {"total_registros": len(itens)}}
+    return {
+        "ok": True,
+        "itens": itens,
+        "stats": {
+            "total_registros": len(itens),
+            "search_engine": search_engine,
+            "fts_needs_rebuild": bool(fts_meta.get("needs_rebuild")),
+        },
+    }
 
 
 def create_research_session(

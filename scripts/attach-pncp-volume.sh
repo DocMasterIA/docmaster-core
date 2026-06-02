@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Aponta o compose PNCP para um volume Docker existente (índice antigo).
-# Uso: PNCP_DATA_VOLUME=docmaster_pncp_researcher_data ./scripts/attach-pncp-volume.sh
+# Uso: PNCP_DATA_VOLUME=docmaster-pncp_pncp_researcher_data ./scripts/attach-pncp-volume.sh
+#
+# Docker Desktop (WSL): cria/usa docker-compose.pncp.noports.yml (porta 8012 no host falha com 500).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -8,6 +10,7 @@ DEPLOY="${DOCMASTER_DEPLOY_DIR:-$SCRIPT_DIR/..}"
 DEPLOY="$(cd "$DEPLOY" && pwd)"
 COMPOSE_FILE="${DOCMASTER_PNCP_COMPOSE_FILE:-$DEPLOY/docker-compose.pncp.yml}"
 OVERRIDE_FILE="${DEPLOY}/docker-compose.pncp.override.yml"
+NOPORTS_FILE="${DEPLOY}/docker-compose.pncp.noports.yml"
 VOL="${PNCP_DATA_VOLUME:-}"
 
 if [[ -z "$VOL" ]]; then
@@ -29,19 +32,36 @@ volumes:
     name: ${VOL}
 EOF
 
+# Sem porta no host: site usa pncp_researcher_service:8012 na docmaster_net.
+if [[ "${PNCP_PUBLISH_HOST_PORT:-0}" != "1" ]]; then
+  cat >"$NOPORTS_FILE" <<'EOF'
+# Gerado por attach-pncp-volume.sh — evita bind 127.0.0.1:8012 (Docker Desktop WSL).
+services:
+  pncp_researcher_service:
+    ports: !reset []
+EOF
+fi
+
 echo "Escrito: $OVERRIDE_FILE"
 echo "Volume: $VOL -> /data/pncp"
+[[ -f "$NOPORTS_FILE" ]] && echo "Usando: $NOPORTS_FILE (sem porta 8012 no host)"
 echo ""
 cd "$DEPLOY"
-docker compose -f "$COMPOSE_FILE" -f "$OVERRIDE_FILE" up -d --force-recreate
+COMPOSE_ARGS=(-f "$COMPOSE_FILE" -f "$OVERRIDE_FILE")
+[[ -f "$NOPORTS_FILE" ]] && COMPOSE_ARGS+=(-f "$NOPORTS_FILE")
+docker compose "${COMPOSE_ARGS[@]}" up -d --force-recreate
 
-sleep 3
+sleep 5
 echo "==> /health"
-curl -sf http://127.0.0.1:8012/api/pncp-research/health | python3 -m json.tool 2>/dev/null || \
-  curl -sf http://127.0.0.1:8012/api/pncp-research/health
+docker exec pncp_researcher_service python -c \
+  "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8012/api/pncp-research/health', timeout=30).read().decode())" \
+  | python3 -m json.tool 2>/dev/null || true
 echo ""
-echo "==> /local-index/stats"
-curl -sf http://127.0.0.1:8012/api/pncp-research/local-index/stats | python3 -m json.tool 2>/dev/null || \
-  curl -sf http://127.0.0.1:8012/api/pncp-research/local-index/stats
+echo "==> /local-index/stats (resumo)"
+docker exec pncp_researcher_service python -c \
+  "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8012/api/pncp-research/local-index/stats', timeout=120).read().decode())" \
+  | python3 -c "import json,sys; d=json.load(sys.stdin); print('  total_contratos:', d.get('total_contratos')); print('  total_itens:', d.get('total_itens'))" \
+  2>/dev/null || true
 echo ""
 echo "Mantenha 24/7: ./scripts/ensure-pncp-researcher.sh  (não use down -v)"
+echo "NÃO rode attach de novo sem precisar — use o compose com override + noports."

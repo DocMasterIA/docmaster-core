@@ -30,11 +30,16 @@ DEBUG = False
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
+    "backend",  # cloudflared → http://backend:8000 (Host = nome do serviço Docker)
+    "frontend-vue",
     "docmasteria.com.br",
     "www.docmasteria.com.br",
     "api.docmasteria.com.br",
     "www.api.docmasteria.com.br",
 ]
+_extra_hosts = os.environ.get("DJANGO_ALLOWED_HOSTS_EXTRA", "")
+if _extra_hosts.strip():
+    ALLOWED_HOSTS.extend(h.strip() for h in _extra_hosts.split(",") if h.strip())
 
 # CSRF: aceita origem ngrok (Django 4.2+ aceita subdomínio com ponto à esquerda)
 CSRF_TRUSTED_ORIGINS = [

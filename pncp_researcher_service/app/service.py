@@ -24,6 +24,9 @@ from .config import (
     PNCP_ITEM_ROWS_MAX_DESTAQUE,
     PNCP_ITEM_AMOSTRA_LINHAS,
     PNCP_REQUIRE_TABLE_MATCH_WHEN_ITENS_EXIST,
+    PNCP_HYBRID_FALLBACK_ENABLED,
+    PNCP_HYBRID_MAX_LIVE_PAGES,
+    PNCP_HYBRID_MIN_LOCAL_RESULTS,
     PNCP_LOCAL_AUTO_INGEST,
     PNCP_IA_RERANK_ENABLED,
     PNCP_IA_BASE_URL,
@@ -37,6 +40,7 @@ from .config import (
     PNCP_SERVICE_BLOCK_TERMS,
 )
 from .pncp_client import (
+    PNCPClientError,
     create_pncp_http_client,
     search_contracts,
     get_contract_items,
@@ -1776,6 +1780,42 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         cleanup_for_display=False,
     )
     itens = list(base_items.get("itens") or [])
+    base_stats = dict(base_items.get("stats") or {})
+    hybrid_used = False
+    hybrid_live_count = 0
+    if (
+        PNCP_HYBRID_FALLBACK_ENABLED
+        and len(itens) < max(1, int(PNCP_HYBRID_MIN_LOCAL_RESULTS))
+    ):
+        live_pages = max(1, min(int(PNCP_HYBRID_MAX_LIVE_PAGES), int(payload.max_paginas or 1)))
+        live_payload = payload.model_copy(update={"max_paginas": live_pages})
+        try:
+            live_result = await market_search(live_payload)
+            live_itens = list(live_result.get("itens") or [])
+            hybrid_used = True
+            hybrid_live_count = len(live_itens)
+            seen = {
+                (
+                    str(it.get("numero_pncp") or ""),
+                    str(it.get("numero_item") or ""),
+                    str(it.get("descricao_item") or "")[:120],
+                )
+                for it in itens
+            }
+            for lit in live_itens:
+                key = (
+                    str(lit.get("numero_pncp") or ""),
+                    str(lit.get("numero_item") or ""),
+                    str(lit.get("descricao_item") or "")[:120],
+                )
+                if key in seen:
+                    continue
+                seen.add(key)
+                lit = dict(lit)
+                lit["origem"] = lit.get("origem") or "pncp_live_fallback"
+                itens.append(lit)
+        except PNCPClientError:
+            pass
     service_blocked_count = 0
     if PNCP_BLOCK_SERVICE_ITEMS and itens:
         filtered_items: List[Dict[str, Any]] = []
@@ -1805,9 +1845,11 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                 "fonte": "local_item_search",
             },
             "stats": {
-                **dict(base_items.get("stats", {})),
+                **base_stats,
                 "servico_bloqueio_ativo": bool(PNCP_BLOCK_SERVICE_ITEMS),
                 "servico_bloqueados": int(service_blocked_count),
+                "hybrid_fallback_used": hybrid_used,
+                "hybrid_live_count": hybrid_live_count,
             },
             "itens": [],
         }
@@ -2125,6 +2167,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     out_stats["modo_selecao_literal_similaridade"] = pool_mode
     out_stats["servico_bloqueio_ativo"] = bool(PNCP_BLOCK_SERVICE_ITEMS)
     out_stats["servico_bloqueados"] = int(service_blocked_count)
+    out_stats["hybrid_fallback_used"] = hybrid_used
+    out_stats["hybrid_live_count"] = hybrid_live_count
 
     return {
         "ok": bool(base_items.get("ok", True)),

@@ -8,6 +8,62 @@ DEPLOY="${DOCMASTER_DEPLOY_DIR:-$SCRIPT_DIR/..}"
 DEPLOY="$(cd "$DEPLOY" && pwd)"
 COMPOSE_FILE="${DOCMASTER_PNCP_COMPOSE_FILE:-$DEPLOY/docker-compose.pncp.yml}"
 OVERRIDE_FILE="${DEPLOY}/docker-compose.pncp.override.yml"
+# shellcheck source=lib/pncp-compose-args.sh
+if [[ -f "${SCRIPT_DIR}/lib/pncp-compose-args.sh" ]]; then
+  # shellcheck source=lib/pncp-compose-args.sh
+  source "${SCRIPT_DIR}/lib/pncp-compose-args.sh"
+else
+  pncp_setup_compose_args() {
+    local deploy="$1"
+    COMPOSE_FILE="${DOCMASTER_PNCP_COMPOSE_FILE:-$deploy/docker-compose.pncp.yml}"
+    OVERRIDE_FILE="${deploy}/docker-compose.pncp.override.yml"
+    NOPORTS_FILE="${deploy}/docker-compose.pncp.noports.yml"
+    PNCP_USE_DOCKER_HEALTH=0
+    COMPOSE_ARGS=(-f "$COMPOSE_FILE")
+    [[ -f "$OVERRIDE_FILE" ]] && COMPOSE_ARGS+=(-f "$OVERRIDE_FILE")
+    if [[ -f "$NOPORTS_FILE" ]]; then
+      COMPOSE_ARGS+=(-f "$NOPORTS_FILE")
+      PNCP_USE_DOCKER_HEALTH=1
+      echo "==> Sem porta 8012 no host ($NOPORTS_FILE)"
+    fi
+  }
+  pncp_health_ok() {
+    if [[ "${PNCP_USE_DOCKER_HEALTH:-0}" == "1" ]]; then
+      docker exec pncp_researcher_service python -c \
+        "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8012/api/pncp-research/health', timeout=5)" \
+        >/dev/null 2>&1
+    else
+      curl -sf --max-time 5 "$PNCP_HEALTH_URL" >/dev/null 2>&1
+    fi
+  }
+  pncp_print_health() {
+    if [[ "${PNCP_USE_DOCKER_HEALTH:-0}" == "1" ]]; then
+      docker exec pncp_researcher_service python -c \
+        "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8012/api/pncp-research/health', timeout=10).read().decode())" \
+        2>/dev/null | python3 -m json.tool 2>/dev/null || true
+    else
+      curl -sf "$PNCP_HEALTH_URL" | python3 -m json.tool 2>/dev/null || curl -sf "$PNCP_HEALTH_URL"
+    fi
+  }
+  pncp_print_stats_summary() {
+    local stats_json
+    if [[ "${PNCP_USE_DOCKER_HEALTH:-0}" == "1" ]]; then
+      stats_json="$(docker exec pncp_researcher_service python -c \
+        "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8012/api/pncp-research/local-index/stats', timeout=120).read().decode())" \
+        2>/dev/null || true)"
+    else
+      stats_json="$(curl -sf --max-time 10 "$PNCP_STATS_URL" 2>/dev/null || true)"
+    fi
+    [[ -z "$stats_json" ]] && return 1
+    echo "$stats_json" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print('  db_path:', d.get('db_path'))
+print('  total_contratos:', d.get('total_contratos'))
+print('  total_itens:', d.get('total_itens'))
+" 2>/dev/null
+  }
+fi
 
 if [[ ! -f "$COMPOSE_FILE" ]]; then
   echo "ERRO: $COMPOSE_FILE não encontrado"
@@ -27,9 +83,8 @@ cd "$DEPLOY"
 PNCP_HEALTH_URL="${PNCP_HEALTH_URL:-http://127.0.0.1:8012/api/pncp-research/health}"
 PNCP_STATS_URL="${PNCP_STATS_URL:-http://127.0.0.1:8012/api/pncp-research/local-index/stats}"
 
-COMPOSE_ARGS=(-f "$COMPOSE_FILE")
+pncp_setup_compose_args "$DEPLOY"
 if [[ -f "$OVERRIDE_FILE" ]]; then
-  COMPOSE_ARGS+=(-f "$OVERRIDE_FILE")
   echo "==> Usando override: $OVERRIDE_FILE (volume external)"
   ext_vol="$(grep -E '^[[:space:]]*name:[[:space:]]*' "$OVERRIDE_FILE" | tail -1 | sed -E 's/^[[:space:]]*name:[[:space:]]*//; s/[[:space:]]+$//')"
   if [[ -n "${ext_vol:-}" ]] && ! docker volume inspect "$ext_vol" >/dev/null 2>&1; then
@@ -78,7 +133,7 @@ echo ""
 echo "==> /health"
 ok=0
 for _ in $(seq 1 15); do
-  if curl -sf --max-time 5 "$PNCP_HEALTH_URL" >/dev/null 2>&1; then
+  if pncp_health_ok; then
     ok=1
     break
   fi
@@ -86,22 +141,22 @@ for _ in $(seq 1 15); do
 done
 
 if [[ "$ok" -eq 1 ]]; then
-  curl -sf "$PNCP_HEALTH_URL" | python3 -m json.tool 2>/dev/null || curl -sf "$PNCP_HEALTH_URL"
+  pncp_print_health
   echo ""
-  if curl -sf --max-time 10 "$PNCP_STATS_URL" >/dev/null 2>&1; then
-    echo "==> /local-index/stats (resumo)"
-    curl -sf "$PNCP_STATS_URL" | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-print('  db_path:', d.get('db_path'))
-print('  total_contratos:', d.get('total_contratos'))
-print('  total_itens:', d.get('total_itens'))
-" 2>/dev/null || true
+  echo "==> /local-index/stats (resumo)"
+  pncp_print_stats_summary || true
+  echo ""
+  if [[ "${PNCP_USE_DOCKER_HEALTH:-0}" == "1" ]]; then
+    echo "OK  PNCP ativo (health via docker exec; sem 127.0.0.1:8012 no host)"
+  else
+    echo "OK  PNCP ativo em $PNCP_HEALTH_URL"
   fi
-  echo ""
-  echo "OK  PNCP ativo em $PNCP_HEALTH_URL"
 else
-  echo "OFF $PNCP_HEALTH_URL"
+  if [[ "${PNCP_USE_DOCKER_HEALTH:-0}" == "1" ]]; then
+    echo "OFF PNCP /health (contentor ou API)"
+  else
+    echo "OFF $PNCP_HEALTH_URL"
+  fi
   echo "Logs: docker compose ${COMPOSE_ARGS[*]} logs --tail 80"
   exit 1
 fi

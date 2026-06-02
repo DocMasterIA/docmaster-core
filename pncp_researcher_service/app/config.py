@@ -136,6 +136,14 @@ PNCP_INGEST_AUTOPAUSE_JSON_INVALID_SECONDS: int = _env_int(
     "PNCP_INGEST_AUTOPAUSE_JSON_INVALID_SECONDS", 120
 )
 
+# Busca local FTS5 (pncp_itens_fts) — fallback LIKE se desativado ou índice vazio.
+PNCP_FTS5_ENABLED: bool = _env_bool("PNCP_FTS5_ENABLED", True)
+
+# Busca híbrida: complemento via PNCP ao vivo quando o índice local retorna poucos itens.
+PNCP_HYBRID_FALLBACK_ENABLED: bool = _env_bool("PNCP_HYBRID_FALLBACK_ENABLED", True)
+PNCP_HYBRID_MIN_LOCAL_RESULTS: int = _env_int("PNCP_HYBRID_MIN_LOCAL_RESULTS", 8)
+PNCP_HYBRID_MAX_LIVE_PAGES: int = _env_int("PNCP_HYBRID_MAX_LIVE_PAGES", 4)
+
 # Re-ranking leve com LLM para escolher os 3 melhores itens.
 PNCP_IA_RERANK_ENABLED: bool = _env_bool("PNCP_IA_RERANK_ENABLED", True)
 PNCP_IA_BASE_URL: str = os.getenv("PNCP_IA_BASE_URL", "http://llm_api:8002").rstrip("/")

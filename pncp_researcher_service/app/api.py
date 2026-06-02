@@ -26,8 +26,11 @@ from .local_index import (
     update_research_session,
     local_index_stats,
     ingest_operational_status,
+    local_index_operational_status,
     local_item_search,
     local_search,
+    rebuild_fts_index,
+    fts_index_status,
 )
 
 router = APIRouter(prefix="/pncp-research", tags=["pncp-research"])
@@ -110,6 +113,30 @@ async def local_index_stats_endpoint():
 async def local_index_ingest_status_endpoint(uf: str | None = None):
     try:
         return ingest_operational_status(uf=uf)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/local-index/operational-status")
+async def local_index_operational_status_endpoint(uf: str | None = None):
+    try:
+        return local_index_operational_status(uf=uf)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/local-index/fts-status")
+async def local_index_fts_status_endpoint():
+    try:
+        return fts_index_status()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/local-index/fts-rebuild")
+async def local_index_fts_rebuild_endpoint():
+    try:
+        return rebuild_fts_index()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 

@@ -1,0 +1,7 @@
+# Docker Desktop (WSL): se «ports are not available» na 8012, copie para o DEPLOY:
+#   cp docker-compose.pncp.noports.yml.example docker-compose.pncp.noports.yml
+# O site usa pncp_researcher_service:8012 na rede docmaster_net (host 8012 é opcional).
+
+services:
+  pncp_researcher_service:
+    ports: !reset []

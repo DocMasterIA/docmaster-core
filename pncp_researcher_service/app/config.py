@@ -128,6 +128,14 @@ PNCP_LOCAL_INCLUDE_ITEMS: bool = os.getenv(
     "PNCP_LOCAL_INCLUDE_ITEMS", "true"
 ).strip().lower() in {"1", "true", "yes", "on"}
 
+# Ingestão resiliente PNCP (auto-pause ao detectar bloqueio/rate limit/timeout).
+PNCP_INGEST_AUTOPAUSE_ENABLED: bool = _env_bool("PNCP_INGEST_AUTOPAUSE_ENABLED", True)
+PNCP_INGEST_AUTOPAUSE_BASE_SECONDS: int = _env_int("PNCP_INGEST_AUTOPAUSE_BASE_SECONDS", 180)
+PNCP_INGEST_AUTOPAUSE_MAX_SECONDS: int = _env_int("PNCP_INGEST_AUTOPAUSE_MAX_SECONDS", 1800)
+PNCP_INGEST_AUTOPAUSE_JSON_INVALID_SECONDS: int = _env_int(
+    "PNCP_INGEST_AUTOPAUSE_JSON_INVALID_SECONDS", 120
+)
+
 # Re-ranking leve com LLM para escolher os 3 melhores itens.
 PNCP_IA_RERANK_ENABLED: bool = _env_bool("PNCP_IA_RERANK_ENABLED", True)
 PNCP_IA_BASE_URL: str = os.getenv("PNCP_IA_BASE_URL", "http://llm_api:8002").rstrip("/")

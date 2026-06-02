@@ -25,6 +25,7 @@ from .local_index import (
     list_research_sessions,
     update_research_session,
     local_index_stats,
+    ingest_operational_status,
     local_item_search,
     local_search,
 )
@@ -101,6 +102,14 @@ async def market_search_stream_endpoint(body: MarketSearchRequest):
 async def local_index_stats_endpoint():
     try:
         return local_index_stats()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/local-index/ingest-status")
+async def local_index_ingest_status_endpoint(uf: str | None = None):
+    try:
+        return ingest_operational_status(uf=uf)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 

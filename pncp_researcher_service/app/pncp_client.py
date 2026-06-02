@@ -168,6 +168,7 @@ async def search_contracts(
     codigo_municipio_ibge: Optional[str] = None,
     pagina: int = 1,
     tamanho_pagina: int = 50,
+    tolerate_rate_limit: bool = True,
     *,
     client: Optional[httpx.AsyncClient] = None,
 ) -> List[Dict[str, Any]]:
@@ -190,7 +191,12 @@ async def search_contracts(
         client = create_pncp_http_client()
         close_client = True
     try:
-        resp = await _get_pncp(client, endpoint, params=req_params, tolerate_rate_limit=True)
+        resp = await _get_pncp(
+            client,
+            endpoint,
+            params=req_params,
+            tolerate_rate_limit=tolerate_rate_limit,
+        )
     finally:
         if close_client:
             await client.aclose()

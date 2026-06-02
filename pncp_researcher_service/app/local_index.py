@@ -12,6 +12,10 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from .config import (
     PNCP_BACKFILL_ITEM_TIMEOUT_SECONDS,
+    PNCP_INGEST_AUTOPAUSE_BASE_SECONDS,
+    PNCP_INGEST_AUTOPAUSE_ENABLED,
+    PNCP_INGEST_AUTOPAUSE_JSON_INVALID_SECONDS,
+    PNCP_INGEST_AUTOPAUSE_MAX_SECONDS,
     PNCP_LOCAL_BACKFILL_MONTHS,
     PNCP_LOCAL_DB_PATH,
     PNCP_LOCAL_INCLUDE_ITEMS,
@@ -154,6 +158,298 @@ def ensure_local_index() -> None:
         c.execute(
             "CREATE INDEX IF NOT EXISTS idx_pesq_sess_itens_sessao ON pesquisador_sessao_itens(sessao_id)"
         )
+        c.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pncp_ingest_state (
+                uf TEXT NOT NULL,
+                modalidade INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'active',
+                error_streak INTEGER NOT NULL DEFAULT 0,
+                last_error_kind TEXT,
+                last_error_message TEXT,
+                paused_until TEXT,
+                last_success_at TEXT,
+                last_attempt_at TEXT,
+                last_data_inicial TEXT,
+                last_data_final TEXT,
+                last_page INTEGER,
+                total_upserts INTEGER NOT NULL DEFAULT 0,
+                total_item_upserts INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (uf, modalidade)
+            )
+            """
+        )
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ingest_state_status ON pncp_ingest_state(status, paused_until)"
+        )
+
+
+def _ingest_scope_uf(uf: Optional[str]) -> str:
+    u = str(uf or "").strip().upper()
+    return u if u else "*"
+
+
+def _utc_now_iso() -> str:
+    return datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+
+def _parse_iso_utc(v: Any) -> Optional[datetime]:
+    s = str(v or "").strip()
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00")).replace(tzinfo=None)
+    except Exception:
+        return None
+
+
+def _classify_ingest_error(message: str) -> str:
+    t = (message or "").lower()
+    if "429" in t or "rate" in t:
+        return "rate_limit"
+    if "json inválido" in t or "json invalido" in t:
+        return "json_invalid"
+    if "502" in t or "503" in t or "504" in t or "gateway" in t or "waf" in t:
+        return "waf_or_gateway"
+    if "timeout" in t or "timed out" in t:
+        return "timeout"
+    return "other"
+
+
+def _compute_pause_seconds(error_kind: str, streak: int) -> int:
+    if not PNCP_INGEST_AUTOPAUSE_ENABLED:
+        return 0
+    s = max(1, int(streak))
+    if error_kind == "json_invalid":
+        return max(0, int(PNCP_INGEST_AUTOPAUSE_JSON_INVALID_SECONDS))
+    base = max(1, int(PNCP_INGEST_AUTOPAUSE_BASE_SECONDS))
+    cap = max(base, int(PNCP_INGEST_AUTOPAUSE_MAX_SECONDS))
+    return min(cap, base * (2 ** max(0, s - 1)))
+
+
+def _get_ingest_state(uf: Optional[str], modalidade: int) -> Optional[sqlite3.Row]:
+    ensure_local_index()
+    with _conn() as c:
+        return c.execute(
+            """
+            SELECT *
+            FROM pncp_ingest_state
+            WHERE uf = ? AND modalidade = ?
+            """,
+            (_ingest_scope_uf(uf), int(modalidade)),
+        ).fetchone()
+
+
+def _upsert_ingest_state(
+    uf: Optional[str],
+    modalidade: int,
+    **fields: Any,
+) -> None:
+    ensure_local_index()
+    scope_uf = _ingest_scope_uf(uf)
+    now = _utc_now_iso()
+    base: Dict[str, Any] = {
+        "status": "active",
+        "error_streak": 0,
+        "last_error_kind": None,
+        "last_error_message": None,
+        "paused_until": None,
+        "last_success_at": None,
+        "last_attempt_at": None,
+        "last_data_inicial": None,
+        "last_data_final": None,
+        "last_page": None,
+        "total_upserts": 0,
+        "total_item_upserts": 0,
+    }
+    base.update(fields)
+    with _conn() as c:
+        c.execute(
+            """
+            INSERT INTO pncp_ingest_state (
+                uf, modalidade, status, error_streak, last_error_kind, last_error_message,
+                paused_until, last_success_at, last_attempt_at, last_data_inicial, last_data_final,
+                last_page, total_upserts, total_item_upserts, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(uf, modalidade) DO UPDATE SET
+                status=excluded.status,
+                error_streak=excluded.error_streak,
+                last_error_kind=excluded.last_error_kind,
+                last_error_message=excluded.last_error_message,
+                paused_until=excluded.paused_until,
+                last_success_at=excluded.last_success_at,
+                last_attempt_at=excluded.last_attempt_at,
+                last_data_inicial=excluded.last_data_inicial,
+                last_data_final=excluded.last_data_final,
+                last_page=excluded.last_page,
+                total_upserts=excluded.total_upserts,
+                total_item_upserts=excluded.total_item_upserts,
+                updated_at=excluded.updated_at
+            """,
+            (
+                scope_uf,
+                int(modalidade),
+                str(base.get("status") or "active"),
+                int(base.get("error_streak") or 0),
+                base.get("last_error_kind"),
+                base.get("last_error_message"),
+                base.get("paused_until"),
+                base.get("last_success_at"),
+                base.get("last_attempt_at"),
+                base.get("last_data_inicial"),
+                base.get("last_data_final"),
+                int(base.get("last_page")) if base.get("last_page") is not None else None,
+                int(base.get("total_upserts") or 0),
+                int(base.get("total_item_upserts") or 0),
+                now,
+            ),
+        )
+
+
+def _mark_ingest_success(
+    uf: Optional[str],
+    modalidade: int,
+    *,
+    data_inicial: str,
+    data_final: str,
+    page: int,
+    add_upserts: int,
+    add_item_upserts: int,
+) -> None:
+    row = _get_ingest_state(uf, modalidade)
+    total_upserts = int((row["total_upserts"] if row else 0) or 0) + max(0, int(add_upserts))
+    total_item_upserts = int((row["total_item_upserts"] if row else 0) or 0) + max(
+        0, int(add_item_upserts)
+    )
+    now = _utc_now_iso()
+    _upsert_ingest_state(
+        uf,
+        modalidade,
+        status="active",
+        error_streak=0,
+        last_error_kind=None,
+        last_error_message=None,
+        paused_until=None,
+        last_success_at=now,
+        last_attempt_at=now,
+        last_data_inicial=data_inicial,
+        last_data_final=data_final,
+        last_page=page,
+        total_upserts=total_upserts,
+        total_item_upserts=total_item_upserts,
+    )
+
+
+def _mark_ingest_error(
+    uf: Optional[str],
+    modalidade: int,
+    *,
+    data_inicial: str,
+    data_final: str,
+    page: int,
+    message: str,
+) -> Dict[str, Any]:
+    prev = _get_ingest_state(uf, modalidade)
+    prev_streak = int((prev["error_streak"] if prev else 0) or 0)
+    streak = prev_streak + 1
+    kind = _classify_ingest_error(message)
+    pause_seconds = _compute_pause_seconds(kind, streak)
+    now_dt = datetime.utcnow()
+    paused_until = (
+        (now_dt + timedelta(seconds=pause_seconds)).isoformat(timespec="seconds") + "Z"
+        if pause_seconds > 0
+        else None
+    )
+    status = "paused_blocked" if paused_until else "degraded"
+    _upsert_ingest_state(
+        uf,
+        modalidade,
+        status=status,
+        error_streak=streak,
+        last_error_kind=kind,
+        last_error_message=(message or "")[:800],
+        paused_until=paused_until,
+        last_attempt_at=now_dt.isoformat(timespec="seconds") + "Z",
+        last_data_inicial=data_inicial,
+        last_data_final=data_final,
+        last_page=page,
+        total_upserts=int((prev["total_upserts"] if prev else 0) or 0),
+        total_item_upserts=int((prev["total_item_upserts"] if prev else 0) or 0),
+    )
+    return {
+        "error_kind": kind,
+        "error_streak": streak,
+        "pause_seconds": pause_seconds,
+        "paused_until": paused_until,
+        "status": status,
+    }
+
+
+def ingest_operational_status(*, uf: Optional[str] = None) -> Dict[str, Any]:
+    ensure_local_index()
+    now = datetime.utcnow()
+    scope_uf = _ingest_scope_uf(uf) if uf else None
+    where = "WHERE uf = ?" if scope_uf else ""
+    params: tuple[Any, ...] = (scope_uf,) if scope_uf else ()
+    with _conn() as c:
+        rows = c.execute(
+            f"""
+            SELECT uf, modalidade, status, error_streak, last_error_kind, last_error_message,
+                   paused_until, last_success_at, last_attempt_at, last_data_inicial, last_data_final,
+                   last_page, total_upserts, total_item_upserts, updated_at
+            FROM pncp_ingest_state
+            {where}
+            ORDER BY uf, modalidade
+            """,
+            params,
+        ).fetchall()
+    scopes: List[Dict[str, Any]] = []
+    paused = 0
+    degraded = 0
+    for r in rows:
+        pu = _parse_iso_utc(r["paused_until"])
+        is_paused = bool(pu and pu > now)
+        status = "paused_blocked" if is_paused else str(r["status"] or "active")
+        if status == "paused_blocked":
+            paused += 1
+        elif status != "active":
+            degraded += 1
+        scopes.append(
+            {
+                "uf": r["uf"],
+                "modalidade": r["modalidade"],
+                "status": status,
+                "error_streak": int(r["error_streak"] or 0),
+                "last_error_kind": r["last_error_kind"],
+                "last_error_message": r["last_error_message"],
+                "paused_until": r["paused_until"] if is_paused else None,
+                "last_success_at": r["last_success_at"],
+                "last_attempt_at": r["last_attempt_at"],
+                "watermark": {
+                    "data_inicial": r["last_data_inicial"],
+                    "data_final": r["last_data_final"],
+                    "last_page": r["last_page"],
+                },
+                "total_upserts": int(r["total_upserts"] or 0),
+                "total_item_upserts": int(r["total_item_upserts"] or 0),
+                "updated_at": r["updated_at"],
+            }
+        )
+    overall = "active"
+    if paused > 0:
+        overall = "paused_blocked"
+    elif degraded > 0:
+        overall = "degraded"
+    return {
+        "ok": True,
+        "overall_status": overall,
+        "scopes_total": len(scopes),
+        "scopes_paused": paused,
+        "scopes_degraded": degraded,
+        "scopes_active": max(0, len(scopes) - paused - degraded),
+        "scopes": scopes,
+    }
 
 
 def _migrate_pesquisador_sessoes_columns(c: sqlite3.Cursor) -> None:
@@ -913,6 +1209,20 @@ async def backfill_local_index(
         for modalidade in modalidades:
             pagina = 1
             while True:
+                state = _get_ingest_state(uf, modalidade)
+                pause_until = _parse_iso_utc(state["paused_until"]) if state else None
+                if pause_until and pause_until > datetime.utcnow():
+                    erros_modalidade.append(
+                        {
+                            "modalidade": modalidade,
+                            "pagina": pagina,
+                            "erro": "ingestao_pausada_automaticamente",
+                            "paused_until": state["paused_until"],
+                            "error_streak": int(state["error_streak"] or 0),
+                            "error_kind": state["last_error_kind"],
+                        }
+                    )
+                    break
                 try:
                     batch = await search_contracts(
                         data_inicial=data_inicial,
@@ -922,14 +1232,26 @@ async def backfill_local_index(
                         codigo_municipio_ibge=codigo_municipio_ibge,
                         pagina=pagina,
                         tamanho_pagina=tamanho_pagina,
+                        tolerate_rate_limit=False,
                         client=http,
                     )
                 except PNCPClientError as e:
+                    ingest_err = _mark_ingest_error(
+                        uf,
+                        modalidade,
+                        data_inicial=data_inicial,
+                        data_final=data_final,
+                        page=pagina,
+                        message=str(e),
+                    )
                     erros_modalidade.append(
                         {
                             "modalidade": modalidade,
                             "pagina": pagina,
                             "erro": str(e),
+                            "error_kind": ingest_err["error_kind"],
+                            "error_streak": ingest_err["error_streak"],
+                            "paused_until": ingest_err["paused_until"],
                         }
                     )
                     # Em erro persistente de modalidade/página, segue para próxima modalidade.
@@ -941,6 +1263,15 @@ async def backfill_local_index(
                         modalidade,
                         pagina,
                         uf or "*",
+                    )
+                    _mark_ingest_success(
+                        uf,
+                        modalidade,
+                        data_inicial=data_inicial,
+                        data_final=data_final,
+                        page=pagina,
+                        add_upserts=0,
+                        add_item_upserts=0,
                     )
                     break
                 total_upserts += upsert_contracts(batch)
@@ -998,6 +1329,15 @@ async def backfill_local_index(
                     total_upserts,
                     total_upserts_itens,
                 )
+                _mark_ingest_success(
+                    uf,
+                    modalidade,
+                    data_inicial=data_inicial,
+                    data_final=data_final,
+                    page=pagina,
+                    add_upserts=len(batch),
+                    add_item_upserts=page_item_upserts,
+                )
                 if len(batch) < 10:
                     break
                 if (not unlimited_pages) and pagina >= paginas_limite:
@@ -1016,6 +1356,7 @@ async def backfill_local_index(
             "unbounded_paginas": unlimited_pages,
             "max_paginas_efetivo": None if unlimited_pages else paginas_limite,
             "erros_modalidade": erros_modalidade,
+            "ingestao_operacional": ingest_operational_status(uf=uf),
         }
     )
     return stats

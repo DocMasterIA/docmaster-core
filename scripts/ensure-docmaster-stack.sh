@@ -82,20 +82,35 @@ prune_orphan_cloudflared_containers() {
   done < <(docker ps -aq --filter "ancestor=cloudflare/cloudflared" 2>/dev/null || true)
 }
 
+# Não usar cgroup (docker-ffbaca… pode ser o túnel válido no Docker Desktop).
+# Órfão = processo cloudflared que não aparece em «docker top cloudflared-tunnel».
 prune_orphan_cloudflared_processes() {
-  local tunnel_id tunnel_short pid cgroup
-  tunnel_id="$(docker inspect -f '{{.Id}}' cloudflared-tunnel 2>/dev/null || true)"
-  [[ -n "$tunnel_id" ]] || return 0
-  tunnel_short="${tunnel_id#sha256:}"
-  tunnel_short="${tunnel_short:0:12}"
+  local pid expected ok
+  if ! docker inspect -f '{{.State.Running}}' cloudflared-tunnel 2>/dev/null | grep -qx true; then
+    return 0
+  fi
   for pid in $(pgrep -f 'cloudflared.*tunnel' 2>/dev/null || true); do
-    cgroup="$(tr '\n' ' ' <"/proc/$pid/cgroup" 2>/dev/null || true)"
-    if [[ "$cgroup" == *"$tunnel_short"* ]]; then
-      continue
+    ok=0
+    while read -r expected; do
+      [[ -n "$expected" && "$pid" == "$expected" ]] && ok=1 && break
+    done < <(docker top cloudflared-tunnel -eo pid 2>/dev/null | tail -n +2 || true)
+    if [[ "$ok" -eq 0 ]]; then
+      log "Matando cloudflared órfão PID $pid (fora de docker top cloudflared-tunnel)"
+      kill -9 "$pid" 2>/dev/null || true
     fi
-    log "Matando processo cloudflared órfão PID $pid (fora de cloudflared-tunnel)"
+  done
+}
+
+# Um único túnel: remove contentor + processos antes do compose up (evita 502 ao re-correr ensure/systemctl).
+reset_cloudflared_before_compose() {
+  log "Reset cloudflared (contentor + processos) antes do compose up"
+  prune_orphan_cloudflared_containers
+  docker rm -f cloudflared-tunnel 2>/dev/null || true
+  for pid in $(pgrep -f 'cloudflared.*tunnel' 2>/dev/null || true); do
+    log "Matando cloudflared PID $pid (reset)"
     kill -9 "$pid" 2>/dev/null || true
   done
+  sleep 2
 }
 
 main_compose_up() {
@@ -126,8 +141,7 @@ main_compose_up() {
   local obs=(node_exporter prometheus grafana)
 
   log "Stack principal (site + túnel) em $DEPLOY"
-  prune_orphan_cloudflared_containers
-  prune_orphan_cloudflared_processes
+  reset_cloudflared_before_compose
   docker compose -f "$COMPOSE_FILE" up "${up_flags[@]}" "${core[@]}"
   prune_orphan_cloudflared_containers
   prune_orphan_cloudflared_processes

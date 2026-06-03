@@ -72,26 +72,12 @@ class Prefeitura(models.Model):
         ordering = ["nome_municipio"]
 
     def __str__(self):
+        # Exibição no admin (listas, FKs): só o valor cadastrado, sem prefixo automático.
         return self.nome_municipio
-
-    @staticmethod
-    def _strip_prefeitura_prefix(nome: str) -> str:
-        """Admin e imports: guarda só o município (ex. Itajá), sem «Prefeitura de …»."""
-        nome = (nome or "").strip()
-        for prefix in (
-            "Prefeitura Municipal de ",
-            "Prefeitura Municipal da ",
-            "Prefeitura de ",
-            "Prefeitura da ",
-        ):
-            if nome.casefold().startswith(prefix.casefold()):
-                return nome[len(prefix) :].strip()
-        return nome
 
     # Gera/atualiza o slug `url` a partir do nome do município.
     # Remove acentuação, espaços e normaliza para padrão seguro de URL.
     def save(self, *args, **kwargs):
-        self.nome_municipio = self._strip_prefeitura_prefix(self.nome_municipio)
         # Normaliza (remove acentos e espaços)
         nome = unicodedata.normalize("NFKD", self.nome_municipio)
         nome = nome.encode("ASCII", "ignore").decode("ASCII")

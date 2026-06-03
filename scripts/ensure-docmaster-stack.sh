@@ -67,6 +67,21 @@ ensure_network() {
   fi
 }
 
+# Segundo contentor cloudflared (ID tipo ffbaca301977…) rouba tráfego → site 200, API 502.
+# Não aparece em «docker ps | grep cloud» porque o nome não contém «cloud».
+prune_orphan_cloudflared_containers() {
+  local id name
+  while read -r id; do
+    [[ -n "$id" ]] || continue
+    name="$(docker inspect -f '{{.Name}}' "$id" 2>/dev/null | sed 's|^/||' || true)"
+    if [[ "$name" == "cloudflared-tunnel" ]]; then
+      continue
+    fi
+    log "Removendo cloudflared órfão: ${name:-?} ($id)"
+    docker rm -f "$id" 2>/dev/null || true
+  done < <(docker ps -aq --filter "ancestor=cloudflare/cloudflared" 2>/dev/null || true)
+}
+
 main_compose_up() {
   if [[ ! -f "$COMPOSE_FILE" ]]; then
     log "ERRO: compose não encontrado: $COMPOSE_FILE"
@@ -95,7 +110,9 @@ main_compose_up() {
   local obs=(node_exporter prometheus grafana)
 
   log "Stack principal (site + túnel) em $DEPLOY"
+  prune_orphan_cloudflared_containers
   docker compose -f "$COMPOSE_FILE" up "${up_flags[@]}" "${core[@]}"
+  prune_orphan_cloudflared_containers
 
   log "Observabilidade (opcional; falha de porta 9100 não derruba o site)"
   if ! docker compose -f "$COMPOSE_FILE" up -d "${obs[@]}"; then

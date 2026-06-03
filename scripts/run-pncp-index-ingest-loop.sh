@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Alimentação contínua do índice PNCP: busca no portal e grava contratos + itens no SQLite.
 #
-# O ensure-pncp-researcher.sh só mantém o API 24/7; este script é quem faz o total_itens subir.
+# O ensure-pncp-researcher.sh só mantém o API 24/7; este script alimenta o índice local.
+# Com PNCP_INGEST_WATERMARK_RESUME (default), cada UF avança páginas no PNCP — cobertura de busca
+# cresce mesmo quando total_itens sobe devagar (refresh + páginas novas).
 #
 # Uso:
 #   ./scripts/run-pncp-index-ingest-loop.sh              # loop infinito (nohup recomendado)

@@ -23,10 +23,12 @@
 
 4. **Nunca** `docker compose -f docker-compose.pncp.yml down -v` (apaga o SQLite).
 
-5. **Alimentar o índice (fazer `total_itens` subir)** é outro processo do que «manter API 24/7»:
+5. **Alimentar o índice (cobertura de busca alta)** é outro processo do que «manter API 24/7»:
    - `ensure-pncp-researcher.sh` → só sobe o contentor.
    - `run-pncp-index-ingest-loop.sh` → busca no PNCP e grava contratos/itens no SQLite (rode em `nohup` ou cron).
-   - Não use um único `curl` com `max_paginas: null` no Brasil inteiro (trava dias sem subir o count).
+   - Com **`PNCP_INGEST_WATERMARK_RESUME=1`** (default), cada corrida retoma de `last_page+1` por UF/modalidade; ao esgotar o catálogo, volta à página 1 (novos editais no topo). O que importa é **`next_page` subir** em `GET /local-index/ingest-status`, não só `total_itens`/dia.
+   - Busca inteligente: FTS5 local + fallback híbrido PNCP ao vivo quando local < 8 resultados (`PNCP_HYBRID_*`).
+   - Não use um único `curl` com `max_paginas: null` no Brasil inteiro (trava dias).
 
 ```bash
 nohup ./scripts/run-pncp-index-ingest-loop.sh >> ~/pncp-ingest.log 2>&1 &

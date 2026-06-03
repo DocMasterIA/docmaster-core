@@ -17,6 +17,7 @@ from .config import (
     PNCP_INGEST_AUTOPAUSE_ENABLED,
     PNCP_INGEST_AUTOPAUSE_JSON_INVALID_SECONDS,
     PNCP_INGEST_AUTOPAUSE_MAX_SECONDS,
+    PNCP_INGEST_WATERMARK_RESUME,
     PNCP_LOCAL_BACKFILL_MONTHS,
     PNCP_LOCAL_DB_PATH,
     PNCP_LOCAL_INCLUDE_ITEMS,
@@ -502,6 +503,32 @@ def _mark_ingest_error(
     }
 
 
+def _resolve_backfill_start_page(
+    uf: Optional[str],
+    modalidade: int,
+    *,
+    data_inicial: str,
+    data_final: str,
+) -> tuple[int, bool]:
+    if not PNCP_INGEST_WATERMARK_RESUME:
+        return 1, False
+    state = _get_ingest_state(uf, modalidade)
+    if not state:
+        return 1, False
+    if (
+        state.get("last_data_inicial") != data_inicial
+        or state.get("last_data_final") != data_final
+    ):
+        return 1, False
+    last_page = state.get("last_page")
+    if last_page is None:
+        return 1, False
+    last = int(last_page)
+    if last <= 0:
+        return 1, False
+    return last + 1, True
+
+
 def ingest_operational_status(*, uf: Optional[str] = None) -> Dict[str, Any]:
     ensure_local_index()
     now = datetime.utcnow()
@@ -531,6 +558,9 @@ def ingest_operational_status(*, uf: Optional[str] = None) -> Dict[str, Any]:
             paused += 1
         elif status != "active":
             degraded += 1
+        last_page_raw = r["last_page"]
+        last_page_int = int(last_page_raw) if last_page_raw is not None else None
+        next_page = 1 if (last_page_int is None or last_page_int <= 0) else last_page_int + 1
         scopes.append(
             {
                 "uf": r["uf"],
@@ -545,7 +575,9 @@ def ingest_operational_status(*, uf: Optional[str] = None) -> Dict[str, Any]:
                 "watermark": {
                     "data_inicial": r["last_data_inicial"],
                     "data_final": r["last_data_final"],
-                    "last_page": r["last_page"],
+                    "last_page": last_page_raw,
+                    "next_page": next_page,
+                    "resume_enabled": PNCP_INGEST_WATERMARK_RESUME,
                 },
                 "total_upserts": int(r["total_upserts"] or 0),
                 "total_item_upserts": int(r["total_item_upserts"] or 0),
@@ -1410,7 +1442,20 @@ async def backfill_local_index(
     paginas_limite = 0 if unlimited_pages else int(max_paginas)
     async with create_pncp_http_client() as http:
         for modalidade in modalidades:
-            pagina = 1
+            pagina, resumed_from_watermark = _resolve_backfill_start_page(
+                uf,
+                modalidade,
+                data_inicial=data_inicial,
+                data_final=data_final,
+            )
+            pages_this_run = 0
+            if resumed_from_watermark:
+                logger.info(
+                    "backfill resume modalidade=%s uf=%s pagina=%s",
+                    modalidade,
+                    uf or "*",
+                    pagina,
+                )
             while True:
                 state = _get_ingest_state(uf, modalidade)
                 pause_until = _parse_iso_utc(state["paused_until"]) if state else None
@@ -1460,6 +1505,7 @@ async def backfill_local_index(
                     # Em erro persistente de modalidade/página, segue para próxima modalidade.
                     break
                 total_paginas += 1
+                pages_this_run += 1
                 if not batch:
                     logger.info(
                         "backfill fim lote vazio modalidade=%s pagina=%s uf=%s",
@@ -1472,7 +1518,7 @@ async def backfill_local_index(
                         modalidade,
                         data_inicial=data_inicial,
                         data_final=data_final,
-                        page=pagina,
+                        page=0,
                         add_upserts=0,
                         add_item_upserts=0,
                     )
@@ -1532,18 +1578,19 @@ async def backfill_local_index(
                     total_upserts,
                     total_upserts_itens,
                 )
+                end_of_catalog = len(batch) < 10
                 _mark_ingest_success(
                     uf,
                     modalidade,
                     data_inicial=data_inicial,
                     data_final=data_final,
-                    page=pagina,
+                    page=0 if end_of_catalog else pagina,
                     add_upserts=len(batch),
                     add_item_upserts=page_item_upserts,
                 )
-                if len(batch) < 10:
+                if end_of_catalog:
                     break
-                if (not unlimited_pages) and pagina >= paginas_limite:
+                if (not unlimited_pages) and pages_this_run >= paginas_limite:
                     break
                 pagina += 1
     stats = local_index_stats()
@@ -1558,6 +1605,7 @@ async def backfill_local_index(
             "include_items": use_items,
             "unbounded_paginas": unlimited_pages,
             "max_paginas_efetivo": None if unlimited_pages else paginas_limite,
+            "watermark_resume": PNCP_INGEST_WATERMARK_RESUME,
             "erros_modalidade": erros_modalidade,
             "ingestao_operacional": ingest_operational_status(uf=uf),
         }

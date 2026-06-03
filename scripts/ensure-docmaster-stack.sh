@@ -67,8 +67,8 @@ ensure_network() {
   fi
 }
 
-# Segundo contentor cloudflared (ID tipo ffbaca301977…) rouba tráfego → site 200, API 502.
-# Não aparece em «docker ps | grep cloud» porque o nome não contém «cloud».
+# Segundo cloudflared (contentor ou processo órfão, ex. cgroup docker-ffbaca…) → site 200, API 502.
+# «docker ps | grep cloud» só mostra cloudflared-tunnel; o órfão pode ficar só como PID.
 prune_orphan_cloudflared_containers() {
   local id name
   while read -r id; do
@@ -80,6 +80,22 @@ prune_orphan_cloudflared_containers() {
     log "Removendo cloudflared órfão: ${name:-?} ($id)"
     docker rm -f "$id" 2>/dev/null || true
   done < <(docker ps -aq --filter "ancestor=cloudflare/cloudflared" 2>/dev/null || true)
+}
+
+prune_orphan_cloudflared_processes() {
+  local tunnel_id tunnel_short pid cgroup
+  tunnel_id="$(docker inspect -f '{{.Id}}' cloudflared-tunnel 2>/dev/null || true)"
+  [[ -n "$tunnel_id" ]] || return 0
+  tunnel_short="${tunnel_id#sha256:}"
+  tunnel_short="${tunnel_short:0:12}"
+  for pid in $(pgrep -f 'cloudflared.*tunnel' 2>/dev/null || true); do
+    cgroup="$(tr '\n' ' ' <"/proc/$pid/cgroup" 2>/dev/null || true)"
+    if [[ "$cgroup" == *"$tunnel_short"* ]]; then
+      continue
+    fi
+    log "Matando processo cloudflared órfão PID $pid (fora de cloudflared-tunnel)"
+    kill -9 "$pid" 2>/dev/null || true
+  done
 }
 
 main_compose_up() {
@@ -111,8 +127,10 @@ main_compose_up() {
 
   log "Stack principal (site + túnel) em $DEPLOY"
   prune_orphan_cloudflared_containers
+  prune_orphan_cloudflared_processes
   docker compose -f "$COMPOSE_FILE" up "${up_flags[@]}" "${core[@]}"
   prune_orphan_cloudflared_containers
+  prune_orphan_cloudflared_processes
 
   log "Observabilidade (opcional; falha de porta 9100 não derruba o site)"
   if ! docker compose -f "$COMPOSE_FILE" up -d "${obs[@]}"; then

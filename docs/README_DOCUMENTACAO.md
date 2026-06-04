@@ -25,6 +25,8 @@
 | [DOC_LLM_AGENT.md](DOC_LLM_AGENT.md) | LLM Agent: endpoints, prompts, schemas, interpretador, estrutura, clause-structure, melhorias |
 | [DOC_LLM_API.md](DOC_LLM_API.md) | LLM API (orchestration): endpoints, adapter, Ollama, auditoria, testes, melhorias |
 | [DOC_CONFIG_AMBIENTE.md](DOC_CONFIG_AMBIENTE.md) | Configuração e ambiente: variáveis de ambiente, URLs entre serviços, feature flags |
+| [PESQUISADOR_PNCP_FUNCIONAMENTO_ATUAL.md](PESQUISADOR_PNCP_FUNCIONAMENTO_ATUAL.md) | Pesquisador PNCP: busca, cotação, relatório |
+| [PLANO-MODULO-COBERTURA-FORNECEDOR-PNCP.md](PLANO-MODULO-COBERTURA-FORNECEDOR-PNCP.md) | **Planejamento** — cobertura fornecedor vencedor no índice e relatório |
 
 ---
 

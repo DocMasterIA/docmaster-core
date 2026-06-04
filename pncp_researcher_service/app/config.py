@@ -160,6 +160,17 @@ PNCP_IA_MAX_CANDIDATES: int = _env_int("PNCP_IA_MAX_CANDIDATES", 36)
 PNCP_IA_ITEM_RESUMO_ENABLED: bool = _env_bool("PNCP_IA_ITEM_RESUMO_ENABLED", True)
 PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS: float = float(os.getenv("PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS", "3.5"))
 
+# Cobertura de fornecedor vencedor (Fase A+): elegibilidade e cache BrasilAPI.
+PNCP_SUPPLIER_ELIGIBLE_SITUATIONS: list[str] = _env_str_list(
+    "PNCP_SUPPLIER_ELIGIBLE_SITUATIONS",
+    ["homolog", "adjudic", "encerr"],
+)
+PNCP_SUPPLIER_SKIP_SITUATIONS: list[str] = _env_str_list(
+    "PNCP_SUPPLIER_SKIP_SITUATIONS",
+    ["revog", "anul", "cancel"],
+)
+PNCP_BRASILAPI_CACHE_DAYS: int = _env_int("PNCP_BRASILAPI_CACHE_DAYS", 90)
+
 # Bloqueio de itens ligados à prestação de serviço/locação no resultado de busca.
 PNCP_BLOCK_SERVICE_ITEMS: bool = _env_bool("PNCP_BLOCK_SERVICE_ITEMS", True)
 PNCP_SERVICE_BLOCK_TERMS: list[str] = _env_str_list(

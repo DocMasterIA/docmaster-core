@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import time
-import re
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -20,13 +19,18 @@ from .config import (
     PNCP_RATE_LIMIT_EXTRA_ATTEMPTS,
     PNCP_RATE_LIMIT_BACKOFF_CAP_SECONDS,
 )
+from .supplier_resolver import (
+    cnpj_digits as _cnpj_digits,
+    extract_item_numbers_prioritized as _extract_item_numbers_prioritized,
+    extract_supplier_cnpj_only as _extract_supplier_cnpj_only,
+    normalize_cnpj as _normalize_cnpj,
+    parse_brasilapi_to_fornecedor as _parse_brasilapi_to_fornecedor,
+)
 
 
 class PNCPClientError(Exception):
     pass
 
-
-_CNPJ_RE = re.compile(r"\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}")
 
 
 # 429/5xx: limite/instabilidade PNCP ou gateway/proxy (transitório).
@@ -274,119 +278,7 @@ async def get_contract_items(
     return []
 
 
-def _walk_supplier_candidates(obj: Any, *, path: str = "", acc: Optional[List[Dict[str, str]]] = None) -> List[Dict[str, str]]:
-    if acc is None:
-        acc = []
-    if isinstance(obj, dict):
-        name_keys = (
-            "fornecedor",
-            "razaosocial",
-            "razao_social",
-            "nomerazaosocialfornecedor",
-            "nome_fornecedor",
-            "fornecedor_nome",
-            "vencedor",
-        )
-        cnpj_keys = ("cnpj", "cnpjfornecedor", "cnpjcpffornecedor", "nifornecedor", "ni_fornecedor")
-        nome = ""
-        cnpj = ""
-        for k, v in obj.items():
-            kk = str(k or "").strip().lower()
-            vv = str(v or "").strip()
-            if vv:
-                if any(x in kk for x in name_keys) and len(vv) > 2:
-                    nome = vv
-                if any(x in kk for x in cnpj_keys):
-                    m = _CNPJ_RE.search(vv)
-                    if m:
-                        cnpj = m.group()
-                    else:
-                        d = re.sub(r"\D", "", vv)
-                        if len(d) == 14:
-                            cnpj = d
-        if nome or cnpj:
-            acc.append({"path": path, "fornecedor": nome, "cnpj": cnpj})
-        for k, v in obj.items():
-            nxt = f"{path}.{k}" if path else str(k)
-            _walk_supplier_candidates(v, path=nxt, acc=acc)
-    elif isinstance(obj, list):
-        for i, v in enumerate(obj):
-            _walk_supplier_candidates(v, path=f"{path}[{i}]", acc=acc)
-    return acc
-
-
-def _is_orgao_path(path: str) -> bool:
-    p = (path or "").lower()
-    if not p:
-        return False
-    # Evita falso positivo por conter "orgao" em qualquer trecho;
-    # só bloqueia quando o caminho aponta de forma explícita para entidade compradora.
-    blocked_tokens = ("orgaoentidade", "orgao_entidade", "unidadeorgao", "unidade_orgao")
-    if any(tok in p for tok in blocked_tokens):
-        return True
-    parts = [x for x in re.split(r"[.\[\]]+", p) if x]
-    return any(part in {"orgao", "unidadeorgao", "orgaoentidade"} for part in parts)
-
-
-def _normalize_cnpj(raw: str) -> str:
-    d = re.sub(r"\D", "", str(raw or ""))
-    if len(d) != 14:
-        return ""
-    return f"{d[:2]}.{d[2:5]}.{d[5:8]}/{d[8:12]}-{d[12:14]}"
-
-
-def _cnpj_digits(raw: Any) -> str:
-    return re.sub(r"\D", "", str(raw or ""))
-
-
 BRASILAPI_CNPJ_URL = "https://brasilapi.com.br/api/cnpj/v1/{cnpj_digits}"
-
-
-def _extract_supplier_cnpj_only(payload: Any) -> str:
-    """Apenas CNPJ a partir do JSON PNCP; razão social / nome vêm da BrasilAPI."""
-    cands = _walk_supplier_candidates(payload)
-    for cand in cands:
-        if _is_orgao_path(cand.get("path", "")):
-            continue
-        cj = _normalize_cnpj(str(cand.get("cnpj") or "").strip())
-        if cj:
-            return cj
-    return ""
-
-
-def _parse_brasilapi_to_fornecedor(payload: Dict[str, Any], *, cnpj_digits: str) -> tuple[str, Dict[str, Any]]:
-    """Alinha campos ao fluxo de cotação direta (BrasilAPI CNPJ)."""
-    razao = str(payload.get("razao_social") or "").strip()
-    fantasia = str(payload.get("nome_fantasia") or "").strip()
-    nome = razao or fantasia
-    porte_raw = payload.get("porte")
-    if isinstance(porte_raw, dict):
-        porte_txt = str(porte_raw.get("descricao") or porte_raw.get("descricaoPorte") or "").strip()
-    else:
-        porte_txt = str(porte_raw or "").strip()
-    cadastro: Dict[str, Any] = {
-        "cnpj": _normalize_cnpj(cnpj_digits),
-        "razao_social": razao,
-        "nome_fantasia": fantasia,
-        "tipo_pessoa": "Pessoa Jurídica",
-        "tipo": str(payload.get("descricao_identificador_matriz_filial") or "").strip(),
-        "porte": porte_txt,
-        "logradouro": str(payload.get("logradouro") or "").strip(),
-        "numero": str(payload.get("numero") or "").strip(),
-        "complemento": str(payload.get("complemento") or "").strip(),
-        "cep": str(payload.get("cep") or "").strip(),
-        "bairro": str(payload.get("bairro") or "").strip(),
-        "municipio": str(payload.get("municipio") or "").strip(),
-        "uf": str(payload.get("uf") or "").strip(),
-        "email": str(payload.get("email") or "").strip(),
-        "telefone": str(payload.get("ddd_telefone_1") or payload.get("ddd_telefone_2") or "").strip(),
-        "situacao": str(payload.get("descricao_situacao_cadastral") or "").strip(),
-        "data_situacao": str(payload.get("data_situacao_cadastral") or "").strip(),
-        "motivo_situacao": str(payload.get("motivo_situacao_cadastral") or "").strip(),
-        "situacao_especial": str(payload.get("situacao_especial") or "").strip(),
-        "data_situacao_especial": str(payload.get("data_situacao_especial") or "").strip(),
-    }
-    return nome, {k: v for k, v in cadastro.items() if v}
 
 
 async def fetch_brasilapi_fornecedor_por_cnpj(
@@ -408,40 +300,7 @@ async def fetch_brasilapi_fornecedor_por_cnpj(
         return "", {}
     if not isinstance(body, dict):
         return "", {}
-    return _parse_brasilapi_to_fornecedor(body, cnpj_digits=d)
-
-
-def _extract_item_numbers_prioritized(items_payload: Any, *, max_items: int = 8) -> List[str]:
-    if isinstance(items_payload, dict) and isinstance(items_payload.get("data"), list):
-        rows = items_payload["data"]
-    elif isinstance(items_payload, list):
-        rows = items_payload
-    else:
-        rows = []
-    scored: List[tuple[int, str]] = []
-    for it in rows:
-        if not isinstance(it, dict):
-            continue
-        n = str(it.get("numeroItem") or it.get("ordemItem") or it.get("sequencialItem") or "").strip()
-        if not n:
-            continue
-        score = 0
-        if bool(it.get("temResultado")):
-            score += 5
-        sit = str(it.get("situacaoCompraItemNome") or it.get("situacaoCompraItem") or "").lower()
-        if "homolog" in sit:
-            score += 3
-        if "result" in sit:
-            score += 1
-        scored.append((score, n))
-    scored.sort(key=lambda x: (-x[0], int(re.sub(r"\D", "", x[1]) or 0)))
-    out: List[str] = []
-    for _, n in scored:
-        if n not in out:
-            out.append(n)
-        if len(out) >= max_items:
-            break
-    return out
+    return _parse_brasilapi_to_fornecedor(body, cnpj_digits_val=d)
 
 
 async def get_contract_supplier_snapshot(

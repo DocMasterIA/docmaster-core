@@ -1,0 +1,14 @@
+{
+  "data": [
+    {
+      "numeroItem": "1",
+      "cnpjCpfFornecedor": "98765432000110",
+      "razaoSocialFornecedor": "OUTRO FORNECEDOR SA"
+    },
+    {
+      "numeroItem": "2",
+      "niFornecedor": "12345678000195",
+      "nomeRazaoSocialFornecedor": "FORNECEDORA EXEMPLO LTDA"
+    }
+  ]
+}

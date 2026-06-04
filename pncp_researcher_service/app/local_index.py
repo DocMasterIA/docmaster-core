@@ -26,6 +26,7 @@ from .config import (
 )
 
 logger = logging.getLogger(__name__)
+from .fornecedor_cache import cache_stats, ensure_fornecedor_cache_table
 from .pncp_client import PNCPClientError, create_pncp_http_client, get_contract_items, search_contracts
 from .search_text_clean import apply_item_display_cleanup, normalize_for_search
 
@@ -131,6 +132,8 @@ def ensure_local_index() -> None:
             """
         )
         _migrate_pesquisador_sessoes_columns(c)
+        _migrate_pncp_itens_supplier_columns(c)
+        ensure_fornecedor_cache_table(c)
         c.execute(
             """
             CREATE TABLE IF NOT EXISTS pesquisador_sessao_itens (
@@ -667,6 +670,33 @@ def _migrate_pesquisador_sessoes_columns(c: sqlite3.Cursor) -> None:
         )
 
 
+_PNCP_ITENS_SUPPLIER_COLUMNS: List[tuple[str, str]] = [
+    ("cnpj_fornecedor", "TEXT"),
+    ("fornecedor", "TEXT"),
+    ("fornecedor_fonte", "TEXT"),
+    ("situacao_item", "TEXT"),
+    ("situacao_compra", "TEXT"),
+    ("fornecedor_elegivel", "INTEGER NOT NULL DEFAULT 0"),
+    ("fornecedor_resolvido_at", "TEXT"),
+]
+
+
+def _migrate_pncp_itens_supplier_columns(c: sqlite3.Cursor) -> None:
+    """Fase A: colunas de fornecedor vencedor em pncp_itens (bases existentes)."""
+    cols = {row[1] for row in c.execute("PRAGMA table_info(pncp_itens)")}
+    for name, col_type in _PNCP_ITENS_SUPPLIER_COLUMNS:
+        if name not in cols:
+            c.execute(f"ALTER TABLE pncp_itens ADD COLUMN {name} {col_type}")
+    c.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pncp_itens_fornecedor_elegivel "
+        "ON pncp_itens(fornecedor_elegivel, cnpj_fornecedor)"
+    )
+    c.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pncp_itens_pncp_numero_item "
+        "ON pncp_itens(numero_pncp, numero_item)"
+    )
+
+
 def _objeto(raw: Dict[str, Any]) -> str:
     for k in ("objetoCompra", "objeto", "descricaoObjeto", "titulo"):
         v = raw.get(k)
@@ -834,6 +864,51 @@ def upsert_contract_items(raw_contract: Dict[str, Any], item_rows: Iterable[Dict
     return count
 
 
+def supplier_coverage_stats() -> Dict[str, Any]:
+    """Métricas de cobertura de fornecedor (Fase A — leitura; preenchimento nas fases B/C)."""
+    ensure_local_index()
+    with _conn() as c:
+        row = c.execute(
+            """
+            SELECT
+                COUNT(*) AS total,
+                SUM(CASE WHEN TRIM(COALESCE(cnpj_fornecedor,'')) != '' THEN 1 ELSE 0 END) AS com_cnpj,
+                SUM(CASE WHEN TRIM(COALESCE(fornecedor,'')) != '' THEN 1 ELSE 0 END) AS com_nome,
+                SUM(CASE WHEN fornecedor_elegivel = 1 THEN 1 ELSE 0 END) AS elegiveis,
+                SUM(
+                    CASE WHEN fornecedor_elegivel = 1
+                         AND TRIM(COALESCE(cnpj_fornecedor,'')) != ''
+                         AND TRIM(COALESCE(fornecedor,'')) != ''
+                    THEN 1 ELSE 0 END
+                ) AS elegiveis_completos
+            FROM pncp_itens
+            """
+        ).fetchone()
+        cache = cache_stats(c)
+    total = int(row["total"] or 0)
+    com_cnpj = int(row["com_cnpj"] or 0)
+    com_nome = int(row["com_nome"] or 0)
+    elegiveis = int(row["elegiveis"] or 0)
+    elegiveis_ok = int(row["elegiveis_completos"] or 0)
+
+    def _pct(num: int, den: int) -> float:
+        if den <= 0:
+            return 0.0
+        return round(100.0 * num / den, 2)
+
+    return {
+        "total_itens": total,
+        "itens_com_cnpj_fornecedor": com_cnpj,
+        "itens_com_nome_fornecedor": com_nome,
+        "itens_elegiveis": elegiveis,
+        "itens_elegiveis_com_cnpj_e_nome": elegiveis_ok,
+        "cobertura_cnpj_pct": _pct(com_cnpj, total),
+        "cobertura_nome_pct": _pct(com_nome, total),
+        "cobertura_elegivel_pct": _pct(elegiveis_ok, elegiveis),
+        **cache,
+    }
+
+
 def local_index_stats() -> Dict[str, Any]:
     ensure_local_index()
     with _conn() as c:
@@ -845,7 +920,7 @@ def local_index_stats() -> Dict[str, Any]:
         by_modal_rows = c.execute(
             "SELECT COALESCE(modalidade_nome,'') AS modalidade, COUNT(*) AS n FROM pncp_contratos GROUP BY modalidade_nome ORDER BY n DESC LIMIT 20"
         ).fetchall()
-    return {
+    out = {
         "ok": True,
         "db_path": PNCP_LOCAL_DB_PATH,
         "total_contratos": int(total or 0),
@@ -853,6 +928,8 @@ def local_index_stats() -> Dict[str, Any]:
         "por_uf": [{"uf": r["uf"], "total": r["n"]} for r in by_uf_rows],
         "por_modalidade": [{"modalidade": r["modalidade"], "total": r["n"]} for r in by_modal_rows],
     }
+    out["fornecedor"] = supplier_coverage_stats()
+    return out
 
 
 def local_search(

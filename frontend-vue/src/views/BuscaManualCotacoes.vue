@@ -891,6 +891,9 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
         valor_base: faixaBaseSelecionada,
       },
       similaridade_encontrada: Boolean(r.similaridadeEncontrada),
+      temResultado: r.sourceRaw?.temResultado ?? null,
+      situacaoCompraItemNome: r.sourceRaw?.situacaoCompraItemNome ?? null,
+      situacao: r.sourceRaw?.situacao_compra || r.sourceRaw?.situacao || null,
     }))
     .filter((it) => !!it.descricao_item || !!it.numero_pncp || (it.ano_compra != null && it.sequencial_compra != null));
   if (!registros.length) {

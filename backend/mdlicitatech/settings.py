@@ -477,15 +477,15 @@ PNCP_RELATORIO_PDF_SKIP_ENRICH = os.environ.get("PNCP_RELATORIO_PDF_SKIP_ENRICH"
     "false",
     "no",
 )
-PNCP_RELATORIO_PDF_MAX_PNCP_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_PNCP_LOOKUPS", "10"))
-PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS", "28"))
+PNCP_RELATORIO_PDF_MAX_PNCP_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_PNCP_LOOKUPS", "96"))
+PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS", "64"))
 # Ao adicionar fonte PNCP à cotação: buscar /resultados por numero_item se CNPJ faltar no payload.
 PNCP_ADD_SOURCE_ENRICH_SUPPLIER = os.environ.get("PNCP_ADD_SOURCE_ENRICH_SUPPLIER", "true").strip().lower() not in (
     "0",
     "false",
     "no",
 )
-PNCP_ADD_SOURCE_MAX_PNCP_LOOKUPS = int(os.environ.get("PNCP_ADD_SOURCE_MAX_PNCP_LOOKUPS", "24"))
+PNCP_ADD_SOURCE_MAX_PNCP_LOOKUPS = int(os.environ.get("PNCP_ADD_SOURCE_MAX_PNCP_LOOKUPS", "48"))
 PNCP_ADD_SOURCE_MAX_BRASILAPI_LOOKUPS = int(os.environ.get("PNCP_ADD_SOURCE_MAX_BRASILAPI_LOOKUPS", "48"))
 
 # Serviço RAG (geração de documentos com IA)

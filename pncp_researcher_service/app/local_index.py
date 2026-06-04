@@ -1293,6 +1293,13 @@ def _row_to_local_item(
     if situacao_compra:
         entry["situacao"] = situacao_compra
         entry["situacao_compra"] = situacao_compra
+    catalog = _decompress_zlib_json_blob(_row_get(r, "raw_json_zlib"))
+    if isinstance(catalog, dict):
+        if catalog.get("temResultado") is not None:
+            entry["temResultado"] = bool(catalog.get("temResultado"))
+        sit_item = str(catalog.get("situacaoCompraItemNome") or catalog.get("situacaoCompraItem") or "").strip()
+        if sit_item:
+            entry["situacaoCompraItemNome"] = sit_item
     entry.update(_supplier_fields_from_local_row(r))
     if cleanup_for_display:
         apply_item_display_cleanup(entry)

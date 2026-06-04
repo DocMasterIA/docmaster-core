@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import threading
 import uuid
 from pathlib import Path
@@ -44,6 +45,8 @@ from backend.app.services.pncp_relatorio_verification_store import (
     verification_download_path,
 )
 from backend.app.services.pncp_supplier_enrichment import enrich_missing_supplier_fields_for_cotacao
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_FORMULA_CALCULO = "media_aritmetica_precos_obtidos"
 FORMULA_LABELS = {
@@ -244,7 +247,10 @@ def _generate_relatorio_pdf_bytes(
                 max_brasilapi_lookups=settings.PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS,
             )
         except Exception:
-            pass
+            logger.exception(
+                "enrich_missing_supplier_fields_for_cotacao falhou cotacao_id=%s",
+                cotacao.id,
+            )
 
     pdf_bytes = gerar_pdf_relatorio_cotacao(
         cotacao=cotacao,

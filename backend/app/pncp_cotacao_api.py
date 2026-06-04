@@ -187,6 +187,8 @@ _SOURCE_KEEP_KEYS = frozenset(
         "situacao",
         "situacao_compra",
         "situacaoCompraNome",
+        "situacaoCompraItemNome",
+        "temResultado",
     }
 )
 

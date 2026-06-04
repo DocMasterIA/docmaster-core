@@ -516,11 +516,11 @@ def _resolve_backfill_start_page(
     if not state:
         return 1, False
     if (
-        state.get("last_data_inicial") != data_inicial
-        or state.get("last_data_final") != data_final
+        state["last_data_inicial"] != data_inicial
+        or state["last_data_final"] != data_final
     ):
         return 1, False
-    last_page = state.get("last_page")
+    last_page = state["last_page"]
     if last_page is None:
         return 1, False
     last = int(last_page)

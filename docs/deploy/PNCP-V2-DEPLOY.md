@@ -51,7 +51,16 @@ curl -s http://127.0.0.1:8012/api/pncp-research/local-index/operational-status |
 
 | Variável | Default | Função |
 |----------|---------|--------|
+| `PNCP_INGEST_WATERMARK_RESUME` | 1 | Backfill retoma de `last_page+1` |
+| `PNCP_BACKFILL_ITEM_CONCURRENCY` | 12 | GET de itens em paralelo no backfill |
 | `PNCP_FTS5_ENABLED` | 1 | Busca FTS5 vs LIKE |
 | `PNCP_HYBRID_FALLBACK_ENABLED` | 1 | Complemento PNCP ao vivo |
 | `PNCP_HYBRID_MIN_LOCAL_RESULTS` | 8 | Limiar para acionar live |
-| `PNCP_HYBRID_MAX_LIVE_PAGES` | 4 | Páginas live no fallback |
+| `PNCP_HYBRID_MAX_LIVE_PAGES` | 6 | Páginas live no fallback |
+
+Documentação completa:
+
+- [README.md](./README.md) — índice
+- [PNCP-INGESTAO-INDEX-24-7.md](./PNCP-INGESTAO-INDEX-24-7.md) — loop 24/7, volumes, troubleshooting
+- [PNCP-API-INDICE-LOCAL.md](./PNCP-API-INDICE-LOCAL.md) — endpoints detalhados
+- [PNCP-SCRIPTS-REFERENCIA.md](./PNCP-SCRIPTS-REFERENCIA.md) — scripts e compose

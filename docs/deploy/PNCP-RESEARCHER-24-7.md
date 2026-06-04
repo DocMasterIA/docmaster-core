@@ -1,5 +1,8 @@
 # PNCP Researcher — rodar 24h sem cair no `up -d`
 
+**Guia completo de alimentação do índice (loop, watermarks, paralelo, monitorização, o que não fazer):**  
+→ [PNCP-INGESTAO-INDEX-24-7.md](./PNCP-INGESTAO-INDEX-24-7.md)
+
 ## Checklist 24/7 (produção)
 
 1. **Volume fixo** (uma vez, com o `.db` grande):

@@ -2,6 +2,14 @@
 
 Com Prometheus/Grafana ok, estes passos reduzem quedas e o **1033** (“túnel não alcança a origem”).
 
+**Índice deploy:** [README.md](./README.md) · **Site 200 / API 502 (cloudflared órfão):** [STACK-E-CLOUDFLARE-502.md](./STACK-E-CLOUDFLARE-502.md)
+
+## Erro 502 na API com site 200 (cloudflared duplicado)
+
+Sintoma: frontend OK, `api.*` devolve **502**. Causa típica: segundo contentor ou processo `cloudflared` com o mesmo token (órfão no WSL/Docker Desktop).
+
+O script `ensure-docmaster-stack.sh` faz prune + reset antes do `compose up`. Runbook: [STACK-E-CLOUDFLARE-502.md](./STACK-E-CLOUDFLARE-502.md).
+
 ## O que é o erro 1033
 
 Não é bug do Django. A Cloudflare **não consegue falar com o `cloudflared`** na sua máquina (túnel parado, PC desligado, Docker parado, ou origem `backend`/`frontend-vue` down).

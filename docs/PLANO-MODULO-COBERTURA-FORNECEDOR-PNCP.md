@@ -363,12 +363,69 @@ FROM pncp_itens;
 
 ---
 
-## 13. Próximo passo recomendado
+## 13. Roteiro «100%» (testes + modificações)
 
-1. Validar regras de **elegibilidade** com amostra de 50 registros do índice DESKTOP (`situacao`, `temResultado`).  
-2. Implementar **Fase A** com fixtures JSON reais.  
-3. Ligar **Fase B** com flag off em staging; medir `cobertura_elegivel` 24h.  
-4. Lançar **Fase C** em loop no servidor DESKTOP em paralelo ao ingest existente.
+**Definição honesta de 100%:** 100% das fontes em que o PNCP **publica** fornecedor em alguma camada consultável (resultado, contrato, inline). Fontes com `pncp_resultados_204` + `pncp_contrato_404` **não são falha de software** — são lacuna de publicação pelo órgão.
+
+### 13.1 Matriz de testes (ordem de execução)
+
+| # | Teste | Comando / artefato | O que valida |
+|---|--------|-------------------|--------------|
+| T1 | Unit resolver | `cd pncp_researcher_service && python -m unittest tests.test_supplier_resolver` | Extração JSON `/resultados`, contratos, catálogo |
+| T2 | Unit parse NP | `backend/app/tests/test_pncp_supplier_enrichment.py` | `numero_pncp` formato `000085/2025` |
+| T3 | Auditoria cotação | `python manage.py audit_pncp_supplier_coverage --cotacao-id N` | Resumo `gap_reason` por fonte |
+| T4 | Só faltantes | `... --only-missing` | As 5 linhas sem CNPJ (como na cotação 6) |
+| T5 | JSON relatório | `... --json > /tmp/audit.json` | Dashboard / planilha |
+| T6 | Amostra índice | Script SQLite 1k itens + probe async | Distribuição 204 vs ok no índice |
+| T7 | Regressão PDF | Gerar PDF antes/depois; comparar `sem CNPJ` | Persistência no `source` |
+
+### 13.2 Motivos padronizados (`gap_reason`)
+
+| Código | Significado | Ação |
+|--------|-------------|------|
+| `ok_ja_no_source` | Já tem CNPJ na cotação | Nenhuma |
+| `ok_fornecedor_resolvido` | Probe encontrou na API | Persistir se ainda não no source |
+| `missing_pncp_keys` | Sem `numero_pncp`/ano/seq | Corrigir payload na busca |
+| `pncp_resultados_204` | Item/compra sem resultado publicado | Aguardar órgão ou trocar fonte |
+| `pncp_contrato_404` | Sem contrato publicado | Idem |
+| `pncp_contrato_200_sem_cnpj` | Contrato existe mas JSON sem CNPJ | Revisar parser / amostra real |
+| `pncp_catalogo_sem_fornecedor` | Todas as camadas vazias | Idem 204 |
+
+### 13.3 Camadas PNCP (ordem implementada)
+
+1. `GET .../itens/{n}/resultados`  
+2. `GET .../resultados` (compra)  
+3. `GET .../itens/{n}` (inline)  
+4. **`GET .../contratos/contratacao/{ano}/{seq}`** (novo fallback jun/2026)  
+5. BrasilAPI se só CNPJ  
+
+### 13.4 Modificações por fase (caminho a cobertura máxima)
+
+| Fase | Entrega | Impacto |
+|------|---------|---------|
+| **R0** (feito) | Auditoria `audit_pncp_supplier_coverage`, probe, limites PDF 96, parse `.../2025` | Entender **por que** cada linha falha |
+| **R1** | Fallback contratos em `pncp_client` + `pncp_supplier_enrichment` | +% onde há contrato sem `/resultados` |
+| **R2** | Fase B ingestão: gravar `/resultados` no índice | Busca manual já com fornecedor |
+| **R3** | Job reprocessamento só elegíveis homologados | Índice histórico |
+| **R4** | UI: badge `gap_reason` ao adicionar fonte | Usuário não adiciona fonte 204 |
+| **R5** | PDF: «Não publicado no PNCP (204)» | Relatório explícito |
+
+### 13.5 Comando no DESKTOP (após deploy)
+
+```bash
+docker exec backend python manage.py audit_pncp_supplier_coverage --cotacao-id 6 --only-missing
+docker exec backend python manage.py audit_pncp_supplier_coverage --cotacao-id 6 --json
+```
+
+Deploy dos ficheiros novos: `pncp_supplier_enrichment.py`, `pncp_supplier_gap_audit.py`, `audit_pncp_supplier_coverage.py`, `pncp_client.py`, `supplier_resolver.py`, `supplier_probe.py` (researcher).
+
+---
+
+## 14. Próximo passo recomendado
+
+1. Rodar **T3/T4** nas cotações 3 e 6 e guardar JSON.  
+2. Medir % `pncp_resultados_204` vs `ok_*` — define teto realista.  
+3. Aprovar **R2** (ingestão) se o teto for insuficiente sem reprocessar índice.  
 
 ---
 

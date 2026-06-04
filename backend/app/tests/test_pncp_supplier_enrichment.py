@@ -16,6 +16,11 @@ class ParseNumeroPncpTests(unittest.TestCase):
         self.assertEqual(ano, 2024)
         self.assertEqual(seq, 42)
 
+    def test_parse_ano_seq_formato_barra(self):
+        ano, seq = _parse_ano_seq_from_numero_pncp("87613279000167-1-000085/2025")
+        self.assertEqual(ano, 2025)
+        self.assertEqual(seq, 85)
+
     def test_parse_invalido(self):
         self.assertEqual(_parse_ano_seq_from_numero_pncp(""), (None, None))
         self.assertEqual(_parse_ano_seq_from_numero_pncp("apenas-texto"), (None, None))

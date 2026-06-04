@@ -38,9 +38,25 @@ def _extract_cnpj_orgao(numero_pncp: str) -> str:
 
 def _parse_ano_seq_from_numero_pncp(numero_pncp: str) -> Tuple[Optional[int], Optional[int]]:
     """
-    Extrai ano/sequencial do numeroControlePNCP (ex.: 00000000000191-1-2024-42).
+    Extrai ano/sequencial do numeroControlePNCP.
+
+    Formatos:
+    - ``CNPJ-1-2024-42`` (4 segmentos)
+    - ``CNPJ-1-000261/2025`` (sequencial/ano no último segmento)
     """
-    parts = [p.strip() for p in str(numero_pncp or "").strip().split("-") if p.strip()]
+    s = str(numero_pncp or "").strip()
+    m = re.search(r"-(\d+)/(\d{4})\s*$", s)
+    if m:
+        try:
+            seq = int(m.group(1))
+            ano = int(m.group(2))
+        except (TypeError, ValueError):
+            return None, None
+        if 1990 <= ano <= 2100 and 1 <= seq <= 2_147_483_647:
+            return ano, seq
+        return None, None
+
+    parts = [p.strip() for p in s.split("-") if p.strip()]
     if len(parts) < 4:
         return None, None
     try:
@@ -286,9 +302,9 @@ def fetch_brasilapi_fornecedor_por_cnpj(cnpj_formatted: str) -> tuple[str, Dict[
     return nome, {k: v for k, v in cadastro.items() if v}
 
 
-def _get_json(url: str, timeout=_DEFAULT_TIMEOUT) -> Any:
+def _get_json(url: str, timeout=_DEFAULT_TIMEOUT, *, params: Optional[Dict[str, Any]] = None) -> Any:
     try:
-        r = requests.get(url, timeout=timeout)
+        r = requests.get(url, timeout=timeout, params=params or {})
     except Exception:
         return None
     if r.status_code in (204, 404) or r.status_code >= 400:
@@ -297,6 +313,22 @@ def _get_json(url: str, timeout=_DEFAULT_TIMEOUT) -> Any:
         return r.json()
     except Exception:
         return None
+
+
+def _fetch_contratos_contratacao_sync(cnpj_org: str, ano: Any, seq: Any) -> Any:
+    url = f"{PNCP_API_BASE}/v1/orgaos/{cnpj_org}/contratos/contratacao/{ano}/{seq}"
+    return _get_json(url, params={"pagina": 1, "tamanhoPagina": 50})
+
+
+def _supplier_snap_from_contratos_payload(
+    data: Any,
+    *,
+    numero_item: str = "",
+    situacao_compra: str = "",
+) -> Dict[str, str]:
+    return _supplier_snap_from_resultados_payload(
+        data, numero_item=numero_item, situacao_compra=situacao_compra
+    )
 
 
 def _extract_item_numbers(items_payload: Any, max_items: int = 8) -> List[str]:
@@ -452,6 +484,16 @@ def get_contract_supplier_snapshot_sync(
             snap = _extract_supplier_snapshot(catalog)
             if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
                 return _finalize_supplier_snapshot_sync(snap)
+
+        contratos = _fetch_contratos_contratacao_sync(cnpj, ano, seq)
+        if contratos is not None:
+            snap = _supplier_snap_from_contratos_payload(
+                contratos, numero_item=n_item, situacao_compra=sit
+            )
+            if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
+                out = _finalize_supplier_snapshot_sync(snap)
+                out["fornecedor_fonte"] = out.get("fornecedor_fonte") or "pncp_contrato"
+                return out
         return empty
 
     itens_data = _get_json(f"{base}/itens")
@@ -468,6 +510,16 @@ def get_contract_supplier_snapshot_sync(
         snap = _supplier_snap_from_resultados_payload(data)
         if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
             return _finalize_supplier_snapshot_sync(snap)
+
+    contratos = _fetch_contratos_contratacao_sync(cnpj, ano, seq)
+    if contratos is not None:
+        snap = _supplier_snap_from_contratos_payload(
+            contratos, numero_item=n_item, situacao_compra=sit
+        )
+        if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
+            out = _finalize_supplier_snapshot_sync(snap)
+            out["fornecedor_fonte"] = out.get("fornecedor_fonte") or "pncp_contrato"
+            return out
     return empty
 
 

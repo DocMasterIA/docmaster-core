@@ -28,6 +28,7 @@ from .supplier_resolver import (
     nome_fornecedor_e_util,
     parse_brasilapi_to_fornecedor as _parse_brasilapi_to_fornecedor,
     resolution_to_api_dict,
+    resolve_from_contratos_payload,
     resolve_from_item_catalog_row,
     resolve_from_resultados_payload,
 )
@@ -327,14 +328,55 @@ async def _finalize_supplier_resolution(
     return out
 
 
-async def _fetch_json_pncp(client: httpx.AsyncClient, url: str) -> Any:
-    resp = await _get_pncp(client, url, params=None, tolerate_rate_limit=True)
+async def _fetch_json_pncp(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    params: Optional[Dict[str, Any]] = None,
+) -> Any:
+    resp = await _get_pncp(client, url, params=params, tolerate_rate_limit=True)
     if resp is None or resp.status_code in (204, 404) or resp.status_code >= 400:
         return None
     try:
         return resp.json()
     except ValueError:
         return None
+
+
+async def _fetch_contratos_contratacao(
+    client: httpx.AsyncClient,
+    cnpj: str,
+    ano: str,
+    seq: str,
+) -> Any:
+    url = f"{PNCP_PNCP_API_BASE_URL}/v1/orgaos/{cnpj}/contratos/contratacao/{ano}/{seq}"
+    return await _fetch_json_pncp(
+        client,
+        url,
+        params={"pagina": 1, "tamanhoPagina": 50},
+    )
+
+
+async def _try_contratos_supplier(
+    client: httpx.AsyncClient,
+    *,
+    cnpj: str,
+    ano: str,
+    seq: str,
+    numero_item: str,
+    situacao_compra: str,
+) -> Optional[Dict[str, Any]]:
+    data = await _fetch_contratos_contratacao(client, cnpj, ano, seq)
+    if data is None:
+        return None
+    res = resolve_from_contratos_payload(
+        data,
+        numero_item=numero_item or None,
+        situacao_compra=situacao_compra,
+    )
+    if res.cnpj_fornecedor or res.fornecedor:
+        return await _finalize_supplier_resolution(client, res)
+    return None
 
 
 async def get_contract_supplier_snapshot(
@@ -396,6 +438,17 @@ async def get_contract_supplier_snapshot(
                 res = resolve_from_item_catalog_row(catalog_row, situacao_compra=sit_compra)
                 if res.cnpj_fornecedor or res.fornecedor:
                     return await _finalize_supplier_resolution(client, res)
+
+            out = await _try_contratos_supplier(
+                client,
+                cnpj=cnpj,
+                ano=ano,
+                seq=seq,
+                numero_item=n_item,
+                situacao_compra=sit_compra,
+            )
+            if out:
+                return out
             return empty
 
         nums: List[str] = []
@@ -427,6 +480,17 @@ async def get_contract_supplier_snapshot(
             )
             if res.cnpj_fornecedor or res.fornecedor:
                 return await _finalize_supplier_resolution(client, res)
+
+        out = await _try_contratos_supplier(
+            client,
+            cnpj=cnpj,
+            ano=ano,
+            seq=seq,
+            numero_item=n_item,
+            situacao_compra=sit_compra,
+        )
+        if out:
+            return out
     finally:
         if close_client:
             await client.aclose()

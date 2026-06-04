@@ -204,12 +204,25 @@ def iter_resultado_entries(payload: Any) -> Iterable[Dict[str, Any]]:
             yield row
 
 
+_ITEM_NUMERO_KEYS = (
+    "numeroItem",
+    "ordemItem",
+    "sequencialItem",
+    "numeroItemCompra",
+    "numeroItemContratacao",
+    "itemNumero",
+)
+
+
 def _numero_item_match(row: Dict[str, Any], numero_item: str) -> bool:
     want = str(numero_item or "").strip()
     if not want:
         return False
-    got = str(row.get("numeroItem") or row.get("ordemItem") or row.get("sequencialItem") or "").strip()
-    return got == want
+    for key in _ITEM_NUMERO_KEYS:
+        got = str(row.get(key) or "").strip()
+        if got == want:
+            return True
+    return False
 
 
 def resolve_from_resultados_payload(
@@ -262,6 +275,21 @@ def resolve_from_resultados_payload(
                 situacao_compra=situacao_compra,
             )
     return SupplierResolution(situacao_compra=str(situacao_compra or "").strip())
+
+
+def resolve_from_contratos_payload(
+    payload: Any,
+    *,
+    numero_item: Optional[str] = None,
+    situacao_compra: Any = "",
+) -> SupplierResolution:
+    """Extrai fornecedor de GET /contratos/contratacao/{ano}/{seq}."""
+    return resolve_from_resultados_payload(
+        payload,
+        numero_item=numero_item,
+        situacao_compra=situacao_compra,
+        fonte_prefix="pncp_contrato",
+    )
 
 
 def resolve_from_item_catalog_row(
@@ -466,13 +494,14 @@ def resolve_item_supplier_offline(
     item_row: Optional[Dict[str, Any]] = None,
     resultados_item_payload: Any = None,
     resultados_compra_payload: Any = None,
+    contratos_payload: Any = None,
     situacao_compra: Any = "",
     numero_item: Optional[str] = None,
     cadastro_nome: str = "",
     cadastro: Optional[Dict[str, Any]] = None,
 ) -> SupplierResolution:
     """
-    Ordem: resultados do item → resultados da compra (match numero_item) → inline no item_row.
+    Ordem: resultados item → resultados compra → contratos da contratação → inline catálogo.
     Opcionalmente merge com nome/cadastro já resolvido (cache BrasilAPI).
     """
     sit_compra = str(situacao_compra or "").strip()
@@ -498,6 +527,15 @@ def resolve_item_supplier_offline(
             numero_item=n_item or None,
             situacao_compra=sit_compra,
             fonte_prefix="pncp_resultado_compra",
+        )
+        if res.cnpj_fornecedor or res.fornecedor:
+            return merge_with_cadastro(res, nome=cadastro_nome, cadastro=cadastro)
+
+    if contratos_payload is not None:
+        res = resolve_from_contratos_payload(
+            contratos_payload,
+            numero_item=n_item or None,
+            situacao_compra=sit_compra,
         )
         if res.cnpj_fornecedor or res.fornecedor:
             return merge_with_cadastro(res, nome=cadastro_nome, cadastro=cadastro)

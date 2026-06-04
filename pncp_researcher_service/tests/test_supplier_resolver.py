@@ -27,6 +27,7 @@ from app.supplier_resolver import (  # noqa: E402
     item_elegivel,
     merge_with_cadastro,
     normalize_cnpj,
+    resolve_from_contratos_payload,
     resolve_from_resultados_payload,
     resolve_item_supplier_offline,
     resolve_from_item_catalog_row,
@@ -112,6 +113,21 @@ class TestSupplierResolver(unittest.TestCase):
             "niFornecedor": "12345678000195",
         }
         self.assertEqual(extract_supplier_cnpj_only(payload), "12.345.678/0001-95")
+
+    def test_contratos_contratacao_match_numero_item(self):
+        payload = _fixture("contrato_contratacao_lista.json")
+        res = resolve_from_contratos_payload(payload, numero_item="8")
+        self.assertEqual(res.cnpj_fornecedor, "98.765.432/0001-10")
+        self.assertIn("CONTRATO", res.fornecedor)
+        self.assertIn("contrato", res.fornecedor_fonte)
+
+    def test_offline_contratos_layer(self):
+        payload = _fixture("contrato_contratacao_lista.json")
+        res = resolve_item_supplier_offline(
+            contratos_payload=payload,
+            numero_item="8",
+        )
+        self.assertTrue(res.cnpj_fornecedor)
 
 
 class TestFornecedorCache(unittest.TestCase):

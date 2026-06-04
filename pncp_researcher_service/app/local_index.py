@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, List, Optional
 
 from .config import (
+    PNCP_BACKFILL_ITEM_CONCURRENCY,
     PNCP_BACKFILL_ITEM_TIMEOUT_SECONDS,
     PNCP_FTS5_ENABLED,
     PNCP_INGEST_AUTOPAUSE_BASE_SECONDS,
@@ -527,6 +528,60 @@ def _resolve_backfill_start_page(
     if last <= 0:
         return 1, False
     return last + 1, True
+
+
+def _contract_keys_for_items(raw: Dict[str, Any]) -> Optional[tuple[str, Any, Any]]:
+    cnpj = (
+        (raw.get("orgaoEntidade") or {}).get("cnpj")
+        or (raw.get("orgaoEntidade") or {}).get("cnpjOrgaoEntidade")
+        or raw.get("cnpjOrgaoEntidade")
+    )
+    numero = str(raw.get("numeroControlePNCP") or "")
+    if (not cnpj) and "-" in numero:
+        cnpj = numero.split("-")[0]
+    ano = raw.get("anoCompra")
+    seq = raw.get("sequencialCompra")
+    if not cnpj or ano is None or seq is None:
+        return None
+    return str(cnpj), ano, seq
+
+
+async def _backfill_fetch_contract_items(
+    raw: Dict[str, Any],
+    *,
+    client: Any,
+    item_timeout: float,
+    sem: asyncio.Semaphore,
+) -> tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    keys = _contract_keys_for_items(raw)
+    if not keys:
+        return raw, []
+    cnpj, ano, seq = keys
+    async with sem:
+        try:
+            rows = await asyncio.wait_for(
+                get_contract_items(cnpj, ano, seq, client=client),
+                timeout=item_timeout,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "backfill timeout itens cnpj=%s ano=%s seq=%s (>%.0fs)",
+                cnpj,
+                ano,
+                seq,
+                item_timeout,
+            )
+            rows = []
+        except Exception as exc:
+            logger.warning(
+                "backfill erro itens cnpj=%s ano=%s seq=%s: %s",
+                cnpj,
+                ano,
+                seq,
+                exc,
+            )
+            rows = []
+    return raw, rows
 
 
 def ingest_operational_status(*, uf: Optional[str] = None) -> Dict[str, Any]:
@@ -1527,42 +1582,26 @@ async def backfill_local_index(
                 page_item_upserts = 0
                 if use_items:
                     item_timeout = max(5.0, float(PNCP_BACKFILL_ITEM_TIMEOUT_SECONDS or 45))
-                    for raw in batch:
-                        cnpj = (
-                            (raw.get("orgaoEntidade") or {}).get("cnpj")
-                            or (raw.get("orgaoEntidade") or {}).get("cnpjOrgaoEntidade")
-                            or raw.get("cnpjOrgaoEntidade")
-                        )
-                        numero = str(raw.get("numeroControlePNCP") or "")
-                        if (not cnpj) and "-" in numero:
-                            cnpj = numero.split("-")[0]
-                        ano = raw.get("anoCompra")
-                        seq = raw.get("sequencialCompra")
-                        if not cnpj or ano is None or seq is None:
+                    item_sem = asyncio.Semaphore(
+                        max(1, int(PNCP_BACKFILL_ITEM_CONCURRENCY or 12))
+                    )
+                    fetch_results = await asyncio.gather(
+                        *[
+                            _backfill_fetch_contract_items(
+                                raw,
+                                client=http,
+                                item_timeout=item_timeout,
+                                sem=item_sem,
+                            )
+                            for raw in batch
+                        ],
+                        return_exceptions=True,
+                    )
+                    for fetched in fetch_results:
+                        if isinstance(fetched, Exception):
+                            logger.warning("backfill erro itens lote: %s", fetched)
                             continue
-                        try:
-                            rows = await asyncio.wait_for(
-                                get_contract_items(str(cnpj), ano, seq, client=http),
-                                timeout=item_timeout,
-                            )
-                        except asyncio.TimeoutError:
-                            logger.warning(
-                                "backfill timeout itens cnpj=%s ano=%s seq=%s (>%.0fs)",
-                                cnpj,
-                                ano,
-                                seq,
-                                item_timeout,
-                            )
-                            rows = []
-                        except Exception as exc:
-                            logger.warning(
-                                "backfill erro itens cnpj=%s ano=%s seq=%s: %s",
-                                cnpj,
-                                ano,
-                                seq,
-                                exc,
-                            )
-                            rows = []
+                        raw, rows = fetched
                         if rows:
                             n = upsert_contract_items(raw, rows)
                             page_item_upserts += n

@@ -124,6 +124,8 @@ PNCP_LOCAL_BACKFILL_MONTHS: int = _env_int("PNCP_LOCAL_BACKFILL_MONTHS", 12)
 PNCP_BACKFILL_ITEM_TIMEOUT_SECONDS: float = float(
     os.getenv("PNCP_BACKFILL_ITEM_TIMEOUT_SECONDS", "45")
 )
+# GET de itens em paralelo por página no backfill (constância + rapidez).
+PNCP_BACKFILL_ITEM_CONCURRENCY: int = _env_int("PNCP_BACKFILL_ITEM_CONCURRENCY", 12)
 PNCP_LOCAL_INCLUDE_ITEMS: bool = os.getenv(
     "PNCP_LOCAL_INCLUDE_ITEMS", "true"
 ).strip().lower() in {"1", "true", "yes", "on"}

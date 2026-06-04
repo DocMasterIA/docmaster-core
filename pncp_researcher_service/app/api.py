@@ -181,6 +181,7 @@ async def local_index_search_items_endpoint(body: MarketSearchRequest):
             recortes_geograficos=body.recortes_geograficos,
             codigo_modalidade=body.codigo_modalidade,
             limit=max(200, body.max_paginas * body.tamanho_pagina),
+            somente_homologados=body.somente_homologados,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e

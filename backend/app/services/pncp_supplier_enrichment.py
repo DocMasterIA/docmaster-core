@@ -97,6 +97,46 @@ def _ano_seq_for_enrichment(
     return _parse_ano_seq_from_numero_pncp(np)
 
 
+_HOMOLOG_TOKENS = ("homolog", "adjudic")
+_SKIP_SIT_TOKENS = ("revog", "anul", "cancel")
+
+
+def _situacao_lower(value: Any) -> str:
+    return str(value or "").strip().lower()
+
+
+def _situacao_has_any(sit: str, tokens: tuple[str, ...]) -> bool:
+    if not sit:
+        return False
+    return any(tok in sit for tok in tokens)
+
+
+def item_homologado_para_busca_dict(it: Dict[str, Any]) -> bool:
+    """Alinhado ao researcher: só homologado/adjudicado na montagem de cotação."""
+    if not isinstance(it, dict):
+        return False
+    sit_item = _situacao_lower(
+        it.get("situacaoCompraItemNome")
+        or it.get("situacaoCompraItem")
+        or it.get("situacao_item_exibicao")
+        or ""
+    )
+    if _situacao_has_any(sit_item, _SKIP_SIT_TOKENS):
+        return False
+    if _situacao_has_any(sit_item, _HOMOLOG_TOKENS):
+        return True
+    sit_compra = _situacao_lower(
+        it.get("situacao_compra") or it.get("situacao") or it.get("situacaoCompraNome") or ""
+    )
+    if _situacao_has_any(sit_compra, _SKIP_SIT_TOKENS):
+        return False
+    if _situacao_has_any(sit_compra, ("homolog", "adjudic", "encerr")):
+        return True
+    if it.get("item_homologado") is True:
+        return True
+    return False
+
+
 def _enrich_payload_sort_key(it: Dict[str, Any]) -> Tuple[int, int]:
     """Prioriza itens com resultado/homologação quando o limite de lookups é atingido."""
     score = 0
@@ -608,8 +648,12 @@ def enrich_supplier_fields_in_payloads(
     ordered = [it for it in payloads if isinstance(it, dict)]
     ordered.sort(key=_enrich_payload_sort_key)
 
+    only_homolog = bool(getattr(settings, "PNCP_ADD_SOURCE_ONLY_HOMOLOGATED", True))
+
     for it in ordered:
         if not isinstance(it, dict):
+            continue
+        if only_homolog and not item_homologado_para_busca_dict(it):
             continue
         if _payload_supplier_complete(it):
             continue

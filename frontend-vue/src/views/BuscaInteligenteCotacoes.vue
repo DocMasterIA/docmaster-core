@@ -658,6 +658,7 @@ async function runSearchWithContext({
   try {
     const recortes = buildRecortesGeograficosPayload(filtros.cidades);
     const basePayload = {
+      somente_homologados: true,
       termo_busca: String(descricao).trim(),
       codigo_modalidade: null,
       max_paginas: 500,

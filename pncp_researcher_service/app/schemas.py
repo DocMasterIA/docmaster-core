@@ -85,6 +85,10 @@ class MarketSearchRequest(BaseModel):
         None,
         description="Variação percentual da faixa regional do item (ex.: 20 => +/-20%).",
     )
+    somente_homologados: Optional[bool] = Field(
+        None,
+        description="Se true, retorna só itens homologados/adjudicados. Omitido = usa PNCP_SEARCH_ONLY_HOMOLOGATED do serviço.",
+    )
 
     @field_validator("max_paginas")
     @classmethod

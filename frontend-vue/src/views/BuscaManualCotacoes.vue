@@ -670,6 +670,7 @@ async function buscarNoBackend() {
       termo_busca: termoBuscaEfetivo,
       ...geo,
       codigo_modalidade: codigoModalidade,
+      somente_homologados: true,
       // Busca agressiva para varrer o máximo possível (backend limita teto de segurança).
       max_paginas: 500,
       tamanho_pagina: 200,
@@ -682,6 +683,7 @@ async function buscarNoBackend() {
         termo_busca: termoBuscaEfetivo,
         ...geo,
         codigo_modalidade: codigoModalidade,
+        somente_homologados: true,
         max_paginas: 500,
         tamanho_pagina: 200,
       });

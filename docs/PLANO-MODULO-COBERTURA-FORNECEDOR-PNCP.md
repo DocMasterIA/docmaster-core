@@ -421,11 +421,29 @@ Deploy dos ficheiros novos: `pncp_supplier_enrichment.py`, `pncp_supplier_gap_au
 
 ---
 
-## 14. Próximo passo recomendado
+## 14. Estratégia produto (jun/2026): só homologados + 100% nesse conjunto
 
-1. Rodar **T3/T4** nas cotações 3 e 6 e guardar JSON.  
-2. Medir % `pncp_resultados_204` vs `ok_*` — define teto realista.  
-3. Aprovar **R2** (ingestão) se o teto for insuficiente sem reprocessar índice.  
+**Decisão:** a busca de preços PNCP exibe **apenas itens homologados/adjudicados** (`PNCP_SEARCH_ONLY_HOMOLOGATED=true`). Itens «Em andamento» saem da lista.
+
+| Camada | Comportamento |
+|--------|----------------|
+| Busca manual / IA | `somente_homologados: true` |
+| Homolog sem CNPJ no índice | Até 16 consultas PNCP+BrasilAPI por busca (`PNCP_SEARCH_ENRICH_HOMOLOG_MAX`) |
+| Adicionar fonte | Enriquecimento só homologados (`PNCP_ADD_SOURCE_ONLY_HOMOLOGATED`) |
+
+**Meta 100%:** todas as **fontes homologadas** na cotação com CNPJ quando a PNCP publicar resultado/contrato.
+
+```bash
+python manage.py audit_pncp_homologados_coverage --cotacao-id 6
+```
+
+---
+
+## 15. Próximo passo recomendado
+
+1. Deploy researcher + backend + frontend (`somente_homologados`).  
+2. `audit_pncp_homologados_coverage` nas cotações em uso.  
+3. Se cobertura homolog &lt; 100%: **R2** backfill `/resultados` no índice.  
 
 ---
 

@@ -171,6 +171,11 @@ PNCP_SUPPLIER_SKIP_SITUATIONS: list[str] = _env_str_list(
 )
 PNCP_BRASILAPI_CACHE_DAYS: int = _env_int("PNCP_BRASILAPI_CACHE_DAYS", 90)
 
+# Busca de preços: só itens homologados/adjudicados (exclui «Em andamento» sem vencedor publicado).
+PNCP_SEARCH_ONLY_HOMOLOGATED: bool = _env_bool("PNCP_SEARCH_ONLY_HOMOLOGATED", True)
+# Após filtrar, consulta PNCP/BrasilAPI nos primeiros N homologados sem CNPJ no índice.
+PNCP_SEARCH_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_SEARCH_ENRICH_HOMOLOG_MAX", 16)
+
 # Bloqueio de itens ligados à prestação de serviço/locação no resultado de busca.
 PNCP_BLOCK_SERVICE_ITEMS: bool = _env_bool("PNCP_BLOCK_SERVICE_ITEMS", True)
 PNCP_SERVICE_BLOCK_TERMS: list[str] = _env_str_list(

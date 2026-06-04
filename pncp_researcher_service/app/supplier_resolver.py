@@ -96,6 +96,39 @@ def compra_elegivel(situacao_compra: Any) -> bool:
     return situacao_contem_any(sit, PNCP_SUPPLIER_ELIGIBLE_SITUATIONS)
 
 
+def item_homologado_para_busca(
+    item_row: Optional[Dict[str, Any]],
+    *,
+    situacao_compra: Any = "",
+) -> bool:
+    """
+    Critério de exibição na busca de preços: somente homologado/adjudicado (não «Em andamento»).
+    `temResultado` sozinho não basta — no PNCP costuma vir 204 em /resultados mesmo assim.
+    """
+    if not isinstance(item_row, dict):
+        return False
+    sit_item = str(
+        item_row.get("situacaoCompraItemNome")
+        or item_row.get("situacaoCompraItem")
+        or item_row.get("situacaoItemNome")
+        or ""
+    ).strip().lower()
+    if situacao_contem_any(sit_item, PNCP_SUPPLIER_SKIP_SITUATIONS):
+        return False
+    if situacao_contem_any(sit_item, ("homolog", "adjudic")):
+        return True
+    sit_compra = str(
+        situacao_compra
+        or item_row.get("situacao_compra")
+        or item_row.get("situacao")
+        or item_row.get("situacaoCompraNome")
+        or ""
+    ).strip().lower()
+    if situacao_contem_any(sit_compra, PNCP_SUPPLIER_SKIP_SITUATIONS):
+        return False
+    return situacao_contem_any(sit_compra, PNCP_SUPPLIER_ELIGIBLE_SITUATIONS)
+
+
 def item_elegivel(item_row: Optional[Dict[str, Any]], *, situacao_compra: Any = "") -> bool:
     if not isinstance(item_row, dict):
         return compra_elegivel(situacao_compra)

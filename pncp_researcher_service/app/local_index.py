@@ -13,6 +13,8 @@ from typing import Any, Dict, Iterable, List, Optional
 from .config import (
     PNCP_BACKFILL_ITEM_CONCURRENCY,
     PNCP_BACKFILL_ITEM_TIMEOUT_SECONDS,
+    PNCP_SEARCH_ENRICH_HOMOLOG_MAX,
+    PNCP_SEARCH_ONLY_HOMOLOGATED,
     PNCP_FTS5_ENABLED,
     PNCP_INGEST_AUTOPAUSE_BASE_SECONDS,
     PNCP_INGEST_AUTOPAUSE_ENABLED,
@@ -30,6 +32,8 @@ from .fornecedor_cache import cache_stats, ensure_fornecedor_cache_table
 from .pncp_client import PNCPClientError, create_pncp_http_client, get_contract_items, search_contracts
 from .search_text_clean import apply_item_display_cleanup, normalize_for_search
 from .supplier_resolver import (
+    item_homologado_para_busca,
+    item_elegivel,
     nome_fornecedor_e_util,
     resolution_to_api_dict,
     resolve_from_item_catalog_row,
@@ -819,13 +823,19 @@ def upsert_contract_items(raw_contract: Dict[str, Any], item_rows: Iterable[Dict
             unidade = str(r.get("unidadeMedida") or r.get("unidadeFornecimentoNome") or "").strip()
             fingerprint = f"{numero_item}|{desc}|{qtd}|{unidade}|{valor_unit}|{valor_total}"
             raw_blob = zlib.compress(json.dumps(r, ensure_ascii=False).encode("utf-8"), level=6)
+            sit_compra_row = str(raw_contract.get("situacaoCompra") or raw_contract.get("situacao") or "").strip()
+            sit_item_row = str(
+                r.get("situacaoCompraItemNome") or r.get("situacaoCompraItem") or ""
+            ).strip()
+            elegivel = 1 if item_elegivel(r, situacao_compra=sit_compra_row) else 0
             c.execute(
                 """
                 INSERT INTO pncp_itens (
                     numero_pncp, ano_compra, sequencial_compra, numero_item, descricao, material_servico,
                     quantidade, unidade_medida, valor_unitario, valor_total, orgao, municipio, uf,
-                    modalidade_nome, data_publicacao, item_fingerprint, updated_at, raw_json_zlib
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    modalidade_nome, data_publicacao, item_fingerprint, updated_at, raw_json_zlib,
+                    situacao_item, situacao_compra, fornecedor_elegivel
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(numero_pncp, item_fingerprint) DO UPDATE SET
                     ano_compra=excluded.ano_compra,
                     sequencial_compra=excluded.sequencial_compra,
@@ -842,7 +852,10 @@ def upsert_contract_items(raw_contract: Dict[str, Any], item_rows: Iterable[Dict
                     modalidade_nome=excluded.modalidade_nome,
                     data_publicacao=excluded.data_publicacao,
                     updated_at=excluded.updated_at,
-                    raw_json_zlib=excluded.raw_json_zlib
+                    raw_json_zlib=excluded.raw_json_zlib,
+                    situacao_item=excluded.situacao_item,
+                    situacao_compra=excluded.situacao_compra,
+                    fornecedor_elegivel=excluded.fornecedor_elegivel
                 """,
                 (
                     numero,
@@ -863,6 +876,9 @@ def upsert_contract_items(raw_contract: Dict[str, Any], item_rows: Iterable[Dict
                     fingerprint,
                     now,
                     raw_blob,
+                    sit_item_row,
+                    sit_compra_row,
+                    elegivel,
                 ),
             )
             count += 1
@@ -1205,6 +1221,85 @@ def _normalize_recortes_geograficos(recortes_geograficos: Optional[List[Any]]) -
     return out
 
 
+def _resolve_somente_homologados_flag(explicit: Optional[bool]) -> bool:
+    if explicit is not None:
+        return bool(explicit)
+    return bool(PNCP_SEARCH_ONLY_HOMOLOGATED)
+
+
+def _row_passes_homolog_filter(r: sqlite3.Row, *, somente_homologados: bool) -> bool:
+    if not somente_homologados:
+        return True
+    sit_compra = str(_row_get(r, "situacao_compra", "") or _row_get(r, "situacao_compra", "") or "").strip()
+    if not sit_compra:
+        sit_compra = _situacao_compra_from_contract_blob(_row_get(r, "contrato_raw_json"))
+    sit_item_db = str(_row_get(r, "situacao_item", "") or "").strip()
+    if sit_item_db and item_homologado_para_busca(
+        {"situacaoCompraItemNome": sit_item_db}, situacao_compra=sit_compra
+    ):
+        return True
+    catalog = _decompress_zlib_json_blob(_row_get(r, "raw_json_zlib"))
+    if isinstance(catalog, dict):
+        return item_homologado_para_busca(catalog, situacao_compra=sit_compra)
+    return False
+
+
+async def _enrich_homolog_items_from_pncp(
+    itens: List[Dict[str, Any]],
+    *,
+    max_n: int,
+) -> int:
+    """Consulta /resultados (+ contratos) para homologados sem CNPJ no índice."""
+    if max_n <= 0 or not itens:
+        return 0
+    from .pncp_client import get_contract_supplier_snapshot, create_pncp_http_client
+
+    enriched = 0
+    client = create_pncp_http_client()
+    try:
+        for entry in itens:
+            if enriched >= max_n:
+                break
+            if str(entry.get("cnpj_fornecedor") or "").strip():
+                continue
+            if not entry.get("item_homologado"):
+                continue
+            cnpj = re.sub(r"\D", "", str(entry.get("numero_pncp") or "").split("-")[0])
+            ano = entry.get("ano_compra")
+            seq = entry.get("sequencial_compra")
+            ni = str(entry.get("numero_item") or "").strip()
+            if len(cnpj) != 14 or not ano or not seq:
+                continue
+            snap = await get_contract_supplier_snapshot(
+                cnpj,
+                ano,
+                seq,
+                numero_item=ni or None,
+                situacao_compra=str(entry.get("situacao_compra") or entry.get("situacao") or ""),
+                client=client,
+            )
+            if not str(snap.get("cnpj_fornecedor") or "").strip():
+                continue
+            entry.update({k: v for k, v in snap.items() if v})
+            entry["fornecedor_busca_pncp"] = True
+            enriched += 1
+    finally:
+        await client.aclose()
+    return enriched
+
+
+def _enrich_homolog_items_from_pncp_sync(itens: List[Dict[str, Any]], *, max_n: int) -> int:
+    import asyncio
+
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            return 0
+    except RuntimeError:
+        pass
+    return asyncio.run(_enrich_homolog_items_from_pncp(itens, max_n=max_n))
+
+
 def _local_item_filter_clauses(
     *,
     uf: Optional[str],
@@ -1315,11 +1410,21 @@ def local_item_search(
     codigo_modalidade: Optional[int] = None,
     limit: int = 500,
     cleanup_for_display: bool = True,
+    somente_homologados: Optional[bool] = None,
 ) -> Dict[str, Any]:
     ensure_local_index()
+    only_homolog = _resolve_somente_homologados_flag(somente_homologados)
     token_groups = _build_search_tokens(termo_busca)
     if not token_groups:
-        return {"ok": True, "itens": [], "stats": {"total_registros": 0, "search_engine": "none"}}
+        return {
+            "ok": True,
+            "itens": [],
+            "stats": {
+                "total_registros": 0,
+                "search_engine": "none",
+                "somente_homologados": only_homolog,
+            },
+        }
 
     filter_where, filter_params = _local_item_filter_clauses(
         uf=uf,
@@ -1400,18 +1505,41 @@ def local_item_search(
 
     itens: List[Dict[str, Any]] = []
     com_fornecedor = 0
+    filtrados_nao_homolog = 0
+    candidatos_enrich: List[Dict[str, Any]] = []
     for r in rows:
         desc = r["descricao"] or ""
         mat = r["material_servico"] or ""
         texto_item = f"{desc} {mat}".strip()
         if not _row_matches_search_tokens(texto_item, token_groups):
             continue
+        if only_homolog and not _row_passes_homolog_filter(r, somente_homologados=True):
+            filtrados_nao_homolog += 1
+            continue
         entry = _row_to_local_item(r, cleanup_for_display=cleanup_for_display)
+        sit_compra = str(entry.get("situacao_compra") or entry.get("situacao") or "").strip()
+        catalog = _decompress_zlib_json_blob(_row_get(r, "raw_json_zlib"))
+        homolog = item_homologado_para_busca(
+            catalog if isinstance(catalog, dict) else {},
+            situacao_compra=sit_compra,
+        )
+        entry["item_homologado"] = homolog
+        if str(entry.get("situacaoCompraItemNome") or "").strip():
+            entry["situacao_item_exibicao"] = entry.get("situacaoCompraItemNome")
         if str(entry.get("cnpj_fornecedor") or "").strip():
             com_fornecedor += 1
+        elif homolog:
+            candidatos_enrich.append(entry)
         itens.append(entry)
         if len(itens) >= max(1, min(int(limit), 5000)):
             break
+
+    enrich_max = max(0, int(PNCP_SEARCH_ENRICH_HOMOLOG_MAX))
+    enrich_n = 0
+    if enrich_max and candidatos_enrich:
+        enrich_n = _enrich_homolog_items_from_pncp_sync(candidatos_enrich, max_n=enrich_max)
+        com_fornecedor = sum(1 for it in itens if str(it.get("cnpj_fornecedor") or "").strip())
+
     return {
         "ok": True,
         "itens": itens,
@@ -1420,6 +1548,9 @@ def local_item_search(
             "itens_com_cnpj_fornecedor": com_fornecedor,
             "search_engine": search_engine,
             "fts_needs_rebuild": bool(fts_meta.get("needs_rebuild")),
+            "somente_homologados": only_homolog,
+            "filtrados_nao_homologados": filtrados_nao_homolog,
+            "enriquecidos_pncp_na_busca": enrich_n,
         },
     }
 

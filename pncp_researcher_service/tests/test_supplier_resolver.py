@@ -25,6 +25,7 @@ from app.supplier_resolver import (  # noqa: E402
     compra_elegivel,
     extract_supplier_cnpj_only,
     item_elegivel,
+    item_homologado_para_busca,
     merge_with_cadastro,
     normalize_cnpj,
     resolve_from_contratos_payload,
@@ -106,6 +107,20 @@ class TestSupplierResolver(unittest.TestCase):
         self.assertTrue(compra_elegivel("Homologada"))
         self.assertFalse(compra_elegivel("Revogada"))
         self.assertTrue(item_elegivel({"temResultado": True}, situacao_compra="Em andamento"))
+
+    def test_homologado_para_busca_estrito(self):
+        self.assertTrue(
+            item_homologado_para_busca(
+                {"situacaoCompraItemNome": "Homologado"},
+                situacao_compra="Em andamento",
+            )
+        )
+        self.assertFalse(
+            item_homologado_para_busca(
+                {"temResultado": True, "situacaoCompraItemNome": "Em andamento"},
+            )
+        )
+        self.assertFalse(item_homologado_para_busca({"situacaoCompraItemNome": "Revogado"}))
 
     def test_extract_cnpj_ignores_orgao_path(self):
         payload = {

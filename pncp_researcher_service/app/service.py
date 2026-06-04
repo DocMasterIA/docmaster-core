@@ -1810,6 +1810,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         codigo_modalidade=payload.codigo_modalidade,
         limit=limit,
         cleanup_for_display=False,
+        somente_homologados=payload.somente_homologados,
     )
     itens = list(base_items.get("itens") or [])
     base_stats = dict(base_items.get("stats") or {})

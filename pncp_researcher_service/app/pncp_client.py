@@ -20,11 +20,16 @@ from .config import (
     PNCP_RATE_LIMIT_BACKOFF_CAP_SECONDS,
 )
 from .supplier_resolver import (
+    SupplierResolution,
     cnpj_digits as _cnpj_digits,
     extract_item_numbers_prioritized as _extract_item_numbers_prioritized,
-    extract_supplier_cnpj_only as _extract_supplier_cnpj_only,
-    normalize_cnpj as _normalize_cnpj,
+    find_catalog_item_row,
+    merge_with_cadastro,
+    nome_fornecedor_e_util,
     parse_brasilapi_to_fornecedor as _parse_brasilapi_to_fornecedor,
+    resolution_to_api_dict,
+    resolve_from_item_catalog_row,
+    resolve_from_resultados_payload,
 )
 
 
@@ -303,73 +308,127 @@ async def fetch_brasilapi_fornecedor_por_cnpj(
     return _parse_brasilapi_to_fornecedor(body, cnpj_digits_val=d)
 
 
+async def _finalize_supplier_resolution(
+    client: httpx.AsyncClient,
+    res: SupplierResolution,
+) -> Dict[str, Any]:
+    """PNCP primeiro; BrasilAPI só se faltar nome útil."""
+    merged = res
+    if res.cnpj_fornecedor and not nome_fornecedor_e_util(res.fornecedor):
+        nome, cad = await fetch_brasilapi_fornecedor_por_cnpj(client, res.cnpj_fornecedor)
+        merged = merge_with_cadastro(res, nome=nome, cadastro=cad, fonte_nome="brasilapi_cnpj")
+    elif res.cnpj_fornecedor and res.fornecedor and not merged.fornecedor_fonte:
+        merged.fornecedor_fonte = "pncp"
+    out = resolution_to_api_dict(merged)
+    if merged.fornecedor and "brasilapi" in (merged.fornecedor_fonte or ""):
+        out["fornecedor_fonte_nome"] = "brasilapi_cnpj"
+    elif merged.fornecedor and merged.fornecedor_fonte:
+        out["fornecedor_fonte_nome"] = merged.fornecedor_fonte
+    return out
+
+
+async def _fetch_json_pncp(client: httpx.AsyncClient, url: str) -> Any:
+    resp = await _get_pncp(client, url, params=None, tolerate_rate_limit=True)
+    if resp is None or resp.status_code in (204, 404) or resp.status_code >= 400:
+        return None
+    try:
+        return resp.json()
+    except ValueError:
+        return None
+
+
 async def get_contract_supplier_snapshot(
     cnpj_orgao: str,
     ano_compra: Any,
     sequencial_compra: Any,
     *,
+    numero_item: Optional[str] = None,
+    situacao_compra: Any = None,
     client: Optional[httpx.AsyncClient] = None,
 ) -> Dict[str, Any]:
     """
-    Obtém CNPJ do fornecedor vencedor via PNCP (/itens/.../resultados ou /resultados)
-    e resolve nome + cadastro na BrasilAPI (mesma fonte da cotação direta).
+    Fornecedor vencedor por linha de item quando `numero_item` é informado;
+    senão fallback na compra (itens priorizados + /resultados).
     """
+    empty: Dict[str, Any] = {"cnpj_fornecedor": "", "fornecedor": "", "fornecedor_cadastro": {}}
     cnpj = _cnpj_digits(str(cnpj_orgao or ""))
     ano = str(ano_compra or "").strip()
     seq = str(sequencial_compra or "").strip()
     if len(cnpj) != 14 or not ano or not seq:
-        return {"cnpj_fornecedor": "", "fornecedor": "", "fornecedor_cadastro": {}}
+        return empty
 
     base = f"{PNCP_PNCP_API_BASE_URL}/v1/orgaos/{cnpj}/compras/{ano}/{seq}"
+    sit_compra = str(situacao_compra or "").strip()
+    n_item = str(numero_item or "").strip()
 
     close_client = False
     if client is None:
         client = create_pncp_http_client()
         close_client = True
 
-    async def _finalize(cnpj_fmt: str) -> Dict[str, Any]:
-        if not cnpj_fmt:
-            return {"cnpj_fornecedor": "", "fornecedor": "", "fornecedor_cadastro": {}}
-        nome, cad = await fetch_brasilapi_fornecedor_por_cnpj(client, cnpj_fmt)
-        out: Dict[str, Any] = {"cnpj_fornecedor": cnpj_fmt, "fornecedor": nome, "fornecedor_cadastro": cad or {}}
-        if nome or cad:
-            out["fornecedor_fonte_nome"] = "brasilapi_cnpj"
-        return out
-
     try:
-        itens_resp = await _get_pncp(client, f"{base}/itens", params=None, tolerate_rate_limit=True)
+        if n_item:
+            res_data = await _fetch_json_pncp(client, f"{base}/itens/{n_item}/resultados")
+            if res_data is not None:
+                res = resolve_from_resultados_payload(
+                    res_data,
+                    numero_item=n_item,
+                    situacao_compra=sit_compra,
+                    fonte_prefix="pncp_resultado_item",
+                )
+                if res.cnpj_fornecedor or res.fornecedor:
+                    return await _finalize_supplier_resolution(client, res)
+
+            root_data = await _fetch_json_pncp(client, f"{base}/resultados")
+            if root_data is not None:
+                res = resolve_from_resultados_payload(
+                    root_data,
+                    numero_item=n_item,
+                    situacao_compra=sit_compra,
+                    fonte_prefix="pncp_resultado_compra",
+                )
+                if res.cnpj_fornecedor or res.fornecedor:
+                    return await _finalize_supplier_resolution(client, res)
+
+            itens_data = await _fetch_json_pncp(client, f"{base}/itens")
+            catalog_row = find_catalog_item_row(itens_data, n_item) if itens_data is not None else None
+            if catalog_row:
+                res = resolve_from_item_catalog_row(catalog_row, situacao_compra=sit_compra)
+                if res.cnpj_fornecedor or res.fornecedor:
+                    return await _finalize_supplier_resolution(client, res)
+            return empty
+
         nums: List[str] = []
-        if itens_resp is not None and itens_resp.status_code < 400:
+        itens_data = await _fetch_json_pncp(client, f"{base}/itens")
+        if itens_data is not None:
             try:
-                nums = _extract_item_numbers_prioritized(itens_resp.json(), max_items=3)
+                nums = _extract_item_numbers_prioritized(itens_data, max_items=3)
             except Exception:
                 nums = []
-        for n_item in nums:
-            res_resp = await _get_pncp(
-                client, f"{base}/itens/{n_item}/resultados", params=None, tolerate_rate_limit=True
+        for num in nums:
+            res_data = await _fetch_json_pncp(client, f"{base}/itens/{num}/resultados")
+            if res_data is None:
+                continue
+            res = resolve_from_resultados_payload(
+                res_data,
+                numero_item=num,
+                situacao_compra=sit_compra,
+                fonte_prefix="pncp_resultado_item",
             )
-            if res_resp is None or res_resp.status_code in (204, 404) or res_resp.status_code >= 400:
-                continue
-            try:
-                res_data = res_resp.json()
-            except ValueError:
-                continue
-            cj = _extract_supplier_cnpj_only(res_data)
-            if cj:
-                return await _finalize(cj)
+            if res.cnpj_fornecedor or res.fornecedor:
+                return await _finalize_supplier_resolution(client, res)
 
-        res_root = await _get_pncp(client, f"{base}/resultados", params=None, tolerate_rate_limit=True)
-        if res_root is not None and res_root.status_code < 400:
-            try:
-                root_data = res_root.json()
-            except ValueError:
-                root_data = None
-            if root_data is not None:
-                cj = _extract_supplier_cnpj_only(root_data)
-                if cj:
-                    return await _finalize(cj)
+        root_data = await _fetch_json_pncp(client, f"{base}/resultados")
+        if root_data is not None:
+            res = resolve_from_resultados_payload(
+                root_data,
+                situacao_compra=sit_compra,
+                fonte_prefix="pncp_resultado_compra",
+            )
+            if res.cnpj_fornecedor or res.fornecedor:
+                return await _finalize_supplier_resolution(client, res)
     finally:
         if close_client:
             await client.aclose()
 
-    return {"cnpj_fornecedor": "", "fornecedor": "", "fornecedor_cadastro": {}}
+    return empty

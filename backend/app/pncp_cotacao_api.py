@@ -38,6 +38,7 @@ from backend.app.models import (
     PncpCotacaoItemCotacao,
     Prefeitura,
 )
+from backend.app.services.pncp_supplier_enrichment import enrich_supplier_fields_in_payloads
 from backend.app.services.pncp_relatorio_itens import (
     agrupar_cotacoes_por_item_relatorio_pesquisa_precos,
     agrupar_itens_relatorio_pesquisa_precos,
@@ -177,6 +178,15 @@ _SOURCE_KEEP_KEYS = frozenset(
         "cnpjCpfFornecedor",
         "niFornecedor",
         "cnpj",
+        "fornecedor_fonte",
+        "fornecedor_fonte_nome",
+        "fornecedor_cadastro",
+        "fornecedor_elegivel",
+        "fornecedor_origem_indice",
+        "fornecedor_enriquecido_ao_adicionar",
+        "situacao",
+        "situacao_compra",
+        "situacaoCompraNome",
     }
 )
 
@@ -1358,6 +1368,8 @@ def pncp_research_sessions_add_items(request, sessao_id: int):
                     next_numero_item = n + 1
             normalized_itens.append(payload)
 
+        enrich_supplier_fields_in_payloads(normalized_itens)
+
         built = [_item_from_payload(it, c) for it in normalized_itens]
         for i in range(0, len(built), BULK_CREATE_BATCH):
             chunk = built[i : i + BULK_CREATE_BATCH]
@@ -1437,12 +1449,13 @@ def pncp_research_sessions_item_cotacoes(request, sessao_id: int, item_id: int):
             )
         )
 
+    dict_rows = [dict(r) for r in raw_cotacoes if isinstance(r, dict)]
+    enrich_supplier_fields_in_payloads(dict_rows)
+
     built: List[PncpCotacaoItemCotacao] = []
     ignored_duplicadas = 0
     request_seen: set[str] = set()
-    for row in raw_cotacoes:
-        if not isinstance(row, dict):
-            continue
+    for row in dict_rows:
         k = _dedupe_key(row)
         if k and (k in existing_keys or k in request_seen):
             ignored_duplicadas += 1

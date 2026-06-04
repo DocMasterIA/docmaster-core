@@ -209,7 +209,28 @@ Reutilizar scoring já existente em `_extract_item_numbers_prioritized` (`temRes
 cd pncp_researcher_service && python -m unittest discover -s tests -v
 ```
 
-### Fase B — Ingestão no caminho quente
+### Passo 3 — Enriquecer ao adicionar fonte à cotação ✅
+
+- [x] `enrich_supplier_fields_in_payloads` — PNCP `/itens/{n}/resultados` por `numero_item` se payload sem CNPJ/nome  
+- [x] Hook em `pncp_research_sessions_item_cotacoes` (POST fontes) e `add_items`  
+- [x] Settings: `PNCP_ADD_SOURCE_ENRICH_SUPPLIER`, `PNCP_ADD_SOURCE_MAX_PNCP_LOOKUPS` (24), `PNCP_ADD_SOURCE_MAX_BRASILAPI_LOOKUPS` (48)  
+
+### Passo 2 — Busca local / IA com fornecedor do índice (sem alterar ingestão) ✅
+
+- [x] `_supplier_fields_from_local_row` — lê `raw_json_zlib` + colunas `pncp_itens` via `supplier_resolver`  
+- [x] `local_item_search` / `market_search_intelligent` expõem `cnpj_fornecedor`, `fornecedor`, …  
+- [x] Híbrido: se item local sem CNPJ e live tiver, preenche na mesma chave  
+- [x] Django `_SOURCE_KEEP_KEYS` preserva fornecedor ao adicionar item/cotação  
+
+### Passo 1 — Fornecedor por linha de item (sem alterar ingestão) ✅
+
+- [x] `get_contract_supplier_snapshot(..., numero_item=, situacao_compra=)` — researcher  
+- [x] `get_contract_supplier_snapshot_sync` + cache `(órgão, ano, seq, numero_item)` — Django PDF/cotação  
+- [x] Busca ao vivo: `numero_item` da linha que melhor casa com o termo em `/itens`  
+
+**Escopo do cliente:** não muda backfill 24/7; melhora encontrar CNPJ no momento da busca/enrichment.
+
+### Fase B — Ingestão no caminho quente (opcional / fora do escopo atual)
 
 - [ ] Hook pós-`upsert_contract_items` no backfill (flag desligada por default em dev)  
 - [ ] Rate limit + semáforo + logging por contrato  

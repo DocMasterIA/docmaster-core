@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import requests
+from django.conf import settings
 
 from backend.app.models import PncpCotacaoItemCotacao
 
@@ -265,42 +266,289 @@ def _extract_item_numbers(items_payload: Any, max_items: int = 8) -> List[str]:
     return out
 
 
-def get_contract_supplier_snapshot_sync(cnpj_orgao: str, ano_compra: Any, sequencial_compra: Any) -> Dict[str, Any]:
+def _numero_item_from_row_or_source(row: PncpCotacaoItemCotacao, src: Dict[str, Any]) -> str:
+    for raw in (
+        getattr(row, "numero_item", None),
+        src.get("numero_item"),
+        src.get("numeroItem"),
+    ):
+        n = str(raw or "").strip()
+        if n:
+            return n
+    return ""
+
+
+def _finalize_supplier_snapshot_sync(snap: Dict[str, str]) -> Dict[str, Any]:
+    cnpj_fmt = str(snap.get("cnpj_fornecedor") or "").strip()
+    nome = str(snap.get("fornecedor") or "").strip()
+    if not cnpj_fmt and not nome:
+        return {"cnpj_fornecedor": "", "fornecedor": "", "fornecedor_cadastro": {}}
+    if cnpj_fmt and not _fornecedor_tem_nome_util({"fornecedor": nome}):
+        nome_br, cad = fetch_brasilapi_fornecedor_por_cnpj(cnpj_fmt)
+        if nome_br:
+            nome = nome_br
+        out: Dict[str, Any] = {
+            "cnpj_fornecedor": cnpj_fmt,
+            "fornecedor": nome,
+            "fornecedor_cadastro": cad or {},
+        }
+        if nome_br or cad:
+            out["fornecedor_fonte_nome"] = "brasilapi_cnpj"
+        return out
+    out = {"cnpj_fornecedor": cnpj_fmt, "fornecedor": nome, "fornecedor_cadastro": {}}
+    if nome:
+        out["fornecedor_fonte_nome"] = "pncp"
+    return out
+
+
+def _supplier_snap_from_resultados_payload(
+    data: Any,
+    *,
+    numero_item: str = "",
+    situacao_compra: str = "",
+) -> Dict[str, str]:
+    """Extrai fornecedor do JSON /resultados com match opcional por numeroItem."""
+    if numero_item and isinstance(data, dict) and isinstance(data.get("data"), list):
+        want = str(numero_item).strip()
+        for row in data["data"]:
+            if not isinstance(row, dict):
+                continue
+            got = str(row.get("numeroItem") or row.get("ordemItem") or "").strip()
+            if got == want:
+                snap = _extract_supplier_snapshot(row)
+                if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
+                    return snap
+    return _extract_supplier_snapshot(data)
+
+
+def _find_catalog_row(items_payload: Any, numero_item: str) -> Optional[Dict[str, Any]]:
+    want = str(numero_item or "").strip()
+    if not want:
+        return None
+    if isinstance(items_payload, dict) and isinstance(items_payload.get("data"), list):
+        rows = items_payload["data"]
+    elif isinstance(items_payload, list):
+        rows = items_payload
+    else:
+        return None
+    for it in rows:
+        if not isinstance(it, dict):
+            continue
+        got = str(it.get("numeroItem") or it.get("ordemItem") or it.get("sequencialItem") or "").strip()
+        if got == want:
+            return it
+    return None
+
+
+def get_contract_supplier_snapshot_sync(
+    cnpj_orgao: str,
+    ano_compra: Any,
+    sequencial_compra: Any,
+    *,
+    numero_item: Optional[str] = None,
+    situacao_compra: Any = None,
+) -> Dict[str, Any]:
+    """
+    Fornecedor por `numero_item` quando informado; senão fallback por compra.
+    """
+    empty = {"cnpj_fornecedor": "", "fornecedor": "", "fornecedor_cadastro": {}}
     cnpj = re.sub(r"\D", "", str(cnpj_orgao or ""))
     ano = str(ano_compra or "").strip()
     seq = str(sequencial_compra or "").strip()
     if len(cnpj) != 14 or not ano or not seq:
-        return {"cnpj_fornecedor": "", "fornecedor": "", "fornecedor_cadastro": {}}
+        return empty
 
     base = f"{PNCP_API_BASE}/v1/orgaos/{cnpj}/compras/{ano}/{seq}"
+    sit = str(situacao_compra or "").strip()
+    n_item = str(numero_item or "").strip()
 
-    def _finalize(cnpj_fmt: str) -> Dict[str, Any]:
-        if not cnpj_fmt:
-            return {"cnpj_fornecedor": "", "fornecedor": "", "fornecedor_cadastro": {}}
-        nome, cad = fetch_brasilapi_fornecedor_por_cnpj(cnpj_fmt)
-        out: Dict[str, Any] = {"cnpj_fornecedor": cnpj_fmt, "fornecedor": nome, "fornecedor_cadastro": cad or {}}
-        if nome or cad:
-            out["fornecedor_fonte_nome"] = "brasilapi_cnpj"
-        return out
-
-    # Caminho mais eficiente (documentado no manual PNCP): resultado por item — só CNPJ.
-    itens_data = _get_json(f"{base}/itens")
-    nums = _extract_item_numbers(itens_data, max_items=3)
-    if nums:
-        n_item = nums[0]
+    if n_item:
         data = _get_json(f"{base}/itens/{n_item}/resultados")
         if data is not None:
-            cj = _extract_supplier_cnpj_only(data)
-            if cj:
-                return _finalize(cj)
+            snap = _supplier_snap_from_resultados_payload(
+                data, numero_item=n_item, situacao_compra=sit
+            )
+            if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
+                return _finalize_supplier_snapshot_sync(snap)
 
-    # Fallback mínimo (1 GET) quando o resultado por item não responde.
+        data = _get_json(f"{base}/resultados")
+        if data is not None:
+            snap = _supplier_snap_from_resultados_payload(
+                data, numero_item=n_item, situacao_compra=sit
+            )
+            if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
+                return _finalize_supplier_snapshot_sync(snap)
+
+        itens_data = _get_json(f"{base}/itens")
+        catalog = _find_catalog_row(itens_data, n_item)
+        if catalog:
+            snap = _extract_supplier_snapshot(catalog)
+            if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
+                return _finalize_supplier_snapshot_sync(snap)
+        return empty
+
+    itens_data = _get_json(f"{base}/itens")
+    nums = _extract_item_numbers(itens_data, max_items=3)
+    for num in nums:
+        data = _get_json(f"{base}/itens/{num}/resultados")
+        if data is not None:
+            snap = _supplier_snap_from_resultados_payload(data, numero_item=num)
+            if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
+                return _finalize_supplier_snapshot_sync(snap)
+
     data = _get_json(f"{base}/resultados")
     if data is not None:
-        cj = _extract_supplier_cnpj_only(data)
-        if cj:
-            return _finalize(cj)
-    return {"cnpj_fornecedor": "", "fornecedor": "", "fornecedor_cadastro": {}}
+        snap = _supplier_snap_from_resultados_payload(data)
+        if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
+            return _finalize_supplier_snapshot_sync(snap)
+    return empty
+
+
+def _safe_int_field(v: Any, *, min_v: int, max_v: int) -> Optional[int]:
+    try:
+        n = int(v)
+    except (TypeError, ValueError):
+        return None
+    if n < min_v or n > max_v:
+        return None
+    return n
+
+
+def _numero_item_from_payload(it: Dict[str, Any]) -> str:
+    for key in ("numero_item", "numeroItem"):
+        n = str(it.get(key) or "").strip()
+        if n:
+            return n
+    return ""
+
+
+def _payload_supplier_complete(it: Dict[str, Any]) -> bool:
+    has_cnpj = bool(str(it.get("cnpj_fornecedor") or "").strip())
+    return has_cnpj and _fornecedor_tem_nome_util(it)
+
+
+def _merge_supplier_snap_into_payload(it: Dict[str, Any], snap: Dict[str, Any]) -> bool:
+    """Mescla snapshot PNCP/BrasilAPI no dict do front; retorna True se alterou."""
+    if not isinstance(snap, dict):
+        return False
+    changed = False
+    cnpj_f = str(snap.get("cnpj_fornecedor") or "").strip()
+    nome_f = str(snap.get("fornecedor") or "").strip()
+    if cnpj_f and not str(it.get("cnpj_fornecedor") or "").strip():
+        it["cnpj_fornecedor"] = cnpj_f
+        changed = True
+    if nome_f and not _fornecedor_tem_nome_util(it):
+        it["fornecedor"] = nome_f
+        changed = True
+    cad = snap.get("fornecedor_cadastro")
+    if isinstance(cad, dict) and cad:
+        prev = it.get("fornecedor_cadastro")
+        if not isinstance(prev, dict):
+            prev = {}
+        merged_cad = {**prev, **cad}
+        if merged_cad != prev:
+            it["fornecedor_cadastro"] = merged_cad
+            changed = True
+    if snap.get("fornecedor_fonte_nome") and not str(it.get("fornecedor_fonte_nome") or "").strip():
+        it["fornecedor_fonte_nome"] = snap["fornecedor_fonte_nome"]
+        changed = True
+    if snap.get("fornecedor_fonte") and not str(it.get("fornecedor_fonte") or "").strip():
+        it["fornecedor_fonte"] = snap["fornecedor_fonte"]
+        changed = True
+    if changed:
+        it["fornecedor_enriquecido_ao_adicionar"] = True
+    return changed
+
+
+def enrich_supplier_fields_in_payloads(
+    payloads: Iterable[Dict[str, Any]],
+    *,
+    max_pncp_lookups: Optional[int] = None,
+    max_brasilapi_lookups: Optional[int] = None,
+) -> int:
+    """
+    Passo 3: ao adicionar fonte da busca, consulta PNCP por numero_item se faltar CNPJ/nome.
+    Retorna quantidade de lookups PNCP realizados.
+    """
+    if not getattr(settings, "PNCP_ADD_SOURCE_ENRICH_SUPPLIER", True):
+        return 0
+    lim_pncp = max_pncp_lookups
+    if lim_pncp is None:
+        lim_pncp = int(getattr(settings, "PNCP_ADD_SOURCE_MAX_PNCP_LOOKUPS", 24))
+    lim_br = max_brasilapi_lookups
+    if lim_br is None:
+        lim_br = int(getattr(settings, "PNCP_ADD_SOURCE_MAX_BRASILAPI_LOOKUPS", 48))
+
+    cache: Dict[Tuple[str, int, int, str], Dict[str, Any]] = {}
+    brasil_cache: Dict[str, tuple[str, Dict[str, Any]]] = {}
+    lookups = 0
+    brasil_fetches = 0
+    enriched_count = 0
+
+    for it in payloads:
+        if not isinstance(it, dict):
+            continue
+        if _payload_supplier_complete(it):
+            continue
+
+        has_cnpj = bool(str(it.get("cnpj_fornecedor") or "").strip())
+        if not has_cnpj:
+            display = _fornecedor_display_name_from_source(it)
+            if _nome_e_somente_cnpj_formatado(display):
+                fmt = _normalize_cnpj(_cnpj_digits(display))
+                if fmt:
+                    it["cnpj_fornecedor"] = fmt
+                    has_cnpj = True
+
+        if has_cnpj and not _fornecedor_tem_nome_util(it):
+            ck = _cnpj_digits(str(it.get("cnpj_fornecedor") or ""))
+            if len(ck) == 14 and ck in brasil_cache:
+                nome_br, cad_br = brasil_cache[ck]
+            elif len(ck) == 14 and brasil_fetches < lim_br:
+                nome_br, cad_br = fetch_brasilapi_fornecedor_por_cnpj(str(it.get("cnpj_fornecedor") or ""))
+                brasil_cache[ck] = (nome_br, cad_br)
+                brasil_fetches += 1
+            else:
+                nome_br, cad_br = "", {}
+            if nome_br or cad_br:
+                snap_br = {
+                    "cnpj_fornecedor": it.get("cnpj_fornecedor"),
+                    "fornecedor": nome_br,
+                    "fornecedor_cadastro": cad_br,
+                    "fornecedor_fonte_nome": "brasilapi_cnpj",
+                }
+                if _merge_supplier_snap_into_payload(it, snap_br):
+                    enriched_count += 1
+            if _payload_supplier_complete(it):
+                continue
+
+        cnpj_org = _extract_cnpj_orgao(str(it.get("numero_pncp") or it.get("numeroControlePNCP") or ""))
+        ano = _safe_int_field(it.get("ano_compra"), min_v=1990, max_v=2100)
+        seq = _safe_int_field(it.get("sequencial_compra"), min_v=1, max_v=2_147_483_647)
+        if len(cnpj_org) != 14 or ano is None or seq is None:
+            continue
+
+        numero_item = _numero_item_from_payload(it)
+        situacao = str(
+            it.get("situacao_compra") or it.get("situacao") or it.get("situacaoCompraNome") or ""
+        ).strip()
+        key = (cnpj_org, int(ano), int(seq), numero_item)
+        if key not in cache:
+            if lookups >= lim_pncp:
+                continue
+            cache[key] = get_contract_supplier_snapshot_sync(
+                cnpj_org,
+                int(ano),
+                int(seq),
+                numero_item=numero_item or None,
+                situacao_compra=situacao,
+            )
+            lookups += 1
+        snap = cache.get(key) or {}
+        if _merge_supplier_snap_into_payload(it, snap):
+            enriched_count += 1
+
+    return enriched_count
 
 
 def enrich_missing_supplier_fields_for_cotacao(
@@ -311,14 +559,19 @@ def enrich_missing_supplier_fields_for_cotacao(
 ) -> int:
     rows = list(
         PncpCotacaoItemCotacao.objects.filter(cotacao_id=cotacao_id).only(
-            "id", "numero_pncp", "ano_compra", "sequencial_compra", "source"
+            "id",
+            "numero_pncp",
+            "ano_compra",
+            "sequencial_compra",
+            "numero_item",
+            "source",
         )
     )
     if not rows:
         return 0
 
     updated: List[PncpCotacaoItemCotacao] = []
-    cache: Dict[Tuple[str, int, int], Dict[str, Any]] = {}
+    cache: Dict[Tuple[str, int, int, str], Dict[str, Any]] = {}
     lookups = 0
     # Cache BrasilAPI por CNPJ (evita N requisições iguais em cotações com muitas linhas).
     brasil_cache: Dict[str, tuple[str, Dict[str, Any]]] = {}
@@ -374,11 +627,19 @@ def enrich_missing_supplier_fields_for_cotacao(
         if len(cnpj_org) != 14 or ano <= 0 or seq <= 0:
             continue
 
-        key = (cnpj_org, ano, seq)
+        numero_item = _numero_item_from_row_or_source(row, src)
+        situacao = str(src.get("situacao") or src.get("situacaoCompraNome") or "").strip()
+        key = (cnpj_org, ano, seq, numero_item)
         if key not in cache:
             if lookups >= max_lookups:
                 break
-            cache[key] = get_contract_supplier_snapshot_sync(cnpj_org, ano, seq)
+            cache[key] = get_contract_supplier_snapshot_sync(
+                cnpj_org,
+                ano,
+                seq,
+                numero_item=numero_item or None,
+                situacao_compra=situacao,
+            )
             lookups += 1
         snap = cache.get(key) or {}
         cnpj_f = str(snap.get("cnpj_fornecedor") or "").strip()

@@ -403,6 +403,28 @@ def _item_text_from_table_rows(rows: List[Dict[str, Any]]) -> str:
     return " | ".join(texts)
 
 
+def _numero_item_from_best_matching_row(
+    rows: List[Dict[str, Any]],
+    query_groups: List[List[str]],
+) -> str:
+    """Número do item PNCP cuja descrição melhor casa com o termo (para fornecedor por linha)."""
+    best_score = 0.0
+    best_num = ""
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        line = _row_text_for_match(r)
+        if not line:
+            continue
+        sc = _compute_match_score(line, query_groups)
+        if sc > best_score:
+            best_score = sc
+            best_num = str(
+                r.get("numeroItem") or r.get("ordemItem") or r.get("sequencialItem") or ""
+            ).strip()
+    return best_num
+
+
 def _itens_destaque_e_amostra(
     rows: List[Dict[str, Any]],
     query_groups: List[List[str]],
@@ -486,7 +508,17 @@ async def _extract_matching_items_with_table_lookup(
                             rows = await asyncio.wait_for(lookup_coro, timeout=PNCP_ITEM_LOOKUP_TIMEOUT_SECONDS)
                         else:
                             rows = await lookup_coro
-                    fornecedor_coro = get_contract_supplier_snapshot(cnpj, ano, seq, client=http_client)
+                    numero_item_forn = ""
+                    if rows:
+                        numero_item_forn = _numero_item_from_best_matching_row(rows, query_groups)
+                    fornecedor_coro = get_contract_supplier_snapshot(
+                        cnpj,
+                        ano,
+                        seq,
+                        numero_item=numero_item_forn or None,
+                        situacao_compra=raw.get("situacaoCompraNome"),
+                        client=http_client,
+                    )
                     try:
                         fornecedor_data = await asyncio.wait_for(
                             fornecedor_coro,
@@ -1809,6 +1841,27 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                     str(lit.get("descricao_item") or "")[:120],
                 )
                 if key in seen:
+                    live_cnpj = str(lit.get("cnpj_fornecedor") or "").strip()
+                    if live_cnpj:
+                        for loc in itens:
+                            loc_key = (
+                                str(loc.get("numero_pncp") or ""),
+                                str(loc.get("numero_item") or ""),
+                                str(loc.get("descricao_item") or "")[:120],
+                            )
+                            if loc_key != key:
+                                continue
+                            if str(loc.get("cnpj_fornecedor") or "").strip():
+                                break
+                            loc["cnpj_fornecedor"] = live_cnpj
+                            if str(lit.get("fornecedor") or "").strip():
+                                loc["fornecedor"] = lit.get("fornecedor")
+                            if lit.get("fornecedor_cadastro"):
+                                loc["fornecedor_cadastro"] = lit.get("fornecedor_cadastro")
+                            if lit.get("fornecedor_fonte_nome"):
+                                loc["fornecedor_fonte_nome"] = lit.get("fornecedor_fonte_nome")
+                            loc["fornecedor_hibrido_live"] = True
+                            break
                     continue
                 seen.add(key)
                 lit = dict(lit)

@@ -29,6 +29,11 @@ logger = logging.getLogger(__name__)
 from .fornecedor_cache import cache_stats, ensure_fornecedor_cache_table
 from .pncp_client import PNCPClientError, create_pncp_http_client, get_contract_items, search_contracts
 from .search_text_clean import apply_item_display_cleanup, normalize_for_search
+from .supplier_resolver import (
+    nome_fornecedor_e_util,
+    resolution_to_api_dict,
+    resolve_from_item_catalog_row,
+)
 
 
 def _sqlite_pncp_search_norm(value: Any) -> str:
@@ -1021,6 +1026,96 @@ def _row_matches_search_tokens(text: str, tokens: List[List[str]]) -> bool:
     return True
 
 
+def _decompress_zlib_json_blob(raw_blob: Any) -> Optional[Dict[str, Any]]:
+    if not raw_blob:
+        return None
+    try:
+        if isinstance(raw_blob, memoryview):
+            raw_blob = raw_blob.tobytes()
+        if isinstance(raw_blob, (bytes, bytearray)):
+            payload = zlib.decompress(raw_blob)
+            raw = json.loads(payload.decode("utf-8"))
+        else:
+            return None
+    except Exception:
+        return None
+    return raw if isinstance(raw, dict) else None
+
+
+def _situacao_compra_from_contract_blob(contrato_raw_json: Any) -> str:
+    raw = contrato_raw_json
+    if isinstance(contrato_raw_json, (bytes, bytearray, memoryview)):
+        try:
+            raw = bytes(contrato_raw_json).decode("utf-8")
+        except Exception:
+            return ""
+    if not raw:
+        return ""
+    try:
+        data = json.loads(str(raw))
+    except Exception:
+        return ""
+    if not isinstance(data, dict):
+        return ""
+    return str(data.get("situacaoCompraNome") or data.get("situacao") or "").strip()
+
+
+def _row_get(r: sqlite3.Row, key: str, default: Any = None) -> Any:
+    try:
+        val = r[key]
+    except (KeyError, IndexError):
+        return default
+    return default if val is None else val
+
+
+def _supplier_fields_from_local_row(r: sqlite3.Row) -> Dict[str, Any]:
+    """
+    Fornecedor para busca local: colunas persistidas (futuro) ou JSON do item em raw_json_zlib.
+    """
+    cnpj_db = str(_row_get(r, "cnpj_fornecedor", "") or "").strip()
+    nome_db = str(_row_get(r, "fornecedor", "") or "").strip()
+    fonte_db = str(_row_get(r, "fornecedor_fonte", "") or "").strip()
+    elegivel_db = _row_get(r, "fornecedor_elegivel", 0)
+
+    if cnpj_db and nome_fornecedor_e_util(nome_db):
+        out: Dict[str, Any] = {
+            "cnpj_fornecedor": cnpj_db,
+            "fornecedor": nome_db,
+            "fornecedor_fonte": fonte_db or "indice_local",
+        }
+        if fonte_db:
+            out["fornecedor_fonte_nome"] = fonte_db
+        if int(elegivel_db or 0) == 1:
+            out["fornecedor_elegivel"] = True
+        return out
+
+    sit_compra = str(_row_get(r, "situacao_compra", "") or "").strip()
+    if not sit_compra:
+        sit_compra = _situacao_compra_from_contract_blob(_row_get(r, "contrato_raw_json"))
+
+    catalog = _decompress_zlib_json_blob(_row_get(r, "raw_json_zlib"))
+    if not catalog:
+        if cnpj_db:
+            return {
+                "cnpj_fornecedor": cnpj_db,
+                "fornecedor": nome_db,
+                "fornecedor_fonte": fonte_db or "indice_local",
+            }
+        return {}
+
+    res = resolve_from_item_catalog_row(catalog, situacao_compra=sit_compra)
+    if not res.cnpj_fornecedor and not res.fornecedor:
+        if cnpj_db:
+            return {"cnpj_fornecedor": cnpj_db, "fornecedor": nome_db}
+        return {}
+
+    out = resolution_to_api_dict(res)
+    out["fornecedor_origem_indice"] = "raw_json_catalog"
+    if out.get("fornecedor") and out.get("fornecedor_fonte") and "fornecedor_fonte_nome" not in out:
+        out["fornecedor_fonte_nome"] = str(out.get("fornecedor_fonte") or "")
+    return out
+
+
 def _extract_esfera_from_raw_blob(raw_blob: Any) -> tuple[Optional[str], Optional[str], Optional[str]]:
     if not raw_blob:
         return None, None, None
@@ -1194,6 +1289,11 @@ def _row_to_local_item(
         "poder_id": poder_id,
         "origem": origem,
     }
+    situacao_compra = str(_row_get(r, "situacao_compra", "") or "").strip()
+    if situacao_compra:
+        entry["situacao"] = situacao_compra
+        entry["situacao_compra"] = situacao_compra
+    entry.update(_supplier_fields_from_local_row(r))
     if cleanup_for_display:
         apply_item_display_cleanup(entry)
     return entry
@@ -1234,7 +1334,9 @@ def local_item_search(
     select_cols = """
         SELECT i.numero_pncp, i.ano_compra, i.sequencial_compra, i.numero_item, i.descricao, i.material_servico,
                i.quantidade, i.unidade_medida, i.valor_unitario, i.valor_total, i.orgao, i.municipio, i.uf,
-               i.modalidade_nome, i.data_publicacao, i.raw_json_zlib, c.raw_json AS contrato_raw_json
+               i.modalidade_nome, i.data_publicacao, i.raw_json_zlib,
+               i.cnpj_fornecedor, i.fornecedor, i.fornecedor_fonte, i.fornecedor_elegivel,
+               c.raw_json AS contrato_raw_json, c.situacao AS situacao_compra
     """
     if use_fts:
         where = ["pncp_itens_fts MATCH ?"]
@@ -1290,13 +1392,17 @@ def local_item_search(
             rows = c.execute(sql_fb, params_fb).fetchall()
 
     itens: List[Dict[str, Any]] = []
+    com_fornecedor = 0
     for r in rows:
         desc = r["descricao"] or ""
         mat = r["material_servico"] or ""
         texto_item = f"{desc} {mat}".strip()
         if not _row_matches_search_tokens(texto_item, token_groups):
             continue
-        itens.append(_row_to_local_item(r, cleanup_for_display=cleanup_for_display))
+        entry = _row_to_local_item(r, cleanup_for_display=cleanup_for_display)
+        if str(entry.get("cnpj_fornecedor") or "").strip():
+            com_fornecedor += 1
+        itens.append(entry)
         if len(itens) >= max(1, min(int(limit), 5000)):
             break
     return {
@@ -1304,6 +1410,7 @@ def local_item_search(
         "itens": itens,
         "stats": {
             "total_registros": len(itens),
+            "itens_com_cnpj_fornecedor": com_fornecedor,
             "search_engine": search_engine,
             "fts_needs_rebuild": bool(fts_meta.get("needs_rebuild")),
         },

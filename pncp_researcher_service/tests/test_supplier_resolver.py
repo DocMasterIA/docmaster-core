@@ -163,6 +163,17 @@ class TestFornecedorCache(unittest.TestCase):
         self.assertTrue(cache_is_fresh(fresh, max_age_days=90))
 
 
+class TestLocalSupplierFromCatalog(unittest.TestCase):
+    def test_supplier_from_item_catalog_fixture(self):
+        from app.supplier_resolver import resolve_from_item_catalog_row, resolution_to_api_dict
+
+        row = _fixture("item_catalog_inline.json")
+        res = resolve_from_item_catalog_row(row, situacao_compra="Homologada")
+        out = resolution_to_api_dict(res)
+        self.assertEqual(out["cnpj_fornecedor"], "11.222.333/0001-81")
+        self.assertEqual(out["fornecedor"], "PAPELARIA CENTRAL LTDA")
+
+
 class TestLocalIndexMigration(unittest.TestCase):
     def test_migrate_pncp_itens_supplier_columns(self):
         """Migração Fase A sem importar local_index (evita dependência httpx no host)."""

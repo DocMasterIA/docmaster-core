@@ -423,6 +423,44 @@ def parse_brasilapi_to_fornecedor(payload: Dict[str, Any], *, cnpj_digits_val: s
     return nome, {k: v for k, v in cadastro.items() if v}
 
 
+def find_catalog_item_row(items_payload: Any, numero_item: str) -> Optional[Dict[str, Any]]:
+    """Localiza a linha do GET /itens pelo numero_item."""
+    want = str(numero_item or "").strip()
+    if not want:
+        return None
+    if isinstance(items_payload, dict) and isinstance(items_payload.get("data"), list):
+        rows = items_payload["data"]
+    elif isinstance(items_payload, list):
+        rows = items_payload
+    else:
+        return None
+    for it in rows:
+        if not isinstance(it, dict):
+            continue
+        got = str(it.get("numeroItem") or it.get("ordemItem") or it.get("sequencialItem") or "").strip()
+        if got == want:
+            return it
+    return None
+
+
+def resolution_to_api_dict(res: SupplierResolution) -> Dict[str, Any]:
+    """Formato consumido por busca/cotação (`cnpj_fornecedor`, `fornecedor`, …)."""
+    out: Dict[str, Any] = {
+        "cnpj_fornecedor": res.cnpj_fornecedor,
+        "fornecedor": res.fornecedor,
+        "fornecedor_cadastro": dict(res.fornecedor_cadastro or {}),
+    }
+    if res.fornecedor_fonte:
+        out["fornecedor_fonte"] = res.fornecedor_fonte
+        if res.fornecedor and "brasilapi" not in res.fornecedor_fonte:
+            out["fornecedor_fonte_nome"] = res.fornecedor_fonte
+        elif res.fornecedor:
+            out["fornecedor_fonte_nome"] = res.fornecedor_fonte
+    if res.fornecedor_elegivel:
+        out["fornecedor_elegivel"] = True
+    return out
+
+
 def resolve_item_supplier_offline(
     *,
     item_row: Optional[Dict[str, Any]] = None,

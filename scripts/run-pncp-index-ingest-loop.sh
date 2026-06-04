@@ -28,13 +28,20 @@ if ! flock -n 9; then
 fi
 
 BASE_URL="${PNCP_BASE_URL:-http://127.0.0.1:8012}"
-# Com docker-compose.pncp.noports.yml não há 8012 no host — curl falha e o índice não sobe.
-PNCP_INGEST_VIA_DOCKER="${PNCP_INGEST_VIA_DOCKER:-0}"
-if [[ -f "${DEPLOY}/docker-compose.pncp.noports.yml" ]]; then
-  PNCP_INGEST_VIA_DOCKER=1
-elif ! curl -sf --max-time 5 "${BASE_URL}/api/pncp-research/health" >/dev/null 2>&1; then
+# Com docker-compose.pncp.noports.yml não há 8012 no host — curl no host trava/falha o backfill.
+# Preferir docker exec quando o contentor existe (mesmo se DEPLOY=docmaster-core/ sem noports.yml).
+PNCP_INGEST_VIA_DOCKER="${PNCP_INGEST_VIA_DOCKER:-}"
+_pncp_compose_home="${DOCMASTER_DEPLOY_DIR:-${HOME}}"
+if [[ -z "${PNCP_INGEST_VIA_DOCKER}" ]]; then
   if docker inspect pncp_researcher_service >/dev/null 2>&1; then
     PNCP_INGEST_VIA_DOCKER=1
+  elif [[ -f "${DEPLOY}/docker-compose.pncp.noports.yml" ]] \
+    || [[ -f "${_pncp_compose_home}/docker-compose.pncp.noports.yml" ]]; then
+    PNCP_INGEST_VIA_DOCKER=1
+  elif ! curl -sf --max-time 5 "${BASE_URL}/api/pncp-research/health" >/dev/null 2>&1; then
+    PNCP_INGEST_VIA_DOCKER=1
+  else
+    PNCP_INGEST_VIA_DOCKER=0
   fi
 fi
 MONTHS="${PNCP_INGEST_MONTHS:-12}"
@@ -106,8 +113,9 @@ print(json.dumps({
 PY
 )
   log "INGEST START uf=${uf} max_paginas=${MAX_PAGINAS} (timeout ${CURL_MAX_TIME}s — aguarde)"
+  local json_log="${PNCP_INGEST_JSON_LOG:-${HOME}/pncp-ingest-responses.jsonl}"
   if pncp_http POST "/api/pncp-research/local-index/backfill" "${body}" "${CURL_MAX_TIME}" \
-    >>"${PNCP_INGEST_LOG:-/dev/stdout}" 2>&1; then
+    >>"${json_log}" 2>&1; then
     log "INGEST OK uf=${uf}"
   else
     log "INGEST FAIL uf=${uf} (exit $?)"

@@ -198,7 +198,8 @@ async def ingest_worker_loop() -> None:
         return
 
     logger.info("ingest worker iniciado poll=%.1fs", PNCP_INGEST_WORKER_POLL_SECONDS)
-    last_plan = 0.0
+    # Evita planejamento imediato no boot (uvicorn sobe antes de estabilizar volume/DB).
+    last_plan = time.monotonic()
     while True:
         try:
             now = time.monotonic()

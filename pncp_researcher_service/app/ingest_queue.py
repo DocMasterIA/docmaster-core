@@ -274,13 +274,15 @@ def queue_stats() -> Dict[str, Any]:
 
 
 def count_contracts_without_items() -> int:
+    """Aproximação O(1): contratos − contratos distintos com ≥1 linha em pncp_itens."""
     with _queue_conn() as c:
         row = c.execute(
             """
-            SELECT COUNT(*) AS n FROM pncp_contratos c
-            WHERE NOT EXISTS (
-                SELECT 1 FROM pncp_itens i WHERE i.numero_pncp = c.numero_pncp LIMIT 1
-            )
+            SELECT
+              (SELECT COUNT(*) FROM pncp_contratos) AS total_contratos,
+              (SELECT COUNT(DISTINCT numero_pncp) FROM pncp_itens) AS com_itens
             """
         ).fetchone()
-        return int(row["n"] if row else 0)
+        if not row:
+            return 0
+        return max(0, int(row["total_contratos"] or 0) - int(row["com_itens"] or 0))

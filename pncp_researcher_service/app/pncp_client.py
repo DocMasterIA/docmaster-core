@@ -18,6 +18,8 @@ from .config import (
     PNCP_BUCKET_REFILL_PER_SEC,
     PNCP_RATE_LIMIT_EXTRA_ATTEMPTS,
     PNCP_RATE_LIMIT_BACKOFF_CAP_SECONDS,
+    PNCP_INGEST_JSON_INVALID_RETRIES,
+    PNCP_INGEST_JSON_INVALID_RETRY_SECONDS,
 )
 from .supplier_resolver import (
     SupplierResolution,
@@ -200,34 +202,46 @@ async def search_contracts(
     if client is None:
         client = create_pncp_http_client()
         close_client = True
+
+    json_attempts = max(1, int(PNCP_INGEST_JSON_INVALID_RETRIES) + 1)
+    last_json_error: Optional[ValueError] = None
     try:
-        resp = await _get_pncp(
-            client,
-            endpoint,
-            params=req_params,
-            tolerate_rate_limit=tolerate_rate_limit,
-        )
+        for json_try in range(json_attempts):
+            resp = await _get_pncp(
+                client,
+                endpoint,
+                params=req_params,
+                tolerate_rate_limit=tolerate_rate_limit,
+            )
+            if resp is None:
+                return []
+            if resp.status_code == 204:
+                return []
+            if resp.status_code >= 400:
+                raise PNCPClientError(
+                    f"PNCP retornou {resp.status_code}: {_http_error_snippet(resp)}"
+                )
+            try:
+                data = resp.json()
+            except ValueError as e:
+                last_json_error = e
+                if json_try < json_attempts - 1:
+                    wait = float(PNCP_INGEST_JSON_INVALID_RETRY_SECONDS) * (2 ** json_try)
+                    await asyncio.sleep(min(wait, 30.0))
+                    continue
+                raise PNCPClientError("PNCP retornou JSON inválido.") from e
+
+            if isinstance(data, dict) and isinstance(data.get("data"), list):
+                return data["data"]
+            if isinstance(data, list):
+                return data
+            return []
     finally:
         if close_client:
             await client.aclose()
 
-    if resp is None:
-        return []
-    if resp.status_code == 204:
-        return []
-    if resp.status_code >= 400:
-        # 422 período inválido, etc.; códigos retryáveis esgotados também chegam aqui (detalhe sem HTML cru).
-        raise PNCPClientError(f"PNCP retornou {resp.status_code}: {_http_error_snippet(resp)}")
-
-    try:
-        data = resp.json()
-    except ValueError as e:
-        raise PNCPClientError("PNCP retornou JSON inválido.") from e
-
-    if isinstance(data, dict) and isinstance(data.get("data"), list):
-        return data["data"]
-    if isinstance(data, list):
-        return data
+    if last_json_error is not None:
+        raise PNCPClientError("PNCP retornou JSON inválido.") from last_json_error
     return []
 
 

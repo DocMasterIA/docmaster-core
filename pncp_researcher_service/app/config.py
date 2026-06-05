@@ -120,6 +120,66 @@ PNCP_LOCAL_AUTO_INGEST: bool = os.getenv(
     "PNCP_LOCAL_AUTO_INGEST", "true"
 ).strip().lower() in {"1", "true", "yes", "on"}
 PNCP_LOCAL_BACKFILL_MONTHS: int = _env_int("PNCP_LOCAL_BACKFILL_MONTHS", 12)
+# Janela de ingestão em dias (default 365 = teto da API PNCP por request).
+PNCP_LOCAL_BACKFILL_DAYS: int = _env_int("PNCP_LOCAL_BACKFILL_DAYS", 365)
+
+# Fila de ingestão em 2 fases (catálogo → itens).
+PNCP_INGEST_QUEUE_ENABLED: bool = _env_bool("PNCP_INGEST_QUEUE_ENABLED", True)
+PNCP_INGEST_WORKER_ENABLED: bool = _env_bool("PNCP_INGEST_WORKER_ENABLED", True)
+PNCP_INGEST_WORKER_POLL_SECONDS: float = float(
+    os.getenv("PNCP_INGEST_WORKER_POLL_SECONDS", "2")
+)
+PNCP_INGEST_WORKER_CATALOG_BATCH: int = _env_int("PNCP_INGEST_WORKER_CATALOG_BATCH", 4)
+PNCP_INGEST_WORKER_ITEMS_BATCH: int = _env_int("PNCP_INGEST_WORKER_ITEMS_BATCH", 12)
+PNCP_INGEST_QUEUE_MAX_ATTEMPTS: int = _env_int("PNCP_INGEST_QUEUE_MAX_ATTEMPTS", 5)
+PNCP_INGEST_PLANNER_INTERVAL_SECONDS: int = _env_int(
+    "PNCP_INGEST_PLANNER_INTERVAL_SECONDS", 300
+)
+PNCP_INGEST_PLANNER_PAGES_PER_SCOPE: int = _env_int(
+    "PNCP_INGEST_PLANNER_PAGES_PER_SCOPE", 8
+)
+PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS: int = _env_int(
+    "PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS", 200
+)
+# Retentativas extras quando o corpo da resposta não é JSON válido.
+PNCP_INGEST_JSON_INVALID_RETRIES: int = _env_int("PNCP_INGEST_JSON_INVALID_RETRIES", 3)
+PNCP_INGEST_JSON_INVALID_RETRY_SECONDS: float = float(
+    os.getenv("PNCP_INGEST_JSON_INVALID_RETRY_SECONDS", "2")
+)
+
+# UFs varridas pelo planejador (mesma ordem do loop bash).
+PNCP_UFS_DEFAULT: list[str] = _env_str_list(
+    "PNCP_UFS_DEFAULT",
+    [
+        "AC",
+        "AL",
+        "AP",
+        "AM",
+        "BA",
+        "CE",
+        "DF",
+        "ES",
+        "GO",
+        "MA",
+        "MT",
+        "MS",
+        "MG",
+        "PA",
+        "PB",
+        "PR",
+        "PE",
+        "PI",
+        "RJ",
+        "RN",
+        "RS",
+        "RO",
+        "RR",
+        "SC",
+        "SP",
+        "SE",
+        "TO",
+    ],
+)
 # Timeout por contratação no backfill (evita travar a ingestão num único GET de itens).
 PNCP_BACKFILL_ITEM_TIMEOUT_SECONDS: float = float(
     os.getenv("PNCP_BACKFILL_ITEM_TIMEOUT_SECONDS", "45")

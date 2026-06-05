@@ -26,6 +26,7 @@ from .config import (
     PNCP_LOCAL_INCLUDE_ITEMS,
     PNCP_MODALIDADES_DEFAULT,
 )
+from .ingest_dates import PNCP_API_MAX_LOOKBACK_DAYS, resolve_backfill_window
 
 logger = logging.getLogger(__name__)
 from .fornecedor_cache import cache_stats, ensure_fornecedor_cache_table
@@ -47,8 +48,10 @@ def _sqlite_pncp_search_norm(value: Any) -> str:
 
 @contextmanager
 def _conn():
-    conn = sqlite3.connect(PNCP_LOCAL_DB_PATH)
+    conn = sqlite3.connect(PNCP_LOCAL_DB_PATH, timeout=30.0)
     try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=30000")
         conn.row_factory = sqlite3.Row
         conn.create_function("pncp_search_norm", 1, _sqlite_pncp_search_norm)
         yield conn
@@ -198,6 +201,9 @@ def ensure_local_index() -> None:
         c.execute(
             "CREATE INDEX IF NOT EXISTS idx_ingest_state_status ON pncp_ingest_state(status, paused_until)"
         )
+        from .ingest_queue import ensure_ingest_queue
+
+        ensure_ingest_queue(c)
         _ensure_fts5_schema(c)
 
 
@@ -1797,6 +1803,7 @@ def update_research_session(
 async def backfill_local_index(
     *,
     months: Optional[int] = None,
+    days: Optional[int] = None,
     max_paginas: Optional[int] = None,
     tamanho_pagina: int = 50,
     uf: Optional[str] = None,
@@ -1804,11 +1811,8 @@ async def backfill_local_index(
     include_items: Optional[bool] = None,
 ) -> Dict[str, Any]:
     ensure_local_index()
+    data_inicial, data_final, dias_efetivos = resolve_backfill_window(months=months, days=days)
     m = max(1, int(months or PNCP_LOCAL_BACKFILL_MONTHS))
-    end = datetime.utcnow().date()
-    start = end - timedelta(days=30 * m)
-    data_inicial = start.strftime("%Y%m%d")
-    data_final = end.strftime("%Y%m%d")
     modalidades = PNCP_MODALIDADES_DEFAULT
     total_paginas = 0
     total_upserts = 0
@@ -1959,7 +1963,9 @@ async def backfill_local_index(
         {
             "data_inicial": data_inicial,
             "data_final": data_final,
+            "dias_lookback": dias_efetivos,
             "meses_lookback": m,
+            "dias_lookback_max_api": PNCP_API_MAX_LOOKBACK_DAYS,
             "paginas_processadas": total_paginas,
             "upserts_executados": total_upserts,
             "upserts_itens_executados": total_upserts_itens,

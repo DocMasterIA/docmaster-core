@@ -45,6 +45,7 @@ if [[ -z "${PNCP_INGEST_VIA_DOCKER}" ]]; then
   fi
 fi
 MONTHS="${PNCP_INGEST_MONTHS:-12}"
+DAYS="${PNCP_INGEST_DAYS:-365}"
 MAX_PAGINAS="${PNCP_INGEST_MAX_PAGINAS:-60}"
 TAMANHO="${PNCP_INGEST_TAMANHO_PAGINA:-50}"
 SLEEP_BETWEEN_UF="${PNCP_INGEST_SLEEP_UF_SEC:-10}"
@@ -102,14 +103,19 @@ run_backfill_uf() {
   local body
   body=$(python3 - <<PY
 import json
-print(json.dumps({
-    "months": int("${MONTHS}"),
+_days = int("${DAYS}")
+_body = {
     "max_paginas": int("${MAX_PAGINAS}"),
     "tamanho_pagina": int("${TAMANHO}"),
     "uf": "${uf}",
     "codigo_municipio_ibge": None,
     "include_items": True,
-}))
+}
+if _days > 0:
+    _body["days"] = _days
+else:
+    _body["months"] = int("${MONTHS}")
+print(json.dumps(_body))
 PY
 )
   log "INGEST START uf=${uf} max_paginas=${MAX_PAGINAS} (timeout ${CURL_MAX_TIME}s — aguarde)"

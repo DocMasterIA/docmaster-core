@@ -136,8 +136,27 @@ class MarketSearchResponse(BaseModel):
     itens: List[Dict[str, Any]]
 
 
+class IngestPlanRequest(BaseModel):
+    uf: Optional[str] = Field(None, description="Planejar só uma UF; omitido = todas.")
+    pages_per_scope: Optional[int] = Field(
+        None,
+        description="Páginas de catálogo a enfileirar por escopo UF×modalidade.",
+    )
+    contracts_without_items_limit: Optional[int] = Field(
+        None,
+        description="Máx. contratos sem itens a enfileirar neste planejamento.",
+    )
+
+
 class LocalBackfillRequest(BaseModel):
-    months: int = Field(12, description="Janela histórica em meses para ingestão local.")
+    months: Optional[int] = Field(
+        None,
+        description="Legado: janela em meses (×30 dias). Ignorado se ``days`` for informado.",
+    )
+    days: Optional[int] = Field(
+        None,
+        description="Janela em dias (máx. 365). Default do serviço: PNCP_LOCAL_BACKFILL_DAYS.",
+    )
     max_paginas: Optional[int] = Field(
         None,
         description="Máximo de páginas por modalidade. Use null para varrer sem teto (até o PNCP não retornar mais dados).",

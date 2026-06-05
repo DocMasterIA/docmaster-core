@@ -1,13 +1,20 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
+from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 
+from .config import PNCP_INGEST_WORKER_ENABLED
+from .ingest_coverage import ingest_coverage_status
+from .ingest_planner import plan_ingest_queue
+from .ingest_worker import ingest_worker_loop, process_ingest_batch
 from .pncp_client import PNCPClientError
 from .schemas import (
     HealthResponse,
+    IngestPlanRequest,
     LocalBackfillRequest,
     ResearchSessionAddItemsRequest,
     ResearchSessionCreateRequest,
@@ -117,6 +124,36 @@ async def local_index_ingest_status_endpoint(uf: str | None = None):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@router.get("/local-index/coverage")
+async def local_index_coverage_endpoint():
+    try:
+        return ingest_coverage_status()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/local-index/ingest/plan")
+async def local_index_ingest_plan_endpoint(body: IngestPlanRequest | None = None):
+    try:
+        req = body or IngestPlanRequest()
+        return plan_ingest_queue(
+            uf=req.uf,
+            pages_per_scope=req.pages_per_scope,
+            contracts_without_items_limit=req.contracts_without_items_limit,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/local-index/ingest/worker-tick")
+async def local_index_ingest_worker_tick_endpoint():
+    """Processa um lote da fila (útil para debug sem esperar o worker em background)."""
+    try:
+        return await process_ingest_batch()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @router.get("/local-index/operational-status")
 async def local_index_operational_status_endpoint(uf: str | None = None):
     try:
@@ -146,6 +183,7 @@ async def local_index_backfill_endpoint(body: LocalBackfillRequest):
     try:
         return await backfill_local_index(
             months=body.months,
+            days=body.days,
             max_paginas=body.max_paginas,
             tamanho_pagina=body.tamanho_pagina,
             uf=body.uf,
@@ -267,6 +305,20 @@ def create_app() -> FastAPI:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    app = FastAPI(title="PNCP Researcher Service", version="1.0.0")
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        worker_task: asyncio.Task | None = None
+        if PNCP_INGEST_WORKER_ENABLED:
+            worker_task = asyncio.create_task(ingest_worker_loop())
+        yield
+        if worker_task is not None:
+            worker_task.cancel()
+            try:
+                await worker_task
+            except asyncio.CancelledError:
+                pass
+
+    app = FastAPI(title="PNCP Researcher Service", version="1.1.0", lifespan=lifespan)
     app.include_router(router, prefix="/api")
     return app

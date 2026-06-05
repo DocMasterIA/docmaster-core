@@ -133,7 +133,15 @@ PNCP_INGEST_WORKER_CATALOG_BATCH: int = _env_int("PNCP_INGEST_WORKER_CATALOG_BAT
 PNCP_INGEST_WORKER_ITEMS_BATCH: int = _env_int("PNCP_INGEST_WORKER_ITEMS_BATCH", 28)
 PNCP_INGEST_QUEUE_MAX_ATTEMPTS: int = _env_int("PNCP_INGEST_QUEUE_MAX_ATTEMPTS", 5)
 # Planner não enfileira catálogo se pending >= este valor (drena antes de inchando).
-PNCP_INGEST_QUEUE_MAX_PENDING: int = _env_int("PNCP_INGEST_QUEUE_MAX_PENDING", 8000)
+PNCP_INGEST_QUEUE_MAX_PENDING: int = _env_int("PNCP_INGEST_QUEUE_MAX_PENDING", 5000)
+# Com fila de itens acima deste valor, worker/planner pausam catálogo (só drena itens).
+PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG: int = _env_int(
+    "PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG", 3000
+)
+# Boost opcional do batch de itens quando há backlog alto.
+PNCP_INGEST_WORKER_ITEMS_BATCH_MAX: int = _env_int(
+    "PNCP_INGEST_WORKER_ITEMS_BATCH_MAX", 40
+)
 PNCP_INGEST_PLANNER_INTERVAL_SECONDS: int = _env_int(
     "PNCP_INGEST_PLANNER_INTERVAL_SECONDS", 900
 )

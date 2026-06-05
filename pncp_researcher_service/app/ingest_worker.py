@@ -8,9 +8,11 @@ import time
 from typing import Any, Dict, Optional
 
 from .config import (
+    PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG,
     PNCP_INGEST_WORKER_CATALOG_BATCH,
     PNCP_INGEST_WORKER_ENABLED,
     PNCP_INGEST_WORKER_ITEMS_BATCH,
+    PNCP_INGEST_WORKER_ITEMS_BATCH_MAX,
     PNCP_INGEST_WORKER_POLL_SECONDS,
     PNCP_LOCAL_INCLUDE_ITEMS,
 )
@@ -22,6 +24,7 @@ from .ingest_queue import (
     enqueue_contract_items,
     mark_task_done,
     mark_task_failed,
+    pending_by_task_type,
     queue_stats,
 )
 from .local_index import (
@@ -100,10 +103,12 @@ async def process_catalog_page_task(task: Dict[str, Any], *, client: Any) -> Non
     )
 
     if PNCP_LOCAL_INCLUDE_ITEMS:
-        for raw in batch:
-            numero = str(raw.get("numeroControlePNCP") or "").strip()
-            if numero:
-                enqueue_contract_items(numero_pncp=numero, priority=90)
+        items_backlog = pending_by_task_type(TASK_CONTRACT_ITEMS)
+        if items_backlog < max(0, int(PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG)):
+            for raw in batch:
+                numero = str(raw.get("numeroControlePNCP") or "").strip()
+                if numero:
+                    enqueue_contract_items(numero_pncp=numero, priority=90)
 
 
 async def process_contract_items_task(task: Dict[str, Any], *, client: Any) -> None:
@@ -135,16 +140,33 @@ async def process_contract_items_task(task: Dict[str, Any], *, client: Any) -> N
 
 async def process_ingest_batch() -> Dict[str, Any]:
     ensure_local_index()
-    catalog_tasks = claim_tasks(
-        task_type=TASK_CATALOG_PAGE,
-        limit=PNCP_INGEST_WORKER_CATALOG_BATCH,
+    items_backlog = pending_by_task_type(TASK_CONTRACT_ITEMS)
+    pause_catalog = items_backlog >= max(0, int(PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG))
+    catalog_limit = 0 if pause_catalog else PNCP_INGEST_WORKER_CATALOG_BATCH
+    item_limit = PNCP_INGEST_WORKER_ITEMS_BATCH
+    if pause_catalog:
+        item_limit = min(
+            max(item_limit, PNCP_INGEST_WORKER_ITEMS_BATCH_MAX),
+            PNCP_INGEST_WORKER_ITEMS_BATCH_MAX,
+        )
+
+    catalog_tasks = (
+        claim_tasks(task_type=TASK_CATALOG_PAGE, limit=catalog_limit)
+        if catalog_limit > 0
+        else []
     )
     item_tasks = claim_tasks(
         task_type=TASK_CONTRACT_ITEMS,
-        limit=PNCP_INGEST_WORKER_ITEMS_BATCH,
+        limit=item_limit,
     )
     if not catalog_tasks and not item_tasks:
-        return {"catalog_ok": 0, "items_ok": 0, "errors": 0}
+        return {
+            "catalog_ok": 0,
+            "items_ok": 0,
+            "errors": 0,
+            "catalog_paused": pause_catalog,
+            "items_backlog": items_backlog,
+        }
 
     catalog_ok = items_ok = errors = 0
     async with create_pncp_http_client() as client:
@@ -186,6 +208,8 @@ async def process_ingest_batch() -> Dict[str, Any]:
         "catalog_ok": catalog_ok,
         "items_ok": items_ok,
         "errors": errors,
+        "catalog_paused": pause_catalog,
+        "items_backlog": items_backlog,
         "queue": queue_stats(),
     }
 

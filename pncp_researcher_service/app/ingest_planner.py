@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from .config import (
+    PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG,
     PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS,
     PNCP_INGEST_PLANNER_PAGES_PER_SCOPE,
     PNCP_INGEST_QUEUE_ENABLED,
@@ -14,7 +15,13 @@ from .config import (
     PNCP_UFS_DEFAULT,
 )
 from .ingest_dates import resolve_backfill_window
-from .ingest_queue import enqueue_catalog_page, enqueue_contract_items, queue_stats
+from .ingest_queue import (
+    TASK_CONTRACT_ITEMS,
+    enqueue_catalog_page,
+    enqueue_contract_items,
+    pending_by_task_type,
+    queue_stats,
+)
 from .local_index import _get_ingest_state, _parse_iso_utc, _resolve_backfill_start_page, ensure_local_index
 
 logger = logging.getLogger(__name__)
@@ -53,7 +60,12 @@ def plan_ingest_queue(
     items_enqueued = 0
     now = datetime.utcnow()
     pending_now = int(queue_stats().get("pending") or 0)
+    items_backlog = pending_by_task_type(TASK_CONTRACT_ITEMS)
+    pause_catalog_backlog = items_backlog >= max(
+        0, int(PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG)
+    )
     plan_catalog = pending_now < max(0, int(PNCP_INGEST_QUEUE_MAX_PENDING))
+    plan_catalog = plan_catalog and not pause_catalog_backlog
     if not plan_catalog:
         catalog_skipped_queue_full = len(ufs) * len(mods)
 
@@ -125,5 +137,7 @@ def plan_ingest_queue(
         "catalog_scopes_paused": catalog_skipped_paused,
         "catalog_skipped_queue_full": catalog_skipped_queue_full,
         "queue_pending_before": pending_now,
+        "items_backlog_before": items_backlog,
+        "catalog_paused_backlog": pause_catalog_backlog,
         "contract_items_enqueued": items_enqueued,
     }

@@ -273,6 +273,11 @@ def queue_stats() -> Dict[str, Any]:
     }
 
 
+def pending_by_task_type(task_type: str) -> int:
+    stats = queue_stats()
+    return int((stats.get("by_task_type") or {}).get(task_type, {}).get("pending", 0) or 0)
+
+
 def count_contracts_without_items() -> int:
     """Aproximação O(1): contratos − contratos distintos com ≥1 linha em pncp_itens."""
     with _queue_conn() as c:

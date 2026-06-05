@@ -9,11 +9,12 @@ from .config import (
     PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS,
     PNCP_INGEST_PLANNER_PAGES_PER_SCOPE,
     PNCP_INGEST_QUEUE_ENABLED,
+    PNCP_INGEST_QUEUE_MAX_PENDING,
     PNCP_MODALIDADES_DEFAULT,
     PNCP_UFS_DEFAULT,
 )
 from .ingest_dates import resolve_backfill_window
-from .ingest_queue import enqueue_catalog_page, enqueue_contract_items
+from .ingest_queue import enqueue_catalog_page, enqueue_contract_items, queue_stats
 from .local_index import _get_ingest_state, _parse_iso_utc, _resolve_backfill_start_page, ensure_local_index
 
 logger = logging.getLogger(__name__)
@@ -48,10 +49,17 @@ def plan_ingest_queue(
 
     catalog_enqueued = 0
     catalog_skipped_paused = 0
+    catalog_skipped_queue_full = 0
     items_enqueued = 0
     now = datetime.utcnow()
+    pending_now = int(queue_stats().get("pending") or 0)
+    plan_catalog = pending_now < max(0, int(PNCP_INGEST_QUEUE_MAX_PENDING))
+    if not plan_catalog:
+        catalog_skipped_queue_full = len(ufs) * len(mods)
 
     for scope_uf in ufs:
+        if not plan_catalog:
+            break
         for modalidade in mods:
             state = _get_ingest_state(scope_uf, modalidade)
             pause_until = _parse_iso_utc(state["paused_until"]) if state else None
@@ -115,5 +123,7 @@ def plan_ingest_queue(
         "modalidades": mods,
         "catalog_pages_enqueued": catalog_enqueued,
         "catalog_scopes_paused": catalog_skipped_paused,
+        "catalog_skipped_queue_full": catalog_skipped_queue_full,
+        "queue_pending_before": pending_now,
         "contract_items_enqueued": items_enqueued,
     }

@@ -148,6 +148,18 @@ async def process_ingest_batch() -> Dict[str, Any]:
 
     catalog_ok = items_ok = errors = 0
     async with create_pncp_http_client() as client:
+        # Fase 2 primeiro — reduz sem_itens e backlog de contract_items.
+        for task in item_tasks:
+            tid = int(task["id"])
+            try:
+                await process_contract_items_task(task, client=client)
+                mark_task_done(tid)
+                items_ok += 1
+            except Exception as exc:
+                mark_task_failed(tid, str(exc))
+                errors += 1
+                logger.warning("ingest items task %s: %s", tid, exc)
+
         for task in catalog_tasks:
             tid = int(task["id"])
             try:
@@ -169,17 +181,6 @@ async def process_ingest_batch() -> Dict[str, Any]:
                 mark_task_failed(tid, str(exc))
                 errors += 1
                 logger.exception("ingest catalog task %s: %s", tid, exc)
-
-        for task in item_tasks:
-            tid = int(task["id"])
-            try:
-                await process_contract_items_task(task, client=client)
-                mark_task_done(tid)
-                items_ok += 1
-            except Exception as exc:
-                mark_task_failed(tid, str(exc))
-                errors += 1
-                logger.warning("ingest items task %s: %s", tid, exc)
 
     return {
         "catalog_ok": catalog_ok,

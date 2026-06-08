@@ -30,6 +30,7 @@ from .ingest_queue import (
 from .local_index import (
     _mark_ingest_error,
     _mark_ingest_success,
+    contract_needs_items_refresh,
     ensure_local_index,
     upsert_contract_items,
     upsert_contracts,
@@ -107,13 +108,15 @@ async def process_catalog_page_task(task: Dict[str, Any], *, client: Any) -> Non
         if items_backlog < max(0, int(PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG)):
             for raw in batch:
                 numero = str(raw.get("numeroControlePNCP") or "").strip()
-                if numero:
+                if numero and contract_needs_items_refresh(numero):
                     enqueue_contract_items(numero_pncp=numero, priority=90)
 
 
 async def process_contract_items_task(task: Dict[str, Any], *, client: Any) -> None:
     numero = str(task.get("numero_pncp") or "").strip()
     if not numero:
+        return
+    if not contract_needs_items_refresh(numero):
         return
     raw = await _load_contract_raw(numero)
     if not raw:

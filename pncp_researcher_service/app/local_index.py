@@ -21,6 +21,7 @@ from .config import (
     PNCP_INGEST_AUTOPAUSE_JSON_INVALID_SECONDS,
     PNCP_INGEST_AUTOPAUSE_MAX_SECONDS,
     PNCP_INGEST_WATERMARK_RESUME,
+    PNCP_INGEST_ITEMS_REFRESH_DAYS,
     PNCP_LOCAL_BACKFILL_MONTHS,
     PNCP_LOCAL_DB_PATH,
     PNCP_LOCAL_INCLUDE_ITEMS,
@@ -571,6 +572,9 @@ async def _backfill_fetch_contract_items(
     item_timeout: float,
     sem: asyncio.Semaphore,
 ) -> tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    numero = str(raw.get("numeroControlePNCP") or "").strip()
+    if numero and not contract_needs_items_refresh(numero):
+        return raw, []
     keys = _contract_keys_for_items(raw)
     if not keys:
         return raw, []
@@ -796,6 +800,52 @@ def _item_desc(raw: Dict[str, Any]) -> str:
         if v is not None and str(v).strip():
             return str(v).strip()
     return ""
+
+
+def _parse_item_updated_at_iso(value: str) -> Optional[datetime]:
+    s = (value or "").strip()
+    if not s:
+        return None
+    try:
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        elif "T" not in s and " " in s:
+            s = s.replace(" ", "T", 1)
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is not None:
+            dt = dt.replace(tzinfo=None)
+        return dt
+    except Exception:
+        return None
+
+
+def contract_needs_items_refresh(numero_pncp: str) -> bool:
+    """
+    True = deve buscar GET /itens no PNCP.
+    Com PNCP_INGEST_ITEMS_REFRESH_DAYS > 0, pula contratos cujos itens foram buscados recentemente.
+    """
+    days = max(0, int(PNCP_INGEST_ITEMS_REFRESH_DAYS or 0))
+    if days <= 0:
+        return True
+    numero = str(numero_pncp or "").strip()
+    if not numero:
+        return True
+    ensure_local_index()
+    with _conn() as c:
+        row = c.execute(
+            """
+            SELECT COUNT(*) AS n, MAX(updated_at) AS last_upd
+            FROM pncp_itens
+            WHERE numero_pncp = ?
+            """,
+            (numero,),
+        ).fetchone()
+    if not row or int(row["n"] or 0) <= 0:
+        return True
+    last_dt = _parse_item_updated_at_iso(str(row["last_upd"] or ""))
+    if last_dt is None:
+        return True
+    return datetime.utcnow() - last_dt >= timedelta(days=days)
 
 
 def upsert_contract_items(raw_contract: Dict[str, Any], item_rows: Iterable[Dict[str, Any]]) -> int:

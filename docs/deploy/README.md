@@ -12,6 +12,7 @@ Guias operacionais para produção (servidor DESKTOP / `/home/docmaster`, WSL + 
 | **Estado declarativo PNCP** (ingest + homolog + CNPJ — tudo num doc) | [PNCP-DECLARATIVO.md](../PNCP-DECLARATIVO.md) |
 | **Alimentar índice PNCP** (loop, watermarks, paralelo) | [PNCP-INGESTAO-INDEX-24-7.md](./PNCP-INGESTAO-INDEX-24-7.md) |
 | Scripts PNCP (referência) | [PNCP-SCRIPTS-REFERENCIA.md](./PNCP-SCRIPTS-REFERENCIA.md) |
+| **Comandos operação PNCP** (monitorar, backup, deploy) | [PNCP-COMANDOS-OPERACAO.txt](./PNCP-COMANDOS-OPERACAO.txt) |
 | API índice local + FTS + busca V2 | [PNCP-API-INDICE-LOCAL.md](./PNCP-API-INDICE-LOCAL.md), [PNCP-V2-DEPLOY.md](./PNCP-V2-DEPLOY.md) |
 | Grafana / Prometheus | [OBSERVABILIDADE-VPS.md](./OBSERVABILIDADE-VPS.md) |
 | Estabilidade geral / WSL idle | [ESTABILIDADE-E-CLOUDFLARE.md](./ESTABILIDADE-E-CLOUDFLARE.md) |

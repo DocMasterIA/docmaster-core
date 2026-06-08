@@ -1,0 +1,474 @@
+================================================================================
+PNCP — COMANDOS DE OPERAÇÃO (DESKTOP / docmaster)
+================================================================================
+Contentor: pncp_researcher_service
+API dentro do contentor: http://127.0.0.1:8012/api/pncp-research/
+SQLite: /data/pncp/pncp_researcher_local.db
+Compose (usar os 3 ficheiros no DESKTOP):
+  docker compose -f ~/docker-compose.pncp.yml \
+    -f ~/docker-compose.pncp.override.yml \
+    -f ~/docker-compose.pncp.noports.yml \
+    up -d pncp_researcher_service
+
+Nota: sem noports, NÃO use curl http://127.0.0.1:8012 no host — use docker exec.
+
+================================================================================
+1. SUBIR / PARAR / REINICIAR
+================================================================================
+
+# Subir (noports — WSL/Desktop sem porta 8012 no host)
+docker compose -f ~/docker-compose.pncp.yml \
+  -f ~/docker-compose.pncp.override.yml \
+  -f ~/docker-compose.pncp.noports.yml \
+  up -d pncp_researcher_service
+
+# Script ensure (cria noports se PNCP_NO_HOST_PORT=1)
+PNCP_NO_HOST_PORT=1 ~/docmaster-core/scripts/ensure-pncp-researcher.sh
+
+# Parar (NÃO usar down -v — apaga volume)
+docker compose -f ~/docker-compose.pncp.yml \
+  -f ~/docker-compose.pncp.override.yml \
+  -f ~/docker-compose.pncp.noports.yml \
+  stop pncp_researcher_service
+
+# Reiniciar
+docker compose -f ~/docker-compose.pncp.yml \
+  -f ~/docker-compose.pncp.override.yml \
+  -f ~/docker-compose.pncp.noports.yml \
+  restart pncp_researcher_service
+
+# Sincronizar compose do repo
+cp ~/docmaster-core/docker-compose.pncp.yml ~/docker-compose.pncp.yml
+cp ~/docmaster-core/docker-compose.pncp.noports.yml.example ~/docker-compose.pncp.noports.yml
+
+# Rede (se contentor não sobe)
+docker network create docmaster_net 2>/dev/null || true
+
+# Volumes PNCP
+docker volume ls | grep pncp
+
+================================================================================
+2. DEPLOY CÓDIGO (hotfix — após git pull)
+================================================================================
+
+# Script all-in-one (copia app/*.py + restart + testa skip_fn)
+~/docmaster-core/scripts/deploy-pncp-researcher-code.sh
+
+# Manual (mesmos ficheiros)
+for f in config.py local_index.py ingest_worker.py ingest_planner.py ingest_queue.py; do
+  docker cp ~/docmaster-core/pncp_researcher_service/app/$f \
+    pncp_researcher_service:/app/pncp_researcher_service/app/$f
+done
+docker restart pncp_researcher_service
+
+# Rebuild imagem completa (alternativa)
+cd ~/docmaster-core
+docker compose -f ~/docker-compose.pncp.yml build pncp_researcher_service
+docker compose -f ~/docker-compose.pncp.yml \
+  -f ~/docker-compose.pncp.override.yml \
+  -f ~/docker-compose.pncp.noports.yml \
+  up -d --force-recreate pncp_researcher_service
+
+# Confirmar código novo (skip 7 dias)
+docker exec pncp_researcher_service python -c "
+from pncp_researcher_service.app.local_index import contract_needs_items_refresh
+print('skip_fn ok')
+"
+
+# Confirmar envs de produção
+docker exec pncp_researcher_service env | grep -E \
+  'INGEST_WORKER|INGEST_QUEUE|REFRESH_DAYS|SEARCH_ONLY|ENRICH_HOMOLOG|BACKLOG_PAUSE'
+
+================================================================================
+3. SAÚDE RÁPIDA (1 comando)
+================================================================================
+
+docker ps --filter name=pncp_researcher_service --format '{{.Status}}' && \
+docker logs pncp_researcher_service 2>&1 | grep 'ingest batch' | tail -3 && \
+docker exec pncp_researcher_service python -c "
+import urllib.request, json
+d=json.loads(urllib.request.urlopen(
+  'http://127.0.0.1:8012/api/pncp-research/local-index/coverage', timeout=120).read())
+print('itens', d['index']['total_itens'])
+print('pending', d['queue']['pending'])
+print('paused', d['gaps']['scopes_paused'])
+print('sem_itens', d['gaps']['contratos_sem_itens'])
+"
+
+================================================================================
+4. HEALTH / STATS / COVERAGE
+================================================================================
+
+# Health (+ tamanho db)
+docker exec pncp_researcher_service python -c "
+import urllib.request
+print(urllib.request.urlopen(
+  'http://127.0.0.1:8012/api/pncp-research/health', timeout=10).read().decode())
+"
+
+# Stats (contratos, itens, fornecedor)
+docker exec pncp_researcher_service python -c "
+import urllib.request, json
+d=json.loads(urllib.request.urlopen(
+  'http://127.0.0.1:8012/api/pncp-research/local-index/stats', timeout=120).read())
+print('contratos', d['total_contratos'])
+print('itens', d['total_itens'])
+print('fornecedor', json.dumps(d.get('fornecedor'), indent=2))
+"
+
+# Coverage (fila + gaps + janela 365d)
+docker exec pncp_researcher_service python -c "
+import urllib.request, json
+print(json.dumps(json.loads(urllib.request.urlopen(
+  'http://127.0.0.1:8012/api/pncp-research/local-index/coverage', timeout=120).read()), indent=2))
+"
+
+# Coverage resumido
+docker exec pncp_researcher_service python -c "
+import urllib.request, json
+d=json.loads(urllib.request.urlopen(
+  'http://127.0.0.1:8012/api/pncp-research/local-index/coverage', timeout=120).read())
+ci=d['queue']['by_task_type'].get('contract_items',{})
+cp=d['queue']['by_task_type'].get('catalog_page',{})
+print('itens', d['index']['total_itens'])
+print('contratos', d['index']['total_contratos'])
+print('sem_itens', d['gaps']['contratos_sem_itens'])
+print('pending total', d['queue']['pending'])
+print('contract_items pending', ci.get('pending',0))
+print('catalog_page pending', cp.get('pending',0))
+print('scopes_paused', d['gaps']['scopes_paused'])
+"
+
+# Ingest-status (scopes UF×modalidade, next_page, pausas)
+docker exec pncp_researcher_service python -c "
+import urllib.request, json
+print(json.dumps(json.loads(urllib.request.urlopen(
+  'http://127.0.0.1:8012/api/pncp-research/local-index/ingest-status', timeout=120).read()), indent=2))
+"
+
+# Scopes pausados (top 10)
+docker exec pncp_researcher_service python -c "
+import urllib.request, json
+d=json.loads(urllib.request.urlopen(
+  'http://127.0.0.1:8012/api/pncp-research/local-index/ingest-status', timeout=120).read())
+paused=[s for s in d.get('scopes',[]) if s.get('status')=='paused_blocked']
+print('pausados', len(paused))
+for s in paused[:15]:
+  print(s.get('uf'), s.get('modalidade'), s.get('last_error_kind'),
+        (s.get('last_error') or '')[:80])
+"
+
+# Operational-status (agregado)
+docker exec pncp_researcher_service python -c "
+import urllib.request, json
+print(json.dumps(json.loads(urllib.request.urlopen(
+  'http://127.0.0.1:8012/api/pncp-research/local-index/operational-status', timeout=120).read()), indent=2))
+"
+
+================================================================================
+5. MONITORAR INGESTÃO (logs)
+================================================================================
+
+# Últimos batches (saudável: items_ok 28-40, catalog_paused=True quando backlog>=3000)
+docker logs pncp_researcher_service 2>&1 | grep 'ingest batch' | tail -15
+
+# Worker + planner
+docker logs pncp_researcher_service 2>&1 | grep -E 'ingest worker|ingest batch|ingest planner' | tail -20
+
+# Erros ingest
+docker logs pncp_researcher_service 2>&1 | grep -iE 'ingest items task|ingest catalog|json_invalid|ERROR|WARNING' | tail -20
+
+# Log contínuo
+docker logs -f pncp_researcher_service 2>&1 | grep --line-buffered 'ingest batch'
+
+# O que significa batch saudável:
+#   catalog_ok=0 items_ok=40 catalog_paused=True  → drenando fila (backlog >= 3000)
+#   catalog_ok=3 items_ok=28 catalog_paused=False → cruzeiro (backlog < 3000)
+#   errors=0 na maioria
+
+================================================================================
+6. FILA SQLite (detalhe)
+================================================================================
+
+# Por task_type e status
+docker exec pncp_researcher_service python -c "
+import sqlite3
+c=sqlite3.connect('/data/pncp/pncp_researcher_local.db')
+for r in c.execute('''
+  SELECT task_type, status, COUNT(*) n
+  FROM pncp_ingest_queue
+  GROUP BY task_type, status ORDER BY 1,2
+'''):
+    print(r[0], r[1], r[2])
+"
+
+# items_backlog worker (pending + processing de contract_items)
+docker exec pncp_researcher_service python -c "
+import sqlite3
+c=sqlite3.connect('/data/pncp/pncp_researcher_local.db')
+r=c.execute('''
+  SELECT status, COUNT(*) FROM pncp_ingest_queue
+  WHERE task_type='contract_items' GROUP BY status
+''').fetchall()
+print(dict(r))
+pending=sum(n for s,n in r if s=='pending')
+proc=sum(n for s,n in r if s=='processing')
+print('items_backlog worker', pending+proc, '(pending', pending, '+ processing', proc, ')')
+"
+
+# Requeue tarefas presas em processing (após restart/crash)
+docker exec pncp_researcher_service python -c "
+import sqlite3
+c=sqlite3.connect('/data/pncp/pncp_researcher_local.db')
+n=c.execute(\"UPDATE pncp_ingest_queue SET status='pending' WHERE status='processing'\").rowcount
+c.commit()
+print('requeued', n)
+"
+
+================================================================================
+7. CRESCIMENTO NO TEMPO
+================================================================================
+
+# Delta 2 minutos
+docker exec pncp_researcher_service python -c "
+import urllib.request, json, time
+u='http://127.0.0.1:8012/api/pncp-research/local-index/stats'
+a=json.loads(urllib.request.urlopen(u,timeout=120).read())
+print('agora itens', a['total_itens'], 'contratos', a['total_contratos'])
+time.sleep(120)
+b=json.loads(urllib.request.urlopen(u,timeout=120).read())
+print('2min  itens', b['total_itens'], 'contratos', b['total_contratos'])
+print('delta itens', b['total_itens']-a['total_itens'], 'contratos', b['total_contratos']-a['total_contratos'])
+"
+
+# Delta 5 minutos
+docker exec pncp_researcher_service python -c "
+import urllib.request, json, time
+u='http://127.0.0.1:8012/api/pncp-research/local-index/stats'
+a=json.loads(urllib.request.urlopen(u,timeout=120).read())
+time.sleep(300)
+b=json.loads(urllib.request.urlopen(u,timeout=120).read())
+print('+itens', b['total_itens']-a['total_itens'])
+print('+contratos', b['total_contratos']-a['total_contratos'])
+print('projecao itens/h', round((b['total_itens']-a['total_itens'])*12))
+"
+
+# Itens “tocados” nas últimas 48h (inclui re-upsert — não é só linha nova)
+docker exec pncp_researcher_service python -c "
+import sqlite3
+c=sqlite3.connect('/data/pncp/pncp_researcher_local.db')
+norm=\"datetime(replace(replace(updated_at,'T',' '),'Z','')) >= datetime('now','-48 hours')\"
+q=lambda s: c.execute(s).fetchone()[0]
+print('total itens', q('SELECT COUNT(*) FROM pncp_itens'))
+print('total contratos', q('SELECT COUNT(*) FROM pncp_contratos'))
+print('itens tocados 48h', q(f'SELECT COUNT(*) FROM pncp_itens WHERE {norm}'))
+print('contratos tocados 48h', q(f'SELECT COUNT(*) FROM pncp_contratos WHERE {norm}'))
+"
+
+# Histórico manual (neto real entre dias)
+echo \"\$(date -Is) \$(docker exec pncp_researcher_service sqlite3 /data/pncp/pncp_researcher_local.db 'SELECT COUNT(*) FROM pncp_itens;' 2>/dev/null || docker exec pncp_researcher_service python -c \"import sqlite3;c=sqlite3.connect('/data/pncp/pncp_researcher_local.db');print(c.execute('SELECT COUNT(*) FROM pncp_itens').fetchone()[0])\")\" >> ~/pncp-itens-history.log
+tail -5 ~/pncp-itens-history.log
+
+# Neto se souber total anterior (ex.: 1200000)
+docker exec pncp_researcher_service python -c "
+import sqlite3
+antes=1200000
+c=sqlite3.connect('/data/pncp/pncp_researcher_local.db')
+agora=c.execute('SELECT COUNT(*) FROM pncp_itens').fetchone()[0]
+print('itens NOVOS (neto)', agora-antes)
+print('total', agora)
+"
+
+================================================================================
+8. CORREÇÕES / MANUTENÇÃO
+================================================================================
+
+# Reativar scopes pausados (json_invalid antigo)
+docker exec pncp_researcher_service python -c "
+import sqlite3
+c=sqlite3.connect('/data/pncp/pncp_researcher_local.db')
+n=c.execute('''
+UPDATE pncp_ingest_state SET status='active', paused_until=NULL, last_error_kind=NULL
+WHERE status='paused_blocked'
+''').rowcount
+c.commit()
+print('reativados', n)
+"
+
+# Reativar só json_invalid
+docker exec pncp_researcher_service python -c "
+import sqlite3
+c=sqlite3.connect('/data/pncp/pncp_researcher_local.db')
+n=c.execute('''
+UPDATE pncp_ingest_state SET status='active', paused_until=NULL, last_error_kind=NULL
+WHERE status='paused_blocked' AND last_error_kind='json_invalid'
+''').rowcount
+c.commit()
+print('reativados', n)
+"
+
+# Planner manual (1 ciclo de enfileiramento)
+docker exec pncp_researcher_service python -c "
+import urllib.request, json
+req=urllib.request.Request(
+  'http://127.0.0.1:8012/api/pncp-research/local-index/ingest/plan',
+  data=b'{}', method='POST', headers={'Content-Type':'application/json'})
+print(urllib.request.urlopen(req, timeout=120).read().decode())
+"
+
+# Worker tick manual (1 batch)
+docker exec pncp_researcher_service python -c "
+import urllib.request
+req=urllib.request.Request(
+  'http://127.0.0.1:8012/api/pncp-research/local-index/ingest/worker-tick',
+  data=b'', method='POST')
+print(urllib.request.urlopen(req, timeout=300).read().decode())
+"
+
+================================================================================
+9. LOOP BASH (rajada — NÃO usar junto com worker)
+================================================================================
+
+# Ver se loop bash está rodando
+pgrep -af run-pncp-index-ingest-loop || echo "loop bash OFF"
+
+# Parar loop bash
+pkill -f run-pncp-index-ingest-loop || true
+
+# Iniciar loop bash (desligar worker antes: PNCP_INGEST_WORKER_ENABLED=0)
+nohup ~/docmaster-core/scripts/run-pncp-index-ingest-loop.sh >> ~/pncp-ingest.log 2>&1 &
+
+# Log loop bash
+tail -f ~/pncp-ingest.log
+
+# Regra: worker XOR loop bash — nunca os dois 24/7
+
+================================================================================
+10. BACKUP / RESTORE SQLite
+================================================================================
+
+# Backup seguro (Python .backup — contentor sem sqlite3 CLI)
+mkdir -p ~/backups/pncp
+STAMP=$(date +%Y%m%d-%H%M%S)
+
+docker exec pncp_researcher_service python -c "
+import sqlite3
+src=sqlite3.connect('/data/pncp/pncp_researcher_local.db')
+dst=sqlite3.connect('/data/pncp/backup-${STAMP}.db')
+src.backup(dst)
+dst.close()
+src.close()
+print('backup ok')
+"
+
+docker cp pncp_researcher_service:/data/pncp/backup-${STAMP}.db \
+  ~/backups/pncp/pncp_researcher_local-${STAMP}.db
+
+docker exec pncp_researcher_service rm -f /data/pncp/backup-${STAMP}.db
+ls -lh ~/backups/pncp/pncp_researcher_local-${STAMP}.db
+
+# Backup via volume + Alpine (alternativa)
+docker run --rm \
+  -v docmaster-pncp_pncp_researcher_data:/data/pncp \
+  -v ~/backups/pncp:/backup \
+  alpine sh -c "
+    apk add --no-cache sqlite >/dev/null &&
+    sqlite3 /data/pncp/pncp_researcher_local.db \".backup '/backup/pncp-$(date +%Y%m%d-%H%M%S).db'\"
+  "
+
+# Cópia direta (rápida, menos ideal com WAL)
+STAMP=$(date +%Y%m%d-%H%M%S)
+docker cp pncp_researcher_service:/data/pncp/pncp_researcher_local.db \
+  ~/backups/pncp/pncp_researcher_local-${STAMP}.db
+
+# Restore (parar → copiar → subir)
+docker compose -f ~/docker-compose.pncp.yml \
+  -f ~/docker-compose.pncp.override.yml \
+  -f ~/docker-compose.pncp.noports.yml \
+  stop pncp_researcher_service
+
+docker cp ~/backups/pncp/pncp_researcher_local-YYYYMMDD-HHMMSS.db \
+  pncp_researcher_service:/data/pncp/pncp_researcher_local.db
+
+docker compose -f ~/docker-compose.pncp.yml \
+  -f ~/docker-compose.pncp.override.yml \
+  -f ~/docker-compose.pncp.noports.yml \
+  start pncp_researcher_service
+
+================================================================================
+11. BUSCA / TESTE DE ÍNDICE
+================================================================================
+
+# Busca local (homologados + enrich)
+docker exec pncp_researcher_service python -c "
+import urllib.request, json
+body=json.dumps({'termo_busca':'papel','max_paginas':5,'tamanho_pagina':50}).encode()
+req=urllib.request.Request(
+  'http://127.0.0.1:8012/api/pncp-research/local-index/search-items',
+  data=body, headers={'Content-Type':'application/json'})
+r=json.loads(urllib.request.urlopen(req,timeout=120).read())
+s=r.get('stats',{})
+print('total', s.get('total_registros'))
+print('homologados', s.get('somente_homologados'))
+print('filtrados_nao_homolog', s.get('filtrados_nao_homologados'))
+print('com_cnpj', s.get('itens_com_cnpj_fornecedor'))
+print('enriquecidos', s.get('enriquecidos_pncp_na_busca'))
+"
+
+# FTS rebuild
+docker exec pncp_researcher_service python -c "
+import urllib.request
+req=urllib.request.Request(
+  'http://127.0.0.1:8012/api/pncp-research/local-index/fts-rebuild',
+  data=b'', method='POST')
+print(urllib.request.urlopen(req, timeout=600).read().decode())
+"
+
+================================================================================
+12. REFERÊNCIA — ENVS IMPORTANTES (docker-compose.pncp.yml)
+================================================================================
+
+PNCP_INGEST_WORKER_ENABLED=1          # worker 24/7 (desligar se usar loop bash)
+PNCP_INGEST_QUEUE_ENABLED=1
+PNCP_INGEST_ITEMS_REFRESH_DAYS=7       # skip retrabalho GET /itens (< 7 dias)
+PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG=3000
+PNCP_INGEST_QUEUE_MAX_PENDING=5000
+PNCP_SEARCH_ONLY_HOMOLOGATED=1
+PNCP_SEARCH_ENRICH_HOMOLOG_MAX=16
+PNCP_LOCAL_BACKFILL_DAYS=365
+
+================================================================================
+13. LIMIARES — INTERPRETAÇÃO RÁPIDA
+================================================================================
+
+items_backlog worker (pending+processing contract_items):
+  < 3000  → cruzeiro (catálogo pode rodar)
+  >= 3000 → drenagem (catalog_ok=0, items_ok=40)
+
+pending total:
+  < 4000  → ok
+  4000-5000 → atenção
+  > 5000  → fila alta; verificar processing preso + deploy código
+
+sem_itens (contratos sem linhas em pncp_itens):
+  < 500   → ok
+  > 2000  → catálogo >> itens (lag)
+
+scopes_paused:
+  0-10    → normal
+  > 15    → considerar reativar json_invalid ou reduzir carga
+
+total_itens subindo + pending caindo = saudável
+
+================================================================================
+14. DOCUMENTAÇÃO RELACIONADA
+================================================================================
+
+docs/PNCP-DECLARATIVO.md
+docs/deploy/PNCP-INGESTAO-INDEX-24-7.md
+docs/deploy/PNCP-RESEARCHER-24-7.md
+docs/deploy/PNCP-API-INDICE-LOCAL.md
+scripts/deploy-pncp-researcher-code.sh
+scripts/ensure-pncp-researcher.sh
+
+================================================================================

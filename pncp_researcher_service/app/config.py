@@ -157,7 +157,7 @@ PNCP_INGEST_JSON_INVALID_RETRY_SECONDS: float = float(
     os.getenv("PNCP_INGEST_JSON_INVALID_RETRY_SECONDS", "2")
 )
 # Se > 0, não refaz GET /itens se o contrato já tem itens buscados há menos de N dias (0 = sempre busca).
-PNCP_INGEST_ITEMS_REFRESH_DAYS: int = _env_int("PNCP_INGEST_ITEMS_REFRESH_DAYS", 0)
+PNCP_INGEST_ITEMS_REFRESH_DAYS: int = _env_int("PNCP_INGEST_ITEMS_REFRESH_DAYS", 7)
 
 # UFs varridas pelo planejador (mesma ordem do loop bash).
 PNCP_UFS_DEFAULT: list[str] = _env_str_list(

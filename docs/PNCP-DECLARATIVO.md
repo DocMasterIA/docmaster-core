@@ -102,7 +102,7 @@ Estados: `pending` → `processing` → `done` | `failed` | `dead` (após `max_a
 
 ### 4.3.1 Skip de retrabalho (`PNCP_INGEST_ITEMS_REFRESH_DAYS`)
 
-Com **N > 0**, contratos que **já têm itens** no SQLite e `MAX(updated_at)` dentro de N dias **não** disparam GET `/itens` (worker, catálogo e backfill). Default **0** = comportamento legado (sempre busca). Recomendado produção: **7**.
+Com **N > 0**, contratos que **já têm itens** no SQLite e `MAX(updated_at)` dentro de N dias **não** disparam GET `/itens` (worker, catálogo e backfill). Default **7** no compose e no código (`0` = sempre busca, legado).
 
 ### 4.4 Watermark e autopause (legado mantido)
 
@@ -259,7 +259,7 @@ Defaults em `docker-compose.pncp.yml` e `pncp_researcher_service/app/config.py`:
 | `PNCP_INGEST_QUEUE_MAX_PENDING` | `5000` | Teto antes de pausar catálogo |
 | `PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG` | `3000` | Pausa catálogo se itens ≥ N |
 | `PNCP_INGEST_JSON_INVALID_RETRIES` | `3` | Retries JSON inválido |
-| `PNCP_INGEST_ITEMS_REFRESH_DAYS` | `0` | Skip GET `/itens` se buscado há &lt; N dias (`7` recomendado prod) |
+| `PNCP_INGEST_ITEMS_REFRESH_DAYS` | `7` | Skip GET `/itens` se buscado há &lt; N dias (`0` = legado, sempre busca) |
 | `PNCP_BACKFILL_ITEM_CONCURRENCY` | `12` | Paralelo no backfill HTTP |
 | `PNCP_INGEST_WATERMARK_RESUME` | `1` | Watermark `last_page+1` |
 | `PNCP_SEARCH_ONLY_HOMOLOGATED` | `true` | Só homologados na busca |

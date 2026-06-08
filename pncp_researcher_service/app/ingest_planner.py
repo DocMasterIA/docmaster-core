@@ -19,7 +19,7 @@ from .ingest_queue import (
     TASK_CONTRACT_ITEMS,
     enqueue_catalog_page,
     enqueue_contract_items,
-    pending_by_task_type,
+    backlog_by_task_type,
     queue_stats,
 )
 from .local_index import _get_ingest_state, _parse_iso_utc, _resolve_backfill_start_page, ensure_local_index
@@ -60,7 +60,7 @@ def plan_ingest_queue(
     items_enqueued = 0
     now = datetime.utcnow()
     pending_now = int(queue_stats().get("pending") or 0)
-    items_backlog = pending_by_task_type(TASK_CONTRACT_ITEMS)
+    items_backlog = backlog_by_task_type(TASK_CONTRACT_ITEMS)
     pause_catalog_backlog = items_backlog >= max(
         0, int(PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG)
     )

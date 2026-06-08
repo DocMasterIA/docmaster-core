@@ -20,11 +20,11 @@ from .ingest_planner import plan_ingest_queue
 from .ingest_queue import (
     TASK_CATALOG_PAGE,
     TASK_CONTRACT_ITEMS,
+    backlog_by_task_type,
     claim_tasks,
     enqueue_contract_items,
     mark_task_done,
     mark_task_failed,
-    pending_by_task_type,
     queue_stats,
 )
 from .local_index import (
@@ -104,7 +104,7 @@ async def process_catalog_page_task(task: Dict[str, Any], *, client: Any) -> Non
     )
 
     if PNCP_LOCAL_INCLUDE_ITEMS:
-        items_backlog = pending_by_task_type(TASK_CONTRACT_ITEMS)
+        items_backlog = backlog_by_task_type(TASK_CONTRACT_ITEMS)
         if items_backlog < max(0, int(PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG)):
             for raw in batch:
                 numero = str(raw.get("numeroControlePNCP") or "").strip()
@@ -143,7 +143,7 @@ async def process_contract_items_task(task: Dict[str, Any], *, client: Any) -> N
 
 async def process_ingest_batch() -> Dict[str, Any]:
     ensure_local_index()
-    items_backlog = pending_by_task_type(TASK_CONTRACT_ITEMS)
+    items_backlog = backlog_by_task_type(TASK_CONTRACT_ITEMS)
     pause_catalog = items_backlog >= max(0, int(PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG))
     catalog_limit = 0 if pause_catalog else PNCP_INGEST_WORKER_CATALOG_BATCH
     item_limit = PNCP_INGEST_WORKER_ITEMS_BATCH
@@ -243,11 +243,14 @@ async def ingest_worker_loop() -> None:
             result = await process_ingest_batch()
             if (result.get("catalog_ok") or result.get("items_ok") or result.get("errors")):
                 logger.info(
-                    "ingest batch catalog_ok=%s items_ok=%s errors=%s pending=%s",
+                    "ingest batch catalog_ok=%s items_ok=%s errors=%s pending=%s "
+                    "items_backlog=%s catalog_paused=%s",
                     result.get("catalog_ok"),
                     result.get("items_ok"),
                     result.get("errors"),
                     (result.get("queue") or {}).get("pending"),
+                    result.get("items_backlog"),
+                    result.get("catalog_paused"),
                 )
         except asyncio.CancelledError:
             raise

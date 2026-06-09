@@ -13,7 +13,7 @@ if ! docker inspect "$C" >/dev/null 2>&1; then
   exit 1
 fi
 
-for f in config.py local_index.py ingest_worker.py ingest_planner.py ingest_queue.py; do
+for f in config.py local_index.py service.py api.py ingest_worker.py ingest_planner.py ingest_queue.py; do
   src="$REPO/pncp_researcher_service/app/$f"
   [[ -f "$src" ]] || { echo "ERRO: $src não encontrado"; exit 1; }
   docker cp "$src" "$C:$APP/$f"

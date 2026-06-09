@@ -55,7 +55,7 @@ docker volume ls | grep pncp
 ~/docmaster-core/scripts/deploy-pncp-researcher-code.sh
 
 # Manual (mesmos ficheiros)
-for f in config.py local_index.py ingest_worker.py ingest_planner.py ingest_queue.py; do
+for f in config.py local_index.py service.py api.py ingest_worker.py ingest_planner.py ingest_queue.py; do
   docker cp ~/docmaster-core/pncp_researcher_service/app/$f \
     pncp_researcher_service:/app/pncp_researcher_service/app/$f
 done

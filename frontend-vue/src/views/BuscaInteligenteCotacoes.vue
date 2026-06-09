@@ -105,15 +105,26 @@
       </section>
       <p v-if="isAutoSearchingAll" class="bia-meta">
         Busca automática em andamento: item {{ autoSearchProgress.done }} de {{ autoSearchProgress.total }}
+        <span v-if="cotacaoResumo.totalItens > autoSearchProgress.total">
+          ({{ cotacaoResumo.totalItens }} na cotação, {{ cotacaoResumo.completos }} já completos)
+        </span>
         <span v-if="autoSearchProgress.precos > 0 || autoSearchProgress.fail > 0">
           — {{ autoSearchProgress.precos }} preço(s), {{ autoSearchProgress.fail }} falha(s)
         </span>
         ...
       </p>
       <p v-else-if="autoSearchProgress.total > 0" class="bia-meta">
-        Busca automática concluída: {{ autoSearchProgress.done }} item(ns),
-        {{ autoSearchProgress.precos }} preço(s)
+        Busca automática concluída: {{ autoSearchProgress.done }} item(ns) incompletos processados,
+        {{ autoSearchProgress.precos }} preço(s) encontrados
         <span v-if="autoSearchProgress.fail > 0">, {{ autoSearchProgress.fail }} falha(s) de rede</span>.
+        <span v-if="cotacaoResumo.totalItens > autoSearchProgress.total">
+          Cotação com <strong>{{ cotacaoResumo.totalItens }}</strong> itens —
+          <strong>{{ cotacaoResumo.completos }}</strong> já tinham 3+ preços salvos e não foram buscados de novo.
+        </span>
+      </p>
+      <p v-else-if="cotacaoResumo.totalItens > 0 && !rebuscarCompletos" class="bia-meta">
+        Cotação: {{ cotacaoResumo.totalItens }} itens • {{ cotacaoResumo.incompletos }} incompletos (&lt; 3 preços salvos)
+        • {{ cotacaoResumo.completos }} completos (ignorados na busca automática).
       </p>
       <p v-if="lastSearchDebug" class="bia-meta">
         Última busca ({{ lastSearchDebug.termo }}):
@@ -454,6 +465,46 @@ const variacaoPercentualGlobal = ref(null);
 const variacaoSentidoGlobal = ref('ambos');
 const isAutoSearchingAll = ref(false);
 const autoSearchProgress = ref({ done: 0, total: 0, ok: 0, fail: 0, precos: 0, skipped: 0 });
+const cotacaoResumo = ref({
+  totalItens: 0,
+  carregados: 0,
+  incompletos: 0,
+  completos: 0,
+});
+const rebuscarCompletos = computed(() => String(route.query.rebuscar || '').trim() === '1');
+
+function itemTotalCotacoesSalvas(it) {
+  const fontes = it?.fontes_contagem || {};
+  return Number(fontes.governamentais || 0)
+    + Number(fontes.entesPublicos || 0)
+    + Number(fontes.dominioAmplo || 0)
+    + Number(fontes.cotacaoDireta || 0)
+    + Number(fontes.notasFiscais || 0);
+}
+
+function buildPendentesFromItens(itens) {
+  if (rebuscarCompletos.value) return [...itens];
+  return itens.filter((it) => itemTotalCotacoesSalvas(it) < 3);
+}
+
+function refreshCotacaoResumo(itens, totalSessao) {
+  const carregados = Array.isArray(itens) ? itens.length : 0;
+  const totalItens = Number(totalSessao) > 0 ? Number(totalSessao) : carregados;
+  const incompletos = buildPendentesFromItens(itens).length;
+  cotacaoResumo.value = {
+    totalItens,
+    carregados,
+    incompletos,
+    completos: Math.max(0, carregados - incompletos),
+  };
+  if (totalItens > carregados) {
+    searchError.value =
+      `Resposta incompleta da API: ${carregados} de ${totalItens} itens carregados. A busca pode não cobrir toda a cotação — recarregue a página.`;
+    return false;
+  }
+  return true;
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -628,7 +679,9 @@ async function applyFilters() {
   }
 
   // Fluxo cotação completa: reaplica busca para todos os itens.
-  const pendentes = allItemContexts.value.filter((ctx) => Number(ctx?.total_cotacoes_item || 0) < 3);
+  const pendentes = rebuscarCompletos.value
+    ? allItemContexts.value
+    : allItemContexts.value.filter((ctx) => Number(ctx?.total_cotacoes_item || 0) < 3);
   if (!pendentes.length) {
     searchError.value = 'Todos os itens já estão completos (3+ preços).';
     return;
@@ -641,11 +694,7 @@ function buildContextFromItem(it) {
   const src = it?.source || {};
   const faixa = src?.faixa_regional || src?.faixaRegional || {};
   const fontes = it?.fontes_contagem || {};
-  const totalCotacoesItem = Number(fontes.governamentais || 0)
-    + Number(fontes.entesPublicos || 0)
-    + Number(fontes.dominioAmplo || 0)
-    + Number(fontes.cotacaoDireta || 0)
-    + Number(fontes.notasFiscais || 0);
+  const totalCotacoesItem = itemTotalCotacoesSalvas(it);
   const valorBaseRef = parseNumericRef(
     src?.valor_base,
     src?.valorBase,
@@ -1049,6 +1098,8 @@ onMounted(async () => {
     const sentidoRaw = String(filtrosSessao.variacao_sentido_global || '').trim().toLowerCase();
     variacaoSentidoGlobal.value = ['cima', 'baixo', 'ambos'].includes(sentidoRaw) ? sentidoRaw : 'ambos';
     const itens = Array.isArray(data?.itens) ? data.itens : [];
+    const totalSessao = Number(data?.sessao?.total_itens ?? data?.stats?.total_itens ?? itens.length);
+    refreshCotacaoResumo(itens, totalSessao);
     allItemContexts.value = itens.map((it) => buildContextFromItem(it)).filter((x) => x.descricao_item);
     if (itemId.value) {
       const it = itens.find((x) => Number(x?.id) === Number(itemId.value));
@@ -1070,17 +1121,11 @@ onMounted(async () => {
     }
 
     if (autostart.value && itens.length) {
-      const pendentes = itens.filter((it) => {
-        const fontes = it?.fontes_contagem || {};
-        const totalCot = Number(fontes.governamentais || 0)
-          + Number(fontes.entesPublicos || 0)
-          + Number(fontes.dominioAmplo || 0)
-          + Number(fontes.cotacaoDireta || 0)
-          + Number(fontes.notasFiscais || 0);
-        return totalCot < 3;
-      });
+      const pendentes = buildPendentesFromItens(itens);
       if (!pendentes.length) {
-        searchError.value = 'Todos os itens da cotação já estão completos (3+ preços).';
+        searchError.value = rebuscarCompletos.value
+          ? 'Nenhum item com descrição para buscar.'
+          : 'Todos os itens da cotação já estão completos (3+ preços salvos no backend).';
         return;
       }
       const { generation, signal } = beginNewSearchSession();

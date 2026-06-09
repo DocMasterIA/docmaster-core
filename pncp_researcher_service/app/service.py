@@ -39,6 +39,7 @@ from .config import (
     PNCP_BLOCK_SERVICE_ITEMS,
     PNCP_SERVICE_BLOCK_TERMS,
     PNCP_SEARCH_ENRICH_HOMOLOG_MAX,
+    PNCP_SEARCH_MIN_SCORE_APROVACAO,
 )
 from .pncp_client import (
     PNCPClientError,
@@ -1233,17 +1234,19 @@ def _score_table_confirmation(item: Dict[str, Any]) -> float:
 
 
 def _classify_confiabilidade(score: float) -> str:
+    min_ok = int(PNCP_SEARCH_MIN_SCORE_APROVACAO)
     if score >= 80:
         return "Alta"
-    if score >= 60:
+    if score >= min_ok:
         return "Média"
     return "Baixa"
 
 
 def _classify_risco(score: float) -> str:
+    min_ok = int(PNCP_SEARCH_MIN_SCORE_APROVACAO)
     if score >= 80:
         return "Baixo"
-    if score >= 60:
+    if score >= min_ok:
         return "Médio"
     return "Alto"
 
@@ -1263,7 +1266,7 @@ def _is_similaridade_encontrada(item: Dict[str, Any]) -> bool:
         return False
     # `score_relevancia` > 0 indica match semântico básico; score aprovado evita ruído.
     # Para evitar excesso de "similaridade", limita aos casos de aderência literal realmente baixa.
-    return bool(sem_raw > 0 and aprov >= 60 and literal < 30)
+    return bool(sem_raw > 0 and aprov >= int(PNCP_SEARCH_MIN_SCORE_APROVACAO) and literal < 30)
 
 
 def _word_like_match(word: str, token: str) -> bool:
@@ -1405,9 +1408,10 @@ def _select_top3_quality_first(items: List[Dict[str, Any]]) -> List[Dict[str, An
     def score_of(it: Dict[str, Any]) -> int:
         return int(max(0, min(100, _safe_float(it.get("score_aprovacao")))))
 
+    min_ok = int(PNCP_SEARCH_MIN_SCORE_APROVACAO)
     high = [it for it in items if score_of(it) >= 80]
-    medium = [it for it in items if 60 <= score_of(it) < 80]
-    low = [it for it in items if score_of(it) < 60]
+    medium = [it for it in items if min_ok <= score_of(it) < 80]
+    low = [it for it in items if score_of(it) < min_ok]
 
     selected: List[Dict[str, Any]] = []
     for bucket in (high, medium, low):
@@ -1978,9 +1982,13 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         and (x.get("valor_unitario") or x.get("valor_total") or x.get("valor_global") or 0) > 0
     ]
     median_val = median(valores) if valores else None
+    min_ok = int(PNCP_SEARCH_MIN_SCORE_APROVACAO)
 
     def _score_candidates(candidates: List[Dict[str, Any]], *, mode: str) -> List[Dict[str, Any]]:
         out_rows: List[Dict[str, Any]] = []
+        lit_strict = max(4.0, min_ok * 0.16)
+        lit_relaxed = max(2.0, lit_strict * 0.5)
+        lit_aggressive = 1.0
         for it in candidates:
             relaxed = mode != "strict"
             aggressive = mode == "aggressive"
@@ -2019,12 +2027,12 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                 continue
             literal_match = round(_literal_match_score(payload.termo_busca, it), 3)
             # No fallback semântico, aceita variação literal mais ampla.
-            if not relaxed and literal_match < 12:
+            if not relaxed and literal_match < lit_strict:
                 continue
-            if mode == "relaxed" and literal_match < 6:
+            if mode == "relaxed" and literal_match < lit_relaxed:
                 if not partial_anchor:
                     continue
-            if aggressive and literal_match < 2:
+            if aggressive and literal_match < lit_aggressive:
                 if not partial_anchor:
                     continue
             tbl = 8.0
@@ -2070,7 +2078,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             it2["score_aprovacao"] = score_0_100
             it2["confiabilidade"] = _classify_confiabilidade(score_0_100)
             it2["risco"] = _classify_risco(score_0_100)
-            it2["status"] = "Aprovado" if score_0_100 >= 55 else "Revisar"
+            it2["status"] = "Aprovado" if score_0_100 >= min_ok else "Revisar"
             it2["partial_anchor_match"] = bool(partial_anchor)
             it2["similaridade_encontrada"] = _is_similaridade_encontrada(it2) or relaxed or partial_anchor
             if relaxed:
@@ -2127,7 +2135,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             row["score_aprovacao"] = score_adj
             row["confiabilidade"] = _classify_confiabilidade(score_adj)
             row["risco"] = _classify_risco(score_adj)
-            row["status"] = "Aprovado" if score_adj >= 60 else "Revisar"
+            row["status"] = "Aprovado" if score_adj >= min_ok else "Revisar"
             row["similaridade_encontrada"] = _is_similaridade_encontrada(row)
 
     scored.sort(
@@ -2145,7 +2153,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             return False
         if bool(it.get("similaridade_encontrada")):
             return False
-        return float(it.get("literal_match") or 0) >= 12.0
+        return float(it.get("literal_match") or 0) >= max(4.0, int(PNCP_SEARCH_MIN_SCORE_APROVACAO) * 0.16)
 
     literal_scored = [x for x in scored if _is_literal_candidate(x)]
     similar_scored = [x for x in scored if not _is_literal_candidate(x)]
@@ -2199,14 +2207,14 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                     base_score = int(max(0, min(100, _safe_float(row.get("score_aprovacao")))))
                     literal = float(out.get("literal_match") or 0.0)
                     # Blindagem: não deixa o rerank da IA colapsar score forte para ~0.
-                    if not (ia_score <= 15 and base_score >= 70 and literal >= 45):
+                    if not (ia_score <= 15 and base_score >= min_ok and literal >= 45):
                         out["score_aprovacao"] = ia_score
                 # Mantém consistência: confiabilidade/risco sempre derivados do score final.
                 final_score = int(max(0, min(100, _safe_float(out.get("score_aprovacao")))))
                 out["score_aprovacao"] = final_score
                 out["confiabilidade"] = _classify_confiabilidade(final_score)
                 out["risco"] = _classify_risco(final_score)
-                out["status"] = "Aprovado" if final_score >= 60 else "Revisar"
+                out["status"] = "Aprovado" if final_score >= min_ok else "Revisar"
                 if picked.get("justificativa"):
                     out["ia_justificativa"] = picked["justificativa"]
                 chosen.append(out)
@@ -2291,6 +2299,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     )
     out_stats["funil_busca"] = {**funil, "top3_final": len(top3)}
     out_stats["provavel_gargalo"] = _infer_search_bottleneck(funil, len(top3))
+    out_stats["min_score_aprovacao"] = min_ok
 
     return {
         "ok": bool(base_items.get("ok", True)),

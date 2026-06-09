@@ -58,6 +58,7 @@ services:
       # Busca: só homologados + enrich on-demand de CNPJ na pesquisa local.
       - PNCP_SEARCH_ONLY_HOMOLOGATED=${PNCP_SEARCH_ONLY_HOMOLOGATED:-1}
       - PNCP_SEARCH_ENRICH_HOMOLOG_MAX=${PNCP_SEARCH_ENRICH_HOMOLOG_MAX:-16}
+      - PNCP_SEARCH_MIN_SCORE_APROVACAO=${PNCP_SEARCH_MIN_SCORE_APROVACAO:-50}
       # Skip retrabalho: não refaz GET /itens se o contrato já foi buscado nos últimos N dias.
       - PNCP_INGEST_ITEMS_REFRESH_DAYS=${PNCP_INGEST_ITEMS_REFRESH_DAYS:-7}
     volumes:

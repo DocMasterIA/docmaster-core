@@ -65,16 +65,16 @@ Resultado:
 Com base no `score_aprovacao`:
 
 - `confiabilidade`:
-  - Alta: >= 75
-  - Média: >= 55 e < 75
-  - Baixa: < 55
+  - Alta: >= 80
+  - Média: >= `PNCP_SEARCH_MIN_SCORE_APROVACAO` (default **50**)
+  - Baixa: abaixo do mínimo
 - `risco`:
-  - Baixo: >= 75
-  - Médio: >= 55 e < 75
-  - Alto: < 55
+  - Baixo: >= 80
+  - Médio: >= mínimo configurado
+  - Alto: abaixo do mínimo
 - `status`:
-  - Aprovado: >= 55
-  - Revisar: < 55
+  - Aprovado: >= mínimo (default **50**; antes ~55–60 implícito)
+  - Revisar: abaixo do mínimo
 
 ### 3.4 Seleção final (exatamente 3)
 

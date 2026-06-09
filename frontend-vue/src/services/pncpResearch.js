@@ -145,6 +145,56 @@ export function getResearchSession(sessaoId, signal) {
   return cotacaoRequest(`research/sessions/${encodeURIComponent(sessaoId)}`, { signal });
 }
 
+/** Lista paginada e leve de itens para busca inteligente em lote (centenas de itens). */
+export function getResearchSessionItemsSearchContext(
+  sessaoId,
+  { offset = 0, limit = 250, somenteIncompletos = true, signal } = {},
+) {
+  const q = new URLSearchParams({
+    offset: String(Math.max(0, Number(offset) || 0)),
+    limit: String(Math.max(1, Math.min(500, Number(limit) || 250))),
+    somente_incompletos: somenteIncompletos ? '1' : '0',
+  });
+  return cotacaoRequest(
+    `research/sessions/${encodeURIComponent(sessaoId)}/items/search-context?${q}`,
+    { signal },
+  );
+}
+
+export async function fetchAllItemsForBulkSearch(
+  sessaoId,
+  { somenteIncompletos = true, signal, onPage } = {},
+) {
+  const PAGE = 250;
+  let offset = 0;
+  const all = [];
+  let sessao = null;
+  let stats = null;
+  let pageInfo = null;
+  for (;;) {
+    const page = await getResearchSessionItemsSearchContext(sessaoId, {
+      offset,
+      limit: PAGE,
+      somenteIncompletos,
+      signal,
+    });
+    if (!page?.ok) {
+      throw new Error(page?.error || page?.detail || 'Falha ao carregar itens da cotação.');
+    }
+    sessao = page.sessao || sessao;
+    stats = page.stats || stats;
+    pageInfo = page.page || pageInfo;
+    const chunk = Array.isArray(page.itens) ? page.itens : [];
+    all.push(...chunk);
+    if (typeof onPage === 'function') {
+      onPage({ loaded: all.length, stats, page: page.page });
+    }
+    if (!page?.page?.has_more || chunk.length === 0) break;
+    offset += chunk.length;
+  }
+  return { sessao, itens: all, stats, page: pageInfo };
+}
+
 export function updateResearchSession(sessaoId, payload, signal) {
   return cotacaoRequest(`research/sessions/${encodeURIComponent(sessaoId)}/update`, {
     method: 'POST',

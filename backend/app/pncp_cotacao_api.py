@@ -807,6 +807,30 @@ def _fontes_counts_for_session(sessao_id: int) -> Dict[int, Dict[str, int]]:
     return out
 
 
+def _total_cotacoes_from_fontes(fontes: Dict[str, Any]) -> int:
+    if not isinstance(fontes, dict):
+        return 0
+    return (
+        int(fontes.get("governamentais") or 0)
+        + int(fontes.get("entesPublicos") or 0)
+        + int(fontes.get("dominioAmplo") or 0)
+        + int(fontes.get("cotacaoDireta") or 0)
+        + int(fontes.get("notasFiscais") or 0)
+    )
+
+
+def _item_search_context_dict(row: PncpCotacaoItem, fontes: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "id": row.id,
+        "descricao_item": row.descricao_item or None,
+        "quantidade": row.quantidade,
+        "unidade_medida": row.unidade_medida or None,
+        "uf": row.uf or None,
+        "source": row.source if isinstance(row.source, dict) else {},
+        "fontes_contagem": fontes,
+    }
+
+
 def _itens_refletidos_for_session(sessao_id: int, formula_id: str) -> Dict[int, Dict[str, Any]]:
     """
     Por item: média aritmética dos preços unitários por fonte (ausência = 0),
@@ -1177,6 +1201,99 @@ def pncp_research_sessions_detail(request, sessao_id: int):
             "total_linhas_cotacao": total_linhas_cotacao,
             "cnpjs_fontes": extrair_cnpjs_dos_itens(itens_asc),
             "stats": {"total_itens": len(itens_asc), "total_grupos": len(grupos_relatorio)},
+        }
+    )
+
+
+@api_login_required
+@csrf_exempt
+@require_http_methods(["GET", "OPTIONS"])
+@_pncp_json_errors
+def pncp_research_sessions_items_search_context(request, sessao_id: int):
+    """
+    Payload leve e paginado para busca inteligente em lote (centenas de itens).
+    Evita carregar grupos_relatorio/calculo_precos no GET completo da sessão.
+    """
+    if request.method == "OPTIONS":
+        return JsonResponse({}, status=204)
+
+    c = _cotacao_qs_for_user(request.user).filter(pk=sessao_id).first()
+    if not c:
+        return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
+
+    try:
+        offset = max(0, int(request.GET.get("offset") or "0"))
+    except (TypeError, ValueError):
+        offset = 0
+    try:
+        limit = max(1, min(int(request.GET.get("limit") or "250"), 500))
+    except (TypeError, ValueError):
+        limit = 250
+    somente_incompletos = str(request.GET.get("somente_incompletos") or "1").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+    itens_asc = list(
+        c.itens.all()
+        .only("id", "descricao_item", "quantidade", "unidade_medida", "uf", "source")
+        .order_by("id")
+    )
+    fontes_counts = _fontes_counts_for_session(c.id)
+    total_itens = len(itens_asc)
+    total_completos = 0
+    candidatos: List[PncpCotacaoItem] = []
+    for row in itens_asc:
+        fontes = fontes_counts.get(int(row.id), {})
+        if _total_cotacoes_from_fontes(fontes) >= 3:
+            total_completos += 1
+            if not somente_incompletos:
+                candidatos.append(row)
+        else:
+            candidatos.append(row)
+
+    total_candidatos = len(candidatos)
+    page_rows = candidatos[offset : offset + limit]
+    empty_fontes = {
+        "governamentais": 0,
+        "entesPublicos": 0,
+        "dominioAmplo": 0,
+        "cotacaoDireta": 0,
+        "notasFiscais": 0,
+        "similaridadeEncontrada": 0,
+    }
+    itens_payload = [
+        _item_search_context_dict(row, fontes_counts.get(int(row.id), dict(empty_fontes)))
+        for row in page_rows
+    ]
+    filtros = c.filtros if isinstance(c.filtros, dict) else {}
+    return JsonResponse(
+        {
+            "ok": True,
+            "sessao_id": c.id,
+            "sessao": {
+                "id": c.id,
+                "titulo": c.titulo,
+                "status": c.status,
+                "filtros": filtros,
+                "total_itens": total_itens,
+            },
+            "itens": itens_payload,
+            "page": {
+                "offset": offset,
+                "limit": limit,
+                "returned": len(itens_payload),
+                "total_candidatos": total_candidatos,
+                "has_more": (offset + len(itens_payload)) < total_candidatos,
+            },
+            "stats": {
+                "total_itens": total_itens,
+                "total_completos": total_completos,
+                "total_incompletos": max(0, total_itens - total_completos),
+                "somente_incompletos": somente_incompletos,
+            },
         }
     )
 

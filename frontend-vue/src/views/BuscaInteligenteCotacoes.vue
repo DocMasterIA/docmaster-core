@@ -103,6 +103,9 @@
           </div>
         </div>
       </section>
+      <p v-if="isLoadingSessionItems" class="bia-meta">
+        Carregando itens da cotação{{ sessionItemsLoadHint ? ` (${sessionItemsLoadHint})` : '' }}...
+      </p>
       <p v-if="isAutoSearchingAll" class="bia-meta">
         Busca automática em andamento: item {{ autoSearchProgress.done }} de {{ autoSearchProgress.total }}
         <span v-if="cotacaoResumo.totalItens > autoSearchProgress.total">
@@ -114,12 +117,12 @@
         ...
       </p>
       <p v-else-if="autoSearchProgress.total > 0" class="bia-meta">
-        Busca automática concluída: {{ autoSearchProgress.done }} item(ns) incompletos processados,
+        Busca automática concluída: {{ autoSearchProgress.done }} de {{ autoSearchProgress.total }} item(ns) processados,
         {{ autoSearchProgress.precos }} preço(s) encontrados
         <span v-if="autoSearchProgress.fail > 0">, {{ autoSearchProgress.fail }} falha(s) de rede</span>.
-        <span v-if="cotacaoResumo.totalItens > autoSearchProgress.total">
-          Cotação com <strong>{{ cotacaoResumo.totalItens }}</strong> itens —
-          <strong>{{ cotacaoResumo.completos }}</strong> já tinham 3+ preços salvos e não foram buscados de novo.
+        <span v-if="cotacaoResumo.completos > 0 && !rebuscarCompletos">
+          {{ cotacaoResumo.completos }} item(ns) já tinham 3+ preços salvos e foram ignorados
+          (cotação: {{ cotacaoResumo.totalItens }} itens).
         </span>
       </p>
       <p v-else-if="cotacaoResumo.totalItens > 0 && !rebuscarCompletos" class="bia-meta">
@@ -286,6 +289,7 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   addCotacoesToItemInResearchSession,
   addItemsToResearchSession,
+  fetchAllItemsForBulkSearch,
   getResearchSession,
   intelligentMarketSearch,
 } from '../services/pncpResearch';
@@ -464,6 +468,8 @@ const allItemContexts = ref([]);
 const variacaoPercentualGlobal = ref(null);
 const variacaoSentidoGlobal = ref('ambos');
 const isAutoSearchingAll = ref(false);
+const isLoadingSessionItems = ref(false);
+const sessionItemsLoadHint = ref('');
 const autoSearchProgress = ref({ done: 0, total: 0, ok: 0, fail: 0, precos: 0, skipped: 0 });
 const cotacaoResumo = ref({
   totalItens: 0,
@@ -487,19 +493,27 @@ function buildPendentesFromItens(itens) {
   return itens.filter((it) => itemTotalCotacoesSalvas(it) < 3);
 }
 
-function refreshCotacaoResumo(itens, totalSessao) {
+function refreshCotacaoResumo(itens, totalSessao, stats = null) {
   const carregados = Array.isArray(itens) ? itens.length : 0;
-  const totalItens = Number(totalSessao) > 0 ? Number(totalSessao) : carregados;
-  const incompletos = buildPendentesFromItens(itens).length;
+  const totalItens = Number(stats?.total_itens ?? totalSessao) > 0
+    ? Number(stats?.total_itens ?? totalSessao)
+    : carregados;
+  const incompletos = Number.isFinite(Number(stats?.total_incompletos))
+    ? Number(stats.total_incompletos)
+    : buildPendentesFromItens(itens).length;
+  const completos = Number.isFinite(Number(stats?.total_completos))
+    ? Number(stats.total_completos)
+    : Math.max(0, totalItens - incompletos);
   cotacaoResumo.value = {
     totalItens,
     carregados,
     incompletos,
-    completos: Math.max(0, carregados - incompletos),
+    completos,
   };
-  if (totalItens > carregados) {
+  if (!stats && totalItens > carregados) {
     searchError.value =
-      `Resposta incompleta da API: ${carregados} de ${totalItens} itens carregados. A busca pode não cobrir toda a cotação — recarregue a página.`;
+      `Resposta incompleta da API: ${carregados} de ${totalItens} itens carregados. `
+      + 'Recarregue a página após atualizar o backend (endpoint paginado).';
     return false;
   }
   return true;
@@ -574,6 +588,10 @@ async function runBulkItemSearches(pendentes, { generation, signal, clearRows = 
   }
   isAutoSearchingAll.value = false;
   const p = autoSearchProgress.value;
+  if (p.total > 0 && p.done === 0) {
+    searchError.value = 'A busca automática foi interrompida antes do primeiro item. Clique «Pesquisar UF» para tentar de novo.';
+    return;
+  }
   if (p.precos > 0 && p.fail > 0) {
     searchError.value =
       `Busca parcial: ${p.ok} item(ns), ${p.precos} preço(s). ${p.fail} falha(s) de rede — clique «Pesquisar UF» para continuar os restantes (resultados já encontrados são mantidos).`;
@@ -1086,8 +1104,45 @@ async function adicionarSelecionadosNaCotacao() {
 onMounted(async () => {
   const sessionId = Number(cotacaoId.value);
   if (!Number.isFinite(sessionId) || sessionId <= 0) return;
+  autoSearchProgress.value = { done: 0, total: 0, ok: 0, fail: 0, precos: 0, skipped: 0 };
+  searchError.value = '';
   try {
-    const data = await getResearchSession(sessionId);
+    let data;
+    let itens = [];
+    let stats = null;
+
+    if (itemId.value) {
+      data = await getResearchSession(sessionId);
+      itens = Array.isArray(data?.itens) ? data.itens : [];
+      stats = null;
+    } else {
+      isLoadingSessionItems.value = true;
+      try {
+        const bulk = await fetchAllItemsForBulkSearch(sessionId, {
+          somenteIncompletos: !rebuscarCompletos.value,
+          onPage: ({ loaded, stats: st }) => {
+            const total = Number(st?.total_incompletos ?? st?.total_itens ?? 0);
+            sessionItemsLoadHint.value = total > 0 ? `${loaded}/${total}` : String(loaded);
+          },
+        });
+        data = { sessao: bulk.sessao, ok: true };
+        itens = Array.isArray(bulk.itens) ? bulk.itens : [];
+        stats = bulk.stats || null;
+      } catch (bulkErr) {
+        const msg = String(bulkErr?.message || '');
+        if (/not found|404|search-context/i.test(msg)) {
+          data = await getResearchSession(sessionId);
+          itens = Array.isArray(data?.itens) ? data.itens : [];
+          stats = data?.stats || null;
+        } else {
+          throw bulkErr;
+        }
+      } finally {
+        isLoadingSessionItems.value = false;
+        sessionItemsLoadHint.value = '';
+      }
+    }
+
     const filtrosSessao = (data?.sessao?.filtros && typeof data.sessao.filtros === 'object') ? data.sessao.filtros : {};
     const variacaoGlobal = Number(
       filtrosSessao.variacao_percentual_global ?? filtrosSessao.variacao_global_percentual ?? null,
@@ -1097,9 +1152,8 @@ onMounted(async () => {
       : null;
     const sentidoRaw = String(filtrosSessao.variacao_sentido_global || '').trim().toLowerCase();
     variacaoSentidoGlobal.value = ['cima', 'baixo', 'ambos'].includes(sentidoRaw) ? sentidoRaw : 'ambos';
-    const itens = Array.isArray(data?.itens) ? data.itens : [];
-    const totalSessao = Number(data?.sessao?.total_itens ?? data?.stats?.total_itens ?? itens.length);
-    refreshCotacaoResumo(itens, totalSessao);
+    const totalSessao = Number(data?.sessao?.total_itens ?? data?.stats?.total_itens ?? stats?.total_itens ?? itens.length);
+    const apiOk = refreshCotacaoResumo(itens, totalSessao, stats);
     allItemContexts.value = itens.map((it) => buildContextFromItem(it)).filter((x) => x.descricao_item);
     if (itemId.value) {
       const it = itens.find((x) => Number(x?.id) === Number(itemId.value));
@@ -1121,20 +1175,28 @@ onMounted(async () => {
     }
 
     if (autostart.value && itens.length) {
+      if (!apiOk) return;
       const pendentes = buildPendentesFromItens(itens);
+      const esperados = Number(stats?.total_incompletos ?? cotacaoResumo.value.incompletos ?? pendentes.length);
       if (!pendentes.length) {
-        searchError.value = rebuscarCompletos.value
-          ? 'Nenhum item com descrição para buscar.'
-          : 'Todos os itens da cotação já estão completos (3+ preços salvos no backend).';
+        if (esperados > 0) {
+          searchError.value =
+            `Há ${esperados} item(ns) incompletos na cotação, mas nenhum foi carregado para busca. Recarregue após deploy do backend.`;
+        } else {
+          searchError.value = rebuscarCompletos.value
+            ? 'Nenhum item com descrição para buscar.'
+            : 'Todos os itens da cotação já estão completos (3+ preços salvos no backend).';
+        }
         return;
       }
       const { generation, signal } = beginNewSearchSession();
       const pendentesCtx = pendentes.map((it) => buildContextFromItem(it)).filter((x) => x.descricao_item);
       await runBulkItemSearches(pendentesCtx, { generation, signal, clearRows: true });
     }
-  } catch (_) {
-    // contexto do item é opcional; não bloqueia uso normal da tela
+  } catch (err) {
+    isLoadingSessionItems.value = false;
     isAutoSearchingAll.value = false;
+    searchError.value = `Não foi possível carregar a cotação (${err?.message || 'erro desconhecido'}).`;
   }
 });
 

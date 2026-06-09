@@ -1108,11 +1108,20 @@ _SEARCH_ANCHOR_DROP = frozenset(
 )
 
 
-def derive_anchor_search_term(termo_busca: str, *, max_groups: int = 10) -> tuple[str, Dict[str, Any]]:
+def derive_anchor_search_term(
+    termo_busca: str,
+    *,
+    max_groups: Optional[int] = None,
+    full_term_max: Optional[int] = None,
+) -> tuple[str, Dict[str, Any]]:
     """
-    Descrições longas de cotação geram AND de dezenas de tokens no FTS — recall ~0.
-    Mantém até ``max_groups`` âncoras para busca e scoring (mesmos tokens no índice e na IA local).
+    Descrições longas de cotação geram AND de dezenas de tokens — recall ~0.
+    Até ``full_term_max`` tokens: busca com todos; acima: cap de ``max_groups`` âncoras.
     """
+    from .config import PNCP_SEARCH_ANCHOR_FULL_TERM_MAX, PNCP_SEARCH_ANCHOR_MAX_GROUPS
+
+    cap = max(2, int(max_groups if max_groups is not None else PNCP_SEARCH_ANCHOR_MAX_GROUPS))
+    full_max = max(2, int(full_term_max if full_term_max is not None else PNCP_SEARCH_ANCHOR_FULL_TERM_MAX))
     raw = (termo_busca or "").strip()
     groups = _build_search_tokens(raw)
     meta: Dict[str, Any] = {
@@ -1120,10 +1129,11 @@ def derive_anchor_search_term(termo_busca: str, *, max_groups: int = 10) -> tupl
         "termo_original_tokens": len(groups),
         "termo_efetivo_tokens": len(groups),
         "termo_truncado": False,
+        "termo_efetivo": raw,
     }
     if not groups:
         return raw, meta
-    if len(groups) <= max(2, int(max_groups)):
+    if len(groups) <= full_max:
         return raw, meta
     picked: List[str] = []
     for variants in groups:
@@ -1131,10 +1141,10 @@ def derive_anchor_search_term(termo_busca: str, *, max_groups: int = 10) -> tupl
         if anchor in _SEARCH_ANCHOR_DROP:
             continue
         picked.append(anchor)
-        if len(picked) >= max(2, int(max_groups)):
+        if len(picked) >= cap:
             break
     if len(picked) < 2:
-        picked = [g[0] for g in groups[: max(2, int(max_groups))]]
+        picked = [g[0] for g in groups[:cap]]
     meta["termo_truncado"] = True
     meta["termo_efetivo_tokens"] = len(picked)
     meta["termo_efetivo"] = " ".join(picked)

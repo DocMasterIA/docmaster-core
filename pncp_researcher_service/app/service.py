@@ -1467,22 +1467,39 @@ def _select_top3_prioritize_federal(items: List[Dict[str, Any]]) -> List[Dict[st
     Regra de negócio:
     1) Se houver ao menos 3 federais com score >= 80, seleciona apenas federais;
     2) Caso contrário, seleção geral por qualidade (mescla I/II quando necessário).
+    3) Se a regra federal deixar menos de 3, completa com demais esferas (até 3).
     """
     if not items:
         return []
+
+    def _complete_to_three(selected: List[Dict[str, Any]], pool: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        if len(selected) >= 3:
+            return selected[:3]
+        used = {_ia_item_key(x) for x in selected if _ia_item_key(x)}
+        extras = _select_top3_quality_first([x for x in pool if _ia_item_key(x) not in used])
+        out = list(selected)
+        for row in extras:
+            if len(out) >= 3:
+                break
+            k = _ia_item_key(row)
+            if k and k in used:
+                continue
+            out.append(row)
+            if k:
+                used.add(k)
+        return out[:3]
+
     federais = [it for it in items if _is_federal_item(it)]
     federais_80 = [it for it in federais if _safe_float(it.get("score_aprovacao")) >= 80.0]
 
     # Priorização total de Inciso I só quando há 3 federais "fortes" (>=80).
     if len(federais_80) >= 3:
         selected_federal = _select_top3_quality_first(federais)
-        return selected_federal[:3]
+        return _complete_to_three(selected_federal, items)
 
     # Sem 3 federais fortes, usa ranking geral (pode cair em II ou mesclar I/II).
     selected_all = _select_top3_quality_first(items)
-    if len(selected_all) >= 3:
-        return selected_all[:3]
-    return selected_all
+    return selected_all[:3]
 
 
 def _merge_unique_items(primary: List[Dict[str, Any]], secondary: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -1542,6 +1559,62 @@ def _ia_item_key(it: Dict[str, Any]) -> str:
 def _preco_dentro_faixa(it: Dict[str, Any], lo: float, hi: float) -> bool:
     v = _row_price_for_faixa(it)
     return v > 0.0 and lo <= v <= hi
+
+
+def _ensure_top3_from_pool(
+    current: List[Dict[str, Any]],
+    pool: List[Dict[str, Any]],
+    *,
+    target: int = 3,
+    termo_busca: str = "",
+    faixa_min: Optional[float] = None,
+    faixa_max: Optional[float] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Garante até ``target`` preços distintos quando o pool tiver candidatos elegíveis.
+    Regra de negócio: busca inteligente deve tentar sempre 3 cotações por item.
+    """
+    target = max(1, int(target))
+    out: List[Dict[str, Any]] = []
+    used: set[str] = set()
+
+    def eligible(it: Dict[str, Any]) -> bool:
+        if _row_price_for_faixa(it) <= 0.0:
+            return False
+        if faixa_min is not None and faixa_max is not None:
+            return _preco_dentro_faixa(it, faixa_min, faixa_max)
+        return True
+
+    def rank_key(it: Dict[str, Any]) -> tuple[float, float]:
+        return (
+            float(it.get("literal_match") or _literal_match_score(termo_busca, it)),
+            float(it.get("score_aprovacao") or 0),
+        )
+
+    for row in current:
+        if not eligible(row):
+            continue
+        k = _ia_item_key(row)
+        if k and k in used:
+            continue
+        out.append(dict(row))
+        if k:
+            used.add(k)
+        if len(out) >= target:
+            return out[:target]
+
+    candidates = [dict(x) for x in pool if eligible(x)]
+    candidates.sort(key=rank_key, reverse=True)
+    for cand in candidates:
+        if len(out) >= target:
+            break
+        k = _ia_item_key(cand)
+        if k and k in used:
+            continue
+        out.append(cand)
+        if k:
+            used.add(k)
+    return out[:target]
 
 
 def _enforce_faixa_no_top3(
@@ -1869,6 +1942,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     funil: Dict[str, Any] = {
         "termo_busca": term_meta,
         "local_homologados": len(itens),
+        "local_com_preco": sum(1 for x in itens if _row_price_for_faixa(x) > 0.0),
         "sql_rows_fetched": int(base_stats.get("sql_rows_fetched") or 0),
         "filtrados_token_match": int(base_stats.get("filtrados_token_match") or 0),
         "filtrados_nao_homologados": int(base_stats.get("filtrados_nao_homologados") or 0),
@@ -2108,7 +2182,14 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             it2["risco"] = _classify_risco(score_0_100)
             it2["status"] = "Aprovado" if score_0_100 >= min_ok else "Revisar"
             it2["partial_anchor_match"] = bool(partial_anchor)
-            it2["similaridade_encontrada"] = _is_similaridade_encontrada(it2) or relaxed or partial_anchor
+            # Itens do índice local em modo estrito já passaram no match de tokens — não
+            # reclassificar como "similaridade" só por partial_anchor (quebrava top3 literal).
+            if from_local_index and not relaxed and sem_raw > 0 and literal_match >= lit_strict:
+                it2["similaridade_encontrada"] = False
+            else:
+                it2["similaridade_encontrada"] = (
+                    _is_similaridade_encontrada(it2) or relaxed or partial_anchor
+                )
             if relaxed:
                 it2["match_relaxado"] = True
             if aggressive:
@@ -2147,6 +2228,26 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         funil["eliminados_faixa_preco"] = 0
     funil["scored_final_pool"] = len(scored)
 
+    # Rede de segurança: índice achou homologados com preço, mas scoring zerou tudo (sem faixa).
+    if not scored and itens and faixa_min is None and faixa_max is None:
+        priced_local = [x for x in itens if _row_price_for_faixa(x) > 0.0]
+        if priced_local:
+            scored = []
+            for it in priced_local:
+                lit = round(_literal_match_score(termo_efetivo, it), 3)
+                row = dict(it)
+                row["literal_match"] = lit
+                row["score_bruto"] = round(35.0 + min(lit, 55.0), 3)
+                row["score_aprovacao"] = int(max(0, min(100, round(row["score_bruto"]))))
+                row["confiabilidade"] = _classify_confiabilidade(row["score_aprovacao"])
+                row["risco"] = _classify_risco(row["score_aprovacao"])
+                row["status"] = "Aprovado" if row["score_aprovacao"] >= min_ok else "Revisar"
+                row["similaridade_encontrada"] = False
+                row["origem"] = row.get("origem") or "base_local_itens"
+                scored.append(row)
+            funil["scored_fallback_local_preco"] = len(scored)
+            funil["scored_final_pool"] = len(scored)
+
     # Reescala para ampliar separação entre bons e ruins no conjunto atual.
     if scored:
         raw_values = [_safe_float(x.get("score_bruto")) for x in scored]
@@ -2164,7 +2265,10 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             row["confiabilidade"] = _classify_confiabilidade(score_adj)
             row["risco"] = _classify_risco(score_adj)
             row["status"] = "Aprovado" if score_adj >= min_ok else "Revisar"
-            row["similaridade_encontrada"] = _is_similaridade_encontrada(row)
+            # Não sobrescrever classificação literal/similaridade definida no scoring.
+            if not row.get("match_relaxado") and not row.get("match_agressivo"):
+                if row.get("similaridade_encontrada") is None:
+                    row["similaridade_encontrada"] = _is_similaridade_encontrada(row)
 
     scored.sort(
         key=lambda x: (
@@ -2185,6 +2289,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
 
     literal_scored = [x for x in scored if _is_literal_candidate(x)]
     similar_scored = [x for x in scored if not _is_literal_candidate(x)]
+    funil["literal_pool"] = len(literal_scored)
+    funil["similar_pool"] = len(similar_scored)
     pool_mode = "mixed_fallback"
     if len(literal_scored) >= 3:
         selection_pool = list(literal_scored)
@@ -2274,16 +2380,24 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             base_similar = _select_top3_prioritize_federal(complemento)[:faltantes]
             top3 = base_literal + base_similar
 
-    if faixa_min is not None and faixa_max is not None and top3:
-        top3 = _enforce_faixa_no_top3(
-            top3,
-            scored,
-            lo=faixa_min,
-            hi=faixa_max,
-            termo_busca=payload.termo_busca,
-        )
-        # Segurança extra no retorno final.
-        top3 = [x for x in top3 if _preco_dentro_faixa(x, faixa_min, faixa_max)]
+    funil["top3_antes_completar"] = len(top3)
+    top3 = _ensure_top3_from_pool(
+        top3,
+        scored,
+        target=3,
+        termo_busca=termo_efetivo,
+        faixa_min=faixa_min,
+        faixa_max=faixa_max,
+    )
+    funil["top3_final"] = len(top3)
+    if len(top3) < 3 and funil.get("scored_final_pool", 0) >= 3:
+        funil["provavel_gargalo_top3"] = "selecao_top3_incompleta"
+    elif len(top3) < 3 and funil.get("local_com_preco", 0) >= 3 and funil.get("scored_final_pool", 0) < 3:
+        funil["provavel_gargalo_top3"] = "scoring_ou_faixa_reduziu_pool"
+    elif len(top3) == 0 and funil.get("local_homologados", 0) == 0 and funil.get("sql_rows_fetched", 0) > 0:
+        funil["provavel_gargalo_top3"] = "token_match_pos_fts"
+    elif len(top3) == 0 and funil.get("local_homologados", 0) > 0 and funil.get("local_com_preco", 0) == 0:
+        funil["provavel_gargalo_top3"] = "homologados_sem_preco_indice"
 
     enrich_n_top3 = 0
     if top3:
@@ -2325,8 +2439,11 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     out_stats["itens_com_cnpj_fornecedor"] = sum(
         1 for x in top3 if str(x.get("cnpj_fornecedor") or "").strip()
     )
-    out_stats["funil_busca"] = {**funil, "top3_final": len(top3)}
-    out_stats["provavel_gargalo"] = _infer_search_bottleneck(funil, len(top3))
+    out_stats["funil_busca"] = funil
+    out_stats["provavel_gargalo"] = (
+        funil.get("provavel_gargalo_top3")
+        or _infer_search_bottleneck(funil, len(top3))
+    )
     out_stats["min_score_aprovacao"] = min_ok
 
     return {

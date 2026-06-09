@@ -14,7 +14,11 @@ from app.local_index import (  # noqa: E402
     _row_matches_search_tokens,
     derive_anchor_search_term,
 )
-from app.service import _compute_match_score, _infer_search_bottleneck  # noqa: E402
+from app.service import (  # noqa: E402
+    _compute_match_score,
+    _ensure_top3_from_pool,
+    _infer_search_bottleneck,
+)
 
 
 class TestSearchRecallHelpers(unittest.TestCase):
@@ -66,6 +70,46 @@ class TestSearchRecallHelpers(unittest.TestCase):
         groups = _build_search_tokens(term)
         desc = "ACEBROFILINA 50 MG/5 ML XAROPE FR 120 ML"
         self.assertTrue(_row_matches_search_tokens(desc, groups))
+
+    def test_ensure_top3_from_pool_fills_to_three(self):
+        pool = [
+            {
+                "numero_pncp": "1",
+                "numero_item": "1",
+                "descricao_item": "ABAIXADOR DE LINGUA",
+                "orgao": "Org A",
+                "valor_unitario": 10.0,
+                "literal_match": 40.0,
+                "score_aprovacao": 85,
+            },
+            {
+                "numero_pncp": "2",
+                "numero_item": "1",
+                "descricao_item": "ABAIXADOR DE LINGUA",
+                "orgao": "Org B",
+                "valor_unitario": 11.0,
+                "literal_match": 38.0,
+                "score_aprovacao": 82,
+            },
+            {
+                "numero_pncp": "3",
+                "numero_item": "1",
+                "descricao_item": "ABAIXADOR DE LINGUA",
+                "orgao": "Org C",
+                "valor_unitario": 12.0,
+                "literal_match": 36.0,
+                "score_aprovacao": 80,
+            },
+        ]
+        got = _ensure_top3_from_pool([pool[0]], pool, target=3, termo_busca="ABAIXADOR DE LINGUA")
+        self.assertEqual(len(got), 3)
+
+    def test_derive_anchor_caps_long_cotacao_description(self):
+        term = "ACEBROFILINA 50 MG 5 ML XAROPE FRASCO 120 ML ESTERIAL"
+        eff, meta = derive_anchor_search_term(term)
+        self.assertTrue(meta.get("termo_truncado"))
+        self.assertLessEqual(meta.get("termo_efetivo_tokens", 99), 8)
+        self.assertIn("acebrofilina", eff.lower())
 
 
 if __name__ == "__main__":

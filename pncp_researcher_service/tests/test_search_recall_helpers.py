@@ -8,7 +8,12 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from app.local_index import _build_search_tokens, derive_anchor_search_term  # noqa: E402
+from app.local_index import (  # noqa: E402
+    _build_fts_match_query,
+    _build_search_tokens,
+    _row_matches_search_tokens,
+    derive_anchor_search_term,
+)
 from app.service import _compute_match_score, _infer_search_bottleneck  # noqa: E402
 
 
@@ -49,6 +54,18 @@ class TestSearchRecallHelpers(unittest.TestCase):
         desc = "ACEBROFILINA 50 MG/5 ML XAROPE FRASCO 120 ML"
         self.assertEqual(_compute_match_score(desc, groups, variant_groups=False), 0.0)
         self.assertGreater(_compute_match_score(desc, groups, variant_groups=True), 0.0)
+
+    def test_fts_match_query_anchor_only(self):
+        term = "ACEBROFILINA 50 MG/5 ML XAROPE C/120ML"
+        q = _build_fts_match_query(term, anchor_only=True)
+        self.assertIn("acebrofilina", q or "")
+        self.assertNotIn("120ml", (q or "").lower())
+
+    def test_row_matches_120ml_spaced(self):
+        term = "ACEBROFILINA 50 MG/5 ML XAROPE C/120ML"
+        groups = _build_search_tokens(term)
+        desc = "ACEBROFILINA 50 MG/5 ML XAROPE FR 120 ML"
+        self.assertTrue(_row_matches_search_tokens(desc, groups))
 
 
 if __name__ == "__main__":

@@ -256,12 +256,19 @@ def _escape_fts_token(token: str) -> str:
     return re.sub(r'["*]', " ", (token or "")).strip()
 
 
-def _build_fts_match_query(termo_busca: str) -> Optional[str]:
+def _build_fts_match_query(termo_busca: str, *, anchor_only: bool = True) -> Optional[str]:
+    """
+    Monta MATCH FTS5.
+
+    ``anchor_only=True`` (padrão): só o 1º token — recall alto; o AND completo fica
+    em ``_row_matches_search_tokens`` (mesma estratégia do fallback LIKE).
+    """
     token_groups = _build_search_tokens(termo_busca)
     if not token_groups:
         return None
+    groups = token_groups[:1] if anchor_only else token_groups
     parts: List[str] = []
-    for variants in token_groups:
+    for variants in groups:
         opts = [_escape_fts_token(v) for v in variants if _escape_fts_token(v)]
         if not opts:
             continue
@@ -1134,6 +1141,22 @@ def derive_anchor_search_term(termo_busca: str, *, max_groups: int = 10) -> tupl
     return meta["termo_efetivo"], meta
 
 
+def _search_token_hit(opt: str, words: set[str], normalized_text: str) -> bool:
+    if opt in words or opt in normalized_text:
+        return True
+    # ex.: busca "120ml" vs descrição "120 ml" ou "frasco 120 ml"
+    m = re.match(r"^(\d+(?:[.,]\d+)?)(ml|mg|g|kg|l|lt|mcg|ui|un|und|cp|caps)$", opt)
+    if m:
+        num, unit = m.group(1), m.group(2)
+        num_norm = num.replace(",", ".")
+        if num_norm in words and unit in words:
+            return True
+        compact = normalized_text.replace(" ", "")
+        if f"{num_norm}{unit}" in compact or f"{num}{unit}" in compact:
+            return True
+    return False
+
+
 def _row_matches_search_tokens(text: str, tokens: List[List[str]]) -> bool:
     if not tokens:
         return False
@@ -1143,7 +1166,7 @@ def _row_matches_search_tokens(text: str, tokens: List[List[str]]) -> bool:
     words = set(normalized_text.split())
     for options in tokens:
         # cada token de busca deve casar ao menos uma variante (AND entre tokens)
-        matched = any((opt in words) or (opt in normalized_text) for opt in options)
+        matched = any(_search_token_hit(opt, words, normalized_text) for opt in options)
         if not matched:
             return False
     return True
@@ -1571,7 +1594,7 @@ def local_item_search(
         and fts_match
         and not fts_meta.get("needs_rebuild")
     )
-    search_engine = "fts5" if use_fts else "like_anchor"
+    search_engine = "fts5_anchor" if use_fts else "like_anchor"
 
     select_cols = """
         SELECT i.numero_pncp, i.ano_compra, i.sequencial_compra, i.numero_item, i.descricao, i.material_servico,
@@ -1580,6 +1603,22 @@ def local_item_search(
                i.cnpj_fornecedor, i.fornecedor, i.fornecedor_fonte, i.fornecedor_elegivel,
                c.raw_json AS contrato_raw_json, c.situacao AS situacao_compra
     """
+
+    def _like_anchor_sql() -> tuple[str, List[Any]]:
+        anchor = token_groups[0][0]
+        where = ["i.descricao LIKE ?"]
+        pr: List[Any] = [f"%{anchor}%"]
+        where.extend(filter_where)
+        sql_like = f"""
+            {select_cols}
+            FROM pncp_itens i
+            LEFT JOIN pncp_contratos c ON c.numero_pncp = i.numero_pncp
+            WHERE {' AND '.join(where)}
+            ORDER BY i.updated_at DESC
+            LIMIT ?
+        """
+        return sql_like, pr + list(filter_params) + [sql_limit]
+
     if use_fts:
         where = ["pncp_itens_fts MATCH ?"]
         params: List[Any] = [fts_match]
@@ -1593,43 +1632,25 @@ def local_item_search(
             ORDER BY fts_rank
             LIMIT ?
         """
+        params = list(params) + list(filter_params) + [sql_limit]
     else:
-        anchor = token_groups[0][0]
-        where = ["i.descricao LIKE ?"]
-        params = [f"%{anchor}%"]
-        where.extend(filter_where)
-        sql = f"""
-            {select_cols}
-            FROM pncp_itens i
-            LEFT JOIN pncp_contratos c ON c.numero_pncp = i.numero_pncp
-            WHERE {' AND '.join(where)}
-            ORDER BY i.updated_at DESC
-            LIMIT ?
-        """
-    params = list(params) + list(filter_params)
-    params.append(sql_limit)
+        sql, params = _like_anchor_sql()
 
     rows: List[sqlite3.Row] = []
     try:
         with _conn() as c:
             rows = c.execute(sql, params).fetchall()
+        if use_fts and not rows:
+            logger.info("local_item_search fts5_anchor retornou 0 linhas; fallback LIKE")
+            search_engine = "fts5_empty_fallback_like"
+            sql_fb, params_fb = _like_anchor_sql()
+            with _conn() as c:
+                rows = c.execute(sql_fb, params_fb).fetchall()
     except sqlite3.OperationalError as e:
         logger.warning("local_item_search %s falhou (%s); fallback LIKE", search_engine, e)
         use_fts = False
         search_engine = "like_anchor"
-        anchor = token_groups[0][0]
-        where = ["i.descricao LIKE ?"]
-        params_fb: List[Any] = [f"%{anchor}%"]
-        where.extend(filter_where)
-        sql_fb = f"""
-            {select_cols}
-            FROM pncp_itens i
-            LEFT JOIN pncp_contratos c ON c.numero_pncp = i.numero_pncp
-            WHERE {' AND '.join(where)}
-            ORDER BY i.updated_at DESC
-            LIMIT ?
-        """
-        params_fb = params_fb + list(filter_params) + [sql_limit]
+        sql_fb, params_fb = _like_anchor_sql()
         with _conn() as c:
             rows = c.execute(sql_fb, params_fb).fetchall()
 

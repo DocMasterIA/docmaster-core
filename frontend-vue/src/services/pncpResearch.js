@@ -84,7 +84,9 @@ async function researchRequest(path, { method = 'GET', body, signal, timeoutMs }
   const payload = ctype.includes('application/json') ? await res.json() : await res.text();
 
   if (!res.ok) {
-    throw new Error(extractErrorMessage(payload, res.status));
+    const err = new Error(extractErrorMessage(payload, res.status));
+    err.status = res.status;
+    throw err;
   }
   return payload;
 }
@@ -325,6 +327,12 @@ export function searchLocalItems(payload, signal) {
   return researchRequest('local-index/search-items', { method: 'POST', body: payload, signal });
 }
 
+function isRetryableSearchError(err) {
+  if (isNetworkFetchError(err)) return true;
+  const status = Number(err?.status);
+  return status === 502 || status === 504 || status === 503 || status === 429;
+}
+
 export function intelligentMarketSearch(payload, signal, options = {}) {
   const timeoutMs = options.timeoutMs ?? 120000;
   const maxAttempts = Math.max(1, Math.min(5, Number(options.maxAttempts) || 3));
@@ -352,11 +360,11 @@ export function intelligentMarketSearch(payload, signal, options = {}) {
         lastErr = err;
         const aborted = String(err?.name || '') === 'AbortError'
           || /aborted|abort/i.test(String(err?.message || ''));
-        if (aborted || !isNetworkFetchError(err)) {
+        if (aborted || !isRetryableSearchError(err)) {
           throw err;
         }
         if (i < maxAttempts - 1) {
-          await sleep(700 * (i + 1));
+          await sleep(900 * (i + 1));
         }
       }
     }

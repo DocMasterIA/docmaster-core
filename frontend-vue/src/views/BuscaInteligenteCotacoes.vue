@@ -116,6 +116,9 @@
         </span>
         ...
       </p>
+      <p v-if="isAutoSearchingAll && lastBulkFailure" class="bia-meta bia-meta--error">
+        Última falha: {{ lastBulkFailure }}
+      </p>
       <p v-else-if="autoSearchProgress.total > 0" class="bia-meta">
         Busca automática concluída: {{ autoSearchProgress.done }} de {{ autoSearchProgress.total }} item(ns) processados,
         {{ autoSearchProgress.precos }} preço(s) encontrados
@@ -497,6 +500,7 @@ const isAutoSearchingAll = ref(false);
 const isLoadingSessionItems = ref(false);
 const sessionItemsLoadHint = ref('');
 const autoSearchProgress = ref({ done: 0, total: 0, ok: 0, fail: 0, precos: 0, skipped: 0 });
+const lastBulkFailure = ref('');
 const cotacaoResumo = ref({
   totalItens: 0,
   carregados: 0,
@@ -573,6 +577,7 @@ async function runBulkItemSearches(pendentes, {
     skipped: 0,
   };
   searchError.value = '';
+  lastBulkFailure.value = '';
 
   for (const ctx of pendentes) {
     if (mountRunId != null && mountRunId !== mountRunSeq) {
@@ -621,7 +626,8 @@ async function runBulkItemSearches(pendentes, {
     autoSearchProgress.value.done += 1;
     if (result?.aborted) {
       autoSearchProgress.value.fail += 1;
-      await sleep(500);
+      lastBulkFailure.value = 'Requisição cancelada ou substituída (tente «Pesquisar UF» se persistir).';
+      await sleep(800);
       continue;
     }
     if (result?.ok) {
@@ -629,8 +635,10 @@ async function runBulkItemSearches(pendentes, {
       autoSearchProgress.value.precos += Number(result.exibidos || 0);
     } else {
       autoSearchProgress.value.fail += 1;
+      const errMsg = String(result?.error || '').trim();
+      if (errMsg) lastBulkFailure.value = `${ctx.descricao_item?.slice(0, 60) || 'Item'}: ${errMsg}`;
     }
-    await sleep(350);
+    await sleep(800);
   }
 
   if (mountRunId != null && mountRunId !== mountRunSeq) {

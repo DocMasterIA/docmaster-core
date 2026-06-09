@@ -576,8 +576,6 @@ function buildContextFromItem(it) {
     src?.precoBase,
     faixa?.valor_base,
     faixa?.valorBase,
-    it?.valor_unitario,
-    it?.valor_total,
   );
   let variacaoRef = parseNumericRef(
     src?.variacao_percentual,
@@ -590,8 +588,14 @@ function buildContextFromItem(it) {
   if (Number.isFinite(Number(variacaoPercentualGlobal.value)) && Number(variacaoPercentualGlobal.value) >= 0) {
     variacaoRef = Number(variacaoPercentualGlobal.value);
   }
-  if ((variacaoRef === null || !Number.isFinite(variacaoRef)) && valorBaseRef != null && Number.isFinite(valorBaseRef)) {
-    variacaoRef = 20;
+  // Faixa de preço só quando há valor base explícito (source/faixa/sessão) — não usar valor_unitario do item.
+  if (
+    (variacaoRef === null || !Number.isFinite(variacaoRef))
+    && valorBaseRef != null
+    && Number.isFinite(valorBaseRef)
+    && Number.isFinite(Number(variacaoPercentualGlobal.value))
+  ) {
+    variacaoRef = Number(variacaoPercentualGlobal.value);
   }
   const sentidoRaw = String(variacaoSentidoGlobal.value || 'ambos').trim().toLowerCase();
   const sentidoRef = ['cima', 'baixo', 'ambos'].includes(sentidoRaw) ? sentidoRaw : 'ambos';

@@ -1083,6 +1083,57 @@ def _build_search_tokens(termo_busca: str) -> List[List[str]]:
     return [_token_variants(tok) for tok in raw_tokens if _token_variants(tok)]
 
 
+_SEARCH_ANCHOR_DROP = frozenset(
+    {
+        "cx",
+        "un",
+        "und",
+        "pct",
+        "ref",
+        "tipo",
+        "modelo",
+        "marca",
+        "item",
+        "itens",
+        "para",
+        "com",
+    }
+)
+
+
+def derive_anchor_search_term(termo_busca: str, *, max_groups: int = 8) -> tuple[str, Dict[str, Any]]:
+    """
+    Descrições longas de cotação geram AND de dezenas de tokens no FTS — recall ~0.
+    Mantém até ``max_groups`` âncoras para busca; scoring/IA podem usar o termo completo depois.
+    """
+    raw = (termo_busca or "").strip()
+    groups = _build_search_tokens(raw)
+    meta: Dict[str, Any] = {
+        "termo_original": raw,
+        "termo_original_tokens": len(groups),
+        "termo_efetivo_tokens": len(groups),
+        "termo_truncado": False,
+    }
+    if not groups:
+        return raw, meta
+    if len(groups) <= max(2, int(max_groups)):
+        return raw, meta
+    picked: List[str] = []
+    for variants in groups:
+        anchor = variants[0]
+        if anchor in _SEARCH_ANCHOR_DROP:
+            continue
+        picked.append(anchor)
+        if len(picked) >= max(2, int(max_groups)):
+            break
+    if len(picked) < 2:
+        picked = [g[0] for g in groups[: max(2, int(max_groups))]]
+    meta["termo_truncado"] = True
+    meta["termo_efetivo_tokens"] = len(picked)
+    meta["termo_efetivo"] = " ".join(picked)
+    return meta["termo_efetivo"], meta
+
+
 def _row_matches_search_tokens(text: str, tokens: List[List[str]]) -> bool:
     if not tokens:
         return False
@@ -1491,7 +1542,8 @@ def local_item_search(
 ) -> Dict[str, Any]:
     ensure_local_index()
     only_homolog = _resolve_somente_homologados_flag(somente_homologados)
-    token_groups = _build_search_tokens(termo_busca)
+    termo_efetivo, term_meta = derive_anchor_search_term(termo_busca)
+    token_groups = _build_search_tokens(termo_efetivo)
     if not token_groups:
         return {
             "ok": True,
@@ -1500,6 +1552,7 @@ def local_item_search(
                 "total_registros": 0,
                 "search_engine": "none",
                 "somente_homologados": only_homolog,
+                "termo_busca": term_meta,
             },
         }
 
@@ -1511,7 +1564,7 @@ def local_item_search(
     )
     sql_limit = max(1, min(int(limit) * 8, 20000))
     fts_meta = fts_index_status()
-    fts_match = _build_fts_match_query(termo_busca) if PNCP_FTS5_ENABLED else None
+    fts_match = _build_fts_match_query(termo_efetivo) if PNCP_FTS5_ENABLED else None
     use_fts = bool(
         PNCP_FTS5_ENABLED
         and fts_meta.get("ready")
@@ -1583,12 +1636,14 @@ def local_item_search(
     itens: List[Dict[str, Any]] = []
     com_fornecedor = 0
     filtrados_nao_homolog = 0
+    filtrados_token = 0
     candidatos_enrich: List[Dict[str, Any]] = []
     for r in rows:
         desc = r["descricao"] or ""
         mat = r["material_servico"] or ""
         texto_item = f"{desc} {mat}".strip()
         if not _row_matches_search_tokens(texto_item, token_groups):
+            filtrados_token += 1
             continue
         if only_homolog and not _row_passes_homolog_filter(r, somente_homologados=True):
             filtrados_nao_homolog += 1
@@ -1626,8 +1681,11 @@ def local_item_search(
             "search_engine": search_engine,
             "fts_needs_rebuild": bool(fts_meta.get("needs_rebuild")),
             "somente_homologados": only_homolog,
+            "sql_rows_fetched": len(rows),
+            "filtrados_token_match": filtrados_token,
             "filtrados_nao_homologados": filtrados_nao_homolog,
             "enriquecidos_pncp_na_busca": enrich_n,
+            "termo_busca": term_meta,
         },
     }
 

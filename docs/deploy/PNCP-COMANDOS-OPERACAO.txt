@@ -62,12 +62,20 @@ done
 docker restart pncp_researcher_service
 
 # Rebuild imagem completa (alternativa)
-cd ~/docmaster-core
-docker compose -f ~/docker-compose.pncp.yml build pncp_researcher_service
+# IMPORTANTE: compose em ~/ → contexto = docmaster-core (senão lstat pncp_researcher_service falha)
+cd ~
+export PNCP_BUILD_CONTEXT=docmaster-core
+docker compose -f ~/docker-compose.pncp.yml \
+  -f ~/docker-compose.pncp.override.yml \
+  -f ~/docker-compose.pncp.noports.yml \
+  build pncp_researcher_service
 docker compose -f ~/docker-compose.pncp.yml \
   -f ~/docker-compose.pncp.override.yml \
   -f ~/docker-compose.pncp.noports.yml \
   up -d --force-recreate pncp_researcher_service
+
+# Atalho (define PNCP_BUILD_CONTEXT e compose automaticamente):
+#   cd ~ && PNCP_BUILD=1 PNCP_FORCE_RECREATE=1 DOCMASTER_DEPLOY_DIR=~ ~/docmaster-core/scripts/ensure-pncp-researcher.sh
 
 # Confirmar código novo (skip 7 dias)
 docker exec pncp_researcher_service python -c "

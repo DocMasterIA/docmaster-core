@@ -23,6 +23,7 @@ from .schemas import (
     MarketSearchResponse,
 )
 from .service import market_search, market_search_intelligent, market_search_stream
+from .search_diagnose import diagnose_intelligent_search
 from .config import PNCP_LOCAL_DB_PATH
 from .local_index import (
     add_items_to_research_session,
@@ -77,6 +78,15 @@ async def market_search_endpoint(body: MarketSearchRequest) -> MarketSearchRespo
         return MarketSearchResponse(**data)
     except PNCPClientError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/market-search/intelligent/diagnose")
+async def market_search_intelligent_diagnose_endpoint(body: MarketSearchRequest):
+    """Auditoria de funil: índice vs homolog vs faixa vs scoring (sem salvar)."""
+    try:
+        return await diagnose_intelligent_search(body)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 

@@ -112,6 +112,45 @@ for i,it in enumerate(itens[:5]):
 
 **Teste negativo:** repetir com termo impossível → `total` 0, sem erro 500.
 
+### 3.1 Busca inteligente — funil e diagnóstico (125+ itens)
+
+Quando a cotação retorna poucos preços (ex.: 2/125), use o endpoint de diagnóstico **antes** de concluir «falta no índice»:
+
+```bash
+docker exec pncp_researcher_service python -c "
+import urllib.request, json
+body = json.dumps({
+  'termo_busca': 'DESCRIÇÃO DO ITEM AQUI',
+  'somente_homologados': True,
+  'max_paginas': 5,
+  'tamanho_pagina': 50,
+  'valor_base_referencia': None,
+  'variacao_percentual_referencia': None,
+}).encode()
+req = urllib.request.Request(
+  'http://127.0.0.1:8012/api/pncp-research/market-search/intelligent/diagnose',
+  data=body, headers={'Content-Type': 'application/json'})
+r = json.loads(urllib.request.urlopen(req, timeout=180).read())
+print('gargalo:', r.get('provavel_gargalo'))
+print('interpretacao:', r.get('interpretacao'))
+print('indice homolog:', r.get('indice', {}).get('homologados'))
+print('indice qualquer:', r.get('indice', {}).get('qualquer_situacao'))
+print('top3 com faixa:', r.get('inteligente_com_faixa', {}).get('itens'))
+print('top3 sem faixa:', r.get('inteligente_sem_faixa', {}).get('itens'))
+"
+```
+
+| `provavel_gargalo` | Significado |
+|--------------------|-------------|
+| `indice_sem_match_fts` | Termo não acha linhas no SQLite — item provavelmente ausente ou descrição irreconciliável |
+| `filtro_homologados` | Existe no índice, mas nenhum homologado |
+| `faixa_preco` | Candidatos existem; **±% valor base** elimina todos (trava artificial se valor base veio do item) |
+| `token_match_and` | FTS achou linhas, AND de tokens eliminou |
+| `scoring_inteligente` | Passou índice local, scoring IA eliminou |
+| `ok` | Encontrou top 3 |
+
+Na resposta normal da busca inteligente, `stats.funil_busca` e `stats.provavel_gargalo` trazem o mesmo funil por item.
+
 ---
 
 ## 4. UI — busca manual e busca inteligente

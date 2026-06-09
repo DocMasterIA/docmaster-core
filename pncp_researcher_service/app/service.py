@@ -47,7 +47,7 @@ from .pncp_client import (
     get_contract_items,
     get_contract_supplier_snapshot,
 )
-from .local_index import enrich_homolog_items_from_pncp, upsert_contracts, local_item_search
+from .local_index import derive_anchor_search_term, enrich_homolog_items_from_pncp, upsert_contracts, local_item_search
 from .schemas import MarketSearchRequest
 from .search_text_clean import apply_item_display_cleanup, normalize_for_search
 
@@ -1093,6 +1093,13 @@ def _is_strict_candidate_match(item: Dict[str, Any], query_groups: List[List[str
         # Para consulta curta (1 token), mantém filtro semântico padrão.
         return True
 
+    # Descrições longas de cotação: exige proximidade só no núcleo (1º grupo), não em todos os tokens.
+    if len(q_tokens) > 5:
+        query_groups = query_groups[:1] if query_groups else query_groups
+        q_tokens = list(_query_tokens(query_groups))
+        if len(q_tokens) < 2:
+            return True
+
     desc = _normalize_text(str(item.get("descricao_item") or ""))
     mat = _normalize_text(str(item.get("material_servico") or ""))
     if not desc and not mat:
@@ -1794,6 +1801,31 @@ async def _rerank_top3_with_ia(
     return _parse_ia_rerank_response(text)
 
 
+def _infer_search_bottleneck(funil: Dict[str, Any], top3_n: int) -> str:
+    """Heurística: índice vazio vs trava de filtro (token, homolog, faixa, scoring)."""
+    if top3_n >= 1:
+        return "ok"
+    sql_rows = int(funil.get("sql_rows_fetched") or 0)
+    local = int(funil.get("local_homologados") or 0)
+    tok = int(funil.get("filtrados_token_match") or 0)
+    hom = int(funil.get("filtrados_nao_homologados") or 0)
+    faixa_rm = int(funil.get("eliminados_faixa_preco") or 0)
+    scored = int(funil.get("scored_final_pool") or 0)
+    if sql_rows == 0:
+        return "indice_sem_match_fts"
+    if local == 0 and tok > 0 and hom == 0:
+        return "token_match_and"
+    if local == 0 and hom > 0:
+        return "filtro_homologados"
+    if local > 0 and scored == 0 and faixa_rm > 0:
+        return "faixa_preco"
+    if local > 0 and scored == 0:
+        return "scoring_inteligente"
+    if scored > 0 and top3_n == 0:
+        return "selecao_top3"
+    return "indice_ou_termo"
+
+
 async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, Any]:
     """
     Versão inteligente da busca manual:
@@ -1803,8 +1835,9 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     """
     # Reutiliza a mesma fonte da busca manual (itens PNCP normalizados)
     limit = max(50, payload.max_paginas * payload.tamanho_pagina)
+    termo_efetivo, term_meta = derive_anchor_search_term(payload.termo_busca)
     base_items = local_item_search(
-        payload.termo_busca,
+        termo_efetivo,
         uf=payload.uf,
         municipio=payload.municipio,
         recortes_geograficos=payload.recortes_geograficos,
@@ -1815,6 +1848,13 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     )
     itens = list(base_items.get("itens") or [])
     base_stats = dict(base_items.get("stats") or {})
+    funil: Dict[str, Any] = {
+        "termo_busca": term_meta,
+        "local_homologados": len(itens),
+        "sql_rows_fetched": int(base_stats.get("sql_rows_fetched") or 0),
+        "filtrados_token_match": int(base_stats.get("filtrados_token_match") or 0),
+        "filtrados_nao_homologados": int(base_stats.get("filtrados_nao_homologados") or 0),
+    }
     hybrid_used = False
     hybrid_live_count = 0
     if (
@@ -1905,15 +1945,18 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                 "servico_bloqueados": int(service_blocked_count),
                 "hybrid_fallback_used": hybrid_used,
                 "hybrid_live_count": hybrid_live_count,
+                "funil_busca": {**funil, "top3_final": 0},
+                "provavel_gargalo": _infer_search_bottleneck(funil, 0),
             },
             "itens": [],
         }
 
-    query_groups = _build_query_groups(payload.termo_busca)
+    query_groups = _build_query_groups(termo_efetivo)
     ref_qty = _safe_float(payload.quantidade_referencia)
     ref_unit = _normalize_unit(payload.unidade_medida_referencia)
     ref_val_set = payload.valor_base_referencia is not None
     ref_var_set = payload.variacao_percentual_referencia is not None
+    funil["faixa_ativa"] = bool(ref_val_set and ref_var_set)
     try:
         ref_value = float(payload.valor_base_referencia) if ref_val_set else 0.0
     except (TypeError, ValueError):
@@ -2038,23 +2081,35 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         return out_rows
 
     scored: List[Dict[str, Any]] = _score_candidates(itens, mode="strict")
+    funil["scored_estrito"] = len(scored)
     fallback_relaxado_usado = False
     fallback_agressivo_usado = False
     # Fallback: se a busca estrita não atingir massa crítica, abre variações claras.
     if len(scored) < 3:
         fallback_rows = _score_candidates(itens, mode="relaxed")
+        funil["scored_relaxado"] = len(fallback_rows)
         fallback_relaxado_usado = bool(fallback_rows)
         scored = _merge_unique_items(scored, fallback_rows)
     # Fallback agressivo: se ainda estiver fraco, tenta aproximação textual forte.
     if len(scored) < 2:
         fallback_agressivo = _score_candidates(itens, mode="aggressive")
+        funil["scored_agressivo"] = len(fallback_agressivo)
         fallback_agressivo_usado = bool(fallback_agressivo)
         scored = _merge_unique_items(scored, fallback_agressivo)
 
     # Blindagem final: remove qualquer item sem preço válido e, quando houver faixa, mantém só itens dentro.
+    scored_pre_preco = len(scored)
     scored = [x for x in scored if _row_price_for_faixa(x) > 0.0]
+    funil["eliminados_sem_preco"] = max(0, scored_pre_preco - len(scored))
     if faixa_min is not None and faixa_max is not None:
+        before_faixa = len(scored)
         scored = [x for x in scored if _preco_dentro_faixa(x, faixa_min, faixa_max)]
+        funil["eliminados_faixa_preco"] = max(0, before_faixa - len(scored))
+        funil["faixa_min"] = faixa_min
+        funil["faixa_max"] = faixa_max
+    else:
+        funil["eliminados_faixa_preco"] = 0
+    funil["scored_final_pool"] = len(scored)
 
     # Reescala para ampliar separação entre bons e ruins no conjunto atual.
     if scored:
@@ -2234,6 +2289,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     out_stats["itens_com_cnpj_fornecedor"] = sum(
         1 for x in top3 if str(x.get("cnpj_fornecedor") or "").strip()
     )
+    out_stats["funil_busca"] = {**funil, "top3_final": len(top3)}
+    out_stats["provavel_gargalo"] = _infer_search_bottleneck(funil, len(top3))
 
     return {
         "ok": bool(base_items.get("ok", True)),

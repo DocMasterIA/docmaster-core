@@ -488,6 +488,33 @@ function isAbortError(err) {
   return name === 'AbortError' || /aborted|abort|canceled|cancelled/i.test(msg);
 }
 
+function isTimeoutError(err) {
+  const name = String(err?.name || '');
+  const msg = String(err?.message || '');
+  return name === 'TimeoutError' || /timed out|timeout|time.?out/i.test(msg);
+}
+
+function bulkSearchFailResult(err, { superseded = false, timeoutSec = 180 } = {}) {
+  if (superseded) {
+    return { ok: false, exibidos: 0, aborted: true, error: 'Busca substituída por outra sessão.' };
+  }
+  if (isTimeoutError(err)) {
+    return {
+      ok: false,
+      exibidos: 0,
+      aborted: false,
+      error: `Tempo esgotado aguardando o PNCP (${timeoutSec}s). O lote continua; use «Pesquisar UF» depois para os que faltarem.`,
+    };
+  }
+  if (isAbortError(err)) {
+    return { ok: false, exibidos: 0, aborted: true, error: 'Requisição interrompida pelo navegador.' };
+  }
+  const msg = String(err?.message || err || 'erro desconhecido').trim();
+  return { ok: false, exibidos: 0, aborted: false, error: msg };
+}
+
+const BULK_SEARCH_TIMEOUT_MS = 180000;
+
 const searchError = ref('');
 const lastSearchDebug = ref(null);
 const saveMessage = ref('');
@@ -626,7 +653,8 @@ async function runBulkItemSearches(pendentes, {
     autoSearchProgress.value.done += 1;
     if (result?.aborted) {
       autoSearchProgress.value.fail += 1;
-      lastBulkFailure.value = 'Requisição cancelada ou substituída (tente «Pesquisar UF» se persistir).';
+      lastBulkFailure.value = String(result?.error || '').trim()
+        || 'Requisição interrompida (tente «Pesquisar UF» para os restantes).';
       await sleep(800);
       continue;
     }
@@ -960,7 +988,11 @@ async function runSearchWithContext({
     }
 
     let backendItensTotal = 0;
+    const bulkSearchOpts = bulkMode ? { timeoutMs: BULK_SEARCH_TIMEOUT_MS, maxAttempts: 3 } : undefined;
     if (recortes.length > 0) {
+      if (generationStale() || bulkSuperseded()) {
+        return bulkSearchFailResult(null, { superseded: bulkSuperseded() });
+      }
       const backend = await intelligentMarketSearch(
         {
           ...basePayload,
@@ -969,17 +1001,14 @@ async function runSearchWithContext({
           municipio: null,
         },
         signal,
-        bulkMode ? { timeoutMs: 120000, maxAttempts: 3 } : undefined,
+        bulkSearchOpts,
       );
-      if (generationStale() || bulkSuperseded()) {
-        return bulkMode ? { ok: false, exibidos: 0, aborted: true } : undefined;
-      }
       backendItensTotal += mapBackendToRows(backend, 'rec') || 0;
     } else {
       const ufsToRun = context?.uf_padrao ? [context.uf_padrao] : [null];
       for (const ufCode of ufsToRun) {
         if (generationStale() || bulkSuperseded()) {
-          return bulkMode ? { ok: false, exibidos: 0, aborted: true } : undefined;
+          return bulkSearchFailResult(null, { superseded: bulkSuperseded() });
         }
         const backend = await intelligentMarketSearch(
           {
@@ -988,16 +1017,10 @@ async function runSearchWithContext({
             municipio: null,
           },
           signal,
-          bulkMode ? { timeoutMs: 120000, maxAttempts: 3 } : undefined,
+          bulkSearchOpts,
         );
-        if (generationStale() || bulkSuperseded()) {
-          return bulkMode ? { ok: false, exibidos: 0, aborted: true } : undefined;
-        }
         backendItensTotal += mapBackendToRows(backend, ufCode || 'all') || 0;
       }
-    }
-    if (generationStale() || bulkSuperseded()) {
-      return bulkMode ? { ok: false, exibidos: 0, aborted: true } : undefined;
     }
     if (aggregated.length > 0) {
       // Confia no top3 do backend; sem dedupe agressivo (descrições PNCP iguais colapsavam 3→1).
@@ -1041,15 +1064,14 @@ async function runSearchWithContext({
     }
     return { ok: true, exibidos };
   } catch (err) {
-    if (isAbortError(err)) {
-      return bulkMode ? { ok: false, exibidos: 0, aborted: true } : undefined;
-    }
-    if (generationStale() || bulkSuperseded()) {
-      return bulkMode ? { ok: false, exibidos: 0, aborted: true } : undefined;
-    }
     if (bulkMode) {
-      return { ok: false, exibidos: 0, error: err.message || 'erro desconhecido' };
+      return bulkSearchFailResult(err, {
+        superseded: bulkSuperseded() || generationStale(),
+        timeoutSec: Math.round(BULK_SEARCH_TIMEOUT_MS / 1000),
+      });
     }
+    if (isAbortError(err)) return undefined;
+    if (generationStale()) return undefined;
     searchError.value = `Não foi possível consultar o backend (${err.message || 'erro desconhecido'}).`;
     return { ok: false, exibidos: 0, error: err.message || 'erro desconhecido' };
   } finally {

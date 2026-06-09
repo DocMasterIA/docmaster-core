@@ -48,7 +48,13 @@ from .pncp_client import (
     get_contract_items,
     get_contract_supplier_snapshot,
 )
-from .local_index import derive_anchor_search_term, enrich_homolog_items_from_pncp, upsert_contracts, local_item_search
+from .local_index import (
+    _build_search_tokens,
+    derive_anchor_search_term,
+    enrich_homolog_items_from_pncp,
+    upsert_contracts,
+    local_item_search,
+)
 from .schemas import MarketSearchRequest
 from .search_text_clean import apply_item_display_cleanup, normalize_for_search
 
@@ -1955,7 +1961,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             "itens": [],
         }
 
-    query_groups = _build_query_groups(termo_efetivo)
+    query_groups = _build_search_tokens(termo_efetivo)
     ref_qty = _safe_float(payload.quantidade_referencia)
     ref_unit = _normalize_unit(payload.unidade_medida_referencia)
     ref_val_set = payload.valor_base_referencia is not None
@@ -1986,24 +1992,30 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
 
     def _score_candidates(candidates: List[Dict[str, Any]], *, mode: str) -> List[Dict[str, Any]]:
         out_rows: List[Dict[str, Any]] = []
-        lit_strict = max(4.0, min_ok * 0.16)
-        lit_relaxed = max(2.0, lit_strict * 0.5)
+        # Limiares de literal alinhados ao termo_efetivo (não à descrição inteira da cotação).
+        lit_strict = 6.0
+        lit_relaxed = 3.0
         lit_aggressive = 1.0
         for it in candidates:
             relaxed = mode != "strict"
             aggressive = mode == "aggressive"
             partial_anchor = _has_partial_anchor_match(it, query_groups)
+            origem = str(it.get("origem") or "")
+            from_local_index = origem in ("base_local_itens", "") or origem.startswith("base_local")
             if not relaxed and not _is_strict_candidate_match(it, query_groups):
-                continue
+                # Índice local já exigiu match AND nos mesmos token groups — não refiltrar por proximidade.
+                if not from_local_index:
+                    if not _has_core_token_overlap(it, query_groups, min_hits=1):
+                        continue
             if mode == "relaxed" and not _has_core_token_overlap(it, query_groups, min_hits=2):
                 if not partial_anchor:
                     continue
             if aggressive and not _has_core_token_overlap(it, query_groups, min_hits=1):
-                sim = _aggressive_similarity_score(payload.termo_busca, it)
+                sim = _aggressive_similarity_score(termo_efetivo, it)
                 if sim < 0.62 and not partial_anchor:
                     continue
             elif aggressive:
-                sim = _aggressive_similarity_score(payload.termo_busca, it)
+                sim = _aggressive_similarity_score(termo_efetivo, it)
                 if sim < 0.50 and not partial_anchor:
                     continue
             if aggressive:
@@ -2025,10 +2037,11 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                 sem = 18.0
             if sem <= 0:
                 continue
-            literal_match = round(_literal_match_score(payload.termo_busca, it), 3)
-            # No fallback semântico, aceita variação literal mais ampla.
+            literal_match = round(_literal_match_score(termo_efetivo, it), 3)
+            # Índice local já validou tokens: literal baixo não descarta se houve match semântico.
             if not relaxed and literal_match < lit_strict:
-                continue
+                if sem_raw <= 0.0 and not partial_anchor:
+                    continue
             if mode == "relaxed" and literal_match < lit_relaxed:
                 if not partial_anchor:
                     continue
@@ -2153,7 +2166,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             return False
         if bool(it.get("similaridade_encontrada")):
             return False
-        return float(it.get("literal_match") or 0) >= max(4.0, int(PNCP_SEARCH_MIN_SCORE_APROVACAO) * 0.16)
+        return float(it.get("literal_match") or 0) >= 6.0
 
     literal_scored = [x for x in scored if _is_literal_candidate(x)]
     similar_scored = [x for x in scored if not _is_literal_candidate(x)]
@@ -2223,7 +2236,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             if chosen:
                 chosen.sort(
                     key=lambda it: (
-                        float(it.get("literal_match") or _literal_match_score(payload.termo_busca, it)),
+                        float(it.get("literal_match") or _literal_match_score(termo_efetivo, it)),
                         float(it.get("score_aprovacao") or 0),
                     ),
                     reverse=True,

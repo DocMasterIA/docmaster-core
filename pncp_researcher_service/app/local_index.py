@@ -1101,10 +1101,10 @@ _SEARCH_ANCHOR_DROP = frozenset(
 )
 
 
-def derive_anchor_search_term(termo_busca: str, *, max_groups: int = 8) -> tuple[str, Dict[str, Any]]:
+def derive_anchor_search_term(termo_busca: str, *, max_groups: int = 10) -> tuple[str, Dict[str, Any]]:
     """
     Descrições longas de cotação geram AND de dezenas de tokens no FTS — recall ~0.
-    Mantém até ``max_groups`` âncoras para busca; scoring/IA podem usar o termo completo depois.
+    Mantém até ``max_groups`` âncoras para busca e scoring (mesmos tokens no índice e na IA local).
     """
     raw = (termo_busca or "").strip()
     groups = _build_search_tokens(raw)

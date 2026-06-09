@@ -23,9 +23,9 @@ class TestSearchRecallHelpers(unittest.TestCase):
             "SERINGA DESCARTAVEL 10ML LUER LOCK ESTERIL CAIXA 100 UN "
             "MATERIAL MEDICO HOSPITALAR USO UNICO EMBALAGEM INDIVIDUAL"
         )
-        termo, meta = derive_anchor_search_term(long_desc, max_groups=8)
+        termo, meta = derive_anchor_search_term(long_desc, max_groups=10)
         self.assertTrue(meta["termo_truncado"])
-        self.assertLessEqual(meta["termo_efetivo_tokens"], 8)
+        self.assertLessEqual(meta["termo_efetivo_tokens"], 10)
         self.assertLess(len(termo.split()), len(long_desc.split()))
 
     def test_infer_bottleneck_faixa(self):

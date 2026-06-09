@@ -461,14 +461,12 @@ scopes_paused:
 total_itens subindo + pending caindo = saudável
 
 ================================================================================
-14. DOCUMENTAÇÃO RELACIONADA
+15. DOCUMENTAÇÃO / CONTEXTO IA
 ================================================================================
 
+docs/PNCP-CONTEXTO-IA.md          ← contexto completo ingest + fornecedor (IA)
 docs/PNCP-DECLARATIVO.md
-docs/deploy/PNCP-INGESTAO-INDEX-24-7.md
-docs/deploy/PNCP-RESEARCHER-24-7.md
-docs/deploy/PNCP-API-INDICE-LOCAL.md
+docs/PLANO-MODULO-COBERTURA-FORNECEDOR-PNCP.md
 scripts/deploy-pncp-researcher-code.sh
-scripts/ensure-pncp-researcher.sh
 
 ================================================================================

@@ -1300,7 +1300,7 @@ def _row_passes_homolog_filter(r: sqlite3.Row, *, somente_homologados: bool) -> 
     return False
 
 
-async def _enrich_homolog_items_from_pncp(
+async def enrich_homolog_items_from_pncp(
     itens: List[Dict[str, Any]],
     *,
     max_n: int,
@@ -1345,15 +1345,36 @@ async def _enrich_homolog_items_from_pncp(
 
 
 def _enrich_homolog_items_from_pncp_sync(itens: List[Dict[str, Any]], *, max_n: int) -> int:
+    """
+    Wrapper síncrono — só funciona fora de event loop (scripts/CLI).
+    Handlers FastAPI devem usar ``await enrich_homolog_items_from_pncp(...)``.
+    """
     import asyncio
 
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            return 0
+        asyncio.get_running_loop()
     except RuntimeError:
-        pass
-    return asyncio.run(_enrich_homolog_items_from_pncp(itens, max_n=max_n))
+        return asyncio.run(enrich_homolog_items_from_pncp(itens, max_n=max_n))
+    return 0
+
+
+async def enrich_local_search_result(
+    result: Dict[str, Any],
+    *,
+    max_n: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Enriquece fornecedor nos itens retornados por ``local_item_search`` (contexto async)."""
+    itens = list(result.get("itens") or [])
+    if not itens:
+        return result
+    cap = int(PNCP_SEARCH_ENRICH_HOMOLOG_MAX if max_n is None else max_n)
+    enrich_n = await enrich_homolog_items_from_pncp(itens, max_n=max(0, cap))
+    stats = dict(result.get("stats") or {})
+    stats["enriquecidos_pncp_na_busca"] = enrich_n
+    stats["itens_com_cnpj_fornecedor"] = sum(
+        1 for it in itens if str(it.get("cnpj_fornecedor") or "").strip()
+    )
+    return {**result, "itens": itens, "stats": stats}
 
 
 def _local_item_filter_clauses(

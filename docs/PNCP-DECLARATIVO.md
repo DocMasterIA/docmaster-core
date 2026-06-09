@@ -3,7 +3,9 @@
 **Atualizado:** junho/2026  
 **Escopo:** tudo implementado no DocMaster ligado ao **Pesquisador PNCP** — ingestão do índice local, busca, homologados, cobertura de fornecedor (CNPJ), cotação, relatório PDF e operação em produção.
 
-Este ficheiro é a **fonte declarativa única** do que existe hoje. Guias operacionais detalhados continuam em [`docs/deploy/`](deploy/README.md).
+**Contexto IA (completo):** [`PNCP-CONTEXTO-IA.md`](PNCP-CONTEXTO-IA.md) — ingest + fornecedor + produção + anti-padrões.
+
+Este ficheiro é a **fonte declarativa** do estado do repositório. Comandos: [`deploy/PNCP-COMANDOS-OPERACAO.txt`](deploy/PNCP-COMANDOS-OPERACAO.txt).
 
 ---
 
@@ -92,13 +94,12 @@ Estados: `pending` → `processing` → `done` | `failed` | `dead` (após `max_a
 ### 4.3 Comportamento do worker (declarado)
 
 1. **Itens antes de catálogo** — reduz `contratos_sem_itens` e backlog.
-2. Se `contract_items` pending ≥ `PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG` (default **3000**):
-   - `catalog_ok = 0` no tick;
-   - batch de itens sobe até `PNCP_INGEST_WORKER_ITEMS_BATCH_MAX` (**40**);
-   - planner **não** enfileira novas páginas de catálogo.
-3. Planner a cada **900 s**; no máximo **4** páginas por scope (UF × modalidade).
-4. Fila total cap: **5000** pending antes de pausar catálogo.
-5. Lifespan FastAPI inicia `ingest_worker_loop()` se worker habilitado.
+2. Pausa catálogo se **`backlog_by_task_type(contract_items) >= 3000`** (`pending + processing`, não só pending).
+3. Se pausado: `catalog_ok = 0`, `items_ok` até **40**; planner não enfileira catálogo.
+4. Planner a cada **900 s**; no máximo **4** páginas por scope (UF × modalidade).
+5. Fila total cap: **5000** pending antes de planner parar catálogo.
+6. Logs incluem `items_backlog` e `catalog_paused` por batch.
+7. Lifespan FastAPI inicia `ingest_worker_loop()` se worker habilitado.
 
 ### 4.3.1 Skip de retrabalho (`PNCP_INGEST_ITEMS_REFRESH_DAYS`)
 
@@ -130,6 +131,15 @@ Com **N > 0**, contratos que **já têm itens** no SQLite e `MAX(updated_at)` de
 |----------|-----------|
 | `pncp_researcher_service/tests/test_ingest_dates.py` | Janela 365 dias |
 | `pncp_researcher_service/tests/test_ingest_queue.py` | CRUD da fila |
+| `pncp_researcher_service/tests/test_ingest_refresh.py` | Skip `REFRESH_DAYS` |
+
+### 4.8 Deploy hotfix
+
+| Script | Função |
+|--------|--------|
+| `scripts/deploy-pncp-researcher-code.sh` | Copia app PNCP para contentor + restart + valida `skip_fn` |
+
+**Armadilha:** `docker compose up --force-recreate` repõe **imagem** antiga — sempre correr deploy script ou rebuild após recreate.
 
 ---
 
@@ -151,7 +161,7 @@ Lógica: `item_homologado_para_busca`, `_row_passes_homolog_filter`, situações
 | Momento | Limites (defaults) | Módulo |
 |---------|-------------------|--------|
 | Busca local (`local_item_search`) | **16** homologados sem CNPJ | `_enrich_homolog_items_from_pncp_sync` |
-| Adicionar fonte à cotação | **24** PNCP + **48** BrasilAPI | `pncp_supplier_enrichment.py` |
+| Adicionar fonte à cotação | **48** PNCP + **48** BrasilAPI | `pncp_supplier_enrichment.py` |
 | PDF relatório | **96** PNCP + **64** BrasilAPI | `enrich_missing_supplier_fields_for_cotacao` |
 
 Desligar enrich no PDF: `PNCP_RELATORIO_PDF_SKIP_ENRICH=true`.

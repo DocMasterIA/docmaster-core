@@ -34,6 +34,7 @@ from .local_index import (
     local_index_stats,
     ingest_operational_status,
     local_index_operational_status,
+    enrich_local_search_result,
     local_item_search,
     local_search,
     rebuild_fts_index,
@@ -212,7 +213,7 @@ async def local_index_search_endpoint(body: MarketSearchRequest):
 @router.post("/local-index/search-items")
 async def local_index_search_items_endpoint(body: MarketSearchRequest):
     try:
-        return local_item_search(
+        result = local_item_search(
             body.termo_busca,
             uf=body.uf,
             municipio=body.municipio,
@@ -221,6 +222,7 @@ async def local_index_search_items_endpoint(body: MarketSearchRequest):
             limit=max(200, body.max_paginas * body.tamanho_pagina),
             somente_homologados=body.somente_homologados,
         )
+        return await enrich_local_search_result(result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 

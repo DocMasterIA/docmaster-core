@@ -38,6 +38,7 @@ from .config import (
     PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS,
     PNCP_BLOCK_SERVICE_ITEMS,
     PNCP_SERVICE_BLOCK_TERMS,
+    PNCP_SEARCH_ENRICH_HOMOLOG_MAX,
 )
 from .pncp_client import (
     PNCPClientError,
@@ -46,7 +47,7 @@ from .pncp_client import (
     get_contract_items,
     get_contract_supplier_snapshot,
 )
-from .local_index import upsert_contracts, local_item_search
+from .local_index import enrich_homolog_items_from_pncp, upsert_contracts, local_item_search
 from .schemas import MarketSearchRequest
 from .search_text_clean import apply_item_display_cleanup, normalize_for_search
 
@@ -2193,6 +2194,12 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         # Segurança extra no retorno final.
         top3 = [x for x in top3 if _preco_dentro_faixa(x, faixa_min, faixa_max)]
 
+    enrich_n_top3 = 0
+    if top3:
+        enrich_cap = max(0, min(int(PNCP_SEARCH_ENRICH_HOMOLOG_MAX), len(top3)))
+        if enrich_cap:
+            enrich_n_top3 = await enrich_homolog_items_from_pncp(top3, max_n=enrich_cap)
+
     for row in top3:
         apply_item_display_cleanup(row)
 
@@ -2223,6 +2230,10 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     out_stats["servico_bloqueados"] = int(service_blocked_count)
     out_stats["hybrid_fallback_used"] = hybrid_used
     out_stats["hybrid_live_count"] = hybrid_live_count
+    out_stats["enriquecidos_pncp_na_busca"] = enrich_n_top3
+    out_stats["itens_com_cnpj_fornecedor"] = sum(
+        1 for x in top3 if str(x.get("cnpj_fornecedor") or "").strip()
+    )
 
     return {
         "ok": bool(base_items.get("ok", True)),

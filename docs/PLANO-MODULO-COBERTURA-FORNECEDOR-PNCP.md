@@ -20,26 +20,27 @@ No Relatório de Pesquisa de Preços, muitas linhas exibem preço e referência 
 
 ## 2. Estado atual no repositório (diagnóstico)
 
-### 2.1 O que já existe
+### 2.1 O que já existe (atualizado jun/2026)
 
 | Componente | Comportamento atual |
 |------------|---------------------|
-| `pncp_researcher_service/app/pncp_client.py` | `get_contract_supplier_snapshot`: GET `/itens` → até **3** itens com `temResultado`/homolog → GET `/itens/{n}/resultados` → fallback `/resultados`; extrai **CNPJ** do JSON; nome via **BrasilAPI**. |
-| `pncp_researcher_service/app/service.py` | Busca **ao vivo** (`market_search`): chama `get_contract_supplier_snapshot` **por contrato** (não por linha de item indexada), com timeout do lookup de itens. |
-| `backend/app/services/pncp_supplier_enrichment.py` | Cópia síncrona da mesma lógica; `enrich_missing_supplier_fields_for_cotacao` antes do PDF: **max 12** lookups PNCP + **48** BrasilAPI por cotação. |
-| `backend/app/services/pncp_relatorio_itens.py` | Lê `source` do item (`fornecedor`, `cnpj_fornecedor`, chaves aninhadas PNCP); índice local CNPJ→nome entre linhas da mesma cotação. |
-| `pncp_researcher_service/app/local_index.py` | Tabela `pncp_itens`: descrição, valores, `raw_json_zlib` do endpoint **`/itens`** (catálogo). **Sem colunas de fornecedor.** |
-| Backfill 24/7 | `upsert_contract_items` após `get_contract_items` — **não** chama `/resultados`. |
-| `market_search_intelligent` | Fonte principal: `local_item_search` — **sem fornecedor**; fallback híbrido ao vivo só se poucos resultados locais. |
-| `PncpFornecedorCadastro` (Django) | Cadastro **manual** por usuário (cotação direta), não cache global PNCP. |
+| `pncp_researcher_service/app/pncp_client.py` | `get_contract_supplier_snapshot`: GET `/itens` → itens com resultado/homolog → GET `/itens/{n}/resultados` → fallback `/resultados`; CNPJ + BrasilAPI. |
+| `pncp_researcher_service/app/service.py` | Busca ao vivo; snapshot por contrato/item conforme contexto. |
+| `backend/app/services/pncp_supplier_enrichment.py` | Enrich síncrono espelhado; PDF até **96** PNCP + **64** BrasilAPI; add source **48**+**48**. |
+| `backend/app/services/pncp_relatorio_itens.py` | Monta linhas PDF; propaga CNPJ entre linhas da cotação. |
+| `pncp_researcher_service/app/local_index.py` | `pncp_itens` com colunas fornecedor + `fornecedor_elegivel`; ingest via `/itens`; enrich on-demand na busca (16). |
+| Ingest worker 24/7 | `get_contract_items` only — **não** `/resultados`; skip 7d (`REFRESH_DAYS`). |
+| `local_item_search` | Filtro homologados + `_supplier_fields_from_local_row` + enrich até 16. |
+| `PncpFornecedorCadastro` (Django) | Cadastro manual por usuário. |
+| Auditoria | `audit_pncp_supplier_coverage`, `audit_pncp_homologados_coverage`, `pncp_supplier_gap_audit`. |
 
-### 2.2 Causas prováveis dos ~20%
+### 2.2 Causas prováveis de cobertura baixa (onde ainda falha)
 
-1. **Persistência:** índice local não guarda vencedor; busca inteligente e manual indexada não carregam fornecedor.
-2. **Granularidade:** snapshot atual é **por compra** (primeiro item com resultado), não **por `numero_item`** da linha cotada.
-3. **Momento:** enriquecimento concentrado no PDF com **teto baixo** de HTTP e timeouts curtos (`_DEFAULT_TIMEOUT` ~2,4s).
-4. **Elegibilidade:** não há filtro sistemático “só homologado/adjudicado” na ingestão nem flag `fornecedor_elegivel` no índice.
-5. **Duplicação de código:** lógica de extração em `pncp_client.py` e `pncp_supplier_enrichment.py` — divergência futura provável.
+1. **Persistência em massa:** índice não recebe `/resultados` na ingest (Fase B/R2 pendente).
+2. **PNCP 204:** sem vencedor publicado por linha mesmo homologado.
+3. **Tetos HTTP:** busca 16 vs muitos candidatos; PDF 96 pode não bastar em cotações enormes.
+4. **Duplicação researcher ↔ backend:** lógica em dois sítios — risco de divergência.
+5. **Métrica errada:** `cobertura_cnpj_pct` no índice total ≠ cobertura na cotação homologada.
 
 ### 2.3 Fluxo atual (resumo)
 
@@ -51,16 +52,17 @@ flowchart LR
     C --> D[upsert_contract_items]
   end
   subgraph search [Busca]
-    E[local_item_search] --> F[sem fornecedor]
-    G[market_search live] --> H[get_contract_supplier_snapshot]
+    E[local_item_search] --> F[filtro homolog + enrich 16]
   end
   subgraph pdf [Relatório]
-    I[enrich_missing_supplier] --> J[max 12 PNCP + 48 BrasilAPI]
+    I[enrich_missing_supplier] --> J[max 96 PNCP + 64 BrasilAPI]
     J --> K[pncp_relatorio_itens]
   end
-  D -.->|não alimenta| F
-  H -.->|só live / PDF| K
+  D -.->|situação sí; CNPJ raro| F
+  F --> I
 ```
+
+**Contexto IA completo:** [`docs/PNCP-CONTEXTO-IA.md`](PNCP-CONTEXTO-IA.md).
 
 ---
 

@@ -9,7 +9,8 @@ Guias operacionais para produção (servidor DESKTOP / `/home/docmaster`, WSL + 
 | Site + API no ar, túnel Cloudflare, erro 502/1033 | [STACK-E-CLOUDFLARE-502.md](./STACK-E-CLOUDFLARE-502.md) |
 | Boot após reboot (systemd + WSL Windows) | [BOOT-AUTOMATICO.md](./BOOT-AUTOMATICO.md), [WSL-BOOT-WINDOWS.md](./WSL-BOOT-WINDOWS.md) |
 | PNCP API 24/7 (contentor isolado) | [PNCP-RESEARCHER-24-7.md](./PNCP-RESEARCHER-24-7.md) |
-| **Estado declarativo PNCP** (ingest + homolog + CNPJ — tudo num doc) | [PNCP-DECLARATIVO.md](../PNCP-DECLARATIVO.md) |
+| **Contexto IA PNCP** (ingest + fornecedor + ops) | [PNCP-CONTEXTO-IA.md](../PNCP-CONTEXTO-IA.md) |
+| **Estado declarativo PNCP** | [PNCP-DECLARATIVO.md](../PNCP-DECLARATIVO.md) |
 | **Alimentar índice PNCP** (loop, watermarks, paralelo) | [PNCP-INGESTAO-INDEX-24-7.md](./PNCP-INGESTAO-INDEX-24-7.md) |
 | Scripts PNCP (referência) | [PNCP-SCRIPTS-REFERENCIA.md](./PNCP-SCRIPTS-REFERENCIA.md) |
 | **Comandos operação PNCP** (monitorar, backup, deploy) | [PNCP-COMANDOS-OPERACAO.txt](./PNCP-COMANDOS-OPERACAO.txt) |

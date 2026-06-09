@@ -155,7 +155,12 @@
             <header class="bia-group-head">
               <div>
                 <h3 class="bia-group-title">{{ group.label }}</h3>
-                <p class="bia-meta">{{ group.rows.length }} cotações sugeridas para este item</p>
+                <p class="bia-meta">
+                  {{ group.rows.length }} cotações sugeridas para este item
+                  <span v-if="group.backendItensCount != null && group.backendItensCount !== group.rows.length">
+                    (IA retornou {{ group.backendItensCount }})
+                  </span>
+                </p>
               </div>
               <button
                 type="button"
@@ -491,9 +496,13 @@ const groupedRows = computed(() => {
         label: row.itemRefLabel || `Item ${row.itemId ?? '-'}`,
         rows: [],
         allSelected: false,
+        backendItensCount: null,
       });
     }
     map.get(key).rows.push(row);
+    if (Number.isFinite(Number(row.backendItensCount))) {
+      map.get(key).backendItensCount = Number(row.backendItensCount);
+    }
   }
   const groups = [...map.values()];
   for (const g of groups) {
@@ -678,8 +687,47 @@ async function runSearchWithContext({
 
     const aggregated = [];
 
+    function rowDedupeKey(row) {
+      const pncp = String(row.numeroPncp || '').trim();
+      const nitem = String(row.numeroItem ?? '').trim();
+      const price = row.valorUnitario ?? row.valorTotal ?? parseMoeda(row.valor);
+      return [
+        String(row.itemId || ''),
+        pncp || 'no-pncp',
+        nitem || 'no-item',
+        String(row.sequencialCompra ?? ''),
+        String(price ?? ''),
+        String(row.orgao || '').toLowerCase(),
+      ].join('|');
+    }
+
+    function sortRowsByScore(rows) {
+      return [...rows].sort((a, b) => {
+        const sa = Number(a.score ?? 0);
+        const sb = Number(b.score ?? 0);
+        if (sa !== sb) return sb - sa;
+        const va = Number(a.valorUnitario ?? a.valorTotal ?? parseMoeda(a.valor));
+        const vb = Number(b.valorUnitario ?? b.valorTotal ?? parseMoeda(b.valor));
+        const av = Number.isFinite(va) ? va : Number.POSITIVE_INFINITY;
+        const bv = Number.isFinite(vb) ? vb : Number.POSITIVE_INFINITY;
+        return av - bv;
+      });
+    }
+
+    function dedupeRows(rows) {
+      const unique = [];
+      const seen = new Set();
+      for (const row of rows) {
+        const key = rowDedupeKey(row);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        unique.push(row);
+      }
+      return unique;
+    }
+
     function mapBackendToRows(backend, geoKeyPart) {
-      if (!backend?.ok || !Array.isArray(backend.itens)) return;
+      if (!backend?.ok || !Array.isArray(backend.itens)) return 0;
       const mapped = backend.itens.map((it, idx) => ({
         esferaAdministrativa: classificarEsferaAdministrativa(it),
         incisoClassificacao: mapEsferaParaInciso(classificarEsferaAdministrativa(it)),
@@ -716,10 +764,13 @@ async function runSearchWithContext({
         fornecedor: String(it.fornecedor || '').trim() || null,
         cnpjFornecedor: String(it.cnpj_fornecedor || it.cnpjFornecedor || '').trim() || null,
         selecionado: false,
+        backendItensCount: backend.itens.length,
       }));
       aggregated.push(...mapped);
+      return mapped.length;
     }
 
+    let backendItensTotal = 0;
     if (recortes.length > 0) {
       const backend = await intelligentMarketSearch(
         {
@@ -731,7 +782,7 @@ async function runSearchWithContext({
         signal,
       );
       if (generation != null && generation !== searchGeneration.value) return;
-      mapBackendToRows(backend, 'rec');
+      backendItensTotal += mapBackendToRows(backend, 'rec') || 0;
     } else {
       const ufsToRun = context?.uf_padrao ? [context.uf_padrao] : [null];
       for (const ufCode of ufsToRun) {
@@ -745,37 +796,22 @@ async function runSearchWithContext({
           signal,
         );
         if (generation != null && generation !== searchGeneration.value) return;
-        mapBackendToRows(backend, ufCode || 'all');
+        backendItensTotal += mapBackendToRows(backend, ufCode || 'all') || 0;
       }
     }
     if (generation != null && generation !== searchGeneration.value) return;
     if (aggregated.length > 0) {
-      const unique = [];
-      const seen = new Set();
-      for (const row of aggregated) {
-        const key = [
-          String(row.itemId || ''),
-          String(row.numeroPncp || ''),
-          String(row.numeroItem || ''),
-          String(row.titulo || '').toLowerCase(),
-          String(row.orgao || '').toLowerCase(),
-        ].join('|');
-        if (seen.has(key)) continue;
-        seen.add(key);
-        unique.push(row);
+      // Backend já devolve top3 distintos; dedupe só quando há fusão multi-UF/geo (>3 linhas).
+      let picks;
+      if (aggregated.length <= 3) {
+        picks = sortRowsByScore(aggregated);
+      } else {
+        picks = sortRowsByScore(dedupeRows(aggregated)).slice(0, 3);
       }
-      unique.sort((a, b) => {
-        const sa = Number(a.score ?? 0);
-        const sb = Number(b.score ?? 0);
-        if (sa !== sb) return sb - sa;
-        const va = Number(a.valorUnitario ?? a.valorTotal ?? parseMoeda(a.valor));
-        const vb = Number(b.valorUnitario ?? b.valorTotal ?? parseMoeda(b.valor));
-        const av = Number.isFinite(va) ? va : Number.POSITIVE_INFINITY;
-        const bv = Number.isFinite(vb) ? vb : Number.POSITIVE_INFINITY;
-        return av - bv;
-      });
-      const top3 = unique.slice(0, 3);
-      rows.value = append ? [...rows.value, ...top3] : top3;
+      if (backendItensTotal > picks.length && backendItensTotal <= 3) {
+        picks = sortRowsByScore(aggregated);
+      }
+      rows.value = append ? [...rows.value, ...picks] : picks;
     } else if (!append) {
       searchError.value = 'A IA não encontrou 3 cotações aderentes para este termo no recorte atual.';
     }

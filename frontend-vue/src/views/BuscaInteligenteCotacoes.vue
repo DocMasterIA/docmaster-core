@@ -109,6 +109,15 @@
       <p v-else-if="autoSearchProgress.total > 0" class="bia-meta">
         Busca automática concluída: {{ autoSearchProgress.done }} item(ns) processado(s).
       </p>
+      <p v-if="lastSearchDebug" class="bia-meta">
+        Última busca ({{ lastSearchDebug.termo }}):
+        API retornou <strong>{{ lastSearchDebug.apiItens }}</strong>,
+        exibindo <strong>{{ lastSearchDebug.exibidos }}</strong>
+        <span v-if="lastSearchDebug.faixaAtiva"> • faixa R$ {{ lastSearchDebug.faixaMin }}–{{ lastSearchDebug.faixaMax }}</span>
+        <span v-if="lastSearchDebug.apiItens > lastSearchDebug.exibidos" class="bia-meta--error">
+          — perda no front (dedupe/layout); recarregue após deploy do Vue
+        </span>
+      </p>
       <p v-if="itemContext" class="bia-meta">
         Item de referência: <strong>{{ itemContext.descricao_item }}</strong>
         <span v-if="itemContext.quantidade != null"> • Qtd {{ itemContext.quantidade }}</span>
@@ -430,6 +439,7 @@ function isAbortError(err) {
 }
 
 const searchError = ref('');
+const lastSearchDebug = ref(null);
 const saveMessage = ref('');
 const isSavingSelecionados = ref(false);
 const itemContext = ref(null);
@@ -670,6 +680,16 @@ async function runSearchWithContext({
   if (!append) searchError.value = '';
   try {
     const recortes = buildRecortesGeograficosPayload(filtros.cidades);
+    const valorBaseCtx = context?.valor_base_referencia ?? null;
+    const variacaoCtx = context?.variacao_percentual_referencia ?? null;
+    const faixaAtiva =
+      valorBaseCtx != null
+      && Number.isFinite(Number(valorBaseCtx))
+      && Number(valorBaseCtx) > 0
+      && variacaoCtx != null
+      && Number.isFinite(Number(variacaoCtx))
+      && Number(variacaoCtx) >= 0;
+
     const basePayload = {
       somente_homologados: true,
       termo_busca: String(descricao).trim(),
@@ -678,60 +698,21 @@ async function runSearchWithContext({
       tamanho_pagina: 200,
       quantidade_referencia: context?.quantidade ?? null,
       unidade_medida_referencia: context?.unidade_medida ?? null,
-      valor_base_referencia: context?.valor_base_referencia ?? null,
-      variacao_percentual_referencia: context?.variacao_percentual_referencia ?? null,
-      variacao_sentido_referencia: context?.variacao_sentido_referencia ?? null,
-      valor_min_referencia: context?.valor_min_referencia ?? null,
-      valor_max_referencia: context?.valor_max_referencia ?? null,
+      // Faixa só quando valor base + variação estão definidos (evita filtrar 3→1 no backend).
+      valor_base_referencia: faixaAtiva ? Number(valorBaseCtx) : null,
+      variacao_percentual_referencia: faixaAtiva ? Number(variacaoCtx) : null,
     };
 
     const aggregated = [];
-
-    function rowDedupeKey(row) {
-      const pncp = String(row.numeroPncp || '').trim();
-      const nitem = String(row.numeroItem ?? '').trim();
-      const price = row.valorUnitario ?? row.valorTotal ?? parseMoeda(row.valor);
-      return [
-        String(row.itemId || ''),
-        pncp || 'no-pncp',
-        nitem || 'no-item',
-        String(row.sequencialCompra ?? ''),
-        String(price ?? ''),
-        String(row.orgao || '').toLowerCase(),
-      ].join('|');
-    }
-
-    function sortRowsByScore(rows) {
-      return [...rows].sort((a, b) => {
-        const sa = Number(a.score ?? 0);
-        const sb = Number(b.score ?? 0);
-        if (sa !== sb) return sb - sa;
-        const va = Number(a.valorUnitario ?? a.valorTotal ?? parseMoeda(a.valor));
-        const vb = Number(b.valorUnitario ?? b.valorTotal ?? parseMoeda(b.valor));
-        const av = Number.isFinite(va) ? va : Number.POSITIVE_INFINITY;
-        const bv = Number.isFinite(vb) ? vb : Number.POSITIVE_INFINITY;
-        return av - bv;
-      });
-    }
-
-    function dedupeRows(rows) {
-      const unique = [];
-      const seen = new Set();
-      for (const row of rows) {
-        const key = rowDedupeKey(row);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        unique.push(row);
-      }
-      return unique;
-    }
+    let lastBackend = null;
 
     function mapBackendToRows(backend, geoKeyPart) {
       if (!backend?.ok || !Array.isArray(backend.itens)) return 0;
+      lastBackend = backend;
       const mapped = backend.itens.map((it, idx) => ({
         esferaAdministrativa: classificarEsferaAdministrativa(it),
         incisoClassificacao: mapEsferaParaInciso(classificarEsferaAdministrativa(it)),
-        id: `backend-${context?.id || 'none'}-${geoKeyPart}-${idx}-${it.numero_pncp || ''}`,
+        id: `backend-${context?.id || 'none'}-${geoKeyPart}-${idx}-${it.numero_pncp || 'x'}-${it.numero_item ?? idx}`,
         itemId: context?.id || null,
         itemRefLabel: context?.descricao_item || '-',
         sourceRaw: it,
@@ -801,19 +782,43 @@ async function runSearchWithContext({
     }
     if (generation != null && generation !== searchGeneration.value) return;
     if (aggregated.length > 0) {
-      // Backend já devolve top3 distintos; dedupe só quando há fusão multi-UF/geo (>3 linhas).
-      let picks;
-      if (aggregated.length <= 3) {
-        picks = sortRowsByScore(aggregated);
-      } else {
-        picks = sortRowsByScore(dedupeRows(aggregated)).slice(0, 3);
-      }
-      if (backendItensTotal > picks.length && backendItensTotal <= 3) {
-        picks = sortRowsByScore(aggregated);
-      }
+      // Confia no top3 do backend; sem dedupe agressivo (descrições PNCP iguais colapsavam 3→1).
+      const picks = [...aggregated].sort((a, b) => {
+        const sa = Number(a.score ?? 0);
+        const sb = Number(b.score ?? 0);
+        if (sa !== sb) return sb - sa;
+        const va = Number(a.valorUnitario ?? a.valorTotal ?? parseMoeda(a.valor));
+        const vb = Number(b.valorUnitario ?? b.valorTotal ?? parseMoeda(b.valor));
+        return (Number.isFinite(va) ? va : Infinity) - (Number.isFinite(vb) ? vb : Infinity);
+      });
       rows.value = append ? [...rows.value, ...picks] : picks;
+      const apiN = Number(lastBackend?.itens?.length ?? backendItensTotal ?? picks.length);
+      const filtrosResp = lastBackend?.filtros || {};
+      lastSearchDebug.value = {
+        termo: String(descricao).trim().slice(0, 80),
+        apiItens: apiN,
+        exibidos: picks.length,
+        faixaAtiva: Boolean(filtrosResp.faixa_regional_min != null && filtrosResp.faixa_regional_max != null),
+        faixaMin: filtrosResp.faixa_regional_min,
+        faixaMax: filtrosResp.faixa_regional_max,
+        top3Final: lastBackend?.stats?.funil_busca?.top3_final ?? null,
+      };
+      if (faixaAtiva && apiN < 3) {
+        searchError.value = `Faixa de preço ativa (base R$ ${Number(valorBaseCtx).toFixed(2)} ±${Number(variacaoCtx)}%): API retornou ${apiN} cotação(ões). Desative a faixa ou amplie a variação para ver mais preços.`;
+      }
     } else if (!append) {
-      searchError.value = 'A IA não encontrou 3 cotações aderentes para este termo no recorte atual.';
+      lastSearchDebug.value = {
+        termo: String(descricao).trim().slice(0, 80),
+        apiItens: 0,
+        exibidos: 0,
+        faixaAtiva,
+        faixaMin: null,
+        faixaMax: null,
+        top3Final: 0,
+      };
+      searchError.value = faixaAtiva
+        ? 'Nenhuma cotação dentro da faixa de preço configurada para este item.'
+        : 'A IA não encontrou cotações aderentes para este termo no recorte atual.';
     }
   } catch (err) {
     if (isAbortError(err)) return;

@@ -284,7 +284,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   addCotacoesToItemInResearchSession,
@@ -441,6 +441,10 @@ const isSearching = ref(false);
 const activeSearchOps = ref(0);
 const searchGeneration = ref(0);
 let searchAbortController = null;
+/** Evita corrida quando o Vue remonta o componente (autostart duplicado). */
+let mountRunSeq = 0;
+let activeBulkRunId = 0;
+let bulkAutostartController = null;
 
 function beginNewSearchSession() {
   try {
@@ -448,9 +452,31 @@ function beginNewSearchSession() {
   } catch (_) {
     /* ignore */
   }
+  activeBulkRunId += 1;
+  try {
+    bulkAutostartController?.abort();
+  } catch (_) {
+    /* ignore */
+  }
   searchAbortController = new AbortController();
   searchGeneration.value += 1;
   return { generation: searchGeneration.value, signal: searchAbortController.signal };
+}
+
+function beginBulkAutostartSession() {
+  activeBulkRunId += 1;
+  const bulkRunId = activeBulkRunId;
+  try {
+    bulkAutostartController?.abort();
+  } catch (_) {
+    /* ignore */
+  }
+  bulkAutostartController = new AbortController();
+  return { bulkRunId, signal: bulkAutostartController.signal };
+}
+
+function isBulkRunActive(bulkRunId) {
+  return Number(bulkRunId) === activeBulkRunId;
 }
 
 function isAbortError(err) {
@@ -528,7 +554,14 @@ function itemRowsCount(itemId) {
   return rows.value.filter((r) => Number(r.itemId) === Number(itemId)).length;
 }
 
-async function runBulkItemSearches(pendentes, { generation, signal, clearRows = false }) {
+async function runBulkItemSearches(pendentes, {
+  generation = null,
+  bulkRunId = null,
+  mountRunId = null,
+  signal,
+  clearRows = false,
+} = {}) {
+  const myBulkRunId = bulkRunId;
   if (clearRows) rows.value = [];
   isAutoSearchingAll.value = true;
   autoSearchProgress.value = {
@@ -542,7 +575,15 @@ async function runBulkItemSearches(pendentes, { generation, signal, clearRows = 
   searchError.value = '';
 
   for (const ctx of pendentes) {
-    if (generation !== searchGeneration.value) {
+    if (mountRunId != null && mountRunId !== mountRunSeq) {
+      isAutoSearchingAll.value = false;
+      return;
+    }
+    if (myBulkRunId != null && !isBulkRunActive(myBulkRunId)) {
+      isAutoSearchingAll.value = false;
+      return;
+    }
+    if (generation != null && generation !== searchGeneration.value) {
       isAutoSearchingAll.value = false;
       return;
     }
@@ -562,17 +603,27 @@ async function runBulkItemSearches(pendentes, { generation, signal, clearRows = 
       append: true,
       bulkMode: true,
       generation,
+      bulkRunId: myBulkRunId,
       signal,
     });
-    if (generation !== searchGeneration.value) {
+    if (mountRunId != null && mountRunId !== mountRunSeq) {
       isAutoSearchingAll.value = false;
       return;
     }
-    if (result?.aborted) {
+    if (myBulkRunId != null && !isBulkRunActive(myBulkRunId)) {
+      isAutoSearchingAll.value = false;
+      return;
+    }
+    if (generation != null && generation !== searchGeneration.value) {
       isAutoSearchingAll.value = false;
       return;
     }
     autoSearchProgress.value.done += 1;
+    if (result?.aborted) {
+      autoSearchProgress.value.fail += 1;
+      await sleep(500);
+      continue;
+    }
     if (result?.ok) {
       autoSearchProgress.value.ok += 1;
       autoSearchProgress.value.precos += Number(result.exibidos || 0);
@@ -582,14 +633,23 @@ async function runBulkItemSearches(pendentes, { generation, signal, clearRows = 
     await sleep(350);
   }
 
-  if (generation !== searchGeneration.value) {
+  if (mountRunId != null && mountRunId !== mountRunSeq) {
+    isAutoSearchingAll.value = false;
+    return;
+  }
+  if (myBulkRunId != null && !isBulkRunActive(myBulkRunId)) {
+    isAutoSearchingAll.value = false;
+    return;
+  }
+  if (generation != null && generation !== searchGeneration.value) {
     isAutoSearchingAll.value = false;
     return;
   }
   isAutoSearchingAll.value = false;
   const p = autoSearchProgress.value;
   if (p.total > 0 && p.done === 0) {
-    searchError.value = 'A busca automática foi interrompida antes do primeiro item. Clique «Pesquisar UF» para tentar de novo.';
+    searchError.value =
+      'A busca automática não processou nenhum item (sessão substituída ou cancelada). Recarregue a página ou clique «Pesquisar UF».';
     return;
   }
   if (p.precos > 0 && p.fail > 0) {
@@ -705,7 +765,12 @@ async function applyFilters() {
     return;
   }
   const hadRows = rows.value.length > 0;
-  return runBulkItemSearches(pendentes, { generation, signal, clearRows: !hadRows });
+  const bulkSession = beginBulkAutostartSession();
+  return runBulkItemSearches(pendentes, {
+    bulkRunId: bulkSession.bulkRunId,
+    signal: bulkSession.signal,
+    clearRows: !hadRows,
+  });
 }
 
 function buildContextFromItem(it) {
@@ -798,6 +863,7 @@ async function runSearchWithContext({
   append = false,
   bulkMode = false,
   generation = null,
+  bulkRunId = null,
   signal = undefined,
 } = {}) {
   if (!String(descricao || '').trim()) {
@@ -807,6 +873,10 @@ async function runSearchWithContext({
   isSearching.value = true;
   if (!append && !bulkMode) searchError.value = '';
   let exibidos = 0;
+  const bulkAutostart = bulkMode && bulkRunId != null;
+  const generationStale = () =>
+    !bulkAutostart && generation != null && generation !== searchGeneration.value;
+  const bulkSuperseded = () => bulkRunId != null && !isBulkRunActive(bulkRunId);
   try {
     const recortes = buildRecortesGeograficosPayload(filtros.cidades);
     const valorBaseCtx = context?.valor_base_referencia ?? null;
@@ -893,14 +963,14 @@ async function runSearchWithContext({
         signal,
         bulkMode ? { timeoutMs: 120000, maxAttempts: 3 } : undefined,
       );
-      if (generation != null && generation !== searchGeneration.value) {
+      if (generationStale() || bulkSuperseded()) {
         return bulkMode ? { ok: false, exibidos: 0, aborted: true } : undefined;
       }
       backendItensTotal += mapBackendToRows(backend, 'rec') || 0;
     } else {
       const ufsToRun = context?.uf_padrao ? [context.uf_padrao] : [null];
       for (const ufCode of ufsToRun) {
-        if (generation != null && generation !== searchGeneration.value) {
+        if (generationStale() || bulkSuperseded()) {
           return bulkMode ? { ok: false, exibidos: 0, aborted: true } : undefined;
         }
         const backend = await intelligentMarketSearch(
@@ -912,13 +982,13 @@ async function runSearchWithContext({
           signal,
           bulkMode ? { timeoutMs: 120000, maxAttempts: 3 } : undefined,
         );
-        if (generation != null && generation !== searchGeneration.value) {
+        if (generationStale() || bulkSuperseded()) {
           return bulkMode ? { ok: false, exibidos: 0, aborted: true } : undefined;
         }
         backendItensTotal += mapBackendToRows(backend, ufCode || 'all') || 0;
       }
     }
-    if (generation != null && generation !== searchGeneration.value) {
+    if (generationStale() || bulkSuperseded()) {
       return bulkMode ? { ok: false, exibidos: 0, aborted: true } : undefined;
     }
     if (aggregated.length > 0) {
@@ -966,7 +1036,7 @@ async function runSearchWithContext({
     if (isAbortError(err)) {
       return bulkMode ? { ok: false, exibidos: 0, aborted: true } : undefined;
     }
-    if (generation != null && generation !== searchGeneration.value) {
+    if (generationStale() || bulkSuperseded()) {
       return bulkMode ? { ok: false, exibidos: 0, aborted: true } : undefined;
     }
     if (bulkMode) {
@@ -1104,6 +1174,7 @@ async function adicionarSelecionadosNaCotacao() {
 onMounted(async () => {
   const sessionId = Number(cotacaoId.value);
   if (!Number.isFinite(sessionId) || sessionId <= 0) return;
+  const mountRunId = ++mountRunSeq;
   autoSearchProgress.value = { done: 0, total: 0, ok: 0, fail: 0, precos: 0, skipped: 0 };
   searchError.value = '';
   try {
@@ -1153,6 +1224,7 @@ onMounted(async () => {
     const sentidoRaw = String(filtrosSessao.variacao_sentido_global || '').trim().toLowerCase();
     variacaoSentidoGlobal.value = ['cima', 'baixo', 'ambos'].includes(sentidoRaw) ? sentidoRaw : 'ambos';
     const totalSessao = Number(data?.sessao?.total_itens ?? data?.stats?.total_itens ?? stats?.total_itens ?? itens.length);
+    if (mountRunId !== mountRunSeq) return;
     const apiOk = refreshCotacaoResumo(itens, totalSessao, stats);
     allItemContexts.value = itens.map((it) => buildContextFromItem(it)).filter((x) => x.descricao_item);
     if (itemId.value) {
@@ -1175,6 +1247,7 @@ onMounted(async () => {
     }
 
     if (autostart.value && itens.length) {
+      if (mountRunId !== mountRunSeq) return;
       if (!apiOk) return;
       const pendentes = buildPendentesFromItens(itens);
       const esperados = Number(stats?.total_incompletos ?? cotacaoResumo.value.incompletos ?? pendentes.length);
@@ -1189,14 +1262,30 @@ onMounted(async () => {
         }
         return;
       }
-      const { generation, signal } = beginNewSearchSession();
+      const { bulkRunId, signal } = beginBulkAutostartSession();
       const pendentesCtx = pendentes.map((it) => buildContextFromItem(it)).filter((x) => x.descricao_item);
-      await runBulkItemSearches(pendentesCtx, { generation, signal, clearRows: true });
+      if (mountRunId !== mountRunSeq) return;
+      await runBulkItemSearches(pendentesCtx, {
+        bulkRunId,
+        mountRunId,
+        signal,
+        clearRows: true,
+      });
     }
   } catch (err) {
     isLoadingSessionItems.value = false;
     isAutoSearchingAll.value = false;
     searchError.value = `Não foi possível carregar a cotação (${err?.message || 'erro desconhecido'}).`;
+  }
+});
+
+onBeforeUnmount(() => {
+  mountRunSeq += 1;
+  activeBulkRunId += 1;
+  try {
+    bulkAutostartController?.abort();
+  } catch (_) {
+    /* ignore */
   }
 });
 

@@ -35,7 +35,41 @@ function extractErrorMessage(payload, status) {
 }
 
 /** Proxy FastAPI: índice local, market-search, streams. */
-async function researchRequest(path, { method = 'GET', body, signal } = {}) {
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isNetworkFetchError(err) {
+  const name = String(err?.name || '');
+  const msg = String(err?.message || err || '');
+  return (
+    name === 'TypeError'
+    || name === 'TimeoutError'
+    || /failed to fetch|networkerror|load failed|network error|err_failed|timed out|timeout/i.test(msg)
+  );
+}
+
+function mergeAbortSignals(userSignal, timeoutMs) {
+  const ms = Number(timeoutMs);
+  if (!Number.isFinite(ms) || ms <= 0) {
+    return userSignal || undefined;
+  }
+  let timeoutSignal = null;
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    timeoutSignal = AbortSignal.timeout(ms);
+  }
+  if (!userSignal) return timeoutSignal || undefined;
+  if (!timeoutSignal) return userSignal;
+  const ac = new AbortController();
+  const abort = () => {
+    if (!ac.signal.aborted) ac.abort();
+  };
+  userSignal.addEventListener('abort', abort, { once: true });
+  timeoutSignal.addEventListener('abort', abort, { once: true });
+  return ac.signal;
+}
+
+async function researchRequest(path, { method = 'GET', body, signal, timeoutMs } = {}) {
   const res = await fetch(`${API_BASE}/api/pncp-research/${path}`, {
     method,
     credentials: 'include',
@@ -43,7 +77,7 @@ async function researchRequest(path, { method = 'GET', body, signal } = {}) {
       'Content-Type': 'application/json',
     },
     body: body ? JSON.stringify(body) : undefined,
-    signal,
+    signal: mergeAbortSignals(signal, timeoutMs),
   });
 
   const ctype = (res.headers.get('content-type') || '').toLowerCase();
@@ -241,15 +275,43 @@ export function searchLocalItems(payload, signal) {
   return researchRequest('local-index/search-items', { method: 'POST', body: payload, signal });
 }
 
-export function intelligentMarketSearch(payload, signal) {
-  return researchRequest('market-search/intelligent', { method: 'POST', body: payload, signal }).catch(async (err) => {
-    const msg = String(err?.message || '');
-    // Fallback de compatibilidade: ambiente antigo sem endpoint inteligente ainda publicado.
-    if (msg.includes('Not Found') || msg.includes('404')) {
-      return researchRequest('market-search', { method: 'POST', body: payload, signal });
+export function intelligentMarketSearch(payload, signal, options = {}) {
+  const timeoutMs = options.timeoutMs ?? 120000;
+  const maxAttempts = Math.max(1, Math.min(5, Number(options.maxAttempts) || 3));
+
+  const attemptOnce = () =>
+    researchRequest('market-search/intelligent', {
+      method: 'POST',
+      body: payload,
+      signal,
+      timeoutMs,
+    }).catch(async (err) => {
+      const msg = String(err?.message || '');
+      if (msg.includes('Not Found') || msg.includes('404')) {
+        return researchRequest('market-search', { method: 'POST', body: payload, signal, timeoutMs });
+      }
+      throw err;
+    });
+
+  return (async () => {
+    let lastErr = null;
+    for (let i = 0; i < maxAttempts; i += 1) {
+      try {
+        return await attemptOnce();
+      } catch (err) {
+        lastErr = err;
+        const aborted = String(err?.name || '') === 'AbortError'
+          || /aborted|abort/i.test(String(err?.message || ''));
+        if (aborted || !isNetworkFetchError(err)) {
+          throw err;
+        }
+        if (i < maxAttempts - 1) {
+          await sleep(700 * (i + 1));
+        }
+      }
     }
-    throw err;
-  });
+    throw lastErr || new Error('Falha de rede ao consultar busca inteligente.');
+  })();
 }
 
 export function getLocalIndexStats(signal) {
@@ -258,10 +320,6 @@ export function getLocalIndexStats(signal) {
 
 export function backfillLocalIndex(payload, signal) {
   return researchRequest('local-index/backfill', { method: 'POST', body: payload, signal });
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function mapNetworkError(err, context) {

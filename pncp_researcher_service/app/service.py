@@ -1925,6 +1925,9 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     - retorna exatamente 3 cotações com diversidade de órgão.
     """
     # Reutiliza a mesma fonte da busca manual (itens PNCP normalizados)
+    busca_lote = bool(getattr(payload, "busca_lote", False))
+    ia_rerank_on = bool(PNCP_IA_RERANK_ENABLED) and not busca_lote
+    ia_resumo_on = bool(PNCP_IA_ITEM_RESUMO_ENABLED) and not busca_lote
     limit = max(50, payload.max_paginas * payload.tamanho_pagina)
     termo_efetivo, term_meta = derive_anchor_search_term(payload.termo_busca)
     base_items = local_item_search(
@@ -2306,7 +2309,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     ia_used = False
     # IA rerank apenas quando não houver risco de substituir literais por similaridade.
     ia_rerank_allowed = pool_mode in {"literal_only", "similar_only"}
-    if PNCP_IA_RERANK_ENABLED and ia_rerank_allowed and selection_pool:
+    if ia_rerank_on and ia_rerank_allowed and selection_pool:
         limite_candidatos = max(6, min(PNCP_IA_MAX_CANDIDATES, len(selection_pool)))
         pool_ia = list(selection_pool)
         if faixa_min is not None and faixa_max is not None:
@@ -2409,7 +2412,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         apply_item_display_cleanup(row)
 
     ia_resumo_ok = False
-    if PNCP_IA_ITEM_RESUMO_ENABLED and top3:
+    if ia_resumo_on and top3:
         await _enriquecer_interpretacao_ia_itens(payload.termo_busca, top3)
         ia_resumo_ok = any(bool(str(x.get("ia_interpretacao_item") or "").strip()) for x in top3)
 
@@ -2421,9 +2424,9 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     out_stats["regra_selecao"] = "top3_federal_primeiro_depois_inciso_ii"
     out_stats["federais_encontrados"] = total_federais
     out_stats["federais_score_maior_igual_80"] = federais_score_80
-    out_stats["ia_rerank_ativo"] = bool(PNCP_IA_RERANK_ENABLED)
+    out_stats["ia_rerank_ativo"] = bool(ia_rerank_on)
     out_stats["ia_rerank_usado"] = ia_used
-    out_stats["ia_interpretacao_item_ativo"] = bool(PNCP_IA_ITEM_RESUMO_ENABLED)
+    out_stats["ia_interpretacao_item_ativo"] = bool(ia_resumo_on)
     out_stats["ia_interpretacao_item_usado"] = bool(ia_resumo_ok)
     out_stats["fallback_similaridade_ativo"] = True
     out_stats["fallback_similaridade_usado"] = bool(fallback_relaxado_usado)

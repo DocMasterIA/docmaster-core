@@ -89,6 +89,10 @@ class MarketSearchRequest(BaseModel):
         None,
         description="Se true, retorna só itens homologados/adjudicados. Omitido = usa PNCP_SEARCH_ONLY_HOMOLOGATED do serviço.",
     )
+    busca_lote: Optional[bool] = Field(
+        False,
+        description="Cotação com dezenas de itens: pula rerank/resumo LLM por item (mais rápido e estável).",
+    )
 
     @field_validator("max_paginas")
     @classmethod

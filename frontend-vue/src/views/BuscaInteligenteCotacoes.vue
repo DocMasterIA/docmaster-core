@@ -104,10 +104,16 @@
         </div>
       </section>
       <p v-if="isAutoSearchingAll" class="bia-meta">
-        Busca automática em andamento: item {{ autoSearchProgress.done }} de {{ autoSearchProgress.total }}...
+        Busca automática em andamento: item {{ autoSearchProgress.done }} de {{ autoSearchProgress.total }}
+        <span v-if="autoSearchProgress.precos > 0 || autoSearchProgress.fail > 0">
+          — {{ autoSearchProgress.precos }} preço(s), {{ autoSearchProgress.fail }} falha(s)
+        </span>
+        ...
       </p>
       <p v-else-if="autoSearchProgress.total > 0" class="bia-meta">
-        Busca automática concluída: {{ autoSearchProgress.done }} item(ns) processado(s).
+        Busca automática concluída: {{ autoSearchProgress.done }} item(ns),
+        {{ autoSearchProgress.precos }} preço(s)
+        <span v-if="autoSearchProgress.fail > 0">, {{ autoSearchProgress.fail }} falha(s) de rede</span>.
       </p>
       <p v-if="lastSearchDebug" class="bia-meta">
         Última busca ({{ lastSearchDebug.termo }}):
@@ -447,7 +453,86 @@ const allItemContexts = ref([]);
 const variacaoPercentualGlobal = ref(null);
 const variacaoSentidoGlobal = ref('ambos');
 const isAutoSearchingAll = ref(false);
-const autoSearchProgress = ref({ done: 0, total: 0 });
+const autoSearchProgress = ref({ done: 0, total: 0, ok: 0, fail: 0, precos: 0, skipped: 0 });
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function itemRowsCount(itemId) {
+  if (!Number.isFinite(Number(itemId))) return 0;
+  return rows.value.filter((r) => Number(r.itemId) === Number(itemId)).length;
+}
+
+async function runBulkItemSearches(pendentes, { generation, signal, clearRows = false }) {
+  if (clearRows) rows.value = [];
+  isAutoSearchingAll.value = true;
+  autoSearchProgress.value = {
+    done: 0,
+    total: pendentes.length,
+    ok: 0,
+    fail: 0,
+    precos: 0,
+    skipped: 0,
+  };
+  searchError.value = '';
+
+  for (const ctx of pendentes) {
+    if (generation !== searchGeneration.value) {
+      isAutoSearchingAll.value = false;
+      return;
+    }
+    if (!String(ctx?.descricao_item || '').trim()) {
+      autoSearchProgress.value.done += 1;
+      continue;
+    }
+    if (itemRowsCount(ctx.id) > 0) {
+      autoSearchProgress.value.done += 1;
+      autoSearchProgress.value.skipped += 1;
+      autoSearchProgress.value.ok += 1;
+      continue;
+    }
+    const result = await runSearchWithContext({
+      descricao: ctx.descricao_item,
+      context: ctx,
+      append: true,
+      bulkMode: true,
+      generation,
+      signal,
+    });
+    if (generation !== searchGeneration.value) {
+      isAutoSearchingAll.value = false;
+      return;
+    }
+    if (result?.aborted) {
+      isAutoSearchingAll.value = false;
+      return;
+    }
+    autoSearchProgress.value.done += 1;
+    if (result?.ok) {
+      autoSearchProgress.value.ok += 1;
+      autoSearchProgress.value.precos += Number(result.exibidos || 0);
+    } else {
+      autoSearchProgress.value.fail += 1;
+    }
+    await sleep(350);
+  }
+
+  if (generation !== searchGeneration.value) {
+    isAutoSearchingAll.value = false;
+    return;
+  }
+  isAutoSearchingAll.value = false;
+  const p = autoSearchProgress.value;
+  if (p.precos > 0 && p.fail > 0) {
+    searchError.value =
+      `Busca parcial: ${p.ok} item(ns), ${p.precos} preço(s). ${p.fail} falha(s) de rede — clique «Pesquisar UF» para continuar os restantes (resultados já encontrados são mantidos).`;
+  } else if (p.precos === 0 && p.fail > 0) {
+    searchError.value =
+      `Falha de rede em ${p.fail} item(ns). Verifique o serviço PNCP e clique «Pesquisar UF» para tentar de novo.`;
+  } else if (p.precos === 0) {
+    searchError.value = 'Nenhuma cotação aderente encontrada para os itens da cotação nas cidades/UF definidas.';
+  }
+}
 const totalSelecionados = computed(() => displayedRows.value.filter((x) => x.selecionado).length);
 const allDisplayedSelecionados = computed(
   () => displayedRows.value.length > 0 && displayedRows.value.every((x) => x.selecionado),
@@ -548,35 +633,8 @@ async function applyFilters() {
     searchError.value = 'Todos os itens já estão completos (3+ preços).';
     return;
   }
-  rows.value = [];
-  isAutoSearchingAll.value = true;
-  autoSearchProgress.value = { done: 0, total: pendentes.length };
-  for (const ctx of pendentes) {
-    if (generation !== searchGeneration.value) {
-      isAutoSearchingAll.value = false;
-      return;
-    }
-    await runSearchWithContext({
-      descricao: ctx.descricao_item,
-      context: ctx,
-      append: true,
-      generation,
-      signal,
-    });
-    if (generation !== searchGeneration.value) {
-      isAutoSearchingAll.value = false;
-      return;
-    }
-    autoSearchProgress.value.done += 1;
-  }
-  if (generation !== searchGeneration.value) {
-    isAutoSearchingAll.value = false;
-    return;
-  }
-  isAutoSearchingAll.value = false;
-  if (!rows.value.length) {
-    searchError.value = 'Nenhuma cotação aderente encontrada para os itens da cotação nas cidades/UF definidas.';
-  }
+  const hadRows = rows.value.length > 0;
+  return runBulkItemSearches(pendentes, { generation, signal, clearRows: !hadRows });
 }
 
 function buildContextFromItem(it) {
@@ -671,13 +729,17 @@ async function runSearchWithContext({
   descricao,
   context = null,
   append = false,
+  bulkMode = false,
   generation = null,
   signal = undefined,
 } = {}) {
-  if (!String(descricao || '').trim()) return;
+  if (!String(descricao || '').trim()) {
+    return bulkMode ? { ok: false, exibidos: 0 } : undefined;
+  }
   activeSearchOps.value += 1;
   isSearching.value = true;
-  if (!append) searchError.value = '';
+  if (!append && !bulkMode) searchError.value = '';
+  let exibidos = 0;
   try {
     const recortes = buildRecortesGeograficosPayload(filtros.cidades);
     const valorBaseCtx = context?.valor_base_referencia ?? null;
@@ -698,6 +760,7 @@ async function runSearchWithContext({
       tamanho_pagina: 200,
       quantidade_referencia: context?.quantidade ?? null,
       unidade_medida_referencia: context?.unidade_medida ?? null,
+      busca_lote: Boolean(bulkMode),
       // Faixa só quando valor base + variação estão definidos (evita filtrar 3→1 no backend).
       valor_base_referencia: faixaAtiva ? Number(valorBaseCtx) : null,
       variacao_percentual_referencia: faixaAtiva ? Number(variacaoCtx) : null,
@@ -761,13 +824,18 @@ async function runSearchWithContext({
           municipio: null,
         },
         signal,
+        bulkMode ? { timeoutMs: 120000, maxAttempts: 3 } : undefined,
       );
-      if (generation != null && generation !== searchGeneration.value) return;
+      if (generation != null && generation !== searchGeneration.value) {
+        return bulkMode ? { ok: false, exibidos: 0, aborted: true } : undefined;
+      }
       backendItensTotal += mapBackendToRows(backend, 'rec') || 0;
     } else {
       const ufsToRun = context?.uf_padrao ? [context.uf_padrao] : [null];
       for (const ufCode of ufsToRun) {
-        if (generation != null && generation !== searchGeneration.value) return;
+        if (generation != null && generation !== searchGeneration.value) {
+          return bulkMode ? { ok: false, exibidos: 0, aborted: true } : undefined;
+        }
         const backend = await intelligentMarketSearch(
           {
             ...basePayload,
@@ -775,12 +843,17 @@ async function runSearchWithContext({
             municipio: null,
           },
           signal,
+          bulkMode ? { timeoutMs: 120000, maxAttempts: 3 } : undefined,
         );
-        if (generation != null && generation !== searchGeneration.value) return;
+        if (generation != null && generation !== searchGeneration.value) {
+          return bulkMode ? { ok: false, exibidos: 0, aborted: true } : undefined;
+        }
         backendItensTotal += mapBackendToRows(backend, ufCode || 'all') || 0;
       }
     }
-    if (generation != null && generation !== searchGeneration.value) return;
+    if (generation != null && generation !== searchGeneration.value) {
+      return bulkMode ? { ok: false, exibidos: 0, aborted: true } : undefined;
+    }
     if (aggregated.length > 0) {
       // Confia no top3 do backend; sem dedupe agressivo (descrições PNCP iguais colapsavam 3→1).
       const picks = [...aggregated].sort((a, b) => {
@@ -792,6 +865,7 @@ async function runSearchWithContext({
         return (Number.isFinite(va) ? va : Infinity) - (Number.isFinite(vb) ? vb : Infinity);
       });
       rows.value = append ? [...rows.value, ...picks] : picks;
+      exibidos = picks.length;
       const apiN = Number(lastBackend?.itens?.length ?? backendItensTotal ?? picks.length);
       const filtrosResp = lastBackend?.filtros || {};
       lastSearchDebug.value = {
@@ -803,10 +877,10 @@ async function runSearchWithContext({
         faixaMax: filtrosResp.faixa_regional_max,
         top3Final: lastBackend?.stats?.funil_busca?.top3_final ?? null,
       };
-      if (faixaAtiva && apiN < 3) {
+      if (!bulkMode && faixaAtiva && apiN < 3) {
         searchError.value = `Faixa de preço ativa (base R$ ${Number(valorBaseCtx).toFixed(2)} ±${Number(variacaoCtx)}%): API retornou ${apiN} cotação(ões). Desative a faixa ou amplie a variação para ver mais preços.`;
       }
-    } else if (!append) {
+    } else if (!append && !bulkMode) {
       lastSearchDebug.value = {
         termo: String(descricao).trim().slice(0, 80),
         apiItens: 0,
@@ -820,10 +894,19 @@ async function runSearchWithContext({
         ? 'Nenhuma cotação dentro da faixa de preço configurada para este item.'
         : 'A IA não encontrou cotações aderentes para este termo no recorte atual.';
     }
+    return { ok: true, exibidos };
   } catch (err) {
-    if (isAbortError(err)) return;
-    if (generation != null && generation !== searchGeneration.value) return;
+    if (isAbortError(err)) {
+      return bulkMode ? { ok: false, exibidos: 0, aborted: true } : undefined;
+    }
+    if (generation != null && generation !== searchGeneration.value) {
+      return bulkMode ? { ok: false, exibidos: 0, aborted: true } : undefined;
+    }
+    if (bulkMode) {
+      return { ok: false, exibidos: 0, error: err.message || 'erro desconhecido' };
+    }
     searchError.value = `Não foi possível consultar o backend (${err.message || 'erro desconhecido'}).`;
+    return { ok: false, exibidos: 0, error: err.message || 'erro desconhecido' };
   } finally {
     activeSearchOps.value -= 1;
     if (activeSearchOps.value < 0) activeSearchOps.value = 0;
@@ -1001,40 +1084,8 @@ onMounted(async () => {
         return;
       }
       const { generation, signal } = beginNewSearchSession();
-      isAutoSearchingAll.value = true;
-      rows.value = [];
-      autoSearchProgress.value = { done: 0, total: pendentes.length };
-      for (const it of pendentes) {
-        if (generation !== searchGeneration.value) {
-          isAutoSearchingAll.value = false;
-          return;
-        }
-        const ctx = buildContextFromItem(it);
-        if (!ctx.descricao_item) {
-          autoSearchProgress.value.done += 1;
-          continue;
-        }
-        await runSearchWithContext({
-          descricao: ctx.descricao_item,
-          context: ctx,
-          append: true,
-          generation,
-          signal,
-        });
-        if (generation !== searchGeneration.value) {
-          isAutoSearchingAll.value = false;
-          return;
-        }
-        autoSearchProgress.value.done += 1;
-      }
-      if (generation !== searchGeneration.value) {
-        isAutoSearchingAll.value = false;
-        return;
-      }
-      isAutoSearchingAll.value = false;
-      if (!rows.value.length) {
-        searchError.value = 'Nenhuma cotação aderente encontrada para os itens da cotação.';
-      }
+      const pendentesCtx = pendentes.map((it) => buildContextFromItem(it)).filter((x) => x.descricao_item);
+      await runBulkItemSearches(pendentesCtx, { generation, signal, clearRows: true });
     }
   } catch (_) {
     // contexto do item é opcional; não bloqueia uso normal da tela

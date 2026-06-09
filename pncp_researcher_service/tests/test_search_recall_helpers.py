@@ -8,8 +8,8 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from app.local_index import derive_anchor_search_term  # noqa: E402
-from app.service import _infer_search_bottleneck  # noqa: E402
+from app.local_index import _build_search_tokens, derive_anchor_search_term  # noqa: E402
+from app.service import _compute_match_score, _infer_search_bottleneck  # noqa: E402
 
 
 class TestSearchRecallHelpers(unittest.TestCase):
@@ -40,6 +40,15 @@ class TestSearchRecallHelpers(unittest.TestCase):
     def test_infer_bottleneck_indice_vazio(self):
         funil = {"sql_rows_fetched": 0, "local_homologados": 0}
         self.assertEqual(_infer_search_bottleneck(funil, 0), "indice_sem_match_fts")
+
+    def test_compute_match_score_variant_groups_pharmaceutical(self):
+        """Bug: singular/plural no mesmo grupo exigia 2 hits e zerava sem_raw na IA."""
+        term = "ACEBROFILINA 50 MG/5 ML XAROPE C/120ML"
+        _, meta = derive_anchor_search_term(term)
+        groups = _build_search_tokens(meta.get("termo_efetivo") or term)
+        desc = "ACEBROFILINA 50 MG/5 ML XAROPE FRASCO 120 ML"
+        self.assertEqual(_compute_match_score(desc, groups, variant_groups=False), 0.0)
+        self.assertGreater(_compute_match_score(desc, groups, variant_groups=True), 0.0)
 
 
 if __name__ == "__main__":

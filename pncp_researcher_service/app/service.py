@@ -226,11 +226,19 @@ def _build_query_groups(termo_busca: str) -> List[List[str]]:
     return groups
 
 
-def _compute_match_score(text: str, query_groups: List[List[str]]) -> float:
+def _compute_match_score(
+    text: str,
+    query_groups: List[List[str]],
+    *,
+    variant_groups: bool = False,
+) -> float:
     """
     Score de relevância + regra de precisão:
     - precisa casar ao menos 1 token de CADA grupo (AND entre grupos)
     - score favorece maior cobertura e frase completa do grupo.
+
+    ``variant_groups=True``: grupos vindos de ``_build_search_tokens`` (singular/plural
+    do mesmo termo) — basta 1 variante por grupo (OR intra-grupo).
     """
     if not query_groups:
         return 0.0
@@ -270,9 +278,9 @@ def _compute_match_score(text: str, query_groups: List[List[str]]) -> float:
     total_score = 0.0
     for group in query_groups:
         hits = sum(1 for tok in group if token_hit(tok))
-        # Dentro do mesmo segmento (ex.: "material esportivo"), exige AND entre termos
-        # quando há 2 palavras: evita "só esporte/esportivas" sem material.
-        if len(group) == 1:
+        if variant_groups:
+            required_hits = 1
+        elif len(group) == 1:
             required_hits = 1
         elif len(group) == 2:
             required_hits = 2
@@ -284,7 +292,7 @@ def _compute_match_score(text: str, query_groups: List[List[str]]) -> float:
         if hits < required_hits:
             return 0.0  # sem cobertura mínima de um grupo -> descarta
 
-        coverage = hits / max(1, len(group))
+        coverage = hits / max(1, len(group)) if not variant_groups else (1.0 if hits else 0.0)
         group_phrase = " ".join(group)
         phrase_bonus = 0.5 if group_phrase and group_phrase in normalized_text else 0.0
         total_score += coverage + phrase_bonus
@@ -897,18 +905,18 @@ def _score_clarity_and_unit(item: Dict[str, Any], query_groups: List[List[str]])
         if tok.strip() and tok in full:
             return 0.5
 
-    # Requer casamento explícito de todos tokens principais da consulta.
+    # Requer casamento explícito dos tokens principais da consulta (1 hit por grupo).
     main_query_tokens: set[str] = set()
     if query_groups:
         hits = 0
         needed = 0
         words = set(text_norm.split())
         for group in query_groups:
+            needed += 1
+            if any(tok in words for tok in group):
+                hits += 1
             for tok in group:
                 main_query_tokens.add(tok)
-                needed += 1
-                if tok in words:
-                    hits += 1
         if needed and hits / needed < 0.6:
             return 0.0
 
@@ -2030,7 +2038,14 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                 continue
 
             texto_item = f"{it.get('descricao_item') or ''} {it.get('material_servico') or ''}".strip()
-            sem_raw = _compute_match_score(texto_item, query_groups) if query_groups else 0.0
+            sem_raw = (
+                _compute_match_score(texto_item, query_groups, variant_groups=True)
+                if query_groups
+                else 0.0
+            )
+            if sem_raw <= 0.0 and from_local_index:
+                # Índice local já validou AND de tokens (variante OR intra-grupo).
+                sem_raw = 1.0
             sem = min(55.0, (min(sem_raw, 3.0) / 3.0) * 55.0) if sem_raw > 0 else 0.0
             if sem <= 0 and partial_anchor:
                 # Permite "match parcial literal" (núcleo + apresentação), mesmo sem frase completa.

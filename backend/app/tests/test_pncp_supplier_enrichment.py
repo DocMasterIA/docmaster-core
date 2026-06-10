@@ -3,6 +3,10 @@ from __future__ import annotations
 
 import unittest
 
+from backend.app.services.pncp_relatorio_itens import (
+    _pick_supplier_name_from_source,
+    nome_fornecedor_e_util_para_exibicao,
+)
 from backend.app.services.pncp_supplier_enrichment import (
     _ano_seq_for_enrichment,
     _enrich_payload_sort_key,
@@ -49,6 +53,21 @@ class EnrichSortKeyTests(unittest.TestCase):
         a = {"temResultado": True, "situacaoCompraItemNome": "Homologado", "numero_item": "2"}
         b = {"temResultado": False, "situacao": "Em andamento", "numero_item": "1"}
         self.assertLess(_enrich_payload_sort_key(a), _enrich_payload_sort_key(b))
+
+
+class SupplierNameDisplayTests(unittest.TestCase):
+    def test_rejeita_metadado_pncp_como_nome(self):
+        self.assertFalse(nome_fornecedor_e_util_para_exibicao("pncp_resultado_item_item"))
+        self.assertTrue(nome_fornecedor_e_util_para_exibicao("FORNECEDORA EXEMPLO LTDA"))
+
+    def test_pick_name_ignora_fornecedor_fonte(self):
+        src = {
+            "cnpj_fornecedor": "57.836.642/0001-42",
+            "fornecedor": "",
+            "fornecedor_fonte": "pncp_resultado_item_item",
+            "fornecedor_fonte_nome": "pncp_resultado_item_item",
+        }
+        self.assertEqual(_pick_supplier_name_from_source(src), "")
 
 
 if __name__ == "__main__":

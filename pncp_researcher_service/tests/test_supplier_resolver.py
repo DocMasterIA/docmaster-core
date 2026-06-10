@@ -56,7 +56,21 @@ class TestSupplierResolver(unittest.TestCase):
         self.assertEqual(res.cnpj_fornecedor, "12.345.678/0001-95")
         self.assertEqual(res.fornecedor, "FORNECEDORA EXEMPLO LTDA")
         self.assertTrue(res.fornecedor_elegivel)
-        self.assertIn("pncp_resultado", res.fornecedor_fonte)
+        self.assertEqual(res.fornecedor_fonte, "pncp_resultado_item")
+
+    def test_fonte_sufixada_nao_duplica_item(self):
+        from app.supplier_resolver import _fonte_sufixada
+
+        self.assertEqual(_fonte_sufixada("pncp_resultado_item", "item"), "pncp_resultado_item")
+        self.assertEqual(_fonte_sufixada("pncp_resultado_compra", "compra"), "pncp_resultado_compra")
+        self.assertEqual(_fonte_sufixada("pncp_resultado", "item"), "pncp_resultado_item")
+
+    def test_nome_fornecedor_rejeita_metadado_pncp(self):
+        from app.supplier_resolver import nome_fornecedor_e_util
+
+        self.assertFalse(nome_fornecedor_e_util("pncp_resultado_item_item"))
+        self.assertFalse(nome_fornecedor_e_util("pncp_resultado_item"))
+        self.assertTrue(nome_fornecedor_e_util("FORNECEDORA EXEMPLO LTDA"))
 
     def test_resultado_compra_match_numero_item(self):
         payload = _fixture("resultado_compra_lista.json")

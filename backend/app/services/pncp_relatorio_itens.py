@@ -248,6 +248,26 @@ _SUPPLIER_NAME_TOP_KEYS = (
     "fornecedor_nome",
 )
 
+_SUPPLIER_NAME_META_KEYS = frozenset(
+    {
+        "fornecedor_fonte",
+        "fornecedor_fonte_nome",
+        "fornecedor_elegivel",
+        "fornecedor_origem_indice",
+        "fornecedor_enriquecido_ao_adicionar",
+        "fornecedor_cadastro",
+        "fornecedor_hibrido_live",
+        "fornecedor_busca_pncp",
+    }
+)
+
+
+def _supplier_name_key_is_metadata(key: str) -> bool:
+    k = str(key or "").strip().lower()
+    if k in _SUPPLIER_NAME_META_KEYS:
+        return True
+    return k.startswith("fornecedor_fonte")
+
 
 def nome_fornecedor_e_util_para_exibicao(nome: str) -> bool:
     """Nome legível (não placeholder PNCP nem o próprio CNPJ no campo de razão social)."""
@@ -256,6 +276,8 @@ def nome_fornecedor_e_util_para_exibicao(nome: str) -> bool:
         return False
     low = re.sub(r"\s+", " ", n).strip().lower()
     if low in {"demais", "nao informado", "não informado", "epp", "me", "mei", "outros"}:
+        return False
+    if low.startswith("pncp_"):
         return False
     if _nome_e_somente_cnpj_formatado(n):
         return False
@@ -275,6 +297,8 @@ def _pick_supplier_name_from_source(src: Dict[str, Any]) -> str:
     # Busca aninhada por chaves de fornecedor, sem cair em contexto de órgão.
     for path, key, value in _iter_source_pairs(src):
         if _looks_orgao_context(path):
+            continue
+        if _supplier_name_key_is_metadata(key):
             continue
         k = key.lower()
         if any(t in k for t in ("fornecedor", "razaosocial", "razao_social", "nomefornecedor", "nome_fornecedor")):

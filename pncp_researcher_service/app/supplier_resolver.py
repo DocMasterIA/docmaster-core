@@ -71,9 +71,22 @@ def nome_fornecedor_e_util(nome: str) -> bool:
         return False
     if s in GENERIC_SUPPLIER_NAMES:
         return False
+    if s.startswith("pncp_"):
+        return False
     if _CNPJ_RE.fullmatch(s.replace(" ", "")) or len(cnpj_digits(s)) == 14:
         return False
     return True
+
+
+def _fonte_sufixada(prefix: str, sufixo: str) -> str:
+    """Evita sufixo duplicado quando o prefixo já termina com _item / _compra."""
+    p = str(prefix or "").strip().rstrip("_")
+    s = str(sufixo or "").strip().lstrip("_")
+    if not p:
+        return s
+    if p.endswith(f"_{s}"):
+        return p
+    return f"{p}_{s}"
 
 
 def _situacao_lower(value: Any) -> str:
@@ -278,7 +291,7 @@ def resolve_from_resultados_payload(
                 if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
                     return _build_resolution(
                         snap,
-                        fonte=f"{fonte_prefix}_item",
+                        fonte=_fonte_sufixada(fonte_prefix, "item"),
                         situacao_item=situacao_item,
                         situacao_compra=situacao_compra,
                         item_row=row,
@@ -289,9 +302,9 @@ def resolve_from_resultados_payload(
             situacao_item = str(
                 row.get("situacaoCompraItemNome") or row.get("situacaoItemNome") or ""
             ).strip()
-            fonte = f"{fonte_prefix}_compra"
+            fonte = _fonte_sufixada(fonte_prefix, "compra")
             if numero_item and _numero_item_match(row, numero_item):
-                fonte = f"{fonte_prefix}_item"
+                fonte = _fonte_sufixada(fonte_prefix, "item")
             return _build_resolution(
                 snap,
                 fonte=fonte,

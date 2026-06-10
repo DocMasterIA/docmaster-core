@@ -108,7 +108,10 @@
       </p>
       <p v-if="isAutoSearchingAll" class="bia-meta">
         Busca automática em andamento: item {{ autoSearchProgress.done }} de {{ autoSearchProgress.total }}
-        <span v-if="cotacaoResumo.totalItens > autoSearchProgress.total">
+        <span v-if="rebuscarCompletos && cotacaoResumo.completos > 0">
+          (rebusca todos — {{ cotacaoResumo.completos }} já tinham 3+ preços)
+        </span>
+        <span v-else-if="cotacaoResumo.totalItens > autoSearchProgress.total">
           ({{ cotacaoResumo.totalItens }} na cotação, {{ cotacaoResumo.completos }} já completos)
         </span>
         <span v-if="autoSearchProgress.precos > 0 || autoSearchProgress.fail > 0">
@@ -549,7 +552,9 @@ function bulkSearchFailResult(err, { superseded = false, timeoutSec = 180 } = {}
   return { ok: false, exibidos: 0, aborted: false, error: msg };
 }
 
-const BULK_SEARCH_TIMEOUT_MS = 180000;
+const BULK_SEARCH_TIMEOUT_MS = 120000;
+const BULK_CONCURRENCY = 2;
+const BULK_ITEM_DELAY_MS = 200;
 
 const searchError = ref('');
 const lastSearchDebug = ref(null);
@@ -659,6 +664,68 @@ function itemRowsCount(itemId) {
   return rows.value.filter((r) => Number(r.itemId) === Number(itemId)).length;
 }
 
+function bulkRunShouldStop({ mountRunId, myBulkRunId, generation } = {}) {
+  if (mountRunId != null && mountRunId !== mountRunSeq) return true;
+  if (myBulkRunId != null && !isBulkRunActive(myBulkRunId)) return true;
+  if (generation != null && generation !== searchGeneration.value) return true;
+  return false;
+}
+
+async function processOneBulkItem(ctx, {
+  mountRunId,
+  myBulkRunId,
+  generation,
+  signal,
+  sessionId,
+} = {}) {
+  const sid = Number(sessionId);
+  if (bulkRunShouldStop({ mountRunId, myBulkRunId, generation })) {
+    return { stop: true };
+  }
+  if (!String(ctx?.descricao_item || '').trim()) {
+    autoSearchProgress.value.done += 1;
+    return { stop: false };
+  }
+  if (itemRowsCount(ctx.id) > 0) {
+    autoSearchProgress.value.done += 1;
+    autoSearchProgress.value.skipped += 1;
+    autoSearchProgress.value.ok += 1;
+    return { stop: false };
+  }
+  const result = await runSearchWithContext({
+    descricao: ctx.descricao_item,
+    context: ctx,
+    append: true,
+    bulkMode: true,
+    generation,
+    bulkRunId: myBulkRunId,
+    signal,
+  });
+  if (bulkRunShouldStop({ mountRunId, myBulkRunId, generation })) {
+    return { stop: true };
+  }
+  autoSearchProgress.value.done += 1;
+  if (result?.aborted) {
+    if (!result?.ghost) {
+      autoSearchProgress.value.fail += 1;
+      lastBulkFailure.value = String(result?.error || '').trim()
+        || 'Requisição interrompida (tente «Pesquisar UF» para os restantes).';
+    }
+  } else if (result?.ok) {
+    autoSearchProgress.value.ok += 1;
+    autoSearchProgress.value.precos += Number(result.exibidos || 0);
+  } else {
+    autoSearchProgress.value.fail += 1;
+    const errMsg = String(result?.error || '').trim();
+    if (errMsg) {
+      lastBulkFailure.value = `${ctx.descricao_item?.slice(0, 60) || 'Item'}: ${errMsg}`;
+    }
+  }
+  if (Number.isFinite(sid)) persistBulkUiSnapshot(sid);
+  if (BULK_ITEM_DELAY_MS > 0) await sleep(BULK_ITEM_DELAY_MS);
+  return { stop: false };
+}
+
 async function runBulkItemSearches(pendentes, {
   generation = null,
   bulkRunId = null,
@@ -683,82 +750,36 @@ async function runBulkItemSearches(pendentes, {
   lastBulkFailure.value = '';
   if (Number.isFinite(sid)) persistBulkUiSnapshot(sid);
 
-  for (const ctx of pendentes) {
-    if (mountRunId != null && mountRunId !== mountRunSeq) {
-      isAutoSearchingAll.value = false;
-      return;
-    }
-    if (myBulkRunId != null && !isBulkRunActive(myBulkRunId)) {
-      isAutoSearchingAll.value = false;
-      return;
-    }
-    if (generation != null && generation !== searchGeneration.value) {
-      isAutoSearchingAll.value = false;
-      return;
-    }
-    if (!String(ctx?.descricao_item || '').trim()) {
-      autoSearchProgress.value.done += 1;
-      continue;
-    }
-    if (itemRowsCount(ctx.id) > 0) {
-      autoSearchProgress.value.done += 1;
-      autoSearchProgress.value.skipped += 1;
-      autoSearchProgress.value.ok += 1;
-      continue;
-    }
-    const result = await runSearchWithContext({
-      descricao: ctx.descricao_item,
-      context: ctx,
-      append: true,
-      bulkMode: true,
-      generation,
-      bulkRunId: myBulkRunId,
-      signal,
-    });
-    if (mountRunId != null && mountRunId !== mountRunSeq) {
-      isAutoSearchingAll.value = false;
-      return;
-    }
-    if (myBulkRunId != null && !isBulkRunActive(myBulkRunId)) {
-      isAutoSearchingAll.value = false;
-      return;
-    }
-    if (generation != null && generation !== searchGeneration.value) {
-      isAutoSearchingAll.value = false;
-      return;
-    }
-    autoSearchProgress.value.done += 1;
-    if (result?.aborted) {
-      if (!result?.ghost) {
-        autoSearchProgress.value.fail += 1;
-        lastBulkFailure.value = String(result?.error || '').trim()
-          || 'Requisição interrompida (tente «Pesquisar UF» para os restantes).';
+  let nextIdx = 0;
+  let stopRequested = false;
+
+  async function bulkWorker() {
+    while (!stopRequested) {
+      if (bulkRunShouldStop({ mountRunId, myBulkRunId, generation })) {
+        stopRequested = true;
+        break;
       }
-      await sleep(800);
-      if (Number.isFinite(sid)) persistBulkUiSnapshot(sid);
-      continue;
+      const idx = nextIdx;
+      nextIdx += 1;
+      if (idx >= pendentes.length) break;
+      const outcome = await processOneBulkItem(pendentes[idx], {
+        mountRunId,
+        myBulkRunId,
+        generation,
+        signal,
+        sessionId: sid,
+      });
+      if (outcome?.stop) {
+        stopRequested = true;
+        break;
+      }
     }
-    if (result?.ok) {
-      autoSearchProgress.value.ok += 1;
-      autoSearchProgress.value.precos += Number(result.exibidos || 0);
-    } else {
-      autoSearchProgress.value.fail += 1;
-      const errMsg = String(result?.error || '').trim();
-      if (errMsg) lastBulkFailure.value = `${ctx.descricao_item?.slice(0, 60) || 'Item'}: ${errMsg}`;
-    }
-    await sleep(800);
-    if (Number.isFinite(sid)) persistBulkUiSnapshot(sid);
   }
 
-  if (mountRunId != null && mountRunId !== mountRunSeq) {
-    isAutoSearchingAll.value = false;
-    return;
-  }
-  if (myBulkRunId != null && !isBulkRunActive(myBulkRunId)) {
-    isAutoSearchingAll.value = false;
-    return;
-  }
-  if (generation != null && generation !== searchGeneration.value) {
+  const workers = Math.max(1, Math.min(BULK_CONCURRENCY, pendentes.length || 1));
+  await Promise.all(Array.from({ length: workers }, () => bulkWorker()));
+
+  if (bulkRunShouldStop({ mountRunId, myBulkRunId, generation })) {
     isAutoSearchingAll.value = false;
     return;
   }
@@ -1013,8 +1034,8 @@ async function runSearchWithContext({
       somente_homologados: true,
       termo_busca: String(descricao).trim(),
       codigo_modalidade: null,
-      max_paginas: 500,
-      tamanho_pagina: 200,
+      max_paginas: bulkMode ? 3 : 500,
+      tamanho_pagina: bulkMode ? 80 : 200,
       quantidade_referencia: context?.quantidade ?? null,
       unidade_medida_referencia: context?.unidade_medida ?? null,
       busca_lote: Boolean(bulkMode),
@@ -1072,7 +1093,9 @@ async function runSearchWithContext({
     }
 
     let backendItensTotal = 0;
-    const bulkSearchOpts = bulkMode ? { timeoutMs: BULK_SEARCH_TIMEOUT_MS, maxAttempts: 3 } : undefined;
+    const bulkSearchOpts = bulkMode
+      ? { timeoutMs: BULK_SEARCH_TIMEOUT_MS, maxAttempts: 4 }
+      : undefined;
     if (recortes.length > 0) {
       if (generationStale() || bulkSuperseded()) {
         return bulkSearchFailResult(null, { superseded: bulkSuperseded() });

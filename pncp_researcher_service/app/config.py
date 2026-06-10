@@ -247,6 +247,8 @@ PNCP_BRASILAPI_CACHE_DAYS: int = _env_int("PNCP_BRASILAPI_CACHE_DAYS", 90)
 PNCP_SEARCH_ONLY_HOMOLOGATED: bool = _env_bool("PNCP_SEARCH_ONLY_HOMOLOGATED", True)
 # Após filtrar, consulta PNCP/BrasilAPI nos primeiros N homologados sem CNPJ no índice.
 PNCP_SEARCH_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_SEARCH_ENRICH_HOMOLOG_MAX", 16)
+# Limite SQL no índice local quando busca_lote=true (evita varrer 100k linhas por item).
+PNCP_BULK_SEARCH_SQL_LIMIT: int = _env_int("PNCP_BULK_SEARCH_SQL_LIMIT", 200)
 # Score mínimo (0–100) para considerar item aderente na busca inteligente (antes ~60–70 implícito).
 PNCP_SEARCH_MIN_SCORE_APROVACAO: int = _env_int("PNCP_SEARCH_MIN_SCORE_APROVACAO", 50)
 # Descrições de cotação: até N tokens usam busca completa; acima disso cap de âncoras (recall).

@@ -40,6 +40,7 @@ from .config import (
     PNCP_SERVICE_BLOCK_TERMS,
     PNCP_SEARCH_ENRICH_HOMOLOG_MAX,
     PNCP_SEARCH_MIN_SCORE_APROVACAO,
+    PNCP_BULK_SEARCH_SQL_LIMIT,
 )
 from .pncp_client import (
     PNCPClientError,
@@ -1929,6 +1930,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     ia_rerank_on = bool(PNCP_IA_RERANK_ENABLED) and not busca_lote
     ia_resumo_on = bool(PNCP_IA_ITEM_RESUMO_ENABLED) and not busca_lote
     limit = max(50, payload.max_paginas * payload.tamanho_pagina)
+    if busca_lote:
+        limit = min(limit, max(80, int(PNCP_BULK_SEARCH_SQL_LIMIT)))
     termo_efetivo, term_meta = derive_anchor_search_term(payload.termo_busca)
     base_items = local_item_search(
         termo_efetivo,
@@ -1953,7 +1956,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     hybrid_used = False
     hybrid_live_count = 0
     if (
-        PNCP_HYBRID_FALLBACK_ENABLED
+        not busca_lote
+        and PNCP_HYBRID_FALLBACK_ENABLED
         and len(itens) < max(1, int(PNCP_HYBRID_MIN_LOCAL_RESULTS))
     ):
         live_pages = max(1, min(int(PNCP_HYBRID_MAX_LIVE_PAGES), int(payload.max_paginas or 1)))
@@ -2403,7 +2407,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         funil["provavel_gargalo_top3"] = "homologados_sem_preco_indice"
 
     enrich_n_top3 = 0
-    if top3:
+    if top3 and not busca_lote:
         enrich_cap = max(0, min(int(PNCP_SEARCH_ENRICH_HOMOLOG_MAX), len(top3)))
         if enrich_cap:
             enrich_n_top3 = await enrich_homolog_items_from_pncp(top3, max_n=enrich_cap)

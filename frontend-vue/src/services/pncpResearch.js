@@ -364,7 +364,8 @@ export function intelligentMarketSearch(payload, signal, options = {}) {
           throw err;
         }
         if (i < maxAttempts - 1) {
-          await sleep(900 * (i + 1));
+          const base = Number(options.retryDelayMs) > 0 ? Number(options.retryDelayMs) : 700;
+          await sleep(base * (i + 1));
         }
       }
     }

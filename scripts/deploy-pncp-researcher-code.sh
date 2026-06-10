@@ -29,6 +29,12 @@ for _ in $(seq 1 30); do
     echo "OK  PNCP researcher reiniciado"
     docker exec "$C" python -c \
       "from pncp_researcher_service.app.local_index import contract_needs_items_refresh; print('skip_fn ok')"
+    if docker exec "$C" grep -q 'purge_redundant_dead_tasks' "$APP/ingest_maintenance.py"; then
+      echo "OK  ingest_maintenance.py (purge dead)"
+    else
+      echo "AVISO: ingest_maintenance.py no contentor parece desatualizado"
+      exit 1
+    fi
     exit 0
   fi
   sleep 2

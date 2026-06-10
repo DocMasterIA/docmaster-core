@@ -39,8 +39,35 @@ def test_requeue_all_processing_on_startup(queue_db):
     assert stats["pending"] == 1
 
 
+def test_revive_two_dead_same_key(queue_db):
+    """Duas dead com mesma chave → purge deixa uma; revive sem IntegrityError."""
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    old = (datetime.utcnow() - timedelta(hours=2)).isoformat(timespec="seconds") + "Z"
+    with ingest_queue._queue_conn() as c:
+        for _ in range(2):
+            c.execute(
+                """
+                INSERT INTO pncp_ingest_queue (
+                    task_type, priority, uf, modalidade, pagina, data_inicial, data_final,
+                    numero_pncp, payload_json, status, attempts, max_attempts,
+                    last_error, available_at, created_at, updated_at
+                ) VALUES ('catalog_page', 100, 'PR', 8, 3, '20250601', '20260601',
+                    NULL, '{}', 'dead', 5, 5, 'json', ?, ?, ?)
+                """,
+                (now, old, old),
+            )
+        c.commit()
+    purged = ingest_maintenance.purge_redundant_dead_tasks()
+    assert purged == 1
+    n = ingest_maintenance.revive_dead_tasks(limit=10, min_dead_age_seconds=600)
+    assert n == 1
+    stats = ingest_queue.queue_stats()
+    assert stats["pending"] == 1
+    assert stats["dead"] == 0
+
+
 def test_revive_dead_skips_duplicate_pending(queue_db):
-    """dead com mesma chave que pending → remove dead, não viola UNIQUE."""
+    """dead com mesma chave que pending → purge remove dead, não viola UNIQUE."""
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     old = (datetime.utcnow() - timedelta(hours=2)).isoformat(timespec="seconds") + "Z"
     ingest_queue.enqueue_catalog_page(
@@ -60,6 +87,8 @@ def test_revive_dead_skips_duplicate_pending(queue_db):
             (now, old, old),
         )
         c.commit()
+    purged = ingest_maintenance.purge_redundant_dead_tasks()
+    assert purged == 1
     n = ingest_maintenance.revive_dead_tasks(limit=10, min_dead_age_seconds=600)
     assert n == 0
     stats = ingest_queue.queue_stats()

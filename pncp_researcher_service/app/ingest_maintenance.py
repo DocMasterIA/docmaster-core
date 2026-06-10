@@ -17,6 +17,68 @@ from .local_index import ensure_local_index, resume_expired_ingest_scopes
 logger = logging.getLogger(__name__)
 
 
+def purge_redundant_dead_tasks() -> int:
+    """
+    Remove tarefas dead redundantes:
+    - já existe pending/processing com a mesma chave lógica;
+    - outra dead mais antiga (menor id) com a mesma chave.
+    """
+    with _queue_conn() as c:
+        cur = c.execute(
+            """
+            DELETE FROM pncp_ingest_queue
+            WHERE status = 'dead'
+            AND (
+                (task_type = 'catalog_page' AND (
+                    EXISTS (
+                        SELECT 1 FROM pncp_ingest_queue q2
+                        WHERE q2.task_type = 'catalog_page'
+                          AND q2.status IN ('pending', 'processing')
+                          AND q2.uf = pncp_ingest_queue.uf
+                          AND q2.modalidade = pncp_ingest_queue.modalidade
+                          AND q2.pagina = pncp_ingest_queue.pagina
+                          AND q2.data_inicial = pncp_ingest_queue.data_inicial
+                          AND q2.data_final = pncp_ingest_queue.data_final
+                          AND q2.id != pncp_ingest_queue.id
+                    )
+                    OR EXISTS (
+                        SELECT 1 FROM pncp_ingest_queue d2
+                        WHERE d2.status = 'dead'
+                          AND d2.task_type = 'catalog_page'
+                          AND d2.uf = pncp_ingest_queue.uf
+                          AND d2.modalidade = pncp_ingest_queue.modalidade
+                          AND d2.pagina = pncp_ingest_queue.pagina
+                          AND d2.data_inicial = pncp_ingest_queue.data_inicial
+                          AND d2.data_final = pncp_ingest_queue.data_final
+                          AND d2.id < pncp_ingest_queue.id
+                    )
+                ))
+                OR (task_type = 'contract_items' AND (
+                    EXISTS (
+                        SELECT 1 FROM pncp_ingest_queue q2
+                        WHERE q2.task_type = 'contract_items'
+                          AND q2.status IN ('pending', 'processing')
+                          AND q2.numero_pncp = pncp_ingest_queue.numero_pncp
+                          AND q2.id != pncp_ingest_queue.id
+                    )
+                    OR EXISTS (
+                        SELECT 1 FROM pncp_ingest_queue d2
+                        WHERE d2.status = 'dead'
+                          AND d2.task_type = 'contract_items'
+                          AND d2.numero_pncp = pncp_ingest_queue.numero_pncp
+                          AND d2.id < pncp_ingest_queue.id
+                    )
+                ))
+            )
+            """
+        )
+        n = int(cur.rowcount or 0)
+        c.commit()
+    if n:
+        logger.info("ingest purge dead redundantes removidas=%s", n)
+    return n
+
+
 def requeue_processing_tasks(*, stale_only: bool, stale_seconds: int) -> int:
     """Devolve tarefas em processing para pending (crash/restart ou presas)."""
     now = _utc_now_iso()
@@ -70,36 +132,6 @@ def revive_dead_tasks(*, limit: int, min_dead_age_seconds: int) -> int:
         if not ids:
             return 0
         placeholders = ",".join("?" for _ in ids)
-        # Índice parcial uq_* só permite 1 pending/processing por chave lógica.
-        # dead + pending duplicado → UPDATE viola UNIQUE; descarta o dead redundante.
-        c.execute(
-            f"""
-            DELETE FROM pncp_ingest_queue
-            WHERE id IN ({placeholders}) AND status = 'dead'
-            AND (
-                (task_type = 'catalog_page' AND EXISTS (
-                    SELECT 1 FROM pncp_ingest_queue q2
-                    WHERE q2.task_type = 'catalog_page'
-                      AND q2.status IN ('pending', 'processing')
-                      AND q2.uf = pncp_ingest_queue.uf
-                      AND q2.modalidade = pncp_ingest_queue.modalidade
-                      AND q2.pagina = pncp_ingest_queue.pagina
-                      AND q2.data_inicial = pncp_ingest_queue.data_inicial
-                      AND q2.data_final = pncp_ingest_queue.data_final
-                      AND q2.id != pncp_ingest_queue.id
-                ))
-                OR
-                (task_type = 'contract_items' AND EXISTS (
-                    SELECT 1 FROM pncp_ingest_queue q2
-                    WHERE q2.task_type = 'contract_items'
-                      AND q2.status IN ('pending', 'processing')
-                      AND q2.numero_pncp = pncp_ingest_queue.numero_pncp
-                      AND q2.id != pncp_ingest_queue.id
-                ))
-            )
-            """,
-            ids,
-        )
         cur = c.execute(
             f"""
             UPDATE pncp_ingest_queue
@@ -136,6 +168,7 @@ def run_ingest_self_healing(*, mode: str = "periodic") -> Dict[str, Any]:
     requeue_all = startup or stall
     requeued = requeue_processing_tasks(stale_only=not requeue_all, stale_seconds=stale_sec)
     scopes = resume_expired_ingest_scopes()
+    purged = purge_redundant_dead_tasks()
     revived = revive_dead_tasks(limit=dead_batch, min_dead_age_seconds=dead_min_age)
 
     out = {
@@ -143,8 +176,9 @@ def run_ingest_self_healing(*, mode: str = "periodic") -> Dict[str, Any]:
         "mode": mode,
         "requeued_processing": requeued,
         "scopes_resumed": scopes,
+        "dead_purged": purged,
         "dead_revived": revived,
     }
-    if requeued or scopes or revived:
+    if requeued or scopes or purged or revived:
         logger.info("ingest self-heal (%s): %s", mode, out)
     return out

@@ -237,7 +237,11 @@ async def ingest_worker_loop() -> None:
         return
 
     mark_worker_started()
-    run_ingest_self_healing(mode="startup")
+    try:
+        await asyncio.to_thread(run_ingest_self_healing, mode="startup")
+    except Exception:
+        logger.exception("ingest self-heal (startup) falhou — worker continua")
+
     logger.info("ingest worker iniciado poll=%.1fs", PNCP_INGEST_WORKER_POLL_SECONDS)
     try:
         boot_plan = plan_ingest_queue()
@@ -255,7 +259,10 @@ async def ingest_worker_loop() -> None:
         try:
             now = time.monotonic()
             if now - last_heal >= float(PNCP_INGEST_SELF_HEAL_INTERVAL_SECONDS):
-                run_ingest_self_healing(mode="periodic")
+                try:
+                    await asyncio.to_thread(run_ingest_self_healing, mode="periodic")
+                except Exception:
+                    logger.exception("ingest self-heal (periodic) falhou")
                 last_heal = now
             if now - last_plan >= float(PNCP_INGEST_PLANNER_INTERVAL_SECONDS):
                 summary = plan_ingest_queue()

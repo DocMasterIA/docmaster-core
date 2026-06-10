@@ -334,8 +334,13 @@ def create_app() -> FastAPI:
                 return
             except asyncio.CancelledError:
                 raise
-            except Exception:
-                sup_log.exception("ingest worker encerrou com erro — reinício em 5s")
+            except Exception as exc:
+                sup_log.error(
+                    "ingest worker falha: %s: %s — reinício em 5s",
+                    type(exc).__name__,
+                    exc,
+                )
+                sup_log.exception("ingest worker traceback")
                 await asyncio.sleep(5.0)
 
     @asynccontextmanager

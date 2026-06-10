@@ -287,7 +287,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   addCotacoesToItemInResearchSession,
@@ -298,6 +298,17 @@ import {
 } from '../services/pncpResearch';
 import { MUNICIPIOS_POR_UF } from '../data/brasilMunicipiosPorUf';
 import { buildRecortesGeograficosPayload } from '../utils/recortesGeograficos';
+
+/** Sobrevive remontagem Vue (Strict Mode / HMR) — evita 2º autostart abortando os ~10 primeiros itens. */
+const bulkAutostartRegistry = {
+  sessionId: null,
+  isRunning: false,
+  promise: null,
+  bulkRunId: null,
+  progress: null,
+  rows: null,
+  lastFailure: '',
+};
 
 const route = useRoute();
 const router = useRouter();
@@ -466,7 +477,19 @@ function beginNewSearchSession() {
   return { generation: searchGeneration.value, signal: searchAbortController.signal };
 }
 
-function beginBulkAutostartSession() {
+function beginBulkAutostartSession(sessionId, { reuseRunning = false } = {}) {
+  if (
+    reuseRunning
+    && bulkAutostartRegistry.isRunning
+    && Number(bulkAutostartRegistry.sessionId) === Number(sessionId)
+    && bulkAutostartRegistry.bulkRunId != null
+    && bulkAutostartController
+  ) {
+    return {
+      bulkRunId: bulkAutostartRegistry.bulkRunId,
+      signal: bulkAutostartController.signal,
+    };
+  }
   activeBulkRunId += 1;
   const bulkRunId = activeBulkRunId;
   try {
@@ -475,6 +498,7 @@ function beginBulkAutostartSession() {
     /* ignore */
   }
   bulkAutostartController = new AbortController();
+  bulkAutostartRegistry.bulkRunId = bulkRunId;
   return { bulkRunId, signal: bulkAutostartController.signal };
 }
 
@@ -496,7 +520,13 @@ function isTimeoutError(err) {
 
 function bulkSearchFailResult(err, { superseded = false, timeoutSec = 180 } = {}) {
   if (superseded) {
-    return { ok: false, exibidos: 0, aborted: true, error: 'Busca substituída por outra sessão.' };
+    return {
+      ok: false,
+      exibidos: 0,
+      aborted: true,
+      ghost: true,
+      error: 'Busca substituída por outra sessão.',
+    };
   }
   if (isTimeoutError(err)) {
     return {
@@ -507,7 +537,13 @@ function bulkSearchFailResult(err, { superseded = false, timeoutSec = 180 } = {}
     };
   }
   if (isAbortError(err)) {
-    return { ok: false, exibidos: 0, aborted: true, error: 'Requisição interrompida pelo navegador.' };
+    return {
+      ok: false,
+      exibidos: 0,
+      aborted: true,
+      ghost: true,
+      error: 'Requisição interrompida (remontagem da página).',
+    };
   }
   const msg = String(err?.message || err || 'erro desconhecido').trim();
   return { ok: false, exibidos: 0, aborted: false, error: msg };
@@ -580,6 +616,44 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function persistBulkUiSnapshot(sessionId) {
+  if (!Number.isFinite(Number(sessionId))) return;
+  bulkAutostartRegistry.sessionId = Number(sessionId);
+  bulkAutostartRegistry.progress = { ...autoSearchProgress.value };
+  bulkAutostartRegistry.rows = [...rows.value];
+  bulkAutostartRegistry.lastFailure = String(lastBulkFailure.value || '');
+}
+
+function applyBulkUiSnapshot(sessionId) {
+  if (Number(bulkAutostartRegistry.sessionId) !== Number(sessionId)) return false;
+  if (bulkAutostartRegistry.progress) {
+    autoSearchProgress.value = { ...bulkAutostartRegistry.progress };
+  }
+  if (Array.isArray(bulkAutostartRegistry.rows)) {
+    rows.value = [...bulkAutostartRegistry.rows];
+  }
+  lastBulkFailure.value = bulkAutostartRegistry.lastFailure || '';
+  isAutoSearchingAll.value = Boolean(bulkAutostartRegistry.isRunning);
+  return true;
+}
+
+async function awaitBulkAutostartRegistry(sessionId) {
+  applyBulkUiSnapshot(sessionId);
+  const pollMs = 400;
+  while (bulkAutostartRegistry.isRunning && Number(bulkAutostartRegistry.sessionId) === Number(sessionId)) {
+    await sleep(pollMs);
+    applyBulkUiSnapshot(sessionId);
+  }
+  if (bulkAutostartRegistry.promise) {
+    try {
+      await bulkAutostartRegistry.promise;
+    } catch (_) {
+      /* erros tratados em runBulkItemSearches */
+    }
+  }
+  applyBulkUiSnapshot(sessionId);
+}
+
 function itemRowsCount(itemId) {
   if (!Number.isFinite(Number(itemId))) return 0;
   return rows.value.filter((r) => Number(r.itemId) === Number(itemId)).length;
@@ -591,8 +665,10 @@ async function runBulkItemSearches(pendentes, {
   mountRunId = null,
   signal,
   clearRows = false,
+  sessionId = null,
 } = {}) {
   const myBulkRunId = bulkRunId;
+  const sid = Number(sessionId);
   if (clearRows) rows.value = [];
   isAutoSearchingAll.value = true;
   autoSearchProgress.value = {
@@ -605,6 +681,7 @@ async function runBulkItemSearches(pendentes, {
   };
   searchError.value = '';
   lastBulkFailure.value = '';
+  if (Number.isFinite(sid)) persistBulkUiSnapshot(sid);
 
   for (const ctx of pendentes) {
     if (mountRunId != null && mountRunId !== mountRunSeq) {
@@ -652,10 +729,13 @@ async function runBulkItemSearches(pendentes, {
     }
     autoSearchProgress.value.done += 1;
     if (result?.aborted) {
-      autoSearchProgress.value.fail += 1;
-      lastBulkFailure.value = String(result?.error || '').trim()
-        || 'Requisição interrompida (tente «Pesquisar UF» para os restantes).';
+      if (!result?.ghost) {
+        autoSearchProgress.value.fail += 1;
+        lastBulkFailure.value = String(result?.error || '').trim()
+          || 'Requisição interrompida (tente «Pesquisar UF» para os restantes).';
+      }
       await sleep(800);
+      if (Number.isFinite(sid)) persistBulkUiSnapshot(sid);
       continue;
     }
     if (result?.ok) {
@@ -667,6 +747,7 @@ async function runBulkItemSearches(pendentes, {
       if (errMsg) lastBulkFailure.value = `${ctx.descricao_item?.slice(0, 60) || 'Item'}: ${errMsg}`;
     }
     await sleep(800);
+    if (Number.isFinite(sid)) persistBulkUiSnapshot(sid);
   }
 
   if (mountRunId != null && mountRunId !== mountRunSeq) {
@@ -683,7 +764,7 @@ async function runBulkItemSearches(pendentes, {
   }
   isAutoSearchingAll.value = false;
   const p = autoSearchProgress.value;
-  if (p.total > 0 && p.done === 0) {
+  if (p.total > 0 && p.done === 0 && !bulkAutostartRegistry.isRunning) {
     searchError.value =
       'A busca automática não processou nenhum item (sessão substituída ou cancelada). Recarregue a página ou clique «Pesquisar UF».';
     return;
@@ -801,11 +882,14 @@ async function applyFilters() {
     return;
   }
   const hadRows = rows.value.length > 0;
-  const bulkSession = beginBulkAutostartSession();
+  const bulkSession = beginBulkAutostartSession(Number(cotacaoId.value));
+  bulkAutostartRegistry.sessionId = Number(cotacaoId.value);
+  bulkAutostartRegistry.isRunning = false;
   return runBulkItemSearches(pendentes, {
     bulkRunId: bulkSession.bulkRunId,
     signal: bulkSession.signal,
     clearRows: !hadRows,
+    sessionId: Number(cotacaoId.value),
   });
 }
 
@@ -1205,8 +1289,17 @@ onMounted(async () => {
   const sessionId = Number(cotacaoId.value);
   if (!Number.isFinite(sessionId) || sessionId <= 0) return;
   const mountRunId = ++mountRunSeq;
-  autoSearchProgress.value = { done: 0, total: 0, ok: 0, fail: 0, precos: 0, skipped: 0 };
-  searchError.value = '';
+
+  // Remontagem no meio do autostart: reanexar UI ao bulk em curso (não reiniciar).
+  if (autostart.value && bulkAutostartRegistry.isRunning && Number(bulkAutostartRegistry.sessionId) === sessionId) {
+    await awaitBulkAutostartRegistry(sessionId);
+    return;
+  }
+
+  if (!bulkAutostartRegistry.isRunning) {
+    autoSearchProgress.value = { done: 0, total: 0, ok: 0, fail: 0, precos: 0, skipped: 0 };
+    searchError.value = '';
+  }
   try {
     let data;
     let itens = [];
@@ -1278,6 +1371,10 @@ onMounted(async () => {
 
     if (autostart.value && itens.length) {
       if (mountRunId !== mountRunSeq) return;
+      if (bulkAutostartRegistry.isRunning && Number(bulkAutostartRegistry.sessionId) === sessionId) {
+        await awaitBulkAutostartRegistry(sessionId);
+        return;
+      }
       if (!apiOk) return;
       const pendentes = buildPendentesFromItens(itens);
       const esperados = Number(stats?.total_incompletos ?? cotacaoResumo.value.incompletos ?? pendentes.length);
@@ -1292,15 +1389,26 @@ onMounted(async () => {
         }
         return;
       }
-      const { bulkRunId, signal } = beginBulkAutostartSession();
+      bulkAutostartRegistry.sessionId = sessionId;
+      bulkAutostartRegistry.isRunning = true;
+      const { bulkRunId, signal } = beginBulkAutostartSession(sessionId);
       const pendentesCtx = pendentes.map((it) => buildContextFromItem(it)).filter((x) => x.descricao_item);
       if (mountRunId !== mountRunSeq) return;
-      await runBulkItemSearches(pendentesCtx, {
+      const bulkPromise = runBulkItemSearches(pendentesCtx, {
         bulkRunId,
         mountRunId,
         signal,
         clearRows: true,
+        sessionId,
       });
+      bulkAutostartRegistry.promise = bulkPromise;
+      try {
+        await bulkPromise;
+      } finally {
+        bulkAutostartRegistry.isRunning = false;
+        bulkAutostartRegistry.promise = null;
+        persistBulkUiSnapshot(sessionId);
+      }
     }
   } catch (err) {
     isLoadingSessionItems.value = false;
@@ -1309,15 +1417,7 @@ onMounted(async () => {
   }
 });
 
-onBeforeUnmount(() => {
-  mountRunSeq += 1;
-  activeBulkRunId += 1;
-  try {
-    bulkAutostartController?.abort();
-  } catch (_) {
-    /* ignore */
-  }
-});
+// Não abortar bulk no unmount — remontagem Vue (Strict Mode) gerava falhas fantasma nos ~10 primeiros itens.
 
 function parseMoeda(v) {
   const n = Number(String(v || '').replace(/[^\d,.-]/g, '').replace(',', '.'));

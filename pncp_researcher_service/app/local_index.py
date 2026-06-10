@@ -530,6 +530,28 @@ def _mark_ingest_error(
     }
 
 
+def resume_expired_ingest_scopes() -> int:
+    """Reativa scopes cuja pausa expirou ou ficaram presos em paused_blocked/degraded."""
+    ensure_local_index()
+    now = _utc_now_iso()
+    with _conn() as c:
+        cur = c.execute(
+            """
+            UPDATE pncp_ingest_state
+            SET status = 'active', paused_until = NULL, updated_at = ?
+            WHERE status IN ('paused_blocked', 'degraded')
+              AND (
+                paused_until IS NULL
+                OR paused_until <= ?
+              )
+            """,
+            (now, now),
+        )
+        n = int(cur.rowcount or 0)
+        c.commit()
+    return n
+
+
 def _resolve_backfill_start_page(
     uf: Optional[str],
     modalidade: int,
@@ -637,7 +659,13 @@ def ingest_operational_status(*, uf: Optional[str] = None) -> Dict[str, Any]:
     for r in rows:
         pu = _parse_iso_utc(r["paused_until"])
         is_paused = bool(pu and pu > now)
-        status = "paused_blocked" if is_paused else str(r["status"] or "active")
+        db_status = str(r["status"] or "active")
+        if is_paused:
+            status = "paused_blocked"
+        elif db_status in ("paused_blocked", "degraded"):
+            status = "active"
+        else:
+            status = db_status
         if status == "paused_blocked":
             paused += 1
         elif status != "active":

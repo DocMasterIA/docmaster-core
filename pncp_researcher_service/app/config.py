@@ -212,6 +212,19 @@ PNCP_INGEST_AUTOPAUSE_JSON_INVALID_SECONDS: int = _env_int(
 # Retoma backfill a partir de last_page+1 (pncp_ingest_state) — cobertura profunda 24/7.
 PNCP_INGEST_WATERMARK_RESUME: bool = _env_bool("PNCP_INGEST_WATERMARK_RESUME", True)
 
+# Autocura 24/7: requeue processing, scopes expirados, retry de dead (sem ops manual).
+PNCP_INGEST_SELF_HEAL_ENABLED: bool = _env_bool("PNCP_INGEST_SELF_HEAL_ENABLED", True)
+PNCP_INGEST_SELF_HEAL_INTERVAL_SECONDS: int = _env_int(
+    "PNCP_INGEST_SELF_HEAL_INTERVAL_SECONDS", 300
+)
+PNCP_INGEST_PROCESSING_STALE_SECONDS: int = _env_int(
+    "PNCP_INGEST_PROCESSING_STALE_SECONDS", 900
+)
+PNCP_INGEST_DEAD_REVIVE_BATCH: int = _env_int("PNCP_INGEST_DEAD_REVIVE_BATCH", 200)
+PNCP_INGEST_DEAD_REVIVE_MIN_AGE_SECONDS: int = _env_int(
+    "PNCP_INGEST_DEAD_REVIVE_MIN_AGE_SECONDS", 3600
+)
+
 # Busca local FTS5 (pncp_itens_fts) — fallback LIKE se desativado ou índice vazio.
 PNCP_FTS5_ENABLED: bool = _env_bool("PNCP_FTS5_ENABLED", True)
 

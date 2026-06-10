@@ -9,6 +9,9 @@ from typing import Any, Dict, Optional
 
 from .config import (
     PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG,
+    PNCP_INGEST_PLANNER_INTERVAL_SECONDS,
+    PNCP_INGEST_QUEUE_ENABLED,
+    PNCP_INGEST_SELF_HEAL_INTERVAL_SECONDS,
     PNCP_INGEST_WORKER_CATALOG_BATCH,
     PNCP_INGEST_WORKER_ENABLED,
     PNCP_INGEST_WORKER_ITEMS_BATCH,
@@ -16,6 +19,7 @@ from .config import (
     PNCP_INGEST_WORKER_POLL_SECONDS,
     PNCP_LOCAL_INCLUDE_ITEMS,
 )
+from .ingest_maintenance import run_ingest_self_healing
 from .ingest_planner import plan_ingest_queue
 from .ingest_queue import (
     TASK_CATALOG_PAGE,
@@ -219,18 +223,30 @@ async def process_ingest_batch() -> Dict[str, Any]:
 
 async def ingest_worker_loop() -> None:
     """Loop em background: planeja periodicamente e processa a fila."""
-    from .config import PNCP_INGEST_PLANNER_INTERVAL_SECONDS, PNCP_INGEST_QUEUE_ENABLED
-
     if not PNCP_INGEST_WORKER_ENABLED or not PNCP_INGEST_QUEUE_ENABLED:
         logger.info("ingest worker desligado (WORKER=%s QUEUE=%s)", PNCP_INGEST_WORKER_ENABLED, PNCP_INGEST_QUEUE_ENABLED)
         return
 
+    run_ingest_self_healing(mode="startup")
     logger.info("ingest worker iniciado poll=%.1fs", PNCP_INGEST_WORKER_POLL_SECONDS)
-    # Evita planejamento imediato no boot (uvicorn sobe antes de estabilizar volume/DB).
+    try:
+        boot_plan = plan_ingest_queue()
+        logger.info(
+            "ingest planner (boot) catalog=%s items=%s paused_scopes=%s",
+            boot_plan.get("catalog_pages_enqueued"),
+            boot_plan.get("contract_items_enqueued"),
+            boot_plan.get("catalog_scopes_paused"),
+        )
+    except Exception:
+        logger.exception("ingest planner (boot) falhou")
     last_plan = time.monotonic()
+    last_heal = time.monotonic()
     while True:
         try:
             now = time.monotonic()
+            if now - last_heal >= float(PNCP_INGEST_SELF_HEAL_INTERVAL_SECONDS):
+                run_ingest_self_healing(mode="periodic")
+                last_heal = now
             if now - last_plan >= float(PNCP_INGEST_PLANNER_INTERVAL_SECONDS):
                 summary = plan_ingest_queue()
                 logger.info(

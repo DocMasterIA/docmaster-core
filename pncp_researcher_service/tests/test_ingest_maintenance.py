@@ -39,6 +39,34 @@ def test_requeue_all_processing_on_startup(queue_db):
     assert stats["pending"] == 1
 
 
+def test_revive_dead_skips_duplicate_pending(queue_db):
+    """dead com mesma chave que pending → remove dead, não viola UNIQUE."""
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    old = (datetime.utcnow() - timedelta(hours=2)).isoformat(timespec="seconds") + "Z"
+    ingest_queue.enqueue_catalog_page(
+        uf="MG", modalidade=8, pagina=2,
+        data_inicial="20250601", data_final="20260601",
+    )
+    with ingest_queue._queue_conn() as c:
+        c.execute(
+            """
+            INSERT INTO pncp_ingest_queue (
+                task_type, priority, uf, modalidade, pagina, data_inicial, data_final,
+                numero_pncp, payload_json, status, attempts, max_attempts,
+                last_error, available_at, created_at, updated_at
+            ) VALUES ('catalog_page', 100, 'MG', 8, 2, '20250601', '20260601',
+                NULL, '{}', 'dead', 5, 5, 'json', ?, ?, ?)
+            """,
+            (now, old, old),
+        )
+        c.commit()
+    n = ingest_maintenance.revive_dead_tasks(limit=10, min_dead_age_seconds=600)
+    assert n == 0
+    stats = ingest_queue.queue_stats()
+    assert stats["pending"] == 1
+    assert stats["dead"] == 0
+
+
 def test_revive_dead_tasks_after_cooldown(queue_db):
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     old = (datetime.utcnow() - timedelta(hours=2)).isoformat(timespec="seconds") + "Z"

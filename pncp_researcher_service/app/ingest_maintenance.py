@@ -70,6 +70,36 @@ def revive_dead_tasks(*, limit: int, min_dead_age_seconds: int) -> int:
         if not ids:
             return 0
         placeholders = ",".join("?" for _ in ids)
+        # Índice parcial uq_* só permite 1 pending/processing por chave lógica.
+        # dead + pending duplicado → UPDATE viola UNIQUE; descarta o dead redundante.
+        c.execute(
+            f"""
+            DELETE FROM pncp_ingest_queue
+            WHERE id IN ({placeholders}) AND status = 'dead'
+            AND (
+                (task_type = 'catalog_page' AND EXISTS (
+                    SELECT 1 FROM pncp_ingest_queue q2
+                    WHERE q2.task_type = 'catalog_page'
+                      AND q2.status IN ('pending', 'processing')
+                      AND q2.uf = pncp_ingest_queue.uf
+                      AND q2.modalidade = pncp_ingest_queue.modalidade
+                      AND q2.pagina = pncp_ingest_queue.pagina
+                      AND q2.data_inicial = pncp_ingest_queue.data_inicial
+                      AND q2.data_final = pncp_ingest_queue.data_final
+                      AND q2.id != pncp_ingest_queue.id
+                ))
+                OR
+                (task_type = 'contract_items' AND EXISTS (
+                    SELECT 1 FROM pncp_ingest_queue q2
+                    WHERE q2.task_type = 'contract_items'
+                      AND q2.status IN ('pending', 'processing')
+                      AND q2.numero_pncp = pncp_ingest_queue.numero_pncp
+                      AND q2.id != pncp_ingest_queue.id
+                ))
+            )
+            """,
+            ids,
+        )
         cur = c.execute(
             f"""
             UPDATE pncp_ingest_queue

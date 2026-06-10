@@ -11,6 +11,7 @@ from .config import PNCP_INGEST_WORKER_ENABLED
 from .ingest_coverage import ingest_coverage_status
 from .ingest_planner import plan_ingest_queue
 from .ingest_worker import ingest_worker_loop, process_ingest_batch
+from .ingest_runtime import configure_service_logging, ingest_runtime_status
 from .pncp_client import PNCPClientError
 from .schemas import (
     HealthResponse,
@@ -62,12 +63,20 @@ async def health() -> HealthResponse:
         hint = "AVISO: db_path fora de /data/pncp — confira volume e docker-compose.pncp.override.yml."
     elif db_bytes < 5_000_000:
         hint = "Índice pequeno ou vazio (<5 MB) — confira volume correto (attach-pncp-volume.sh)."
+    ingest = ingest_runtime_status()
+    if ingest.get("stalled"):
+        stall_hint = (
+            f"INGEST parada ({ingest.get('seconds_since_progress')}s sem progresso, "
+            f"pending={ingest.get('pending_last')}) — autocura automática ativa."
+        )
+        hint = f"{hint} {stall_hint}".strip() if hint else stall_hint
     return HealthResponse(
         ok=True,
         db_path=db_path,
         db_bytes=db_bytes,
         db_on_data_volume=on_volume,
         index_hint=hint,
+        ingest=ingest,
     )
 
 
@@ -311,18 +320,29 @@ async def research_session_update_endpoint(sessao_id: int, body: ResearchSession
 
 
 def create_app() -> FastAPI:
-    import logging
+    configure_service_logging()
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
+    async def _supervised_ingest_worker() -> None:
+        import logging
+
+        sup_log = logging.getLogger("pncp_researcher_service.app.ingest_worker")
+        if not PNCP_INGEST_WORKER_ENABLED:
+            return
+        while True:
+            try:
+                await ingest_worker_loop()
+                return
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                sup_log.exception("ingest worker encerrou com erro — reinício em 5s")
+                await asyncio.sleep(5.0)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         worker_task: asyncio.Task | None = None
         if PNCP_INGEST_WORKER_ENABLED:
-            worker_task = asyncio.create_task(ingest_worker_loop())
+            worker_task = asyncio.create_task(_supervised_ingest_worker())
         yield
         if worker_task is not None:
             worker_task.cancel()

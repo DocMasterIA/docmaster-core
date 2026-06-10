@@ -224,6 +224,11 @@ PNCP_INGEST_DEAD_REVIVE_BATCH: int = _env_int("PNCP_INGEST_DEAD_REVIVE_BATCH", 2
 PNCP_INGEST_DEAD_REVIVE_MIN_AGE_SECONDS: int = _env_int(
     "PNCP_INGEST_DEAD_REVIVE_MIN_AGE_SECONDS", 3600
 )
+# Detecção de parada: fila com trabalho sem progresso → autocura + replanejamento automático.
+PNCP_INGEST_STALL_RECOVERY_ENABLED: bool = _env_bool("PNCP_INGEST_STALL_RECOVERY_ENABLED", True)
+PNCP_INGEST_STALL_SECONDS: int = _env_int("PNCP_INGEST_STALL_SECONDS", 900)
+PNCP_INGEST_STALL_MIN_PENDING: int = _env_int("PNCP_INGEST_STALL_MIN_PENDING", 100)
+PNCP_INGEST_HEARTBEAT_LOG_SECONDS: int = _env_int("PNCP_INGEST_HEARTBEAT_LOG_SECONDS", 300)
 
 # Busca local FTS5 (pncp_itens_fts) — fallback LIKE se desativado ou índice vazio.
 PNCP_FTS5_ENABLED: bool = _env_bool("PNCP_FTS5_ENABLED", True)

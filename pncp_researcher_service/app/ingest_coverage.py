@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 from .ingest_dates import resolve_backfill_window
 from .ingest_queue import count_contracts_without_items, queue_stats
+from .ingest_runtime import ingest_runtime_status
 from .local_index import ensure_local_index, ingest_operational_status, local_index_stats
 
 
@@ -56,4 +57,5 @@ def ingest_coverage_status() -> Dict[str, Any]:
             "scopes_total": ingest.get("scopes_total"),
             "scopes_active": ingest.get("scopes_active"),
         },
+        "runtime": ingest_runtime_status(),
     }

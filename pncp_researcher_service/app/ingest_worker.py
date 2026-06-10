@@ -21,6 +21,13 @@ from .config import (
 )
 from .ingest_maintenance import run_ingest_self_healing
 from .ingest_planner import plan_ingest_queue
+from .ingest_runtime import (
+    configure_service_logging,
+    mark_worker_started,
+    maybe_log_heartbeat,
+    record_batch_result,
+    run_stall_recovery_if_needed,
+)
 from .ingest_queue import (
     TASK_CATALOG_PAGE,
     TASK_CONTRACT_ITEMS,
@@ -173,6 +180,7 @@ async def process_ingest_batch() -> Dict[str, Any]:
             "errors": 0,
             "catalog_paused": pause_catalog,
             "items_backlog": items_backlog,
+            "queue": queue_stats(),
         }
 
     catalog_ok = items_ok = errors = 0
@@ -223,10 +231,12 @@ async def process_ingest_batch() -> Dict[str, Any]:
 
 async def ingest_worker_loop() -> None:
     """Loop em background: planeja periodicamente e processa a fila."""
+    configure_service_logging()
     if not PNCP_INGEST_WORKER_ENABLED or not PNCP_INGEST_QUEUE_ENABLED:
         logger.info("ingest worker desligado (WORKER=%s QUEUE=%s)", PNCP_INGEST_WORKER_ENABLED, PNCP_INGEST_QUEUE_ENABLED)
         return
 
+    mark_worker_started()
     run_ingest_self_healing(mode="startup")
     logger.info("ingest worker iniciado poll=%.1fs", PNCP_INGEST_WORKER_POLL_SECONDS)
     try:
@@ -256,7 +266,10 @@ async def ingest_worker_loop() -> None:
                     summary.get("catalog_scopes_paused"),
                 )
                 last_plan = now
+            run_stall_recovery_if_needed()
             result = await process_ingest_batch()
+            record_batch_result(result)
+            maybe_log_heartbeat()
             if (result.get("catalog_ok") or result.get("items_ok") or result.get("errors")):
                 logger.info(
                     "ingest batch catalog_ok=%s items_ok=%s errors=%s pending=%s "

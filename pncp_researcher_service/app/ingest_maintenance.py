@@ -93,15 +93,18 @@ def run_ingest_self_healing(*, mode: str = "periodic") -> Dict[str, Any]:
         return {"ok": True, "skipped": True}
 
     ensure_local_index()
-    startup = str(mode or "").strip().lower() == "startup"
+    mode_s = str(mode or "").strip().lower()
+    startup = mode_s == "startup"
+    stall = mode_s == "stall"
     stale_sec = int(PNCP_INGEST_PROCESSING_STALE_SECONDS)
     dead_batch = int(PNCP_INGEST_DEAD_REVIVE_BATCH)
     dead_min_age = int(PNCP_INGEST_DEAD_REVIVE_MIN_AGE_SECONDS)
-    if startup:
+    if startup or stall:
         dead_batch = max(dead_batch, 2000)
-        dead_min_age = min(dead_min_age, 120)
+        dead_min_age = min(dead_min_age, 120 if startup else 60)
 
-    requeued = requeue_processing_tasks(stale_only=not startup, stale_seconds=stale_sec)
+    requeue_all = startup or stall
+    requeued = requeue_processing_tasks(stale_only=not requeue_all, stale_seconds=stale_sec)
     scopes = resume_expired_ingest_scopes()
     revived = revive_dead_tasks(limit=dead_batch, min_dead_age_seconds=dead_min_age)
 

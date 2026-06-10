@@ -509,6 +509,26 @@ function isBulkRunActive(bulkRunId) {
   return Number(bulkRunId) === activeBulkRunId;
 }
 
+function isRegistryAutostartBulk(bulkRunId) {
+  return Boolean(bulkAutostartRegistry.isRunning)
+    && Number(bulkAutostartRegistry.bulkRunId) === Number(bulkRunId);
+}
+
+function bulkRunShouldStop({
+  mountRunId,
+  myBulkRunId,
+  generation,
+  autostartBulk = false,
+} = {}) {
+  if (autostartBulk) {
+    return !isRegistryAutostartBulk(myBulkRunId);
+  }
+  if (mountRunId != null && mountRunId !== mountRunSeq) return true;
+  if (myBulkRunId != null && !isBulkRunActive(myBulkRunId)) return true;
+  if (generation != null && generation !== searchGeneration.value) return true;
+  return false;
+}
+
 function isAbortError(err) {
   const name = String(err?.name || '');
   const msg = String(err?.message || '');
@@ -664,22 +684,17 @@ function itemRowsCount(itemId) {
   return rows.value.filter((r) => Number(r.itemId) === Number(itemId)).length;
 }
 
-function bulkRunShouldStop({ mountRunId, myBulkRunId, generation } = {}) {
-  if (mountRunId != null && mountRunId !== mountRunSeq) return true;
-  if (myBulkRunId != null && !isBulkRunActive(myBulkRunId)) return true;
-  if (generation != null && generation !== searchGeneration.value) return true;
-  return false;
-}
-
 async function processOneBulkItem(ctx, {
   mountRunId,
   myBulkRunId,
   generation,
-  signal,
+  autostartBulk = false,
+  fetchSignal = undefined,
   sessionId,
 } = {}) {
   const sid = Number(sessionId);
-  if (bulkRunShouldStop({ mountRunId, myBulkRunId, generation })) {
+  const stopOpts = { mountRunId, myBulkRunId, generation, autostartBulk };
+  if (bulkRunShouldStop(stopOpts)) {
     return { stop: true };
   }
   if (!String(ctx?.descricao_item || '').trim()) {
@@ -692,16 +707,27 @@ async function processOneBulkItem(ctx, {
     autoSearchProgress.value.ok += 1;
     return { stop: false };
   }
-  const result = await runSearchWithContext({
-    descricao: ctx.descricao_item,
-    context: ctx,
-    append: true,
-    bulkMode: true,
-    generation,
-    bulkRunId: myBulkRunId,
-    signal,
-  });
-  if (bulkRunShouldStop({ mountRunId, myBulkRunId, generation })) {
+  let result;
+  try {
+    result = await runSearchWithContext({
+      descricao: ctx.descricao_item,
+      context: ctx,
+      append: true,
+      bulkMode: true,
+      generation,
+      bulkRunId: myBulkRunId,
+      autostartBulk,
+      signal: fetchSignal,
+    });
+  } catch (err) {
+    result = bulkSearchFailResult(err, {
+      timeoutSec: Math.round(BULK_SEARCH_TIMEOUT_MS / 1000),
+    });
+  }
+  if (!result) {
+    result = { ok: false, exibidos: 0, error: 'Resposta vazia do motor de busca.' };
+  }
+  if (bulkRunShouldStop(stopOpts)) {
     return { stop: true };
   }
   autoSearchProgress.value.done += 1;
@@ -730,12 +756,14 @@ async function runBulkItemSearches(pendentes, {
   generation = null,
   bulkRunId = null,
   mountRunId = null,
-  signal,
+  autostartBulk = false,
+  fetchSignal = undefined,
   clearRows = false,
   sessionId = null,
 } = {}) {
   const myBulkRunId = bulkRunId;
   const sid = Number(sessionId);
+  const stopOpts = { mountRunId, myBulkRunId, generation, autostartBulk };
   if (clearRows) rows.value = [];
   isAutoSearchingAll.value = true;
   autoSearchProgress.value = {
@@ -755,23 +783,31 @@ async function runBulkItemSearches(pendentes, {
 
   async function bulkWorker() {
     while (!stopRequested) {
-      if (bulkRunShouldStop({ mountRunId, myBulkRunId, generation })) {
+      if (bulkRunShouldStop(stopOpts)) {
         stopRequested = true;
         break;
       }
       const idx = nextIdx;
       nextIdx += 1;
       if (idx >= pendentes.length) break;
-      const outcome = await processOneBulkItem(pendentes[idx], {
-        mountRunId,
-        myBulkRunId,
-        generation,
-        signal,
-        sessionId: sid,
-      });
-      if (outcome?.stop) {
-        stopRequested = true;
-        break;
+      try {
+        const outcome = await processOneBulkItem(pendentes[idx], {
+          mountRunId,
+          myBulkRunId,
+          generation,
+          autostartBulk,
+          fetchSignal,
+          sessionId: sid,
+        });
+        if (outcome?.stop) {
+          stopRequested = true;
+          break;
+        }
+      } catch (err) {
+        autoSearchProgress.value.done += 1;
+        autoSearchProgress.value.fail += 1;
+        lastBulkFailure.value = String(err?.message || err || 'Erro inesperado no lote').slice(0, 120);
+        if (Number.isFinite(sid)) persistBulkUiSnapshot(sid);
       }
     }
   }
@@ -779,7 +815,7 @@ async function runBulkItemSearches(pendentes, {
   const workers = Math.max(1, Math.min(BULK_CONCURRENCY, pendentes.length || 1));
   await Promise.all(Array.from({ length: workers }, () => bulkWorker()));
 
-  if (bulkRunShouldStop({ mountRunId, myBulkRunId, generation })) {
+  if (bulkRunShouldStop(stopOpts)) {
     isAutoSearchingAll.value = false;
     return;
   }
@@ -790,9 +826,21 @@ async function runBulkItemSearches(pendentes, {
       'A busca automática não processou nenhum item (sessão substituída ou cancelada). Recarregue a página ou clique «Pesquisar UF».';
     return;
   }
+  if (p.done < p.total) {
+    const restantes = p.total - p.done;
+    if (p.precos > 0 || p.fail > 0) {
+      searchError.value =
+        `Busca parcial (${p.done}/${p.total}): ${p.precos} preço(s), ${p.fail} falha(s). `
+        + `${restantes} item(ns) restante(s) — clique «Pesquisar UF» para continuar (resultados já encontrados são mantidos).`;
+    } else {
+      searchError.value =
+        `A busca parou em ${p.done} de ${p.total} item(ns). Clique «Pesquisar UF» para continuar.`;
+    }
+    return;
+  }
   if (p.precos > 0 && p.fail > 0) {
     searchError.value =
-      `Busca parcial: ${p.ok} item(ns), ${p.precos} preço(s). ${p.fail} falha(s) de rede — clique «Pesquisar UF» para continuar os restantes (resultados já encontrados são mantidos).`;
+      `Busca concluída com ressalvas: ${p.ok} item(ns), ${p.precos} preço(s), ${p.fail} falha(s) de rede.`;
   } else if (p.precos === 0 && p.fail > 0) {
     searchError.value =
       `Falha de rede em ${p.fail} item(ns). Verifique o serviço PNCP e clique «Pesquisar UF» para tentar de novo.`;
@@ -908,7 +956,8 @@ async function applyFilters() {
   bulkAutostartRegistry.isRunning = false;
   return runBulkItemSearches(pendentes, {
     bulkRunId: bulkSession.bulkRunId,
-    signal: bulkSession.signal,
+    generation,
+    fetchSignal: bulkSession.signal,
     clearRows: !hadRows,
     sessionId: Number(cotacaoId.value),
   });
@@ -1005,6 +1054,7 @@ async function runSearchWithContext({
   bulkMode = false,
   generation = null,
   bulkRunId = null,
+  autostartBulk = false,
   signal = undefined,
 } = {}) {
   if (!String(descricao || '').trim()) {
@@ -1014,10 +1064,15 @@ async function runSearchWithContext({
   isSearching.value = true;
   if (!append && !bulkMode) searchError.value = '';
   let exibidos = 0;
-  const bulkAutostart = bulkMode && bulkRunId != null;
+  const bulkAutostart = bulkMode && bulkRunId != null && autostartBulk;
   const generationStale = () =>
     !bulkAutostart && generation != null && generation !== searchGeneration.value;
-  const bulkSuperseded = () => bulkRunId != null && !isBulkRunActive(bulkRunId);
+  const bulkSuperseded = () => {
+    if (autostartBulk) return !isRegistryAutostartBulk(bulkRunId);
+    return bulkRunId != null && !isBulkRunActive(bulkRunId);
+  };
+  // Autostart: só timeout por item — falha de rede num item não cancela os demais.
+  const fetchSignal = autostartBulk ? undefined : signal;
   try {
     const recortes = buildRecortesGeograficosPayload(filtros.cidades);
     const valorBaseCtx = context?.valor_base_referencia ?? null;
@@ -1107,7 +1162,7 @@ async function runSearchWithContext({
           uf: null,
           municipio: null,
         },
-        signal,
+        fetchSignal,
         bulkSearchOpts,
       );
       backendItensTotal += mapBackendToRows(backend, 'rec') || 0;
@@ -1123,7 +1178,7 @@ async function runSearchWithContext({
             uf: ufCode || null,
             municipio: null,
           },
-          signal,
+          fetchSignal,
           bulkSearchOpts,
         );
         backendItensTotal += mapBackendToRows(backend, ufCode || 'all') || 0;
@@ -1414,13 +1469,15 @@ onMounted(async () => {
       }
       bulkAutostartRegistry.sessionId = sessionId;
       bulkAutostartRegistry.isRunning = true;
-      const { bulkRunId, signal } = beginBulkAutostartSession(sessionId);
+      const { bulkRunId } = beginBulkAutostartSession(sessionId);
       const pendentesCtx = pendentes.map((it) => buildContextFromItem(it)).filter((x) => x.descricao_item);
-      if (mountRunId !== mountRunSeq) return;
+      if (mountRunId !== mountRunSeq) {
+        bulkAutostartRegistry.isRunning = false;
+        return;
+      }
       const bulkPromise = runBulkItemSearches(pendentesCtx, {
         bulkRunId,
-        mountRunId,
-        signal,
+        autostartBulk: true,
         clearRows: true,
         sessionId,
       });
@@ -1436,6 +1493,10 @@ onMounted(async () => {
   } catch (err) {
     isLoadingSessionItems.value = false;
     isAutoSearchingAll.value = false;
+    if (bulkAutostartRegistry.isRunning && Number(bulkAutostartRegistry.sessionId) === sessionId) {
+      bulkAutostartRegistry.isRunning = false;
+      bulkAutostartRegistry.promise = null;
+    }
     searchError.value = `Não foi possível carregar a cotação (${err?.message || 'erro desconhecido'}).`;
   }
 });

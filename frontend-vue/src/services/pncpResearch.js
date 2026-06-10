@@ -54,18 +54,29 @@ function mergeAbortSignals(userSignal, timeoutMs) {
   if (!Number.isFinite(ms) || ms <= 0) {
     return userSignal || undefined;
   }
-  let timeoutSignal = null;
-  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
-    timeoutSignal = AbortSignal.timeout(ms);
-  }
-  if (!userSignal) return timeoutSignal || undefined;
-  if (!timeoutSignal) return userSignal;
   const ac = new AbortController();
+  let timer = null;
   const abort = () => {
+    if (timer != null) clearTimeout(timer);
     if (!ac.signal.aborted) ac.abort();
   };
-  userSignal.addEventListener('abort', abort, { once: true });
-  timeoutSignal.addEventListener('abort', abort, { once: true });
+  if (userSignal) {
+    if (userSignal.aborted) {
+      abort();
+      return ac.signal;
+    }
+    userSignal.addEventListener('abort', abort, { once: true });
+  }
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    const timeoutSignal = AbortSignal.timeout(ms);
+    if (timeoutSignal.aborted) {
+      abort();
+      return ac.signal;
+    }
+    timeoutSignal.addEventListener('abort', abort, { once: true });
+  } else {
+    timer = setTimeout(abort, ms);
+  }
   return ac.signal;
 }
 

@@ -222,35 +222,43 @@ def _ensure_fts5_schema(c: sqlite3.Cursor) -> None:
         )
         """
     )
-    c.execute("DROP TRIGGER IF EXISTS pncp_itens_fts_ai")
-    c.execute("DROP TRIGGER IF EXISTS pncp_itens_fts_ad")
-    c.execute("DROP TRIGGER IF EXISTS pncp_itens_fts_au")
-    c.execute(
-        """
-        CREATE TRIGGER pncp_itens_fts_ai AFTER INSERT ON pncp_itens BEGIN
-            INSERT INTO pncp_itens_fts(rowid, descricao, material_servico)
-            VALUES (new.id, new.descricao, new.material_servico);
-        END
-        """
-    )
-    c.execute(
-        """
-        CREATE TRIGGER pncp_itens_fts_ad AFTER DELETE ON pncp_itens BEGIN
-            INSERT INTO pncp_itens_fts(pncp_itens_fts, rowid, descricao, material_servico)
-            VALUES ('delete', old.id, old.descricao, old.material_servico);
-        END
-        """
-    )
-    c.execute(
-        """
-        CREATE TRIGGER pncp_itens_fts_au AFTER UPDATE ON pncp_itens BEGIN
-            INSERT INTO pncp_itens_fts(pncp_itens_fts, rowid, descricao, material_servico)
-            VALUES ('delete', old.id, old.descricao, old.material_servico);
-            INSERT INTO pncp_itens_fts(rowid, descricao, material_servico)
-            VALUES (new.id, new.descricao, new.material_servico);
-        END
-        """
-    )
+
+    def _trigger_exists(name: str) -> bool:
+        row = c.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'trigger' AND name = ?",
+            (name,),
+        ).fetchone()
+        return row is not None
+
+    if not _trigger_exists("pncp_itens_fts_ai"):
+        c.execute(
+            """
+            CREATE TRIGGER pncp_itens_fts_ai AFTER INSERT ON pncp_itens BEGIN
+                INSERT INTO pncp_itens_fts(rowid, descricao, material_servico)
+                VALUES (new.id, new.descricao, new.material_servico);
+            END
+            """
+        )
+    if not _trigger_exists("pncp_itens_fts_ad"):
+        c.execute(
+            """
+            CREATE TRIGGER pncp_itens_fts_ad AFTER DELETE ON pncp_itens BEGIN
+                INSERT INTO pncp_itens_fts(pncp_itens_fts, rowid, descricao, material_servico)
+                VALUES ('delete', old.id, old.descricao, old.material_servico);
+            END
+            """
+        )
+    if not _trigger_exists("pncp_itens_fts_au"):
+        c.execute(
+            """
+            CREATE TRIGGER pncp_itens_fts_au AFTER UPDATE ON pncp_itens BEGIN
+                INSERT INTO pncp_itens_fts(pncp_itens_fts, rowid, descricao, material_servico)
+                VALUES ('delete', old.id, old.descricao, old.material_servico);
+                INSERT INTO pncp_itens_fts(rowid, descricao, material_servico)
+                VALUES (new.id, new.descricao, new.material_servico);
+            END
+            """
+        )
 
 
 def _escape_fts_token(token: str) -> str:
@@ -737,9 +745,9 @@ def mark_contract_items_verified(numero_pncp: str) -> None:
     numero = str(numero_pncp or "").strip()
     if not numero:
         return
-    ensure_local_index()
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     with _conn() as c:
+        _migrate_pncp_contratos_items_verified(c)
         c.execute(
             "UPDATE pncp_contratos SET itens_verificados_at = ? WHERE numero_pncp = ?",
             (now, numero),

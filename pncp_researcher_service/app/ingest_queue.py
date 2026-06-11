@@ -89,9 +89,33 @@ def enqueue_catalog_page(
     priority: int = 100,
     tamanho_pagina: int = 50,
 ) -> bool:
+    uf_k = str(uf).strip().upper()
+    pag = int(pagina)
+    mod = int(modalidade)
     now = _utc_now_iso()
     payload = json.dumps({"tamanho_pagina": int(tamanho_pagina)}, ensure_ascii=False)
     with _queue_conn() as c:
+        skipped = c.execute(
+            """
+            SELECT 1 FROM pncp_ingest_queue
+            WHERE task_type = ?
+              AND uf = ? AND modalidade = ? AND pagina = ?
+              AND data_inicial = ? AND data_final = ?
+              AND status = 'done'
+              AND last_error LIKE 'skip:%'
+            LIMIT 1
+            """,
+            (
+                TASK_CATALOG_PAGE,
+                uf_k,
+                mod,
+                pag,
+                data_inicial,
+                data_final,
+            ),
+        ).fetchone()
+        if skipped:
+            return False
         cur = c.execute(
             """
             INSERT OR IGNORE INTO pncp_ingest_queue (

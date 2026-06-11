@@ -91,8 +91,8 @@ def _maybe_contracts_without_items(*, items_backlog: int, pause_catalog: bool) -
     return count_contracts_without_items()
 
 
-def _skip_catalog_task_if_slow(task_id: int, message: str) -> None:
-    """Após 3 timeouts, marca done (não revive) — páginas PNCP cronicamente lentas."""
+def _skip_catalog_task_if_slow(task: Dict[str, Any], task_id: int, message: str) -> bool:
+    """Após 2 timeouts, marca done e avança watermark — páginas PNCP cronicamente lentas."""
     from .ingest_queue import _queue_conn
 
     with _queue_conn() as c:
@@ -100,8 +100,8 @@ def _skip_catalog_task_if_slow(task_id: int, message: str) -> None:
             "SELECT attempts FROM pncp_ingest_queue WHERE id = ?",
             (int(task_id),),
         ).fetchone()
-        if not row or int(row["attempts"] or 0) < 3:
-            return
+        if not row or int(row["attempts"] or 0) < 2:
+            return False
         now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
         c.execute(
             """
@@ -112,6 +112,23 @@ def _skip_catalog_task_if_slow(task_id: int, message: str) -> None:
             (f"skip: {message}"[:800], now, int(task_id)),
         )
         c.commit()
+    _mark_ingest_success(
+        task.get("uf"),
+        int(task["modalidade"]),
+        data_inicial=str(task["data_inicial"]),
+        data_final=str(task["data_final"]),
+        page=int(task["pagina"]),
+        add_upserts=0,
+        add_item_upserts=0,
+    )
+    logger.info(
+        "ingest catalog task %s pulada (timeout): uf=%s mod=%s pag=%s",
+        task_id,
+        task.get("uf"),
+        task.get("modalidade"),
+        task.get("pagina"),
+    )
+    return True
 
 
 async def _load_contract_raw(numero_pncp: str) -> Optional[Dict[str, Any]]:
@@ -268,7 +285,8 @@ async def _run_catalog_task(task: Dict[str, Any], *, client: Any, timeout: float
     except asyncio.TimeoutError:
         msg = f"timeout após {catalog_timeout:.0f}s"
         mark_task_failed(tid, msg)
-        _skip_catalog_task_if_slow(tid, msg)
+        if _skip_catalog_task_if_slow(task, tid, msg):
+            return "skip"
         _mark_ingest_error(
             task.get("uf"),
             int(task["modalidade"]),
@@ -427,7 +445,7 @@ async def process_ingest_batch() -> Dict[str, Any]:
                 st = await _run_catalog_task(task, client=client, timeout=task_timeout)
                 if st == "ok":
                     catalog_ok += 1
-                else:
+                elif st != "skip":
                     errors += 1
 
         if run_catalog_first:

@@ -48,6 +48,21 @@ def test_plan_pauses_catalog_when_items_starved(queue_db, monkeypatch):
         "pncp_researcher_service.app.ingest_planner.PNCP_INGEST_ITEMS_STARVE_BACKLOG",
         150,
     )
+    monkeypatch.setattr(
+        "pncp_researcher_service.app.ingest_backpressure.PNCP_INGEST_CATALOG_PAUSE_MIN_GAP",
+        50,
+    )
+    now = "2026-06-11T12:00:00Z"
+    with local_index._conn() as c:
+        for i in range(60):
+            c.execute(
+                """
+                INSERT INTO pncp_contratos (numero_pncp, updated_at, raw_json)
+                VALUES (?, ?, '{}')
+                """,
+                (f"PNCP-GAP-{i}", now),
+            )
+        c.commit()
     out = ingest_planner.plan_ingest_queue()
     assert out["catalog_paused_starve"] is True
     assert out["catalog_pages_enqueued"] == 0

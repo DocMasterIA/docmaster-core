@@ -35,6 +35,18 @@ for _ in $(seq 1 30); do
       echo "AVISO: ingest_maintenance.py no contentor parece desatualizado"
       exit 1
     fi
+    if docker exec "$C" grep -q 'gap_low' "$APP/ingest_backpressure.py"; then
+      echo "OK  ingest_backpressure.py (gap_low anti-oscilação)"
+    else
+      echo "AVISO: ingest_backpressure.py no contentor sem gap_low — redeploy necessário"
+      exit 1
+    fi
+    if docker exec "$C" grep -q 'mark_contract_items_verified' "$APP/local_index.py"; then
+      echo "OK  local_index.py (itens_verificados_at)"
+    else
+      echo "AVISO: local_index.py no contentor sem itens_verificados_at"
+      exit 1
+    fi
     exit 0
   fi
   sleep 2

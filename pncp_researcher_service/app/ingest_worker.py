@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 
 from .config import (
     PNCP_INGEST_BATCH_MAX_SECONDS,
+    PNCP_INGEST_CATALOG_PAUSE_MIN_GAP,
     PNCP_INGEST_PLANNER_INTERVAL_SECONDS,
     PNCP_INGEST_QUEUE_ENABLED,
     PNCP_INGEST_SELF_HEAL_INTERVAL_SECONDS,
@@ -47,6 +48,7 @@ from .local_index import (
     _mark_ingest_success,
     contract_needs_items_refresh,
     ensure_local_index,
+    mark_contract_items_verified,
     upsert_contract_items,
     upsert_contracts,
 )
@@ -169,11 +171,15 @@ async def process_contract_items_task(task: Dict[str, Any], *, client: Any) -> i
     ano = raw.get("anoCompra")
     seq = raw.get("sequencialCompra")
     if not cnpj or ano is None or seq is None:
+        mark_contract_items_verified(numero)
+        logger.info("ingest items %s: chaves PNCP ausentes — marcado verificado", numero)
         return 0
 
     rows = await get_contract_items(str(cnpj), ano, seq, client=client)
     if rows:
         return int(upsert_contract_items(raw, rows) or 0)
+    mark_contract_items_verified(numero)
+    logger.debug("ingest items %s: PNCP retornou 0 itens — marcado verificado", numero)
     return 0
 
 
@@ -189,7 +195,7 @@ async def _run_item_task(task: Dict[str, Any], *, client: Any, timeout: float) -
     except asyncio.TimeoutError:
         mark_task_failed(tid, f"timeout após {timeout:.0f}s")
         logger.warning("ingest items task %s: timeout", tid)
-        return "error", 0, 0
+        return "error", 0
     except Exception as exc:
         mark_task_failed(tid, str(exc))
         logger.warning("ingest items task %s: %s", tid, exc)
@@ -282,6 +288,10 @@ async def process_ingest_batch() -> Dict[str, Any]:
             max(item_limit, PNCP_INGEST_WORKER_ITEMS_BATCH_MAX),
             PNCP_INGEST_WORKER_ITEMS_BATCH_MAX,
         )
+    elif gap_sqlite < max(1, int(PNCP_INGEST_CATALOG_PAUSE_MIN_GAP)):
+        # Gap baixo: prioriza catálogo mas ainda processa alguns itens se enfileirados.
+        catalog_limit = PNCP_INGEST_WORKER_CATALOG_BATCH
+        item_limit = min(item_limit, 8)
 
     catalog_tasks = (
         claim_tasks(task_type=TASK_CATALOG_PAGE, limit=catalog_limit)

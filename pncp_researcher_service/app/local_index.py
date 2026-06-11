@@ -145,6 +145,7 @@ def ensure_local_index() -> None:
             """
         )
         _migrate_pesquisador_sessoes_columns(c)
+        _migrate_pncp_contratos_items_verified(c)
         _migrate_pncp_itens_supplier_columns(c)
         ensure_fornecedor_cache_table(c)
         c.execute(
@@ -724,6 +725,27 @@ def _migrate_pesquisador_sessoes_columns(c: sqlite3.Cursor) -> None:
         )
 
 
+def _migrate_pncp_contratos_items_verified(c: sqlite3.Cursor) -> None:
+    """Contratos consultados no PNCP sem linhas em pncp_itens (evita gap eterno)."""
+    cols = {row[1] for row in c.execute("PRAGMA table_info(pncp_contratos)")}
+    if "itens_verificados_at" not in cols:
+        c.execute("ALTER TABLE pncp_contratos ADD COLUMN itens_verificados_at TEXT")
+
+
+def mark_contract_items_verified(numero_pncp: str) -> None:
+    """Marca contrato como verificado no PNCP mesmo sem linhas em pncp_itens."""
+    numero = str(numero_pncp or "").strip()
+    if not numero:
+        return
+    ensure_local_index()
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    with _conn() as c:
+        c.execute(
+            "UPDATE pncp_contratos SET itens_verificados_at = ? WHERE numero_pncp = ?",
+            (now, numero),
+        )
+
+
 _PNCP_ITENS_SUPPLIER_COLUMNS: List[tuple[str, str]] = [
     ("cnpj_fornecedor", "TEXT"),
     ("fornecedor", "TEXT"),
@@ -867,6 +889,10 @@ def contract_needs_items_refresh(numero_pncp: str) -> bool:
         return True
     ensure_local_index()
     with _conn() as c:
+        ctr = c.execute(
+            "SELECT itens_verificados_at FROM pncp_contratos WHERE numero_pncp = ?",
+            (numero,),
+        ).fetchone()
         row = c.execute(
             """
             SELECT COUNT(*) AS n, MAX(updated_at) AS last_upd
@@ -875,6 +901,10 @@ def contract_needs_items_refresh(numero_pncp: str) -> bool:
             """,
             (numero,),
         ).fetchone()
+    if (not row or int(row["n"] or 0) <= 0) and ctr and ctr["itens_verificados_at"]:
+        verified_dt = _parse_item_updated_at_iso(str(ctr["itens_verificados_at"] or ""))
+        if verified_dt is not None and datetime.utcnow() - verified_dt < timedelta(days=days):
+            return False
     if not row or int(row["n"] or 0) <= 0:
         return True
     last_dt = _parse_item_updated_at_iso(str(row["last_upd"] or ""))

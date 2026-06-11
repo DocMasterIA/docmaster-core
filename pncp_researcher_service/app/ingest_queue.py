@@ -286,15 +286,16 @@ def backlog_by_task_type(task_type: str) -> int:
 
 
 def count_contracts_without_items() -> int:
-    """Aproximação O(1): contratos − contratos distintos com ≥1 linha em pncp_itens."""
+    """Contratos sem linhas em pncp_itens e ainda não verificados vazios no PNCP."""
     with _queue_conn() as c:
         row = c.execute(
             """
-            SELECT
-              (SELECT COUNT(*) FROM pncp_contratos) AS total_contratos,
-              (SELECT COUNT(DISTINCT numero_pncp) FROM pncp_itens) AS com_itens
+            SELECT COUNT(*) AS n
+            FROM pncp_contratos c
+            WHERE NOT EXISTS (
+                SELECT 1 FROM pncp_itens i WHERE i.numero_pncp = c.numero_pncp LIMIT 1
+            )
+            AND (c.itens_verificados_at IS NULL OR TRIM(c.itens_verificados_at) = '')
             """
         ).fetchone()
-        if not row:
-            return 0
-        return max(0, int(row["total_contratos"] or 0) - int(row["com_itens"] or 0))
+        return int(row["n"] or 0) if row else 0

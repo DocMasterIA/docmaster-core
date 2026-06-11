@@ -49,6 +49,7 @@ def enqueue_contracts_without_items(*, limit: int, priority: int = PRIORITY_BACK
             WHERE NOT EXISTS (
                 SELECT 1 FROM pncp_itens i WHERE i.numero_pncp = c.numero_pncp LIMIT 1
             )
+            AND (c.itens_verificados_at IS NULL OR TRIM(c.itens_verificados_at) = '')
             ORDER BY c.updated_at DESC
             LIMIT ?
             """,

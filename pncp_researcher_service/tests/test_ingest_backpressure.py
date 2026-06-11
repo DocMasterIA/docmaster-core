@@ -59,6 +59,49 @@ def test_catalog_heavy_pauses_catalog_when_gap_grande(queue_db, monkeypatch):
     assert bp["pause_catalog"] is True
 
 
+def test_gap_baixo_nunca_pausa_catalogo_mesmo_com_items_na_fila(queue_db, monkeypatch):
+    """Topup enfileira 15 itens — catálogo não deve voltar a pausar se gap < min_gap."""
+    monkeypatch.setattr(
+        "pncp_researcher_service.app.ingest_backpressure.PNCP_INGEST_CATALOG_HEAVY_PENDING",
+        100,
+    )
+    monkeypatch.setattr(
+        "pncp_researcher_service.app.ingest_backpressure.PNCP_INGEST_CATALOG_PAUSE_MIN_GAP",
+        50,
+    )
+    now = "2026-06-11T12:00:00Z"
+    with ingest_queue._queue_conn() as c:
+        for i in range(120):
+            c.execute(
+                """
+                INSERT INTO pncp_ingest_queue (
+                    task_type, priority, uf, modalidade, pagina, data_inicial, data_final,
+                    numero_pncp, payload_json, status, attempts, max_attempts,
+                    last_error, available_at, created_at, updated_at
+                ) VALUES ('catalog_page', 100, 'SP', 8, ?, '20250601', '20260601',
+                    NULL, '{}', 'pending', 0, 5, NULL, ?, ?, ?)
+                """,
+                (i + 1, now, now, now),
+            )
+        for i in range(15):
+            c.execute(
+                """
+                INSERT INTO pncp_ingest_queue (
+                    task_type, priority, uf, modalidade, pagina, data_inicial, data_final,
+                    numero_pncp, payload_json, status, attempts, max_attempts,
+                    last_error, available_at, created_at, updated_at
+                ) VALUES ('contract_items', 80, NULL, NULL, NULL, NULL, NULL,
+                    ?, '{}', 'pending', 0, 5, NULL, ?, ?, ?)
+                """,
+                (f"PNCP-GAP-{i}", now, now, now),
+            )
+        c.commit()
+    bp = compute_ingest_backpressure(contracts_without_items=15)
+    assert bp["gap_low"] is True
+    assert bp["pause_catalog"] is False
+    assert bp["catalog_heavy"] is False
+
+
 def test_gap_baixo_reabre_catalogo(queue_db, monkeypatch):
     monkeypatch.setattr(
         "pncp_researcher_service.app.ingest_backpressure.PNCP_INGEST_CATALOG_HEAVY_PENDING",

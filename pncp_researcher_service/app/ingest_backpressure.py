@@ -34,6 +34,7 @@ def compute_ingest_backpressure(
     pause_high = max(0, int(PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG))
     min_gap = max(0, int(PNCP_INGEST_CATALOG_PAUSE_MIN_GAP))
     gap = int(contracts_without_items) if contracts_without_items is not None else None
+    gap_low = gap is not None and gap < min_gap
 
     starving = items_backlog < starve_thresh
     items_work_queued = items_backlog > 0
@@ -42,9 +43,14 @@ def compute_ingest_backpressure(
     catalog_heavy_raw = (
         catalog_pending >= heavy_thresh and items_backlog < max(starve_thresh, 500)
     )
-    catalog_heavy = catalog_heavy_raw and (items_work_queued or gap_needs_drain)
+    # Gap esgotado (< min_gap): catálogo tem de correr sempre — não re-pausar por topup de 15 itens.
+    if gap_low:
+        catalog_heavy = False
+        pause_starve = False
+    else:
+        catalog_heavy = catalog_heavy_raw and (items_work_queued or gap_needs_drain)
+        pause_starve = starving and (items_work_queued or gap_needs_drain)
     pause_high_items = items_backlog >= pause_high
-    pause_starve = starving and (items_work_queued or gap_needs_drain)
     pause_catalog = pause_starve or catalog_heavy or pause_high_items
 
     return {
@@ -52,6 +58,7 @@ def compute_ingest_backpressure(
         "catalog_pending": catalog_pending,
         "items_pending": items_pending,
         "contracts_without_items": gap,
+        "gap_low": gap_low,
         "starving": starving,
         "catalog_heavy": catalog_heavy,
         "catalog_heavy_raw": catalog_heavy_raw,

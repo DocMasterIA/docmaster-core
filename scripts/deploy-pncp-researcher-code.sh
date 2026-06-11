@@ -47,6 +47,12 @@ for _ in $(seq 1 30); do
       echo "AVISO: local_index.py no contentor sem itens_verificados_at"
       exit 1
     fi
+    if docker exec "$C" grep -q 'reconcile_gap_contracts_after_done_items' "$APP/ingest_maintenance.py"; then
+      echo "OK  ingest_maintenance.py (reconcile gap)"
+    else
+      echo "AVISO: ingest_maintenance.py sem reconcile gap"
+      exit 1
+    fi
     exit 0
   fi
   sleep 2

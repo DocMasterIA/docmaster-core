@@ -146,6 +146,39 @@ def revive_dead_tasks(*, limit: int, min_dead_age_seconds: int) -> int:
     return n
 
 
+def reconcile_gap_contracts_after_done_items() -> int:
+    """
+    Contratos ainda no gap SQLite com tarefa contract_items já concluída (done).
+    Marca como verificados — corrige bases onde items_ok>0 mas item_rows=0 antes do fix.
+    """
+    from .local_index import mark_contract_items_verified
+
+    with _queue_conn() as c:
+        rows = c.execute(
+            """
+            SELECT c.numero_pncp
+            FROM pncp_contratos c
+            WHERE NOT EXISTS (
+                SELECT 1 FROM pncp_itens i WHERE i.numero_pncp = c.numero_pncp LIMIT 1
+            )
+            AND (c.itens_verificados_at IS NULL OR TRIM(c.itens_verificados_at) = '')
+            AND EXISTS (
+                SELECT 1 FROM pncp_ingest_queue q
+                WHERE q.task_type = 'contract_items'
+                  AND q.numero_pncp = c.numero_pncp
+                  AND q.status = 'done'
+            )
+            """
+        ).fetchall()
+    n = 0
+    for r in rows:
+        mark_contract_items_verified(str(r["numero_pncp"]))
+        n += 1
+    if n:
+        logger.info("ingest reconcile gap: contratos marcados verificados=%s", n)
+    return n
+
+
 def run_ingest_self_healing(*, mode: str = "periodic") -> Dict[str, Any]:
     """
     mode=startup: requeue total + scopes + dead (batch maior).
@@ -170,6 +203,9 @@ def run_ingest_self_healing(*, mode: str = "periodic") -> Dict[str, Any]:
     scopes = resume_expired_ingest_scopes()
     purged = purge_redundant_dead_tasks()
     revived = revive_dead_tasks(limit=dead_batch, min_dead_age_seconds=dead_min_age)
+    gap_reconciled = 0
+    if startup or stall:
+        gap_reconciled = reconcile_gap_contracts_after_done_items()
 
     out = {
         "ok": True,
@@ -178,7 +214,8 @@ def run_ingest_self_healing(*, mode: str = "periodic") -> Dict[str, Any]:
         "scopes_resumed": scopes,
         "dead_purged": purged,
         "dead_revived": revived,
+        "gap_reconciled": gap_reconciled,
     }
-    if requeued or scopes or purged or revived:
+    if requeued or scopes or purged or revived or gap_reconciled:
         logger.info("ingest self-heal (%s): %s", mode, out)
     return out

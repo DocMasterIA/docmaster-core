@@ -178,9 +178,17 @@ async def process_contract_items_task(task: Dict[str, Any], *, client: Any) -> i
 
     rows = await get_contract_items(str(cnpj), ano, seq, client=client)
     if rows:
-        return int(upsert_contract_items(raw, rows) or 0)
+        upserted = int(upsert_contract_items(raw, rows) or 0)
+        if upserted <= 0:
+            mark_contract_items_verified(numero)
+            logger.info(
+                "ingest items %s: PNCP retornou %s itens mas 0 upsertados — marcado verificado",
+                numero,
+                len(rows),
+            )
+        return upserted
     mark_contract_items_verified(numero)
-    logger.debug("ingest items %s: PNCP retornou 0 itens — marcado verificado", numero)
+    logger.info("ingest items %s: PNCP retornou 0 itens — marcado verificado", numero)
     return 0
 
 

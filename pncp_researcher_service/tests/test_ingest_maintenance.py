@@ -148,3 +148,33 @@ def test_self_heal_startup_runs_all(queue_db, monkeypatch):
     out = ingest_maintenance.run_ingest_self_healing(mode="startup")
     assert out["ok"] is True
     assert "requeued_processing" in out
+
+
+def test_reconcile_gap_after_done_item_tasks(queue_db):
+    now = "2026-06-11T12:00:00Z"
+    with local_index._conn() as c:
+        c.execute(
+            """
+            INSERT INTO pncp_contratos (numero_pncp, updated_at, raw_json)
+            VALUES ('PNCP-STUCK', ?, '{}')
+            """,
+            (now,),
+        )
+        c.commit()
+    with ingest_queue._queue_conn() as c:
+        c.execute(
+            """
+            INSERT INTO pncp_ingest_queue (
+                task_type, priority, uf, modalidade, pagina, data_inicial, data_final,
+                numero_pncp, payload_json, status, attempts, max_attempts,
+                last_error, available_at, created_at, updated_at
+            ) VALUES ('contract_items', 80, NULL, NULL, NULL, NULL, NULL,
+                'PNCP-STUCK', '{}', 'done', 1, 5, NULL, ?, ?, ?)
+            """,
+            (now, now, now),
+        )
+        c.commit()
+    assert ingest_queue.count_contracts_without_items() == 1
+    n = ingest_maintenance.reconcile_gap_contracts_after_done_items()
+    assert n == 1
+    assert ingest_queue.count_contracts_without_items() == 0

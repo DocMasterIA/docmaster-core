@@ -5,6 +5,7 @@ import asyncio
 import json
 import logging
 import time
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 from .config import (
@@ -88,6 +89,29 @@ def _maybe_contracts_without_items(*, items_backlog: int, pause_catalog: bool) -
     from .ingest_queue import count_contracts_without_items
 
     return count_contracts_without_items()
+
+
+def _skip_catalog_task_if_slow(task_id: int, message: str) -> None:
+    """Após 3 timeouts, marca done (não revive) — páginas PNCP cronicamente lentas."""
+    from .ingest_queue import _queue_conn
+
+    with _queue_conn() as c:
+        row = c.execute(
+            "SELECT attempts FROM pncp_ingest_queue WHERE id = ?",
+            (int(task_id),),
+        ).fetchone()
+        if not row or int(row["attempts"] or 0) < 3:
+            return
+        now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+        c.execute(
+            """
+            UPDATE pncp_ingest_queue
+            SET status = 'done', last_error = ?, updated_at = ?
+            WHERE id = ? AND task_type = 'catalog_page'
+            """,
+            (f"skip: {message}"[:800], now, int(task_id)),
+        )
+        c.commit()
 
 
 async def _load_contract_raw(numero_pncp: str) -> Optional[Dict[str, Any]]:
@@ -242,7 +266,17 @@ async def _run_catalog_task(task: Dict[str, Any], *, client: Any, timeout: float
         mark_task_done(tid)
         return "ok"
     except asyncio.TimeoutError:
-        mark_task_failed(tid, f"timeout após {catalog_timeout:.0f}s")
+        msg = f"timeout após {catalog_timeout:.0f}s"
+        mark_task_failed(tid, msg)
+        _skip_catalog_task_if_slow(tid, msg)
+        _mark_ingest_error(
+            task.get("uf"),
+            int(task["modalidade"]),
+            data_inicial=str(task["data_inicial"]),
+            data_final=str(task["data_final"]),
+            page=int(task["pagina"]),
+            message=msg,
+        )
         logger.warning("ingest catalog task %s: timeout", tid)
         return "error"
     except PNCPClientError as exc:

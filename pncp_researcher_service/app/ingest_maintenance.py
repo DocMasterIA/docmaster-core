@@ -123,6 +123,11 @@ def revive_dead_tasks(*, limit: int, min_dead_age_seconds: int) -> int:
                 """
                 SELECT id FROM pncp_ingest_queue
                 WHERE status = 'dead' AND updated_at <= ?
+                  AND (last_error IS NULL OR (
+                    last_error NOT LIKE 'manual:%'
+                    AND last_error NOT LIKE 'skip:%'
+                    AND last_error NOT LIKE 'purge:%'
+                  ))
                 ORDER BY priority ASC, id ASC
                 LIMIT ?
                 """,

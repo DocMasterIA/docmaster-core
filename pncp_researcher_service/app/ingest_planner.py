@@ -6,7 +6,6 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from .config import (
-    PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG,
     PNCP_INGEST_ITEMS_STARVE_BACKLOG,
     PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS,
     PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS_MAX,
@@ -16,12 +15,12 @@ from .config import (
     PNCP_MODALIDADES_DEFAULT,
     PNCP_UFS_DEFAULT,
 )
+from .ingest_backpressure import compute_ingest_backpressure
 from .ingest_dates import resolve_backfill_window
 from .ingest_queue import (
     TASK_CONTRACT_ITEMS,
     enqueue_catalog_page,
     enqueue_contract_items,
-    backlog_by_task_type,
     queue_stats,
 )
 from .local_index import _get_ingest_state, _parse_iso_utc, _resolve_backfill_start_page, ensure_local_index
@@ -108,13 +107,13 @@ def plan_ingest_queue(
     items_enqueued = 0
     now = datetime.utcnow()
     pending_now = int(queue_stats().get("pending") or 0)
-    items_backlog = backlog_by_task_type(TASK_CONTRACT_ITEMS)
-    pause_catalog_backlog = items_backlog >= max(
-        0, int(PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG)
-    )
-    pause_catalog_starve = items_backlog < max(0, int(PNCP_INGEST_ITEMS_STARVE_BACKLOG))
+    bp = compute_ingest_backpressure()
+    items_backlog = int(bp["items_backlog"])
+    pause_catalog_backlog = bool(bp["pause_high_items"])
+    pause_catalog_starve = bool(bp["starving"])
+    pause_catalog_heavy = bool(bp["catalog_heavy"])
     plan_catalog = pending_now < max(0, int(PNCP_INGEST_QUEUE_MAX_PENDING))
-    plan_catalog = plan_catalog and not pause_catalog_backlog and not pause_catalog_starve
+    plan_catalog = plan_catalog and not bool(bp["pause_catalog"])
     if not plan_catalog:
         catalog_skipped_queue_full = len(ufs) * len(mods)
 
@@ -175,5 +174,7 @@ def plan_ingest_queue(
         "items_backlog_before": items_backlog,
         "catalog_paused_backlog": pause_catalog_backlog,
         "catalog_paused_starve": pause_catalog_starve,
+        "catalog_paused_heavy": pause_catalog_heavy,
+        "catalog_pending_before": bp.get("catalog_pending"),
         "contract_items_enqueued": items_enqueued,
     }

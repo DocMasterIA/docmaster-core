@@ -5,6 +5,8 @@
 
 **Contexto IA (completo):** [`PNCP-CONTEXTO-IA.md`](PNCP-CONTEXTO-IA.md) — ingest + fornecedor + produção + anti-padrões.
 
+**Planejamento fino (análise jun/2026):** [`PNCP-PLANEJAMENTO/00-INDICE.md`](PNCP-PLANEJAMENTO/00-INDICE.md) — objetivos, arquitetura, ingestão, gaps e roadmap em série de `.md`.
+
 Este ficheiro é a **fonte declarativa** do estado do repositório. Comandos: [`deploy/PNCP-COMANDOS-OPERACAO.txt`](deploy/PNCP-COMANDOS-OPERACAO.txt).
 
 ---

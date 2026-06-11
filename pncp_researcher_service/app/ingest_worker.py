@@ -9,8 +9,6 @@ from typing import Any, Dict, Optional
 
 from .config import (
     PNCP_INGEST_BATCH_MAX_SECONDS,
-    PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG,
-    PNCP_INGEST_ITEMS_STARVE_BACKLOG,
     PNCP_INGEST_PLANNER_INTERVAL_SECONDS,
     PNCP_INGEST_QUEUE_ENABLED,
     PNCP_INGEST_SELF_HEAL_INTERVAL_SECONDS,
@@ -23,6 +21,7 @@ from .config import (
     PNCP_INGEST_WORKER_POLL_SECONDS,
     PNCP_LOCAL_INCLUDE_ITEMS,
 )
+from .ingest_backpressure import compute_ingest_backpressure
 from .ingest_maintenance import requeue_processing_tasks, run_ingest_self_healing
 from .ingest_planner import plan_ingest_queue, topup_contract_items_if_starved
 from .ingest_runtime import (
@@ -55,7 +54,23 @@ from .pncp_client import PNCPClientError, create_pncp_http_client, get_contract_
 logger = logging.getLogger(__name__)
 
 _last_topup_mono: float = 0.0
+_last_gap_check_mono: float = 0.0
+GAP_CHECK_INTERVAL_SECONDS: float = 120.0
 TOPUP_MIN_INTERVAL_SECONDS: float = 30.0
+
+
+def _maybe_contracts_without_items(*, items_backlog: int, pause_catalog: bool) -> int:
+    """Gap SQLite — amostra barata, no máximo a cada 2 min quando fila de itens está baixa."""
+    global _last_gap_check_mono
+    if items_backlog >= 50 and not pause_catalog:
+        return 0
+    now = time.monotonic()
+    if (now - _last_gap_check_mono) < GAP_CHECK_INTERVAL_SECONDS:
+        return 0
+    _last_gap_check_mono = now
+    from .ingest_queue import count_contracts_without_items
+
+    return count_contracts_without_items()
 
 
 async def _load_contract_raw(numero_pncp: str) -> Optional[Dict[str, Any]]:
@@ -213,21 +228,44 @@ async def process_ingest_batch() -> Dict[str, Any]:
     global _last_topup_mono
     ensure_local_index()
     task_timeout = max(30.0, float(PNCP_INGEST_TASK_TIMEOUT_SECONDS))
-    items_backlog = backlog_by_task_type(TASK_CONTRACT_ITEMS)
-    starving = items_backlog < max(0, int(PNCP_INGEST_ITEMS_STARVE_BACKLOG))
     now_mono = time.monotonic()
-    if starving and (now_mono - _last_topup_mono) >= TOPUP_MIN_INTERVAL_SECONDS:
-        topped = topup_contract_items_if_starved(items_backlog=items_backlog)
-        if topped:
-            logger.info("ingest topup itens enfileirados=%s backlog_antes=%s", topped, items_backlog)
-        _last_topup_mono = now_mono
-        items_backlog = backlog_by_task_type(TASK_CONTRACT_ITEMS)
-        starving = items_backlog < max(0, int(PNCP_INGEST_ITEMS_STARVE_BACKLOG))
 
-    pause_catalog = (
-        items_backlog >= max(0, int(PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG))
-        or starving
-    )
+    bp = compute_ingest_backpressure()
+    items_backlog = int(bp["items_backlog"])
+    starving = bool(bp["starving"])
+    catalog_heavy = bool(bp["catalog_heavy"])
+    pause_catalog = bool(bp["pause_catalog"])
+
+    if (now_mono - _last_topup_mono) >= TOPUP_MIN_INTERVAL_SECONDS and (
+        starving or pause_catalog
+    ):
+        gap = _maybe_contracts_without_items(
+            items_backlog=items_backlog,
+            pause_catalog=pause_catalog,
+        )
+        if starving or (gap > 0 and items_backlog < 50):
+            topped = topup_contract_items_if_starved(items_backlog=items_backlog)
+            if topped:
+                logger.info(
+                    "ingest topup itens enfileirados=%s backlog_antes=%s gap_sqlite=%s",
+                    topped,
+                    items_backlog,
+                    gap,
+                )
+            _last_topup_mono = now_mono
+            bp = compute_ingest_backpressure()
+            items_backlog = int(bp["items_backlog"])
+            starving = bool(bp["starving"])
+            catalog_heavy = bool(bp["catalog_heavy"])
+            pause_catalog = bool(bp["pause_catalog"])
+
+    if catalog_heavy and pause_catalog:
+        logger.info(
+            "ingest catálogo pausado (heavy): catalog_pending=%s items_backlog=%s",
+            bp.get("catalog_pending"),
+            items_backlog,
+        )
+
     catalog_limit = 0 if pause_catalog else PNCP_INGEST_WORKER_CATALOG_BATCH
     item_limit = PNCP_INGEST_WORKER_ITEMS_BATCH
     if pause_catalog:
@@ -246,12 +284,19 @@ async def process_ingest_batch() -> Dict[str, Any]:
         limit=item_limit,
     )
     if not catalog_tasks and not item_tasks:
+        gap = _maybe_contracts_without_items(
+            items_backlog=items_backlog,
+            pause_catalog=pause_catalog,
+        )
         return {
             "catalog_ok": 0,
             "items_ok": 0,
             "errors": 0,
             "catalog_paused": pause_catalog,
+            "catalog_heavy": catalog_heavy,
             "items_backlog": items_backlog,
+            "items_starved": starving,
+            "contracts_without_items": gap,
             "queue": queue_stats(),
         }
 
@@ -282,13 +327,19 @@ async def process_ingest_batch() -> Dict[str, Any]:
             else:
                 errors += 1
 
+    gap = _maybe_contracts_without_items(
+        items_backlog=items_backlog,
+        pause_catalog=pause_catalog,
+    )
     return {
         "catalog_ok": catalog_ok,
         "items_ok": items_ok,
         "errors": errors,
         "catalog_paused": pause_catalog,
+        "catalog_heavy": catalog_heavy,
         "items_backlog": items_backlog,
         "items_starved": starving,
+        "contracts_without_items": gap,
         "queue": queue_stats(),
     }
 
@@ -368,13 +419,14 @@ async def ingest_worker_loop() -> None:
             if (result.get("catalog_ok") or result.get("items_ok") or result.get("errors")):
                 logger.info(
                     "ingest batch catalog_ok=%s items_ok=%s errors=%s pending=%s "
-                    "items_backlog=%s catalog_paused=%s",
+                    "items_backlog=%s catalog_paused=%s catalog_heavy=%s",
                     result.get("catalog_ok"),
                     result.get("items_ok"),
                     result.get("errors"),
                     (result.get("queue") or {}).get("pending"),
                     result.get("items_backlog"),
                     result.get("catalog_paused"),
+                    result.get("catalog_heavy"),
                 )
         except asyncio.CancelledError:
             raise

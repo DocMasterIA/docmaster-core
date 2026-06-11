@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional
 from .config import (
     PNCP_INGEST_BATCH_MAX_SECONDS,
     PNCP_INGEST_CATALOG_PAUSE_MIN_GAP,
+    PNCP_INGEST_CATALOG_TASK_TIMEOUT_SECONDS,
     PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG,
     PNCP_INGEST_PLANNER_INTERVAL_SECONDS,
     PNCP_INGEST_QUEUE_ENABLED,
@@ -63,6 +64,18 @@ GAP_CHECK_INTERVAL_SECONDS: float = 120.0
 TOPUP_MIN_INTERVAL_SECONDS: float = 30.0
 
 
+def _cap_catalog_batch_limit(requested: int, *, has_item_tasks: bool) -> int:
+    """Evita batch > PNCP_INGEST_BATCH_MAX_SECONDS com N páginas × timeout HTTP."""
+    req = max(0, int(requested))
+    if req <= 0:
+        return 0
+    batch_t = max(120.0, float(PNCP_INGEST_BATCH_MAX_SECONDS))
+    page_t = max(30.0, float(PNCP_INGEST_CATALOG_TASK_TIMEOUT_SECONDS))
+    reserve = 45.0 + (25.0 if has_item_tasks else 0.0)
+    slots = max(1, int((batch_t - reserve) // (page_t + 8.0)))
+    return min(req, slots)
+
+
 def _maybe_contracts_without_items(*, items_backlog: int, pause_catalog: bool) -> int:
     """Gap SQLite — amostra barata, no máximo a cada 2 min quando fila de itens está baixa."""
     global _last_gap_check_mono
@@ -114,7 +127,7 @@ async def process_catalog_page_task(task: Dict[str, Any], *, client: Any) -> Non
         uf=uf or None,
         pagina=pagina,
         tamanho_pagina=tamanho,
-        tolerate_rate_limit=False,
+        tolerate_rate_limit=True,
         client=client,
     )
     if not batch:
@@ -217,15 +230,19 @@ async def _run_item_task(task: Dict[str, Any], *, client: Any, timeout: float) -
 
 async def _run_catalog_task(task: Dict[str, Any], *, client: Any, timeout: float) -> str:
     tid = int(task["id"])
+    catalog_timeout = min(
+        max(30.0, timeout),
+        max(30.0, float(PNCP_INGEST_CATALOG_TASK_TIMEOUT_SECONDS)),
+    )
     try:
         await asyncio.wait_for(
             process_catalog_page_task(task, client=client),
-            timeout=max(30.0, timeout),
+            timeout=catalog_timeout,
         )
         mark_task_done(tid)
         return "ok"
     except asyncio.TimeoutError:
-        mark_task_failed(tid, f"timeout após {timeout:.0f}s")
+        mark_task_failed(tid, f"timeout após {catalog_timeout:.0f}s")
         logger.warning("ingest catalog task %s: timeout", tid)
         return "error"
     except PNCPClientError as exc:
@@ -305,6 +322,12 @@ async def process_ingest_batch() -> Dict[str, Any]:
         # Gap baixo: prioriza catálogo; quase não processa fila legada de itens.
         catalog_limit = PNCP_INGEST_WORKER_CATALOG_BATCH
         item_limit = 0 if items_backlog > 20 else min(item_limit, 4)
+
+    if catalog_limit > 0:
+        catalog_limit = _cap_catalog_batch_limit(
+            catalog_limit,
+            has_item_tasks=item_limit > 0,
+        )
 
     catalog_tasks = (
         claim_tasks(task_type=TASK_CATALOG_PAGE, limit=catalog_limit)

@@ -136,6 +136,10 @@ PNCP_INGEST_WORKER_ITEMS_CONCURRENCY: int = _env_int("PNCP_INGEST_WORKER_ITEMS_C
 PNCP_INGEST_TASK_TIMEOUT_SECONDS: float = float(
     os.getenv("PNCP_INGEST_TASK_TIMEOUT_SECONDS", "180")
 )
+# Timeout por página de catálogo (menor que itens — evita batch 480s estourar).
+PNCP_INGEST_CATALOG_TASK_TIMEOUT_SECONDS: float = float(
+    os.getenv("PNCP_INGEST_CATALOG_TASK_TIMEOUT_SECONDS", "90")
+)
 # Teto de duração do batch; ao estourar, requeue processing e segue o loop.
 PNCP_INGEST_BATCH_MAX_SECONDS: float = float(
     os.getenv("PNCP_INGEST_BATCH_MAX_SECONDS", "480")

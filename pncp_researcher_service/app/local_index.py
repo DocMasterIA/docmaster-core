@@ -790,7 +790,6 @@ def _objeto(raw: Dict[str, Any]) -> str:
 
 
 def upsert_contracts(raw_items: Iterable[Dict[str, Any]]) -> int:
-    ensure_local_index()
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     count = 0
     with _conn() as c:

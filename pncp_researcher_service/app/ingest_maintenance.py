@@ -146,6 +146,46 @@ def revive_dead_tasks(*, limit: int, min_dead_age_seconds: int) -> int:
     return n
 
 
+def purge_redundant_pending_item_tasks(*, limit: int = 5000) -> int:
+    """Remove da fila pending contract_items que já não precisam refresh (itens recentes)."""
+    from .local_index import contract_needs_items_refresh
+
+    lim = max(1, int(limit))
+    with _queue_conn() as c:
+        rows = c.execute(
+            """
+            SELECT id, numero_pncp FROM pncp_ingest_queue
+            WHERE task_type = 'contract_items' AND status = 'pending'
+            ORDER BY priority DESC, id ASC
+            LIMIT ?
+            """,
+            (lim,),
+        ).fetchall()
+    ids = [
+        int(r["id"])
+        for r in rows
+        if not contract_needs_items_refresh(str(r["numero_pncp"] or ""))
+    ]
+    if not ids:
+        return 0
+    now = _utc_now_iso()
+    with _queue_conn() as c:
+        placeholders = ",".join("?" for _ in ids)
+        cur = c.execute(
+            f"""
+            UPDATE pncp_ingest_queue
+            SET status = 'done', updated_at = ?, last_error = 'purge: refresh desnecessário'
+            WHERE id IN ({placeholders}) AND status = 'pending'
+            """,
+            (now, *ids),
+        )
+        n = int(cur.rowcount or 0)
+        c.commit()
+    if n:
+        logger.info("ingest purge pending itens redundantes=%s", n)
+    return n
+
+
 def reconcile_gap_contracts_after_done_items() -> int:
     """
     Contratos ainda no gap SQLite com tarefa contract_items já concluída (done).
@@ -204,8 +244,10 @@ def run_ingest_self_healing(*, mode: str = "periodic") -> Dict[str, Any]:
     purged = purge_redundant_dead_tasks()
     revived = revive_dead_tasks(limit=dead_batch, min_dead_age_seconds=dead_min_age)
     gap_reconciled = 0
+    items_purged = 0
     if startup or stall:
         gap_reconciled = reconcile_gap_contracts_after_done_items()
+        items_purged = purge_redundant_pending_item_tasks()
 
     out = {
         "ok": True,
@@ -215,7 +257,8 @@ def run_ingest_self_healing(*, mode: str = "periodic") -> Dict[str, Any]:
         "dead_purged": purged,
         "dead_revived": revived,
         "gap_reconciled": gap_reconciled,
+        "items_purged": items_purged,
     }
-    if requeued or scopes or purged or revived or gap_reconciled:
+    if requeued or scopes or purged or revived or gap_reconciled or items_purged:
         logger.info("ingest self-heal (%s): %s", mode, out)
     return out

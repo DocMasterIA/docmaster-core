@@ -194,6 +194,10 @@ async def process_contract_items_task(task: Dict[str, Any], *, client: Any) -> i
 
 async def _run_item_task(task: Dict[str, Any], *, client: Any, timeout: float) -> tuple[str, int]:
     tid = int(task["id"])
+    numero = str(task.get("numero_pncp") or "").strip()
+    if numero and not contract_needs_items_refresh(numero):
+        mark_task_done(tid)
+        return "skip", 0
     try:
         rows_up = await asyncio.wait_for(
             process_contract_items_task(task, client=client),
@@ -298,9 +302,9 @@ async def process_ingest_batch() -> Dict[str, Any]:
             PNCP_INGEST_WORKER_ITEMS_BATCH_MAX,
         )
     elif gap_sqlite < max(1, int(PNCP_INGEST_CATALOG_PAUSE_MIN_GAP)):
-        # Gap baixo: prioriza catálogo mas ainda processa alguns itens se enfileirados.
+        # Gap baixo: prioriza catálogo; quase não processa fila legada de itens.
         catalog_limit = PNCP_INGEST_WORKER_CATALOG_BATCH
-        item_limit = min(item_limit, 8)
+        item_limit = 0 if items_backlog > 20 else min(item_limit, 4)
 
     catalog_tasks = (
         claim_tasks(task_type=TASK_CATALOG_PAGE, limit=catalog_limit)
@@ -319,6 +323,7 @@ async def process_ingest_batch() -> Dict[str, Any]:
         return {
             "catalog_ok": 0,
             "items_ok": 0,
+            "items_skipped": 0,
             "item_rows_upserted": 0,
             "errors": 0,
             "catalog_paused": pause_catalog,
@@ -329,9 +334,16 @@ async def process_ingest_batch() -> Dict[str, Any]:
             "queue": queue_stats(),
         }
 
-    catalog_ok = items_ok = item_rows_upserted = errors = 0
+    catalog_ok = items_ok = items_skipped = item_rows_upserted = errors = 0
+    # Com gap=0, catálogo primeiro — se o batch estourar timeout, páginas já foram processadas.
+    run_catalog_first = gap_sqlite == 0 and bool(catalog_tasks)
+
     async with create_pncp_http_client() as client:
-        if item_tasks:
+
+        async def _run_items() -> None:
+            nonlocal items_ok, items_skipped, item_rows_upserted, errors
+            if not item_tasks:
+                return
             conc = max(1, int(PNCP_INGEST_WORKER_ITEMS_CONCURRENCY))
             sem = asyncio.Semaphore(conc)
 
@@ -344,23 +356,35 @@ async def process_ingest_batch() -> Dict[str, Any]:
                 return_exceptions=False,
             )
             for st, rows_up in item_results:
-                if st == "ok":
+                if st == "error":
+                    errors += 1
+                elif st == "skip":
+                    items_skipped += 1
+                else:
                     items_ok += 1
                     item_rows_upserted += int(rows_up or 0)
+
+        async def _run_catalog() -> None:
+            nonlocal catalog_ok, errors
+            for task in catalog_tasks:
+                st = await _run_catalog_task(task, client=client, timeout=task_timeout)
+                if st == "ok":
+                    catalog_ok += 1
                 else:
                     errors += 1
 
-        for task in catalog_tasks:
-            st = await _run_catalog_task(task, client=client, timeout=task_timeout)
-            if st == "ok":
-                catalog_ok += 1
-            else:
-                errors += 1
+        if run_catalog_first:
+            await _run_catalog()
+            await _run_items()
+        else:
+            await _run_items()
+            await _run_catalog()
 
     gap_sqlite = count_contracts_without_items()
     return {
         "catalog_ok": catalog_ok,
         "items_ok": items_ok,
+        "items_skipped": items_skipped,
         "item_rows_upserted": item_rows_upserted,
         "errors": errors,
         "catalog_paused": pause_catalog,
@@ -434,22 +458,31 @@ async def ingest_worker_loop() -> None:
                     batch_timeout,
                     n,
                 )
+                gap_sqlite = await asyncio.to_thread(count_contracts_without_items)
+                bp = compute_ingest_backpressure(contracts_without_items=gap_sqlite)
                 result = {
                     "catalog_ok": 0,
                     "items_ok": 0,
+                    "items_skipped": 0,
+                    "item_rows_upserted": 0,
                     "errors": 1,
                     "batch_timeout": True,
                     "requeued_processing": n,
+                    "contracts_without_items": gap_sqlite,
+                    "items_backlog": int(bp["items_backlog"]),
+                    "catalog_paused": bool(bp["pause_catalog"]),
+                    "catalog_heavy": bool(bp["catalog_heavy"]),
                     "queue": queue_stats(),
                 }
             record_batch_result(result)
             maybe_log_heartbeat()
             if (result.get("catalog_ok") or result.get("items_ok") or result.get("errors")):
                 logger.info(
-                    "ingest batch catalog_ok=%s items_ok=%s item_rows=%s errors=%s pending=%s "
+                    "ingest batch catalog_ok=%s items_ok=%s items_skip=%s item_rows=%s errors=%s pending=%s "
                     "gap=%s items_backlog=%s catalog_paused=%s catalog_heavy=%s",
                     result.get("catalog_ok"),
                     result.get("items_ok"),
+                    result.get("items_skipped"),
                     result.get("item_rows_upserted"),
                     result.get("errors"),
                     (result.get("queue") or {}).get("pending"),

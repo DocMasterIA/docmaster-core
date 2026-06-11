@@ -895,8 +895,8 @@ def contract_needs_items_refresh(numero_pncp: str) -> bool:
     numero = str(numero_pncp or "").strip()
     if not numero:
         return True
-    ensure_local_index()
     with _conn() as c:
+        _migrate_pncp_contratos_items_verified(c)
         ctr = c.execute(
             "SELECT itens_verificados_at FROM pncp_contratos WHERE numero_pncp = ?",
             (numero,),

@@ -178,3 +178,43 @@ def test_reconcile_gap_after_done_item_tasks(queue_db):
     n = ingest_maintenance.reconcile_gap_contracts_after_done_items()
     assert n == 1
     assert ingest_queue.count_contracts_without_items() == 0
+
+
+def test_purge_redundant_pending_item_tasks(queue_db, monkeypatch):
+    monkeypatch.setattr(local_index, "PNCP_INGEST_ITEMS_REFRESH_DAYS", 7)
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    recent = now
+    with local_index._conn() as c:
+        c.execute(
+            """
+            INSERT INTO pncp_contratos (numero_pncp, updated_at, raw_json)
+            VALUES ('PNCP-FRESH', ?, '{}')
+            """,
+            (now,),
+        )
+        c.execute(
+            """
+            INSERT INTO pncp_itens (
+                numero_pncp, descricao, item_fingerprint, updated_at
+            ) VALUES ('PNCP-FRESH', 'parafuso', '1|parafuso|||', ?)
+            """,
+            (recent,),
+        )
+        c.commit()
+    with ingest_queue._queue_conn() as c:
+        c.execute(
+            """
+            INSERT INTO pncp_ingest_queue (
+                task_type, priority, uf, modalidade, pagina, data_inicial, data_final,
+                numero_pncp, payload_json, status, attempts, max_attempts,
+                last_error, available_at, created_at, updated_at
+            ) VALUES ('contract_items', 80, NULL, NULL, NULL, NULL, NULL,
+                'PNCP-FRESH', '{}', 'pending', 0, 5, NULL, ?, ?, ?)
+            """,
+            (now, now, now),
+        )
+        c.commit()
+    n = ingest_maintenance.purge_redundant_pending_item_tasks()
+    assert n == 1
+    stats = ingest_queue.queue_stats()
+    assert stats["pending"] == 0

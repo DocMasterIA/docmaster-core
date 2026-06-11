@@ -7,7 +7,9 @@ from typing import Any, Dict, List, Optional
 
 from .config import (
     PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG,
+    PNCP_INGEST_ITEMS_STARVE_BACKLOG,
     PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS,
+    PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS_MAX,
     PNCP_INGEST_PLANNER_PAGES_PER_SCOPE,
     PNCP_INGEST_QUEUE_ENABLED,
     PNCP_INGEST_QUEUE_MAX_PENDING,
@@ -29,6 +31,52 @@ logger = logging.getLogger(__name__)
 PRIORITY_GAP = 50
 PRIORITY_NORMAL = 100
 PRIORITY_BACKLOG_ITEMS = 80
+
+
+def enqueue_contracts_without_items(*, limit: int, priority: int = PRIORITY_BACKLOG_ITEMS) -> int:
+    """Enfileira contratos locais que ainda não têm linhas em pncp_itens."""
+    lim = max(0, int(limit))
+    if lim <= 0:
+        return 0
+    ensure_local_index()
+    from .ingest_queue import _queue_conn
+
+    with _queue_conn() as c:
+        rows = c.execute(
+            """
+            SELECT c.numero_pncp
+            FROM pncp_contratos c
+            WHERE NOT EXISTS (
+                SELECT 1 FROM pncp_itens i WHERE i.numero_pncp = c.numero_pncp LIMIT 1
+            )
+            ORDER BY c.updated_at DESC
+            LIMIT ?
+            """,
+            (lim,),
+        ).fetchall()
+    n = 0
+    for r in rows:
+        if enqueue_contract_items(
+            numero_pncp=str(r["numero_pncp"]),
+            priority=int(priority),
+        ):
+            n += 1
+    return n
+
+
+def topup_contract_items_if_starved(*, items_backlog: int) -> int:
+    """Alimenta a fila de itens quando o backlog está baixo (crescimento do índice)."""
+    starve = max(0, int(PNCP_INGEST_ITEMS_STARVE_BACKLOG))
+    if items_backlog >= starve:
+        return 0
+    base = max(0, int(PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS))
+    ceiling = max(base, int(PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS_MAX))
+    # Quanto menor o backlog, mais contratos enfileiramos nesta rodada.
+    if items_backlog <= 0:
+        lim = ceiling
+    else:
+        lim = min(ceiling, base + (starve - items_backlog) * 4)
+    return enqueue_contracts_without_items(limit=lim)
 
 
 def plan_ingest_queue(
@@ -64,8 +112,9 @@ def plan_ingest_queue(
     pause_catalog_backlog = items_backlog >= max(
         0, int(PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG)
     )
+    pause_catalog_starve = items_backlog < max(0, int(PNCP_INGEST_ITEMS_STARVE_BACKLOG))
     plan_catalog = pending_now < max(0, int(PNCP_INGEST_QUEUE_MAX_PENDING))
-    plan_catalog = plan_catalog and not pause_catalog_backlog
+    plan_catalog = plan_catalog and not pause_catalog_backlog and not pause_catalog_starve
     if not plan_catalog:
         catalog_skipped_queue_full = len(ufs) * len(mods)
 
@@ -102,27 +151,13 @@ def plan_ingest_queue(
                     catalog_enqueued += 1
 
     if backlog_lim > 0:
-        from .ingest_queue import _queue_conn
-
-        with _queue_conn() as c:
-            rows = c.execute(
-                """
-                SELECT c.numero_pncp
-                FROM pncp_contratos c
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM pncp_itens i WHERE i.numero_pncp = c.numero_pncp LIMIT 1
-                )
-                ORDER BY c.updated_at DESC
-                LIMIT ?
-                """,
-                (backlog_lim,),
-            ).fetchall()
-        for r in rows:
-            if enqueue_contract_items(
-                numero_pncp=str(r["numero_pncp"]),
-                priority=PRIORITY_BACKLOG_ITEMS,
-            ):
-                items_enqueued += 1
+        starve = max(0, int(PNCP_INGEST_ITEMS_STARVE_BACKLOG))
+        if items_backlog < starve:
+            backlog_lim = max(
+                backlog_lim,
+                int(PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS_MAX),
+            )
+        items_enqueued = enqueue_contracts_without_items(limit=backlog_lim)
 
     return {
         "ok": True,
@@ -139,5 +174,6 @@ def plan_ingest_queue(
         "queue_pending_before": pending_now,
         "items_backlog_before": items_backlog,
         "catalog_paused_backlog": pause_catalog_backlog,
+        "catalog_paused_starve": pause_catalog_starve,
         "contract_items_enqueued": items_enqueued,
     }

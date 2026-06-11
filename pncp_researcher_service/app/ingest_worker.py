@@ -8,19 +8,23 @@ import time
 from typing import Any, Dict, Optional
 
 from .config import (
+    PNCP_INGEST_BATCH_MAX_SECONDS,
     PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG,
+    PNCP_INGEST_ITEMS_STARVE_BACKLOG,
     PNCP_INGEST_PLANNER_INTERVAL_SECONDS,
     PNCP_INGEST_QUEUE_ENABLED,
     PNCP_INGEST_SELF_HEAL_INTERVAL_SECONDS,
+    PNCP_INGEST_TASK_TIMEOUT_SECONDS,
     PNCP_INGEST_WORKER_CATALOG_BATCH,
     PNCP_INGEST_WORKER_ENABLED,
     PNCP_INGEST_WORKER_ITEMS_BATCH,
     PNCP_INGEST_WORKER_ITEMS_BATCH_MAX,
+    PNCP_INGEST_WORKER_ITEMS_CONCURRENCY,
     PNCP_INGEST_WORKER_POLL_SECONDS,
     PNCP_LOCAL_INCLUDE_ITEMS,
 )
-from .ingest_maintenance import run_ingest_self_healing
-from .ingest_planner import plan_ingest_queue
+from .ingest_maintenance import requeue_processing_tasks, run_ingest_self_healing
+from .ingest_planner import plan_ingest_queue, topup_contract_items_if_starved
 from .ingest_runtime import (
     configure_service_logging,
     mark_worker_started,
@@ -49,6 +53,9 @@ from .local_index import (
 from .pncp_client import PNCPClientError, create_pncp_http_client, get_contract_items, search_contracts
 
 logger = logging.getLogger(__name__)
+
+_last_topup_mono: float = 0.0
+TOPUP_MIN_INTERVAL_SECONDS: float = 30.0
 
 
 async def _load_contract_raw(numero_pncp: str) -> Optional[Dict[str, Any]]:
@@ -152,10 +159,75 @@ async def process_contract_items_task(task: Dict[str, Any], *, client: Any) -> N
         upsert_contract_items(raw, rows)
 
 
+async def _run_item_task(task: Dict[str, Any], *, client: Any, timeout: float) -> str:
+    tid = int(task["id"])
+    try:
+        await asyncio.wait_for(
+            process_contract_items_task(task, client=client),
+            timeout=max(30.0, timeout),
+        )
+        mark_task_done(tid)
+        return "ok"
+    except asyncio.TimeoutError:
+        mark_task_failed(tid, f"timeout após {timeout:.0f}s")
+        logger.warning("ingest items task %s: timeout", tid)
+        return "error"
+    except Exception as exc:
+        mark_task_failed(tid, str(exc))
+        logger.warning("ingest items task %s: %s", tid, exc)
+        return "error"
+
+
+async def _run_catalog_task(task: Dict[str, Any], *, client: Any, timeout: float) -> str:
+    tid = int(task["id"])
+    try:
+        await asyncio.wait_for(
+            process_catalog_page_task(task, client=client),
+            timeout=max(30.0, timeout),
+        )
+        mark_task_done(tid)
+        return "ok"
+    except asyncio.TimeoutError:
+        mark_task_failed(tid, f"timeout após {timeout:.0f}s")
+        logger.warning("ingest catalog task %s: timeout", tid)
+        return "error"
+    except PNCPClientError as exc:
+        mark_task_failed(tid, str(exc))
+        _mark_ingest_error(
+            task.get("uf"),
+            int(task["modalidade"]),
+            data_inicial=str(task["data_inicial"]),
+            data_final=str(task["data_final"]),
+            page=int(task["pagina"]),
+            message=str(exc),
+        )
+        logger.warning("ingest catalog task %s: %s", tid, exc)
+        return "error"
+    except Exception as exc:
+        mark_task_failed(tid, str(exc))
+        logger.exception("ingest catalog task %s: %s", tid, exc)
+        return "error"
+
+
 async def process_ingest_batch() -> Dict[str, Any]:
+    global _last_topup_mono
     ensure_local_index()
+    task_timeout = max(30.0, float(PNCP_INGEST_TASK_TIMEOUT_SECONDS))
     items_backlog = backlog_by_task_type(TASK_CONTRACT_ITEMS)
-    pause_catalog = items_backlog >= max(0, int(PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG))
+    starving = items_backlog < max(0, int(PNCP_INGEST_ITEMS_STARVE_BACKLOG))
+    now_mono = time.monotonic()
+    if starving and (now_mono - _last_topup_mono) >= TOPUP_MIN_INTERVAL_SECONDS:
+        topped = topup_contract_items_if_starved(items_backlog=items_backlog)
+        if topped:
+            logger.info("ingest topup itens enfileirados=%s backlog_antes=%s", topped, items_backlog)
+        _last_topup_mono = now_mono
+        items_backlog = backlog_by_task_type(TASK_CONTRACT_ITEMS)
+        starving = items_backlog < max(0, int(PNCP_INGEST_ITEMS_STARVE_BACKLOG))
+
+    pause_catalog = (
+        items_backlog >= max(0, int(PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG))
+        or starving
+    )
     catalog_limit = 0 if pause_catalog else PNCP_INGEST_WORKER_CATALOG_BATCH
     item_limit = PNCP_INGEST_WORKER_ITEMS_BATCH
     if pause_catalog:
@@ -185,39 +257,30 @@ async def process_ingest_batch() -> Dict[str, Any]:
 
     catalog_ok = items_ok = errors = 0
     async with create_pncp_http_client() as client:
-        # Fase 2 primeiro — reduz sem_itens e backlog de contract_items.
-        for task in item_tasks:
-            tid = int(task["id"])
-            try:
-                await process_contract_items_task(task, client=client)
-                mark_task_done(tid)
-                items_ok += 1
-            except Exception as exc:
-                mark_task_failed(tid, str(exc))
-                errors += 1
-                logger.warning("ingest items task %s: %s", tid, exc)
+        if item_tasks:
+            conc = max(1, int(PNCP_INGEST_WORKER_ITEMS_CONCURRENCY))
+            sem = asyncio.Semaphore(conc)
+
+            async def _item_wrapped(t: Dict[str, Any]) -> str:
+                async with sem:
+                    return await _run_item_task(t, client=client, timeout=task_timeout)
+
+            item_results = await asyncio.gather(
+                *(_item_wrapped(t) for t in item_tasks),
+                return_exceptions=False,
+            )
+            for st in item_results:
+                if st == "ok":
+                    items_ok += 1
+                else:
+                    errors += 1
 
         for task in catalog_tasks:
-            tid = int(task["id"])
-            try:
-                await process_catalog_page_task(task, client=client)
-                mark_task_done(tid)
+            st = await _run_catalog_task(task, client=client, timeout=task_timeout)
+            if st == "ok":
                 catalog_ok += 1
-            except PNCPClientError as exc:
-                mark_task_failed(tid, str(exc))
-                _mark_ingest_error(
-                    task.get("uf"),
-                    int(task["modalidade"]),
-                    data_inicial=str(task["data_inicial"]),
-                    data_final=str(task["data_final"]),
-                    page=int(task["pagina"]),
-                    message=str(exc),
-                )
+            else:
                 errors += 1
-            except Exception as exc:
-                mark_task_failed(tid, str(exc))
-                errors += 1
-                logger.exception("ingest catalog task %s: %s", tid, exc)
 
     return {
         "catalog_ok": catalog_ok,
@@ -225,6 +288,7 @@ async def process_ingest_batch() -> Dict[str, Any]:
         "errors": errors,
         "catalog_paused": pause_catalog,
         "items_backlog": items_backlog,
+        "items_starved": starving,
         "queue": queue_stats(),
     }
 
@@ -274,7 +338,31 @@ async def ingest_worker_loop() -> None:
                 )
                 last_plan = now
             run_stall_recovery_if_needed()
-            result = await process_ingest_batch()
+            batch_timeout = max(120.0, float(PNCP_INGEST_BATCH_MAX_SECONDS))
+            try:
+                result = await asyncio.wait_for(
+                    process_ingest_batch(),
+                    timeout=batch_timeout,
+                )
+            except asyncio.TimeoutError:
+                n = await asyncio.to_thread(
+                    requeue_processing_tasks,
+                    stale_only=False,
+                    stale_seconds=900,
+                )
+                logger.warning(
+                    "ingest batch timeout (%.0fs) — %s tarefas processing devolvidas à fila",
+                    batch_timeout,
+                    n,
+                )
+                result = {
+                    "catalog_ok": 0,
+                    "items_ok": 0,
+                    "errors": 1,
+                    "batch_timeout": True,
+                    "requeued_processing": n,
+                    "queue": queue_stats(),
+                }
             record_batch_result(result)
             maybe_log_heartbeat()
             if (result.get("catalog_ok") or result.get("items_ok") or result.get("errors")):

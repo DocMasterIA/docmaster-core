@@ -129,28 +129,43 @@ PNCP_INGEST_WORKER_ENABLED: bool = _env_bool("PNCP_INGEST_WORKER_ENABLED", True)
 PNCP_INGEST_WORKER_POLL_SECONDS: float = float(
     os.getenv("PNCP_INGEST_WORKER_POLL_SECONDS", "2")
 )
-PNCP_INGEST_WORKER_CATALOG_BATCH: int = _env_int("PNCP_INGEST_WORKER_CATALOG_BATCH", 3)
-PNCP_INGEST_WORKER_ITEMS_BATCH: int = _env_int("PNCP_INGEST_WORKER_ITEMS_BATCH", 28)
+PNCP_INGEST_WORKER_CATALOG_BATCH: int = _env_int("PNCP_INGEST_WORKER_CATALOG_BATCH", 6)
+PNCP_INGEST_WORKER_ITEMS_BATCH: int = _env_int("PNCP_INGEST_WORKER_ITEMS_BATCH", 32)
+PNCP_INGEST_WORKER_ITEMS_CONCURRENCY: int = _env_int("PNCP_INGEST_WORKER_ITEMS_CONCURRENCY", 10)
+# Timeout por tarefa HTTP no worker — evita batch preso 20+ min numa chamada PNCP.
+PNCP_INGEST_TASK_TIMEOUT_SECONDS: float = float(
+    os.getenv("PNCP_INGEST_TASK_TIMEOUT_SECONDS", "180")
+)
+# Teto de duração do batch; ao estourar, requeue processing e segue o loop.
+PNCP_INGEST_BATCH_MAX_SECONDS: float = float(
+    os.getenv("PNCP_INGEST_BATCH_MAX_SECONDS", "480")
+)
 PNCP_INGEST_QUEUE_MAX_ATTEMPTS: int = _env_int("PNCP_INGEST_QUEUE_MAX_ATTEMPTS", 5)
 # Planner não enfileira catálogo se pending >= este valor (drena antes de inchando).
-PNCP_INGEST_QUEUE_MAX_PENDING: int = _env_int("PNCP_INGEST_QUEUE_MAX_PENDING", 5000)
+PNCP_INGEST_QUEUE_MAX_PENDING: int = _env_int("PNCP_INGEST_QUEUE_MAX_PENDING", 12000)
 # Com fila de itens acima deste valor, worker/planner pausam catálogo (só drena itens).
 PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG: int = _env_int(
     "PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG", 3000
 )
 # Boost opcional do batch de itens quando há backlog alto.
 PNCP_INGEST_WORKER_ITEMS_BATCH_MAX: int = _env_int(
-    "PNCP_INGEST_WORKER_ITEMS_BATCH_MAX", 40
+    "PNCP_INGEST_WORKER_ITEMS_BATCH_MAX", 48
 )
 PNCP_INGEST_PLANNER_INTERVAL_SECONDS: int = _env_int(
-    "PNCP_INGEST_PLANNER_INTERVAL_SECONDS", 900
+    "PNCP_INGEST_PLANNER_INTERVAL_SECONDS", 300
 )
 PNCP_INGEST_PLANNER_PAGES_PER_SCOPE: int = _env_int(
-    "PNCP_INGEST_PLANNER_PAGES_PER_SCOPE", 4
+    "PNCP_INGEST_PLANNER_PAGES_PER_SCOPE", 8
 )
 PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS: int = _env_int(
-    "PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS", 200
+    "PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS", 400
 )
+# Quando a fila de itens está baixa, o planner/worker enfileiram até este teto por rodada.
+PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS_MAX: int = _env_int(
+    "PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS_MAX", 1200
+)
+# Abaixo deste backlog de itens, prioriza encher contract_items e reduz catálogo.
+PNCP_INGEST_ITEMS_STARVE_BACKLOG: int = _env_int("PNCP_INGEST_ITEMS_STARVE_BACKLOG", 150)
 # Retentativas extras quando o corpo da resposta não é JSON válido.
 PNCP_INGEST_JSON_INVALID_RETRIES: int = _env_int("PNCP_INGEST_JSON_INVALID_RETRIES", 3)
 PNCP_INGEST_JSON_INVALID_RETRY_SECONDS: float = float(

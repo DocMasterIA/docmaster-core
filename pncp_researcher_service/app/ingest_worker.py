@@ -36,6 +36,7 @@ from .ingest_queue import (
     TASK_CONTRACT_ITEMS,
     backlog_by_task_type,
     claim_tasks,
+    count_contracts_without_items,
     enqueue_contract_items,
     mark_task_done,
     mark_task_failed,
@@ -145,12 +146,13 @@ async def process_catalog_page_task(task: Dict[str, Any], *, client: Any) -> Non
                     enqueue_contract_items(numero_pncp=numero, priority=90)
 
 
-async def process_contract_items_task(task: Dict[str, Any], *, client: Any) -> None:
+async def process_contract_items_task(task: Dict[str, Any], *, client: Any) -> int:
+    """Busca GET /itens; retorna linhas upserted em pncp_itens (0 se skip/vazio)."""
     numero = str(task.get("numero_pncp") or "").strip()
     if not numero:
-        return
+        return 0
     if not contract_needs_items_refresh(numero):
-        return
+        return 0
     raw = await _load_contract_raw(numero)
     if not raw:
         raise PNCPClientError(f"Contrato {numero} não encontrado no índice local.")
@@ -167,30 +169,31 @@ async def process_contract_items_task(task: Dict[str, Any], *, client: Any) -> N
     ano = raw.get("anoCompra")
     seq = raw.get("sequencialCompra")
     if not cnpj or ano is None or seq is None:
-        return
+        return 0
 
     rows = await get_contract_items(str(cnpj), ano, seq, client=client)
     if rows:
-        upsert_contract_items(raw, rows)
+        return int(upsert_contract_items(raw, rows) or 0)
+    return 0
 
 
-async def _run_item_task(task: Dict[str, Any], *, client: Any, timeout: float) -> str:
+async def _run_item_task(task: Dict[str, Any], *, client: Any, timeout: float) -> tuple[str, int]:
     tid = int(task["id"])
     try:
-        await asyncio.wait_for(
+        rows_up = await asyncio.wait_for(
             process_contract_items_task(task, client=client),
             timeout=max(30.0, timeout),
         )
         mark_task_done(tid)
-        return "ok"
+        return "ok", int(rows_up or 0)
     except asyncio.TimeoutError:
         mark_task_failed(tid, f"timeout após {timeout:.0f}s")
         logger.warning("ingest items task %s: timeout", tid)
-        return "error"
+        return "error", 0, 0
     except Exception as exc:
         mark_task_failed(tid, str(exc))
         logger.warning("ingest items task %s: %s", tid, exc)
-        return "error"
+        return "error", 0
 
 
 async def _run_catalog_task(task: Dict[str, Any], *, client: Any, timeout: float) -> str:
@@ -230,7 +233,8 @@ async def process_ingest_batch() -> Dict[str, Any]:
     task_timeout = max(30.0, float(PNCP_INGEST_TASK_TIMEOUT_SECONDS))
     now_mono = time.monotonic()
 
-    bp = compute_ingest_backpressure()
+    gap_sqlite = count_contracts_without_items()
+    bp = compute_ingest_backpressure(contracts_without_items=gap_sqlite)
     items_backlog = int(bp["items_backlog"])
     starving = bool(bp["starving"])
     catalog_heavy = bool(bp["catalog_heavy"])
@@ -239,10 +243,7 @@ async def process_ingest_batch() -> Dict[str, Any]:
     if (now_mono - _last_topup_mono) >= TOPUP_MIN_INTERVAL_SECONDS and (
         starving or pause_catalog
     ):
-        gap = _maybe_contracts_without_items(
-            items_backlog=items_backlog,
-            pause_catalog=pause_catalog,
-        )
+        gap = gap_sqlite
         if starving or (gap > 0 and items_backlog < 50):
             topped = topup_contract_items_if_starved(items_backlog=items_backlog)
             if topped:
@@ -253,7 +254,8 @@ async def process_ingest_batch() -> Dict[str, Any]:
                     gap,
                 )
             _last_topup_mono = now_mono
-            bp = compute_ingest_backpressure()
+            gap_sqlite = count_contracts_without_items()
+            bp = compute_ingest_backpressure(contracts_without_items=gap_sqlite)
             items_backlog = int(bp["items_backlog"])
             starving = bool(bp["starving"])
             catalog_heavy = bool(bp["catalog_heavy"])
@@ -261,9 +263,16 @@ async def process_ingest_batch() -> Dict[str, Any]:
 
     if catalog_heavy and pause_catalog:
         logger.info(
-            "ingest catálogo pausado (heavy): catalog_pending=%s items_backlog=%s",
+            "ingest catálogo pausado (heavy): catalog_pending=%s items_backlog=%s gap=%s",
             bp.get("catalog_pending"),
             items_backlog,
+            gap_sqlite,
+        )
+    elif not pause_catalog and int(bp.get("catalog_pending") or 0) >= 100 and gap_sqlite < 50:
+        logger.info(
+            "ingest catálogo reaberto (gap baixo=%s): catalog_pending=%s",
+            gap_sqlite,
+            bp.get("catalog_pending"),
         )
 
     catalog_limit = 0 if pause_catalog else PNCP_INGEST_WORKER_CATALOG_BATCH
@@ -291,22 +300,23 @@ async def process_ingest_batch() -> Dict[str, Any]:
         return {
             "catalog_ok": 0,
             "items_ok": 0,
+            "item_rows_upserted": 0,
             "errors": 0,
             "catalog_paused": pause_catalog,
             "catalog_heavy": catalog_heavy,
             "items_backlog": items_backlog,
             "items_starved": starving,
-            "contracts_without_items": gap,
+            "contracts_without_items": gap_sqlite,
             "queue": queue_stats(),
         }
 
-    catalog_ok = items_ok = errors = 0
+    catalog_ok = items_ok = item_rows_upserted = errors = 0
     async with create_pncp_http_client() as client:
         if item_tasks:
             conc = max(1, int(PNCP_INGEST_WORKER_ITEMS_CONCURRENCY))
             sem = asyncio.Semaphore(conc)
 
-            async def _item_wrapped(t: Dict[str, Any]) -> str:
+            async def _item_wrapped(t: Dict[str, Any]) -> tuple[str, int]:
                 async with sem:
                     return await _run_item_task(t, client=client, timeout=task_timeout)
 
@@ -314,9 +324,10 @@ async def process_ingest_batch() -> Dict[str, Any]:
                 *(_item_wrapped(t) for t in item_tasks),
                 return_exceptions=False,
             )
-            for st in item_results:
+            for st, rows_up in item_results:
                 if st == "ok":
                     items_ok += 1
+                    item_rows_upserted += int(rows_up or 0)
                 else:
                     errors += 1
 
@@ -327,19 +338,17 @@ async def process_ingest_batch() -> Dict[str, Any]:
             else:
                 errors += 1
 
-    gap = _maybe_contracts_without_items(
-        items_backlog=items_backlog,
-        pause_catalog=pause_catalog,
-    )
+    gap_sqlite = count_contracts_without_items()
     return {
         "catalog_ok": catalog_ok,
         "items_ok": items_ok,
+        "item_rows_upserted": item_rows_upserted,
         "errors": errors,
         "catalog_paused": pause_catalog,
         "catalog_heavy": catalog_heavy,
         "items_backlog": items_backlog,
         "items_starved": starving,
-        "contracts_without_items": gap,
+        "contracts_without_items": gap_sqlite,
         "queue": queue_stats(),
     }
 
@@ -418,12 +427,14 @@ async def ingest_worker_loop() -> None:
             maybe_log_heartbeat()
             if (result.get("catalog_ok") or result.get("items_ok") or result.get("errors")):
                 logger.info(
-                    "ingest batch catalog_ok=%s items_ok=%s errors=%s pending=%s "
-                    "items_backlog=%s catalog_paused=%s catalog_heavy=%s",
+                    "ingest batch catalog_ok=%s items_ok=%s item_rows=%s errors=%s pending=%s "
+                    "gap=%s items_backlog=%s catalog_paused=%s catalog_heavy=%s",
                     result.get("catalog_ok"),
                     result.get("items_ok"),
+                    result.get("item_rows_upserted"),
                     result.get("errors"),
                     (result.get("queue") or {}).get("pending"),
+                    result.get("contracts_without_items"),
                     result.get("items_backlog"),
                     result.get("catalog_paused"),
                     result.get("catalog_heavy"),

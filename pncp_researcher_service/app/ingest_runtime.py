@@ -21,6 +21,8 @@ _last_batch_summary: Dict[str, Any] = {}
 _stall_recoveries: int = 0
 _last_stall_recovery_at: float = 0.0
 _items_ok_window: Deque[Tuple[float, int]] = deque()
+_item_rows_window: Deque[Tuple[float, int]] = deque()
+_last_heartbeat_mono: float = 0.0
 
 
 def configure_service_logging() -> None:
@@ -73,15 +75,22 @@ def record_batch_result(result: Dict[str, Any]) -> None:
     global _last_batch_at, _last_progress_at, _last_items_progress_at, _last_pending, _last_batch_summary
     now = time.monotonic()
     _last_batch_at = now
+    prev_hb = float(_last_batch_summary.get("_last_heartbeat_mono") or 0.0)
     _last_batch_summary = dict(result or {})
+    if prev_hb > 0:
+        _last_batch_summary["_last_heartbeat_mono"] = prev_hb
 
     queue = result.get("queue") if isinstance(result.get("queue"), dict) else {}
     pending = int(queue.get("pending") or 0)
     items_ok = int(result.get("items_ok") or 0)
+    item_rows = int(result.get("item_rows_upserted") or 0)
     catalog_ok = int(result.get("catalog_ok") or 0)
     progress_units = items_ok + catalog_ok
 
-    if items_ok > 0:
+    if item_rows > 0:
+        _last_items_progress_at = now
+        _item_rows_window.append((now, item_rows))
+    elif items_ok > 0:
         _last_items_progress_at = now
         _items_ok_window.append((now, items_ok))
     if progress_units > 0:
@@ -92,6 +101,8 @@ def record_batch_result(result: Dict[str, Any]) -> None:
     cutoff = now - 3600.0
     while _items_ok_window and _items_ok_window[0][0] < cutoff:
         _items_ok_window.popleft()
+    while _item_rows_window and _item_rows_window[0][0] < cutoff:
+        _item_rows_window.popleft()
 
     _last_pending = pending
 
@@ -100,6 +111,12 @@ def items_ok_last_hour() -> int:
     now = time.monotonic()
     cutoff = now - 3600.0
     return sum(n for ts, n in _items_ok_window if ts >= cutoff)
+
+
+def item_rows_last_hour() -> int:
+    now = time.monotonic()
+    cutoff = now - 3600.0
+    return sum(n for ts, n in _item_rows_window if ts >= cutoff)
 
 
 def seconds_since_progress() -> float:
@@ -115,8 +132,10 @@ def seconds_since_items_progress() -> float:
 
 
 def is_items_feed_stalled() -> bool:
-    """Parada de alimentação do índice: fila de itens existe mas items_ok=0 por N minutos."""
+    """Parada de alimentação: gap/trabalho de itens mas zero linhas upserted por N minutos."""
     if not _items_work_pending(_last_batch_summary):
+        return False
+    if item_rows_last_hour() > 0:
         return False
     return seconds_since_items_progress() >= float(config.PNCP_INGEST_ITEMS_STALL_SECONDS)
 
@@ -139,17 +158,21 @@ def maybe_log_heartbeat(*, force: bool = False) -> None:
     last_log = float(_last_batch_summary.get("_last_heartbeat_mono") or 0.0)
     if not force and (now - last_log) < interval:
         return
+    global _last_heartbeat_mono
+    _last_heartbeat_mono = now
     _last_batch_summary["_last_heartbeat_mono"] = now
     stalled = is_ingest_stalled()
     items_stalled = is_items_feed_stalled()
     logger.info(
-        "ingest heartbeat pending=%s processing=%s items_ok=%s errors=%s "
-        "items_ok_1h=%s gap_contratos=%s since_items_progress=%.0fs items_stalled=%s "
+        "ingest heartbeat pending=%s processing=%s items_ok=%s item_rows=%s errors=%s "
+        "item_rows_1h=%s items_ok_1h=%s gap_contratos=%s since_items_progress=%.0fs items_stalled=%s "
         "since_progress=%.0fs stalled=%s stall_recoveries=%s",
         _last_pending,
         (_last_batch_summary.get("queue") or {}).get("processing"),
         _last_batch_summary.get("items_ok"),
+        _last_batch_summary.get("item_rows_upserted"),
         _last_batch_summary.get("errors"),
+        item_rows_last_hour(),
         items_ok_last_hour(),
         _last_batch_summary.get("contracts_without_items"),
         seconds_since_items_progress(),
@@ -232,6 +255,7 @@ def ingest_runtime_status() -> Dict[str, Any]:
         "seconds_since_progress": round(seconds_since_progress(), 1),
         "seconds_since_items_progress": round(seconds_since_items_progress(), 1),
         "items_ok_last_hour": items_ok_last_hour(),
+        "item_rows_last_hour": item_rows_last_hour(),
         "contracts_without_items_last": _last_batch_summary.get("contracts_without_items"),
         "seconds_since_batch": round(max(0.0, time.monotonic() - _last_batch_at), 1)
         if _last_batch_at
@@ -241,6 +265,7 @@ def ingest_runtime_status() -> Dict[str, Any]:
         "last_batch": {
             "catalog_ok": _last_batch_summary.get("catalog_ok"),
             "items_ok": _last_batch_summary.get("items_ok"),
+            "item_rows_upserted": _last_batch_summary.get("item_rows_upserted"),
             "errors": _last_batch_summary.get("errors"),
             "catalog_heavy": _last_batch_summary.get("catalog_heavy"),
         },

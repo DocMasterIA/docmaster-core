@@ -168,6 +168,8 @@ PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS_MAX: int = _env_int(
 PNCP_INGEST_ITEMS_STARVE_BACKLOG: int = _env_int("PNCP_INGEST_ITEMS_STARVE_BACKLOG", 150)
 # Com muitas páginas de catálogo pending e poucos itens na fila, pausa catálogo (anti-trava).
 PNCP_INGEST_CATALOG_HEAVY_PENDING: int = _env_int("PNCP_INGEST_CATALOG_HEAVY_PENDING", 300)
+# Só pausa catálogo por starve/heavy se gap SQLite >= este valor; senão reabre catálogo p/ descobrir contratos.
+PNCP_INGEST_CATALOG_PAUSE_MIN_GAP: int = _env_int("PNCP_INGEST_CATALOG_PAUSE_MIN_GAP", 50)
 # Sem items_ok por N segundos enquanto há trabalho de itens → stall recovery (não confundir com catalog_ok).
 PNCP_INGEST_ITEMS_STALL_SECONDS: int = _env_int("PNCP_INGEST_ITEMS_STALL_SECONDS", 600)
 # Retentativas extras quando o corpo da resposta não é JSON válido.

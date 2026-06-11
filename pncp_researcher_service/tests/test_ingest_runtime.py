@@ -24,6 +24,8 @@ class IngestRuntimeTests(unittest.TestCase):
         rt._stall_recoveries = 0
         rt._last_stall_recovery_at = 0.0
         rt._items_ok_window.clear()
+        rt._item_rows_window.clear()
+        rt._last_heartbeat_mono = 0.0
         rt.mark_worker_started()
         self._patches = [
             mock.patch.object(config, "PNCP_INGEST_WORKER_ENABLED", True),

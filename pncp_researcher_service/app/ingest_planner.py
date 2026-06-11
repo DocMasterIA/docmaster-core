@@ -19,6 +19,7 @@ from .ingest_backpressure import compute_ingest_backpressure
 from .ingest_dates import resolve_backfill_window
 from .ingest_queue import (
     TASK_CONTRACT_ITEMS,
+    count_contracts_without_items,
     enqueue_catalog_page,
     enqueue_contract_items,
     queue_stats,
@@ -107,7 +108,7 @@ def plan_ingest_queue(
     items_enqueued = 0
     now = datetime.utcnow()
     pending_now = int(queue_stats().get("pending") or 0)
-    bp = compute_ingest_backpressure()
+    bp = compute_ingest_backpressure(contracts_without_items=count_contracts_without_items())
     items_backlog = int(bp["items_backlog"])
     pause_catalog_backlog = bool(bp["pause_high_items"])
     pause_catalog_starve = bool(bp["starving"])

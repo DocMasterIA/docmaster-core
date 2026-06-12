@@ -13,6 +13,8 @@ from .config import (
     PNCP_INGEST_PLANNER_PAGES_PER_SCOPE,
     PNCP_INGEST_QUEUE_ENABLED,
     PNCP_INGEST_QUEUE_MAX_PENDING,
+    PNCP_INGEST_RESULTADOS_TOPUP_ENABLED,
+    PNCP_INGEST_RESULTADOS_TOPUP_LIMIT,
     PNCP_MODALIDADES_DEFAULT,
     PNCP_UFS_DEFAULT,
     effective_items_refresh_days,
@@ -28,11 +30,18 @@ from .ingest_queue import (
     enqueue_contract_items,
     queue_stats,
 )
-from .local_index import _get_ingest_state, _parse_iso_utc, _resolve_backfill_start_page, ensure_local_index
+from .local_index import (
+    _get_ingest_state,
+    _parse_iso_utc,
+    _resolve_backfill_start_page,
+    ensure_local_index,
+    list_contracts_needing_resultados,
+)
 
 logger = logging.getLogger(__name__)
 
 PRIORITY_GAP = 50
+PRIORITY_RESULTADOS = 95
 PRIORITY_NORMAL = 100
 PRIORITY_BACKLOG_ITEMS = 80
 # Abaixo de catálogo-on-page (90) e gap (80): não compete com descoberta imediata.
@@ -210,6 +219,25 @@ def topup_contract_items_if_starved(*, items_backlog: int) -> int:
     return total
 
 
+def enqueue_contracts_needing_resultados(limit: Optional[int] = None) -> int:
+    """
+    Enfileira contratos já no índice sem preço homologado.
+    O worker trata com GET /resultados only (sem refetch /itens).
+    """
+    if not PNCP_INGEST_RESULTADOS_TOPUP_ENABLED:
+        return 0
+    lim = max(1, int(limit or PNCP_INGEST_RESULTADOS_TOPUP_LIMIT))
+    ensure_local_index()
+    numeros = list_contracts_needing_resultados(lim)
+    n = 0
+    for numero in numeros:
+        if enqueue_contract_items(numero_pncp=numero, priority=PRIORITY_RESULTADOS):
+            n += 1
+    if n:
+        logger.info("ingest topup resultados enfileirados=%s", n)
+    return n
+
+
 def plan_ingest_queue(
     *,
     uf: Optional[str] = None,
@@ -288,6 +316,8 @@ def plan_ingest_queue(
         else:
             items_enqueued = enqueue_contracts_without_items(limit=backlog_lim)
 
+    resultados_enqueued = enqueue_contracts_needing_resultados()
+
     return {
         "ok": True,
         "backfill_mode": is_ingest_backfill_mode(),
@@ -308,4 +338,5 @@ def plan_ingest_queue(
         "catalog_paused_heavy": pause_catalog_heavy,
         "catalog_pending_before": bp.get("catalog_pending"),
         "contract_items_enqueued": items_enqueued,
+        "resultados_enqueued": resultados_enqueued,
     }

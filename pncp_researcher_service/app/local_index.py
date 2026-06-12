@@ -1160,6 +1160,279 @@ def upsert_contract_items(
     return count
 
 
+def _item_row_likely_has_resultado(
+    *,
+    situacao_item: str = "",
+    fornecedor_elegivel: int = 0,
+    catalog: Optional[Dict[str, Any]] = None,
+) -> bool:
+    if int(fornecedor_elegivel or 0) == 1:
+        return True
+    if isinstance(catalog, dict):
+        if bool(catalog.get("temResultado")):
+            return True
+        if item_homologado_para_busca(catalog):
+            return True
+    sit = str(situacao_item or "").strip().lower()
+    if "homolog" in sit or "adjudic" in sit:
+        return True
+    return False
+
+
+def contract_has_items_needing_resultados(numero_pncp: str) -> bool:
+    """True se há linhas em pncp_itens elegíveis sem valor homologado persistido."""
+    numero = str(numero_pncp or "").strip()
+    if not numero:
+        return False
+    ensure_local_index()
+    with _conn() as c:
+        _migrate_pncp_itens_homolog_columns(c)
+        rows = c.execute(
+            """
+            SELECT situacao_item, fornecedor_elegivel, raw_json_zlib
+            FROM pncp_itens
+            WHERE numero_pncp = ? AND valor_unitario_homologado IS NULL
+            LIMIT 50
+            """,
+            (numero,),
+        ).fetchall()
+    for row in rows:
+        catalog = _decompress_zlib_json_blob(row["raw_json_zlib"])
+        if _item_row_likely_has_resultado(
+            situacao_item=str(row["situacao_item"] or ""),
+            fornecedor_elegivel=int(row["fornecedor_elegivel"] or 0),
+            catalog=catalog if isinstance(catalog, dict) else None,
+        ):
+            return True
+    return False
+
+
+def list_item_stubs_for_resultados_fetch(numero_pncp: str) -> List[Dict[str, Any]]:
+    """Linhas mínimas para decidir fetch /resultados (sem GET /itens)."""
+    numero = str(numero_pncp or "").strip()
+    if not numero:
+        return []
+    ensure_local_index()
+    stubs: List[Dict[str, Any]] = []
+    with _conn() as c:
+        _migrate_pncp_itens_homolog_columns(c)
+        rows = c.execute(
+            """
+            SELECT numero_item, situacao_item, fornecedor_elegivel, raw_json_zlib
+            FROM pncp_itens
+            WHERE numero_pncp = ? AND valor_unitario_homologado IS NULL
+            """,
+            (numero,),
+        ).fetchall()
+    for row in rows:
+        catalog = _decompress_zlib_json_blob(row["raw_json_zlib"])
+        cat_dict = catalog if isinstance(catalog, dict) else {}
+        if not _item_row_likely_has_resultado(
+            situacao_item=str(row["situacao_item"] or ""),
+            fornecedor_elegivel=int(row["fornecedor_elegivel"] or 0),
+            catalog=cat_dict or None,
+        ):
+            continue
+        ni = str(row["numero_item"] or cat_dict.get("numeroItem") or "").strip()
+        if not ni:
+            continue
+        stub = dict(cat_dict) if cat_dict else {}
+        stub["numeroItem"] = ni
+        if stub.get("temResultado") is None and _item_row_likely_has_resultado(
+            situacao_item=str(row["situacao_item"] or ""),
+            fornecedor_elegivel=1,
+        ):
+            stub["temResultado"] = True
+        stubs.append(stub)
+    return stubs
+
+
+def list_contracts_needing_resultados(limit: int) -> List[str]:
+    ensure_local_index()
+    lim = max(1, int(limit))
+    with _conn() as c:
+        _migrate_pncp_itens_homolog_columns(c)
+        rows = c.execute(
+            """
+            SELECT DISTINCT i.numero_pncp AS numero_pncp
+            FROM pncp_itens i
+            WHERE i.valor_unitario_homologado IS NULL
+              AND (
+                    i.fornecedor_elegivel = 1
+                    OR LOWER(COALESCE(i.situacao_item, '')) LIKE '%homolog%'
+                    OR LOWER(COALESCE(i.situacao_item, '')) LIKE '%adjudic%'
+                  )
+            ORDER BY i.updated_at DESC
+            LIMIT ?
+            """,
+            (lim,),
+        ).fetchall()
+    return [str(r["numero_pncp"] or "").strip() for r in rows if str(r["numero_pncp"] or "").strip()]
+
+
+def apply_resultados_to_stored_items(
+    numero_pncp: str,
+    resultados_by_item: Dict[str, Dict[str, Any]],
+) -> int:
+    """Atualiza preço/fornecedor homologado em linhas já existentes (sem GET /itens)."""
+    numero = str(numero_pncp or "").strip()
+    if not numero or not resultados_by_item:
+        return 0
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    updated = 0
+    ensure_local_index()
+    with _conn() as c:
+        _migrate_pncp_itens_homolog_columns(c)
+        _migrate_pncp_itens_supplier_columns(c)
+        rows = c.execute(
+            """
+            SELECT id, numero_item, quantidade, valor_unitario, valor_total,
+                   valor_unitario_estimado, valor_total_estimado, quantidade_estimada,
+                   situacao_item, situacao_compra, raw_json_zlib
+            FROM pncp_itens
+            WHERE numero_pncp = ? AND valor_unitario_homologado IS NULL
+            """,
+            (numero,),
+        ).fetchall()
+        for row in rows:
+            ni = str(row["numero_item"] or "").strip()
+            resultado = resultados_by_item.get(ni)
+            if not isinstance(resultado, dict):
+                continue
+            homolog = extract_homologated_pricing(resultado)
+            vu_hom = homolog["valor_unitario_homologado"]
+            vt_hom = homolog["valor_total_homologado"]
+            q_hom = homolog["quantidade_homologada"]
+            if vu_hom is None and vt_hom is None and q_hom is None:
+                continue
+
+            vu_est = _safe_float(row["valor_unitario_estimado"])
+            if vu_est is None:
+                vu_est = _safe_float(row["valor_unitario"])
+            vt_est = _safe_float(row["valor_total_estimado"])
+            if vt_est is None:
+                vt_est = _safe_float(row["valor_total"])
+            q_est = _safe_float(row["quantidade_estimada"])
+            if q_est is None:
+                q_est = _safe_float(row["quantidade"])
+
+            qtd = q_hom if q_hom is not None else q_est
+            valor_unit = vu_hom if vu_hom is not None else vu_est
+            valor_total = vt_hom if vt_hom is not None else vt_est
+
+            sit_compra_row = str(row["situacao_compra"] or "").strip()
+            res = resolve_from_resultados_payload(
+                resultado,
+                numero_item=ni or None,
+                situacao_compra=sit_compra_row,
+                fonte_prefix="pncp_resultado_enrich",
+            )
+            cnpj_forn = str(res.cnpj_fornecedor or "").strip()
+            fornecedor = str(res.fornecedor or "").strip()
+            fornecedor_fonte = str(res.fornecedor_fonte or "").strip()
+            fornecedor_resolvido_at = now if (cnpj_forn or fornecedor) else None
+
+            c.execute(
+                """
+                UPDATE pncp_itens SET
+                    quantidade=?,
+                    valor_unitario=?,
+                    valor_total=?,
+                    valor_unitario_estimado=COALESCE(valor_unitario_estimado, ?),
+                    valor_total_estimado=COALESCE(valor_total_estimado, ?),
+                    quantidade_estimada=COALESCE(quantidade_estimada, ?),
+                    valor_unitario_homologado=?,
+                    valor_total_homologado=?,
+                    quantidade_homologada=?,
+                    resultado_resolvido_at=?,
+                    updated_at=?,
+                    cnpj_fornecedor=COALESCE(?, cnpj_fornecedor),
+                    fornecedor=COALESCE(?, fornecedor),
+                    fornecedor_fonte=COALESCE(?, fornecedor_fonte),
+                    fornecedor_resolvido_at=COALESCE(?, fornecedor_resolvido_at)
+                WHERE id=?
+                """,
+                (
+                    qtd,
+                    valor_unit,
+                    valor_total,
+                    vu_est,
+                    vt_est,
+                    q_est,
+                    vu_hom,
+                    vt_hom,
+                    q_hom,
+                    now,
+                    now,
+                    cnpj_forn or None,
+                    fornecedor or None,
+                    fornecedor_fonte or None,
+                    fornecedor_resolvido_at,
+                    int(row["id"]),
+                ),
+            )
+            updated += 1
+    return updated
+
+
+def load_contract_raw_dict(numero_pncp: str) -> Optional[Dict[str, Any]]:
+    numero = str(numero_pncp or "").strip()
+    if not numero:
+        return None
+    ensure_local_index()
+    with _conn() as c:
+        row = c.execute(
+            "SELECT raw_json FROM pncp_contratos WHERE numero_pncp = ?",
+            (numero,),
+        ).fetchone()
+    if not row:
+        return None
+    try:
+        parsed = json.loads(row["raw_json"])
+    except Exception:
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+async def enrich_contract_resultados_only(
+    numero_pncp: str,
+    *,
+    client: Any,
+) -> int:
+    """
+    Busca só GET /resultados e grava preço homologado em itens já indexados.
+    Não refaz GET /itens — barato para migrar o índice existente.
+    """
+    from .config import PNCP_INGEST_FETCH_ITEM_RESULTADOS
+
+    if not PNCP_INGEST_FETCH_ITEM_RESULTADOS:
+        return 0
+    numero = str(numero_pncp or "").strip()
+    if not numero or not contract_has_items_needing_resultados(numero):
+        return 0
+    raw = load_contract_raw_dict(numero)
+    if not raw:
+        return 0
+    keys = _contract_keys_for_items(raw)
+    if not keys:
+        return 0
+    cnpj, ano, seq = keys
+    stubs = list_item_stubs_for_resultados_fetch(numero)
+    if not stubs:
+        return 0
+    resultados = await fetch_resultados_map_for_items(
+        cnpj,
+        ano,
+        seq,
+        stubs,
+        client=client,
+    )
+    n = apply_resultados_to_stored_items(numero, resultados)
+    if n:
+        logger.info("ingest resultados-only %s: %s itens homologados", numero, n)
+    return n
+
+
 def supplier_coverage_stats() -> Dict[str, Any]:
     """Métricas de cobertura de fornecedor (Fase A — leitura; preenchimento nas fases B/C)."""
     ensure_local_index()

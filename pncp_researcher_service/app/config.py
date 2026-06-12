@@ -200,6 +200,9 @@ PNCP_INGEST_BACKFILL_LOW_ROWS_ALERT_SECONDS: int = _env_int(
 )
 # GET /resultados por item homologado (valorUnitarioHomologado) durante ingest.
 PNCP_INGEST_FETCH_ITEM_RESULTADOS: bool = _env_bool("PNCP_INGEST_FETCH_ITEM_RESULTADOS", True)
+# Enfileira contratos já indexados que ainda não têm preço homologado (só /resultados, sem /itens).
+PNCP_INGEST_RESULTADOS_TOPUP_ENABLED: bool = _env_bool("PNCP_INGEST_RESULTADOS_TOPUP_ENABLED", True)
+PNCP_INGEST_RESULTADOS_TOPUP_LIMIT: int = _env_int("PNCP_INGEST_RESULTADOS_TOPUP_LIMIT", 400)
 
 
 def is_ingest_backfill_mode() -> bool:

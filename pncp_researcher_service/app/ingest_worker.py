@@ -52,7 +52,9 @@ from .ingest_queue import (
 from .local_index import (
     _mark_ingest_error,
     _mark_ingest_success,
+    contract_has_items_needing_resultados,
     contract_needs_items_refresh,
+    enrich_contract_resultados_only,
     ensure_local_index,
     mark_contract_items_verified,
     upsert_contract_items,
@@ -212,10 +214,18 @@ async def process_catalog_page_task(task: Dict[str, Any], *, client: Any) -> Non
 
 
 async def process_contract_items_task(task: Dict[str, Any], *, client: Any) -> int:
-    """Busca GET /itens; retorna linhas upserted em pncp_itens (0 se skip/vazio)."""
+    """Busca GET /itens (+ /resultados); ou só /resultados se itens já existem no índice."""
     numero = str(task.get("numero_pncp") or "").strip()
     if not numero:
         return 0
+
+    if contract_has_items_needing_resultados(numero):
+        n_res = int(await enrich_contract_resultados_only(numero, client=client) or 0)
+        if not contract_needs_items_refresh(numero):
+            return n_res
+        if n_res > 0 and not contract_has_items_needing_resultados(numero):
+            return n_res
+
     if not contract_needs_items_refresh(numero):
         return 0
     raw = await _load_contract_raw(numero)
@@ -262,7 +272,22 @@ async def _run_item_task(task: Dict[str, Any], *, client: Any, timeout: float) -
     tid = int(task["id"])
     numero = str(task.get("numero_pncp") or "").strip()
     if numero and not contract_needs_items_refresh(numero):
+        try:
+            n_res = await asyncio.wait_for(
+                enrich_contract_resultados_only(numero, client=client),
+                timeout=min(max(30.0, timeout), 120.0),
+            )
+        except asyncio.TimeoutError:
+            mark_task_failed(tid, "timeout resultados-only")
+            logger.warning("ingest resultados-only task %s: timeout", tid)
+            return "error", 0
+        except Exception as exc:
+            mark_task_failed(tid, str(exc))
+            logger.warning("ingest resultados-only task %s: %s", tid, exc)
+            return "error", 0
         mark_task_done(tid)
+        if int(n_res or 0) > 0:
+            return "ok", int(n_res)
         return "skip", 0
     try:
         rows_up = await asyncio.wait_for(

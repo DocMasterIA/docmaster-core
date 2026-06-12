@@ -81,6 +81,49 @@ def test_upsert_prefers_homologated_pricing(item_db):
     assert row["resultado_resolvido_at"]
 
 
+def test_apply_resultados_to_stored_items_without_refetch(item_db):
+    raw = {
+        "numeroControlePNCP": "PNCP-RES-ONLY",
+        "anoCompra": 2025,
+        "sequencialCompra": 9,
+        "orgaoEntidade": {},
+        "unidadeOrgao": {},
+        "situacaoCompraNome": "Homologado",
+    }
+    catalog = {
+        "numeroItem": 3,
+        "descricao": "Serviço X",
+        "quantidade": 1.0,
+        "valorUnitarioEstimado": 999.0,
+        "valorTotal": 999.0,
+        "temResultado": True,
+        "situacaoCompraItemNome": "Homologado",
+    }
+    local_index.upsert_contract_items(raw, [catalog])
+    resultado = _fixture("resultado_item_pricing.json")
+    resultado["numeroItem"] = 3
+
+    n = local_index.apply_resultados_to_stored_items(
+        raw["numeroControlePNCP"],
+        {"3": resultado},
+    )
+    assert n == 1
+
+    with local_index._conn() as c:
+        row = c.execute(
+            """
+            SELECT valor_unitario, valor_unitario_estimado, valor_unitario_homologado, resultado_resolvido_at
+            FROM pncp_itens WHERE numero_pncp = ?
+            """,
+            (raw["numeroControlePNCP"],),
+        ).fetchone()
+
+    assert row["valor_unitario_estimado"] == pytest.approx(999.0)
+    assert row["valor_unitario_homologado"] == pytest.approx(21.48)
+    assert row["valor_unitario"] == pytest.approx(21.48)
+    assert row["resultado_resolvido_at"]
+
+
 def test_upsert_updates_existing_row_by_numero_item(item_db):
     raw = {
         "numeroControlePNCP": "PNCP-UPD-1",

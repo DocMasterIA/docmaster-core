@@ -497,6 +497,68 @@ def parse_brasilapi_to_fornecedor(payload: Dict[str, Any], *, cnpj_digits_val: s
     return nome, {k: v for k, v in cadastro.items() if v}
 
 
+def item_numero_from_row(row: Dict[str, Any]) -> str:
+    """Número do item no catálogo ou resultado PNCP."""
+    for key in _ITEM_NUMERO_KEYS:
+        got = str(row.get(key) or "").strip()
+        if got:
+            return got
+    return ""
+
+
+def _optional_float(val: Any) -> Optional[float]:
+    if val is None or val == "":
+        return None
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
+
+
+def extract_homologated_pricing(row: Optional[Dict[str, Any]]) -> Dict[str, Optional[float]]:
+    """Preço homologado a partir de GET /resultados ou campos inline no /itens."""
+    if not isinstance(row, dict):
+        return {
+            "valor_unitario_homologado": None,
+            "valor_total_homologado": None,
+            "quantidade_homologada": None,
+        }
+    return {
+        "valor_unitario_homologado": _optional_float(row.get("valorUnitarioHomologado")),
+        "valor_total_homologado": _optional_float(row.get("valorTotalHomologado")),
+        "quantidade_homologada": _optional_float(row.get("quantidadeHomologada")),
+    }
+
+
+def item_row_needs_resultado_fetch(item_row: Dict[str, Any]) -> bool:
+    """True se o item provavelmente tem preço homologado fora do GET /itens."""
+    if extract_homologated_pricing(item_row)["valor_unitario_homologado"] is not None:
+        return False
+    if extract_homologated_pricing(item_row)["valor_total_homologado"] is not None:
+        return False
+    if bool(item_row.get("temResultado")):
+        return True
+    return item_homologado_para_busca(item_row)
+
+
+def index_resultados_by_numero_item(payload: Any) -> Dict[str, Dict[str, Any]]:
+    """Agrupa linhas de /resultados por numeroItem (preferência ordemClassificacaoSrp=1)."""
+    out: Dict[str, Dict[str, Any]] = {}
+    for row in iter_resultado_entries(payload):
+        ni = item_numero_from_row(row)
+        if not ni:
+            continue
+        prev = out.get(ni)
+        if prev is None:
+            out[ni] = row
+            continue
+        prev_rank = int(prev.get("ordemClassificacaoSrp") or 99)
+        row_rank = int(row.get("ordemClassificacaoSrp") or 99)
+        if row_rank < prev_rank:
+            out[ni] = row
+    return out
+
+
 def find_catalog_item_row(items_payload: Any, numero_item: str) -> Optional[Dict[str, Any]]:
     """Localiza a linha do GET /itens pelo numero_item."""
     want = str(numero_item or "").strip()

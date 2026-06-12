@@ -31,14 +31,23 @@ from .ingest_dates import PNCP_API_MAX_LOOKBACK_DAYS, resolve_backfill_window
 
 logger = logging.getLogger(__name__)
 from .fornecedor_cache import cache_stats, ensure_fornecedor_cache_table
-from .pncp_client import PNCPClientError, create_pncp_http_client, get_contract_items, search_contracts
+from .pncp_client import (
+    PNCPClientError,
+    create_pncp_http_client,
+    fetch_contract_items_with_resultados,
+    fetch_resultados_map_for_items,
+    get_contract_items,
+    search_contracts,
+)
 from .search_text_clean import apply_item_display_cleanup, normalize_for_search
 from .supplier_resolver import (
+    extract_homologated_pricing,
     item_homologado_para_busca,
     item_elegivel,
     nome_fornecedor_e_util,
     resolution_to_api_dict,
     resolve_from_item_catalog_row,
+    resolve_from_resultados_payload,
 )
 
 
@@ -147,6 +156,7 @@ def ensure_local_index() -> None:
         _migrate_pesquisador_sessoes_columns(c)
         _migrate_pncp_contratos_items_verified(c)
         _migrate_pncp_itens_supplier_columns(c)
+        _migrate_pncp_itens_homolog_columns(c)
         ensure_fornecedor_cache_table(c)
         c.execute(
             """
@@ -609,18 +619,18 @@ async def _backfill_fetch_contract_items(
     client: Any,
     item_timeout: float,
     sem: asyncio.Semaphore,
-) -> tuple[Dict[str, Any], List[Dict[str, Any]]]:
+) -> tuple[Dict[str, Any], List[Dict[str, Any]], Dict[str, Dict[str, Any]]]:
     numero = str(raw.get("numeroControlePNCP") or "").strip()
     if numero and not contract_needs_items_refresh(numero):
-        return raw, []
+        return raw, [], {}
     keys = _contract_keys_for_items(raw)
     if not keys:
-        return raw, []
+        return raw, [], {}
     cnpj, ano, seq = keys
     async with sem:
         try:
-            rows = await asyncio.wait_for(
-                get_contract_items(cnpj, ano, seq, client=client),
+            rows, resultados = await asyncio.wait_for(
+                fetch_contract_items_with_resultados(cnpj, ano, seq, client=client),
                 timeout=item_timeout,
             )
         except asyncio.TimeoutError:
@@ -631,7 +641,7 @@ async def _backfill_fetch_contract_items(
                 seq,
                 item_timeout,
             )
-            rows = []
+            rows, resultados = [], {}
         except Exception as exc:
             logger.warning(
                 "backfill erro itens cnpj=%s ano=%s seq=%s: %s",
@@ -640,8 +650,8 @@ async def _backfill_fetch_contract_items(
                 seq,
                 exc,
             )
-            rows = []
-    return raw, rows
+            rows, resultados = [], {}
+    return raw, rows, resultados
 
 
 def ingest_operational_status(*, uf: Optional[str] = None) -> Dict[str, Any]:
@@ -763,6 +773,24 @@ _PNCP_ITENS_SUPPLIER_COLUMNS: List[tuple[str, str]] = [
     ("fornecedor_elegivel", "INTEGER NOT NULL DEFAULT 0"),
     ("fornecedor_resolvido_at", "TEXT"),
 ]
+
+
+_PNCP_ITENS_HOMOLOG_COLUMNS: List[tuple[str, str]] = [
+    ("valor_unitario_estimado", "REAL"),
+    ("valor_total_estimado", "REAL"),
+    ("quantidade_estimada", "REAL"),
+    ("valor_unitario_homologado", "REAL"),
+    ("valor_total_homologado", "REAL"),
+    ("quantidade_homologada", "REAL"),
+    ("resultado_resolvido_at", "TEXT"),
+]
+
+
+def _migrate_pncp_itens_homolog_columns(c: sqlite3.Cursor) -> None:
+    cols = {row[1] for row in c.execute("PRAGMA table_info(pncp_itens)")}
+    for name, col_type in _PNCP_ITENS_HOMOLOG_COLUMNS:
+        if name not in cols:
+            c.execute(f"ALTER TABLE pncp_itens ADD COLUMN {name} {col_type}")
 
 
 def _migrate_pncp_itens_supplier_columns(c: sqlite3.Cursor) -> None:
@@ -920,7 +948,12 @@ def contract_needs_items_refresh(numero_pncp: str) -> bool:
     return datetime.utcnow() - last_dt >= timedelta(days=days)
 
 
-def upsert_contract_items(raw_contract: Dict[str, Any], item_rows: Iterable[Dict[str, Any]]) -> int:
+def upsert_contract_items(
+    raw_contract: Dict[str, Any],
+    item_rows: Iterable[Dict[str, Any]],
+    *,
+    resultados_by_item: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> int:
     numero = str(raw_contract.get("numeroControlePNCP") or "").strip()
     if not numero:
         return 0
@@ -931,8 +964,12 @@ def upsert_contract_items(raw_contract: Dict[str, Any], item_rows: Iterable[Dict
     seq = raw_contract.get("sequencialCompra")
     modalidade_nome = raw_contract.get("modalidadeNome")
     data_pub = raw_contract.get("dataPublicacaoPncp") or raw_contract.get("dataPublicacao")
+    sit_compra_row = str(raw_contract.get("situacaoCompra") or raw_contract.get("situacao") or "").strip()
+    resultados_map = resultados_by_item or {}
     count = 0
     with _conn() as c:
+        _migrate_pncp_itens_homolog_columns(c)
+        _migrate_pncp_itens_supplier_columns(c)
         for r in item_rows:
             if not isinstance(r, dict):
                 continue
@@ -942,73 +979,183 @@ def upsert_contract_items(raw_contract: Dict[str, Any], item_rows: Iterable[Dict
             numero_item = str(
                 r.get("numeroItem") or r.get("ordemItem") or r.get("sequencialItem") or ""
             ).strip()
-            qtd = _safe_float(r.get("quantidade"))
-            valor_unit = _safe_float(
-                r.get("valorUnitarioEstimado") or r.get("valorUnitarioHomologado")
-            )
-            valor_total = _safe_float(r.get("valorTotal") or r.get("valorTotalEstimado") or r.get("valorTotalHomologado"))
+            resultado = resultados_map.get(numero_item) if numero_item else None
+
+            qtd_est = _safe_float(r.get("quantidade"))
+            vu_est = _safe_float(r.get("valorUnitarioEstimado"))
+            vt_est = _safe_float(r.get("valorTotal") or r.get("valorTotalEstimado"))
+
+            pricing_src = resultado if isinstance(resultado, dict) else r
+            homolog = extract_homologated_pricing(pricing_src)
+            qtd_hom = homolog["quantidade_homologada"]
+            vu_hom = homolog["valor_unitario_homologado"]
+            vt_hom = homolog["valor_total_homologado"]
+            has_homolog = vu_hom is not None or vt_hom is not None or qtd_hom is not None
+
+            qtd = qtd_hom if qtd_hom is not None else qtd_est
+            valor_unit = vu_hom if vu_hom is not None else vu_est
+            valor_total = vt_hom if vt_hom is not None else vt_est
+
             material_servico = str(r.get("materialOuServicoNome") or r.get("tipoItemNome") or "").strip()
             unidade = str(r.get("unidadeMedida") or r.get("unidadeFornecimentoNome") or "").strip()
-            fingerprint = f"{numero_item}|{desc}|{qtd}|{unidade}|{valor_unit}|{valor_total}"
+            fingerprint = (
+                f"item:{numero_item}" if numero_item else f"{desc}|{qtd}|{unidade}|{valor_unit}|{valor_total}"
+            )
             raw_blob = zlib.compress(json.dumps(r, ensure_ascii=False).encode("utf-8"), level=6)
-            sit_compra_row = str(raw_contract.get("situacaoCompra") or raw_contract.get("situacao") or "").strip()
             sit_item_row = str(
                 r.get("situacaoCompraItemNome") or r.get("situacaoCompraItem") or ""
             ).strip()
             elegivel = 1 if item_elegivel(r, situacao_compra=sit_compra_row) else 0
-            c.execute(
-                """
-                INSERT INTO pncp_itens (
-                    numero_pncp, ano_compra, sequencial_compra, numero_item, descricao, material_servico,
-                    quantidade, unidade_medida, valor_unitario, valor_total, orgao, municipio, uf,
-                    modalidade_nome, data_publicacao, item_fingerprint, updated_at, raw_json_zlib,
-                    situacao_item, situacao_compra, fornecedor_elegivel
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(numero_pncp, item_fingerprint) DO UPDATE SET
-                    ano_compra=excluded.ano_compra,
-                    sequencial_compra=excluded.sequencial_compra,
-                    numero_item=excluded.numero_item,
-                    descricao=excluded.descricao,
-                    material_servico=excluded.material_servico,
-                    quantidade=excluded.quantidade,
-                    unidade_medida=excluded.unidade_medida,
-                    valor_unitario=excluded.valor_unitario,
-                    valor_total=excluded.valor_total,
-                    orgao=excluded.orgao,
-                    municipio=excluded.municipio,
-                    uf=excluded.uf,
-                    modalidade_nome=excluded.modalidade_nome,
-                    data_publicacao=excluded.data_publicacao,
-                    updated_at=excluded.updated_at,
-                    raw_json_zlib=excluded.raw_json_zlib,
-                    situacao_item=excluded.situacao_item,
-                    situacao_compra=excluded.situacao_compra,
-                    fornecedor_elegivel=excluded.fornecedor_elegivel
-                """,
-                (
-                    numero,
-                    ano,
-                    seq,
-                    numero_item,
-                    desc,
-                    material_servico,
-                    qtd,
-                    unidade,
-                    valor_unit,
-                    valor_total,
-                    org.get("razaoSocial") or org.get("razaosocial"),
-                    unid.get("municipioNome"),
-                    unid.get("ufSigla"),
-                    modalidade_nome,
-                    data_pub,
-                    fingerprint,
-                    now,
-                    raw_blob,
-                    sit_item_row,
-                    sit_compra_row,
-                    elegivel,
-                ),
+
+            if isinstance(resultado, dict):
+                res = resolve_from_resultados_payload(
+                    resultado,
+                    numero_item=numero_item or None,
+                    situacao_compra=sit_compra_row,
+                    fonte_prefix="pncp_resultado_ingest",
+                )
+            else:
+                res = resolve_from_item_catalog_row(r, situacao_compra=sit_compra_row)
+            cnpj_forn = str(res.cnpj_fornecedor or "").strip()
+            fornecedor = str(res.fornecedor or "").strip()
+            fornecedor_fonte = str(res.fornecedor_fonte or "").strip()
+            fornecedor_resolvido_at = now if (cnpj_forn or fornecedor) else None
+            resultado_resolvido_at = now if has_homolog else None
+
+            values = (
+                numero,
+                ano,
+                seq,
+                numero_item,
+                desc,
+                material_servico,
+                qtd,
+                unidade,
+                valor_unit,
+                valor_total,
+                org.get("razaoSocial") or org.get("razaosocial"),
+                unid.get("municipioNome"),
+                unid.get("ufSigla"),
+                modalidade_nome,
+                data_pub,
+                fingerprint,
+                now,
+                raw_blob,
+                sit_item_row,
+                sit_compra_row,
+                elegivel,
+                cnpj_forn or None,
+                fornecedor or None,
+                fornecedor_fonte or None,
+                vu_est,
+                vt_est,
+                qtd_est,
+                vu_hom,
+                vt_hom,
+                qtd_hom,
+                resultado_resolvido_at,
+                fornecedor_resolvido_at,
             )
+            updated = False
+            if numero_item:
+                cur = c.execute(
+                    """
+                    UPDATE pncp_itens SET
+                        ano_compra=?, sequencial_compra=?, descricao=?, material_servico=?,
+                        quantidade=?, unidade_medida=?, valor_unitario=?, valor_total=?,
+                        orgao=?, municipio=?, uf=?, modalidade_nome=?, data_publicacao=?,
+                        item_fingerprint=?, updated_at=?, raw_json_zlib=?,
+                        situacao_item=?, situacao_compra=?, fornecedor_elegivel=?,
+                        cnpj_fornecedor=?, fornecedor=?, fornecedor_fonte=?,
+                        valor_unitario_estimado=?, valor_total_estimado=?, quantidade_estimada=?,
+                        valor_unitario_homologado=?, valor_total_homologado=?, quantidade_homologada=?,
+                        resultado_resolvido_at=COALESCE(?, resultado_resolvido_at),
+                        fornecedor_resolvido_at=COALESCE(?, fornecedor_resolvido_at)
+                    WHERE numero_pncp=? AND numero_item=?
+                    """,
+                    (
+                        ano,
+                        seq,
+                        desc,
+                        material_servico,
+                        qtd,
+                        unidade,
+                        valor_unit,
+                        valor_total,
+                        org.get("razaoSocial") or org.get("razaosocial"),
+                        unid.get("municipioNome"),
+                        unid.get("ufSigla"),
+                        modalidade_nome,
+                        data_pub,
+                        fingerprint,
+                        now,
+                        raw_blob,
+                        sit_item_row,
+                        sit_compra_row,
+                        elegivel,
+                        cnpj_forn or None,
+                        fornecedor or None,
+                        fornecedor_fonte or None,
+                        vu_est,
+                        vt_est,
+                        qtd_est,
+                        vu_hom,
+                        vt_hom,
+                        qtd_hom,
+                        resultado_resolvido_at,
+                        fornecedor_resolvido_at,
+                        numero,
+                        numero_item,
+                    ),
+                )
+                updated = int(cur.rowcount or 0) > 0
+            if not updated:
+                c.execute(
+                    """
+                    INSERT INTO pncp_itens (
+                        numero_pncp, ano_compra, sequencial_compra, numero_item, descricao, material_servico,
+                        quantidade, unidade_medida, valor_unitario, valor_total, orgao, municipio, uf,
+                        modalidade_nome, data_publicacao, item_fingerprint, updated_at, raw_json_zlib,
+                        situacao_item, situacao_compra, fornecedor_elegivel,
+                        cnpj_fornecedor, fornecedor, fornecedor_fonte,
+                        valor_unitario_estimado, valor_total_estimado, quantidade_estimada,
+                        valor_unitario_homologado, valor_total_homologado, quantidade_homologada,
+                        resultado_resolvido_at, fornecedor_resolvido_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(numero_pncp, item_fingerprint) DO UPDATE SET
+                        ano_compra=excluded.ano_compra,
+                        sequencial_compra=excluded.sequencial_compra,
+                        numero_item=excluded.numero_item,
+                        descricao=excluded.descricao,
+                        material_servico=excluded.material_servico,
+                        quantidade=excluded.quantidade,
+                        unidade_medida=excluded.unidade_medida,
+                        valor_unitario=excluded.valor_unitario,
+                        valor_total=excluded.valor_total,
+                        orgao=excluded.orgao,
+                        municipio=excluded.municipio,
+                        uf=excluded.uf,
+                        modalidade_nome=excluded.modalidade_nome,
+                        data_publicacao=excluded.data_publicacao,
+                        updated_at=excluded.updated_at,
+                        raw_json_zlib=excluded.raw_json_zlib,
+                        situacao_item=excluded.situacao_item,
+                        situacao_compra=excluded.situacao_compra,
+                        fornecedor_elegivel=excluded.fornecedor_elegivel,
+                        cnpj_fornecedor=excluded.cnpj_fornecedor,
+                        fornecedor=excluded.fornecedor,
+                        fornecedor_fonte=excluded.fornecedor_fonte,
+                        valor_unitario_estimado=excluded.valor_unitario_estimado,
+                        valor_total_estimado=excluded.valor_total_estimado,
+                        quantidade_estimada=excluded.quantidade_estimada,
+                        valor_unitario_homologado=excluded.valor_unitario_homologado,
+                        valor_total_homologado=excluded.valor_total_homologado,
+                        quantidade_homologada=excluded.quantidade_homologada,
+                        resultado_resolvido_at=COALESCE(excluded.resultado_resolvido_at, resultado_resolvido_at),
+                        fornecedor_resolvido_at=COALESCE(excluded.fornecedor_resolvido_at, fornecedor_resolvido_at)
+                    """,
+                    values,
+                )
             count += 1
     return count
 
@@ -1600,6 +1747,12 @@ def _row_to_local_item(
         "unidade_medida": r["unidade_medida"],
         "valor_unitario": r["valor_unitario"],
         "valor_total": r["valor_total"],
+        "valor_unitario_estimado": _row_get(r, "valor_unitario_estimado"),
+        "valor_total_estimado": _row_get(r, "valor_total_estimado"),
+        "quantidade_estimada": _row_get(r, "quantidade_estimada"),
+        "valor_unitario_homologado": _row_get(r, "valor_unitario_homologado"),
+        "valor_total_homologado": _row_get(r, "valor_total_homologado"),
+        "quantidade_homologada": _row_get(r, "quantidade_homologada"),
         "orgao": r["orgao"],
         "municipio": r["municipio"],
         "uf": r["uf"],
@@ -1673,7 +1826,10 @@ def local_item_search(
 
     select_cols = """
         SELECT i.numero_pncp, i.ano_compra, i.sequencial_compra, i.numero_item, i.descricao, i.material_servico,
-               i.quantidade, i.unidade_medida, i.valor_unitario, i.valor_total, i.orgao, i.municipio, i.uf,
+               i.quantidade, i.unidade_medida, i.valor_unitario, i.valor_total,
+               i.valor_unitario_estimado, i.valor_total_estimado, i.quantidade_estimada,
+               i.valor_unitario_homologado, i.valor_total_homologado, i.quantidade_homologada,
+               i.orgao, i.municipio, i.uf,
                i.modalidade_nome, i.data_publicacao, i.raw_json_zlib,
                i.cnpj_fornecedor, i.fornecedor, i.fornecedor_fonte, i.fornecedor_elegivel,
                c.raw_json AS contrato_raw_json, c.situacao AS situacao_compra
@@ -2152,9 +2308,9 @@ async def backfill_local_index(
                         if isinstance(fetched, Exception):
                             logger.warning("backfill erro itens lote: %s", fetched)
                             continue
-                        raw, rows = fetched
+                        raw, rows, resultados = fetched
                         if rows:
-                            n = upsert_contract_items(raw, rows)
+                            n = upsert_contract_items(raw, rows, resultados_by_item=resultados)
                             page_item_upserts += n
                             total_upserts_itens += n
                 logger.info(

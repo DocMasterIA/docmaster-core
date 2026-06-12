@@ -298,6 +298,96 @@ async def get_contract_items(
     return []
 
 
+async def fetch_resultados_map_for_items(
+    cnpj_orgao: str,
+    ano_compra: Any,
+    sequencial_compra: Any,
+    item_rows: List[Dict[str, Any]],
+    *,
+    client: httpx.AsyncClient,
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Busca preços/fornecedor homologados: 1× GET /resultados da compra + GET por item faltante.
+    """
+    from .config import PNCP_INGEST_FETCH_ITEM_RESULTADOS
+    from .supplier_resolver import (
+        index_resultados_by_numero_item,
+        item_numero_from_row,
+        item_row_needs_resultado_fetch,
+    )
+
+    if not PNCP_INGEST_FETCH_ITEM_RESULTADOS or not item_rows:
+        return {}
+
+    cnpj = str(cnpj_orgao or "").strip()
+    ano = str(ano_compra or "").strip()
+    seq = str(sequencial_compra or "").strip()
+    if not cnpj or not ano or not seq:
+        return {}
+
+    need: Dict[str, Dict[str, Any]] = {}
+    for row in item_rows:
+        if not isinstance(row, dict):
+            continue
+        ni = item_numero_from_row(row)
+        if not ni or not item_row_needs_resultado_fetch(row):
+            continue
+        need[ni] = row
+
+    if not need:
+        return {}
+
+    base = f"{PNCP_PNCP_API_BASE_URL}/v1/orgaos/{cnpj}/compras/{ano}/{seq}"
+    out: Dict[str, Dict[str, Any]] = {}
+
+    compra_payload = await _fetch_json_pncp(client, f"{base}/resultados")
+    if compra_payload is not None:
+        out.update(index_resultados_by_numero_item(compra_payload))
+
+    for ni in list(need.keys()):
+        if ni in out:
+            continue
+        item_payload = await _fetch_json_pncp(client, f"{base}/itens/{ni}/resultados")
+        if item_payload is None:
+            continue
+        mapped = index_resultados_by_numero_item(item_payload)
+        if ni in mapped:
+            out[ni] = mapped[ni]
+        elif mapped:
+            out.update(mapped)
+
+    return {k: v for k, v in out.items() if k in need}
+
+
+async def fetch_contract_items_with_resultados(
+    cnpj_orgao: str,
+    ano_compra: Any,
+    sequencial_compra: Any,
+    *,
+    client: Optional[httpx.AsyncClient] = None,
+) -> tuple[List[Dict[str, Any]], Dict[str, Dict[str, Any]]]:
+    """GET /itens + mapa de /resultados para itens homologados."""
+    close_client = False
+    if client is None:
+        client = create_pncp_http_client()
+        close_client = True
+    try:
+        rows = await get_contract_items(cnpj_orgao, ano_compra, sequencial_compra, client=client)
+        if not rows:
+            return [], {}
+        resultados = await fetch_resultados_map_for_items(
+            cnpj_orgao,
+            ano_compra,
+            sequencial_compra,
+            rows,
+            client=client,
+        )
+        return rows, resultados
+    finally:
+        if close_client:
+            await client.aclose()
+
+
 BRASILAPI_CNPJ_URL = "https://brasilapi.com.br/api/cnpj/v1/{cnpj_digits}"
 
 

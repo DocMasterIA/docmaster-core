@@ -198,6 +198,8 @@ PNCP_INGEST_BACKFILL_LOW_ROWS_1H_ALERT: int = _env_int(
 PNCP_INGEST_BACKFILL_LOW_ROWS_ALERT_SECONDS: int = _env_int(
     "PNCP_INGEST_BACKFILL_LOW_ROWS_ALERT_SECONDS", 7200
 )
+# GET /resultados por item homologado (valorUnitarioHomologado) durante ingest.
+PNCP_INGEST_FETCH_ITEM_RESULTADOS: bool = _env_bool("PNCP_INGEST_FETCH_ITEM_RESULTADOS", True)
 
 
 def is_ingest_backfill_mode() -> bool:

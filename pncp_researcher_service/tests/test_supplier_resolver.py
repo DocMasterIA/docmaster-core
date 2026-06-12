@@ -23,9 +23,11 @@ from app.fornecedor_cache import (  # noqa: E402
 )
 from app.supplier_resolver import (  # noqa: E402
     compra_elegivel,
+    extract_homologated_pricing,
     extract_supplier_cnpj_only,
     item_elegivel,
     item_homologado_para_busca,
+    item_row_needs_resultado_fetch,
     merge_with_cadastro,
     normalize_cnpj,
     resolve_from_contratos_payload,
@@ -135,6 +137,23 @@ class TestSupplierResolver(unittest.TestCase):
             )
         )
         self.assertFalse(item_homologado_para_busca({"situacaoCompraItemNome": "Revogado"}))
+
+    def test_extract_homologated_pricing_from_resultado(self):
+        row = {
+            "valorUnitarioHomologado": 21.48,
+            "valorTotalHomologado": 170121.6,
+            "quantidadeHomologada": 7920,
+        }
+        out = extract_homologated_pricing(row)
+        self.assertEqual(out["valor_unitario_homologado"], 21.48)
+        self.assertEqual(out["valor_total_homologado"], 170121.6)
+        self.assertEqual(out["quantidade_homologada"], 7920.0)
+
+    def test_item_row_needs_resultado_fetch(self):
+        self.assertTrue(item_row_needs_resultado_fetch({"temResultado": True}))
+        self.assertFalse(
+            item_row_needs_resultado_fetch({"valorUnitarioHomologado": 10.0, "temResultado": True})
+        )
 
     def test_extract_cnpj_ignores_orgao_path(self):
         payload = {

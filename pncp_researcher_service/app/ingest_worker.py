@@ -58,7 +58,12 @@ from .local_index import (
     upsert_contract_items,
     upsert_contracts,
 )
-from .pncp_client import PNCPClientError, create_pncp_http_client, get_contract_items, search_contracts
+from .pncp_client import (
+    PNCPClientError,
+    create_pncp_http_client,
+    fetch_contract_items_with_resultados,
+    search_contracts,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -233,9 +238,13 @@ async def process_contract_items_task(task: Dict[str, Any], *, client: Any) -> i
         logger.info("ingest items %s: chaves PNCP ausentes — marcado verificado", numero)
         return 0
 
-    rows = await get_contract_items(str(cnpj), ano, seq, client=client)
+    rows, resultados = await fetch_contract_items_with_resultados(
+        str(cnpj), ano, seq, client=client
+    )
     if rows:
-        upserted = int(upsert_contract_items(raw, rows) or 0)
+        upserted = int(
+            upsert_contract_items(raw, rows, resultados_by_item=resultados) or 0
+        )
         if upserted <= 0:
             mark_contract_items_verified(numero)
             logger.info(

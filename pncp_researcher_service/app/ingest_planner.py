@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from .config import (
+    PNCP_INGEST_ITEMS_REFRESH_DAYS,
     PNCP_INGEST_ITEMS_STARVE_BACKLOG,
     PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS,
     PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS_MAX,
@@ -31,6 +32,12 @@ logger = logging.getLogger(__name__)
 PRIORITY_GAP = 50
 PRIORITY_NORMAL = 100
 PRIORITY_BACKLOG_ITEMS = 80
+# Abaixo de catálogo-on-page (90) e gap (80): não compete com descoberta imediata.
+PRIORITY_STALE_REFRESH = 110
+
+_SQL_ITEM_UPDATED_AT = (
+    "datetime(replace(replace(i.updated_at,'T',' '),'Z',''))"
+)
 
 
 def enqueue_contracts_without_items(*, limit: int, priority: int = PRIORITY_BACKLOG_ITEMS) -> int:
@@ -65,6 +72,54 @@ def enqueue_contracts_without_items(*, limit: int, priority: int = PRIORITY_BACK
     return n
 
 
+def enqueue_contracts_needing_items_refresh(
+    *,
+    limit: int,
+    priority: int = PRIORITY_STALE_REFRESH,
+) -> int:
+    """
+    Enfileira contratos que já têm itens locais mas passaram do refresh window.
+    Complementa enqueue_contracts_without_items (gap=0) sem esperar o catálogo repassar.
+    """
+    days = max(0, int(PNCP_INGEST_ITEMS_REFRESH_DAYS or 0))
+    lim = max(0, int(limit))
+    if lim <= 0 or days <= 0:
+        return 0
+    ensure_local_index()
+    from .ingest_queue import _queue_conn
+
+    with _queue_conn() as c:
+        rows = c.execute(
+            f"""
+            SELECT c.numero_pncp
+            FROM pncp_contratos c
+            WHERE EXISTS (
+                SELECT 1 FROM pncp_itens i WHERE i.numero_pncp = c.numero_pncp LIMIT 1
+            )
+            AND (
+                SELECT MAX({_SQL_ITEM_UPDATED_AT})
+                FROM pncp_itens i
+                WHERE i.numero_pncp = c.numero_pncp
+            ) < datetime('now', ?)
+            ORDER BY (
+                SELECT MAX({_SQL_ITEM_UPDATED_AT})
+                FROM pncp_itens i
+                WHERE i.numero_pncp = c.numero_pncp
+            ) ASC
+            LIMIT ?
+            """,
+            (f"-{days} days", lim),
+        ).fetchall()
+    n = 0
+    for r in rows:
+        if enqueue_contract_items(
+            numero_pncp=str(r["numero_pncp"]),
+            priority=int(priority),
+        ):
+            n += 1
+    return n
+
+
 def topup_contract_items_if_starved(*, items_backlog: int) -> int:
     """Alimenta a fila de itens quando o backlog está baixo (crescimento do índice)."""
     starve = max(0, int(PNCP_INGEST_ITEMS_STARVE_BACKLOG))
@@ -77,7 +132,17 @@ def topup_contract_items_if_starved(*, items_backlog: int) -> int:
         lim = ceiling
     else:
         lim = min(ceiling, base + (starve - items_backlog) * 4)
-    return enqueue_contracts_without_items(limit=lim)
+    n_gap = enqueue_contracts_without_items(limit=lim)
+    remaining = max(0, lim - n_gap)
+    n_stale = enqueue_contracts_needing_items_refresh(limit=remaining)
+    if n_stale:
+        logger.info(
+            "ingest topup stale refresh enfileirados=%s gap=%s backlog_antes=%s",
+            n_stale,
+            n_gap,
+            items_backlog,
+        )
+    return n_gap + n_stale
 
 
 def plan_ingest_queue(
@@ -154,11 +219,9 @@ def plan_ingest_queue(
     if backlog_lim > 0:
         starve = max(0, int(PNCP_INGEST_ITEMS_STARVE_BACKLOG))
         if items_backlog < starve:
-            backlog_lim = max(
-                backlog_lim,
-                int(PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS_MAX),
-            )
-        items_enqueued = enqueue_contracts_without_items(limit=backlog_lim)
+            items_enqueued = topup_contract_items_if_starved(items_backlog=items_backlog)
+        else:
+            items_enqueued = enqueue_contracts_without_items(limit=backlog_lim)
 
     return {
         "ok": True,

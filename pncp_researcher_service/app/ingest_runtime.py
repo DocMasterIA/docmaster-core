@@ -23,6 +23,7 @@ _last_stall_recovery_at: float = 0.0
 _items_ok_window: Deque[Tuple[float, int]] = deque()
 _item_rows_window: Deque[Tuple[float, int]] = deque()
 _last_heartbeat_mono: float = 0.0
+_low_rows_alert_since: float = 0.0
 
 
 def configure_service_logging() -> None:
@@ -153,26 +154,28 @@ def is_ingest_stalled() -> bool:
 
 def maybe_log_heartbeat(*, force: bool = False) -> None:
     """Log periódico para docker logs — prova de vida sem monitor manual."""
+    global _last_heartbeat_mono, _low_rows_alert_since
     interval = max(60.0, float(config.PNCP_INGEST_HEARTBEAT_LOG_SECONDS))
     now = time.monotonic()
     last_log = float(_last_batch_summary.get("_last_heartbeat_mono") or 0.0)
     if not force and (now - last_log) < interval:
         return
-    global _last_heartbeat_mono
     _last_heartbeat_mono = now
     _last_batch_summary["_last_heartbeat_mono"] = now
     stalled = is_ingest_stalled()
     items_stalled = is_items_feed_stalled()
+    backfill = config.is_ingest_backfill_mode()
+    rows_1h = item_rows_last_hour()
     logger.info(
         "ingest heartbeat pending=%s processing=%s items_ok=%s item_rows=%s errors=%s "
         "item_rows_1h=%s items_ok_1h=%s gap_contratos=%s since_items_progress=%.0fs items_stalled=%s "
-        "since_progress=%.0fs stalled=%s stall_recoveries=%s",
+        "since_progress=%.0fs stalled=%s stall_recoveries=%s backfill_mode=%s",
         _last_pending,
         (_last_batch_summary.get("queue") or {}).get("processing"),
         _last_batch_summary.get("items_ok"),
         _last_batch_summary.get("item_rows_upserted"),
         _last_batch_summary.get("errors"),
-        item_rows_last_hour(),
+        rows_1h,
         items_ok_last_hour(),
         _last_batch_summary.get("contracts_without_items"),
         seconds_since_items_progress(),
@@ -180,7 +183,24 @@ def maybe_log_heartbeat(*, force: bool = False) -> None:
         seconds_since_progress(),
         stalled,
         _stall_recoveries,
+        backfill,
     )
+    if backfill:
+        alert_thresh = max(0, int(config.PNCP_INGEST_BACKFILL_LOW_ROWS_1H_ALERT))
+        alert_secs = max(300.0, float(config.PNCP_INGEST_BACKFILL_LOW_ROWS_ALERT_SECONDS))
+        if alert_thresh > 0 and rows_1h < alert_thresh:
+            if _low_rows_alert_since <= 0:
+                _low_rows_alert_since = now
+            elif (now - _low_rows_alert_since) >= alert_secs:
+                logger.warning(
+                    "ingest backfill throughput baixo item_rows_1h=%s (alerta <%s por %.0fs)",
+                    rows_1h,
+                    alert_thresh,
+                    alert_secs,
+                )
+                _low_rows_alert_since = now
+        else:
+            _low_rows_alert_since = 0.0
 
 
 def run_stall_recovery_if_needed() -> Optional[Dict[str, Any]]:
@@ -249,6 +269,7 @@ def ingest_runtime_status() -> Dict[str, Any]:
     return {
         "worker_enabled": bool(config.PNCP_INGEST_WORKER_ENABLED),
         "queue_enabled": bool(config.PNCP_INGEST_QUEUE_ENABLED),
+        "backfill_mode": config.is_ingest_backfill_mode(),
         "worker_started": _worker_started_at > 0,
         "stalled": stalled,
         "items_feed_stalled": items_stalled,

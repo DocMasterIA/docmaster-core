@@ -55,3 +55,11 @@ def test_claim_and_complete_contract_items(queue_db):
     stats = ingest_queue.queue_stats()
     assert stats["done"] == 1
     assert stats["pending"] == 0
+
+
+def test_claim_tasks_zero_limit_returns_empty(queue_db):
+    ingest_queue.enqueue_contract_items(numero_pncp="12345678000100-1-000001/2025")
+    tasks = ingest_queue.claim_tasks(task_type=ingest_queue.TASK_CONTRACT_ITEMS, limit=0)
+    assert tasks == []
+    stats = ingest_queue.queue_stats()
+    assert stats["pending"] == 1

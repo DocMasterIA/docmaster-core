@@ -182,7 +182,9 @@ def enqueue_contract_items(
 
 def claim_tasks(*, task_type: Optional[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
     now = _utc_now_iso()
-    lim = max(1, int(limit))
+    lim = int(limit)
+    if lim <= 0:
+        return []
     with _queue_conn() as c:
         where = "status = ? AND available_at <= ?"
         params: List[Any] = [_STATUS_PENDING, now]

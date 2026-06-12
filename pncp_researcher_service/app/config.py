@@ -183,6 +183,42 @@ PNCP_INGEST_JSON_INVALID_RETRY_SECONDS: float = float(
 )
 # Se > 0, não refaz GET /itens se o contrato já tem itens buscados há menos de N dias (0 = sempre busca).
 PNCP_INGEST_ITEMS_REFRESH_DAYS: int = _env_int("PNCP_INGEST_ITEMS_REFRESH_DAYS", 7)
+# Modo backfill: pipeline cheio, refresh=0 efetivo, backpressure relaxada (365d × UFs × modalidades).
+PNCP_INGEST_BACKFILL_MODE: bool = _env_bool("PNCP_INGEST_BACKFILL_MODE", False)
+PNCP_INGEST_BACKFILL_TARGET_BACKLOG: int = _env_int(
+    "PNCP_INGEST_BACKFILL_TARGET_BACKLOG", 10000
+)
+PNCP_INGEST_BACKFILL_TOPUP_CHUNK: int = _env_int("PNCP_INGEST_BACKFILL_TOPUP_CHUNK", 5000)
+PNCP_INGEST_BACKFILL_ITEMS_FIRST_BACKLOG: int = _env_int(
+    "PNCP_INGEST_BACKFILL_ITEMS_FIRST_BACKLOG", 1000
+)
+PNCP_INGEST_BACKFILL_LOW_ROWS_1H_ALERT: int = _env_int(
+    "PNCP_INGEST_BACKFILL_LOW_ROWS_1H_ALERT", 2000
+)
+PNCP_INGEST_BACKFILL_LOW_ROWS_ALERT_SECONDS: int = _env_int(
+    "PNCP_INGEST_BACKFILL_LOW_ROWS_ALERT_SECONDS", 7200
+)
+
+
+def is_ingest_backfill_mode() -> bool:
+    return bool(PNCP_INGEST_BACKFILL_MODE)
+
+
+def effective_items_refresh_days() -> int:
+    if is_ingest_backfill_mode():
+        return 0
+    return max(0, int(PNCP_INGEST_ITEMS_REFRESH_DAYS or 0))
+
+
+def effective_items_starve_backlog() -> int:
+    if is_ingest_backfill_mode():
+        return max(1, int(PNCP_INGEST_BACKFILL_TARGET_BACKLOG))
+    return max(0, int(PNCP_INGEST_ITEMS_STARVE_BACKLOG))
+
+
+def effective_backlog_pause_catalog() -> int:
+    return max(0, int(PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG))
+
 
 # UFs varridas pelo planejador (mesma ordem do loop bash).
 PNCP_UFS_DEFAULT: list[str] = _env_str_list(

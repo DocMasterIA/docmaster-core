@@ -9,10 +9,11 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 from .config import (
+    PNCP_INGEST_BACKFILL_ITEMS_FIRST_BACKLOG,
+    PNCP_INGEST_BACKFILL_TARGET_BACKLOG,
     PNCP_INGEST_BATCH_MAX_SECONDS,
     PNCP_INGEST_CATALOG_PAUSE_MIN_GAP,
     PNCP_INGEST_CATALOG_TASK_TIMEOUT_SECONDS,
-    PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG,
     PNCP_INGEST_PLANNER_INTERVAL_SECONDS,
     PNCP_INGEST_QUEUE_ENABLED,
     PNCP_INGEST_SELF_HEAL_INTERVAL_SECONDS,
@@ -24,6 +25,8 @@ from .config import (
     PNCP_INGEST_WORKER_ITEMS_CONCURRENCY,
     PNCP_INGEST_WORKER_POLL_SECONDS,
     PNCP_LOCAL_INCLUDE_ITEMS,
+    effective_backlog_pause_catalog,
+    is_ingest_backfill_mode,
 )
 from .ingest_backpressure import compute_ingest_backpressure
 from .ingest_maintenance import requeue_processing_tasks, run_ingest_self_healing
@@ -196,7 +199,7 @@ async def process_catalog_page_task(task: Dict[str, Any], *, client: Any) -> Non
 
     if PNCP_LOCAL_INCLUDE_ITEMS:
         items_backlog = backlog_by_task_type(TASK_CONTRACT_ITEMS)
-        if items_backlog < max(0, int(PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG)):
+        if items_backlog < max(0, int(effective_backlog_pause_catalog())):
             for raw in batch:
                 numero = str(raw.get("numeroControlePNCP") or "").strip()
                 if numero and contract_needs_items_refresh(numero):
@@ -318,6 +321,7 @@ async def _run_catalog_task(task: Dict[str, Any], *, client: Any, timeout: float
 async def process_ingest_batch() -> Dict[str, Any]:
     global _last_topup_mono
     ensure_local_index()
+    backfill = is_ingest_backfill_mode()
     task_timeout = max(30.0, float(PNCP_INGEST_TASK_TIMEOUT_SECONDS))
     now_mono = time.monotonic()
 
@@ -328,18 +332,24 @@ async def process_ingest_batch() -> Dict[str, Any]:
     catalog_heavy = bool(bp["catalog_heavy"])
     pause_catalog = bool(bp["pause_catalog"])
 
-    if (now_mono - _last_topup_mono) >= TOPUP_MIN_INTERVAL_SECONDS and (
-        starving or pause_catalog
-    ):
+    if (now_mono - _last_topup_mono) >= TOPUP_MIN_INTERVAL_SECONDS:
         gap = gap_sqlite
-        if starving or (gap > 0 and items_backlog < 50):
+        should_topup = False
+        if is_ingest_backfill_mode():
+            should_topup = items_backlog < max(
+                1, int(PNCP_INGEST_BACKFILL_TARGET_BACKLOG)
+            )
+        elif starving or pause_catalog:
+            should_topup = starving or (gap > 0 and items_backlog < 50)
+        if should_topup:
             topped = topup_contract_items_if_starved(items_backlog=items_backlog)
             if topped:
                 logger.info(
-                    "ingest topup itens enfileirados=%s backlog_antes=%s gap_sqlite=%s",
+                    "ingest topup itens enfileirados=%s backlog_antes=%s gap_sqlite=%s backfill=%s",
                     topped,
                     items_backlog,
                     gap,
+                    is_ingest_backfill_mode(),
                 )
             _last_topup_mono = now_mono
             gap_sqlite = count_contracts_without_items()
@@ -365,13 +375,12 @@ async def process_ingest_batch() -> Dict[str, Any]:
 
     catalog_limit = 0 if pause_catalog else PNCP_INGEST_WORKER_CATALOG_BATCH
     item_limit = PNCP_INGEST_WORKER_ITEMS_BATCH
-    if pause_catalog:
+    if pause_catalog or backfill:
         item_limit = min(
             max(item_limit, PNCP_INGEST_WORKER_ITEMS_BATCH_MAX),
             PNCP_INGEST_WORKER_ITEMS_BATCH_MAX,
         )
     elif items_backlog > item_limit:
-        # Fila cheia: usa teto configurado (não cap artificial por gap baixo).
         item_limit = min(items_backlog, PNCP_INGEST_WORKER_ITEMS_BATCH_MAX)
 
     if catalog_limit > 0:
@@ -405,12 +414,18 @@ async def process_ingest_batch() -> Dict[str, Any]:
             "items_backlog": items_backlog,
             "items_starved": starving,
             "contracts_without_items": gap_sqlite,
+            "backfill_mode": backfill,
             "queue": queue_stats(),
         }
 
     catalog_ok = items_ok = items_skipped = item_rows_upserted = errors = 0
-    # Com gap=0, catálogo primeiro — se o batch estourar timeout, páginas já foram processadas.
-    run_catalog_first = gap_sqlite == 0 and bool(catalog_tasks)
+    items_first = backfill and items_backlog > max(
+        0, int(PNCP_INGEST_BACKFILL_ITEMS_FIRST_BACKLOG)
+    )
+    # Com gap=0, catálogo primeiro — exceto backfill com fila grande (prioriza itens).
+    run_catalog_first = (
+        not items_first and gap_sqlite == 0 and bool(catalog_tasks)
+    )
 
     async with create_pncp_http_client() as client:
 
@@ -466,6 +481,7 @@ async def process_ingest_batch() -> Dict[str, Any]:
         "items_backlog": items_backlog,
         "items_starved": starving,
         "contracts_without_items": gap_sqlite,
+        "backfill_mode": backfill,
         "queue": queue_stats(),
     }
 
@@ -553,7 +569,7 @@ async def ingest_worker_loop() -> None:
             if (result.get("catalog_ok") or result.get("items_ok") or result.get("errors")):
                 logger.info(
                     "ingest batch catalog_ok=%s items_ok=%s items_skip=%s item_rows=%s errors=%s pending=%s "
-                    "gap=%s items_backlog=%s catalog_paused=%s catalog_heavy=%s",
+                    "gap=%s items_backlog=%s catalog_paused=%s catalog_heavy=%s backfill_mode=%s",
                     result.get("catalog_ok"),
                     result.get("items_ok"),
                     result.get("items_skipped"),
@@ -564,6 +580,7 @@ async def ingest_worker_loop() -> None:
                     result.get("items_backlog"),
                     result.get("catalog_paused"),
                     result.get("catalog_heavy"),
+                    result.get("backfill_mode"),
                 )
         except asyncio.CancelledError:
             raise

@@ -44,7 +44,8 @@ def test_topup_enqueues_contracts_without_items(queue_db):
 
 
 def test_topup_enqueues_stale_refresh_when_gap_empty(queue_db, monkeypatch):
-    monkeypatch.setattr(ingest_planner, "PNCP_INGEST_ITEMS_REFRESH_DAYS", 7)
+    monkeypatch.setattr(ingest_planner, "is_ingest_backfill_mode", lambda: False)
+    monkeypatch.setattr(ingest_planner, "effective_items_refresh_days", lambda: 7)
     old = "2026-05-01T12:00:00Z"
     now = "2026-06-11T12:00:00Z"
     with local_index._conn() as c:
@@ -71,8 +72,8 @@ def test_topup_enqueues_stale_refresh_when_gap_empty(queue_db, monkeypatch):
 
 
 def test_topup_skips_stale_when_backlog_not_starved(queue_db, monkeypatch):
-    monkeypatch.setattr(ingest_planner, "PNCP_INGEST_ITEMS_REFRESH_DAYS", 7)
-    monkeypatch.setattr(ingest_planner, "PNCP_INGEST_ITEMS_STARVE_BACKLOG", 150)
+    monkeypatch.setattr(ingest_planner, "is_ingest_backfill_mode", lambda: False)
+    monkeypatch.setattr(ingest_planner, "effective_items_starve_backlog", lambda: 150)
     old = "2026-05-01T12:00:00Z"
     now = "2026-06-11T12:00:00Z"
     with local_index._conn() as c:
@@ -98,7 +99,8 @@ def test_topup_skips_stale_when_backlog_not_starved(queue_db, monkeypatch):
 
 
 def test_topup_no_stale_when_refresh_days_zero(queue_db, monkeypatch):
-    monkeypatch.setattr(ingest_planner, "PNCP_INGEST_ITEMS_REFRESH_DAYS", 0)
+    monkeypatch.setattr(ingest_planner, "is_ingest_backfill_mode", lambda: False)
+    monkeypatch.setattr(ingest_planner, "effective_items_refresh_days", lambda: 0)
     old = "2026-05-01T12:00:00Z"
     now = "2026-06-11T12:00:00Z"
     with local_index._conn() as c:
@@ -122,11 +124,29 @@ def test_topup_no_stale_when_refresh_days_zero(queue_db, monkeypatch):
     assert n == 0
 
 
+def test_topup_backfill_enqueues_contracts_not_in_queue(queue_db, monkeypatch):
+    monkeypatch.setattr(ingest_planner, "is_ingest_backfill_mode", lambda: True)
+    monkeypatch.setattr(ingest_planner, "PNCP_INGEST_BACKFILL_TARGET_BACKLOG", 100)
+    monkeypatch.setattr(ingest_planner, "PNCP_INGEST_BACKFILL_TOPUP_CHUNK", 50)
+    now = "2026-06-11T12:00:00Z"
+    with local_index._conn() as c:
+        for i in range(5):
+            c.execute(
+                """
+                INSERT INTO pncp_contratos (numero_pncp, updated_at, raw_json)
+                VALUES (?, ?, '{}')
+                """,
+                (f"PNCP-BF-{i}", now),
+            )
+        c.commit()
+    n = ingest_planner.topup_contract_items_if_starved(items_backlog=0)
+    assert n == 5
+    assert ingest_queue.queue_stats()["pending"] == 5
+
+
 def test_plan_pauses_catalog_when_items_starved(queue_db, monkeypatch):
-    monkeypatch.setattr(
-        "pncp_researcher_service.app.ingest_planner.PNCP_INGEST_ITEMS_STARVE_BACKLOG",
-        150,
-    )
+    monkeypatch.setattr(ingest_planner, "is_ingest_backfill_mode", lambda: False)
+    monkeypatch.setattr(ingest_planner, "effective_items_starve_backlog", lambda: 150)
     monkeypatch.setattr(
         "pncp_researcher_service.app.ingest_backpressure.PNCP_INGEST_CATALOG_PAUSE_MIN_GAP",
         50,

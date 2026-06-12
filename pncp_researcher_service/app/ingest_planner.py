@@ -6,8 +6,8 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from .config import (
-    PNCP_INGEST_ITEMS_REFRESH_DAYS,
-    PNCP_INGEST_ITEMS_STARVE_BACKLOG,
+    PNCP_INGEST_BACKFILL_TARGET_BACKLOG,
+    PNCP_INGEST_BACKFILL_TOPUP_CHUNK,
     PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS,
     PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS_MAX,
     PNCP_INGEST_PLANNER_PAGES_PER_SCOPE,
@@ -15,6 +15,9 @@ from .config import (
     PNCP_INGEST_QUEUE_MAX_PENDING,
     PNCP_MODALIDADES_DEFAULT,
     PNCP_UFS_DEFAULT,
+    effective_items_refresh_days,
+    effective_items_starve_backlog,
+    is_ingest_backfill_mode,
 )
 from .ingest_backpressure import compute_ingest_backpressure
 from .ingest_dates import resolve_backfill_window
@@ -81,7 +84,7 @@ def enqueue_contracts_needing_items_refresh(
     Enfileira contratos que já têm itens locais mas passaram do refresh window.
     Complementa enqueue_contracts_without_items (gap=0) sem esperar o catálogo repassar.
     """
-    days = max(0, int(PNCP_INGEST_ITEMS_REFRESH_DAYS or 0))
+    days = effective_items_refresh_days()
     lim = max(0, int(limit))
     if lim <= 0 or days <= 0:
         return 0
@@ -120,29 +123,91 @@ def enqueue_contracts_needing_items_refresh(
     return n
 
 
-def topup_contract_items_if_starved(*, items_backlog: int) -> int:
-    """Alimenta a fila de itens quando o backlog está baixo (crescimento do índice)."""
-    starve = max(0, int(PNCP_INGEST_ITEMS_STARVE_BACKLOG))
+def enqueue_contracts_not_in_item_queue(
+    *,
+    limit: int,
+    priority: int = PRIORITY_STALE_REFRESH,
+) -> int:
+    """Enfileira contratos sem task contract_items pending/processing (backfill contínuo)."""
+    lim = max(0, int(limit))
+    if lim <= 0:
+        return 0
+    ensure_local_index()
+    from .ingest_queue import _queue_conn
+
+    with _queue_conn() as c:
+        rows = c.execute(
+            """
+            SELECT c.numero_pncp
+            FROM pncp_contratos c
+            WHERE NOT EXISTS (
+                SELECT 1 FROM pncp_ingest_queue q
+                WHERE q.task_type = ?
+                  AND q.numero_pncp = c.numero_pncp
+                  AND q.status IN ('pending', 'processing')
+            )
+            ORDER BY
+                CASE WHEN EXISTS (
+                    SELECT 1 FROM pncp_itens i WHERE i.numero_pncp = c.numero_pncp LIMIT 1
+                ) THEN 1 ELSE 0 END ASC,
+                c.updated_at DESC
+            LIMIT ?
+            """,
+            (TASK_CONTRACT_ITEMS, lim),
+        ).fetchall()
+    n = 0
+    for r in rows:
+        if enqueue_contract_items(
+            numero_pncp=str(r["numero_pncp"]),
+            priority=int(priority),
+        ):
+            n += 1
+    return n
+
+
+def _topup_chunk_limit(*, items_backlog: int) -> int:
+    if is_ingest_backfill_mode():
+        target = max(1, int(PNCP_INGEST_BACKFILL_TARGET_BACKLOG))
+        if items_backlog >= target:
+            return 0
+        chunk = max(1, int(PNCP_INGEST_BACKFILL_TOPUP_CHUNK))
+        return min(chunk, target - items_backlog)
+    starve = max(0, int(effective_items_starve_backlog()))
     if items_backlog >= starve:
         return 0
     base = max(0, int(PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS))
     ceiling = max(base, int(PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS_MAX))
-    # Quanto menor o backlog, mais contratos enfileiramos nesta rodada.
     if items_backlog <= 0:
-        lim = ceiling
-    else:
-        lim = min(ceiling, base + (starve - items_backlog) * 4)
+        return ceiling
+    return min(ceiling, base + (starve - items_backlog) * 4)
+
+
+def topup_contract_items_if_starved(*, items_backlog: int) -> int:
+    """Alimenta a fila de itens quando o backlog está baixo (crescimento do índice)."""
+    lim = _topup_chunk_limit(items_backlog=items_backlog)
+    if lim <= 0:
+        return 0
     n_gap = enqueue_contracts_without_items(limit=lim)
     remaining = max(0, lim - n_gap)
-    n_stale = enqueue_contracts_needing_items_refresh(limit=remaining)
-    if n_stale:
+    n_stale = 0
+    if remaining > 0 and not is_ingest_backfill_mode():
+        n_stale = enqueue_contracts_needing_items_refresh(limit=remaining)
+        remaining = max(0, remaining - n_stale)
+    n_queue = 0
+    if remaining > 0 and is_ingest_backfill_mode():
+        n_queue = enqueue_contracts_not_in_item_queue(limit=remaining)
+    total = n_gap + n_stale + n_queue
+    if total:
         logger.info(
-            "ingest topup stale refresh enfileirados=%s gap=%s backlog_antes=%s",
-            n_stale,
+            "ingest topup enfileirados=%s gap=%s stale=%s queue=%s backlog_antes=%s backfill=%s",
+            total,
             n_gap,
+            n_stale,
+            n_queue,
             items_backlog,
+            is_ingest_backfill_mode(),
         )
-    return n_gap + n_stale
+    return total
 
 
 def plan_ingest_queue(
@@ -217,7 +282,7 @@ def plan_ingest_queue(
                     catalog_enqueued += 1
 
     if backlog_lim > 0:
-        starve = max(0, int(PNCP_INGEST_ITEMS_STARVE_BACKLOG))
+        starve = max(0, int(effective_items_starve_backlog()))
         if items_backlog < starve:
             items_enqueued = topup_contract_items_if_starved(items_backlog=items_backlog)
         else:
@@ -225,6 +290,7 @@ def plan_ingest_queue(
 
     return {
         "ok": True,
+        "backfill_mode": is_ingest_backfill_mode(),
         "window": {
             "data_inicial": data_inicial,
             "data_final": data_final,

@@ -4,6 +4,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict
 
+from .config import (
+    PNCP_INGEST_BACKFILL_TARGET_BACKLOG,
+    is_ingest_backfill_mode,
+)
 from .ingest_dates import resolve_backfill_window
 from .ingest_queue import count_contracts_without_items, queue_stats
 from .ingest_runtime import ingest_runtime_status
@@ -35,6 +39,8 @@ def ingest_coverage_status() -> Dict[str, Any]:
     return {
         "ok": True,
         "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "backfill_mode": is_ingest_backfill_mode(),
+        "backfill_target_backlog": int(PNCP_INGEST_BACKFILL_TARGET_BACKLOG),
         "window": {
             "data_inicial": data_inicial,
             "data_final": data_final,

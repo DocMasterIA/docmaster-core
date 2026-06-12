@@ -21,7 +21,7 @@ from .config import (
     PNCP_INGEST_AUTOPAUSE_JSON_INVALID_SECONDS,
     PNCP_INGEST_AUTOPAUSE_MAX_SECONDS,
     PNCP_INGEST_WATERMARK_RESUME,
-    PNCP_INGEST_ITEMS_REFRESH_DAYS,
+    effective_items_refresh_days,
     PNCP_LOCAL_BACKFILL_MONTHS,
     PNCP_LOCAL_DB_PATH,
     PNCP_LOCAL_INCLUDE_ITEMS,
@@ -888,7 +888,7 @@ def contract_needs_items_refresh(numero_pncp: str) -> bool:
     True = deve buscar GET /itens no PNCP.
     Com PNCP_INGEST_ITEMS_REFRESH_DAYS > 0, pula contratos cujos itens foram buscados recentemente.
     """
-    days = max(0, int(PNCP_INGEST_ITEMS_REFRESH_DAYS or 0))
+    days = effective_items_refresh_days()
     if days <= 0:
         return True
     numero = str(numero_pncp or "").strip()

@@ -53,6 +53,20 @@ for _ in $(seq 1 30); do
       echo "AVISO: ingest_maintenance.py sem reconcile gap"
       exit 1
     fi
+    if docker exec "$C" grep -q 'fetch_contract_items_with_resultados' "$APP/pncp_client.py"; then
+      echo "OK  pncp_client.py (resultados fetch)"
+    else
+      echo "AVISO: pncp_client.py sem fetch_contract_items_with_resultados — copie pncp_client.py"
+      exit 1
+    fi
+    if docker exec "$C" grep -q 'enrich_contract_resultados_only' "$APP/local_index.py"; then
+      echo "OK  local_index.py (resultados-only enrich)"
+    else
+      echo "AVISO: local_index.py sem enrich_contract_resultados_only"
+      exit 1
+    fi
+    docker exec "$C" python -c \
+      "from pncp_researcher_service.app.pncp_client import fetch_contract_items_with_resultados; from pncp_researcher_service.app.local_index import enrich_contract_resultados_only; print('homolog imports ok')"
     exit 0
   fi
   sleep 2

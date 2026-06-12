@@ -371,9 +371,16 @@ async def process_ingest_batch() -> Dict[str, Any]:
             PNCP_INGEST_WORKER_ITEMS_BATCH_MAX,
         )
     elif gap_sqlite < max(1, int(PNCP_INGEST_CATALOG_PAUSE_MIN_GAP)):
-        # Gap baixo: prioriza catálogo; quase não processa fila legada de itens.
+        # Gap baixo: catálogo continua; itens enfileirados pelo catálogo TÊM de drenar
+        # (item_limit=0 com backlog>20 congelava total_itens — catálogo enfileirava, worker ignorava).
         catalog_limit = PNCP_INGEST_WORKER_CATALOG_BATCH
-        item_limit = 0 if items_backlog > 20 else min(item_limit, 4)
+        if items_backlog > 20:
+            item_limit = min(
+                PNCP_INGEST_WORKER_ITEMS_BATCH,
+                max(8, min(items_backlog, PNCP_INGEST_WORKER_ITEMS_BATCH_MAX)),
+            )
+        else:
+            item_limit = min(item_limit, 8)
 
     if catalog_limit > 0:
         catalog_limit = _cap_catalog_batch_limit(

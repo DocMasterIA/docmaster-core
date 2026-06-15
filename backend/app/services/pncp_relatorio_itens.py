@@ -215,6 +215,31 @@ def _pick_source(src: Dict[str, Any], *keys: str, default: str = "—") -> str:
     return default
 
 
+def _pick_descricao_fonte_pncp(it: Any, src: Dict[str, Any]) -> str:
+    """
+    Descrição/título do item na fonte PNCP (não confundir com descricao_item do item manual da cotação).
+    Prioriza campos do payload PNCP em ``source``; usa coluna ORM só como fallback.
+    """
+    if not isinstance(src, dict):
+        src = {}
+    for key in (
+        "descricao",
+        "descricaoItem",
+        "descricao_item",
+        "objeto_resumido",
+        "objetoResumido",
+        "objetoCompra",
+        "material_servico",
+        "materialOuServicoNome",
+        "titulo",
+    ):
+        v = _pick_source(src, key, default="")
+        if v and v != "—":
+            return v[:500]
+    row_desc = str(getattr(it, "descricao_item", None) or "").strip()
+    return row_desc[:500] if row_desc else "—"
+
+
 def _iter_source_pairs(obj: Any, prefix: str = ""):
     if isinstance(obj, dict):
         for k, v in obj.items():
@@ -502,9 +527,11 @@ def fonte_dict_de_item(
     )
     email = _pick_source(src, "email", "emailFornecedor", "email_fornecedor", default="")
     endereco = _endereco_de_source(src)
+    descricao_fonte = _pick_descricao_fonte_pncp(it, src)
 
     return {
         "tipo": tipo[:120],
+        "descricao_fonte": descricao_fonte,
         "fornecedor": fornecedor[:400],
         "cnpj": cnpj[:32],
         "data": data_str,

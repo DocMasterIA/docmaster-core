@@ -196,7 +196,7 @@
                   <div class="rpv-mini-grid rpv-mini-grid--2">
                     <div class="rpv-dcard rpv-dcard--wide">
                       <span class="rpv-dcard__label">Descrição do item</span>
-                      <span class="rpv-dcard__value">{{ g.nome }}</span>
+                      <span class="rpv-dcard__value">{{ f.descricao_fonte || '—' }}</span>
                     </div>
                     <div class="rpv-dcard rpv-dcard--wide">
                       <span class="rpv-dcard__label">Ajuste</span>
@@ -565,8 +565,19 @@ function itemToFonte(it) {
   }
   const processo = src.processo || it.numero_pncp || '—';
   const ajuste = src.ajuste || src.observacao_frete || 'Sem frete';
+  const descricaoFonte = String(
+    src.descricao
+      || src.descricaoItem
+      || src.descricao_item
+      || src.objeto_resumido
+      || src.objetoResumido
+      || src.objetoCompra
+      || it.descricao_item
+      || '',
+  ).trim() || '—';
   return {
     tipo,
+    descricao_fonte: descricaoFonte,
     fornecedor,
     cnpj,
     data,

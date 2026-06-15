@@ -285,6 +285,12 @@ def nome_fornecedor_e_util_para_exibicao(nome: str) -> bool:
 
 
 def _pick_supplier_name_from_source(src: Dict[str, Any]) -> str:
+    cad = src.get("fornecedor_cadastro")
+    if isinstance(cad, dict):
+        for k in ("razao_social", "nome_fantasia", "razaoSocial", "nomeFantasia"):
+            v = str(cad.get(k) or "").strip()
+            if nome_fornecedor_e_util_para_exibicao(v):
+                return v
     # Não parar no primeiro campo preenchido: «fornecedor» costuma repetir o CNPJ
     # enquanto nomeRazaoSocialFornecedor / razaoSocial trazem a razão social.
     for k in _SUPPLIER_NAME_TOP_KEYS:
@@ -373,6 +379,58 @@ def _format_municipio_uf(municipio: Any, uf: Any) -> str:
     return mun or sigla or ""
 
 
+_MUNICIPIO_NOME_KEYS = frozenset(
+    {"municipio", "municipionome", "municipio_nome", "nomemunicipio", "cidade", "localidade"}
+)
+_UF_SIGLA_KEYS = frozenset({"uf", "ufsigla", "uf_sigla", "siglauf", "sigla_uf"})
+
+
+def _pick_localidade_from_source(src: Dict[str, Any]) -> tuple[str, str]:
+    """Município/UF em source PNCP (inclui unidadeOrgao aninhado)."""
+    mun = ""
+    uf = ""
+    if not isinstance(src, dict):
+        return mun, uf
+    for k in ("municipio", "municipioNome", "municipio_nome", "cidade"):
+        v = src.get(k)
+        if v is not None and str(v).strip():
+            mun = str(v).strip()
+            break
+    for k in ("uf", "ufSigla", "uf_sigla", "siglaUf"):
+        v = src.get(k)
+        if v is not None and str(v).strip():
+            uf = str(v).strip().upper()[:2]
+            break
+    for _path, key, value in _iter_source_pairs(src):
+        kl = str(key or "").lower()
+        if not mun and kl in _MUNICIPIO_NOME_KEYS:
+            s = str(value or "").strip()
+            if len(s) >= 2 and not s.isdigit():
+                mun = s
+        if not uf and kl in _UF_SIGLA_KEYS:
+            s = str(value or "").strip().upper()
+            if len(s) == 2 and s.isalpha():
+                uf = s
+        if mun and uf:
+            break
+    return mun, uf
+
+
+def _resolve_municipio_uf_para_fonte(
+    municipio: Any,
+    uf: Any,
+    src: Dict[str, Any],
+) -> tuple[str, str]:
+    """ORM + source PNCP (topo e unidadeOrgao aninhado)."""
+    mun = str(municipio or "").strip()
+    sigla = str(uf or "").strip().upper()[:2] if str(uf or "").strip() else ""
+    if not mun or not sigla:
+        sm, su = _pick_localidade_from_source(src)
+        mun = mun or sm
+        sigla = sigla or su
+    return mun, sigla
+
+
 def _format_orgao_com_local(orgao: Any, municipio: Any, uf: Any) -> str:
     """Ex.: «Porto Alegre/RS - Secretaria da Saúde»."""
     org = str(orgao or "").strip()
@@ -419,12 +477,11 @@ def fonte_dict_de_item(
     pu = preco_unitario_cotacao_fonte(it, quantidade_item=quantidade_item_base)
     valor = f"R$ {_formatar_moeda_br(pu)}" if pu is not None else "—"
 
-    mun = (getattr(it, "municipio", None) or "").strip()
-    uf = (getattr(it, "uf", None) or "").strip()
-    if not mun:
-        mun = str(_pick_source(src, "municipio", "municipioNome", "municipio_nome", default="")).strip()
-    if not uf:
-        uf = str(_pick_source(src, "uf", "ufSigla", "uf_sigla", default="")).strip()
+    mun, uf = _resolve_municipio_uf_para_fonte(
+        getattr(it, "municipio", None),
+        getattr(it, "uf", None),
+        src,
+    )
     municipio_uf = _format_municipio_uf(mun, uf) or "—"
     orgao = _format_orgao_com_local(getattr(it, "orgao", None), mun, uf)[:200]
 

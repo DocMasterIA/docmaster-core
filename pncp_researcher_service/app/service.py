@@ -2421,7 +2421,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         funil["provavel_gargalo_top3"] = "homologados_sem_preco_indice"
 
     enrich_n_top3 = 0
-    if top3 and not busca_lote:
+    if top3:
         enrich_cap = max(0, min(int(PNCP_SEARCH_ENRICH_HOMOLOG_MAX), len(top3)))
         if enrich_cap:
             enrich_n_top3 = await enrich_homolog_items_from_pncp(top3, max_n=enrich_cap)

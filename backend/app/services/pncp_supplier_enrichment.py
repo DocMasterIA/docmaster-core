@@ -8,6 +8,7 @@ import requests
 from django.conf import settings
 
 from backend.app.models import PncpCotacaoItemCotacao
+from backend.app.services.pncp_source_normalize import normalize_pncp_geo_in_payload
 
 logger = logging.getLogger(__name__)
 
@@ -648,13 +649,10 @@ def enrich_supplier_fields_in_payloads(
     ordered = [it for it in payloads if isinstance(it, dict)]
     ordered.sort(key=_enrich_payload_sort_key)
 
-    only_homolog = bool(getattr(settings, "PNCP_ADD_SOURCE_ONLY_HOMOLOGATED", True))
-
     for it in ordered:
         if not isinstance(it, dict):
             continue
-        if only_homolog and not item_homologado_para_busca_dict(it):
-            continue
+        normalize_pncp_geo_in_payload(it)
         if _payload_supplier_complete(it):
             continue
 
@@ -667,6 +665,7 @@ def enrich_supplier_fields_in_payloads(
                     it["cnpj_fornecedor"] = fmt
                     has_cnpj = True
 
+        # BrasilAPI: qualquer fonte com CNPJ e sem razão social (não depende de homologado).
         if has_cnpj and not _fornecedor_tem_nome_util(it):
             ck = _cnpj_digits(str(it.get("cnpj_fornecedor") or ""))
             if len(ck) == 14 and ck in brasil_cache:
@@ -686,8 +685,33 @@ def enrich_supplier_fields_in_payloads(
                 }
                 if _merge_supplier_snap_into_payload(it, snap_br):
                     enriched_count += 1
-            if _payload_supplier_complete(it):
-                continue
+
+    only_homolog = bool(getattr(settings, "PNCP_ADD_SOURCE_ONLY_HOMOLOGATED", True))
+
+    for it in ordered:
+        if not isinstance(it, dict):
+            continue
+        if _payload_supplier_complete(it):
+            continue
+        if only_homolog and not item_homologado_para_busca_dict(it):
+            continue
+
+        has_cnpj = bool(str(it.get("cnpj_fornecedor") or "").strip())
+        if not has_cnpj:
+            display = _fornecedor_display_name_from_source(it)
+            if _nome_e_somente_cnpj_formatado(display):
+                fmt = _normalize_cnpj(_cnpj_digits(display))
+                if fmt:
+                    it["cnpj_fornecedor"] = fmt
+                    has_cnpj = True
+
+        if not has_cnpj:
+            display = _fornecedor_display_name_from_source(it)
+            if _nome_e_somente_cnpj_formatado(display):
+                fmt = _normalize_cnpj(_cnpj_digits(display))
+                if fmt:
+                    it["cnpj_fornecedor"] = fmt
+                    has_cnpj = True
 
         np = str(it.get("numero_pncp") or it.get("numeroControlePNCP") or "").strip()
         cnpj_org = _extract_cnpj_orgao(np)
@@ -740,6 +764,8 @@ def enrich_missing_supplier_fields_for_cotacao(
             "ano_compra",
             "sequencial_compra",
             "numero_item",
+            "municipio",
+            "uf",
             "source",
         )
     )
@@ -784,12 +810,22 @@ def enrich_missing_supplier_fields_for_cotacao(
     updated: List[PncpCotacaoItemCotacao] = []
     for row, merged in work:
         orig = row.source if isinstance(row.source, dict) else {}
-        if merged != orig:
+        changed = merged != orig
+        if changed:
             row.source = merged
+        mun = str(merged.get("municipio") or "").strip()
+        uf = str(merged.get("uf") or "").strip().upper()[:2]
+        if mun and not str(row.municipio or "").strip():
+            row.municipio = mun[:256]
+            changed = True
+        if uf and not str(row.uf or "").strip():
+            row.uf = uf[:8]
+            changed = True
+        if changed:
             updated.append(row)
 
     if updated:
-        PncpCotacaoItemCotacao.objects.bulk_update(updated, ["source"], batch_size=500)
+        PncpCotacaoItemCotacao.objects.bulk_update(updated, ["source", "municipio", "uf"], batch_size=500)
         logger.info(
             "fornecedor enriquecido antes do PDF: cotacao_id=%s linhas=%s",
             cotacao_id,

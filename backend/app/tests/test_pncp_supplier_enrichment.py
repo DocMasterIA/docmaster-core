@@ -69,6 +69,14 @@ class SupplierNameDisplayTests(unittest.TestCase):
         }
         self.assertEqual(_pick_supplier_name_from_source(src), "")
 
+    def test_pick_name_from_fornecedor_cadastro(self):
+        src = {
+            "cnpj_fornecedor": "27.105.456/0001-72",
+            "fornecedor": "",
+            "fornecedor_cadastro": {"razao_social": "EMPRESA TESTE LTDA"},
+        }
+        self.assertEqual(_pick_supplier_name_from_source(src), "EMPRESA TESTE LTDA")
+
 
 if __name__ == "__main__":
     unittest.main()

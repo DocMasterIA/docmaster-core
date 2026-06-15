@@ -38,6 +38,7 @@ from backend.app.models import (
     PncpCotacaoItemCotacao,
     Prefeitura,
 )
+from backend.app.services.pncp_source_normalize import normalize_pncp_geo_in_payload
 from backend.app.services.pncp_supplier_enrichment import enrich_supplier_fields_in_payloads
 from backend.app.services.pncp_relatorio_itens import (
     agrupar_cotacoes_por_item_relatorio_pesquisa_precos,
@@ -146,7 +147,9 @@ _SOURCE_KEEP_KEYS = frozenset(
         "valorTotal",
         "orgao",
         "municipio",
+        "municipioNome",
         "uf",
+        "ufSigla",
         "modalidade",
         "data_publicacao",
         "esfera",
@@ -905,31 +908,33 @@ def _item_identity_error(it: Dict[str, Any]) -> Optional[str]:
 
 
 def _item_from_payload(it: Dict[str, Any], cotacao: PncpCotacao) -> PncpCotacaoItem:
+    payload = dict(it)
+    normalize_pncp_geo_in_payload(payload)
     desc = (
-        it.get("descricao_item")
-        or it.get("descricao")
-        or it.get("objeto_resumido")
-        or it.get("objetoCompra")
+        payload.get("descricao_item")
+        or payload.get("descricao")
+        or payload.get("objeto_resumido")
+        or payload.get("objetoCompra")
         or ""
     )
-    vt = _safe_float(it.get("valor_total")) or _safe_float(it.get("valor_global"))
-    np = str(it.get("numero_pncp") or it.get("numeroControlePNCP") or "")[:256]
+    vt = _safe_float(payload.get("valor_total")) or _safe_float(payload.get("valor_global"))
+    np = str(payload.get("numero_pncp") or payload.get("numeroControlePNCP") or "")[:256]
     return PncpCotacaoItem(
         cotacao=cotacao,
         numero_pncp=np,
-        ano_compra=_safe_int_field(it.get("ano_compra"), min_v=1990, max_v=2100),
-        sequencial_compra=_safe_int_field(it.get("sequencial_compra"), min_v=1, max_v=2_147_483_647),
-        numero_item=str(it.get("numero_item") or it.get("numeroItem") or "")[:64],
+        ano_compra=_safe_int_field(payload.get("ano_compra"), min_v=1990, max_v=2100),
+        sequencial_compra=_safe_int_field(payload.get("sequencial_compra"), min_v=1, max_v=2_147_483_647),
+        numero_item=str(payload.get("numero_item") or payload.get("numeroItem") or "")[:64],
         descricao_item=str(desc)[:10000] if desc else "",
-        quantidade=_safe_float(it.get("quantidade")),
-        unidade_medida=str(it.get("unidade_medida") or it.get("unidadeMedida") or "")[:64],
-        valor_unitario=_safe_float(it.get("valor_unitario")) or _safe_float(it.get("valorUnitario")),
+        quantidade=_safe_float(payload.get("quantidade")),
+        unidade_medida=str(payload.get("unidade_medida") or payload.get("unidadeMedida") or "")[:64],
+        valor_unitario=_safe_float(payload.get("valor_unitario")) or _safe_float(payload.get("valorUnitario")),
         valor_total=vt,
-        orgao=str(it.get("orgao") or "")[:512],
-        municipio=str(it.get("municipio") or "")[:256],
-        uf=_normalize_uf(it.get("uf")),
-        modalidade=str(it.get("modalidade") or "")[:256],
-        source=_compact_item_source(it),
+        orgao=str(payload.get("orgao") or "")[:512],
+        municipio=str(payload.get("municipio") or "")[:256],
+        uf=_normalize_uf(payload.get("uf")),
+        modalidade=str(payload.get("modalidade") or "")[:256],
+        source=_compact_item_source(payload),
     )
 
 
@@ -1481,6 +1486,8 @@ def pncp_research_sessions_add_items(request, sessao_id: int):
                     next_numero_item = n + 1
             normalized_itens.append(payload)
 
+        for payload in normalized_itens:
+            normalize_pncp_geo_in_payload(payload)
         enrich_supplier_fields_in_payloads(normalized_itens)
 
         built = [_item_from_payload(it, c) for it in normalized_itens]
@@ -1563,6 +1570,8 @@ def pncp_research_sessions_item_cotacoes(request, sessao_id: int, item_id: int):
         )
 
     dict_rows = [dict(r) for r in raw_cotacoes if isinstance(r, dict)]
+    for row in dict_rows:
+        normalize_pncp_geo_in_payload(row)
     enrich_supplier_fields_in_payloads(dict_rows)
 
     built: List[PncpCotacaoItemCotacao] = []

@@ -535,7 +535,9 @@ function itemToFonte(it) {
   const src = it.source && typeof it.source === 'object' ? it.source : {};
   let tipo = src.tipo_fonte || src.fonte || src.origem || '';
   if (!tipo) tipo = String(it.numero_pncp || '').trim() ? 'PNCP' : 'Registro importado';
-  const fornecedor = src.fornecedor || src.nomeRazaoSocialFornecedor || it.orgao || '—';
+  const fornecedor = src.fornecedor || src.nomeRazaoSocialFornecedor
+    || (src.fornecedor_cadastro && (src.fornecedor_cadastro.razao_social || src.fornecedor_cadastro.nome_fantasia))
+    || '—';
   const cnpj = src.cnpj || src.cnpj_fornecedor || '—';
   let data = '—';
   if (it.created_at) {
@@ -546,8 +548,10 @@ function itemToFonte(it) {
   }
   const vn = valorNum(it);
   const valor = vn != null ? `R$ ${formatarMoedaBr(vn)}` : '—';
-  const mun = String(it.municipio || src.municipio || src.municipioNome || '').trim();
-  const uf = String(it.uf || src.uf || src.ufSigla || '').trim();
+  const mun = String(it.municipio || src.municipio || src.municipioNome || '').trim()
+    || String((src.unidadeOrgao && src.unidadeOrgao.municipioNome) || '').trim();
+  const uf = String(it.uf || src.uf || src.ufSigla || '').trim()
+    || String((src.unidadeOrgao && src.unidadeOrgao.ufSigla) || '').trim();
   let municipioUf = '—';
   if (mun && uf) municipioUf = `${mun}/${uf}`;
   else if (mun) municipioUf = mun;

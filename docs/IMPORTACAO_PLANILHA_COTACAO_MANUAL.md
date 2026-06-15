@@ -65,6 +65,9 @@ Exemplos de alias que sao convertidos automaticamente para IDs canonicos:
 - `id_item` -> `numero_item`
 - `item_id` -> `numero_item`
 - `item` -> `numero_item`
+- `id` -> `numero_item` (coluna «ID» da planilha)
+- `n` / `N°` -> `numero_item` (primeira coluna do modelo «N°»)
+- `descricao_do_item` -> `descricao_item` (cabeçalho «Descrição do Item» do modelo)
 
 ## Regras de normalizacao de cabecalho
 

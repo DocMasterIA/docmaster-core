@@ -208,6 +208,7 @@ _IMPORT_ALLOWED_IDS = frozenset(IMPORT_REQUIRED_COLUMN_IDS + IMPORT_OPTIONAL_COL
 _IMPORT_ALIASES = {
     "nome_do_item": "descricao_item",
     "nome_item": "descricao_item",
+    "descricao_do_item": "descricao_item",
     "id_item": "numero_item",
     "numero_do_item": "numero_item",
     "numero_item": "numero_item",
@@ -215,6 +216,13 @@ _IMPORT_ALIASES = {
     "n_item": "numero_item",
     "item_id": "numero_item",
     "item": "numero_item",
+    "id": "numero_item",
+    "n": "numero_item",
+    "no": "numero_item",
+    "numero": "numero_item",
+    "num": "numero_item",
+    "codigo": "numero_item",
+    "codigo_item": "numero_item",
     "descricao": "descricao_item",
     "descricaoitem": "descricao_item",
     "qtd": "quantidade",
@@ -373,6 +381,11 @@ def _build_items_from_import_rows(rows: List[Dict[str, Any]], column_map: Dict[s
             if val is None and source_key != cid:
                 val = normalized_row.get(cid)
             it[cid] = val
+
+        if not str(it.get("numero_item") or "").strip():
+            fallback_num = normalized_row.get("numero_item")
+            if fallback_num is not None and str(fallback_num).strip():
+                it["numero_item"] = str(fallback_num).strip()
 
         desc = str(it.get("descricao_item") or "").strip()
         if not desc:

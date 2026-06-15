@@ -1107,6 +1107,7 @@ async function onImportSpreadsheetSelected(event) {
       quantidade: 'quantidade',
       unidade_medida: 'unidade_medida',
       valor_unitario: 'valor_unitario',
+      // numero_item: cabeçalhos id, N°, item, etc. são normalizados no backend
       numero_item: 'numero_item',
     });
     await loadSessionFromBackend();

@@ -1956,8 +1956,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     hybrid_used = False
     hybrid_live_count = 0
     if (
-        not busca_lote
-        and PNCP_HYBRID_FALLBACK_ENABLED
+        PNCP_HYBRID_FALLBACK_ENABLED
         and len(itens) < max(1, int(PNCP_HYBRID_MIN_LOCAL_RESULTS))
     ):
         live_pages = max(1, min(int(PNCP_HYBRID_MAX_LIVE_PAGES), int(payload.max_paginas or 1)))

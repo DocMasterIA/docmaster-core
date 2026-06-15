@@ -1086,7 +1086,7 @@ async function runSearchWithContext({
       && Number(variacaoCtx) >= 0;
 
     const basePayload = {
-      somente_homologados: true,
+      somente_homologados: !bulkMode,
       termo_busca: String(descricao).trim(),
       codigo_modalidade: null,
       max_paginas: bulkMode ? 3 : 500,
@@ -1094,9 +1094,9 @@ async function runSearchWithContext({
       quantidade_referencia: context?.quantidade ?? null,
       unidade_medida_referencia: context?.unidade_medida ?? null,
       busca_lote: Boolean(bulkMode),
-      // Faixa só quando valor base + variação estão definidos (evita filtrar 3→1 no backend).
-      valor_base_referencia: faixaAtiva ? Number(valorBaseCtx) : null,
-      variacao_percentual_referencia: faixaAtiva ? Number(variacaoCtx) : null,
+      // Faixa por item só fora do lote — no bulk o backend ignora faixa/homolog estrito.
+      valor_base_referencia: faixaAtiva && !bulkMode ? Number(valorBaseCtx) : null,
+      variacao_percentual_referencia: faixaAtiva && !bulkMode ? Number(variacaoCtx) : null,
     };
 
     const aggregated = [];

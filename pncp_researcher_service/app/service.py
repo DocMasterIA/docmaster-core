@@ -1927,21 +1927,31 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     """
     # Reutiliza a mesma fonte da busca manual (itens PNCP normalizados)
     busca_lote = bool(getattr(payload, "busca_lote", False))
+    # Busca automática (696+ itens): mesmo recorte do índice que antes do filtro homolog/faixa por item.
+    search_payload = payload
+    if busca_lote:
+        search_payload = payload.model_copy(
+            update={
+                "somente_homologados": False,
+                "valor_base_referencia": None,
+                "variacao_percentual_referencia": None,
+            }
+        )
     ia_rerank_on = bool(PNCP_IA_RERANK_ENABLED) and not busca_lote
     ia_resumo_on = bool(PNCP_IA_ITEM_RESUMO_ENABLED) and not busca_lote
-    limit = max(50, payload.max_paginas * payload.tamanho_pagina)
+    limit = max(50, search_payload.max_paginas * search_payload.tamanho_pagina)
     if busca_lote:
         limit = min(limit, max(80, int(PNCP_BULK_SEARCH_SQL_LIMIT)))
-    termo_efetivo, term_meta = derive_anchor_search_term(payload.termo_busca)
+    termo_efetivo, term_meta = derive_anchor_search_term(search_payload.termo_busca)
     base_items = local_item_search(
         termo_efetivo,
-        uf=payload.uf,
-        municipio=payload.municipio,
-        recortes_geograficos=payload.recortes_geograficos,
-        codigo_modalidade=payload.codigo_modalidade,
+        uf=search_payload.uf,
+        municipio=search_payload.municipio,
+        recortes_geograficos=search_payload.recortes_geograficos,
+        codigo_modalidade=search_payload.codigo_modalidade,
         limit=limit,
         cleanup_for_display=False,
-        somente_homologados=payload.somente_homologados,
+        somente_homologados=search_payload.somente_homologados,
     )
     itens = list(base_items.get("itens") or [])
     base_stats = dict(base_items.get("stats") or {})
@@ -1952,15 +1962,20 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         "sql_rows_fetched": int(base_stats.get("sql_rows_fetched") or 0),
         "filtrados_token_match": int(base_stats.get("filtrados_token_match") or 0),
         "filtrados_nao_homologados": int(base_stats.get("filtrados_nao_homologados") or 0),
+        "busca_lote_relaxada": bool(busca_lote),
     }
     hybrid_used = False
     hybrid_live_count = 0
+    hybrid_min = max(1, int(PNCP_HYBRID_MIN_LOCAL_RESULTS))
+    local_priced = sum(1 for x in itens if _row_price_for_faixa(x) > 0.0)
     if (
         PNCP_HYBRID_FALLBACK_ENABLED
-        and len(itens) < max(1, int(PNCP_HYBRID_MIN_LOCAL_RESULTS))
+        and (len(itens) < hybrid_min or local_priced < hybrid_min)
     ):
-        live_pages = max(1, min(int(PNCP_HYBRID_MAX_LIVE_PAGES), int(payload.max_paginas or 1)))
-        live_payload = payload.model_copy(update={"max_paginas": live_pages})
+        live_pages = max(1, min(int(PNCP_HYBRID_MAX_LIVE_PAGES), int(search_payload.max_paginas or 1)))
+        if busca_lote:
+            live_pages = max(live_pages, min(int(PNCP_HYBRID_MAX_LIVE_PAGES), 6))
+        live_payload = search_payload.model_copy(update={"max_paginas": live_pages})
         try:
             live_result = await market_search(live_payload)
             live_itens = list(live_result.get("itens") or [])
@@ -2050,17 +2065,17 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         }
 
     query_groups = _build_search_tokens(termo_efetivo)
-    ref_qty = _safe_float(payload.quantidade_referencia)
-    ref_unit = _normalize_unit(payload.unidade_medida_referencia)
-    ref_val_set = payload.valor_base_referencia is not None
-    ref_var_set = payload.variacao_percentual_referencia is not None
+    ref_qty = _safe_float(search_payload.quantidade_referencia)
+    ref_unit = _normalize_unit(search_payload.unidade_medida_referencia)
+    ref_val_set = search_payload.valor_base_referencia is not None
+    ref_var_set = search_payload.variacao_percentual_referencia is not None
     funil["faixa_ativa"] = bool(ref_val_set and ref_var_set)
     try:
-        ref_value = float(payload.valor_base_referencia) if ref_val_set else 0.0
+        ref_value = float(search_payload.valor_base_referencia) if ref_val_set else 0.0
     except (TypeError, ValueError):
         ref_value = 0.0
     try:
-        ref_var_pct = float(payload.variacao_percentual_referencia) if ref_var_set else 0.0
+        ref_var_pct = float(search_payload.variacao_percentual_referencia) if ref_var_set else 0.0
     except (TypeError, ValueError):
         ref_var_pct = 0.0
     faixa_min: Optional[float] = None

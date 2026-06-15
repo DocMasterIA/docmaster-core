@@ -546,12 +546,19 @@ function itemToFonte(it) {
   }
   const vn = valorNum(it);
   const valor = vn != null ? `R$ ${formatarMoedaBr(vn)}` : '—';
-  const mun = String(it.municipio || '').trim();
-  const uf = String(it.uf || '').trim();
+  const mun = String(it.municipio || src.municipio || src.municipioNome || '').trim();
+  const uf = String(it.uf || src.uf || src.ufSigla || '').trim();
   let municipioUf = '—';
   if (mun && uf) municipioUf = `${mun}/${uf}`;
   else if (mun) municipioUf = mun;
   else if (uf) municipioUf = uf;
+  const orgaoRaw = String(it.orgao || src.orgao || '').trim();
+  let orgaoExib = orgaoRaw || '—';
+  if (municipioUf !== '—' && orgaoRaw) {
+    orgaoExib = `${municipioUf} - ${orgaoRaw}`;
+  } else if (municipioUf !== '—') {
+    orgaoExib = municipioUf;
+  }
   const processo = src.processo || it.numero_pncp || '—';
   const ajuste = src.ajuste || src.observacao_frete || 'Sem frete';
   return {
@@ -560,7 +567,7 @@ function itemToFonte(it) {
     cnpj,
     data,
     valor,
-    orgao: it.orgao || '—',
+    orgao: orgaoExib,
     municipio_uf: municipioUf,
     processo,
     ajuste,

@@ -365,6 +365,27 @@ def _endereco_de_source(src: Dict[str, Any]) -> str:
     return (v or "")[:400]
 
 
+def _format_municipio_uf(municipio: Any, uf: Any) -> str:
+    mun = str(municipio or "").strip()
+    sigla = str(uf or "").strip()
+    if mun and sigla:
+        return f"{mun}/{sigla}"
+    return mun or sigla or ""
+
+
+def _format_orgao_com_local(orgao: Any, municipio: Any, uf: Any) -> str:
+    """Ex.: «Porto Alegre/RS - Secretaria da Saúde»."""
+    org = str(orgao or "").strip()
+    if org in {"—", "-"}:
+        org = ""
+    local = _format_municipio_uf(municipio, uf)
+    if local and org:
+        return f"{local} - {org}"
+    if local:
+        return local
+    return org or "—"
+
+
 def fonte_dict_de_item(
     it: Any,
     *,
@@ -398,17 +419,14 @@ def fonte_dict_de_item(
     pu = preco_unitario_cotacao_fonte(it, quantidade_item=quantidade_item_base)
     valor = f"R$ {_formatar_moeda_br(pu)}" if pu is not None else "—"
 
-    orgao = (getattr(it, "orgao", None) or "—")[:200]
     mun = (getattr(it, "municipio", None) or "").strip()
     uf = (getattr(it, "uf", None) or "").strip()
-    if mun and uf:
-        municipio_uf = f"{mun}/{uf}"
-    elif mun:
-        municipio_uf = mun
-    elif uf:
-        municipio_uf = uf
-    else:
-        municipio_uf = "—"
+    if not mun:
+        mun = str(_pick_source(src, "municipio", "municipioNome", "municipio_nome", default="")).strip()
+    if not uf:
+        uf = str(_pick_source(src, "uf", "ufSigla", "uf_sigla", default="")).strip()
+    municipio_uf = _format_municipio_uf(mun, uf) or "—"
+    orgao = _format_orgao_com_local(getattr(it, "orgao", None), mun, uf)[:200]
 
     processo = _pick_source(src, "processo", "numeroControlePNCP")
     if processo == "—":

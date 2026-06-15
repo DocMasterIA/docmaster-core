@@ -17,7 +17,7 @@ PDF_TERMO_PNCP_MAX = 240
 # --- Cartões de fonte (detalhamento) ---
 PDF_FONTE_TEXTO_MAX: Dict[str, int] = {
     "fornecedor": 160,
-    "orgao": 100,
+    "orgao": 160,
     "endereco": 180,
     "email": 72,
     "telefone": 36,

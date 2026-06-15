@@ -103,6 +103,17 @@
                       Similaridade parcial encontrada
                     </span>
                   </div>
+                  <a
+                    v-if="pncpProcessoUrl(r)"
+                    :href="pncpProcessoUrl(r)"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="item-cotacao-card__pncp-link"
+                    :title="`Abrir processo ${pncpProcessoLabel(r) || ''} no portal PNCP`"
+                  >
+                    <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                    Ver no PNCP
+                  </a>
                   <button
                     type="button"
                     class="item-cotacao-card__remove"
@@ -240,6 +251,17 @@
                   <span>Inciso</span>
                   <strong>{{ labelIncisoFromCotacao(r) }}</strong>
                 </div>
+                <div v-if="pncpProcessoUrl(r)" class="item-cotacao-card__field item-cotacao-card__field--wide">
+                  <span>Processo PNCP</span>
+                  <a
+                    :href="pncpProcessoUrl(r)"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="item-cotacao-card__link"
+                  >
+                    {{ pncpProcessoLabel(r) || 'Abrir no portal PNCP' }}
+                  </a>
+                </div>
                 <div class="item-cotacao-card__field">
                   <span>Quantidade</span>
                   <strong>{{ formatQuantidadeCotacao(r) }}</strong>
@@ -272,6 +294,10 @@ import {
   getItemCotacoesFromResearchSession,
   getResearchSession,
 } from '../services/pncpResearch';
+import {
+  buildPncpPortalProcessoUrl,
+  pncpProcessoDisplayLabel,
+} from '../utils/pncpPortal';
 
 const route = useRoute();
 const cotacaoId = computed(() => String(route.params.cotacaoId || ''));
@@ -709,6 +735,14 @@ function labelFonte(code) {
   return 'Não classificada';
 }
 
+function pncpProcessoUrl(r) {
+  return buildPncpPortalProcessoUrl(r);
+}
+
+function pncpProcessoLabel(r) {
+  return pncpProcessoDisplayLabel(r);
+}
+
 function labelIncisoFromCotacao(cotacao) {
   const inciso = normalizeFonte(
     cotacao?.inciso_classificacao ||
@@ -803,6 +837,25 @@ function labelIncisoFromCotacao(cotacao) {
   gap: 6px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+.item-cotacao-card__pncp-link {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid #93c5fd;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.item-cotacao-card__pncp-link:hover {
+  background: #dbeafe;
+  border-color: #60a5fa;
 }
 .item-cotacao-card__remove {
   flex-shrink: 0;

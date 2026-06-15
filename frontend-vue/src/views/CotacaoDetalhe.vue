@@ -398,7 +398,7 @@
                     :aria-label="`Selecionar item ${linha.id}`"
                   />
                 </td>
-                <td class="cot-sheet-center">{{ idx + 1 }}</td>
+                <td class="cot-sheet-center">{{ linha.numeroItem }}</td>
                 <td>
                   <div class="cot-item-nome-wrap">
                     <span>{{ linha.nomeItem }}</span>
@@ -1300,9 +1300,11 @@ async function loadSessionFromBackend() {
           + Number(fontesContagem.dominioAmplo || 0)
           + Number(fontesContagem.cotacaoDireta || 0)
           + Number(fontesContagem.notasFiscais || 0);
+        const numeroItem = String(it.numero_item ?? '').trim() || String(idx + 1);
         return {
           id: it.id || idx + 1,
-          nomeItem: it.descricao_item || `Item ${idx + 1}`,
+          numeroItem,
+          nomeItem: it.descricao_item || `Item ${numeroItem}`,
           fontes: {
             governamentais: Number(fontesContagem.governamentais || 0),
             entesPublicos: Number(fontesContagem.entesPublicos || 0),

@@ -460,13 +460,6 @@ def _next_numero_item_seq_for_cotacao(cotacao: PncpCotacao) -> int:
     return max_n + 1
 
 
-def _item_order_key_by_numero_item(it: PncpCotacaoItem) -> Tuple[int, int, int]:
-    n = _parse_numero_item_seq(getattr(it, "numero_item", None))
-    if n is not None:
-        return (0, n, int(getattr(it, "id", 0) or 0))
-    return (1, 10**9, int(getattr(it, "id", 0) or 0))
-
-
 def _normalize_uf(uf: Any) -> str:
     if uf is None:
         return ""
@@ -1121,8 +1114,9 @@ def pncp_research_sessions_detail(request, sessao_id: int):
     if not c:
         return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
 
+    # Ordem de inserção (planilha / importação) — não reordenar por numero_item numérico.
     itens_asc = list(c.itens.all().order_by("id"))
-    itens_visual = sorted(itens_asc, key=_item_order_key_by_numero_item)
+    itens_visual = itens_asc
     cotacoes_sessao = list(
         PncpCotacaoItemCotacao.objects.filter(cotacao_id=c.id).select_related("item").order_by("item_id", "id")
     )

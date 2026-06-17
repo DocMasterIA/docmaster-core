@@ -20,6 +20,7 @@ from backend.app.services.pncp_supplier_enrichment import (
     _nome_e_somente_cnpj_formatado,
     _promote_supplier_from_deep_walk,
     _supplier_payload_layers,
+    fetch_brasilapi_fornecedor_por_cnpj,
     flatten_supplier_fields_in_payload,
 )
 
@@ -617,6 +618,37 @@ def _format_orgao_com_local(orgao: Any, municipio: Any, uf: Any) -> str:
     return org or "—"
 
 
+def _completar_contato_brasilapi_se_faltar(
+    *,
+    cnpj_fornecedor: str,
+    telefone: str,
+    email: str,
+    cache: Dict[str, Dict[str, Any]],
+) -> tuple[str, str]:
+    """Consulta BrasilAPI (cache por CNPJ na requisição) quando falta tel/e-mail no source."""
+    tel = str(telefone or "").strip()
+    em = str(email or "").strip()
+    if tel and em:
+        return tel, em
+    d = re.sub(r"\D", "", str(cnpj_fornecedor or ""))
+    if len(d) != 14:
+        return tel, em
+    if d not in cache:
+        _, cad = fetch_brasilapi_fornecedor_por_cnpj(d)
+        cache[d] = cad if isinstance(cad, dict) else {}
+    cad = cache.get(d) or {}
+    if not tel:
+        tel = str(
+            cad.get("telefone")
+            or cad.get("ddd_telefone_1")
+            or cad.get("ddd_telefone_2")
+            or ""
+        ).strip()
+    if not em:
+        em = str(cad.get("email") or "").strip()
+    return tel, em
+
+
 def _source_efetivo_linha_cotacao(it: Any) -> Dict[str, Any]:
     """Mescla colunas ORM com JSON `source` antes de extrair fornecedor."""
     src: Dict[str, Any] = dict(getattr(it, "source", None) or {})
@@ -643,6 +675,7 @@ def fonte_dict_de_item(
     tz,
     supplier_name_by_cnpj: Optional[Dict[str, str]] = None,
     quantidade_item_base: Optional[float] = None,
+    brasilapi_cache: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Dict[str, str]:
     """Uma linha ORM → uma linha da tabela «fontes» do detalhamento."""
     src = _source_efetivo_linha_cotacao(it)
@@ -693,6 +726,13 @@ def fonte_dict_de_item(
 
     telefone = _pick_supplier_telefone_from_source(src)
     email = _pick_supplier_email_from_source(src)
+    if brasilapi_cache is not None and cnpj_fornecedor and (not telefone or not email):
+        telefone, email = _completar_contato_brasilapi_se_faltar(
+            cnpj_fornecedor=cnpj_fornecedor,
+            telefone=telefone,
+            email=email,
+            cache=brasilapi_cache,
+        )
     endereco = _endereco_de_source(src)
     descricao_fonte = _pick_descricao_fonte_pncp(it, src)
 
@@ -725,6 +765,7 @@ def agrupar_itens_relatorio_pesquisa_precos(itens: List[Any]) -> Tuple[List[Dict
 
     tz = timezone.get_current_timezone()
     total_linhas = len(itens)
+    brasilapi_cache: Dict[str, Dict[str, Any]] = {}
 
     buckets: Dict[Tuple[str, str, str, str], List[Any]] = {}
     order_keys: List[Tuple[str, str, str, str]] = []
@@ -770,7 +811,13 @@ def agrupar_itens_relatorio_pesquisa_precos(itens: List[Any]) -> Tuple[List[Dict
             situacao = f"Insuficiente ({n_cot} de {MIN_FONTES_SITUACAO_VALIDA} fontes)"
 
         fontes = [
-            fonte_dict_de_item(m, tz=tz, supplier_name_by_cnpj=supplier_name_idx, quantidade_item_base=q_first)
+            fonte_dict_de_item(
+                m,
+                tz=tz,
+                supplier_name_by_cnpj=supplier_name_idx,
+                quantidade_item_base=q_first,
+                brasilapi_cache=brasilapi_cache,
+            )
             for m in members
         ]
 
@@ -810,6 +857,7 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
 
     tz = timezone.get_current_timezone()
     total_linhas = len(cotacoes or [])
+    brasilapi_cache: Dict[str, Dict[str, Any]] = {}
     cotacoes_por_item: Dict[int, List[Any]] = defaultdict(list)
     for c in cotacoes or []:
         item_id = getattr(c, "item_id", None)
@@ -873,7 +921,13 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
             situacao = f"Insuficiente ({n_cot} de {MIN_FONTES_SITUACAO_VALIDA} fontes)"
 
         fontes = [
-            fonte_dict_de_item(m, tz=tz, supplier_name_by_cnpj=supplier_name_idx, quantidade_item_base=qtd_item_f)
+            fonte_dict_de_item(
+                m,
+                tz=tz,
+                supplier_name_by_cnpj=supplier_name_idx,
+                quantidade_item_base=qtd_item_f,
+                brasilapi_cache=brasilapi_cache,
+            )
             for m in members
         ]
         grupos.append(

@@ -40,8 +40,9 @@ from backend.app.models import (
 )
 from backend.app.services.pncp_source_normalize import normalize_pncp_geo_in_payload
 from backend.app.services.pncp_supplier_enrichment import (
-    fornecedor_tem_cnpj_para_cotacao,
+    enrich_missing_supplier_fields_for_cotacao,
     enrich_supplier_fields_in_payloads,
+    fornecedor_tem_cnpj_para_cotacao,
 )
 from backend.app.services.pncp_relatorio_itens import (
     agrupar_cotacoes_por_item_relatorio_pesquisa_precos,
@@ -1158,6 +1159,29 @@ def pncp_research_sessions_detail(request, sessao_id: int):
     cotacoes_sessao = list(
         PncpCotacaoItemCotacao.objects.filter(cotacao_id=c.id).select_related("item").order_by("item_id", "id")
     )
+    relatorio_view = str(request.GET.get("relatorio") or "").strip().lower() in ("1", "true", "yes")
+    if (
+        relatorio_view
+        and cotacoes_sessao
+        and settings.PNCP_RELATORIO_VIEW_ENRICH
+        and not settings.PNCP_RELATORIO_PDF_SKIP_ENRICH
+    ):
+        try:
+            enrich_missing_supplier_fields_for_cotacao(
+                c.id,
+                max_lookups=settings.PNCP_RELATORIO_PDF_MAX_PNCP_LOOKUPS,
+                max_brasilapi_lookups=settings.PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS,
+            )
+            cotacoes_sessao = list(
+                PncpCotacaoItemCotacao.objects.filter(cotacao_id=c.id)
+                .select_related("item")
+                .order_by("item_id", "id")
+            )
+        except Exception:
+            logger.exception(
+                "enrich_missing_supplier_fields_for_cotacao falhou sessao_id=%s (relatorio view)",
+                c.id,
+            )
     fontes_counts = _fontes_counts_for_session(c.id)
     formula_id = _resolve_formula_calculo_id(c.filtros or {})
     refletidos = _itens_refletidos_for_session(c.id, formula_id)

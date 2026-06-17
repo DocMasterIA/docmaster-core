@@ -531,6 +531,34 @@ function fmtQtd(q) {
   return f.toFixed(2).replace('.', ',');
 }
 
+function pickContatoFromSource(src) {
+  if (!src || typeof src !== 'object') {
+    return { telefone: '', email: '', endereco: '' };
+  }
+  const cad = (src.fornecedor_cadastro && typeof src.fornecedor_cadastro === 'object')
+    ? src.fornecedor_cadastro
+    : {};
+  const telefone = String(
+    src.telefone
+    || cad.telefone
+    || cad.ddd_telefone_1
+    || cad.ddd_telefone_2
+    || '',
+  ).trim();
+  const email = String(src.email || cad.email || src.emailFornecedor || '').trim();
+  const enderecoPartes = [];
+  for (const blob of [cad, src]) {
+    if (!blob || typeof blob !== 'object') continue;
+    for (const k of ['logradouro', 'numero', 'complemento', 'bairro', 'municipio', 'uf', 'cep']) {
+      const v = String(blob[k] || '').trim();
+      if (v) enderecoPartes.push(v);
+    }
+    if (enderecoPartes.length) break;
+  }
+  const endereco = enderecoPartes.length ? enderecoPartes.join(', ').slice(0, 400) : String(src.endereco || '').trim();
+  return { telefone, email, endereco };
+}
+
 function itemToFonte(it) {
   const src = it.source && typeof it.source === 'object' ? it.source : {};
   let tipo = src.tipo_fonte || src.fonte || src.origem || '';
@@ -539,6 +567,7 @@ function itemToFonte(it) {
     || (src.fornecedor_cadastro && (src.fornecedor_cadastro.razao_social || src.fornecedor_cadastro.nome_fantasia))
     || '—';
   const cnpj = src.cnpj || src.cnpj_fornecedor || '—';
+  const { telefone, email, endereco } = pickContatoFromSource(src);
   let data = '—';
   if (it.created_at) {
     const d = new Date(it.created_at);
@@ -586,6 +615,9 @@ function itemToFonte(it) {
     municipio_uf: municipioUf,
     processo,
     ajuste,
+    telefone,
+    email,
+    endereco,
   };
 }
 
@@ -686,7 +718,7 @@ async function carregar() {
   isLoading.value = true;
   loadError.value = '';
   try {
-    const data = await getResearchSession(sessionId);
+    const data = await getResearchSession(sessionId, { relatorio: true });
     if (!data?.ok || !data.sessao) {
       loadError.value = data?.error || 'Sessão não encontrada.';
       aplicarDemo();

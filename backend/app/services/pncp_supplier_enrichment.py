@@ -10,7 +10,10 @@ from django.conf import settings
 
 from backend.app.services.pncp_cnpj_email_cache import (
     get_cached_cnpj_email,
+    get_cached_cnpj_emails_bulk,
+    is_cnpj_email_negative_cached,
     set_cached_cnpj_email,
+    set_cached_cnpj_sem_email,
 )
 from backend.app.models import PncpCotacaoItemCotacao
 from backend.app.services.pncp_source_normalize import normalize_pncp_geo_in_payload
@@ -599,8 +602,64 @@ def receitaws_email_fallback_enabled() -> bool:
 
 
 def receitaws_email_max_lookups() -> int:
-    """Máximo de chamadas HTTP externas por requisição (cada API limita ~3/min)."""
-    return int(getattr(settings, "PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS", 3) or 0)
+    """Máximo de chamadas HTTP externas por requisição síncrona (tela). 0 = ilimitado."""
+    return int(getattr(settings, "PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS", 8) or 0)
+
+
+def cnpj_email_prefetch_max_new_http(*, allow_wait: bool, unlimited: bool = False) -> int:
+    """0 = sem teto (PDF assíncrono)."""
+    if unlimited:
+        return 0
+    if allow_wait:
+        return int(getattr(settings, "PNCP_RELATORIO_VIEW_EMAIL_MAX_NEW", 15) or 15)
+    return receitaws_email_max_lookups()
+
+
+def cnpj_email_min_interval_sec() -> float:
+    return float(getattr(settings, "PNCP_CNPJ_EMAIL_MIN_INTERVAL_SEC", 21) or 21)
+
+
+def new_cnpj_email_fetch_state(
+    *,
+    allow_rate_limit_wait: bool = False,
+    unlimited: bool = False,
+) -> Dict[str, Any]:
+    max_http = cnpj_email_prefetch_max_new_http(allow_wait=allow_rate_limit_wait, unlimited=unlimited)
+    state: Dict[str, Any] = {
+        "cache": {},
+        "http_fetches": 0,
+        "max_http_fetches": max_http,
+        "rate_limited": False,
+    }
+    if allow_rate_limit_wait:
+        state["allow_rate_limit_wait"] = True
+    return state
+
+
+def _pace_before_cnpj_email_http(state: Optional[Dict[str, Any]]) -> None:
+    if not state or not state.get("allow_rate_limit_wait"):
+        return
+    last = state.get("_last_http_ts")
+    if not last:
+        return
+    interval = cnpj_email_min_interval_sec()
+    elapsed = time.time() - float(last)
+    if elapsed < interval:
+        time.sleep(interval - elapsed)
+
+
+def _mark_cnpj_email_http(state: Optional[Dict[str, Any]]) -> None:
+    if state is not None:
+        state["_last_http_ts"] = time.time()
+
+
+def _http_limit_reached(state: Optional[Dict[str, Any]]) -> bool:
+    if state is None:
+        return False
+    max_http = int(state.get("max_http_fetches") or 0)
+    if max_http <= 0:
+        return False
+    return int(state.get("http_fetches") or 0) >= max_http
 
 
 def _email_externo_valido(em: Any) -> bool:
@@ -665,7 +724,7 @@ def fetch_cnpj_email_externo(
 ) -> str:
     """
     E-mail via cache persistente + cnpj.ws / ReceitaWS (BrasilAPI omite).
-    state opcional: cache de memória, contagem HTTP e rate limit na requisição.
+    state opcional: cache de memória, contagem HTTP e pacing na requisição.
     """
     d = _cnpj_digits(cnpj_formatted)
     if len(d) != 14:
@@ -683,57 +742,110 @@ def fetch_cnpj_email_externo(
             mem[d] = cached
         return cached
 
-    if state is not None and state.get("rate_limited"):
+    if is_cnpj_email_negative_cached(d):
+        if mem is not None:
+            mem[d] = ""
         return ""
 
-    max_http = int((state or {}).get("max_http_fetches") or receitaws_email_max_lookups())
-    http_n = int((state or {}).get("http_fetches") or 0)
-    if state is not None and max_http > 0 and http_n >= max_http:
+    if state is not None and state.get("rate_limited") and not state.get("allow_rate_limit_wait"):
         return ""
 
-    def _http_fetch(fetch_fn) -> Tuple[str, bool]:
-        nonlocal http_n
-        em, rl = fetch_fn(d)
-        if state is not None:
-            state["http_fetches"] = http_n + 1
-            http_n += 1
-            if rl:
-                state["rate_limited"] = True
-        return em, rl
+    if _http_limit_reached(state):
+        return ""
 
     wait_sec = int(getattr(settings, "PNCP_CNPJ_EMAIL_RATE_LIMIT_WAIT_SEC", 0) or 0)
     if state is not None and state.get("allow_rate_limit_wait"):
         wait_sec = int(getattr(settings, "PNCP_CNPJ_EMAIL_RATE_LIMIT_WAIT_SEC", 22) or 0)
 
+    def _http_fetch(fetch_fn) -> Tuple[str, bool]:
+        _pace_before_cnpj_email_http(state)
+        em, rl = fetch_fn(d)
+        _mark_cnpj_email_http(state)
+        if state is not None:
+            state["http_fetches"] = int(state.get("http_fetches") or 0) + 1
+            if rl:
+                state["rate_limited"] = True
+        return em, rl
+
     em = ""
     fonte = ""
+    tried_providers = 0
     for fetch_fn, nome_fonte in ((_fetch_cnpj_ws_email_http, "cnpj.ws"), (_fetch_receitaws_email_http, "receitaws")):
-        if state is not None and state.get("rate_limited"):
+        if state is not None and state.get("rate_limited") and not state.get("allow_rate_limit_wait"):
             break
-        if state is not None and max_http > 0 and http_n >= max_http:
+        if _http_limit_reached(state):
             break
+        tried_providers += 1
         got, rl = _http_fetch(fetch_fn)
         if got:
             em, fonte = got, nome_fonte
             break
-        if rl and wait_sec > 0 and state is not None and not state.get("_rate_wait_done"):
+        if rl and wait_sec > 0 and state is not None and state.get("allow_rate_limit_wait"):
             time.sleep(wait_sec)
-            state["_rate_wait_done"] = True
             state["rate_limited"] = False
-            got2, rl2 = _http_fetch(fetch_fn)
-            if got2:
-                em, fonte = got2, nome_fonte
-                break
-            if rl2 and state is not None:
-                state["rate_limited"] = True
-        if rl:
+            if not _http_limit_reached(state):
+                got2, rl2 = _http_fetch(fetch_fn)
+                if got2:
+                    em, fonte = got2, nome_fonte
+                    break
+                if rl2:
+                    state["rate_limited"] = True
+        if rl and not (state and state.get("allow_rate_limit_wait")):
             break
 
     if em:
         set_cached_cnpj_email(d, em, fonte=fonte)
         if mem is not None:
             mem[d] = em
+    elif tried_providers >= 2 and not (state and state.get("rate_limited")):
+        set_cached_cnpj_sem_email(d)
+        if mem is not None:
+            mem[d] = ""
     return em
+
+
+def prefetch_cnpj_emails(
+    cnpjs: Iterable[str],
+    *,
+    state: Optional[Dict[str, Any]] = None,
+) -> Dict[str, str]:
+    """
+    Pré-carrega e-mails para CNPJs únicos (cache → HTTP com pacing).
+    Retorna mapa cnpj_digits → email (só entradas com e-mail).
+    """
+    if not receitaws_email_fallback_enabled():
+        return {}
+    digits_list: List[str] = []
+    seen: set[str] = set()
+    for raw in cnpjs:
+        d = _cnpj_digits(str(raw or ""))
+        if len(d) != 14 or d in seen:
+            continue
+        seen.add(d)
+        digits_list.append(d)
+    if not digits_list:
+        return {}
+
+    if state is None:
+        state = new_cnpj_email_fetch_state(allow_rate_limit_wait=False)
+
+    bulk = get_cached_cnpj_emails_bulk(digits_list)
+    mem = state.setdefault("cache", {})
+    mem.update(bulk)
+
+    out: Dict[str, str] = dict(bulk)
+    for d in digits_list:
+        if d in out:
+            continue
+        if is_cnpj_email_negative_cached(d):
+            mem[d] = ""
+            continue
+        if _http_limit_reached(state):
+            break
+        em = fetch_cnpj_email_externo(d, state=state)
+        if em:
+            out[d] = em
+    return out
 
 
 def fetch_receitaws_email_por_cnpj(cnpj_formatted: str) -> str:
@@ -1387,15 +1499,32 @@ def enrich_supplier_fields_in_payloads(
             enriched_count += 1
 
     if enrich_external_email:
-        lim_rw = receitaws_email_max_lookups()
-        rw_state: Dict[str, Any] = {
-            "cache": {},
-            "http_fetches": 0,
-            "max_http_fetches": lim_rw,
-            "rate_limited": False,
-        }
-        if receitaws_allow_wait:
-            rw_state["allow_rate_limit_wait"] = True
+        cnpjs_sem_email: List[str] = []
+        seen_cnpj: set[str] = set()
+        for it in ordered:
+            if not isinstance(it, dict):
+                continue
+            flatten_supplier_fields_in_payload(it)
+            if _contact_email_from_payload(it):
+                continue
+            ck = _cnpj_digits(str(it.get("cnpj_fornecedor") or ""))
+            if len(ck) == 14 and ck not in seen_cnpj:
+                seen_cnpj.add(ck)
+                cnpjs_sem_email.append(ck)
+
+        rw_state = new_cnpj_email_fetch_state(
+            allow_rate_limit_wait=receitaws_allow_wait,
+            unlimited=receitaws_allow_wait and bool(getattr(settings, "PNCP_CNPJ_EMAIL_PREFETCH_UNLIMITED", True)),
+        )
+        if cnpjs_sem_email:
+            prefetch_cnpj_emails(cnpjs_sem_email, state=rw_state)
+            logger.info(
+                "prefetch e-mail CNPJ: %s únicos, %s HTTP, cache mem=%s",
+                len(cnpjs_sem_email),
+                rw_state.get("http_fetches"),
+                len(rw_state.get("cache") or {}),
+            )
+
         for it in ordered:
             if not isinstance(it, dict):
                 continue

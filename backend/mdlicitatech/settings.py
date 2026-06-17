@@ -491,6 +491,23 @@ PNCP_RELATORIO_PDF_RECEITAWS_EMAIL = os.environ.get("PNCP_RELATORIO_PDF_RECEITAW
 PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS", "8"))
 # PDF (job assíncrono): aguarda ~22s após 429 e tenta de novo (APIs limitam ~3 req/min).
 PNCP_CNPJ_EMAIL_RATE_LIMIT_WAIT_SEC = int(os.environ.get("PNCP_CNPJ_EMAIL_RATE_LIMIT_WAIT_SEC", "22"))
+# Intervalo mínimo entre consultas HTTP de e-mail (respeita ~3/min das APIs gratuitas).
+PNCP_CNPJ_EMAIL_MIN_INTERVAL_SEC = int(os.environ.get("PNCP_CNPJ_EMAIL_MIN_INTERVAL_SEC", "21"))
+# PDF assíncrono: buscar todos os CNPJs únicos com pacing (0 = ilimitado via unlimited flag).
+PNCP_CNPJ_EMAIL_PREFETCH_MAX_NEW = int(os.environ.get("PNCP_CNPJ_EMAIL_PREFETCH_MAX_NEW", "0"))
+PNCP_CNPJ_EMAIL_PREFETCH_UNLIMITED = os.environ.get("PNCP_CNPJ_EMAIL_PREFETCH_UNLIMITED", "true").strip().lower() not in (
+    "0",
+    "false",
+    "no",
+)
+# GET ?relatorio=1: até N consultas HTTP novas com pacing (resto vem do cache).
+PNCP_RELATORIO_VIEW_EMAIL_MAX_NEW = int(os.environ.get("PNCP_RELATORIO_VIEW_EMAIL_MAX_NEW", "15"))
+# GET ?relatorio=1: pacing entre consultas (demora mais, cobre mais fornecedores).
+PNCP_RELATORIO_VIEW_EMAIL_WAIT = os.environ.get("PNCP_RELATORIO_VIEW_EMAIL_WAIT", "true").strip().lower() not in (
+    "0",
+    "false",
+    "no",
+)
 # GET sessão com ?relatorio=1 (tela RelatorioPesquisaPrecos): enrich PNCP/BrasilAPI antes de montar grupos.
 PNCP_RELATORIO_VIEW_ENRICH = os.environ.get("PNCP_RELATORIO_VIEW_ENRICH", "true").strip().lower() not in (
     "0",

@@ -1190,11 +1190,13 @@ def pncp_research_sessions_detail(request, sessao_id: int):
             itens_asc,
             cotacoes_sessao,
             receitaws_email_fallback=bool(getattr(settings, "PNCP_RELATORIO_PDF_RECEITAWS_EMAIL", True)),
+            receitaws_allow_wait=bool(getattr(settings, "PNCP_RELATORIO_VIEW_EMAIL_WAIT", True)),
         )
     else:
         grupos_relatorio, total_linhas_cotacao = agrupar_itens_relatorio_pesquisa_precos(
             itens_asc,
             receitaws_email_fallback=bool(getattr(settings, "PNCP_RELATORIO_PDF_RECEITAWS_EMAIL", True)),
+            receitaws_allow_wait=bool(getattr(settings, "PNCP_RELATORIO_VIEW_EMAIL_WAIT", True)),
         )
     orgao_exibicao = texto_orgao_exibicao_relatorio_pesquisa_precos(c, request.user, grupos_relatorio)
     formula_label = FORMULA_LABELS.get(formula_id, FORMULA_LABELS[DEFAULT_FORMULA_CALCULO])

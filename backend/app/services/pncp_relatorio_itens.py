@@ -23,8 +23,9 @@ from backend.app.services.pncp_supplier_enrichment import (
     fetch_brasilapi_fornecedor_por_cnpj,
     fetch_cnpj_email_externo,
     flatten_supplier_fields_in_payload,
+    new_cnpj_email_fetch_state,
+    prefetch_cnpj_emails,
     receitaws_email_fallback_enabled,
-    receitaws_email_max_lookups,
 )
 
 # Mínimo de cotações (fontes) por item para marcar situação como válida (IN 65 / prática comum).
@@ -809,31 +810,19 @@ def _receitaws_state_if_enabled(
     *,
     receitaws_email_fallback: bool,
     allow_rate_limit_wait: bool = False,
+    unlimited: bool = False,
 ) -> Optional[Dict[str, Any]]:
     if not receitaws_email_fallback or not receitaws_email_fallback_enabled():
         return None
-    max_l = receitaws_email_max_lookups()
-    if max_l <= 0:
-        return None
-    state: Dict[str, Any] = {
-        "cache": {},
-        "http_fetches": 0,
-        "max_http_fetches": max_l,
-        "rate_limited": False,
-    }
-    if allow_rate_limit_wait:
-        state["allow_rate_limit_wait"] = True
-    return state
+    return new_cnpj_email_fetch_state(
+        allow_rate_limit_wait=allow_rate_limit_wait,
+        unlimited=unlimited,
+    )
 
 
-def _prefetch_emails_cnpj_para_linhas(
-    members: List[Any],
-    state: Optional[Dict[str, Any]],
-) -> None:
-    """Consulta e-mail (cache/API) uma vez por CNPJ antes de montar as fontes."""
-    if not state:
-        return
+def _cnpjs_sem_email_das_linhas(members: List[Any]) -> List[str]:
     seen: set[str] = set()
+    out: List[str] = []
     for it in members:
         src = _source_efetivo_linha_cotacao(it)
         flatten_supplier_fields_in_payload(src)
@@ -845,7 +834,20 @@ def _prefetch_emails_cnpj_para_linhas(
         if len(d) != 14 or d in seen:
             continue
         seen.add(d)
-        fetch_cnpj_email_externo(d, state=state)
+        out.append(d)
+    return out
+
+
+def _prefetch_emails_cnpj_para_linhas(
+    members: List[Any],
+    state: Optional[Dict[str, Any]],
+) -> None:
+    """Pré-carrega e-mail (cache + API com pacing) para CNPJs únicos das linhas."""
+    if not state:
+        return
+    cnpjs = _cnpjs_sem_email_das_linhas(members)
+    if cnpjs:
+        prefetch_cnpj_emails(cnpjs, state=state)
 
 
 def agrupar_itens_relatorio_pesquisa_precos(
@@ -853,6 +855,7 @@ def agrupar_itens_relatorio_pesquisa_precos(
     *,
     receitaws_email_fallback: bool = False,
     receitaws_allow_wait: bool = False,
+    receitaws_unlimited: bool = False,
 ) -> Tuple[List[Dict[str, Any]], int]:
     """
     Retorna lista de grupos (ordenada por menor id no grupo) e total de linhas importadas.
@@ -868,6 +871,7 @@ def agrupar_itens_relatorio_pesquisa_precos(
     receitaws_pdf_state = _receitaws_state_if_enabled(
         receitaws_email_fallback=receitaws_email_fallback,
         allow_rate_limit_wait=receitaws_allow_wait,
+        unlimited=receitaws_allow_wait and receitaws_unlimited,
     )
 
     buckets: Dict[Tuple[str, str, str, str], List[Any]] = {}
@@ -953,6 +957,7 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
     *,
     receitaws_email_fallback: bool = False,
     receitaws_allow_wait: bool = False,
+    receitaws_unlimited: bool = False,
 ) -> Tuple[List[Dict[str, Any]], int]:
     """
     Novo fluxo: item manual + múltiplas cotações vinculadas.
@@ -972,6 +977,7 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
     receitaws_pdf_state = _receitaws_state_if_enabled(
         receitaws_email_fallback=receitaws_email_fallback,
         allow_rate_limit_wait=receitaws_allow_wait,
+        unlimited=receitaws_allow_wait and receitaws_unlimited,
     )
     cotacoes_por_item: Dict[int, List[Any]] = defaultdict(list)
     for c in cotacoes or []:

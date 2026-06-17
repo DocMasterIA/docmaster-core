@@ -410,12 +410,14 @@ def montar_contexto_relatorio(
             cotacoes,
             receitaws_email_fallback=pdf_receitaws_email,
             receitaws_allow_wait=True,
+            receitaws_unlimited=True,
         )
     else:
         grupos, total_linhas = agrupar_itens_relatorio_pesquisa_precos(
             itens,
             receitaws_email_fallback=pdf_receitaws_email,
             receitaws_allow_wait=True,
+            receitaws_unlimited=True,
         )
     sanear_grupos_relatorio_para_pdf(grupos)
     # Prioriza CNPJs presentes nas fontes (cotações reais exibidas no relatório).

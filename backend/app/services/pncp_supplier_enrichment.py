@@ -277,7 +277,7 @@ def flatten_supplier_fields_in_payload(it: Dict[str, Any]) -> None:
         digits = _cnpj_digits(raw_cnpj)
         if len(digits) == 14:
             it["cnpj_fornecedor"] = _normalize_cnpj(digits)
-    if not _fornecedor_tem_nome_util(it):
+    if not _fornecedor_tem_nome_util_topo(it):
         for layer in _supplier_payload_layers(it):
             cad = layer.get("fornecedor_cadastro")
             if isinstance(cad, dict):
@@ -306,7 +306,8 @@ def flatten_supplier_fields_in_payload(it: Dict[str, Any]) -> None:
 
 def _fornecedor_display_name_from_source(src: Dict[str, Any]) -> str:
     """Nome legível em qualquer camada do payload (topo, source aninhado, cadastro)."""
-    flatten_supplier_fields_in_payload(src)
+    # Não chamar flatten_supplier_fields_in_payload aqui: flatten usa _fornecedor_tem_nome_util,
+    # que delega a esta função — recursão infinita (500 ao carregar sessão / PDF).
     generic = {"demais", "nao informado", "não informado", "epp", "me", "mei", "outros"}
     for layer in _supplier_payload_layers(src):
         cad = layer.get("fornecedor_cadastro")
@@ -348,6 +349,47 @@ def _nome_e_somente_cnpj_formatado(nome: str) -> bool:
     if not nome or any(ch.isalpha() for ch in nome):
         return False
     return len(_cnpj_digits(nome)) == 14
+
+
+def _nome_fornecedor_util_para_flatten(nome: str, *, cnpj_raw: str = "") -> bool:
+    if not nome:
+        return False
+    generic = {"demais", "nao informado", "não informado", "epp", "me", "mei", "outros"}
+    nome_norm = re.sub(r"\s+", " ", nome).strip().lower()
+    if nome_norm in generic:
+        return False
+    if _nome_e_somente_cnpj_formatado(nome):
+        return False
+    d_cnpj = _cnpj_digits(cnpj_raw)
+    d_nome = _cnpj_digits(nome)
+    if len(d_cnpj) == 14 and len(d_nome) == 14 and d_nome == d_cnpj:
+        return False
+    return True
+
+
+def _fornecedor_tem_nome_util_topo(src: Dict[str, Any]) -> bool:
+    """Nome legível só no topo do payload (flatten promove camadas aninhadas se faltar aqui)."""
+    if not isinstance(src, dict):
+        return False
+    cnpj_raw = str(src.get("cnpj_fornecedor") or "")
+    cad = src.get("fornecedor_cadastro")
+    if isinstance(cad, dict):
+        for k in ("razao_social", "nome_fantasia", "razaoSocial", "nomeFantasia"):
+            v = str(cad.get(k) or "").strip()
+            if _nome_fornecedor_util_para_flatten(v, cnpj_raw=cnpj_raw):
+                return True
+    for k in (
+        "fornecedor",
+        "fornecedor_nome",
+        "nome_fornecedor",
+        "nomeRazaoSocialFornecedor",
+        "razaoSocialFornecedor",
+        "razao_social",
+    ):
+        v = str(src.get(k) or "").strip()
+        if _nome_fornecedor_util_para_flatten(v, cnpj_raw=cnpj_raw):
+            return True
+    return False
 
 
 def _fornecedor_tem_nome_util(src: Dict[str, Any]) -> bool:

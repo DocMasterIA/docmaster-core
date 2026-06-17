@@ -239,6 +239,7 @@ def _generate_relatorio_pdf_bytes(
     verification_token = issue_verification_token()
     url_qr = _url_qr_download_pdf_verificacao(api_base_url, sessao_id, verification_token)
     # Enriquecimento PNCP/BrasilAPI: ligado por omissão; desligar com PNCP_RELATORIO_PDF_SKIP_ENRICH.
+    enriched_emails = False
     if not settings.PNCP_RELATORIO_PDF_SKIP_ENRICH:
         try:
             enrich_missing_supplier_fields_for_cotacao(
@@ -246,7 +247,9 @@ def _generate_relatorio_pdf_bytes(
                 max_lookups=settings.PNCP_RELATORIO_PDF_MAX_PNCP_LOOKUPS,
                 max_brasilapi_lookups=settings.PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS,
                 receitaws_allow_wait=True,
+                receitaws_unlimited=False,
             )
+            enriched_emails = True
         except Exception:
             logger.exception(
                 "enrich_missing_supplier_fields_for_cotacao falhou cotacao_id=%s",
@@ -260,6 +263,7 @@ def _generate_relatorio_pdf_bytes(
         url_verificacao=url_qr,
         anexo_fornecedor_url=anexo_fornecedor_url,
         formula_id=formula_id,
+        skip_email_http_prefetch=enriched_emails,
     )
     if anexos_merge:
         try:

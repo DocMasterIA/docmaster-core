@@ -811,12 +811,14 @@ def _receitaws_state_if_enabled(
     receitaws_email_fallback: bool,
     allow_rate_limit_wait: bool = False,
     unlimited: bool = False,
+    max_http_fetches: Optional[int] = None,
 ) -> Optional[Dict[str, Any]]:
     if not receitaws_email_fallback or not receitaws_email_fallback_enabled():
         return None
     return new_cnpj_email_fetch_state(
         allow_rate_limit_wait=allow_rate_limit_wait,
         unlimited=unlimited,
+        max_http_fetches=max_http_fetches,
     )
 
 
@@ -857,6 +859,7 @@ def agrupar_itens_relatorio_pesquisa_precos(
     receitaws_allow_wait: bool = False,
     receitaws_unlimited: bool = False,
     include_fontes: bool = True,
+    receitaws_max_http: Optional[int] = None,
 ) -> Tuple[List[Dict[str, Any]], int]:
     """
     Retorna lista de grupos (ordenada por menor id no grupo) e total de linhas importadas.
@@ -874,6 +877,7 @@ def agrupar_itens_relatorio_pesquisa_precos(
             receitaws_email_fallback=receitaws_email_fallback,
             allow_rate_limit_wait=receitaws_allow_wait,
             unlimited=receitaws_allow_wait and receitaws_unlimited,
+            max_http_fetches=receitaws_max_http,
         )
         if include_fontes
         else None
@@ -968,6 +972,7 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
     receitaws_allow_wait: bool = False,
     receitaws_unlimited: bool = False,
     include_fontes: bool = True,
+    receitaws_max_http: Optional[int] = None,
 ) -> Tuple[List[Dict[str, Any]], int]:
     """
     Novo fluxo: item manual + múltiplas cotações vinculadas.
@@ -989,6 +994,7 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
             receitaws_email_fallback=receitaws_email_fallback,
             allow_rate_limit_wait=receitaws_allow_wait,
             unlimited=receitaws_allow_wait and receitaws_unlimited,
+            max_http_fetches=receitaws_max_http,
         )
         if include_fontes
         else None

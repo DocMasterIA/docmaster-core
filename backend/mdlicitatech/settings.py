@@ -488,14 +488,15 @@ PNCP_RELATORIO_PDF_RECEITAWS_EMAIL = os.environ.get("PNCP_RELATORIO_PDF_RECEITAW
     "false",
     "no",
 )
-PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS", "8"))
+# Máx. consultas HTTP novas (cnpj.ws/ReceitaWS) por geração de PDF; 0 = ilimitado (lento).
+PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS", "48"))
 # PDF (job assíncrono): aguarda ~22s após 429 e tenta de novo (APIs limitam ~3 req/min).
 PNCP_CNPJ_EMAIL_RATE_LIMIT_WAIT_SEC = int(os.environ.get("PNCP_CNPJ_EMAIL_RATE_LIMIT_WAIT_SEC", "22"))
 # Intervalo mínimo entre consultas HTTP de e-mail (respeita ~3/min das APIs gratuitas).
 PNCP_CNPJ_EMAIL_MIN_INTERVAL_SEC = int(os.environ.get("PNCP_CNPJ_EMAIL_MIN_INTERVAL_SEC", "21"))
 # PDF assíncrono: buscar todos os CNPJs únicos com pacing (0 = ilimitado via unlimited flag).
 PNCP_CNPJ_EMAIL_PREFETCH_MAX_NEW = int(os.environ.get("PNCP_CNPJ_EMAIL_PREFETCH_MAX_NEW", "0"))
-PNCP_CNPJ_EMAIL_PREFETCH_UNLIMITED = os.environ.get("PNCP_CNPJ_EMAIL_PREFETCH_UNLIMITED", "true").strip().lower() not in (
+PNCP_CNPJ_EMAIL_PREFETCH_UNLIMITED = os.environ.get("PNCP_CNPJ_EMAIL_PREFETCH_UNLIMITED", "false").strip().lower() not in (
     "0",
     "false",
     "no",

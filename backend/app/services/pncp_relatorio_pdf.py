@@ -35,7 +35,10 @@ from backend.app.services.pncp_relatorio_itens import (
     nome_fornecedor_e_util_para_exibicao,
     texto_orgao_exibicao_relatorio_pesquisa_precos,
 )
-from backend.app.services.pncp_supplier_enrichment import receitaws_email_fallback_enabled
+from backend.app.services.pncp_supplier_enrichment import (
+    pdf_receitaws_max_http_lookups,
+    receitaws_email_fallback_enabled,
+)
 from backend.app.services.pncp_relatorio_pdf_layout import (
     PDF_CAPA_RESPONSAVEL_MAX,
     PDF_CAPA_TITULO_COTACAO_MAX,
@@ -399,25 +402,29 @@ def montar_contexto_relatorio(
     url_verificacao: str,
     anexo_fornecedor_url: str = "",
     formula_id: str = "media_aritmetica_precos_obtidos",
+    skip_email_http_prefetch: bool = False,
 ) -> RelatorioCotacaoContext:
     itens = list(itens_qs.order_by("id"))
     cotacoes_qs = getattr(cotacao, "cotacoes_itens", None)
     cotacoes = list(cotacoes_qs.select_related("item").order_by("item_id", "id")) if cotacoes_qs is not None else []
-    pdf_receitaws_email = receitaws_email_fallback_enabled()
+    pdf_receitaws_email = receitaws_email_fallback_enabled() and not skip_email_http_prefetch
+    pdf_email_max = pdf_receitaws_max_http_lookups() if pdf_receitaws_email else 0
     if cotacoes:
         grupos, total_linhas = agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
             itens,
             cotacoes,
             receitaws_email_fallback=pdf_receitaws_email,
-            receitaws_allow_wait=True,
-            receitaws_unlimited=True,
+            receitaws_allow_wait=pdf_receitaws_email,
+            receitaws_unlimited=False,
+            receitaws_max_http=pdf_email_max,
         )
     else:
         grupos, total_linhas = agrupar_itens_relatorio_pesquisa_precos(
             itens,
             receitaws_email_fallback=pdf_receitaws_email,
-            receitaws_allow_wait=True,
-            receitaws_unlimited=True,
+            receitaws_allow_wait=pdf_receitaws_email,
+            receitaws_unlimited=False,
+            receitaws_max_http=pdf_email_max,
         )
     sanear_grupos_relatorio_para_pdf(grupos)
     # Prioriza CNPJs presentes nas fontes (cotações reais exibidas no relatório).
@@ -509,6 +516,7 @@ def gerar_pdf_relatorio_cotacao(
     url_verificacao: str,
     anexo_fornecedor_url: str = "",
     formula_id: str = "media_aritmetica_precos_obtidos",
+    skip_email_http_prefetch: bool = False,
 ) -> bytes:
     ctx = montar_contexto_relatorio(
         cotacao=cotacao,
@@ -517,6 +525,7 @@ def gerar_pdf_relatorio_cotacao(
         url_verificacao=url_verificacao,
         anexo_fornecedor_url=anexo_fornecedor_url,
         formula_id=formula_id,
+        skip_email_http_prefetch=skip_email_http_prefetch,
     )
     html = renderizar_html_relatorio(ctx)
     base_url = _SERVICES_DIR.as_uri() + "/"

@@ -603,7 +603,12 @@ def receitaws_email_fallback_enabled() -> bool:
 
 def receitaws_email_max_lookups() -> int:
     """Máximo de chamadas HTTP externas por requisição síncrona (tela). 0 = ilimitado."""
-    return int(getattr(settings, "PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS", 8) or 0)
+    return int(getattr(settings, "PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS", 48) or 0)
+
+
+def pdf_receitaws_max_http_lookups() -> int:
+    """Teto de HTTP novos (cnpj.ws/ReceitaWS) por job de PDF. 0 = sem teto."""
+    return receitaws_email_max_lookups()
 
 
 def cnpj_email_prefetch_max_new_http(*, allow_wait: bool, unlimited: bool = False) -> int:
@@ -623,8 +628,12 @@ def new_cnpj_email_fetch_state(
     *,
     allow_rate_limit_wait: bool = False,
     unlimited: bool = False,
+    max_http_fetches: Optional[int] = None,
 ) -> Dict[str, Any]:
-    max_http = cnpj_email_prefetch_max_new_http(allow_wait=allow_rate_limit_wait, unlimited=unlimited)
+    if max_http_fetches is not None:
+        max_http = int(max_http_fetches)
+    else:
+        max_http = cnpj_email_prefetch_max_new_http(allow_wait=allow_rate_limit_wait, unlimited=unlimited)
     state: Dict[str, Any] = {
         "cache": {},
         "http_fetches": 0,
@@ -1358,6 +1367,8 @@ def enrich_supplier_fields_in_payloads(
     ignore_add_source_setting: bool = False,
     only_homologated: Optional[bool] = None,
     receitaws_allow_wait: bool = False,
+    receitaws_unlimited: bool = False,
+    receitaws_max_http: Optional[int] = None,
     enrich_external_email: bool = False,
 ) -> int:
     """
@@ -1512,9 +1523,18 @@ def enrich_supplier_fields_in_payloads(
                 seen_cnpj.add(ck)
                 cnpjs_sem_email.append(ck)
 
+        unlimited = bool(
+            receitaws_unlimited
+            and receitaws_allow_wait
+            and bool(getattr(settings, "PNCP_CNPJ_EMAIL_PREFETCH_UNLIMITED", False))
+        )
+        max_http = receitaws_max_http
+        if max_http is None and receitaws_allow_wait and not unlimited:
+            max_http = pdf_receitaws_max_http_lookups()
         rw_state = new_cnpj_email_fetch_state(
             allow_rate_limit_wait=receitaws_allow_wait,
-            unlimited=receitaws_allow_wait and bool(getattr(settings, "PNCP_CNPJ_EMAIL_PREFETCH_UNLIMITED", True)),
+            unlimited=unlimited,
+            max_http_fetches=max_http,
         )
         if cnpjs_sem_email:
             prefetch_cnpj_emails(cnpjs_sem_email, state=rw_state)
@@ -1540,6 +1560,8 @@ def enrich_missing_supplier_fields_for_cotacao(
     max_lookups: int = 12,
     max_brasilapi_lookups: int = 48,
     receitaws_allow_wait: bool = False,
+    receitaws_unlimited: bool = False,
+    receitaws_max_http: Optional[int] = None,
 ) -> int:
     rows = list(
         PncpCotacaoItemCotacao.objects.filter(cotacao_id=cotacao_id).only(
@@ -1592,6 +1614,8 @@ def enrich_missing_supplier_fields_for_cotacao(
         ignore_add_source_setting=True,
         only_homologated=False,
         receitaws_allow_wait=receitaws_allow_wait,
+        receitaws_unlimited=receitaws_unlimited,
+        receitaws_max_http=receitaws_max_http,
         enrich_external_email=True,
     )
 

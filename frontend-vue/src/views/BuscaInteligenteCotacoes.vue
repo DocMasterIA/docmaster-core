@@ -1149,7 +1149,7 @@ async function runSearchWithContext({
 
     let backendItensTotal = 0;
     const bulkSearchOpts = bulkMode
-      ? { timeoutMs: BULK_SEARCH_TIMEOUT_MS, maxAttempts: 4 }
+      ? { timeoutMs: BULK_SEARCH_TIMEOUT_MS, maxAttempts: 2 }
       : undefined;
     if (recortes.length > 0) {
       if (generationStale() || bulkSuperseded()) {

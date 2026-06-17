@@ -26,7 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Dependências Python
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt gunicorn
+RUN pip install --no-cache-dir -r requirements.txt gunicorn gevent
 
 # Código da aplicação
 COPY backend/ backend/
@@ -46,4 +46,6 @@ ENV PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
 ENV GUNICORN_TIMEOUT=0
 ENV GUNICORN_WORKERS=4
 ENV GUNICORN_THREADS=4
-CMD ["sh", "-c", "python manage.py migrate --noinput && exec gunicorn backend.mdlicitatech.wsgi:application --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-4} --threads ${GUNICORN_THREADS:-4} --timeout ${GUNICORN_TIMEOUT:-0} --graceful-timeout 600 --config backend/mdlicitatech/gunicorn_conf.py --access-logfile - --error-logfile -"]
+ENV GUNICORN_WORKER_CLASS=gevent
+ENV GUNICORN_WORKER_CONNECTIONS=100
+CMD ["sh", "-c", "python manage.py migrate --noinput && if [ \"${GUNICORN_WORKER_CLASS:-gevent}\" = \"gevent\" ]; then exec gunicorn backend.mdlicitatech.wsgi:application --bind 0.0.0.0:8000 --worker-class gevent --workers ${GUNICORN_WORKERS:-4} --worker-connections ${GUNICORN_WORKER_CONNECTIONS:-100} --timeout ${GUNICORN_TIMEOUT:-0} --graceful-timeout 600 --config backend/mdlicitatech/gunicorn_conf.py --access-logfile - --error-logfile -; else exec gunicorn backend.mdlicitatech.wsgi:application --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-4} --threads ${GUNICORN_THREADS:-4} --timeout ${GUNICORN_TIMEOUT:-0} --graceful-timeout 600 --config backend/mdlicitatech/gunicorn_conf.py --access-logfile - --error-logfile -; fi"]

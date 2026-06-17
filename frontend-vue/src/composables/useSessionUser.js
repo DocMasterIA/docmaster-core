@@ -8,16 +8,23 @@ let inflightPromise = null;
 /** Evita /api/me/ em cada navegação enquanto busca PNCP ocupa workers do Django. */
 let lastFetchedAt = 0;
 const ME_CACHE_MS = 5 * 60 * 1000;
+const ME_FETCH_TIMEOUT_MS = 8000;
+
+function hasCachedUser() {
+  return Boolean(
+    user.value
+    && lastFetchedAt > 0
+    && Date.now() - lastFetchedAt < ME_CACHE_MS,
+  );
+}
 
 export function useSessionUser() {
   async function fetchMe({ force = false } = {}) {
-    const now = Date.now();
-    if (
-      !force
-      && user.value
-      && lastFetchedAt > 0
-      && now - lastFetchedAt < ME_CACHE_MS
-    ) {
+    if (!force && hasCachedUser()) {
+      return user.value;
+    }
+    // Não bloquear navegação num /api/me/ pendente se já temos perfil em cache.
+    if (inflightPromise && !force && user.value && lastFetchedAt > 0) {
       return user.value;
     }
     if (inflightPromise && !force) {
@@ -26,9 +33,13 @@ export function useSessionUser() {
     userLoading.value = true;
     inflightPromise = (async () => {
       try {
+        const signal = typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+          ? AbortSignal.timeout(ME_FETCH_TIMEOUT_MS)
+          : undefined;
         const res = await fetch(`${getApiBase()}/api/me/`, {
           method: 'GET',
           credentials: 'include',
+          signal,
         });
         if (res.status !== 200) {
           user.value = null;
@@ -71,5 +82,5 @@ export function useSessionUser() {
     lastFetchedAt = 0;
   }
 
-  return { user, userLoading, fetchMe, clearUser };
+  return { user, userLoading, fetchMe, clearUser, hasCachedUser };
 }

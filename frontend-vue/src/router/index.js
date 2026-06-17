@@ -291,7 +291,14 @@ const router = createRouter({
 
 /** Verifica autenticação: rotas sem meta.public exigem login. */
 router.beforeEach(async (to) => {
-  const { fetchMe } = useSessionUser();
+  const { user, fetchMe, hasCachedUser } = useSessionUser();
+
+  // Com perfil em cache: navega imediatamente; refresh em background (busca PNCP satura Django).
+  if (!to.meta?.public && hasCachedUser()) {
+    fetchMe().catch(() => {});
+    return;
+  }
+
   const me = await fetchMe();
   if (to.meta?.public) {
     if (me && to.name === 'Login') {

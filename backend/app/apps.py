@@ -7,6 +7,9 @@ class AppConfig(AppConfig):
 
     def ready(self):
         import backend.app.signals
+        from backend.app.sqlite_wal import connect_sqlite_wal_signal
+
+        connect_sqlite_wal_signal()
         import sys
 
         # Evita registrar métricas durante collectstatic/migrate no build Docker.

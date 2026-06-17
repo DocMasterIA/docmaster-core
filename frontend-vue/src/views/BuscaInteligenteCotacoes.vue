@@ -1142,37 +1142,60 @@ async function runSearchWithContext({
     const bulkSearchOpts = bulkMode
       ? { timeoutMs: BULK_SEARCH_TIMEOUT_MS, maxAttempts: 2 }
       : undefined;
-    if (recortes.length > 0) {
+
+    async function runGeoSearch(geoPayload, geoKeyPart) {
       if (generationStale() || bulkSuperseded()) {
-        return bulkSearchFailResult(null, { superseded: bulkSuperseded() });
+        return null;
       }
-      const backend = await intelligentMarketSearch(
+      const backend = await intelligentMarketSearch(geoPayload, fetchSignal, bulkSearchOpts);
+      return mapBackendToRows(backend, geoKeyPart) || 0;
+    }
+
+    if (recortes.length > 0) {
+      const n = await runGeoSearch(
         {
           ...basePayload,
           recortes_geograficos: recortes,
           uf: null,
           municipio: null,
         },
-        fetchSignal,
-        bulkSearchOpts,
+        'rec',
       );
-      backendItensTotal += mapBackendToRows(backend, 'rec') || 0;
+      if (n === null) {
+        return bulkSearchFailResult(null, { superseded: bulkSuperseded() });
+      }
+      backendItensTotal += n;
     } else {
-      const ufsToRun = context?.uf_padrao ? [context.uf_padrao] : [null];
+      const ufItem = context?.uf_padrao ? String(context.uf_padrao).trim().toUpperCase() : null;
+      const ufsToRun = ufItem ? [ufItem] : [null];
       for (const ufCode of ufsToRun) {
-        if (generationStale() || bulkSuperseded()) {
-          return bulkSearchFailResult(null, { superseded: bulkSuperseded() });
-        }
-        const backend = await intelligentMarketSearch(
+        const n = await runGeoSearch(
           {
             ...basePayload,
             uf: ufCode || null,
             municipio: null,
           },
-          fetchSignal,
-          bulkSearchOpts,
+          ufCode || 'all',
         );
-        backendItensTotal += mapBackendToRows(backend, ufCode || 'all') || 0;
+        if (n === null) {
+          return bulkSearchFailResult(null, { superseded: bulkSuperseded() });
+        }
+        backendItensTotal += n;
+      }
+      // Item com UF mas sem match local: ampliar para nacional (comum em cotações hospitalares).
+      if (aggregated.length === 0 && ufItem) {
+        const n = await runGeoSearch(
+          {
+            ...basePayload,
+            uf: null,
+            municipio: null,
+          },
+          'br',
+        );
+        if (n === null) {
+          return bulkSearchFailResult(null, { superseded: bulkSuperseded() });
+        }
+        backendItensTotal += n;
       }
     }
     if (aggregated.length > 0) {
@@ -1215,7 +1238,7 @@ async function runSearchWithContext({
         ? 'Nenhuma cotação dentro da faixa de preço configurada para este item.'
         : 'A IA não encontrou cotações aderentes para este termo no recorte atual.';
     }
-    return { ok: true, exibidos };
+    return { ok: exibidos > 0, exibidos, empty: exibidos === 0 };
   } catch (err) {
     if (bulkMode) {
       return bulkSearchFailResult(err, {

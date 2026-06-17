@@ -242,6 +242,8 @@ def preprocess_cotacao_search_term(text: str) -> str:
         s,
     )
     s = re.sub(r"\s+", " ", s).strip()
+    s = re.sub(r"^[:\-.,;|]+\s*", "", s)
+    s = re.sub(r"\s*[:\-.,;|]+$", "", s).strip()
     return s
 
 

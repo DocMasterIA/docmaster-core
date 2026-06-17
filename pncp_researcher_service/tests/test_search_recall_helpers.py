@@ -114,11 +114,12 @@ class TestSearchRecallHelpers(unittest.TestCase):
         self.assertIn("acebrofilina", eff.lower())
 
     def test_preprocess_agulha_compacta_dimensao(self):
-        raw = "AGULHA HIPODÊRMICA TAMANHO: 13 X 4,5 (26 G½) CX C/100 UNIDADES"
+        raw = "AGULHA HIPODÊRMICA TAMANHO: 13 X 4,5 (26 G½) CX C/100 UNIDADES."
         pre = preprocess_cotacao_search_term(raw)
         self.assertIn("13x45", pre.lower())
         self.assertIn("26g", pre.lower())
         self.assertNotIn("unidades", pre.lower())
+        self.assertFalse(pre.endswith("."))
 
     def test_agulha_longa_casa_catalogo_curto(self):
         term = "AGULHA HIPODÊRMICA TAMANHO: 13 X 4,5 (26 G½) CX C/100 UNIDADES"

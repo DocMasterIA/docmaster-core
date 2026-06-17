@@ -1543,7 +1543,19 @@ def _safe_float(value: Any) -> float:
 
 
 def _row_price_for_faixa(it: Dict[str, Any]) -> float:
-    return _safe_float(it.get("valor_unitario") or it.get("valor_total") or it.get("valor_global"))
+    for key in (
+        "valor_unitario",
+        "valor_unitario_homologado",
+        "valor_unitario_estimado",
+        "valor_total",
+        "valor_total_homologado",
+        "valor_total_estimado",
+        "valor_global",
+    ):
+        v = _safe_float(it.get(key))
+        if v > 0.0:
+            return v
+    return 0.0
 
 
 def _ia_item_key(it: Dict[str, Any]) -> str:

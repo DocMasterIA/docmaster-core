@@ -14,6 +14,8 @@ from backend.app.services.pncp_supplier_enrichment import (
     _enrich_payload_sort_key,
     _needs_brasilapi_enrichment,
     _parse_ano_seq_from_numero_pncp,
+    _pncp_compra_keys_present,
+    _should_attempt_pncp_supplier_lookup,
     flatten_supplier_fields_in_payload,
 )
 
@@ -120,6 +122,32 @@ class SupplierNameDisplayTests(unittest.TestCase):
         flatten_supplier_fields_in_payload(it)
         self.assertEqual(it["cnpj_fornecedor"], "27.105.456/0001-72")
         self.assertEqual(it["fornecedor"], "EMPRESA ANINHADA LTDA")
+
+    def test_flatten_ignora_metadado_pncp_no_topo(self):
+        it = {
+            "numero_pncp": "12345678000195-1-2023-7",
+            "fornecedor": "pncp_resultado_item_item",
+            "source": {
+                "cnpj_fornecedor": "27.105.456/0001-72",
+                "fornecedor": "EMPRESA REAL LTDA",
+            },
+        }
+        flatten_supplier_fields_in_payload(it)
+        self.assertEqual(it["fornecedor"], "EMPRESA REAL LTDA")
+
+    def test_should_lookup_nao_homologado_com_chaves_pncp(self):
+        it = {
+            "numero_pncp": "12345678000195-1-2023-7",
+            "ano_compra": 2023,
+            "sequencial_compra": 7,
+            "situacao": "Em andamento",
+        }
+        self.assertTrue(_pncp_compra_keys_present(it))
+        self.assertTrue(_should_attempt_pncp_supplier_lookup(it, only_homolog=True))
+
+    def test_should_skip_nao_homologado_sem_chaves_pncp(self):
+        it = {"situacao": "Em andamento", "descricao_item": "Caneta"}
+        self.assertFalse(_should_attempt_pncp_supplier_lookup(it, only_homolog=True))
 
 
 if __name__ == "__main__":

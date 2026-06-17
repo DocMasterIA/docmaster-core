@@ -138,6 +138,35 @@ def item_homologado_para_busca_dict(it: Dict[str, Any]) -> bool:
     return False
 
 
+def _pncp_compra_keys_present(it: Dict[str, Any]) -> bool:
+    """True se há dados mínimos para lookup PNCP de fornecedor (compra + item)."""
+    np = str(it.get("numero_pncp") or it.get("numeroControlePNCP") or "").strip()
+    if not np or len(_extract_cnpj_orgao(np)) != 14:
+        return False
+    ano, seq = _ano_seq_for_enrichment(
+        numero_pncp=np,
+        ano_compra=it.get("ano_compra"),
+        sequencial_compra=it.get("sequencial_compra"),
+        source=it,
+    )
+    return ano is not None and seq is not None
+
+
+def _should_attempt_pncp_supplier_lookup(it: Dict[str, Any], *, only_homolog: bool) -> bool:
+    """
+    Decide se consulta PNCP por fornecedor.
+    Busca em lote traz itens não homologados; ainda assim tentamos lookup quando falta CNPJ/nome
+    e a compra tem chaves PNCP (evita «Não informado» no relatório).
+    """
+    if _payload_supplier_complete(it):
+        return False
+    if item_homologado_para_busca_dict(it):
+        return True
+    if not only_homolog:
+        return True
+    return _pncp_compra_keys_present(it)
+
+
 def _enrich_payload_sort_key(it: Dict[str, Any]) -> Tuple[int, int]:
     """Prioriza itens com resultado/homologação quando o limite de lookups é atingido."""
     score = 0
@@ -300,6 +329,8 @@ def flatten_supplier_fields_in_payload(it: Dict[str, Any]) -> None:
                 low = re.sub(r"\s+", " ", v).strip().lower()
                 if low in {"demais", "nao informado", "não informado", "epp", "me", "mei", "outros"}:
                     continue
+                if low.startswith("pncp_"):
+                    continue
                 it["fornecedor"] = v
                 return
 
@@ -317,7 +348,7 @@ def _fornecedor_display_name_from_source(src: Dict[str, Any]) -> str:
                 if not v or _nome_e_somente_cnpj_formatado(v):
                     continue
                 low = re.sub(r"\s+", " ", v).strip().lower()
-                if low in generic:
+                if low in generic or low.startswith("pncp_"):
                     continue
                 return v
         for k in (
@@ -332,7 +363,7 @@ def _fornecedor_display_name_from_source(src: Dict[str, Any]) -> str:
             if not v:
                 continue
             low = re.sub(r"\s+", " ", v).strip().lower()
-            if low in generic:
+            if low in generic or low.startswith("pncp_"):
                 continue
             if _nome_e_somente_cnpj_formatado(v):
                 continue
@@ -357,6 +388,8 @@ def _nome_fornecedor_util_para_flatten(nome: str, *, cnpj_raw: str = "") -> bool
     generic = {"demais", "nao informado", "não informado", "epp", "me", "mei", "outros"}
     nome_norm = re.sub(r"\s+", " ", nome).strip().lower()
     if nome_norm in generic:
+        return False
+    if nome_norm.startswith("pncp_"):
         return False
     if _nome_e_somente_cnpj_formatado(nome):
         return False
@@ -879,9 +912,7 @@ def enrich_supplier_fields_in_payloads(
         if not isinstance(it, dict):
             continue
         flatten_supplier_fields_in_payload(it)
-        if _payload_supplier_complete(it):
-            continue
-        if only_homolog and not item_homologado_para_busca_dict(it):
+        if not _should_attempt_pncp_supplier_lookup(it, only_homolog=only_homolog):
             continue
 
         has_cnpj = bool(str(it.get("cnpj_fornecedor") or "").strip())

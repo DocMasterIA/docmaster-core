@@ -1264,6 +1264,12 @@ async function adicionarSelecionadosNaCotacao() {
       data_publicacao: r.data,
       fornecedor: r.fornecedor || null,
       cnpj_fornecedor: r.cnpjFornecedor || null,
+      situacao: r.sourceRaw?.situacao || r.sourceRaw?.situacaoCompraNome || null,
+      situacao_compra: r.sourceRaw?.situacao || r.sourceRaw?.situacaoCompraNome || null,
+      situacaoCompraNome: r.sourceRaw?.situacaoCompraNome || r.sourceRaw?.situacao || null,
+      temResultado: r.sourceRaw?.temResultado ?? null,
+      ano_compra: r.anoCompra ?? r.sourceRaw?.ano_compra ?? null,
+      sequencial_compra: r.sequencialCompra ?? r.sourceRaw?.sequencial_compra ?? null,
       source: {
         ...(r.sourceRaw && typeof r.sourceRaw === 'object' ? r.sourceRaw : {}),
         fornecedor: r.fornecedor || null,

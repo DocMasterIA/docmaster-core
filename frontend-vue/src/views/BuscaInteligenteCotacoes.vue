@@ -1390,11 +1390,24 @@ async function adicionarSelecionadosNaCotacao() {
         if (!byItem.has(iid)) byItem.set(iid, []);
         byItem.get(iid).push(row);
       }
+      const entries = [...byItem.entries()];
       let total = 0;
-      for (const [iid, arr] of byItem.entries()) {
-        const res = await addCotacoesToItemInResearchSession(sessionId, iid, arr);
-        total += Number(res?.cotacoes_inseridas || arr.length);
+      let done = 0;
+      const CONCURRENCY = 4;
+      let nextIdx = 0;
+      async function saveWorker() {
+        while (nextIdx < entries.length) {
+          const batchIdx = nextIdx;
+          nextIdx += 1;
+          const [iid, arr] = entries[batchIdx];
+          saveMessage.value = `Salvando... ${done + 1}/${entries.length} item(ns)`;
+          const res = await addCotacoesToItemInResearchSession(sessionId, iid, arr);
+          total += Number(res?.cotacoes_inseridas || arr.length);
+          done += 1;
+          saveMessage.value = `Salvando... ${done}/${entries.length} item(ns)`;
+        }
       }
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, entries.length) }, () => saveWorker()));
       saveMessage.value = `${total} cotação(ões) adicionadas aos itens da cotação.`;
       const selectedIds = new Set(displayedRows.value.filter((r) => r.selecionado).map((r) => r.id));
       rows.value = rows.value.filter((r) => !selectedIds.has(r.id));

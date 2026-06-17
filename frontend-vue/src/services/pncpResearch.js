@@ -103,7 +103,8 @@ async function researchRequest(path, { method = 'GET', body, signal, timeoutMs }
 }
 
 /** Cotações / sessões persistidas no Django (ORM). */
-async function cotacaoRequest(path, { method = 'GET', body, signal } = {}) {
+async function cotacaoRequest(path, { method = 'GET', body, signal, timeoutMs } = {}) {
+  const defaultTimeout = method === 'GET' ? 0 : 120_000;
   const res = await fetch(`${API_BASE}/api/pncp/cotacoes/${path}`, {
     method,
     credentials: 'include',
@@ -111,7 +112,7 @@ async function cotacaoRequest(path, { method = 'GET', body, signal } = {}) {
       'Content-Type': 'application/json',
     },
     body: body ? JSON.stringify(body) : undefined,
-    signal,
+    signal: mergeAbortSignals(signal, timeoutMs ?? defaultTimeout),
   });
 
   const ctype = (res.headers.get('content-type') || '').toLowerCase();

@@ -1246,6 +1246,7 @@ def enrich_supplier_fields_in_payloads(
     ignore_add_source_setting: bool = False,
     only_homologated: Optional[bool] = None,
     receitaws_allow_wait: bool = False,
+    enrich_external_email: bool = False,
 ) -> int:
     """
     Passo 3: ao adicionar fonte da busca, consulta PNCP por numero_item se faltar CNPJ/nome.
@@ -1385,20 +1386,21 @@ def enrich_supplier_fields_in_payloads(
         if changed:
             enriched_count += 1
 
-    lim_rw = receitaws_email_max_lookups()
-    rw_state: Dict[str, Any] = {
-        "cache": {},
-        "http_fetches": 0,
-        "max_http_fetches": lim_rw,
-        "rate_limited": False,
-    }
-    if receitaws_allow_wait:
-        rw_state["allow_rate_limit_wait"] = True
-    for it in ordered:
-        if not isinstance(it, dict):
-            continue
-        if _apply_receitaws_email_enrichment(it, rw_state=rw_state):
-            enriched_count += 1
+    if enrich_external_email:
+        lim_rw = receitaws_email_max_lookups()
+        rw_state: Dict[str, Any] = {
+            "cache": {},
+            "http_fetches": 0,
+            "max_http_fetches": lim_rw,
+            "rate_limited": False,
+        }
+        if receitaws_allow_wait:
+            rw_state["allow_rate_limit_wait"] = True
+        for it in ordered:
+            if not isinstance(it, dict):
+                continue
+            if _apply_receitaws_email_enrichment(it, rw_state=rw_state):
+                enriched_count += 1
 
     return enriched_count
 
@@ -1461,6 +1463,7 @@ def enrich_missing_supplier_fields_for_cotacao(
         ignore_add_source_setting=True,
         only_homologated=False,
         receitaws_allow_wait=receitaws_allow_wait,
+        enrich_external_email=True,
     )
 
     updated: List[PncpCotacaoItemCotacao] = []

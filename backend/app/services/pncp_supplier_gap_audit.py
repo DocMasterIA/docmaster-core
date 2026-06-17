@@ -19,6 +19,11 @@ from backend.app.services.pncp_supplier_enrichment import (
     _find_catalog_row,
     _get_json,
     _supplier_snap_from_resultados_payload,
+    flatten_supplier_fields_in_payload,
+)
+from backend.app.services.pncp_relatorio_itens import (
+    _pick_supplier_cnpj_from_source,
+    _pick_supplier_name_from_source,
 )
 
 GAP_OK = "ok_fornecedor_resolvido"
@@ -90,13 +95,16 @@ def probe_fonte_pncp(
     source: Optional[Dict[str, Any]] = None,
 ) -> SupplierGapReport:
     src = source if isinstance(source, dict) else {}
-    if str(src.get("cnpj_fornecedor") or "").strip():
+    flatten_supplier_fields_in_payload(src)
+    cnpj_f = _pick_supplier_cnpj_from_source(src)
+    nome_f = _pick_supplier_name_from_source(src)
+    if cnpj_f and cnpj_f not in ("—", "Não informado"):
         return SupplierGapReport(
             row_id=row_id,
             numero_pncp=numero_pncp,
             gap_reason=GAP_ALREADY_IN_SOURCE,
-            cnpj_fornecedor=str(src.get("cnpj_fornecedor") or ""),
-            fornecedor=str(src.get("fornecedor") or ""),
+            cnpj_fornecedor=cnpj_f,
+            fornecedor=nome_f or str(src.get("fornecedor") or ""),
         )
 
     np = str(numero_pncp or src.get("numero_pncp") or src.get("numeroControlePNCP") or "").strip()

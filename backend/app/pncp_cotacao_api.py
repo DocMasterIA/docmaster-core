@@ -192,6 +192,19 @@ _SOURCE_KEEP_KEYS = frozenset(
         "situacaoCompraNome",
         "situacaoCompraItemNome",
         "temResultado",
+        "item_homologado",
+        "fornecedor_contato_fonte",
+        "valor_unitario_estimado",
+        "valor_total_estimado",
+        "quantidade_estimada",
+        "valor_unitario_homologado",
+        "valor_total_homologado",
+        "quantidade_homologada",
+        "valorUnitarioEstimado",
+        "valorTotalEstimado",
+        "valorUnitarioHomologado",
+        "valorTotalHomologado",
+        "source",
     }
 )
 

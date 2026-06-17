@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from django.utils import timezone
 
-from backend.app.services.pncp_supplier_enrichment import _nome_e_somente_cnpj_formatado
+from backend.app.services.pncp_supplier_enrichment import _nome_e_somente_cnpj_formatado, flatten_supplier_fields_in_payload
 
 # Mínimo de cotações (fontes) por item para marcar situação como válida (IN 65 / prática comum).
 MIN_FONTES_SITUACAO_VALIDA = 3
@@ -384,14 +384,52 @@ def _build_supplier_name_index(rows: List[Any]) -> Dict[str, str]:
     return idx
 
 
+def _supplier_cadastro_dict(src: Dict[str, Any]) -> Dict[str, Any]:
+    cad = src.get("fornecedor_cadastro")
+    return cad if isinstance(cad, dict) else {}
+
+
+def _pick_supplier_telefone_from_source(src: Dict[str, Any]) -> str:
+    cad = _supplier_cadastro_dict(src)
+    for blob in (src, cad):
+        v = _pick_source(
+            blob,
+            "telefone",
+            "ddd_telefone_1",
+            "ddd_telefone_2",
+            "telefone1",
+            "telefone2",
+            default="",
+        )
+        if v and v != "—":
+            return v
+    return ""
+
+
+def _pick_supplier_email_from_source(src: Dict[str, Any]) -> str:
+    cad = _supplier_cadastro_dict(src)
+    for blob in (src, cad):
+        v = _pick_source(
+            blob,
+            "email",
+            "emailFornecedor",
+            "email_fornecedor",
+            default="",
+        )
+        if v and v != "—":
+            return v
+    return ""
+
+
 def _endereco_de_source(src: Dict[str, Any]) -> str:
-    partes: List[str] = []
-    for k in ("logradouro", "numero", "complemento", "bairro", "municipio", "uf", "cep"):
-        v = str(src.get(k) or "").strip()
-        if v:
-            partes.append(v)
-    if partes:
-        return ", ".join(partes)[:400]
+    for blob in (_supplier_cadastro_dict(src), src):
+        partes: List[str] = []
+        for k in ("logradouro", "numero", "complemento", "bairro", "municipio", "uf", "cep"):
+            v = str(blob.get(k) or "").strip()
+            if v:
+                partes.append(v)
+        if partes:
+            return ", ".join(partes)[:400]
     v = _pick_source(src, "endereco", "enderecoCompleto", "endereco_completo", default="")
     return (v or "")[:400]
 
@@ -480,6 +518,7 @@ def fonte_dict_de_item(
     src: Dict[str, Any] = getattr(it, "source", None) or {}
     if not isinstance(src, dict):
         src = {}
+    flatten_supplier_fields_in_payload(src)
 
     tipo = (getattr(it, "modalidade", None) or "").strip()
     if not tipo:
@@ -516,16 +555,8 @@ def fonte_dict_de_item(
 
     ajuste = _pick_source(src, "ajuste", "observacao_frete", "frete", default="Sem frete")
 
-    telefone = _pick_source(
-        src,
-        "telefone",
-        "ddd_telefone_1",
-        "ddd_telefone_2",
-        "telefone1",
-        "telefone2",
-        default="",
-    )
-    email = _pick_source(src, "email", "emailFornecedor", "email_fornecedor", default="")
+    telefone = _pick_supplier_telefone_from_source(src)
+    email = _pick_supplier_email_from_source(src)
     endereco = _endereco_de_source(src)
     descricao_fonte = _pick_descricao_fonte_pncp(it, src)
 

@@ -96,6 +96,13 @@
                   <div class="item-cotacao-card__badges">
                     <span class="item-cotacao-card__fonte">{{ labelFonte(classificarFonte(r)) }}</span>
                     <span
+                      v-if="hasPnCpHomologadoPreco(r)"
+                      class="item-cotacao-card__homologado"
+                      title="Preço efetivamente pago após a licitação (resultado homologado no PNCP)"
+                    >
+                      Preço homologado
+                    </span>
+                    <span
                       v-if="Boolean(r?.source?.similaridade_encontrada)"
                       class="item-cotacao-card__similaridade"
                       title="Cotação vinculada por similaridade semântica"
@@ -267,12 +274,25 @@
                   <strong>{{ formatQuantidadeCotacao(r) }}</strong>
                 </div>
                 <div class="item-cotacao-card__field">
-                  <span>Valor médio do item</span>
-                  <strong>{{ formatCurrency(r.valor_unitario) }}</strong>
+                  <span>{{ hasPnCpHomologadoPreco(r) ? 'Preço homologado (unit.)' : 'Valor médio do item' }}</span>
+                  <strong
+                    class="item-preco-valor"
+                    :class="{ 'item-preco-valor--homologado': hasPnCpHomologadoPreco(r) }"
+                  >
+                    {{ formatCurrency(displayPnCpUnitario(r)) }}
+                  </strong>
+                  <small v-if="hasPnCpEstimadoDistinto(r)" class="item-preco-estimado">
+                    Estimado (edital): {{ formatCurrency(extractPnCpEstimadoUnit(r)) }}
+                  </small>
                 </div>
                 <div class="item-cotacao-card__field">
-                  <span>Valor total</span>
-                  <strong>{{ formatCurrency(r.valor_total) }}</strong>
+                  <span>{{ hasPnCpHomologadoPreco(r) ? 'Total homologado' : 'Valor total' }}</span>
+                  <strong
+                    class="item-preco-valor"
+                    :class="{ 'item-preco-valor--homologado': hasPnCpHomologadoPreco(r) }"
+                  >
+                    {{ formatCurrency(displayPnCpTotal(r)) }}
+                  </strong>
                 </div>
               </div>
             </article>
@@ -298,6 +318,13 @@ import {
   buildPncpPortalProcessoUrl,
   pncpProcessoDisplayLabel,
 } from '../utils/pncpPortal';
+import {
+  displayPnCpTotal,
+  displayPnCpUnitario,
+  extractPnCpEstimadoUnit,
+  hasPnCpEstimadoDistinto,
+  hasPnCpHomologadoPreco,
+} from '../utils/pncpPricing';
 
 const route = useRoute();
 const cotacaoId = computed(() => String(route.params.cotacaoId || ''));
@@ -881,7 +908,26 @@ function labelIncisoFromCotacao(cotacao) {
   opacity: 0.65;
   cursor: not-allowed;
 }
-.item-cotacao-card__similaridade {
+.item-cotacao-card__homologado {
+  border: 1px solid #86efac;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.item-preco-valor--homologado {
+  color: #047857;
+  font-size: 14px;
+}
+.item-preco-estimado {
+  font-size: 10px;
+  color: #64748b;
+  font-weight: 500;
+  margin-top: 2px;
+}
   border: 1px solid #f2dfb7;
   border-radius: 999px;
   background: #fff7e6;

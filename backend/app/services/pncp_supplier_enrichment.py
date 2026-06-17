@@ -232,27 +232,110 @@ def _cnpj_digits(raw: Any) -> str:
     return re.sub(r"\D", "", str(raw or ""))
 
 
+def _supplier_payload_layers(it: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Camadas onde cotações PNCP guardam fornecedor (topo, source aninhado, cadastro)."""
+    layers: List[Dict[str, Any]] = []
+    if isinstance(it, dict):
+        layers.append(it)
+        inner = it.get("source")
+        if isinstance(inner, dict):
+            layers.append(inner)
+            inner2 = inner.get("source")
+            if isinstance(inner2, dict):
+                layers.append(inner2)
+        cad = it.get("fornecedor_cadastro")
+        if isinstance(cad, dict):
+            layers.append(cad)
+    return layers
+
+
+def _pick_supplier_field_from_layers(it: Dict[str, Any], *keys: str) -> str:
+    for layer in _supplier_payload_layers(it):
+        for k in keys:
+            v = str(layer.get(k) or "").strip()
+            if v:
+                return v
+    return ""
+
+
+def flatten_supplier_fields_in_payload(it: Dict[str, Any]) -> None:
+    """
+    Promove CNPJ/nome de source aninhado para o topo do payload.
+    Cotações da busca inteligente gravam sourceRaw dentro de source.source.
+    """
+    if not isinstance(it, dict):
+        return
+    if not str(it.get("cnpj_fornecedor") or "").strip():
+        raw_cnpj = _pick_supplier_field_from_layers(
+            it,
+            "cnpj_fornecedor",
+            "cnpjFornecedor",
+            "cnpjCpfFornecedor",
+            "niFornecedor",
+            "cnpj",
+        )
+        digits = _cnpj_digits(raw_cnpj)
+        if len(digits) == 14:
+            it["cnpj_fornecedor"] = _normalize_cnpj(digits)
+    if not _fornecedor_tem_nome_util(it):
+        for layer in _supplier_payload_layers(it):
+            cad = layer.get("fornecedor_cadastro")
+            if isinstance(cad, dict):
+                for k in ("razao_social", "nome_fantasia", "razaoSocial", "nomeFantasia"):
+                    v = str(cad.get(k) or "").strip()
+                    if v and not _nome_e_somente_cnpj_formatado(v):
+                        it["fornecedor"] = v
+                        return
+            for k in (
+                "fornecedor",
+                "fornecedor_nome",
+                "nome_fornecedor",
+                "nomeRazaoSocialFornecedor",
+                "razaoSocialFornecedor",
+                "razao_social",
+            ):
+                v = str(layer.get(k) or "").strip()
+                if not v or _nome_e_somente_cnpj_formatado(v):
+                    continue
+                low = re.sub(r"\s+", " ", v).strip().lower()
+                if low in {"demais", "nao informado", "não informado", "epp", "me", "mei", "outros"}:
+                    continue
+                it["fornecedor"] = v
+                return
+
+
 def _fornecedor_display_name_from_source(src: Dict[str, Any]) -> str:
-    """Primeiro nome legível no topo do source (ignora CNPJ colado em «fornecedor»)."""
-    keys = (
-        "fornecedor",
-        "fornecedor_nome",
-        "nome_fornecedor",
-        "nomeRazaoSocialFornecedor",
-        "razaoSocialFornecedor",
-        "razao_social",
-    )
+    """Nome legível em qualquer camada do payload (topo, source aninhado, cadastro)."""
+    flatten_supplier_fields_in_payload(src)
     generic = {"demais", "nao informado", "não informado", "epp", "me", "mei", "outros"}
-    for k in keys:
-        v = str(src.get(k) or "").strip()
-        if not v:
-            continue
-        low = re.sub(r"\s+", " ", v).strip().lower()
-        if low in generic:
-            continue
-        if _nome_e_somente_cnpj_formatado(v):
-            continue
-        return v
+    for layer in _supplier_payload_layers(src):
+        cad = layer.get("fornecedor_cadastro")
+        if isinstance(cad, dict):
+            for k in ("razao_social", "nome_fantasia", "razaoSocial", "nomeFantasia"):
+                v = str(cad.get(k) or "").strip()
+                if not v or _nome_e_somente_cnpj_formatado(v):
+                    continue
+                low = re.sub(r"\s+", " ", v).strip().lower()
+                if low in generic:
+                    continue
+                return v
+        for k in (
+            "fornecedor",
+            "fornecedor_nome",
+            "nome_fornecedor",
+            "nomeRazaoSocialFornecedor",
+            "razaoSocialFornecedor",
+            "razao_social",
+        ):
+            v = str(layer.get(k) or "").strip()
+            if not v:
+                continue
+            low = re.sub(r"\s+", " ", v).strip().lower()
+            if low in generic:
+                continue
+            if _nome_e_somente_cnpj_formatado(v):
+                continue
+            return v
     return ""
 
 
@@ -582,6 +665,46 @@ def _numero_item_from_payload(it: Dict[str, Any]) -> str:
     return ""
 
 
+def _supplier_cadastro_dict(it: Dict[str, Any]) -> Dict[str, Any]:
+    cad = it.get("fornecedor_cadastro")
+    return cad if isinstance(cad, dict) else {}
+
+
+def _contact_telefone_from_payload(it: Dict[str, Any]) -> str:
+    cad = _supplier_cadastro_dict(it)
+    return str(
+        it.get("telefone")
+        or cad.get("telefone")
+        or it.get("ddd_telefone_1")
+        or cad.get("ddd_telefone_1")
+        or it.get("ddd_telefone_2")
+        or cad.get("ddd_telefone_2")
+        or ""
+    ).strip()
+
+
+def _contact_email_from_payload(it: Dict[str, Any]) -> str:
+    cad = _supplier_cadastro_dict(it)
+    return str(it.get("email") or cad.get("email") or "").strip()
+
+
+def _needs_brasilapi_enrichment(it: Dict[str, Any]) -> bool:
+    """Consulta Receita (BrasilAPI) se falta razão social ou contato no cadastro."""
+    flatten_supplier_fields_in_payload(it)
+    has_cnpj = bool(str(it.get("cnpj_fornecedor") or "").strip())
+    if not has_cnpj:
+        return False
+    if not _fornecedor_tem_nome_util(it):
+        return True
+    tel = _contact_telefone_from_payload(it)
+    email = _contact_email_from_payload(it)
+    if tel and email:
+        return False
+    if str(it.get("fornecedor_contato_fonte") or "").strip() == "brasilapi_cnpj":
+        return False
+    return not tel or not email
+
+
 def _payload_supplier_complete(it: Dict[str, Any]) -> bool:
     has_cnpj = bool(str(it.get("cnpj_fornecedor") or "").strip())
     return has_cnpj and _fornecedor_tem_nome_util(it)
@@ -609,11 +732,30 @@ def _merge_supplier_snap_into_payload(it: Dict[str, Any], snap: Dict[str, Any]) 
         if merged_cad != prev:
             it["fornecedor_cadastro"] = merged_cad
             changed = True
+        if not _contact_telefone_from_payload(it):
+            tel = str(
+                merged_cad.get("telefone")
+                or merged_cad.get("ddd_telefone_1")
+                or merged_cad.get("ddd_telefone_2")
+                or ""
+            ).strip()
+            if tel:
+                it["telefone"] = tel
+                changed = True
+        if not _contact_email_from_payload(it):
+            em = str(merged_cad.get("email") or "").strip()
+            if em:
+                it["email"] = em
+                changed = True
     if snap.get("fornecedor_fonte_nome") and not str(it.get("fornecedor_fonte_nome") or "").strip():
         it["fornecedor_fonte_nome"] = snap["fornecedor_fonte_nome"]
         changed = True
     if snap.get("fornecedor_fonte") and not str(it.get("fornecedor_fonte") or "").strip():
         it["fornecedor_fonte"] = snap["fornecedor_fonte"]
+        changed = True
+    contato_fonte = str(snap.get("fornecedor_contato_fonte") or "").strip()
+    if contato_fonte and not str(it.get("fornecedor_contato_fonte") or "").strip():
+        it["fornecedor_contato_fonte"] = contato_fonte
         changed = True
     if changed:
         it["fornecedor_enriquecido_ao_adicionar"] = True
@@ -653,8 +795,7 @@ def enrich_supplier_fields_in_payloads(
         if not isinstance(it, dict):
             continue
         normalize_pncp_geo_in_payload(it)
-        if _payload_supplier_complete(it):
-            continue
+        flatten_supplier_fields_in_payload(it)
 
         has_cnpj = bool(str(it.get("cnpj_fornecedor") or "").strip())
         if not has_cnpj:
@@ -665,8 +806,8 @@ def enrich_supplier_fields_in_payloads(
                     it["cnpj_fornecedor"] = fmt
                     has_cnpj = True
 
-        # BrasilAPI: qualquer fonte com CNPJ e sem razão social (não depende de homologado).
-        if has_cnpj and not _fornecedor_tem_nome_util(it):
+        # BrasilAPI: razão social e/ou telefone+e-mail (Receita Federal) quando faltarem.
+        if _needs_brasilapi_enrichment(it):
             ck = _cnpj_digits(str(it.get("cnpj_fornecedor") or ""))
             if len(ck) == 14 and ck in brasil_cache:
                 nome_br, cad_br = brasil_cache[ck]
@@ -677,12 +818,16 @@ def enrich_supplier_fields_in_payloads(
             else:
                 nome_br, cad_br = "", {}
             if nome_br or cad_br:
-                snap_br = {
+                snap_br: Dict[str, Any] = {
                     "cnpj_fornecedor": it.get("cnpj_fornecedor"),
-                    "fornecedor": nome_br,
                     "fornecedor_cadastro": cad_br,
-                    "fornecedor_fonte_nome": "brasilapi_cnpj",
                 }
+                if nome_br and not _fornecedor_tem_nome_util(it):
+                    snap_br["fornecedor"] = nome_br
+                if nome_br and not str(it.get("fornecedor_fonte_nome") or "").strip():
+                    snap_br["fornecedor_fonte_nome"] = "brasilapi_cnpj"
+                elif cad_br and not str(it.get("fornecedor_contato_fonte") or "").strip():
+                    snap_br["fornecedor_contato_fonte"] = "brasilapi_cnpj"
                 if _merge_supplier_snap_into_payload(it, snap_br):
                     enriched_count += 1
 
@@ -691,6 +836,7 @@ def enrich_supplier_fields_in_payloads(
     for it in ordered:
         if not isinstance(it, dict):
             continue
+        flatten_supplier_fields_in_payload(it)
         if _payload_supplier_complete(it):
             continue
         if only_homolog and not item_homologado_para_busca_dict(it):
@@ -797,6 +943,7 @@ def enrich_missing_supplier_fields_for_cotacao(
             merged.setdefault("ano_compra", ano)
         if seq is not None:
             merged.setdefault("sequencial_compra", seq)
+        flatten_supplier_fields_in_payload(merged)
         work.append((row, merged))
 
     payloads = [m for _, m in work]

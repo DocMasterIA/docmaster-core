@@ -4,13 +4,17 @@ from __future__ import annotations
 import unittest
 
 from backend.app.services.pncp_relatorio_itens import (
+    _pick_supplier_email_from_source,
     _pick_supplier_name_from_source,
+    _pick_supplier_telefone_from_source,
     nome_fornecedor_e_util_para_exibicao,
 )
 from backend.app.services.pncp_supplier_enrichment import (
     _ano_seq_for_enrichment,
     _enrich_payload_sort_key,
+    _needs_brasilapi_enrichment,
     _parse_ano_seq_from_numero_pncp,
+    flatten_supplier_fields_in_payload,
 )
 
 
@@ -76,6 +80,46 @@ class SupplierNameDisplayTests(unittest.TestCase):
             "fornecedor_cadastro": {"razao_social": "EMPRESA TESTE LTDA"},
         }
         self.assertEqual(_pick_supplier_name_from_source(src), "EMPRESA TESTE LTDA")
+
+    def test_pick_contact_from_fornecedor_cadastro(self):
+        src = {
+            "cnpj_fornecedor": "27.105.456/0001-72",
+            "fornecedor": "EMPRESA TESTE LTDA",
+            "fornecedor_cadastro": {
+                "telefone": "(11) 3333-4444",
+                "email": "contato@empresa.com.br",
+            },
+        }
+        self.assertEqual(_pick_supplier_telefone_from_source(src), "(11) 3333-4444")
+        self.assertEqual(_pick_supplier_email_from_source(src), "contato@empresa.com.br")
+
+    def test_needs_brasilapi_when_cnpj_nome_sem_contato(self):
+        it = {
+            "cnpj_fornecedor": "27.105.456/0001-72",
+            "fornecedor": "EMPRESA TESTE LTDA",
+        }
+        self.assertTrue(_needs_brasilapi_enrichment(it))
+
+    def test_needs_brasilapi_false_apos_consulta_rf(self):
+        it = {
+            "cnpj_fornecedor": "27.105.456/0001-72",
+            "fornecedor": "EMPRESA TESTE LTDA",
+            "fornecedor_contato_fonte": "brasilapi_cnpj",
+            "fornecedor_cadastro": {"telefone": "", "email": ""},
+        }
+        self.assertFalse(_needs_brasilapi_enrichment(it))
+
+    def test_flatten_supplier_from_nested_source(self):
+        it = {
+            "numero_pncp": "12345678000195-1-2023-7",
+            "source": {
+                "cnpj_fornecedor": "27.105.456/0001-72",
+                "fornecedor": "EMPRESA ANINHADA LTDA",
+            },
+        }
+        flatten_supplier_fields_in_payload(it)
+        self.assertEqual(it["cnpj_fornecedor"], "27.105.456/0001-72")
+        self.assertEqual(it["fornecedor"], "EMPRESA ANINHADA LTDA")
 
 
 if __name__ == "__main__":

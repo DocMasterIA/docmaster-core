@@ -896,6 +896,14 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
       temResultado: r.sourceRaw?.temResultado ?? null,
       situacaoCompraItemNome: r.sourceRaw?.situacaoCompraItemNome ?? null,
       situacao: r.sourceRaw?.situacao_compra || r.sourceRaw?.situacao || null,
+      valor_unitario_homologado: r.sourceRaw?.valor_unitario_homologado ?? null,
+      valor_total_homologado: r.sourceRaw?.valor_total_homologado ?? null,
+      valor_unitario_estimado: r.sourceRaw?.valor_unitario_estimado ?? null,
+      valor_total_estimado: r.sourceRaw?.valor_total_estimado ?? null,
+      item_homologado: r.sourceRaw?.item_homologado ?? null,
+      source: {
+        ...(r.sourceRaw && typeof r.sourceRaw === 'object' ? r.sourceRaw : {}),
+      },
     }))
     .filter((it) => !!it.descricao_item || !!it.numero_pncp || (it.ano_compra != null && it.sequencial_compra != null));
   if (!registros.length) {

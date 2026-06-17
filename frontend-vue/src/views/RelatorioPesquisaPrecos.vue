@@ -173,8 +173,8 @@
                   </div>
                   <div class="rpv-mini-grid rpv-mini-grid--5">
                     <div class="rpv-dcard rpv-dcard--wide">
-                      <span class="rpv-dcard__label">ID / Processo</span>
-                      <span class="rpv-dcard__value">{{ fi + 1 }} / {{ f.processo || 'N/D' }}</span>
+                      <span class="rpv-dcard__label">Processo</span>
+                      <span class="rpv-dcard__value">{{ f.processo || 'N/D' }}</span>
                     </div>
                     <div class="rpv-dcard">
                       <span class="rpv-dcard__label">Qtd.</span>

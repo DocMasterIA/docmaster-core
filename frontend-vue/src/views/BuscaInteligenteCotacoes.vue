@@ -709,6 +709,40 @@ async function processOneBulkItem(ctx, {
   return { stop: false };
 }
 
+/** Evita dois autostarts em paralelo (Vue Strict Mode / remount). */
+let bulkAutostartLaunchGuard = 0;
+
+async function launchBulkAutostart(sessionId, pendentesCtx) {
+  if (
+    bulkAutostartRegistry.isRunning
+    && Number(bulkAutostartRegistry.sessionId) === Number(sessionId)
+    && bulkAutostartRegistry.promise
+  ) {
+    await bulkAutostartRegistry.promise;
+    return;
+  }
+  const launchId = ++bulkAutostartLaunchGuard;
+  bulkAutostartRegistry.sessionId = sessionId;
+  bulkAutostartRegistry.isRunning = true;
+  const { bulkRunId } = beginBulkAutostartSession(sessionId);
+  const bulkPromise = runBulkItemSearches(pendentesCtx, {
+    bulkRunId,
+    autostartBulk: true,
+    clearRows: true,
+    sessionId,
+  });
+  bulkAutostartRegistry.promise = bulkPromise;
+  try {
+    await bulkPromise;
+  } finally {
+    if (launchId === bulkAutostartLaunchGuard && Number(bulkAutostartRegistry.bulkRunId) === Number(bulkRunId)) {
+      bulkAutostartRegistry.isRunning = false;
+      bulkAutostartRegistry.promise = null;
+    }
+    persistBulkUiSnapshot(sessionId);
+  }
+}
+
 async function runBulkItemSearches(pendentes, {
   generation = null,
   bulkRunId = null,
@@ -1447,28 +1481,9 @@ onMounted(async () => {
         }
         return;
       }
-      bulkAutostartRegistry.sessionId = sessionId;
-      bulkAutostartRegistry.isRunning = true;
-      const { bulkRunId } = beginBulkAutostartSession(sessionId);
       const pendentesCtx = pendentes.map((it) => buildContextFromItem(it)).filter((x) => x.descricao_item);
-      if (mountRunId !== mountRunSeq) {
-        bulkAutostartRegistry.isRunning = false;
-        return;
-      }
-      const bulkPromise = runBulkItemSearches(pendentesCtx, {
-        bulkRunId,
-        autostartBulk: true,
-        clearRows: true,
-        sessionId,
-      });
-      bulkAutostartRegistry.promise = bulkPromise;
-      try {
-        await bulkPromise;
-      } finally {
-        bulkAutostartRegistry.isRunning = false;
-        bulkAutostartRegistry.promise = null;
-        persistBulkUiSnapshot(sessionId);
-      }
+      if (mountRunId !== mountRunSeq) return;
+      await launchBulkAutostart(sessionId, pendentesCtx);
     }
   } catch (err) {
     isLoadingSessionItems.value = false;

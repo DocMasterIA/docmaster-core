@@ -57,7 +57,7 @@ from .local_index import (
     local_item_search,
 )
 from .schemas import MarketSearchRequest
-from .search_text_clean import apply_item_display_cleanup, normalize_for_search
+from .search_text_clean import apply_item_display_cleanup, normalize_for_search, preprocess_cotacao_search_term
 
 
 def _default_dates() -> tuple[str, str]:
@@ -1942,9 +1942,10 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     limit = max(50, search_payload.max_paginas * search_payload.tamanho_pagina)
     if busca_lote:
         limit = min(limit, max(80, int(PNCP_BULK_SEARCH_SQL_LIMIT)))
-    termo_efetivo, term_meta = derive_anchor_search_term(search_payload.termo_busca)
+    termo_busca_raw = search_payload.termo_busca
+    termo_efetivo, term_meta = derive_anchor_search_term(termo_busca_raw)
     base_items = local_item_search(
-        termo_efetivo,
+        termo_busca_raw,
         uf=search_payload.uf,
         municipio=search_payload.municipio,
         recortes_geograficos=search_payload.recortes_geograficos,
@@ -2064,7 +2065,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             "itens": [],
         }
 
-    query_groups = _build_search_tokens(termo_efetivo)
+    termo_tokens = preprocess_cotacao_search_term(termo_busca_raw) or termo_busca_raw
+    query_groups = _build_search_tokens(termo_tokens)
     ref_qty = _safe_float(search_payload.quantidade_referencia)
     ref_unit = _normalize_unit(search_payload.unidade_medida_referencia)
     ref_val_set = search_payload.valor_base_referencia is not None

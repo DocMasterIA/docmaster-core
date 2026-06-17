@@ -59,8 +59,7 @@ export function isBulkRunActive(bulkRunId) {
 }
 
 export function isRegistryAutostartBulk(bulkRunId) {
-  return Boolean(bulkAutostartRegistry.isRunning)
-    && Number(bulkAutostartRegistry.bulkRunId) === Number(bulkRunId)
+  return Number(bulkAutostartRegistry.bulkRunId) === Number(bulkRunId)
     && !bulkAutostartRegistry.pausedByNavigation;
 }
 

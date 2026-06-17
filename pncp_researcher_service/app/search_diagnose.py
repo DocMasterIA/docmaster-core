@@ -13,7 +13,8 @@ async def diagnose_intelligent_search(payload: MarketSearchRequest) -> Dict[str,
     Não persiste dados; útil para auditar cotações grandes (125+ itens).
     """
     limit = max(50, payload.max_paginas * payload.tamanho_pagina)
-    termo_efetivo, term_meta = derive_anchor_search_term(payload.termo_busca)
+    termo_busca_raw = payload.termo_busca
+    termo_efetivo, term_meta = derive_anchor_search_term(termo_busca_raw)
 
     common = dict(
         uf=payload.uf,
@@ -24,8 +25,8 @@ async def diagnose_intelligent_search(payload: MarketSearchRequest) -> Dict[str,
         cleanup_for_display=False,
     )
 
-    homolog = local_item_search(termo_efetivo, somente_homologados=True, **common)
-    qualquer = local_item_search(termo_efetivo, somente_homologados=False, **common)
+    homolog = local_item_search(termo_busca_raw, somente_homologados=True, **common)
+    qualquer = local_item_search(termo_busca_raw, somente_homologados=False, **common)
 
     payload_sem_faixa = payload.model_copy(
         update={

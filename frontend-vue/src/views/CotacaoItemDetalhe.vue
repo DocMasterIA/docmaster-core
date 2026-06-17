@@ -928,6 +928,7 @@ function labelIncisoFromCotacao(cotacao) {
   font-weight: 500;
   margin-top: 2px;
 }
+.item-cotacao-card__similaridade {
   border: 1px solid #f2dfb7;
   border-radius: 999px;
   background: #fff7e6;

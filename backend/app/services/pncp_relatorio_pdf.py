@@ -402,10 +402,18 @@ def montar_contexto_relatorio(
     itens = list(itens_qs.order_by("id"))
     cotacoes_qs = getattr(cotacao, "cotacoes_itens", None)
     cotacoes = list(cotacoes_qs.select_related("item").order_by("item_id", "id")) if cotacoes_qs is not None else []
+    pdf_receitaws_email = bool(getattr(settings, "PNCP_RELATORIO_PDF_RECEITAWS_EMAIL", True))
     if cotacoes:
-        grupos, total_linhas = agrupar_cotacoes_por_item_relatorio_pesquisa_precos(itens, cotacoes)
+        grupos, total_linhas = agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
+            itens,
+            cotacoes,
+            pdf_receitaws_email=pdf_receitaws_email,
+        )
     else:
-        grupos, total_linhas = agrupar_itens_relatorio_pesquisa_precos(itens)
+        grupos, total_linhas = agrupar_itens_relatorio_pesquisa_precos(
+            itens,
+            pdf_receitaws_email=pdf_receitaws_email,
+        )
     sanear_grupos_relatorio_para_pdf(grupos)
     # Prioriza CNPJs presentes nas fontes (cotações reais exibidas no relatório).
     cnpjs = extrair_cnpjs_das_fontes_grupos(grupos)

@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from django.utils import timezone
 
 from backend.app.services.pncp_supplier_enrichment import (
+    _get_json,
     _nome_e_somente_cnpj_formatado,
     _promote_supplier_from_deep_walk,
     _supplier_payload_layers,
@@ -29,6 +30,10 @@ MIN_FONTES_SITUACAO_VALIDA = 3
 
 # BrasilAPI/minha-receita não expõe e-mail corporativo (privacidade anti-spam).
 EMAIL_INDISPONIVEL_RF = "Não divulgado pela Receita Federal"
+
+# Fallback só na geração do PDF quando BrasilAPI omite e-mail (ReceitaWS ainda expõe em muitos CNPJs).
+RECEITAWS_CNPJ_URL = "https://www.receitaws.com.br/v1/cnpj/{cnpj_digits}"
+_RECEITAWS_TIMEOUT = 10
 
 _CNPJ_LOOSE = re.compile(r"\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}")
 
@@ -518,6 +523,50 @@ def formatar_email_exibicao_relatorio(email: Any) -> str:
     return em if em and em != "—" else EMAIL_INDISPONIVEL_RF
 
 
+def fetch_receitaws_email_por_cnpj(cnpj_formatted: str) -> str:
+    """Consulta ReceitaWS (somente e-mail) — usado como fallback no PDF."""
+    d = re.sub(r"\D", "", str(cnpj_formatted or ""))
+    if len(d) != 14:
+        return ""
+    url = RECEITAWS_CNPJ_URL.format(cnpj_digits=d)
+    payload = _get_json(url, timeout=_RECEITAWS_TIMEOUT)
+    if not isinstance(payload, dict):
+        return ""
+    if str(payload.get("status") or "").strip().upper() == "ERROR":
+        return ""
+    em = str(payload.get("email") or "").strip()
+    if "@" not in em or len(em) < 5:
+        return ""
+    return em
+
+
+def _completar_email_receitaws_pdf(
+    *,
+    cnpj_fornecedor: str,
+    email: str,
+    state: Optional[Dict[str, Any]],
+) -> str:
+    """Cache por CNPJ na requisição; respeita max_lookups em state."""
+    em = str(email or "").strip()
+    if em or not state:
+        return em
+    d = re.sub(r"\D", "", str(cnpj_fornecedor or ""))
+    if len(d) != 14:
+        return em
+    cache: Dict[str, str] = state.setdefault("cache", {})
+    if d in cache:
+        return cache[d] or em
+    max_l = int(state.get("max_lookups") or 0)
+    n = int(state.get("fetches") or 0)
+    if max_l <= 0 or n >= max_l:
+        cache[d] = ""
+        return em
+    fetched = fetch_receitaws_email_por_cnpj(d)
+    state["fetches"] = n + 1
+    cache[d] = fetched
+    return fetched or em
+
+
 def _pick_supplier_telefone_from_source(src: Dict[str, Any]) -> str:
     tel_keys = ("telefone", "ddd_telefone_1", "ddd_telefone_2", "telefone1", "telefone2")
     for layer in _supplier_payload_layers(src):
@@ -694,6 +743,7 @@ def fonte_dict_de_item(
     supplier_name_by_cnpj: Optional[Dict[str, str]] = None,
     quantidade_item_base: Optional[float] = None,
     brasilapi_cache: Optional[Dict[str, Dict[str, Any]]] = None,
+    receitaws_pdf_state: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, str]:
     """Uma linha ORM → uma linha da tabela «fontes» do detalhamento."""
     src = _source_efetivo_linha_cotacao(it)
@@ -751,6 +801,12 @@ def fonte_dict_de_item(
             email=email,
             cache=brasilapi_cache,
         )
+    if receitaws_pdf_state is not None and cnpj_fornecedor and not email:
+        email = _completar_email_receitaws_pdf(
+            cnpj_fornecedor=cnpj_fornecedor,
+            email=email,
+            state=receitaws_pdf_state,
+        )
     if telefone:
         telefone = formatar_telefone_br(telefone)
     email = formatar_email_exibicao_relatorio(email)
@@ -775,7 +831,22 @@ def fonte_dict_de_item(
     }
 
 
-def agrupar_itens_relatorio_pesquisa_precos(itens: List[Any]) -> Tuple[List[Dict[str, Any]], int]:
+def _receitaws_pdf_state_if_enabled(*, pdf_receitaws_email: bool) -> Optional[Dict[str, Any]]:
+    if not pdf_receitaws_email:
+        return None
+    from django.conf import settings
+
+    max_l = int(getattr(settings, "PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS", 32) or 0)
+    if max_l <= 0:
+        return None
+    return {"cache": {}, "fetches": 0, "max_lookups": max_l}
+
+
+def agrupar_itens_relatorio_pesquisa_precos(
+    itens: List[Any],
+    *,
+    pdf_receitaws_email: bool = False,
+) -> Tuple[List[Dict[str, Any]], int]:
     """
     Retorna lista de grupos (ordenada por menor id no grupo) e total de linhas importadas.
 
@@ -787,6 +858,7 @@ def agrupar_itens_relatorio_pesquisa_precos(itens: List[Any]) -> Tuple[List[Dict
     tz = timezone.get_current_timezone()
     total_linhas = len(itens)
     brasilapi_cache: Dict[str, Dict[str, Any]] = {}
+    receitaws_pdf_state = _receitaws_pdf_state_if_enabled(pdf_receitaws_email=pdf_receitaws_email)
 
     buckets: Dict[Tuple[str, str, str, str], List[Any]] = {}
     order_keys: List[Tuple[str, str, str, str]] = []
@@ -838,6 +910,7 @@ def agrupar_itens_relatorio_pesquisa_precos(itens: List[Any]) -> Tuple[List[Dict
                 supplier_name_by_cnpj=supplier_name_idx,
                 quantidade_item_base=q_first,
                 brasilapi_cache=brasilapi_cache,
+                receitaws_pdf_state=receitaws_pdf_state,
             )
             for m in members
         ]
@@ -863,6 +936,8 @@ def agrupar_itens_relatorio_pesquisa_precos(itens: List[Any]) -> Tuple[List[Dict
 def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
     itens: List[Any],
     cotacoes: List[Any],
+    *,
+    pdf_receitaws_email: bool = False,
 ) -> Tuple[List[Dict[str, Any]], int]:
     """
     Novo fluxo: item manual + múltiplas cotações vinculadas.
@@ -879,6 +954,7 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
     tz = timezone.get_current_timezone()
     total_linhas = len(cotacoes or [])
     brasilapi_cache: Dict[str, Dict[str, Any]] = {}
+    receitaws_pdf_state = _receitaws_pdf_state_if_enabled(pdf_receitaws_email=pdf_receitaws_email)
     cotacoes_por_item: Dict[int, List[Any]] = defaultdict(list)
     for c in cotacoes or []:
         item_id = getattr(c, "item_id", None)
@@ -948,6 +1024,7 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
                 supplier_name_by_cnpj=supplier_name_idx,
                 quantidade_item_base=qtd_item_f,
                 brasilapi_cache=brasilapi_cache,
+                receitaws_pdf_state=receitaws_pdf_state,
             )
             for m in members
         ]

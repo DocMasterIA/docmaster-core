@@ -2176,6 +2176,15 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                     ref_fit += 2.0
                 else:
                     ref_fit -= 2.0
+            supplier_pen = 0.0
+            cnpj_f = str(it.get("cnpj_fornecedor") or "").strip()
+            if not cnpj_f:
+                homolog_flag = it.get("item_homologado")
+                tem_res = it.get("temResultado")
+                if tem_res is False or homolog_flag is False:
+                    supplier_pen = -35.0
+                else:
+                    supplier_pen = -18.0
             row_value = _safe_float(it.get("valor_unitario") or it.get("valor_total") or it.get("valor_global"))
             # Regra rígida: nunca considerar item com preço zerado/ausente.
             if row_value <= 0:
@@ -2192,7 +2201,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                     ref_fit += 3.0
                 else:
                     ref_fit -= 2.0
-            raw_score = sem + tbl + rec + coh + clar + pen + ref_fit
+            raw_score = sem + tbl + rec + coh + clar + pen + ref_fit + supplier_pen
             score_0_100 = max(0, min(100, round(raw_score)))
             it2 = dict(it)
             it2["score_bruto"] = round(raw_score, 3)

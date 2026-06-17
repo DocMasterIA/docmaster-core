@@ -313,6 +313,62 @@ def nome_fornecedor_e_util_para_exibicao(nome: str) -> bool:
     return True
 
 
+def _fonte_pncp_em_andamento_sem_fornecedor(src: Dict[str, Any]) -> bool:
+    """Compra/item ainda sem vencedor publicado no PNCP (ex.: «Em andamento», temResultado=false)."""
+    if _pick_supplier_cnpj_from_source(src) or _pick_supplier_name_from_source(src):
+        return False
+    tem = src.get("temResultado")
+    if tem is False:
+        return True
+    if src.get("item_homologado") is False:
+        return True
+    sit = str(
+        _pick_source(
+            src,
+            "situacaoCompraItemNome",
+            "situacao_item",
+            "situacaoCompraItem",
+            "situacao",
+            "situacao_compra",
+            default="",
+        )
+        or ""
+    ).strip().lower()
+    if not sit:
+        return False
+    if any(tok in sit for tok in ("andamento", "abert", "publicad", "receb", "julg", "disputa")):
+        return True
+    if any(tok in sit for tok in ("homolog", "adjudic", "result")):
+        return False
+    return False
+
+
+def _fornecedor_exibicao_relatorio(
+    src: Dict[str, Any],
+    *,
+    fornecedor: str,
+    cnpj_fornecedor: str,
+    supplier_name_by_cnpj: Optional[Dict[str, str]] = None,
+) -> str:
+    if fornecedor:
+        return fornecedor
+    if cnpj_fornecedor and supplier_name_by_cnpj:
+        nome = str(supplier_name_by_cnpj.get(cnpj_fornecedor) or "").strip()
+        if nome_fornecedor_e_util_para_exibicao(nome):
+            return nome
+    if _fonte_pncp_em_andamento_sem_fornecedor(src):
+        return "Sem fornecedor homologado (compra em andamento)"
+    return "Não informado"
+
+
+def _cnpj_exibicao_relatorio(src: Dict[str, Any], cnpj_fornecedor: str) -> str:
+    if cnpj_fornecedor:
+        return cnpj_fornecedor
+    if _fonte_pncp_em_andamento_sem_fornecedor(src):
+        return "—"
+    return "Não informado"
+
+
 def _pick_supplier_name_from_source(src: Dict[str, Any]) -> str:
     cad = src.get("fornecedor_cadastro")
     if isinstance(cad, dict):
@@ -550,11 +606,13 @@ def fonte_dict_de_item(
 
     cnpj_fornecedor = _pick_supplier_cnpj_from_source(src)
     fornecedor = _pick_supplier_name_from_source(src)
-    if not fornecedor and cnpj_fornecedor and supplier_name_by_cnpj:
-        fornecedor = str(supplier_name_by_cnpj.get(cnpj_fornecedor) or "").strip()
-    if not fornecedor:
-        fornecedor = "Não informado"
-    cnpj = cnpj_fornecedor or "Não informado"
+    fornecedor = _fornecedor_exibicao_relatorio(
+        src,
+        fornecedor=fornecedor,
+        cnpj_fornecedor=cnpj_fornecedor,
+        supplier_name_by_cnpj=supplier_name_by_cnpj,
+    )
+    cnpj = _cnpj_exibicao_relatorio(src, cnpj_fornecedor)
 
     created = getattr(it, "created_at", None)
     data_str = "—"
@@ -562,7 +620,12 @@ def fonte_dict_de_item(
         data_str = timezone.localtime(created, tz).strftime("%d/%m/%Y")
 
     pu = preco_unitario_cotacao_fonte(it, quantidade_item=quantidade_item_base)
-    valor = f"R$ {_formatar_moeda_br(pu)}" if pu is not None else "—"
+    if pu is not None:
+        valor = f"R$ {_formatar_moeda_br(pu)}"
+        if _fonte_pncp_em_andamento_sem_fornecedor(src):
+            valor = f"{valor} (estimado)"
+    else:
+        valor = "—"
 
     mun, uf = _resolve_municipio_uf_para_fonte(
         getattr(it, "municipio", None),

@@ -4,6 +4,8 @@ from __future__ import annotations
 import unittest
 
 from backend.app.services.pncp_relatorio_itens import (
+    _fonte_pncp_em_andamento_sem_fornecedor,
+    _fornecedor_exibicao_relatorio,
     _pick_supplier_email_from_source,
     _pick_supplier_name_from_source,
     _pick_supplier_telefone_from_source,
@@ -158,6 +160,29 @@ class SupplierNameDisplayTests(unittest.TestCase):
     def test_should_skip_nao_homologado_sem_chaves_pncp(self):
         it = {"situacao": "Em andamento", "descricao_item": "Caneta"}
         self.assertFalse(_should_attempt_pncp_supplier_lookup(it, only_homolog=True))
+
+
+class FonteEmAndamentoRelatorioTests(unittest.TestCase):
+    def test_detecta_compra_em_andamento_sem_fornecedor(self):
+        src = {
+            "numero_pncp": "02267698000131-1-000026/2025",
+            "temResultado": False,
+            "situacaoCompraItemNome": "Em andamento",
+            "valor_unitario": 9.97,
+        }
+        self.assertTrue(_fonte_pncp_em_andamento_sem_fornecedor(src))
+        self.assertEqual(
+            _fornecedor_exibicao_relatorio(src, fornecedor="", cnpj_fornecedor=""),
+            "Sem fornecedor homologado (compra em andamento)",
+        )
+
+    def test_nao_marca_em_andamento_quando_tem_fornecedor(self):
+        src = {
+            "cnpj_fornecedor": "27.105.456/0001-72",
+            "fornecedor": "EMPRESA TESTE LTDA",
+            "temResultado": True,
+        }
+        self.assertFalse(_fonte_pncp_em_andamento_sem_fornecedor(src))
 
 
 if __name__ == "__main__":

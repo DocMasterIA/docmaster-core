@@ -1267,7 +1267,10 @@ async function adicionarSelecionadosNaCotacao() {
       situacao: r.sourceRaw?.situacao || r.sourceRaw?.situacaoCompraNome || null,
       situacao_compra: r.sourceRaw?.situacao || r.sourceRaw?.situacaoCompraNome || null,
       situacaoCompraNome: r.sourceRaw?.situacaoCompraNome || r.sourceRaw?.situacao || null,
+      situacaoCompraItemNome: r.sourceRaw?.situacaoCompraItemNome || r.sourceRaw?.situacao_item_exibicao || null,
       temResultado: r.sourceRaw?.temResultado ?? null,
+      item_homologado: r.sourceRaw?.item_homologado ?? null,
+      valor_unitario_estimado: r.sourceRaw?.valor_unitario_estimado ?? null,
       ano_compra: r.anoCompra ?? r.sourceRaw?.ano_compra ?? null,
       sequencial_compra: r.sequencialCompra ?? r.sourceRaw?.sequencial_compra ?? null,
       source: {

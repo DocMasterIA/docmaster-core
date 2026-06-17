@@ -16,7 +16,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from django.utils import timezone
 
-from backend.app.services.pncp_supplier_enrichment import _nome_e_somente_cnpj_formatado, flatten_supplier_fields_in_payload
+from backend.app.services.pncp_supplier_enrichment import (
+    _nome_e_somente_cnpj_formatado,
+    _promote_supplier_from_deep_walk,
+    flatten_supplier_fields_in_payload,
+)
 
 # Mínimo de cotações (fontes) por item para marcar situação como válida (IN 65 / prática comum).
 MIN_FONTES_SITUACAO_VALIDA = 3
@@ -374,9 +378,9 @@ def _build_supplier_name_index(rows: List[Any]) -> Dict[str, str]:
     """
     idx: Dict[str, str] = {}
     for r in rows or []:
-        src = getattr(r, "source", None) or {}
-        if not isinstance(src, dict):
-            continue
+        src = _source_efetivo_linha_cotacao(r)
+        flatten_supplier_fields_in_payload(src)
+        _promote_supplier_from_deep_walk(src)
         cnpj = _pick_supplier_cnpj_from_source(src)
         nome = _pick_supplier_name_from_source(src)
         if cnpj and nome and nome_fornecedor_e_util_para_exibicao(nome):
@@ -507,6 +511,26 @@ def _format_orgao_com_local(orgao: Any, municipio: Any, uf: Any) -> str:
     return org or "—"
 
 
+def _source_efetivo_linha_cotacao(it: Any) -> Dict[str, Any]:
+    """Mescla colunas ORM com JSON `source` antes de extrair fornecedor."""
+    src: Dict[str, Any] = dict(getattr(it, "source", None) or {})
+    if not isinstance(src, dict):
+        src = {}
+    np = str(getattr(it, "numero_pncp", None) or "").strip()
+    if np:
+        src.setdefault("numero_pncp", np)
+    ni = str(getattr(it, "numero_item", None) or "").strip()
+    if ni:
+        src.setdefault("numero_item", ni)
+    ano = getattr(it, "ano_compra", None)
+    if ano is not None:
+        src.setdefault("ano_compra", ano)
+    seq = getattr(it, "sequencial_compra", None)
+    if seq is not None:
+        src.setdefault("sequencial_compra", seq)
+    return src
+
+
 def fonte_dict_de_item(
     it: Any,
     *,
@@ -515,10 +539,9 @@ def fonte_dict_de_item(
     quantidade_item_base: Optional[float] = None,
 ) -> Dict[str, str]:
     """Uma linha ORM → uma linha da tabela «fontes» do detalhamento."""
-    src: Dict[str, Any] = getattr(it, "source", None) or {}
-    if not isinstance(src, dict):
-        src = {}
+    src = _source_efetivo_linha_cotacao(it)
     flatten_supplier_fields_in_payload(src)
+    _promote_supplier_from_deep_walk(src)
 
     tipo = (getattr(it, "modalidade", None) or "").strip()
     if not tipo:

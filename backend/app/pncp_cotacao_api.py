@@ -1518,7 +1518,7 @@ def pncp_research_sessions_add_items(request, sessao_id: int):
 
         for payload in normalized_itens:
             normalize_pncp_geo_in_payload(payload)
-        enrich_supplier_fields_in_payloads(normalized_itens)
+        enrich_supplier_fields_in_payloads(normalized_itens, only_homologated=False)
 
         built = [_item_from_payload(it, c) for it in normalized_itens]
         for i in range(0, len(built), BULK_CREATE_BATCH):
@@ -1602,7 +1602,7 @@ def pncp_research_sessions_item_cotacoes(request, sessao_id: int, item_id: int):
     dict_rows = [dict(r) for r in raw_cotacoes if isinstance(r, dict)]
     for row in dict_rows:
         normalize_pncp_geo_in_payload(row)
-    enrich_supplier_fields_in_payloads(dict_rows)
+    enrich_supplier_fields_in_payloads(dict_rows, only_homologated=False)
 
     built: List[PncpCotacaoItemCotacao] = []
     ignored_duplicadas = 0

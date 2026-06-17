@@ -21,7 +21,7 @@ from backend.app.services.pncp_supplier_enrichment import (
     _promote_supplier_from_deep_walk,
     _supplier_payload_layers,
     fetch_brasilapi_fornecedor_por_cnpj,
-    fetch_receitaws_email_por_cnpj,
+    fetch_cnpj_email_externo,
     flatten_supplier_fields_in_payload,
     receitaws_email_fallback_enabled,
     receitaws_email_max_lookups,
@@ -532,25 +532,13 @@ def _completar_email_receitaws_pdf(
     email: str,
     state: Optional[Dict[str, Any]],
 ) -> str:
-    """Cache por CNPJ na requisição; respeita max_lookups em state."""
     em = str(email or "").strip()
     if not _email_contato_ausente(em) or not state:
         return em if not _email_contato_ausente(em) else ""
     d = re.sub(r"\D", "", str(cnpj_fornecedor or ""))
     if len(d) != 14:
         return em
-    cache: Dict[str, str] = state.setdefault("cache", {})
-    if d in cache:
-        return cache[d] or em
-    max_l = int(state.get("max_lookups") or 0)
-    n = int(state.get("fetches") or 0)
-    if max_l <= 0 or n >= max_l:
-        cache[d] = ""
-        return em
-    fetched = fetch_receitaws_email_por_cnpj(d)
-    state["fetches"] = n + 1
-    cache[d] = fetched
-    return fetched or em
+    return fetch_cnpj_email_externo(d, state=state) or em
 
 
 def _pick_supplier_telefone_from_source(src: Dict[str, Any]) -> str:
@@ -817,19 +805,54 @@ def fonte_dict_de_item(
     }
 
 
-def _receitaws_state_if_enabled(*, receitaws_email_fallback: bool) -> Optional[Dict[str, Any]]:
+def _receitaws_state_if_enabled(
+    *,
+    receitaws_email_fallback: bool,
+    allow_rate_limit_wait: bool = False,
+) -> Optional[Dict[str, Any]]:
     if not receitaws_email_fallback or not receitaws_email_fallback_enabled():
         return None
     max_l = receitaws_email_max_lookups()
     if max_l <= 0:
         return None
-    return {"cache": {}, "fetches": 0, "max_lookups": max_l}
+    state: Dict[str, Any] = {
+        "cache": {},
+        "http_fetches": 0,
+        "max_http_fetches": max_l,
+        "rate_limited": False,
+    }
+    if allow_rate_limit_wait:
+        state["allow_rate_limit_wait"] = True
+    return state
+
+
+def _prefetch_emails_cnpj_para_linhas(
+    members: List[Any],
+    state: Optional[Dict[str, Any]],
+) -> None:
+    """Consulta e-mail (cache/API) uma vez por CNPJ antes de montar as fontes."""
+    if not state:
+        return
+    seen: set[str] = set()
+    for it in members:
+        src = _source_efetivo_linha_cotacao(it)
+        flatten_supplier_fields_in_payload(src)
+        _promote_supplier_from_deep_walk(src)
+        if not _email_contato_ausente(_pick_supplier_email_from_source(src)):
+            continue
+        cnpj = _pick_supplier_cnpj_from_source(src)
+        d = re.sub(r"\D", "", str(cnpj or ""))
+        if len(d) != 14 or d in seen:
+            continue
+        seen.add(d)
+        fetch_cnpj_email_externo(d, state=state)
 
 
 def agrupar_itens_relatorio_pesquisa_precos(
     itens: List[Any],
     *,
     receitaws_email_fallback: bool = False,
+    receitaws_allow_wait: bool = False,
 ) -> Tuple[List[Dict[str, Any]], int]:
     """
     Retorna lista de grupos (ordenada por menor id no grupo) e total de linhas importadas.
@@ -842,7 +865,10 @@ def agrupar_itens_relatorio_pesquisa_precos(
     tz = timezone.get_current_timezone()
     total_linhas = len(itens)
     brasilapi_cache: Dict[str, Dict[str, Any]] = {}
-    receitaws_pdf_state = _receitaws_state_if_enabled(receitaws_email_fallback=receitaws_email_fallback)
+    receitaws_pdf_state = _receitaws_state_if_enabled(
+        receitaws_email_fallback=receitaws_email_fallback,
+        allow_rate_limit_wait=receitaws_allow_wait,
+    )
 
     buckets: Dict[Tuple[str, str, str, str], List[Any]] = {}
     order_keys: List[Tuple[str, str, str, str]] = []
@@ -853,6 +879,10 @@ def agrupar_itens_relatorio_pesquisa_precos(
             buckets[key] = []
             order_keys.append(key)
         buckets[key].append(it)
+
+    if receitaws_pdf_state:
+        all_members = [m for members in buckets.values() for m in members]
+        _prefetch_emails_cnpj_para_linhas(all_members, receitaws_pdf_state)
 
     grupos: List[Dict[str, Any]] = []
     for ordem, key in enumerate(order_keys, start=1):
@@ -922,6 +952,7 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
     cotacoes: List[Any],
     *,
     receitaws_email_fallback: bool = False,
+    receitaws_allow_wait: bool = False,
 ) -> Tuple[List[Dict[str, Any]], int]:
     """
     Novo fluxo: item manual + múltiplas cotações vinculadas.
@@ -938,13 +969,19 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
     tz = timezone.get_current_timezone()
     total_linhas = len(cotacoes or [])
     brasilapi_cache: Dict[str, Dict[str, Any]] = {}
-    receitaws_pdf_state = _receitaws_state_if_enabled(receitaws_email_fallback=receitaws_email_fallback)
+    receitaws_pdf_state = _receitaws_state_if_enabled(
+        receitaws_email_fallback=receitaws_email_fallback,
+        allow_rate_limit_wait=receitaws_allow_wait,
+    )
     cotacoes_por_item: Dict[int, List[Any]] = defaultdict(list)
     for c in cotacoes or []:
         item_id = getattr(c, "item_id", None)
         if item_id is None:
             continue
         cotacoes_por_item[int(item_id)].append(c)
+
+    if receitaws_pdf_state and cotacoes:
+        _prefetch_emails_cnpj_para_linhas(list(cotacoes), receitaws_pdf_state)
 
     grupos: List[Dict[str, Any]] = []
     for ordem, it in enumerate(itens, start=1):

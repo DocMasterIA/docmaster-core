@@ -488,7 +488,9 @@ PNCP_RELATORIO_PDF_RECEITAWS_EMAIL = os.environ.get("PNCP_RELATORIO_PDF_RECEITAW
     "false",
     "no",
 )
-PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS", "64"))
+PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS", "8"))
+# PDF (job assíncrono): aguarda ~22s após 429 e tenta de novo (APIs limitam ~3 req/min).
+PNCP_CNPJ_EMAIL_RATE_LIMIT_WAIT_SEC = int(os.environ.get("PNCP_CNPJ_EMAIL_RATE_LIMIT_WAIT_SEC", "22"))
 # GET sessão com ?relatorio=1 (tela RelatorioPesquisaPrecos): enrich PNCP/BrasilAPI antes de montar grupos.
 PNCP_RELATORIO_VIEW_ENRICH = os.environ.get("PNCP_RELATORIO_VIEW_ENRICH", "true").strip().lower() not in (
     "0",

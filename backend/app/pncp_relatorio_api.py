@@ -245,6 +245,7 @@ def _generate_relatorio_pdf_bytes(
                 cotacao.id,
                 max_lookups=settings.PNCP_RELATORIO_PDF_MAX_PNCP_LOOKUPS,
                 max_brasilapi_lookups=settings.PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS,
+                receitaws_allow_wait=True,
             )
         except Exception:
             logger.exception(

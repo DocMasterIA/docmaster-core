@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import requests
 from django.conf import settings
 
+from backend.app.services.pncp_cnpj_email_cache import (
+    get_cached_cnpj_email,
+    set_cached_cnpj_email,
+)
 from backend.app.models import PncpCotacaoItemCotacao
 from backend.app.services.pncp_source_normalize import normalize_pncp_geo_in_payload
 
@@ -15,6 +20,8 @@ logger = logging.getLogger(__name__)
 PNCP_API_BASE = "https://pncp.gov.br/api/pncp"
 BRASILAPI_CNPJ_URL = "https://brasilapi.com.br/api/cnpj/v1/{cnpj_digits}"
 RECEITAWS_CNPJ_URL = "https://www.receitaws.com.br/v1/cnpj/{cnpj_digits}"
+CNPJ_WS_URL = "https://publica.cnpj.ws/cnpj/{cnpj_digits}"
+_HTTP_UA = "DocMaster-PNCP/1.0"
 _CNPJ_RE = re.compile(r"\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}")
 
 # Timeout PNCP na geração de PDF / adicionar fonte (evita cancelar cedo demais).
@@ -592,51 +599,164 @@ def receitaws_email_fallback_enabled() -> bool:
 
 
 def receitaws_email_max_lookups() -> int:
-    return int(getattr(settings, "PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS", 64) or 0)
+    """Máximo de chamadas HTTP externas por requisição (cada API limita ~3/min)."""
+    return int(getattr(settings, "PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS", 3) or 0)
 
 
-def fetch_receitaws_email_por_cnpj(cnpj_formatted: str) -> str:
-    """E-mail corporativo via ReceitaWS quando BrasilAPI/minha-receita omite (privacidade)."""
+def _email_externo_valido(em: Any) -> bool:
+    s = str(em or "").strip()
+    return "@" in s and len(s) >= 5
+
+
+def _fetch_cnpj_ws_email_http(cnpj_digits: str) -> Tuple[str, bool]:
+    """Retorna (email, rate_limited)."""
+    url = CNPJ_WS_URL.format(cnpj_digits=cnpj_digits)
+    try:
+        r = requests.get(url, timeout=_RECEITAWS_TIMEOUT, headers={"User-Agent": _HTTP_UA})
+    except Exception:
+        return "", False
+    if r.status_code == 429:
+        return "", True
+    if r.status_code >= 400:
+        return "", False
+    try:
+        payload = r.json()
+    except Exception:
+        return "", False
+    if not isinstance(payload, dict):
+        return "", False
+    est = payload.get("estabelecimento")
+    if not isinstance(est, dict):
+        return "", False
+    em = str(est.get("email") or "").strip()
+    return (em, False) if _email_externo_valido(em) else ("", False)
+
+
+def _fetch_receitaws_email_http(cnpj_digits: str) -> Tuple[str, bool]:
+    """Retorna (email, rate_limited)."""
+    url = RECEITAWS_CNPJ_URL.format(cnpj_digits=cnpj_digits)
+    try:
+        r = requests.get(url, timeout=_RECEITAWS_TIMEOUT, headers={"User-Agent": _HTTP_UA})
+    except Exception:
+        return "", False
+    if r.status_code == 429:
+        return "", True
+    if r.status_code >= 400:
+        return "", False
+    try:
+        payload = r.json()
+    except Exception:
+        return "", False
+    if not isinstance(payload, dict):
+        return "", False
+    if str(payload.get("status") or "").strip().upper() == "ERROR":
+        msg = str(payload.get("message") or "").lower()
+        if any(x in msg for x in ("rate", "many", "limite", "too many")):
+            return "", True
+        return "", False
+    em = str(payload.get("email") or "").strip()
+    return (em, False) if _email_externo_valido(em) else ("", False)
+
+
+def fetch_cnpj_email_externo(
+    cnpj_formatted: str,
+    *,
+    state: Optional[Dict[str, Any]] = None,
+) -> str:
+    """
+    E-mail via cache persistente + cnpj.ws / ReceitaWS (BrasilAPI omite).
+    state opcional: cache de memória, contagem HTTP e rate limit na requisição.
+    """
     d = _cnpj_digits(cnpj_formatted)
     if len(d) != 14:
         return ""
-    url = RECEITAWS_CNPJ_URL.format(cnpj_digits=d)
-    payload = _get_json(url, timeout=_RECEITAWS_TIMEOUT)
-    if not isinstance(payload, dict):
+
+    mem: Optional[Dict[str, str]] = None
+    if state is not None:
+        mem = state.setdefault("cache", {})
+        if d in mem:
+            return str(mem[d] or "")
+
+    cached = get_cached_cnpj_email(d)
+    if cached:
+        if mem is not None:
+            mem[d] = cached
+        return cached
+
+    if state is not None and state.get("rate_limited"):
         return ""
-    if str(payload.get("status") or "").strip().upper() == "ERROR":
+
+    max_http = int((state or {}).get("max_http_fetches") or receitaws_email_max_lookups())
+    http_n = int((state or {}).get("http_fetches") or 0)
+    if state is not None and max_http > 0 and http_n >= max_http:
         return ""
-    em = str(payload.get("email") or "").strip()
-    if "@" not in em or len(em) < 5:
-        return ""
+
+    def _http_fetch(fetch_fn) -> Tuple[str, bool]:
+        nonlocal http_n
+        em, rl = fetch_fn(d)
+        if state is not None:
+            state["http_fetches"] = http_n + 1
+            http_n += 1
+            if rl:
+                state["rate_limited"] = True
+        return em, rl
+
+    wait_sec = int(getattr(settings, "PNCP_CNPJ_EMAIL_RATE_LIMIT_WAIT_SEC", 0) or 0)
+    if state is not None and state.get("allow_rate_limit_wait"):
+        wait_sec = int(getattr(settings, "PNCP_CNPJ_EMAIL_RATE_LIMIT_WAIT_SEC", 22) or 0)
+
+    em = ""
+    fonte = ""
+    for fetch_fn, nome_fonte in ((_fetch_cnpj_ws_email_http, "cnpj.ws"), (_fetch_receitaws_email_http, "receitaws")):
+        if state is not None and state.get("rate_limited"):
+            break
+        if state is not None and max_http > 0 and http_n >= max_http:
+            break
+        got, rl = _http_fetch(fetch_fn)
+        if got:
+            em, fonte = got, nome_fonte
+            break
+        if rl and wait_sec > 0 and state is not None and not state.get("_rate_wait_done"):
+            time.sleep(wait_sec)
+            state["_rate_wait_done"] = True
+            state["rate_limited"] = False
+            got2, rl2 = _http_fetch(fetch_fn)
+            if got2:
+                em, fonte = got2, nome_fonte
+                break
+            if rl2 and state is not None:
+                state["rate_limited"] = True
+        if rl:
+            break
+
+    if em:
+        set_cached_cnpj_email(d, em, fonte=fonte)
+        if mem is not None:
+            mem[d] = em
     return em
+
+
+def fetch_receitaws_email_por_cnpj(cnpj_formatted: str) -> str:
+    """Compat: consulta com cache persistente e cnpj.ws antes da ReceitaWS."""
+    return fetch_cnpj_email_externo(cnpj_formatted)
 
 
 def _apply_receitaws_email_enrichment(
     it: Dict[str, Any],
     *,
-    cache: Dict[str, str],
-    fetches: int,
-    lim: int,
-) -> tuple[bool, int]:
-    if lim <= 0 or not receitaws_email_fallback_enabled():
-        return False, fetches
+    rw_state: Optional[Dict[str, Any]],
+) -> bool:
+    if not rw_state or not receitaws_email_fallback_enabled():
+        return False
     flatten_supplier_fields_in_payload(it)
     if _contact_email_from_payload(it):
-        return False, fetches
+        return False
     ck = _cnpj_digits(str(it.get("cnpj_fornecedor") or ""))
     if len(ck) != 14:
-        return False, fetches
-    if ck in cache:
-        em = cache[ck]
-    elif fetches < lim:
-        em = fetch_receitaws_email_por_cnpj(ck)
-        cache[ck] = em
-        fetches += 1
-    else:
-        return False, fetches
+        return False
+    em = fetch_cnpj_email_externo(ck, state=rw_state)
     if not em:
-        return False, fetches
+        return False
     prev = it.get("fornecedor_cadastro")
     cad = dict(prev) if isinstance(prev, dict) else {}
     cad["email"] = em
@@ -645,8 +765,7 @@ def _apply_receitaws_email_enrichment(
         "fornecedor_cadastro": cad,
         "fornecedor_contato_fonte": "receitaws_cnpj",
     }
-    changed = _merge_supplier_snap_into_payload(it, snap)
-    return changed, fetches
+    return _merge_supplier_snap_into_payload(it, snap)
 
 
 def _get_json(url: str, timeout=_DEFAULT_TIMEOUT, *, params: Optional[Dict[str, Any]] = None) -> Any:
@@ -1126,6 +1245,7 @@ def enrich_supplier_fields_in_payloads(
     max_brasilapi_lookups: Optional[int] = None,
     ignore_add_source_setting: bool = False,
     only_homologated: Optional[bool] = None,
+    receitaws_allow_wait: bool = False,
 ) -> int:
     """
     Passo 3: ao adicionar fonte da busca, consulta PNCP por numero_item se faltar CNPJ/nome.
@@ -1266,18 +1386,18 @@ def enrich_supplier_fields_in_payloads(
             enriched_count += 1
 
     lim_rw = receitaws_email_max_lookups()
-    receitaws_cache: Dict[str, str] = {}
-    receitaws_fetches = 0
+    rw_state: Dict[str, Any] = {
+        "cache": {},
+        "http_fetches": 0,
+        "max_http_fetches": lim_rw,
+        "rate_limited": False,
+    }
+    if receitaws_allow_wait:
+        rw_state["allow_rate_limit_wait"] = True
     for it in ordered:
         if not isinstance(it, dict):
             continue
-        changed, receitaws_fetches = _apply_receitaws_email_enrichment(
-            it,
-            cache=receitaws_cache,
-            fetches=receitaws_fetches,
-            lim=lim_rw,
-        )
-        if changed:
+        if _apply_receitaws_email_enrichment(it, rw_state=rw_state):
             enriched_count += 1
 
     return enriched_count
@@ -1288,6 +1408,7 @@ def enrich_missing_supplier_fields_for_cotacao(
     *,
     max_lookups: int = 12,
     max_brasilapi_lookups: int = 48,
+    receitaws_allow_wait: bool = False,
 ) -> int:
     rows = list(
         PncpCotacaoItemCotacao.objects.filter(cotacao_id=cotacao_id).only(
@@ -1339,6 +1460,7 @@ def enrich_missing_supplier_fields_for_cotacao(
         max_brasilapi_lookups=max_brasilapi_lookups,
         ignore_add_source_setting=True,
         only_homologated=False,
+        receitaws_allow_wait=receitaws_allow_wait,
     )
 
     updated: List[PncpCotacaoItemCotacao] = []

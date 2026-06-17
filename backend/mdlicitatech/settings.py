@@ -488,7 +488,7 @@ PNCP_RELATORIO_PDF_RECEITAWS_EMAIL = os.environ.get("PNCP_RELATORIO_PDF_RECEITAW
     "false",
     "no",
 )
-PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS", "32"))
+PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS", "64"))
 # GET sessão com ?relatorio=1 (tela RelatorioPesquisaPrecos): enrich PNCP/BrasilAPI antes de montar grupos.
 PNCP_RELATORIO_VIEW_ENRICH = os.environ.get("PNCP_RELATORIO_VIEW_ENRICH", "true").strip().lower() not in (
     "0",

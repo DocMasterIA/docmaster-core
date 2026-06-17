@@ -14,12 +14,14 @@ logger = logging.getLogger(__name__)
 
 PNCP_API_BASE = "https://pncp.gov.br/api/pncp"
 BRASILAPI_CNPJ_URL = "https://brasilapi.com.br/api/cnpj/v1/{cnpj_digits}"
+RECEITAWS_CNPJ_URL = "https://www.receitaws.com.br/v1/cnpj/{cnpj_digits}"
 _CNPJ_RE = re.compile(r"\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}")
 
 # Timeout PNCP na geração de PDF / adicionar fonte (evita cancelar cedo demais).
 _DEFAULT_TIMEOUT = (2.5, 5.0)
 # BrasilAPI costuma responder rápido; timeout um pouco maior que PNCP interno.
 _BRASILAPI_TIMEOUT = (2.0, 5.0)
+_RECEITAWS_TIMEOUT = 10
 
 
 def _normalize_cnpj(raw: Any) -> str:
@@ -583,6 +585,68 @@ def fetch_brasilapi_fornecedor_por_cnpj(cnpj_formatted: str) -> tuple[str, Dict[
         "data_situacao_especial": str(payload.get("data_situacao_especial") or "").strip(),
     }
     return nome, {k: v for k, v in cadastro.items() if v}
+
+
+def receitaws_email_fallback_enabled() -> bool:
+    return bool(getattr(settings, "PNCP_RELATORIO_PDF_RECEITAWS_EMAIL", True))
+
+
+def receitaws_email_max_lookups() -> int:
+    return int(getattr(settings, "PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS", 64) or 0)
+
+
+def fetch_receitaws_email_por_cnpj(cnpj_formatted: str) -> str:
+    """E-mail corporativo via ReceitaWS quando BrasilAPI/minha-receita omite (privacidade)."""
+    d = _cnpj_digits(cnpj_formatted)
+    if len(d) != 14:
+        return ""
+    url = RECEITAWS_CNPJ_URL.format(cnpj_digits=d)
+    payload = _get_json(url, timeout=_RECEITAWS_TIMEOUT)
+    if not isinstance(payload, dict):
+        return ""
+    if str(payload.get("status") or "").strip().upper() == "ERROR":
+        return ""
+    em = str(payload.get("email") or "").strip()
+    if "@" not in em or len(em) < 5:
+        return ""
+    return em
+
+
+def _apply_receitaws_email_enrichment(
+    it: Dict[str, Any],
+    *,
+    cache: Dict[str, str],
+    fetches: int,
+    lim: int,
+) -> tuple[bool, int]:
+    if lim <= 0 or not receitaws_email_fallback_enabled():
+        return False, fetches
+    flatten_supplier_fields_in_payload(it)
+    if _contact_email_from_payload(it):
+        return False, fetches
+    ck = _cnpj_digits(str(it.get("cnpj_fornecedor") or ""))
+    if len(ck) != 14:
+        return False, fetches
+    if ck in cache:
+        em = cache[ck]
+    elif fetches < lim:
+        em = fetch_receitaws_email_por_cnpj(ck)
+        cache[ck] = em
+        fetches += 1
+    else:
+        return False, fetches
+    if not em:
+        return False, fetches
+    prev = it.get("fornecedor_cadastro")
+    cad = dict(prev) if isinstance(prev, dict) else {}
+    cad["email"] = em
+    snap: Dict[str, Any] = {
+        "cnpj_fornecedor": it.get("cnpj_fornecedor"),
+        "fornecedor_cadastro": cad,
+        "fornecedor_contato_fonte": "receitaws_cnpj",
+    }
+    changed = _merge_supplier_snap_into_payload(it, snap)
+    return changed, fetches
 
 
 def _get_json(url: str, timeout=_DEFAULT_TIMEOUT, *, params: Optional[Dict[str, Any]] = None) -> Any:
@@ -1197,6 +1261,21 @@ def enrich_supplier_fields_in_payloads(
             brasil_cache=brasil_cache,
             brasil_fetches=brasil_fetches,
             lim_br=lim_br,
+        )
+        if changed:
+            enriched_count += 1
+
+    lim_rw = receitaws_email_max_lookups()
+    receitaws_cache: Dict[str, str] = {}
+    receitaws_fetches = 0
+    for it in ordered:
+        if not isinstance(it, dict):
+            continue
+        changed, receitaws_fetches = _apply_receitaws_email_enrichment(
+            it,
+            cache=receitaws_cache,
+            fetches=receitaws_fetches,
+            lim=lim_rw,
         )
         if changed:
             enriched_count += 1

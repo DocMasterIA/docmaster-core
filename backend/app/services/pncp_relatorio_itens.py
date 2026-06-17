@@ -17,12 +17,14 @@ from typing import Any, Dict, List, Optional, Tuple
 from django.utils import timezone
 
 from backend.app.services.pncp_supplier_enrichment import (
-    _get_json,
     _nome_e_somente_cnpj_formatado,
     _promote_supplier_from_deep_walk,
     _supplier_payload_layers,
     fetch_brasilapi_fornecedor_por_cnpj,
+    fetch_receitaws_email_por_cnpj,
     flatten_supplier_fields_in_payload,
+    receitaws_email_fallback_enabled,
+    receitaws_email_max_lookups,
 )
 
 # Mínimo de cotações (fontes) por item para marcar situação como válida (IN 65 / prática comum).
@@ -30,10 +32,6 @@ MIN_FONTES_SITUACAO_VALIDA = 3
 
 # BrasilAPI/minha-receita não expõe e-mail corporativo (privacidade anti-spam).
 EMAIL_INDISPONIVEL_RF = "Não divulgado pela Receita Federal"
-
-# Fallback só na geração do PDF quando BrasilAPI omite e-mail (ReceitaWS ainda expõe em muitos CNPJs).
-RECEITAWS_CNPJ_URL = "https://www.receitaws.com.br/v1/cnpj/{cnpj_digits}"
-_RECEITAWS_TIMEOUT = 10
 
 _CNPJ_LOOSE = re.compile(r"\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}")
 
@@ -523,21 +521,9 @@ def formatar_email_exibicao_relatorio(email: Any) -> str:
     return em if em and em != "—" else EMAIL_INDISPONIVEL_RF
 
 
-def fetch_receitaws_email_por_cnpj(cnpj_formatted: str) -> str:
-    """Consulta ReceitaWS (somente e-mail) — usado como fallback no PDF."""
-    d = re.sub(r"\D", "", str(cnpj_formatted or ""))
-    if len(d) != 14:
-        return ""
-    url = RECEITAWS_CNPJ_URL.format(cnpj_digits=d)
-    payload = _get_json(url, timeout=_RECEITAWS_TIMEOUT)
-    if not isinstance(payload, dict):
-        return ""
-    if str(payload.get("status") or "").strip().upper() == "ERROR":
-        return ""
-    em = str(payload.get("email") or "").strip()
-    if "@" not in em or len(em) < 5:
-        return ""
-    return em
+def _email_contato_ausente(email: Any) -> bool:
+    em = str(email or "").strip()
+    return not em or em == "—" or em == EMAIL_INDISPONIVEL_RF
 
 
 def _completar_email_receitaws_pdf(
@@ -548,8 +534,8 @@ def _completar_email_receitaws_pdf(
 ) -> str:
     """Cache por CNPJ na requisição; respeita max_lookups em state."""
     em = str(email or "").strip()
-    if em or not state:
-        return em
+    if not _email_contato_ausente(em) or not state:
+        return em if not _email_contato_ausente(em) else ""
     d = re.sub(r"\D", "", str(cnpj_fornecedor or ""))
     if len(d) != 14:
         return em
@@ -794,14 +780,14 @@ def fonte_dict_de_item(
 
     telefone = _pick_supplier_telefone_from_source(src)
     email = _pick_supplier_email_from_source(src)
-    if brasilapi_cache is not None and cnpj_fornecedor and (not telefone or not email):
+    if brasilapi_cache is not None and cnpj_fornecedor and (not telefone or _email_contato_ausente(email)):
         telefone, email = _completar_contato_brasilapi_se_faltar(
             cnpj_fornecedor=cnpj_fornecedor,
             telefone=telefone,
-            email=email,
+            email=email if not _email_contato_ausente(email) else "",
             cache=brasilapi_cache,
         )
-    if receitaws_pdf_state is not None and cnpj_fornecedor and not email:
+    if receitaws_pdf_state is not None and cnpj_fornecedor and _email_contato_ausente(email):
         email = _completar_email_receitaws_pdf(
             cnpj_fornecedor=cnpj_fornecedor,
             email=email,
@@ -831,12 +817,10 @@ def fonte_dict_de_item(
     }
 
 
-def _receitaws_pdf_state_if_enabled(*, pdf_receitaws_email: bool) -> Optional[Dict[str, Any]]:
-    if not pdf_receitaws_email:
+def _receitaws_state_if_enabled(*, receitaws_email_fallback: bool) -> Optional[Dict[str, Any]]:
+    if not receitaws_email_fallback or not receitaws_email_fallback_enabled():
         return None
-    from django.conf import settings
-
-    max_l = int(getattr(settings, "PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS", 32) or 0)
+    max_l = receitaws_email_max_lookups()
     if max_l <= 0:
         return None
     return {"cache": {}, "fetches": 0, "max_lookups": max_l}
@@ -845,7 +829,7 @@ def _receitaws_pdf_state_if_enabled(*, pdf_receitaws_email: bool) -> Optional[Di
 def agrupar_itens_relatorio_pesquisa_precos(
     itens: List[Any],
     *,
-    pdf_receitaws_email: bool = False,
+    receitaws_email_fallback: bool = False,
 ) -> Tuple[List[Dict[str, Any]], int]:
     """
     Retorna lista de grupos (ordenada por menor id no grupo) e total de linhas importadas.
@@ -858,7 +842,7 @@ def agrupar_itens_relatorio_pesquisa_precos(
     tz = timezone.get_current_timezone()
     total_linhas = len(itens)
     brasilapi_cache: Dict[str, Dict[str, Any]] = {}
-    receitaws_pdf_state = _receitaws_pdf_state_if_enabled(pdf_receitaws_email=pdf_receitaws_email)
+    receitaws_pdf_state = _receitaws_state_if_enabled(receitaws_email_fallback=receitaws_email_fallback)
 
     buckets: Dict[Tuple[str, str, str, str], List[Any]] = {}
     order_keys: List[Tuple[str, str, str, str]] = []
@@ -937,7 +921,7 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
     itens: List[Any],
     cotacoes: List[Any],
     *,
-    pdf_receitaws_email: bool = False,
+    receitaws_email_fallback: bool = False,
 ) -> Tuple[List[Dict[str, Any]], int]:
     """
     Novo fluxo: item manual + múltiplas cotações vinculadas.
@@ -954,7 +938,7 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
     tz = timezone.get_current_timezone()
     total_linhas = len(cotacoes or [])
     brasilapi_cache: Dict[str, Dict[str, Any]] = {}
-    receitaws_pdf_state = _receitaws_pdf_state_if_enabled(pdf_receitaws_email=pdf_receitaws_email)
+    receitaws_pdf_state = _receitaws_state_if_enabled(receitaws_email_fallback=receitaws_email_fallback)
     cotacoes_por_item: Dict[int, List[Any]] = defaultdict(list)
     for c in cotacoes or []:
         item_id = getattr(c, "item_id", None)

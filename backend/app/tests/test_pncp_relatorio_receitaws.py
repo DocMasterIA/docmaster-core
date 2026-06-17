@@ -1,4 +1,4 @@
-"""Fallback ReceitaWS de e-mail na montagem do PDF (BrasilAPI omite e-mail)."""
+"""Fallback ReceitaWS de e-mail quando BrasilAPI omite (relatório + PDF)."""
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
@@ -6,15 +6,15 @@ from django.test import SimpleTestCase
 from backend.app.services.pncp_relatorio_itens import (
     EMAIL_INDISPONIVEL_RF,
     _completar_email_receitaws_pdf,
-    fetch_receitaws_email_por_cnpj,
     fonte_dict_de_item,
 )
+from backend.app.services.pncp_supplier_enrichment import fetch_receitaws_email_por_cnpj
 
 
 class ReceitawsPdfEmailTests(SimpleTestCase):
     def test_fetch_receitaws_email_ok(self):
         with patch(
-            "backend.app.services.pncp_relatorio_itens._get_json",
+            "backend.app.services.pncp_supplier_enrichment._get_json",
             return_value={"status": "OK", "email": "bl-distribuidora@hotmail.com"},
         ):
             self.assertEqual(
@@ -22,9 +22,19 @@ class ReceitawsPdfEmailTests(SimpleTestCase):
                 "bl-distribuidora@hotmail.com",
             )
 
+    def test_fetch_receitaws_cristalia_filial(self):
+        with patch(
+            "backend.app.services.pncp_supplier_enrichment._get_json",
+            return_value={"status": "OK", "email": "viviane.barreto@cristalia.com.br"},
+        ):
+            self.assertEqual(
+                fetch_receitaws_email_por_cnpj("44.734.671/0022-86"),
+                "viviane.barreto@cristalia.com.br",
+            )
+
     def test_fetch_receitaws_email_error_status(self):
         with patch(
-            "backend.app.services.pncp_relatorio_itens._get_json",
+            "backend.app.services.pncp_supplier_enrichment._get_json",
             return_value={"status": "ERROR", "message": "rate limit"},
         ):
             self.assertEqual(fetch_receitaws_email_por_cnpj("51420204000112"), "")

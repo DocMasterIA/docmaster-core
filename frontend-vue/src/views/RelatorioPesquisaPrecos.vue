@@ -259,7 +259,9 @@
           <div class="rpv-icon-title__bubble rpv-icon-title__bubble--alt">{{ icon('building') }}</div>
           <div>
             <h2 class="rpv-panel__title">Informações dos fornecedores</h2>
-            <p class="rpv-panel__subtitle">Dados cadastrais e de contato</p>
+            <p class="rpv-panel__subtitle">
+              Dados cadastrais e de contato (telefone/endereço via Receita Federal; e-mail raramente é divulgado publicamente)
+            </p>
           </div>
         </div>
         <div class="rpv-supplier-grid">
@@ -268,7 +270,7 @@
             <div class="rpv-supplier-card__lines">
               <div><span class="rpv-supplier-card__k">CNPJ:</span> {{ f.cnpj }}</div>
               <div><span class="rpv-supplier-card__k">Telefone:</span> {{ f.telefone || 'Não informado' }}</div>
-              <div><span class="rpv-supplier-card__k">Email:</span> {{ f.email || 'Não informado' }}</div>
+              <div><span class="rpv-supplier-card__k">Email:</span> {{ f.email }}</div>
               <div><span class="rpv-supplier-card__k">Endereço:</span> {{ f.endereco || 'Não informado' }}</div>
             </div>
           </article>
@@ -349,6 +351,20 @@ const valorTotalEstimadoFmt = computed(() => {
   return formatarMoedaPtBr(total);
 });
 
+const EMAIL_INDISPONIVEL_RF = 'Não divulgado pela Receita Federal';
+
+function formatarTelefoneBr(raw) {
+  const d = String(raw || '').replace(/\D/g, '');
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  return String(raw || '').trim();
+}
+
+function formatarEmailExibicao(email) {
+  const em = String(email || '').trim();
+  return em || EMAIL_INDISPONIVEL_RF;
+}
+
 const fornecedoresUnicos = computed(() => {
   const out = [];
   const seen = new Set();
@@ -360,8 +376,8 @@ const fornecedoresUnicos = computed(() => {
       out.push({
         fornecedor: f.fornecedor || 'Fornecedor',
         cnpj: f.cnpj || 'Não informado',
-        telefone: f.telefone || '',
-        email: f.email || '',
+        telefone: formatarTelefoneBr(f.telefone) || '',
+        email: formatarEmailExibicao(f.email),
         endereco: f.endereco || '',
       });
     }
@@ -615,8 +631,8 @@ function itemToFonte(it) {
     municipio_uf: municipioUf,
     processo,
     ajuste,
-    telefone,
-    email,
+    telefone: formatarTelefoneBr(telefone),
+    email: formatarEmailExibicao(email),
     endereco,
   };
 }

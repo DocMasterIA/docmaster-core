@@ -27,6 +27,9 @@ from backend.app.services.pncp_supplier_enrichment import (
 # Mínimo de cotações (fontes) por item para marcar situação como válida (IN 65 / prática comum).
 MIN_FONTES_SITUACAO_VALIDA = 3
 
+# BrasilAPI/minha-receita não expõe e-mail corporativo (privacidade anti-spam).
+EMAIL_INDISPONIVEL_RF = "Não divulgado pela Receita Federal"
+
 _CNPJ_LOOSE = re.compile(r"\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}")
 
 FORMULA_LABELS: Dict[str, str] = {
@@ -500,6 +503,21 @@ def _supplier_cadastro_dict(src: Dict[str, Any]) -> Dict[str, Any]:
     return cad if isinstance(cad, dict) else {}
 
 
+def formatar_telefone_br(raw: Any) -> str:
+    """Formata DDD+número (10 ou 11 dígitos) para exibição no relatório."""
+    d = re.sub(r"\D", "", str(raw or ""))
+    if len(d) == 10:
+        return f"({d[:2]}) {d[2:6]}-{d[6:]}"
+    if len(d) == 11:
+        return f"({d[:2]}) {d[2:7]}-{d[7:]}"
+    return str(raw or "").strip()
+
+
+def formatar_email_exibicao_relatorio(email: Any) -> str:
+    em = str(email or "").strip()
+    return em if em and em != "—" else EMAIL_INDISPONIVEL_RF
+
+
 def _pick_supplier_telefone_from_source(src: Dict[str, Any]) -> str:
     tel_keys = ("telefone", "ddd_telefone_1", "ddd_telefone_2", "telefone1", "telefone2")
     for layer in _supplier_payload_layers(src):
@@ -513,7 +531,7 @@ def _pick_supplier_telefone_from_source(src: Dict[str, Any]) -> str:
             for k in tel_keys:
                 v = str(blob.get(k) or "").strip()
                 if v and v != "—":
-                    return v
+                    return formatar_telefone_br(v)
     return ""
 
 
@@ -733,6 +751,9 @@ def fonte_dict_de_item(
             email=email,
             cache=brasilapi_cache,
         )
+    if telefone:
+        telefone = formatar_telefone_br(telefone)
+    email = formatar_email_exibicao_relatorio(email)
     endereco = _endereco_de_source(src)
     descricao_fonte = _pick_descricao_fonte_pncp(it, src)
 

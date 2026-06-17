@@ -27,6 +27,7 @@ from weasyprint import HTML
 
 from backend.app.qr import qr_png_data_url
 from backend.app.services.pncp_relatorio_itens import (
+    EMAIL_INDISPONIVEL_RF,
     FORMULA_LABELS,
     _formatar_moeda_br,
     agrupar_cotacoes_por_item_relatorio_pesquisa_precos,
@@ -111,15 +112,19 @@ def _fornecedores_capa_from_grupos(grupos: List[Dict[str, Any]]) -> List[Dict[st
                 if v2 and not ex.get(fld, ""):
                     ex[fld] = v2
 
-    def _ni(v: str) -> str:
-        return v if v else "Não informado"
+    def _ni(v: str, *, field: str = "") -> str:
+        if v:
+            return v
+        if field == "email":
+            return EMAIL_INDISPONIVEL_RF
+        return "Não informado"
 
     return [
         {
             "fornecedor": by_key[k]["fornecedor"],
             "cnpj": by_key[k]["cnpj"],
             "telefone": _ni(by_key[k].get("telefone", "")),
-            "email": _ni(by_key[k].get("email", "")),
+            "email": _ni(by_key[k].get("email", ""), field="email"),
             "endereco": _ni(by_key[k].get("endereco", "")),
         }
         for k in order

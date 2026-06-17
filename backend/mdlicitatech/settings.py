@@ -489,7 +489,7 @@ PNCP_ADD_SOURCE_ENRICH_SUPPLIER = os.environ.get("PNCP_ADD_SOURCE_ENRICH_SUPPLIE
     "no",
 )
 PNCP_ADD_SOURCE_MAX_PNCP_LOOKUPS = int(os.environ.get("PNCP_ADD_SOURCE_MAX_PNCP_LOOKUPS", "48"))
-PNCP_ADD_SOURCE_MAX_BRASILAPI_LOOKUPS = int(os.environ.get("PNCP_ADD_SOURCE_MAX_BRASILAPI_LOOKUPS", "48"))
+PNCP_ADD_SOURCE_MAX_BRASILAPI_LOOKUPS = int(os.environ.get("PNCP_ADD_SOURCE_MAX_BRASILAPI_LOOKUPS", "96"))
 # Só enriquecer fontes homologadas/adjudicadas ao adicionar à cotação (evita 204 em «Em andamento»).
 PNCP_ADD_SOURCE_ONLY_HOMOLOGATED = os.environ.get("PNCP_ADD_SOURCE_ONLY_HOMOLOGATED", "true").strip().lower() not in (
     "0",

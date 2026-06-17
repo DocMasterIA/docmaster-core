@@ -167,25 +167,6 @@ def _should_attempt_pncp_supplier_lookup(it: Dict[str, Any], *, only_homolog: bo
     return _pncp_compra_keys_present(it)
 
 
-def _enrich_payload_sort_key(it: Dict[str, Any]) -> Tuple[int, int]:
-    """Prioriza itens com resultado/homologação quando o limite de lookups é atingido."""
-    score = 0
-    if bool(it.get("temResultado")):
-        score += 10
-    sit = str(
-        it.get("situacaoCompraItemNome")
-        or it.get("situacao_compra")
-        or it.get("situacao")
-        or it.get("situacaoCompraNome")
-        or ""
-    ).lower()
-    if "homolog" in sit:
-        score += 5
-    if "result" in sit:
-        score += 2
-    return (-score, int(re.sub(r"\D", "", str(it.get("numero_item") or it.get("numeroItem") or "0")) or "0"))
-
-
 def _is_orgao_path(path: str) -> bool:
     p = (path or "").lower()
     if not p:
@@ -476,6 +457,11 @@ def fetch_brasilapi_fornecedor_por_cnpj(cnpj_formatted: str) -> tuple[str, Dict[
         porte_txt = str(porte_raw.get("descricao") or porte_raw.get("descricaoPorte") or "").strip()
     else:
         porte_txt = str(porte_raw or "").strip()
+    t1 = str(payload.get("ddd_telefone_1") or "").strip()
+    t2 = str(payload.get("ddd_telefone_2") or "").strip()
+    telefone = t1
+    if t2 and t2 != t1:
+        telefone = f"{t1} / {t2}" if t1 else t2
     cadastro: Dict[str, Any] = {
         "cnpj": _normalize_cnpj(d),
         "razao_social": razao,
@@ -491,7 +477,9 @@ def fetch_brasilapi_fornecedor_por_cnpj(cnpj_formatted: str) -> tuple[str, Dict[
         "municipio": str(payload.get("municipio") or "").strip(),
         "uf": str(payload.get("uf") or "").strip(),
         "email": str(payload.get("email") or "").strip(),
-        "telefone": str(payload.get("ddd_telefone_1") or payload.get("ddd_telefone_2") or "").strip(),
+        "telefone": telefone,
+        "ddd_telefone_1": t1,
+        "ddd_telefone_2": t2,
         "situacao": str(payload.get("descricao_situacao_cadastral") or "").strip(),
         "data_situacao": str(payload.get("data_situacao_cadastral") or "").strip(),
         "motivo_situacao": str(payload.get("motivo_situacao_cadastral") or "").strip(),
@@ -581,7 +569,7 @@ def _finalize_supplier_snapshot_sync(snap: Dict[str, str]) -> Dict[str, Any]:
     nome = str(snap.get("fornecedor") or "").strip()
     if not cnpj_fmt and not nome:
         return {"cnpj_fornecedor": "", "fornecedor": "", "fornecedor_cadastro": {}}
-    if cnpj_fmt and not _fornecedor_tem_nome_util({"fornecedor": nome}):
+    if cnpj_fmt and not _fornecedor_tem_nome_util({"fornecedor": nome, "cnpj_fornecedor": cnpj_fmt}):
         nome_br, cad = fetch_brasilapi_fornecedor_por_cnpj(cnpj_fmt)
         if nome_br:
             nome = nome_br
@@ -592,6 +580,8 @@ def _finalize_supplier_snapshot_sync(snap: Dict[str, str]) -> Dict[str, Any]:
         }
         if nome_br or cad:
             out["fornecedor_fonte_nome"] = "brasilapi_cnpj"
+        if cad:
+            out["fornecedor_contato_fonte"] = "brasilapi_cnpj"
         return out
     out = {"cnpj_fornecedor": cnpj_fmt, "fornecedor": nome, "fornecedor_cadastro": {}}
     if nome:
@@ -763,6 +753,31 @@ def _contact_email_from_payload(it: Dict[str, Any]) -> str:
     return str(it.get("email") or cad.get("email") or "").strip()
 
 
+def _enrich_payload_sort_key(it: Dict[str, Any]) -> Tuple[int, int]:
+    """Prioriza itens com resultado/homologação e contato faltante (limite de lookups)."""
+    score = 0
+    if bool(it.get("temResultado")):
+        score += 10
+    sit = str(
+        it.get("situacaoCompraItemNome")
+        or it.get("situacao_compra")
+        or it.get("situacao")
+        or it.get("situacaoCompraNome")
+        or ""
+    ).lower()
+    if "homolog" in sit:
+        score += 5
+    if "result" in sit:
+        score += 2
+    if str(it.get("cnpj_fornecedor") or "").strip():
+        score += 1
+    if not _contact_telefone_from_payload(it):
+        score += 4
+    if not _contact_email_from_payload(it):
+        score += 4
+    return (-score, int(re.sub(r"\D", "", str(it.get("numero_item") or it.get("numeroItem") or "0")) or "0"))
+
+
 def _needs_brasilapi_enrichment(it: Dict[str, Any]) -> bool:
     """Consulta Receita (BrasilAPI) se falta razão social ou contato no cadastro."""
     flatten_supplier_fields_in_payload(it)
@@ -837,6 +852,46 @@ def _merge_supplier_snap_into_payload(it: Dict[str, Any], snap: Dict[str, Any]) 
     return changed
 
 
+def _apply_brasilapi_enrichment_to_payload(
+    it: Dict[str, Any],
+    *,
+    brasil_cache: Dict[str, tuple[str, Dict[str, Any]]],
+    brasil_fetches: int,
+    lim_br: int,
+) -> tuple[bool, int]:
+    """
+    Consulta Receita (BrasilAPI) por CNPJ e mescla telefone/e-mail/razão social.
+    Retorna (alterou_payload, brasil_fetches_atualizado).
+    """
+    if not _needs_brasilapi_enrichment(it):
+        return False, brasil_fetches
+    ck = _cnpj_digits(str(it.get("cnpj_fornecedor") or ""))
+    if len(ck) != 14:
+        return False, brasil_fetches
+    if ck in brasil_cache:
+        nome_br, cad_br = brasil_cache[ck]
+    elif brasil_fetches < lim_br:
+        nome_br, cad_br = fetch_brasilapi_fornecedor_por_cnpj(str(it.get("cnpj_fornecedor") or ""))
+        brasil_cache[ck] = (nome_br, cad_br)
+        brasil_fetches += 1
+    else:
+        return False, brasil_fetches
+    if not nome_br and not cad_br:
+        return False, brasil_fetches
+    snap_br: Dict[str, Any] = {
+        "cnpj_fornecedor": it.get("cnpj_fornecedor"),
+        "fornecedor_cadastro": cad_br,
+    }
+    if nome_br and not _fornecedor_tem_nome_util(it):
+        snap_br["fornecedor"] = nome_br
+    if nome_br and not str(it.get("fornecedor_fonte_nome") or "").strip():
+        snap_br["fornecedor_fonte_nome"] = "brasilapi_cnpj"
+    elif cad_br and not str(it.get("fornecedor_contato_fonte") or "").strip():
+        snap_br["fornecedor_contato_fonte"] = "brasilapi_cnpj"
+    changed = _merge_supplier_snap_into_payload(it, snap_br)
+    return changed, brasil_fetches
+
+
 def enrich_supplier_fields_in_payloads(
     payloads: Iterable[Dict[str, Any]],
     *,
@@ -881,30 +936,15 @@ def enrich_supplier_fields_in_payloads(
                     it["cnpj_fornecedor"] = fmt
                     has_cnpj = True
 
-        # BrasilAPI: razão social e/ou telefone+e-mail (Receita Federal) quando faltarem.
-        if _needs_brasilapi_enrichment(it):
-            ck = _cnpj_digits(str(it.get("cnpj_fornecedor") or ""))
-            if len(ck) == 14 and ck in brasil_cache:
-                nome_br, cad_br = brasil_cache[ck]
-            elif len(ck) == 14 and brasil_fetches < lim_br:
-                nome_br, cad_br = fetch_brasilapi_fornecedor_por_cnpj(str(it.get("cnpj_fornecedor") or ""))
-                brasil_cache[ck] = (nome_br, cad_br)
-                brasil_fetches += 1
-            else:
-                nome_br, cad_br = "", {}
-            if nome_br or cad_br:
-                snap_br: Dict[str, Any] = {
-                    "cnpj_fornecedor": it.get("cnpj_fornecedor"),
-                    "fornecedor_cadastro": cad_br,
-                }
-                if nome_br and not _fornecedor_tem_nome_util(it):
-                    snap_br["fornecedor"] = nome_br
-                if nome_br and not str(it.get("fornecedor_fonte_nome") or "").strip():
-                    snap_br["fornecedor_fonte_nome"] = "brasilapi_cnpj"
-                elif cad_br and not str(it.get("fornecedor_contato_fonte") or "").strip():
-                    snap_br["fornecedor_contato_fonte"] = "brasilapi_cnpj"
-                if _merge_supplier_snap_into_payload(it, snap_br):
-                    enriched_count += 1
+        # BrasilAPI (1ª passagem): itens que já têm CNPJ antes do lookup PNCP.
+        changed, brasil_fetches = _apply_brasilapi_enrichment_to_payload(
+            it,
+            brasil_cache=brasil_cache,
+            brasil_fetches=brasil_fetches,
+            lim_br=lim_br,
+        )
+        if changed:
+            enriched_count += 1
 
     only_homolog = bool(getattr(settings, "PNCP_ADD_SOURCE_ONLY_HOMOLOGATED", True))
 
@@ -965,6 +1005,20 @@ def enrich_supplier_fields_in_payloads(
             lookups += 1
         snap = cache.get(key) or {}
         if _merge_supplier_snap_into_payload(it, snap):
+            enriched_count += 1
+
+    # BrasilAPI (2ª passagem): após PNCP muitos itens só então têm CNPJ — busca telefone/e-mail.
+    for it in ordered:
+        if not isinstance(it, dict):
+            continue
+        flatten_supplier_fields_in_payload(it)
+        changed, brasil_fetches = _apply_brasilapi_enrichment_to_payload(
+            it,
+            brasil_cache=brasil_cache,
+            brasil_fetches=brasil_fetches,
+            lim_br=lim_br,
+        )
+        if changed:
             enriched_count += 1
 
     return enriched_count

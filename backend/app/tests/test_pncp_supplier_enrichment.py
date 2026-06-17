@@ -102,6 +102,16 @@ class SupplierNameDisplayTests(unittest.TestCase):
         }
         self.assertTrue(_needs_brasilapi_enrichment(it))
 
+    def test_needs_brasilapi_false_quando_contato_completo(self):
+        it = {
+            "cnpj_fornecedor": "27.105.456/0001-72",
+            "fornecedor": "EMPRESA TESTE LTDA",
+            "telefone": "(11) 3333-4444",
+            "email": "contato@empresa.com.br",
+            "fornecedor_contato_fonte": "brasilapi_cnpj",
+        }
+        self.assertFalse(_needs_brasilapi_enrichment(it))
+
     def test_needs_brasilapi_false_apos_consulta_rf(self):
         it = {
             "cnpj_fornecedor": "27.105.456/0001-72",

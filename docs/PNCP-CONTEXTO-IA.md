@@ -20,6 +20,7 @@
 | [`PESQUISADOR_PNCP_FUNCIONAMENTO_ATUAL.md`](PESQUISADOR_PNCP_FUNCIONAMENTO_ATUAL.md) | Fluxo pesquisador |
 | [`PNCP_BUSCA_INTELIGENTE_IA.md`](PNCP_BUSCA_INTELIGENTE_IA.md) | Busca com LLM |
 | [`PNCP-TESTES-FORNECEDOR.md`](PNCP-TESTES-FORNECEDOR.md) | **Checklist de testes** homolog + CNPJ |
+| [`PNCP-FORNECEDOR-RELATORIO-REGRAS.md`](PNCP-FORNECEDOR-RELATORIO-REGRAS.md) | **Regras invariantes** — enrich, PDF, busca lote (não regredir) |
 
 ---
 

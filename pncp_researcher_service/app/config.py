@@ -338,6 +338,8 @@ PNCP_SEARCH_MIN_SCORE_APROVACAO: int = _env_int("PNCP_SEARCH_MIN_SCORE_APROVACAO
 # Descrições de cotação: até N tokens usam busca completa; acima disso cap de âncoras (recall).
 PNCP_SEARCH_ANCHOR_FULL_TERM_MAX: int = _env_int("PNCP_SEARCH_ANCHOR_FULL_TERM_MAX", 5)
 PNCP_SEARCH_ANCHOR_MAX_GROUPS: int = _env_int("PNCP_SEARCH_ANCHOR_MAX_GROUPS", 8)
+# Camada flexível: fração mínima de tokens do núcleo que devem casar (ex.: 0.65 = 65%).
+PNCP_SEARCH_TIER_FLEX_RATIO: float = float(os.getenv("PNCP_SEARCH_TIER_FLEX_RATIO", "0.65"))
 
 # Bloqueio de itens ligados à prestação de serviço/locação no resultado de busca.
 PNCP_BLOCK_SERVICE_ITEMS: bool = _env_bool("PNCP_BLOCK_SERVICE_ITEMS", True)

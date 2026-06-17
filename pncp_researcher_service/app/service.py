@@ -2201,7 +2201,15 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                     ref_fit += 3.0
                 else:
                     ref_fit -= 2.0
-            raw_score = sem + tbl + rec + coh + clar + pen + ref_fit + supplier_pen
+            tier_bonus = 0.0
+            search_tier = str(it.get("search_tier") or "").strip().lower()
+            if search_tier == "strict":
+                tier_bonus = 10.0
+            elif search_tier == "core":
+                tier_bonus = 6.0
+            elif search_tier == "flex":
+                tier_bonus = 2.0
+            raw_score = sem + tbl + rec + coh + clar + pen + ref_fit + supplier_pen + tier_bonus
             score_0_100 = max(0, min(100, round(raw_score)))
             it2 = dict(it)
             it2["score_bruto"] = round(raw_score, 3)

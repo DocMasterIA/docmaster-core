@@ -215,6 +215,36 @@ def normalize_for_search(text: str) -> str:
     return " ".join(toks2).strip()
 
 
+def preprocess_cotacao_search_term(text: str) -> str:
+    """
+    Normaliza descrições longas de cotação antes da tokenização:
+    - compacta dimensões (13 X 4,5 → 13x4.5);
+    - extrai calibre (26 G½ → 26g);
+    - remove embalagem genérica (CX C/100 UNIDADES).
+    """
+    s = (text or "").strip()
+    if not s:
+        return ""
+    s = re.sub(r"\s+", " ", s)
+    s = re.sub(
+        r"\b(?:cx|cxa|caixa)\s*(?:c/?\s*)?\d+\s*(?:unidades?|unids?|und\.?)\b",
+        " ",
+        s,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(r"\bc/\s*\d+\s*(?:unidades?|unids?|und\.?)\b", " ", s, flags=re.IGNORECASE)
+    s = re.sub(r"\(\s*(\d+)\s*g[^)]*\)", r" \1g ", s, flags=re.IGNORECASE)
+    s = re.sub(r"\b(\d+)\s*g\s*½\b", r"\1g", s, flags=re.IGNORECASE)
+    s = re.sub(r"\b(\d+)\s*g\b", r"\1g", s, flags=re.IGNORECASE)
+    s = re.sub(
+        r"(\d+)\s*[xX×]\s*(\d+[,.]?\d*)",
+        lambda m: f"{m.group(1)}x{m.group(2).replace(',', '').replace('.', '')}",
+        s,
+    )
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
 def _truncate_at_word_boundary(text: str, max_len: int) -> str:
     if max_len <= 0 or len(text) <= max_len:
         return text

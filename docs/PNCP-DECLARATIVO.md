@@ -3,7 +3,8 @@
 **Atualizado:** junho/2026  
 **Escopo:** tudo implementado no DocMaster ligado ao **Pesquisador PNCP** — ingestão do índice local, busca, homologados, cobertura de fornecedor (CNPJ), cotação, relatório PDF e operação em produção.
 
-**Contexto IA (completo):** [`PNCP-CONTEXTO-IA.md`](PNCP-CONTEXTO-IA.md) — ingest + fornecedor + produção + anti-padrões.
+**Contexto IA (completo):** [`PNCP-CONTEXTO-IA.md`](PNCP-CONTEXTO-IA.md) — ingest + fornecedor + produção + anti-padrões.  
+**Regras de referência (fornecedor/PDF/enrich):** [`PNCP-FORNECEDOR-RELATORIO-REGRAS.md`](PNCP-FORNECEDOR-RELATORIO-REGRAS.md).
 
 **Planejamento fino (análise jun/2026):** [`PNCP-PLANEJAMENTO/00-INDICE.md`](PNCP-PLANEJAMENTO/00-INDICE.md) — objetivos, arquitetura, ingestão, gaps e roadmap em série de `.md`.
 

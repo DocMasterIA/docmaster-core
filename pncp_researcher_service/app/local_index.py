@@ -3,10 +3,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import re
 import sqlite3
 import zlib
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -39,7 +41,7 @@ from .pncp_client import (
     get_contract_items,
     search_contracts,
 )
-from .search_text_clean import apply_item_display_cleanup, normalize_for_search
+from .search_text_clean import apply_item_display_cleanup, normalize_for_search, preprocess_cotacao_search_term
 from .supplier_resolver import (
     extract_homologated_pricing,
     item_homologado_para_busca,
@@ -1568,10 +1570,18 @@ def _token_variants(token: str) -> List[str]:
 
 
 def _build_search_tokens(termo_busca: str) -> List[List[str]]:
-    norm = _normalize_search_text(termo_busca)
+    pre = preprocess_cotacao_search_term(termo_busca)
+    norm = _normalize_search_text(pre or termo_busca)
     if not norm:
         return []
-    raw_tokens = [tok for tok in norm.split(" ") if len(tok) >= 2]
+    raw_tokens: List[str] = []
+    for tok in norm.split(" "):
+        if not tok:
+            continue
+        if len(tok) >= 2:
+            raw_tokens.append(tok)
+        elif re.match(r"^\d+x\d+$", tok):
+            raw_tokens.append(tok)
     return [_token_variants(tok) for tok in raw_tokens if _token_variants(tok)]
 
 
@@ -1589,8 +1599,141 @@ _SEARCH_ANCHOR_DROP = frozenset(
         "itens",
         "para",
         "com",
+        "caixa",
+        "unidade",
+        "unidades",
+        "embalagem",
+        "esteril",
+        "estéril",
     }
 )
+
+_SEARCH_GENERIC_DROP = frozenset(
+    {
+        "tamanho",
+        "tam",
+        "medida",
+        "formato",
+    }
+)
+
+
+def _token_group_head(group: List[str]) -> str:
+    return str((group or [""])[0] or "").strip().lower()
+
+
+def _is_spec_token_group(group: List[str]) -> bool:
+    head = _token_group_head(group)
+    if not head:
+        return False
+    if re.match(r"^\d+x\d", head):
+        return True
+    if re.match(r"^\d+g\d*$", head):
+        return True
+    if re.search(r"\d", head) and re.search(r"(ml|mg|g|kg|mm|cm|un|und|cp|ui)$", head):
+        return True
+    return False
+
+
+def _pick_core_token_groups(groups: List[List[str]], *, max_tokens: int = 6) -> List[List[str]]:
+    """Núcleo do produto: substantivos + especificações (dimensão/calibre), sem embalagem."""
+    lexical: List[List[str]] = []
+    specs: List[List[str]] = []
+    for group in groups:
+        head = _token_group_head(group)
+        if not head or head in _SEARCH_ANCHOR_DROP:
+            continue
+        if re.match(r"^\d{3,}$", head):
+            continue
+        if _is_spec_token_group(group):
+            specs.append(group)
+        elif head not in _SEARCH_GENERIC_DROP:
+            lexical.append(group)
+    picked = lexical[:3] + specs[:4]
+    if len(picked) < 2:
+        picked = [g for g in groups if _token_group_head(g) not in _SEARCH_ANCHOR_DROP][:max_tokens]
+    if len(picked) < 2:
+        picked = groups[:max_tokens]
+    return picked[:max_tokens]
+
+
+@dataclass(frozen=True)
+class SearchQueryTier:
+    termo: str
+    token_groups: List[List[str]]
+    min_match_ratio: float
+    label: str
+
+
+def build_search_query_tiers(termo_busca: str) -> List[SearchQueryTier]:
+    """
+    Camadas de busca: estrita (100%) → núcleo → flexível (k-of-n).
+    Prioriza match completo; relaxa para descrições PNCP mais curtas.
+    """
+    from .config import PNCP_SEARCH_TIER_FLEX_RATIO
+
+    pre = preprocess_cotacao_search_term(termo_busca)
+    raw = (pre or termo_busca or "").strip()
+    all_groups = _build_search_tokens(raw)
+    if not all_groups:
+        return []
+    term_strict, _meta = derive_anchor_search_term(raw)
+    strict_groups = _build_search_tokens(term_strict)
+    core_groups = _pick_core_token_groups(all_groups)
+    flex_ratio = max(0.5, min(1.0, float(PNCP_SEARCH_TIER_FLEX_RATIO)))
+    tiers: List[SearchQueryTier] = []
+    if strict_groups:
+        tiers.append(
+            SearchQueryTier(
+                termo=term_strict,
+                token_groups=strict_groups,
+                min_match_ratio=1.0,
+                label="strict",
+            )
+        )
+    core_term = " ".join(_token_group_head(g) for g in core_groups)
+    core_ratio = 1.0
+    if len(core_groups) >= 4:
+        core_ratio = 0.75
+    elif len(core_groups) == 3:
+        core_ratio = 0.67
+    if core_groups and core_groups != strict_groups:
+        tiers.append(
+            SearchQueryTier(
+                termo=core_term,
+                token_groups=core_groups,
+                min_match_ratio=core_ratio,
+                label="core",
+            )
+        )
+    if core_groups and flex_ratio < 1.0 and flex_ratio < core_ratio:
+        tiers.append(
+            SearchQueryTier(
+                termo=core_term,
+                token_groups=core_groups,
+                min_match_ratio=flex_ratio,
+                label="flex",
+            )
+        )
+    if len(core_groups) >= 2:
+        anchor_groups = core_groups[:2]
+        tiers.append(
+            SearchQueryTier(
+                termo=" ".join(_token_group_head(g) for g in anchor_groups),
+                token_groups=anchor_groups,
+                min_match_ratio=1.0,
+                label="anchor",
+            )
+        )
+    deduped: List[SearchQueryTier] = []
+    seen: set = set()
+    for tier in tiers:
+        key = (tier.label, tuple(_token_group_head(g) for g in tier.token_groups), tier.min_match_ratio)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(tier)
+    return deduped
 
 
 def derive_anchor_search_term(
@@ -1607,11 +1750,13 @@ def derive_anchor_search_term(
 
     cap = max(2, int(max_groups if max_groups is not None else PNCP_SEARCH_ANCHOR_MAX_GROUPS))
     full_max = max(2, int(full_term_max if full_term_max is not None else PNCP_SEARCH_ANCHOR_FULL_TERM_MAX))
-    raw = (termo_busca or "").strip()
+    pre = preprocess_cotacao_search_term(termo_busca)
+    raw = (pre or termo_busca or "").strip()
     groups = _build_search_tokens(raw)
     meta: Dict[str, Any] = {
-        "termo_original": raw,
-        "termo_original_tokens": len(groups),
+        "termo_original": (termo_busca or "").strip(),
+        "termo_preprocessado": raw if pre and pre != (termo_busca or "").strip() else None,
+        "termo_original_tokens": len(_build_search_tokens(termo_busca or "")),
         "termo_efetivo_tokens": len(groups),
         "termo_truncado": False,
         "termo_efetivo": raw,
@@ -1629,16 +1774,37 @@ def derive_anchor_search_term(
         if len(picked) >= cap:
             break
     if len(picked) < 2:
-        picked = [g[0] for g in groups[:cap]]
+        picked = [_token_group_head(g) for g in groups[:cap]]
     meta["termo_truncado"] = True
     meta["termo_efetivo_tokens"] = len(picked)
     meta["termo_efetivo"] = " ".join(picked)
     return meta["termo_efetivo"], meta
 
 
+def _dimension_variants(token: str) -> List[str]:
+    """13x4.5 ↔ 13x45 (PNCP costuma omitir decimal em medidas)."""
+    t = str(token or "").strip().lower().replace(",", ".")
+    m = re.match(r"^(\d+)x(\d+\.?\d*)$", t)
+    if not m:
+        return [t] if t else []
+    a, b = m.group(1), m.group(2)
+    out = {f"{a}x{b}"}
+    if "." in b:
+        out.add(f"{a}x{b.replace('.', '')}")
+    elif len(b) >= 2:
+        out.add(f"{a}x{b[:-1]}.{b[-1]}")
+    return sorted(out)
+
+
 def _search_token_hit(opt: str, words: set[str], normalized_text: str) -> bool:
     if opt in words or opt in normalized_text:
         return True
+    for dim in _dimension_variants(opt):
+        compact = normalized_text.replace(" ", "")
+        if dim.replace(".", "") in compact.replace(".", ""):
+            return True
+        if dim in compact:
+            return True
     # ex.: busca "120ml" vs descrição "120 ml" ou "frasco 120 ml"
     m = re.match(r"^(\d+(?:[.,]\d+)?)(ml|mg|g|kg|l|lt|mcg|ui|un|und|cp|caps)$", opt)
     if m:
@@ -1652,19 +1818,36 @@ def _search_token_hit(opt: str, words: set[str], normalized_text: str) -> bool:
     return False
 
 
-def _row_matches_search_tokens(text: str, tokens: List[List[str]]) -> bool:
+def _row_matches_search_tokens(
+    text: str,
+    tokens: List[List[str]],
+    *,
+    min_match_ratio: float = 1.0,
+) -> bool:
     if not tokens:
         return False
     normalized_text = _normalize_search_text(text)
     if not normalized_text:
         return False
     words = set(normalized_text.split())
+    matched = 0
     for options in tokens:
-        # cada token de busca deve casar ao menos uma variante (AND entre tokens)
-        matched = any(_search_token_hit(opt, words, normalized_text) for opt in options)
-        if not matched:
+        if any(_search_token_hit(opt, words, normalized_text) for opt in options):
+            matched += 1
+        elif min_match_ratio >= 1.0:
             return False
-    return True
+    if min_match_ratio >= 1.0:
+        return matched == len(tokens)
+    required = max(1, math.ceil(len(tokens) * min_match_ratio))
+    return matched >= required
+
+
+def _match_row_search_tiers(text: str, tiers: List[SearchQueryTier]) -> Optional[SearchQueryTier]:
+    """Retorna a camada mais estrita que ainda casa com a descrição."""
+    for tier in tiers:
+        if _row_matches_search_tokens(text, tier.token_groups, min_match_ratio=tier.min_match_ratio):
+            return tier
+    return None
 
 
 def _decompress_zlib_json_blob(raw_blob: Any) -> Optional[Dict[str, Any]]:
@@ -2067,7 +2250,10 @@ def local_item_search(
     ensure_local_index()
     only_homolog = _resolve_somente_homologados_flag(somente_homologados)
     termo_efetivo, term_meta = derive_anchor_search_term(termo_busca)
+    search_tiers = build_search_query_tiers(termo_busca)
     token_groups = _build_search_tokens(termo_efetivo)
+    if not token_groups and search_tiers:
+        token_groups = search_tiers[0].token_groups
     if not token_groups:
         return {
             "ok": True,
@@ -2088,7 +2274,14 @@ def local_item_search(
     )
     sql_limit = max(1, min(int(limit) * 8, 20000))
     fts_meta = fts_index_status()
-    fts_match = _build_fts_match_query(termo_efetivo) if PNCP_FTS5_ENABLED else None
+    fts_anchor_term = termo_efetivo
+    for tier in search_tiers:
+        if tier.label in ("anchor", "core") and tier.token_groups:
+            fts_anchor_term = _token_group_head(tier.token_groups[0])
+            break
+    if not fts_anchor_term and token_groups:
+        fts_anchor_term = _token_group_head(token_groups[0])
+    fts_match = _build_fts_match_query(fts_anchor_term) if PNCP_FTS5_ENABLED else None
     use_fts = bool(
         PNCP_FTS5_ENABLED
         and fts_meta.get("ready")
@@ -2162,18 +2355,26 @@ def local_item_search(
     com_fornecedor = 0
     filtrados_nao_homolog = 0
     filtrados_token = 0
+    tier_hits: Dict[str, int] = {}
+    tiers_for_match = search_tiers or [
+        SearchQueryTier(termo=termo_efetivo, token_groups=token_groups, min_match_ratio=1.0, label="strict")
+    ]
     candidatos_enrich: List[Dict[str, Any]] = []
     for r in rows:
         desc = r["descricao"] or ""
         mat = r["material_servico"] or ""
         texto_item = f"{desc} {mat}".strip()
-        if not _row_matches_search_tokens(texto_item, token_groups):
+        matched_tier = _match_row_search_tiers(texto_item, tiers_for_match)
+        if matched_tier is None:
             filtrados_token += 1
             continue
+        tier_hits[matched_tier.label] = int(tier_hits.get(matched_tier.label, 0)) + 1
         if only_homolog and not _row_passes_homolog_filter(r, somente_homologados=True):
             filtrados_nao_homolog += 1
             continue
         entry = _row_to_local_item(r, cleanup_for_display=cleanup_for_display)
+        entry["search_tier"] = matched_tier.label
+        entry["search_match_ratio"] = matched_tier.min_match_ratio
         sit_compra = str(entry.get("situacao_compra") or entry.get("situacao") or "").strip()
         catalog = _decompress_zlib_json_blob(_row_get(r, "raw_json_zlib"))
         homolog = item_homologado_para_busca(
@@ -2211,6 +2412,8 @@ def local_item_search(
             "filtrados_nao_homologados": filtrados_nao_homolog,
             "enriquecidos_pncp_na_busca": enrich_n,
             "termo_busca": term_meta,
+            "search_tiers": [t.label for t in tiers_for_match],
+            "search_tier_hits": tier_hits,
         },
     }
 

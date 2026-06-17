@@ -11,9 +11,12 @@ if str(_ROOT) not in sys.path:
 from app.local_index import (  # noqa: E402
     _build_fts_match_query,
     _build_search_tokens,
+    _match_row_search_tiers,
     _row_matches_search_tokens,
+    build_search_query_tiers,
     derive_anchor_search_term,
 )
+from app.search_text_clean import preprocess_cotacao_search_term  # noqa: E402
 from app.service import (  # noqa: E402
     _compute_match_score,
     _ensure_top3_from_pool,
@@ -53,9 +56,8 @@ class TestSearchRecallHelpers(unittest.TestCase):
     def test_compute_match_score_variant_groups_pharmaceutical(self):
         """Bug: singular/plural no mesmo grupo exigia 2 hits e zerava sem_raw na IA."""
         term = "ACEBROFILINA 50 MG/5 ML XAROPE C/120ML"
-        _, meta = derive_anchor_search_term(term)
-        groups = _build_search_tokens(meta.get("termo_efetivo") or term)
-        desc = "ACEBROFILINA 50 MG/5 ML XAROPE FRASCO 120 ML"
+        groups = _build_search_tokens(term)
+        desc = "ACEBROFILINA 50 MG/5 ML XAROPE FRASCO C/120ML"
         self.assertEqual(_compute_match_score(desc, groups, variant_groups=False), 0.0)
         self.assertGreater(_compute_match_score(desc, groups, variant_groups=True), 0.0)
 
@@ -110,6 +112,28 @@ class TestSearchRecallHelpers(unittest.TestCase):
         self.assertTrue(meta.get("termo_truncado"))
         self.assertLessEqual(meta.get("termo_efetivo_tokens", 99), 8)
         self.assertIn("acebrofilina", eff.lower())
+
+    def test_preprocess_agulha_compacta_dimensao(self):
+        raw = "AGULHA HIPODÊRMICA TAMANHO: 13 X 4,5 (26 G½) CX C/100 UNIDADES"
+        pre = preprocess_cotacao_search_term(raw)
+        self.assertIn("13x45", pre.lower())
+        self.assertIn("26g", pre.lower())
+        self.assertNotIn("unidades", pre.lower())
+
+    def test_agulha_longa_casa_catalogo_curto(self):
+        term = "AGULHA HIPODÊRMICA TAMANHO: 13 X 4,5 (26 G½) CX C/100 UNIDADES"
+        tiers = build_search_query_tiers(term)
+        self.assertTrue(tiers)
+        desc = "AGULHA HIPODERMICA 13X45 MM CX 100 UN"
+        matched = _match_row_search_tiers(desc, tiers)
+        self.assertIsNotNone(matched)
+        self.assertIn(matched.label, ("strict", "core", "flex", "anchor"))
+        self.assertNotEqual(matched.label, "anchor")
+
+    def test_agulha_nao_casa_seringa(self):
+        term = "AGULHA HIPODÊRMICA TAMANHO: 13 X 4,5 (26 G½) CX C/100 UNIDADES"
+        tiers = build_search_query_tiers(term)
+        self.assertIsNone(_match_row_search_tiers("SERINGA DESCARTAVEL 10ML", tiers))
 
 
 if __name__ == "__main__":

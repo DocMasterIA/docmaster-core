@@ -290,7 +290,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   addCotacoesToItemInResearchSession,
@@ -301,17 +301,16 @@ import {
 } from '../services/pncpResearch';
 import { MUNICIPIOS_POR_UF } from '../data/brasilMunicipiosPorUf';
 import { buildRecortesGeograficosPayload } from '../utils/recortesGeograficos';
-
-/** Sobrevive remontagem Vue (Strict Mode / HMR) — evita 2º autostart abortando os ~10 primeiros itens. */
-const bulkAutostartRegistry = {
-  sessionId: null,
-  isRunning: false,
-  promise: null,
-  bulkRunId: null,
-  progress: null,
-  rows: null,
-  lastFailure: '',
-};
+import {
+  bulkAutostartRegistry,
+  beginBulkAutostartSession,
+  bulkRunShouldStop as bulkRunShouldStopBase,
+  clearBulkPausedFlag,
+  getBulkAutostartController,
+  isBulkRunActive,
+  isPncpResearchRoute,
+  isRegistryAutostartBulk,
+} from '../composables/usePncpBulkAutostart.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -461,7 +460,14 @@ let searchAbortController = null;
 /** Evita corrida quando o Vue remonta o componente (autostart duplicado). */
 let mountRunSeq = 0;
 let activeBulkRunId = 0;
-let bulkAutostartController = null;
+
+function bulkRunShouldStop(opts) {
+  return bulkRunShouldStopBase({
+    ...opts,
+    mountRunSeq,
+    searchGeneration: searchGeneration.value,
+  });
+}
 
 function beginNewSearchSession() {
   try {
@@ -471,62 +477,13 @@ function beginNewSearchSession() {
   }
   activeBulkRunId += 1;
   try {
-    bulkAutostartController?.abort();
+    getBulkAutostartController()?.abort();
   } catch (_) {
     /* ignore */
   }
   searchAbortController = new AbortController();
   searchGeneration.value += 1;
   return { generation: searchGeneration.value, signal: searchAbortController.signal };
-}
-
-function beginBulkAutostartSession(sessionId, { reuseRunning = false } = {}) {
-  if (
-    reuseRunning
-    && bulkAutostartRegistry.isRunning
-    && Number(bulkAutostartRegistry.sessionId) === Number(sessionId)
-    && bulkAutostartRegistry.bulkRunId != null
-    && bulkAutostartController
-  ) {
-    return {
-      bulkRunId: bulkAutostartRegistry.bulkRunId,
-      signal: bulkAutostartController.signal,
-    };
-  }
-  activeBulkRunId += 1;
-  const bulkRunId = activeBulkRunId;
-  try {
-    bulkAutostartController?.abort();
-  } catch (_) {
-    /* ignore */
-  }
-  bulkAutostartController = new AbortController();
-  bulkAutostartRegistry.bulkRunId = bulkRunId;
-  return { bulkRunId, signal: bulkAutostartController.signal };
-}
-
-function isBulkRunActive(bulkRunId) {
-  return Number(bulkRunId) === activeBulkRunId;
-}
-
-function isRegistryAutostartBulk(bulkRunId) {
-  return Boolean(bulkAutostartRegistry.isRunning)
-    && Number(bulkAutostartRegistry.bulkRunId) === Number(bulkRunId);
-}
-
-function bulkRunShouldStop({
-  mountRunId,
-  myBulkRunId,
-  generation,
-  autostartBulk = false,
-} = {}) {
-  if (autostartBulk) {
-    return !isRegistryAutostartBulk(myBulkRunId);
-  }
-  if (mountRunId != null && mountRunId !== mountRunSeq) return true;
-  if (myBulkRunId != null && !isBulkRunActive(myBulkRunId)) return true;
-  if (generation != null && generation !== searchGeneration.value) return true;
-  return false;
 }
 
 function isAbortError(err) {
@@ -1071,8 +1028,8 @@ async function runSearchWithContext({
     if (autostartBulk) return !isRegistryAutostartBulk(bulkRunId);
     return bulkRunId != null && !isBulkRunActive(bulkRunId);
   };
-  // Autostart: só timeout por item — falha de rede num item não cancela os demais.
-  const fetchSignal = autostartBulk ? undefined : signal;
+  // Autostart: abortável ao sair do módulo PNCP (liberta API para Dispensa/outros fluxos).
+  const fetchSignal = autostartBulk ? getBulkAutostartController()?.signal : signal;
   try {
     const recortes = buildRecortesGeograficosPayload(filtros.cidades);
     const valorBaseCtx = context?.valor_base_referencia ?? null;
@@ -1374,6 +1331,20 @@ onMounted(async () => {
     return;
   }
 
+  if (
+    bulkAutostartRegistry.pausedByNavigation
+    && Number(bulkAutostartRegistry.sessionId) === sessionId
+  ) {
+    applyBulkUiSnapshot(sessionId);
+    const p = autoSearchProgress.value;
+    if (p.total > 0 && p.done < p.total) {
+      searchError.value =
+        `Busca pausada ao sair do pesquisador (${p.done}/${p.total}). Clique «Pesquisar UF» para continuar.`;
+    }
+    clearBulkPausedFlag();
+    return;
+  }
+
   if (!bulkAutostartRegistry.isRunning) {
     autoSearchProgress.value = { done: 0, total: 0, ok: 0, fail: 0, precos: 0, skipped: 0 };
     searchError.value = '';
@@ -1501,7 +1472,17 @@ onMounted(async () => {
   }
 });
 
-// Não abortar bulk no unmount — remontagem Vue (Strict Mode) gerava falhas fantasma nos ~10 primeiros itens.
+onBeforeUnmount(() => {
+  // Remontagem na mesma rota (Strict Mode): bulk autostart continua.
+  if (bulkAutostartRegistry.isRunning && isPncpResearchRoute(route)) return;
+  try {
+    searchAbortController?.abort();
+  } catch (_) {
+    /* ignore */
+  }
+});
+
+// Não abortar bulk no unmount da mesma rota — remontagem Vue (Strict Mode) gerava falhas fantasma.
 
 function parseMoeda(v) {
   const n = Number(String(v || '').replace(/[^\d,.-]/g, '').replace(',', '.'));

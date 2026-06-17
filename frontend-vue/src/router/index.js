@@ -2,6 +2,10 @@ import { createRouter, createWebHistory } from 'vue-router';
 /** Import estático: evita chunk lazy `DispensaArt75IIRapidaReactPreview-*.js` (falha com index.html ou CDN em cache após deploy). */
 import DispensaArt75IIRapidaReactPreview from '../views/DispensaArt75IIRapidaReactPreview.vue';
 import { useSessionUser } from '../composables/useSessionUser.js';
+import {
+  isPncpResearchRoute,
+  pauseBulkAutostartForNavigation,
+} from '../composables/usePncpBulkAutostart.js';
 
 const routes = [
   {
@@ -312,8 +316,11 @@ router.beforeEach(async (to) => {
   /* Módulos sem permissão: a navegação prossegue; o App.vue mostra «Módulo Não Liberado». */
 });
 
-router.afterEach((to) => {
+router.afterEach((to, from) => {
   document.title = to.meta?.title ? `${to.meta.title} – DocMasterIA` : 'DocMasterIA';
+  if (isPncpResearchRoute(from) && !isPncpResearchRoute(to)) {
+    pauseBulkAutostartForNavigation();
+  }
 });
 
 export default router;

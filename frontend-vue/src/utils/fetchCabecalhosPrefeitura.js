@@ -3,18 +3,21 @@
  * com id para merge de cabeçalho/rodapé em `gerar-tr-e-dfd` (`template_id`).
  *
  * @param {string} apiBase ex.: import.meta.env.DEV ? '' : VITE_API_URL
+ * @param {{ prefeituraId?: string|number|null }} [options]
  * @returns {Promise<Array<{ id: string; name: string }>>}
  */
-export async function fetchCabecalhosPrefeitura(apiBase) {
-  let userPrefeituraId = null;
-  try {
-    const meRes = await fetch(`${apiBase}/api/me/`, { credentials: 'include' });
-    if (meRes.ok) {
-      const me = await meRes.json().catch(() => ({}));
-      userPrefeituraId = me?.prefeitura_id != null ? String(me.prefeitura_id) : null;
+export async function fetchCabecalhosPrefeitura(apiBase, { prefeituraId = null } = {}) {
+  let userPrefeituraId = prefeituraId != null ? String(prefeituraId) : null;
+  if (!userPrefeituraId) {
+    try {
+      const meRes = await fetch(`${apiBase}/api/me/`, { credentials: 'include' });
+      if (meRes.ok) {
+        const me = await meRes.json().catch(() => ({}));
+        userPrefeituraId = me?.prefeitura_id != null ? String(me.prefeitura_id) : null;
+      }
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
   }
 
   try {

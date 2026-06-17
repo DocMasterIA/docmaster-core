@@ -530,10 +530,12 @@ import {
   sanitizeQuantidadeInput,
 } from '@/utils/itemValorCampos.js';
 import '@/components/dispensa-art-75-ii/dispensaArt75ii.css';
+import { useSessionUser } from '@/composables/useSessionUser.js';
 
 // Em dev: '' → proxy Vite `/api`
 const API_BASE = getApiBase();
 const route = useRoute();
+const { user: sessionUser, fetchMe: fetchSessionUser } = useSessionUser();
 
 /** Rotas `/geracao/dispensa-rapida/...` reutilizam pacotes e regras das rotas `DispensaArt75*`. */
 const DISPENSA_RAPIDA_TO_LOGICAL = {
@@ -579,9 +581,8 @@ const userIsSuperuser = ref(false);
 
 async function fetchCurrentUser() {
   try {
-    const res = await fetch(`${API_BASE}/api/me/`, { credentials: 'include' });
-    if (!res.ok) return;
-    const data = await res.json();
+    const data = sessionUser.value || await fetchSessionUser();
+    if (!data) return;
     userPrefeituraId.value = data.prefeitura_id || null;
     userIsSuperuser.value = !!data.is_superuser;
   } catch (e) {
@@ -1133,7 +1134,10 @@ async function loadSlotFormState() {
   isHydratingSlotState.value = true;
   try {
     const url = `${API_BASE}/api/slots/form-state?slot_package_key=${encodeURIComponent(GLOBAL_SLOT_FORM_PRESET_KEY)}`;
-    const res = await fetch(url, { credentials: 'include' });
+    const signal = typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+      ? AbortSignal.timeout(8000)
+      : undefined;
+    const res = await fetch(url, { credentials: 'include', signal });
     if (!res.ok) return;
     const payload = await res.json().catch(() => ({}));
     const data = payload?.data || {};

@@ -417,16 +417,33 @@ async def _finalize_supplier_resolution(
     client: httpx.AsyncClient,
     res: SupplierResolution,
 ) -> Dict[str, Any]:
-    """PNCP primeiro; BrasilAPI só se faltar nome útil."""
+    """PNCP primeiro; BrasilAPI se faltar nome útil ou contato (tel/e-mail)."""
     merged = res
-    if res.cnpj_fornecedor and not nome_fornecedor_e_util(res.fornecedor):
-        nome, cad = await fetch_brasilapi_fornecedor_por_cnpj(client, res.cnpj_fornecedor)
-        merged = merge_with_cadastro(res, nome=nome, cadastro=cad, fonte_nome="brasilapi_cnpj")
+    cad = dict(res.fornecedor_cadastro or {})
+    tel = str(cad.get("telefone") or cad.get("ddd_telefone_1") or "").strip()
+    email = str(cad.get("email") or "").strip()
+    precisa_brasil = bool(res.cnpj_fornecedor) and (
+        not nome_fornecedor_e_util(res.fornecedor) or not tel or not email
+    )
+    if precisa_brasil:
+        nome, cad_br = await fetch_brasilapi_fornecedor_por_cnpj(client, res.cnpj_fornecedor)
+        merged = merge_with_cadastro(res, nome=nome, cadastro=cad_br, fonte_nome="brasilapi_cnpj")
     elif res.cnpj_fornecedor and res.fornecedor and not merged.fornecedor_fonte:
         merged.fornecedor_fonte = "pncp"
     out = resolution_to_api_dict(merged)
+    cad_out = out.get("fornecedor_cadastro") if isinstance(out.get("fornecedor_cadastro"), dict) else {}
+    if cad_out and not str(out.get("email") or "").strip():
+        em = str(cad_out.get("email") or "").strip()
+        if em:
+            out["email"] = em
+    if cad_out and not str(out.get("telefone") or "").strip():
+        tel_out = str(cad_out.get("telefone") or cad_out.get("ddd_telefone_1") or "").strip()
+        if tel_out:
+            out["telefone"] = tel_out
     if merged.fornecedor and "brasilapi" in (merged.fornecedor_fonte or ""):
         out["fornecedor_fonte_nome"] = "brasilapi_cnpj"
+        if cad_out:
+            out["fornecedor_contato_fonte"] = "brasilapi_cnpj"
     elif merged.fornecedor and merged.fornecedor_fonte:
         out["fornecedor_fonte_nome"] = merged.fornecedor_fonte
     return out

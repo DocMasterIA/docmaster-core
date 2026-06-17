@@ -49,7 +49,17 @@ echo ""
 cd "$DEPLOY"
 COMPOSE_ARGS=(-f "$COMPOSE_FILE" -f "$OVERRIDE_FILE")
 [[ -f "$NOPORTS_FILE" ]] && COMPOSE_ARGS+=(-f "$NOPORTS_FILE")
-docker compose "${COMPOSE_ARGS[@]}" up -d --force-recreate
+
+echo "==> A remover contentores PNCP antigos (volumes intactos — sem -v)..."
+docker compose "${COMPOSE_ARGS[@]}" down --remove-orphans 2>/dev/null || true
+docker rm -f pncp_researcher_service 2>/dev/null || true
+while IFS= read -r cid; do
+  [[ -z "$cid" ]] && continue
+  docker rm -f "$cid" 2>/dev/null || true
+done < <(docker ps -aq --filter "name=pncp_researcher" 2>/dev/null || true)
+
+echo "==> A subir pncp_researcher_service com volume ${VOL}..."
+docker compose "${COMPOSE_ARGS[@]}" up -d --force-recreate pncp_researcher_service
 
 sleep 5
 echo "==> /health"

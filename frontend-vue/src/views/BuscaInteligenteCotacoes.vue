@@ -1300,7 +1300,12 @@ async function adicionarSelecionadosNaCotacao() {
   }
   const selecionados = displayedRows.value
     .filter((r) => r.selecionado)
-    .map((r) => ({
+    .map((r) => {
+      const raw = (r.sourceRaw && typeof r.sourceRaw === 'object') ? r.sourceRaw : {};
+      const cad = (raw.fornecedor_cadastro && typeof raw.fornecedor_cadastro === 'object')
+        ? raw.fornecedor_cadastro
+        : {};
+      return {
       item_ref_id: r.itemId ?? null,
       esfera_administrativa: r.esferaAdministrativa || null,
       inciso_classificacao: r.incisoClassificacao || null,
@@ -1332,6 +1337,9 @@ async function adicionarSelecionadosNaCotacao() {
       data_publicacao: r.data,
       fornecedor: r.fornecedor || null,
       cnpj_fornecedor: r.cnpjFornecedor || null,
+      fornecedor_cadastro: Object.keys(cad).length ? cad : null,
+      telefone: raw.telefone || cad.telefone || cad.ddd_telefone_1 || null,
+      email: raw.email || cad.email || null,
       situacao: r.sourceRaw?.situacao || r.sourceRaw?.situacaoCompraNome || null,
       situacao_compra: r.sourceRaw?.situacao || r.sourceRaw?.situacaoCompraNome || null,
       situacaoCompraNome: r.sourceRaw?.situacaoCompraNome || r.sourceRaw?.situacao || null,
@@ -1342,11 +1350,12 @@ async function adicionarSelecionadosNaCotacao() {
       ano_compra: r.anoCompra ?? r.sourceRaw?.ano_compra ?? null,
       sequencial_compra: r.sequencialCompra ?? r.sourceRaw?.sequencial_compra ?? null,
       source: {
-        ...(r.sourceRaw && typeof r.sourceRaw === 'object' ? r.sourceRaw : {}),
+        ...raw,
         fornecedor: r.fornecedor || null,
         cnpj_fornecedor: r.cnpjFornecedor || null,
       },
-    }));
+    };
+    });
   if (!selecionados.length) {
     saveMessage.value = 'Selecione ao menos um item.';
     return;

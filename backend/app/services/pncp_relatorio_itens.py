@@ -19,6 +19,7 @@ from django.utils import timezone
 from backend.app.services.pncp_supplier_enrichment import (
     _nome_e_somente_cnpj_formatado,
     _promote_supplier_from_deep_walk,
+    _supplier_payload_layers,
     flatten_supplier_fields_in_payload,
 )
 
@@ -450,34 +451,34 @@ def _supplier_cadastro_dict(src: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _pick_supplier_telefone_from_source(src: Dict[str, Any]) -> str:
-    cad = _supplier_cadastro_dict(src)
-    for blob in (src, cad):
-        v = _pick_source(
-            blob,
-            "telefone",
-            "ddd_telefone_1",
-            "ddd_telefone_2",
-            "telefone1",
-            "telefone2",
-            default="",
-        )
-        if v and v != "—":
-            return v
+    tel_keys = ("telefone", "ddd_telefone_1", "ddd_telefone_2", "telefone1", "telefone2")
+    for layer in _supplier_payload_layers(src):
+        cad = layer.get("fornecedor_cadastro")
+        blobs: List[Any] = [layer]
+        if isinstance(cad, dict):
+            blobs.append(cad)
+        for blob in blobs:
+            if not isinstance(blob, dict):
+                continue
+            for k in tel_keys:
+                v = str(blob.get(k) or "").strip()
+                if v and v != "—":
+                    return v
     return ""
 
 
 def _pick_supplier_email_from_source(src: Dict[str, Any]) -> str:
-    cad = _supplier_cadastro_dict(src)
-    for blob in (src, cad):
-        v = _pick_source(
-            blob,
-            "email",
-            "emailFornecedor",
-            "email_fornecedor",
-            default="",
-        )
-        if v and v != "—":
-            return v
+    email_keys = ("email", "emailFornecedor", "email_fornecedor")
+    for layer in _supplier_payload_layers(src):
+        cad = layer.get("fornecedor_cadastro")
+        if isinstance(cad, dict):
+            v = str(cad.get("email") or "").strip()
+            if v and v != "—":
+                return v
+        for k in email_keys:
+            v = str(layer.get(k) or "").strip()
+            if v and v != "—":
+                return v
     return ""
 
 

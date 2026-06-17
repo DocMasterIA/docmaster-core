@@ -129,6 +129,15 @@ if [[ "${PNCP_BUILD:-0}" == "1" ]]; then
 fi
 
 echo "==> PNCP Researcher 24/7 (projeto docmaster-pncp)"
+if [[ "${PNCP_BUILD:-0}" == "1" ]] || [[ "${PNCP_FORCE_RECREATE:-0}" == "1" ]]; then
+  echo "==> A remover contentor antigo antes do recreate (volume preservado)..."
+  docker compose "${COMPOSE_ARGS[@]}" down --remove-orphans 2>/dev/null || true
+  docker rm -f pncp_researcher_service 2>/dev/null || true
+  while IFS= read -r cid; do
+    [[ -z "$cid" ]] && continue
+    docker rm -f "$cid" 2>/dev/null || true
+  done < <(docker ps -aq --filter "name=pncp_researcher" 2>/dev/null || true)
+fi
 docker compose "${COMPOSE_ARGS[@]}" up "${UP_FLAGS[@]}" "$PNCP_SERVICE"
 
 echo ""
@@ -150,6 +159,31 @@ if [[ "$ok" -eq 1 ]]; then
   echo ""
   echo "==> /local-index/stats (resumo)"
   pncp_print_stats_summary || true
+  echo ""
+  if [[ "${PNCP_USE_DOCKER_HEALTH:-0}" == "1" ]]; then
+    stats_json="$(docker exec "$PNCP_SERVICE" python -c \
+      "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8012/api/pncp-research/local-index/stats', timeout=120).read().decode())" \
+      2>/dev/null || true)"
+    health_json="$(docker exec "$PNCP_SERVICE" python -c \
+      "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8012/api/pncp-research/health', timeout=30).read().decode())" \
+      2>/dev/null || true)"
+    items_n="$(echo "$stats_json" | python3 -c "import json,sys; d=json.load(sys.stdin); print(int(d.get('total_itens') or 0))" 2>/dev/null || echo 0)"
+    db_bytes="$(echo "$health_json" | python3 -c "import json,sys; d=json.load(sys.stdin); print(int(d.get('db_bytes') or 0))" 2>/dev/null || echo 0)"
+    if [[ "${items_n:-0}" -lt 1000 ]]; then
+      echo ""
+      echo "╔══════════════════════════════════════════════════════════════════════╗"
+      echo "║  AVISO: total_itens=${items_n} — índice vazio ou volume Docker errado.          ║"
+      echo "║  Recriar o contentor NÃO apaga volumes; os dados costumam estar noutro volume. ║"
+      echo "║  NÃO rode «docker compose down -v».                                             ║"
+      echo "║  Recuperação:                                                                   ║"
+      echo "║    ./scripts/find-pncp-db-volumes.sh                                            ║"
+      echo "║    PNCP_DATA_VOLUME=<volume_grande_MB> ./scripts/attach-pncp-volume.sh          ║"
+      echo "╚══════════════════════════════════════════════════════════════════════╝"
+      if [[ "${db_bytes:-0}" -gt 500000000 ]]; then
+        echo "  (db_bytes=${db_bytes} — ficheiro grande mas 0 itens: volume correto? DB corrompido?)"
+      fi
+    fi
+  fi
   echo ""
   echo "==> contentor (confirme «Up … seconds» — não «Up 30+ hours» após deploy com BUILD=1)"
   docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' | grep -E "^(NAMES|${PNCP_SERVICE})" || true

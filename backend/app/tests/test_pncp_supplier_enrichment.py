@@ -135,7 +135,31 @@ class SupplierNameDisplayTests(unittest.TestCase):
         self.assertEqual(it["cnpj_fornecedor"], "27.105.456/0001-72")
         self.assertEqual(it["fornecedor"], "EMPRESA ANINHADA LTDA")
 
-    def test_flatten_ignora_metadado_pncp_no_topo(self):
+    def test_flatten_promove_contato_de_source_aninhado(self):
+        it = {
+            "numero_pncp": "12345678000195-1-2023-7",
+            "cnpj_fornecedor": "27.105.456/0001-72",
+            "fornecedor": "EMPRESA TESTE LTDA",
+            "source": {
+                "fornecedor_cadastro": {
+                    "telefone": "(11) 3333-4444",
+                    "email": "contato@empresa.com.br",
+                },
+            },
+        }
+        flatten_supplier_fields_in_payload(it)
+        self.assertEqual(it.get("telefone"), "(11) 3333-4444")
+        self.assertEqual(it.get("email"), "contato@empresa.com.br")
+        self.assertEqual(it["fornecedor_cadastro"]["email"], "contato@empresa.com.br")
+
+    def test_pick_email_from_nested_source(self):
+        src = {
+            "cnpj_fornecedor": "27.105.456/0001-72",
+            "source": {
+                "email": "aninhado@empresa.com.br",
+            },
+        }
+        self.assertEqual(_pick_supplier_email_from_source(src), "aninhado@empresa.com.br")
         it = {
             "numero_pncp": "12345678000195-1-2023-7",
             "fornecedor": "pncp_resultado_item_item",

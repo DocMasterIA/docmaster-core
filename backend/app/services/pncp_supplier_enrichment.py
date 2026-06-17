@@ -304,6 +304,41 @@ def _pick_supplier_field_from_layers(it: Dict[str, Any], *keys: str) -> str:
     return ""
 
 
+def _merge_fornecedor_cadastro_dict(it: Dict[str, Any], cad: Dict[str, Any]) -> None:
+    if not isinstance(cad, dict) or not cad:
+        return
+    prev = it.get("fornecedor_cadastro")
+    if not isinstance(prev, dict):
+        prev = {}
+    merged = {**prev, **{k: v for k, v in cad.items() if v}}
+    if merged != prev:
+        it["fornecedor_cadastro"] = merged
+
+
+def _promote_supplier_contact_from_layers(it: Dict[str, Any]) -> None:
+    """Promove telefone/e-mail/cadastro de source aninhado (sourceRaw) para o topo."""
+    if not isinstance(it, dict):
+        return
+    email_keys = ("email", "emailFornecedor", "email_fornecedor")
+    tel_keys = ("telefone", "ddd_telefone_1", "ddd_telefone_2", "telefone1", "telefone2")
+    for layer in _supplier_payload_layers(it):
+        cad = layer.get("fornecedor_cadastro")
+        if isinstance(cad, dict) and cad:
+            _merge_fornecedor_cadastro_dict(it, cad)
+        if not str(it.get("email") or "").strip():
+            for k in email_keys:
+                em = str(layer.get(k) or "").strip()
+                if em and em != "—":
+                    it["email"] = em
+                    break
+        if not str(it.get("telefone") or "").strip():
+            for k in tel_keys:
+                tel = str(layer.get(k) or "").strip()
+                if tel and tel != "—":
+                    it["telefone"] = tel
+                    break
+
+
 def flatten_supplier_fields_in_payload(it: Dict[str, Any]) -> None:
     """
     Promove CNPJ/nome de source aninhado para o topo do payload.
@@ -331,6 +366,7 @@ def flatten_supplier_fields_in_payload(it: Dict[str, Any]) -> None:
                     v = str(cad.get(k) or "").strip()
                     if v and not _nome_e_somente_cnpj_formatado(v):
                         it["fornecedor"] = v
+                        _promote_supplier_contact_from_layers(it)
                         return
             for k in (
                 "fornecedor",
@@ -349,7 +385,9 @@ def flatten_supplier_fields_in_payload(it: Dict[str, Any]) -> None:
                 if low.startswith("pncp_"):
                     continue
                 it["fornecedor"] = v
+                _promote_supplier_contact_from_layers(it)
                 return
+    _promote_supplier_contact_from_layers(it)
 
 
 def _fornecedor_display_name_from_source(src: Dict[str, Any]) -> str:
@@ -600,14 +638,29 @@ def _numero_item_from_row_or_source(row: PncpCotacaoItemCotacao, src: Dict[str, 
     return ""
 
 
+def _cadastro_tem_contato_util(cad: Dict[str, Any]) -> bool:
+    tel = str(
+        cad.get("telefone")
+        or cad.get("ddd_telefone_1")
+        or cad.get("ddd_telefone_2")
+        or ""
+    ).strip()
+    email = str(cad.get("email") or "").strip()
+    return bool(tel or email)
+
+
 def _finalize_supplier_snapshot_sync(snap: Dict[str, str]) -> Dict[str, Any]:
     cnpj_fmt = str(snap.get("cnpj_fornecedor") or "").strip()
     nome = str(snap.get("fornecedor") or "").strip()
     if not cnpj_fmt and not nome:
         return {"cnpj_fornecedor": "", "fornecedor": "", "fornecedor_cadastro": {}}
-    if cnpj_fmt and not _fornecedor_tem_nome_util({"fornecedor": nome, "cnpj_fornecedor": cnpj_fmt}):
+    precisa_brasil = bool(cnpj_fmt) and (
+        not _fornecedor_tem_nome_util({"fornecedor": nome, "cnpj_fornecedor": cnpj_fmt})
+        or not _cadastro_tem_contato_util({})
+    )
+    if precisa_brasil:
         nome_br, cad = fetch_brasilapi_fornecedor_por_cnpj(cnpj_fmt)
-        if nome_br:
+        if nome_br and not _fornecedor_tem_nome_util({"fornecedor": nome, "cnpj_fornecedor": cnpj_fmt}):
             nome = nome_br
         out: Dict[str, Any] = {
             "cnpj_fornecedor": cnpj_fmt,
@@ -618,6 +671,12 @@ def _finalize_supplier_snapshot_sync(snap: Dict[str, str]) -> Dict[str, Any]:
             out["fornecedor_fonte_nome"] = "brasilapi_cnpj"
         if cad:
             out["fornecedor_contato_fonte"] = "brasilapi_cnpj"
+            em = str(cad.get("email") or "").strip()
+            tel = str(cad.get("telefone") or cad.get("ddd_telefone_1") or "").strip()
+            if em:
+                out["email"] = em
+            if tel:
+                out["telefone"] = tel
         return out
     out = {"cnpj_fornecedor": cnpj_fmt, "fornecedor": nome, "fornecedor_cadastro": {}}
     if nome:
@@ -800,21 +859,37 @@ def _supplier_cadastro_dict(it: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _contact_telefone_from_payload(it: Dict[str, Any]) -> str:
-    cad = _supplier_cadastro_dict(it)
-    return str(
-        it.get("telefone")
-        or cad.get("telefone")
-        or it.get("ddd_telefone_1")
-        or cad.get("ddd_telefone_1")
-        or it.get("ddd_telefone_2")
-        or cad.get("ddd_telefone_2")
-        or ""
-    ).strip()
+    for layer in _supplier_payload_layers(it):
+        cad = layer.get("fornecedor_cadastro")
+        blobs = [layer]
+        if isinstance(cad, dict):
+            blobs.append(cad)
+        for blob in blobs:
+            v = str(
+                blob.get("telefone")
+                or blob.get("ddd_telefone_1")
+                or blob.get("ddd_telefone_2")
+                or blob.get("telefone1")
+                or blob.get("telefone2")
+                or ""
+            ).strip()
+            if v:
+                return v
+    return ""
 
 
 def _contact_email_from_payload(it: Dict[str, Any]) -> str:
-    cad = _supplier_cadastro_dict(it)
-    return str(it.get("email") or cad.get("email") or "").strip()
+    for layer in _supplier_payload_layers(it):
+        cad = layer.get("fornecedor_cadastro")
+        if isinstance(cad, dict):
+            v = str(cad.get("email") or "").strip()
+            if v:
+                return v
+        for k in ("email", "emailFornecedor", "email_fornecedor"):
+            v = str(layer.get(k) or "").strip()
+            if v:
+                return v
+    return ""
 
 
 def _enrich_payload_sort_key(it: Dict[str, Any]) -> Tuple[int, int]:

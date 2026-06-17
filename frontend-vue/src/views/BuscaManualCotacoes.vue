@@ -870,7 +870,12 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
   const faixaBaseSelecionada = parseMoeda(filtros.valorBase);
   const registros = resultados.value
     .filter((r) => r.selecionado)
-    .map((r) => ({
+    .map((r) => {
+      const raw = (r.sourceRaw && typeof r.sourceRaw === 'object') ? r.sourceRaw : {};
+      const cad = (raw.fornecedor_cadastro && typeof raw.fornecedor_cadastro === 'object')
+        ? raw.fornecedor_cadastro
+        : {};
+      return {
       numero_pncp: toNullableText(r.numeroPncp),
       ano_compra: r.anoCompra,
       sequencial_compra: r.sequencialCompra,
@@ -888,6 +893,11 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
       origem: 'busca_manual',
       data_publicacao: toNullableText(r.data),
       material_servico: toNullableText(r.sourceRaw?.material_servico),
+      fornecedor: toNullableText(r.fornecedor || raw.fornecedor),
+      cnpj_fornecedor: toNullableText(r.cnpjFornecedor || raw.cnpj_fornecedor),
+      fornecedor_cadastro: Object.keys(cad).length ? cad : null,
+      telefone: raw.telefone || cad.telefone || cad.ddd_telefone_1 || null,
+      email: raw.email || cad.email || null,
       valor_base: faixaBaseSelecionada,
       faixa_regional: {
         valor_base: faixaBaseSelecionada,
@@ -902,9 +912,10 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
       valor_total_estimado: r.sourceRaw?.valor_total_estimado ?? null,
       item_homologado: r.sourceRaw?.item_homologado ?? null,
       source: {
-        ...(r.sourceRaw && typeof r.sourceRaw === 'object' ? r.sourceRaw : {}),
+        ...raw,
       },
-    }))
+    };
+    })
     .filter((it) => !!it.descricao_item || !!it.numero_pncp || (it.ano_compra != null && it.sequencial_compra != null));
   if (!registros.length) {
     saveMessage.value = 'Selecione ao menos um item.';

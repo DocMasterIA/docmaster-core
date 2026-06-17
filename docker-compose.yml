@@ -190,6 +190,8 @@ services:
       - RAG_HTTP_TIMEOUT_TR_DFD_MAX=${RAG_HTTP_TIMEOUT_TR_DFD_MAX:-900}
       # PDF: Gunicorn padrão mata o worker após 30s; 0 = sem limite (ver Dockerfile).
       - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-0}
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-4}
+      - GUNICORN_THREADS=${GUNICORN_THREADS:-4}
       - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
     depends_on:
       - llm_api

@@ -44,4 +44,6 @@ ENV PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
 # Migrações na subida; Gunicorn. --timeout 0 = sem limite de tempo por requisição (PDF/WeasyPrint pode demorar muito).
 # Ajuste com env GUNICORN_TIMEOUT (segundos) se quiser um teto, ex.: 3600.
 ENV GUNICORN_TIMEOUT=0
-CMD ["sh", "-c", "python manage.py migrate --noinput && exec gunicorn backend.mdlicitatech.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --timeout ${GUNICORN_TIMEOUT:-0} --graceful-timeout 600 --config backend/mdlicitatech/gunicorn_conf.py --access-logfile - --error-logfile -"]
+ENV GUNICORN_WORKERS=4
+ENV GUNICORN_THREADS=4
+CMD ["sh", "-c", "python manage.py migrate --noinput && exec gunicorn backend.mdlicitatech.wsgi:application --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-4} --threads ${GUNICORN_THREADS:-4} --timeout ${GUNICORN_TIMEOUT:-0} --graceful-timeout 600 --config backend/mdlicitatech/gunicorn_conf.py --access-logfile - --error-logfile -"]

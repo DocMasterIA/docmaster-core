@@ -573,7 +573,7 @@ function bulkSearchFailResult(err, { superseded = false, timeoutSec = 180 } = {}
 }
 
 const BULK_SEARCH_TIMEOUT_MS = 120000;
-const BULK_CONCURRENCY = 2;
+const BULK_CONCURRENCY = 1;
 const BULK_ITEM_DELAY_MS = 200;
 
 const searchError = ref('');

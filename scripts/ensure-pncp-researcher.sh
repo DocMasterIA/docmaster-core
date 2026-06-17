@@ -113,9 +113,14 @@ if ! docker network inspect docmaster_net >/dev/null 2>&1; then
 fi
 
 UP_FLAGS=(-d)
-if [[ "${PNCP_FORCE_RECREATE:-0}" == "1" ]]; then
+PNCP_SERVICE="${PNCP_SERVICE:-pncp_researcher_service}"
+if [[ "${PNCP_FORCE_RECREATE:-0}" == "1" ]] || [[ "${PNCP_BUILD:-0}" == "1" ]]; then
   UP_FLAGS+=(--force-recreate)
-  echo "==> PNCP_FORCE_RECREATE=1 — a recriar contentor"
+  if [[ "${PNCP_BUILD:-0}" == "1" ]]; then
+    echo "==> PNCP_BUILD=1 — rebuild da imagem + recria contentor (código novo só entra após recreate)"
+  else
+    echo "==> PNCP_FORCE_RECREATE=1 — a recriar contentor"
+  fi
 else
   UP_FLAGS+=(--no-recreate)
 fi
@@ -124,7 +129,7 @@ if [[ "${PNCP_BUILD:-0}" == "1" ]]; then
 fi
 
 echo "==> PNCP Researcher 24/7 (projeto docmaster-pncp)"
-docker compose "${COMPOSE_ARGS[@]}" up "${UP_FLAGS[@]}"
+docker compose "${COMPOSE_ARGS[@]}" up "${UP_FLAGS[@]}" "$PNCP_SERVICE"
 
 echo ""
 docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E '^(NAMES|pncp_researcher)' || true
@@ -145,6 +150,17 @@ if [[ "$ok" -eq 1 ]]; then
   echo ""
   echo "==> /local-index/stats (resumo)"
   pncp_print_stats_summary || true
+  echo ""
+  echo "==> contentor (confirme «Up … seconds» — não «Up 30+ hours» após deploy com BUILD=1)"
+  docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' | grep -E "^(NAMES|${PNCP_SERVICE})" || true
+  if [[ "${PNCP_USE_DOCKER_HEALTH:-0}" == "1" ]]; then
+    code_rev="$(docker exec "$PNCP_SERVICE" python -c \
+      "from pncp_researcher_service.app.config import PNCP_SEARCH_CODE_REV; print(PNCP_SEARCH_CODE_REV)" \
+      2>/dev/null || true)"
+    if [[ -n "${code_rev:-}" ]]; then
+      echo "==> search_code_rev (dentro do contentor): $code_rev"
+    fi
+  fi
   echo ""
   if [[ "${PNCP_USE_DOCKER_HEALTH:-0}" == "1" ]]; then
     echo "OK  PNCP ativo (health via docker exec; sem 127.0.0.1:8012 no host)"

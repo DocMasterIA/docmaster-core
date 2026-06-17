@@ -335,6 +335,8 @@ PNCP_SEARCH_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_SEARCH_ENRICH_HOMOLOG_MAX",
 PNCP_BULK_SEARCH_SQL_LIMIT: int = _env_int("PNCP_BULK_SEARCH_SQL_LIMIT", 200)
 # Score mínimo (0–100) para considerar item aderente na busca inteligente (antes ~60–70 implícito).
 PNCP_SEARCH_MIN_SCORE_APROVACAO: int = _env_int("PNCP_SEARCH_MIN_SCORE_APROVACAO", 50)
+# Marcador visível no /health para confirmar deploy do código de busca (manual-parity, tiers, etc.).
+PNCP_SEARCH_CODE_REV: str = os.getenv("PNCP_SEARCH_CODE_REV", "2026-06-17-manual-parity").strip()
 # Descrições de cotação: até N tokens usam busca completa; acima disso cap de âncoras (recall).
 PNCP_SEARCH_ANCHOR_FULL_TERM_MAX: int = _env_int("PNCP_SEARCH_ANCHOR_FULL_TERM_MAX", 5)
 PNCP_SEARCH_ANCHOR_MAX_GROUPS: int = _env_int("PNCP_SEARCH_ANCHOR_MAX_GROUPS", 8)

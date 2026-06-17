@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 
-from .config import PNCP_INGEST_WORKER_ENABLED
+from .config import PNCP_INGEST_WORKER_ENABLED, PNCP_SEARCH_CODE_REV
 from .ingest_coverage import ingest_coverage_status
 from .ingest_planner import plan_ingest_queue
 from .ingest_worker import ingest_worker_loop, process_ingest_batch
@@ -72,6 +72,7 @@ async def health() -> HealthResponse:
         hint = f"{hint} {stall_hint}".strip() if hint else stall_hint
     return HealthResponse(
         ok=True,
+        search_code_rev=PNCP_SEARCH_CODE_REV,
         db_path=db_path,
         db_bytes=db_bytes,
         db_on_data_volume=on_volume,

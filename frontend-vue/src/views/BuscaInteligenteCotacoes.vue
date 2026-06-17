@@ -310,6 +310,7 @@ import {
   isBulkRunActive,
   isPncpResearchRoute,
   isRegistryAutostartBulk,
+  runBulkAutostartOnce,
 } from '../composables/usePncpBulkAutostart.js';
 
 const route = useRoute();
@@ -713,34 +714,37 @@ async function processOneBulkItem(ctx, {
 let bulkAutostartLaunchGuard = 0;
 
 async function launchBulkAutostart(sessionId, pendentesCtx) {
-  if (
-    bulkAutostartRegistry.isRunning
-    && Number(bulkAutostartRegistry.sessionId) === Number(sessionId)
-    && bulkAutostartRegistry.promise
-  ) {
-    await bulkAutostartRegistry.promise;
-    return;
-  }
-  const launchId = ++bulkAutostartLaunchGuard;
-  bulkAutostartRegistry.sessionId = sessionId;
-  bulkAutostartRegistry.isRunning = true;
-  const { bulkRunId } = beginBulkAutostartSession(sessionId);
-  const bulkPromise = runBulkItemSearches(pendentesCtx, {
-    bulkRunId,
-    autostartBulk: true,
-    clearRows: true,
-    sessionId,
-  });
-  bulkAutostartRegistry.promise = bulkPromise;
-  try {
-    await bulkPromise;
-  } finally {
-    if (launchId === bulkAutostartLaunchGuard && Number(bulkAutostartRegistry.bulkRunId) === Number(bulkRunId)) {
-      bulkAutostartRegistry.isRunning = false;
-      bulkAutostartRegistry.promise = null;
+  return runBulkAutostartOnce(sessionId, async () => {
+    if (
+      bulkAutostartRegistry.isRunning
+      && Number(bulkAutostartRegistry.sessionId) === Number(sessionId)
+      && bulkAutostartRegistry.promise
+    ) {
+      await bulkAutostartRegistry.promise;
+      return;
     }
-    persistBulkUiSnapshot(sessionId);
-  }
+    const launchId = ++bulkAutostartLaunchGuard;
+    bulkAutostartRegistry.sessionId = sessionId;
+    bulkAutostartRegistry.isRunning = true;
+    bulkAutostartRegistry.promise = Promise.resolve();
+    const { bulkRunId } = beginBulkAutostartSession(sessionId);
+    const bulkPromise = runBulkItemSearches(pendentesCtx, {
+      bulkRunId,
+      autostartBulk: true,
+      clearRows: true,
+      sessionId,
+    });
+    bulkAutostartRegistry.promise = bulkPromise;
+    try {
+      await bulkPromise;
+    } finally {
+      if (launchId === bulkAutostartLaunchGuard && Number(bulkAutostartRegistry.bulkRunId) === Number(bulkRunId)) {
+        bulkAutostartRegistry.isRunning = false;
+        bulkAutostartRegistry.promise = null;
+      }
+      persistBulkUiSnapshot(sessionId);
+    }
+  });
 }
 
 async function runBulkItemSearches(pendentes, {
@@ -812,9 +816,10 @@ async function runBulkItemSearches(pendentes, {
   }
   isAutoSearchingAll.value = false;
   const p = autoSearchProgress.value;
-  if (p.total > 0 && p.done === 0 && !bulkAutostartRegistry.isRunning) {
+  if (p.total > 0 && p.done === 0) {
     searchError.value =
-      'A busca automática não processou nenhum item (sessão substituída ou cancelada). Recarregue a página ou clique «Pesquisar UF».';
+      'A busca automática não processou nenhum item (sessão cancelada ao recarregar ou duplo autostart). '
+      + 'Recarregue a página uma vez e aguarde, ou clique «Pesquisar UF».';
     return;
   }
   if (p.done < p.total) {
@@ -942,7 +947,7 @@ async function applyFilters() {
     return;
   }
   const hadRows = rows.value.length > 0;
-  const bulkSession = beginBulkAutostartSession(Number(cotacaoId.value));
+  const bulkSession = beginBulkAutostartSession(Number(cotacaoId.value), { forceNew: true });
   bulkAutostartRegistry.sessionId = Number(cotacaoId.value);
   bulkAutostartRegistry.isRunning = false;
   return runBulkItemSearches(pendentes, {

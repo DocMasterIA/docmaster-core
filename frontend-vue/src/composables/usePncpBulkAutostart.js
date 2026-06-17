@@ -18,6 +18,8 @@ export const bulkAutostartRegistry = reactive({
 
 let bulkAutostartController = null;
 let activeBulkRunId = 0;
+/** Evita dois autostarts em paralelo (Vue Strict Mode / double mount). */
+let bulkAutostartSingleFlight = null;
 
 export function isPncpResearchRoute(route) {
   const path = String(route?.path || '');
@@ -28,17 +30,19 @@ export function getBulkAutostartController() {
   return bulkAutostartController;
 }
 
-export function beginBulkAutostartSession(sessionId, { reuseRunning = false } = {}) {
+export function beginBulkAutostartSession(sessionId, { forceNew = false } = {}) {
+  const sid = Number(sessionId);
   if (
-    reuseRunning
+    !forceNew
     && bulkAutostartRegistry.isRunning
-    && Number(bulkAutostartRegistry.sessionId) === Number(sessionId)
+    && Number(bulkAutostartRegistry.sessionId) === sid
     && bulkAutostartRegistry.bulkRunId != null
     && bulkAutostartController
   ) {
     return {
       bulkRunId: bulkAutostartRegistry.bulkRunId,
       signal: bulkAutostartController.signal,
+      reused: true,
     };
   }
   activeBulkRunId += 1;
@@ -51,7 +55,26 @@ export function beginBulkAutostartSession(sessionId, { reuseRunning = false } = 
   bulkAutostartController = new AbortController();
   bulkAutostartRegistry.bulkRunId = bulkRunId;
   bulkAutostartRegistry.pausedByNavigation = false;
-  return { bulkRunId, signal: bulkAutostartController.signal };
+  return { bulkRunId, signal: bulkAutostartController.signal, reused: false };
+}
+
+/**
+ * Garante um único autostart por sessão (remount não cancela o lote em curso).
+ */
+export async function runBulkAutostartOnce(sessionId, runner) {
+  const sid = Number(sessionId);
+  if (bulkAutostartSingleFlight && Number(bulkAutostartSingleFlight.sessionId) === sid) {
+    return bulkAutostartSingleFlight.promise;
+  }
+  const promise = Promise.resolve().then(runner);
+  bulkAutostartSingleFlight = { sessionId: sid, promise };
+  try {
+    return await promise;
+  } finally {
+    if (bulkAutostartSingleFlight?.promise === promise) {
+      bulkAutostartSingleFlight = null;
+    }
+  }
 }
 
 export function isBulkRunActive(bulkRunId) {

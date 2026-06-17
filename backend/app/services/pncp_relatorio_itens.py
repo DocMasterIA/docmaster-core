@@ -314,33 +314,82 @@ def nome_fornecedor_e_util_para_exibicao(nome: str) -> bool:
     return True
 
 
+def _coerce_positive_float(v: Any) -> Optional[float]:
+    if v is None or v == "":
+        return None
+    try:
+        n = float(v)
+    except (TypeError, ValueError):
+        return None
+    return n if n > 0 else None
+
+
+def _item_parece_homologado_mesmo_sem_fornecedor_no_json(src: Dict[str, Any]) -> bool:
+    """Evita rotular homologado como «compra em andamento» quando só faltou snapshot de fornecedor."""
+    if src.get("temResultado") is True or src.get("item_homologado") is True:
+        return True
+    for k in (
+        "valor_unitario_homologado",
+        "valorUnitarioHomologado",
+        "valor_total_homologado",
+        "valorTotalHomologado",
+    ):
+        if _coerce_positive_float(src.get(k)) is not None:
+            return True
+    sit_item = str(
+        _pick_source(
+            src,
+            "situacaoCompraItemNome",
+            "situacao_item",
+            "situacaoCompraItem",
+            default="",
+        )
+        or ""
+    ).strip().lower()
+    return bool(sit_item and any(tok in sit_item for tok in ("homolog", "adjudic", "result")))
+
+
 def _fonte_pncp_em_andamento_sem_fornecedor(src: Dict[str, Any]) -> bool:
     """Compra/item ainda sem vencedor publicado no PNCP (ex.: «Em andamento», temResultado=false)."""
     if _pick_supplier_cnpj_from_source(src) or _pick_supplier_name_from_source(src):
+        return False
+    if _item_parece_homologado_mesmo_sem_fornecedor_no_json(src):
         return False
     tem = src.get("temResultado")
     if tem is False:
         return True
     if src.get("item_homologado") is False:
         return True
-    sit = str(
+    sit_item = str(
         _pick_source(
             src,
             "situacaoCompraItemNome",
             "situacao_item",
             "situacaoCompraItem",
-            "situacao",
-            "situacao_compra",
             default="",
         )
         or ""
     ).strip().lower()
-    if not sit:
-        return False
-    if any(tok in sit for tok in ("andamento", "abert", "publicad", "receb", "julg", "disputa")):
-        return True
-    if any(tok in sit for tok in ("homolog", "adjudic", "result")):
-        return False
+    if sit_item:
+        if any(tok in sit_item for tok in ("homolog", "adjudic", "result")):
+            return False
+        if any(tok in sit_item for tok in ("andamento", "abert", "publicad", "receb", "julg", "disputa")):
+            return True
+    sit_compra = str(
+        _pick_source(
+            src,
+            "situacao",
+            "situacao_compra",
+            "situacaoCompraNome",
+            default="",
+        )
+        or ""
+    ).strip().lower()
+    if sit_compra and not sit_item:
+        if any(tok in sit_compra for tok in ("andamento", "abert", "publicad", "receb", "julg", "disputa")):
+            return True
+        if any(tok in sit_compra for tok in ("homolog", "adjudic", "result")):
+            return False
     return False
 
 

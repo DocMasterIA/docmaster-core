@@ -1291,6 +1291,13 @@ function toggleSelecionarGrupo(group) {
   rows.value = rows.value.map((r) => (ids.has(r.id) ? { ...r, selecionado: mark } : r));
 }
 
+function rowTemCnpjFornecedor(row) {
+  const raw = (row?.sourceRaw && typeof row.sourceRaw === 'object') ? row.sourceRaw : {};
+  const digits = String(row?.cnpjFornecedor || raw.cnpj_fornecedor || raw.cnpjFornecedor || '')
+    .replace(/\D/g, '');
+  return digits.length === 14;
+}
+
 async function adicionarSelecionadosNaCotacao() {
   if (isSavingSelecionados.value) return;
   const sessionId = Number(cotacaoId.value);
@@ -1298,8 +1305,10 @@ async function adicionarSelecionadosNaCotacao() {
     saveMessage.value = 'Cotação inválida para salvar no backend.';
     return;
   }
-  const selecionados = displayedRows.value
-    .filter((r) => r.selecionado)
+  const brutos = displayedRows.value.filter((r) => r.selecionado);
+  const semFornecedor = brutos.filter((r) => !rowTemCnpjFornecedor(r)).length;
+  const selecionados = brutos
+    .filter((r) => rowTemCnpjFornecedor(r))
     .map((r) => {
       const raw = (r.sourceRaw && typeof r.sourceRaw === 'object') ? r.sourceRaw : {};
       const cad = (raw.fornecedor_cadastro && typeof raw.fornecedor_cadastro === 'object')
@@ -1357,8 +1366,13 @@ async function adicionarSelecionadosNaCotacao() {
     };
     });
   if (!selecionados.length) {
-    saveMessage.value = 'Selecione ao menos um item.';
+    saveMessage.value = semFornecedor > 0
+      ? 'Nenhuma fonte com CNPJ de fornecedor homologado. Itens em andamento não entram na cotação.'
+      : 'Selecione ao menos um item.';
     return;
+  }
+  if (semFornecedor > 0) {
+    saveMessage.value = `${semFornecedor} fonte(s) ignorada(s) por não ter CNPJ de fornecedor.`;
   }
   const MAX_ITENS_POR_ENVIO = 2000;
   let enviar = selecionados;

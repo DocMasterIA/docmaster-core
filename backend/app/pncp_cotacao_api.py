@@ -39,7 +39,10 @@ from backend.app.models import (
     Prefeitura,
 )
 from backend.app.services.pncp_source_normalize import normalize_pncp_geo_in_payload
-from backend.app.services.pncp_supplier_enrichment import enrich_supplier_fields_in_payloads
+from backend.app.services.pncp_supplier_enrichment import (
+    fornecedor_tem_cnpj_para_cotacao,
+    enrich_supplier_fields_in_payloads,
+)
 from backend.app.services.pncp_relatorio_itens import (
     agrupar_cotacoes_por_item_relatorio_pesquisa_precos,
     agrupar_itens_relatorio_pesquisa_precos,
@@ -1606,8 +1609,12 @@ def pncp_research_sessions_item_cotacoes(request, sessao_id: int, item_id: int):
 
     built: List[PncpCotacaoItemCotacao] = []
     ignored_duplicadas = 0
+    ignored_sem_fornecedor = 0
     request_seen: set[str] = set()
     for row in dict_rows:
+        if not fornecedor_tem_cnpj_para_cotacao(row):
+            ignored_sem_fornecedor += 1
+            continue
         k = _dedupe_key(row)
         if k and (k in existing_keys or k in request_seen):
             ignored_duplicadas += 1
@@ -1642,6 +1649,16 @@ def pncp_research_sessions_item_cotacoes(request, sessao_id: int, item_id: int):
 
     if not built:
         # Fluxo amigável: ausência de novas linhas (ex.: tudo duplicado) não deve quebrar a UX.
+        msg = "Nenhuma cotação nova para inserir."
+        if ignored_sem_fornecedor and not ignored_duplicadas:
+            msg = (
+                f"{ignored_sem_fornecedor} fonte(s) ignorada(s): sem CNPJ de fornecedor homologado no PNCP."
+            )
+        elif ignored_sem_fornecedor:
+            msg = (
+                f"Nenhuma cotação nova; {ignored_sem_fornecedor} sem fornecedor, "
+                f"{ignored_duplicadas} duplicada(s)."
+            )
         return JsonResponse(
             {
                 "ok": True,
@@ -1649,7 +1666,8 @@ def pncp_research_sessions_item_cotacoes(request, sessao_id: int, item_id: int):
                 "item_id": item.id,
                 "cotacoes_inseridas": 0,
                 "cotacoes_ignoradas_duplicadas": ignored_duplicadas,
-                "mensagem": "Nenhuma cotação nova para inserir.",
+                "cotacoes_ignoradas_sem_fornecedor": ignored_sem_fornecedor,
+                "mensagem": msg,
             }
         )
 
@@ -1666,6 +1684,7 @@ def pncp_research_sessions_item_cotacoes(request, sessao_id: int, item_id: int):
             "item_id": item.id,
             "cotacoes_inseridas": len(built),
             "cotacoes_ignoradas_duplicadas": ignored_duplicadas,
+            "cotacoes_ignoradas_sem_fornecedor": ignored_sem_fornecedor,
         }
     )
 

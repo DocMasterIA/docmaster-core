@@ -499,6 +499,28 @@ def _fornecedor_tem_nome_util(src: Dict[str, Any]) -> bool:
     return True
 
 
+def fornecedor_tem_cnpj_para_cotacao(it: Dict[str, Any]) -> bool:
+    """
+    Exige CNPJ de fornecedor (14 dígitos) para gravar fonte PNCP na cotação.
+    Chamar após flatten/enrich no payload.
+    """
+    if not isinstance(it, dict):
+        return False
+    flatten_supplier_fields_in_payload(it)
+    _promote_supplier_from_deep_walk(it)
+    raw = str(it.get("cnpj_fornecedor") or "").strip()
+    if len(_cnpj_digits(raw)) != 14:
+        raw = _pick_supplier_field_from_layers(
+            it,
+            "cnpj_fornecedor",
+            "cnpjFornecedor",
+            "cnpjCpfFornecedor",
+            "niFornecedor",
+            "cnpj",
+        )
+    return len(_cnpj_digits(raw)) == 14
+
+
 def _extract_supplier_cnpj_only(payload: Any) -> str:
     """Só CNPJ do fornecedor a partir do JSON PNCP; ignora nome (vem da BrasilAPI)."""
     cands = _walk_supplier_candidates(payload)

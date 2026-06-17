@@ -19,6 +19,7 @@ from backend.app.services.pncp_supplier_enrichment import (
     _pncp_compra_keys_present,
     _should_attempt_pncp_supplier_lookup,
     flatten_supplier_fields_in_payload,
+    fornecedor_tem_cnpj_para_cotacao,
 )
 
 
@@ -207,6 +208,27 @@ class FonteEmAndamentoRelatorioTests(unittest.TestCase):
             "temResultado": True,
         }
         self.assertFalse(_fonte_pncp_em_andamento_sem_fornecedor(src))
+
+    def test_homologado_sem_snapshot_nao_e_em_andamento(self):
+        src = {
+            "numero_pncp": "12345678000195-1-2023-7",
+            "temResultado": True,
+            "valor_unitario_homologado": 12.5,
+            "situacao_compra": "Em andamento",
+        }
+        self.assertFalse(_fonte_pncp_em_andamento_sem_fornecedor(src))
+        self.assertEqual(
+            _fornecedor_exibicao_relatorio(src, fornecedor="", cnpj_fornecedor=""),
+            "Não informado",
+        )
+
+    def test_exige_cnpj_para_gravar_cotacao(self):
+        self.assertFalse(fornecedor_tem_cnpj_para_cotacao({"fornecedor": "Só nome LTDA"}))
+        self.assertTrue(
+            fornecedor_tem_cnpj_para_cotacao(
+                {"cnpj_fornecedor": "27.105.456/0001-72", "fornecedor": "EMPRESA TESTE LTDA"}
+            )
+        )
 
 
 if __name__ == "__main__":

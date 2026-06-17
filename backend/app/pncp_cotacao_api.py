@@ -1185,18 +1185,26 @@ def pncp_research_sessions_detail(request, sessao_id: int):
     fontes_counts = _fontes_counts_for_session(c.id)
     formula_id = _resolve_formula_calculo_id(c.filtros or {})
     refletidos = _itens_refletidos_for_session(c.id, formula_id)
+    # Enriquecimento de e-mail (ReceitaWS/cnpj.ws) e fontes detalhadas só na vista de relatório —
+    # evita travar o GET da cotação (Detalhes / item) por minutos em cotações grandes.
+    email_fallback = relatorio_view and bool(
+        getattr(settings, "PNCP_RELATORIO_PDF_RECEITAWS_EMAIL", True)
+    )
+    email_wait = relatorio_view and bool(getattr(settings, "PNCP_RELATORIO_VIEW_EMAIL_WAIT", True))
     if cotacoes_sessao:
         grupos_relatorio, total_linhas_cotacao = agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
             itens_asc,
             cotacoes_sessao,
-            receitaws_email_fallback=bool(getattr(settings, "PNCP_RELATORIO_PDF_RECEITAWS_EMAIL", True)),
-            receitaws_allow_wait=bool(getattr(settings, "PNCP_RELATORIO_VIEW_EMAIL_WAIT", True)),
+            receitaws_email_fallback=email_fallback,
+            receitaws_allow_wait=email_wait,
+            include_fontes=relatorio_view,
         )
     else:
         grupos_relatorio, total_linhas_cotacao = agrupar_itens_relatorio_pesquisa_precos(
             itens_asc,
-            receitaws_email_fallback=bool(getattr(settings, "PNCP_RELATORIO_PDF_RECEITAWS_EMAIL", True)),
-            receitaws_allow_wait=bool(getattr(settings, "PNCP_RELATORIO_VIEW_EMAIL_WAIT", True)),
+            receitaws_email_fallback=email_fallback,
+            receitaws_allow_wait=email_wait,
+            include_fontes=relatorio_view,
         )
     orgao_exibicao = texto_orgao_exibicao_relatorio_pesquisa_precos(c, request.user, grupos_relatorio)
     formula_label = FORMULA_LABELS.get(formula_id, FORMULA_LABELS[DEFAULT_FORMULA_CALCULO])

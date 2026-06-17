@@ -856,6 +856,7 @@ def agrupar_itens_relatorio_pesquisa_precos(
     receitaws_email_fallback: bool = False,
     receitaws_allow_wait: bool = False,
     receitaws_unlimited: bool = False,
+    include_fontes: bool = True,
 ) -> Tuple[List[Dict[str, Any]], int]:
     """
     Retorna lista de grupos (ordenada por menor id no grupo) e total de linhas importadas.
@@ -868,10 +869,14 @@ def agrupar_itens_relatorio_pesquisa_precos(
     tz = timezone.get_current_timezone()
     total_linhas = len(itens)
     brasilapi_cache: Dict[str, Dict[str, Any]] = {}
-    receitaws_pdf_state = _receitaws_state_if_enabled(
-        receitaws_email_fallback=receitaws_email_fallback,
-        allow_rate_limit_wait=receitaws_allow_wait,
-        unlimited=receitaws_allow_wait and receitaws_unlimited,
+    receitaws_pdf_state = (
+        _receitaws_state_if_enabled(
+            receitaws_email_fallback=receitaws_email_fallback,
+            allow_rate_limit_wait=receitaws_allow_wait,
+            unlimited=receitaws_allow_wait and receitaws_unlimited,
+        )
+        if include_fontes
+        else None
     )
 
     buckets: Dict[Tuple[str, str, str, str], List[Any]] = {}
@@ -892,7 +897,7 @@ def agrupar_itens_relatorio_pesquisa_precos(
     for ordem, key in enumerate(order_keys, start=1):
         members = buckets[key]
         members.sort(key=lambda x: int(getattr(x, "pk", 0) or 0))
-        supplier_name_idx = _build_supplier_name_index(members)
+        supplier_name_idx = _build_supplier_name_index(members) if include_fontes else None
 
         first = members[0]
         nome = (getattr(first, "descricao_item", None) or "—")[:500]
@@ -921,17 +926,21 @@ def agrupar_itens_relatorio_pesquisa_precos(
         else:
             situacao = f"Insuficiente ({n_cot} de {MIN_FONTES_SITUACAO_VALIDA} fontes)"
 
-        fontes = [
-            fonte_dict_de_item(
-                m,
-                tz=tz,
-                supplier_name_by_cnpj=supplier_name_idx,
-                quantidade_item_base=q_first,
-                brasilapi_cache=brasilapi_cache,
-                receitaws_pdf_state=receitaws_pdf_state,
-            )
-            for m in members
-        ]
+        fontes = (
+            [
+                fonte_dict_de_item(
+                    m,
+                    tz=tz,
+                    supplier_name_by_cnpj=supplier_name_idx,
+                    quantidade_item_base=q_first,
+                    brasilapi_cache=brasilapi_cache,
+                    receitaws_pdf_state=receitaws_pdf_state,
+                )
+                for m in members
+            ]
+            if include_fontes
+            else []
+        )
 
         grupos.append(
             {
@@ -958,6 +967,7 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
     receitaws_email_fallback: bool = False,
     receitaws_allow_wait: bool = False,
     receitaws_unlimited: bool = False,
+    include_fontes: bool = True,
 ) -> Tuple[List[Dict[str, Any]], int]:
     """
     Novo fluxo: item manual + múltiplas cotações vinculadas.
@@ -974,10 +984,14 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
     tz = timezone.get_current_timezone()
     total_linhas = len(cotacoes or [])
     brasilapi_cache: Dict[str, Dict[str, Any]] = {}
-    receitaws_pdf_state = _receitaws_state_if_enabled(
-        receitaws_email_fallback=receitaws_email_fallback,
-        allow_rate_limit_wait=receitaws_allow_wait,
-        unlimited=receitaws_allow_wait and receitaws_unlimited,
+    receitaws_pdf_state = (
+        _receitaws_state_if_enabled(
+            receitaws_email_fallback=receitaws_email_fallback,
+            allow_rate_limit_wait=receitaws_allow_wait,
+            unlimited=receitaws_allow_wait and receitaws_unlimited,
+        )
+        if include_fontes
+        else None
     )
     cotacoes_por_item: Dict[int, List[Any]] = defaultdict(list)
     for c in cotacoes or []:
@@ -993,7 +1007,7 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
     for ordem, it in enumerate(itens, start=1):
         item_id = int(getattr(it, "id", 0) or 0)
         members = sorted(cotacoes_por_item.get(item_id, []), key=lambda x: int(getattr(x, "pk", 0) or 0))
-        supplier_name_idx = _build_supplier_name_index(members)
+        supplier_name_idx = _build_supplier_name_index(members) if include_fontes else None
 
         nome = (getattr(it, "descricao_item", None) or "—")[:500]
         und = (getattr(it, "unidade_medida", None) or "").strip()[:64]
@@ -1044,17 +1058,21 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
         else:
             situacao = f"Insuficiente ({n_cot} de {MIN_FONTES_SITUACAO_VALIDA} fontes)"
 
-        fontes = [
-            fonte_dict_de_item(
-                m,
-                tz=tz,
-                supplier_name_by_cnpj=supplier_name_idx,
-                quantidade_item_base=qtd_item_f,
-                brasilapi_cache=brasilapi_cache,
-                receitaws_pdf_state=receitaws_pdf_state,
-            )
-            for m in members
-        ]
+        fontes = (
+            [
+                fonte_dict_de_item(
+                    m,
+                    tz=tz,
+                    supplier_name_by_cnpj=supplier_name_idx,
+                    quantidade_item_base=qtd_item_f,
+                    brasilapi_cache=brasilapi_cache,
+                    receitaws_pdf_state=receitaws_pdf_state,
+                )
+                for m in members
+            ]
+            if include_fontes
+            else []
+        )
         grupos.append(
             {
                 "ordem": ordem,

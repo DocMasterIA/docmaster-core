@@ -155,9 +155,9 @@ export function createResearchSession(payload, signal) {
   });
 }
 
-export function getResearchSession(sessaoId, { signal, relatorio = false } = {}) {
+export function getResearchSession(sessaoId, { signal, relatorio = false, timeoutMs = 120_000 } = {}) {
   const q = relatorio ? '?relatorio=1' : '';
-  return cotacaoRequest(`research/sessions/${encodeURIComponent(sessaoId)}${q}`, { signal });
+  return cotacaoRequest(`research/sessions/${encodeURIComponent(sessaoId)}${q}`, { signal, timeoutMs });
 }
 
 /** Lista paginada e leve de itens para busca inteligente em lote (centenas de itens). */

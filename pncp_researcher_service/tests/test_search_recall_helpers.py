@@ -18,9 +18,12 @@ from app.local_index import (  # noqa: E402
 )
 from app.search_text_clean import preprocess_cotacao_search_term  # noqa: E402
 from app.service import (  # noqa: E402
+    _build_manual_parity_top3,
     _compute_match_score,
     _ensure_top3_from_pool,
     _infer_search_bottleneck,
+    _iter_search_term_fallbacks,
+    _row_price_for_faixa,
 )
 
 
@@ -135,6 +138,40 @@ class TestSearchRecallHelpers(unittest.TestCase):
         term = "AGULHA HIPODÊRMICA TAMANHO: 13 X 4,5 (26 G½) CX C/100 UNIDADES"
         tiers = build_search_query_tiers(term)
         self.assertIsNone(_match_row_search_tiers("SERINGA DESCARTAVEL 10ML", tiers))
+
+    def test_search_term_fallbacks_incluem_nucleo_curto(self):
+        term = "AGULHA HIPODÊRMICA TAMANHO: 13 X 4,5 (26 G½) CX C/100 UNIDADES."
+        alts = _iter_search_term_fallbacks(term)
+        self.assertTrue(alts)
+        self.assertEqual(alts[0], term)
+        joined = " ".join(alts).lower()
+        self.assertIn("13x45", joined)
+
+    def test_manual_parity_top3_usa_preco_estimado(self):
+        itens = [
+            {
+                "numero_pncp": "1",
+                "numero_item": "1",
+                "descricao_item": "AGULHA HIPODERMICA 13X45",
+                "orgao": "Org A",
+                "valor_unitario_estimado": 12.5,
+                "search_tier": "core",
+                "origem": "base_local_itens",
+            },
+            {
+                "numero_pncp": "2",
+                "numero_item": "1",
+                "descricao_item": "AGULHA HIPODERMICA 13X45",
+                "orgao": "Org B",
+                "valor_unitario_estimado": 11.0,
+                "search_tier": "flex",
+                "origem": "base_local_itens",
+            },
+        ]
+        self.assertGreater(_row_price_for_faixa(itens[0]), 0.0)
+        top = _build_manual_parity_top3(itens, "AGULHA HIPODERMICA 13 X 4,5")
+        self.assertGreaterEqual(len(top), 1)
+        self.assertTrue(top[0].get("match_manual_parity"))
 
 
 if __name__ == "__main__":

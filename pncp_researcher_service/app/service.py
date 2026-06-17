@@ -51,6 +51,7 @@ from .pncp_client import (
 )
 from .local_index import (
     _build_search_tokens,
+    build_search_query_tiers,
     derive_anchor_search_term,
     enrich_homolog_items_from_pncp,
     upsert_contracts,
@@ -1558,6 +1559,111 @@ def _row_price_for_faixa(it: Dict[str, Any]) -> float:
     return 0.0
 
 
+def _iter_search_term_fallbacks(termo_busca: str) -> List[str]:
+    """
+    Termos alternativos alinhados à busca manual (prefixos / núcleo / âncora).
+    """
+    raw = (termo_busca or "").strip()
+    if not raw:
+        return []
+    out: List[str] = []
+    seen: set[str] = set()
+
+    def push(t: str) -> None:
+        s = (t or "").strip()
+        if len(s) < 4:
+            return
+        key = s.lower()
+        if key in seen:
+            return
+        seen.add(key)
+        out.append(s)
+
+    push(raw)
+    push(preprocess_cotacao_search_term(raw) or raw)
+    eff, _meta = derive_anchor_search_term(raw)
+    push(eff)
+    for tier in build_search_query_tiers(raw):
+        if tier.label in ("strict", "core"):
+            push(tier.termo)
+    tokens = raw.split()
+    if len(tokens) >= 4:
+        for cut in range(1, min(6, len(tokens) - 2)):
+            push(" ".join(tokens[: len(tokens) - cut]))
+    return out
+
+
+def _local_item_dedupe_key(it: Dict[str, Any]) -> tuple[str, str, str]:
+    return (
+        str(it.get("numero_pncp") or ""),
+        str(it.get("numero_item") or ""),
+        str(it.get("descricao_item") or "")[:120],
+    )
+
+
+def _merge_local_item_batches(existing: List[Dict[str, Any]], new_batch: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    seen = {_local_item_dedupe_key(x) for x in existing}
+    out = list(existing)
+    for it in new_batch:
+        key = _local_item_dedupe_key(it)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(it)
+    return out
+
+
+def _build_manual_parity_top3(
+    itens: List[Dict[str, Any]],
+    termo_busca: str,
+    *,
+    faixa_min: Optional[float] = None,
+    faixa_max: Optional[float] = None,
+    target: int = 3,
+    relax_faixa: bool = False,
+) -> List[Dict[str, Any]]:
+    """
+    Fallback da busca inteligente: mesma base da busca manual (índice local + preço).
+    """
+    tier_rank = {"strict": 0, "core": 1, "flex": 2, "anchor": 3}
+    min_ok = int(PNCP_SEARCH_MIN_SCORE_APROVACAO)
+    pool: List[Dict[str, Any]] = []
+    for it in itens:
+        if _row_price_for_faixa(it) <= 0.0:
+            continue
+        if not relax_faixa and faixa_min is not None and faixa_max is not None:
+            if not _preco_dentro_faixa(it, faixa_min, faixa_max):
+                continue
+        tier = str(it.get("search_tier") or "").lower()
+        lit = round(_literal_match_score(termo_busca, it), 3)
+        score_base = 78 if tier == "strict" else 72 if tier == "core" else 65 if tier == "flex" else 58
+        row = dict(it)
+        row["literal_match"] = lit
+        row["score_bruto"] = float(score_base)
+        row["score_aprovacao"] = score_base
+        row["confiabilidade"] = _classify_confiabilidade(score_base)
+        row["risco"] = _classify_risco(score_base)
+        row["status"] = "Aprovado" if score_base >= min_ok else "Revisar"
+        row["similaridade_encontrada"] = tier in ("flex", "anchor") or lit < 6.0
+        row["match_manual_parity"] = True
+        row["origem"] = row.get("origem") or "base_local_itens"
+        row["_manual_rank"] = (tier_rank.get(tier, 4), -lit, -_row_price_for_faixa(it))
+        pool.append(row)
+    if not pool and faixa_min is not None and not relax_faixa:
+        return _build_manual_parity_top3(
+            itens,
+            termo_busca,
+            faixa_min=faixa_min,
+            faixa_max=faixa_max,
+            target=target,
+            relax_faixa=True,
+        )
+    pool.sort(key=lambda x: x["_manual_rank"])
+    for row in pool:
+        row.pop("_manual_rank", None)
+    return _select_top3_prioritize_federal(pool)[: max(1, int(target))]
+
+
 def _ia_item_key(it: Dict[str, Any]) -> str:
     return "|".join(
         [
@@ -1956,17 +2062,31 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         limit = min(limit, max(80, int(PNCP_BULK_SEARCH_SQL_LIMIT)))
     termo_busca_raw = search_payload.termo_busca
     termo_efetivo, term_meta = derive_anchor_search_term(termo_busca_raw)
-    base_items = local_item_search(
-        termo_busca_raw,
-        uf=search_payload.uf,
-        municipio=search_payload.municipio,
-        recortes_geograficos=search_payload.recortes_geograficos,
-        codigo_modalidade=search_payload.codigo_modalidade,
-        limit=limit,
-        cleanup_for_display=False,
-        somente_homologados=search_payload.somente_homologados,
-    )
-    itens = list(base_items.get("itens") or [])
+    itens: List[Dict[str, Any]] = []
+    base_stats: Dict[str, Any] = {}
+    terms_tried: List[str] = []
+    for term_try in _iter_search_term_fallbacks(termo_busca_raw):
+        terms_tried.append(term_try)
+        batch_result = local_item_search(
+            term_try,
+            uf=search_payload.uf,
+            municipio=search_payload.municipio,
+            recortes_geograficos=search_payload.recortes_geograficos,
+            codigo_modalidade=search_payload.codigo_modalidade,
+            limit=limit,
+            cleanup_for_display=False,
+            somente_homologados=search_payload.somente_homologados,
+        )
+        if not base_stats:
+            base_stats = dict(batch_result.get("stats") or {})
+        batch = list(batch_result.get("itens") or [])
+        itens = _merge_local_item_batches(itens, batch)
+        priced_n = sum(1 for x in itens if _row_price_for_faixa(x) > 0.0)
+        if priced_n >= 3:
+            break
+        if len(itens) >= limit:
+            break
+    base_items = {"ok": True, "itens": itens, "stats": base_stats}
     base_stats = dict(base_items.get("stats") or {})
     funil: Dict[str, Any] = {
         "termo_busca": term_meta,
@@ -1976,6 +2096,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         "filtrados_token_match": int(base_stats.get("filtrados_token_match") or 0),
         "filtrados_nao_homologados": int(base_stats.get("filtrados_nao_homologados") or 0),
         "busca_lote_relaxada": bool(busca_lote),
+        "search_terms_tried": terms_tried,
     }
     hybrid_used = False
     hybrid_live_count = 0
@@ -2099,10 +2220,9 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         faixa_min = max(0.0, ref_value - margem)
         faixa_max = ref_value + margem
     valores = [
-        x.get("valor_unitario") or x.get("valor_total") or x.get("valor_global")
+        _row_price_for_faixa(x)
         for x in itens
-        if isinstance((x.get("valor_unitario") or x.get("valor_total") or x.get("valor_global")), (int, float))
-        and (x.get("valor_unitario") or x.get("valor_total") or x.get("valor_global") or 0) > 0
+        if _row_price_for_faixa(x) > 0.0
     ]
     median_val = median(valores) if valores else None
     min_ok = int(PNCP_SEARCH_MIN_SCORE_APROVACAO)
@@ -2199,13 +2319,13 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                     supplier_pen = -35.0
                 else:
                     supplier_pen = -18.0
-            row_value = _safe_float(it.get("valor_unitario") or it.get("valor_total") or it.get("valor_global"))
+            row_value = _row_price_for_faixa(it)
             # Regra rígida: nunca considerar item com preço zerado/ausente.
             if row_value <= 0:
                 continue
             if faixa_min is not None and faixa_max is not None:
                 # Regra de negócio: com valor base + variação informados, faixa é obrigatória.
-                if row_value < faixa_min or row_value > faixa_max:
+                if not _preco_dentro_faixa(it, faixa_min, faixa_max):
                     continue
             if ref_value > 0 and row_value > 0:
                 v_dev = abs(row_value - ref_value) / max(ref_value, 1e-9)
@@ -2335,6 +2455,10 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         # Literal "de verdade": veio do fluxo estrito e não está marcado como similaridade/fallback.
         if bool(it.get("match_relaxado")) or bool(it.get("match_agressivo")):
             return False
+        tier = str(it.get("search_tier") or "").lower()
+        origem = str(it.get("origem") or "")
+        if tier in ("strict", "core") and origem.startswith("base_local"):
+            return True
         if bool(it.get("similaridade_encontrada")):
             return False
         return float(it.get("literal_match") or 0) >= 6.0
@@ -2441,6 +2565,25 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         faixa_min=faixa_min,
         faixa_max=faixa_max,
     )
+    if not top3 and itens:
+        top3 = _build_manual_parity_top3(
+            itens,
+            termo_efetivo,
+            faixa_min=faixa_min,
+            faixa_max=faixa_max,
+        )
+        funil["manual_parity_fallback"] = len(top3)
+    elif len(top3) < 3 and itens:
+        extra = _build_manual_parity_top3(
+            itens,
+            termo_efetivo,
+            faixa_min=faixa_min,
+            faixa_max=faixa_max,
+            target=3,
+        )
+        top3 = _merge_unique_items(top3, extra)[:3]
+        if extra:
+            funil["manual_parity_topup"] = len(extra)
     funil["top3_final"] = len(top3)
     if len(top3) < 3 and funil.get("scored_final_pool", 0) >= 3:
         funil["provavel_gargalo_top3"] = "selecao_top3_incompleta"

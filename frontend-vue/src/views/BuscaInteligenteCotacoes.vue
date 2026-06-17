@@ -477,10 +477,12 @@ function beginNewSearchSession() {
     /* ignore */
   }
   activeBulkRunId += 1;
-  try {
-    getBulkAutostartController()?.abort();
-  } catch (_) {
-    /* ignore */
+  if (!bulkAutostartRegistry.isRunning) {
+    try {
+      getBulkAutostartController()?.abort();
+    } catch (_) {
+      /* ignore */
+    }
   }
   searchAbortController = new AbortController();
   searchGeneration.value += 1;
@@ -653,6 +655,11 @@ async function processOneBulkItem(ctx, {
   const sid = Number(sessionId);
   const stopOpts = { mountRunId, myBulkRunId, generation, autostartBulk };
   if (bulkRunShouldStop(stopOpts)) {
+    if (autostartBulk && bulkAutostartRegistry.pausedByNavigation) {
+      lastBulkFailure.value = 'Busca pausada (navegação para outro módulo).';
+    } else if (autostartBulk) {
+      lastBulkFailure.value = 'Autostart cancelado (requisição abortada).';
+    }
     return { stop: true };
   }
   if (!String(ctx?.descricao_item || '').trim()) {
@@ -715,18 +722,9 @@ let bulkAutostartLaunchGuard = 0;
 
 async function launchBulkAutostart(sessionId, pendentesCtx) {
   return runBulkAutostartOnce(sessionId, async () => {
-    if (
-      bulkAutostartRegistry.isRunning
-      && Number(bulkAutostartRegistry.sessionId) === Number(sessionId)
-      && bulkAutostartRegistry.promise
-    ) {
-      await bulkAutostartRegistry.promise;
-      return;
-    }
     const launchId = ++bulkAutostartLaunchGuard;
     bulkAutostartRegistry.sessionId = sessionId;
     bulkAutostartRegistry.isRunning = true;
-    bulkAutostartRegistry.promise = Promise.resolve();
     const { bulkRunId } = beginBulkAutostartSession(sessionId);
     const bulkPromise = runBulkItemSearches(pendentesCtx, {
       bulkRunId,
@@ -817,9 +815,10 @@ async function runBulkItemSearches(pendentes, {
   isAutoSearchingAll.value = false;
   const p = autoSearchProgress.value;
   if (p.total > 0 && p.done === 0) {
-    searchError.value =
-      'A busca automática não processou nenhum item (sessão cancelada ao recarregar ou duplo autostart). '
-      + 'Recarregue a página uma vez e aguarde, ou clique «Pesquisar UF».';
+    const hint = String(lastBulkFailure.value || '').trim();
+    searchError.value = hint
+      ? `${hint} Recarregue ou clique «Pesquisar UF».`
+      : 'A busca automática não processou nenhum item (cancelada antes da 1ª requisição). Recarregue ou clique «Pesquisar UF».';
     return;
   }
   if (p.done < p.total) {
@@ -1064,7 +1063,14 @@ async function runSearchWithContext({
   const generationStale = () =>
     !bulkAutostart && generation != null && generation !== searchGeneration.value;
   const bulkSuperseded = () => {
-    if (autostartBulk) return !isRegistryAutostartBulk(bulkRunId);
+    if (autostartBulk) {
+      if (bulkAutostartRegistry.pausedByNavigation) return true;
+      try {
+        return Boolean(getBulkAutostartController()?.signal?.aborted);
+      } catch (_) {
+        return false;
+      }
+    }
     return bulkRunId != null && !isBulkRunActive(bulkRunId);
   };
   // Autostart: abortável ao sair do módulo PNCP (liberta API para Dispensa/outros fluxos).

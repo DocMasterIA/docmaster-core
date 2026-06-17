@@ -96,7 +96,13 @@ export function bulkRunShouldStop({
 } = {}) {
   if (autostartBulk) {
     if (bulkAutostartRegistry.pausedByNavigation) return true;
-    return !isRegistryAutostartBulk(myBulkRunId);
+    // Autostart: só cancela por abort explícito (navegação / «Pesquisar UF»), nunca por bulkRunId stale.
+    try {
+      if (bulkAutostartController?.signal?.aborted) return true;
+    } catch (_) {
+      /* ignore */
+    }
+    return false;
   }
   if (mountRunId != null && mountRunId !== mountRunSeq) return true;
   if (myBulkRunId != null && !isBulkRunActive(myBulkRunId)) return true;

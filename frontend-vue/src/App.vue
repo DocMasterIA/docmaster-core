@@ -222,17 +222,17 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { normalizeAllowedModules, resolveModuleKey } from './moduleAccess';
+import { normalizeAllowedModules, resolveModuleKey, MODULE_KEYS } from './moduleAccess';
 import ModuleNotLicensed from './views/ModuleNotLicensed.vue';
 import { getApiBase } from '@/utils/apiBase.js';
+import { useSessionUser } from '@/composables/useSessionUser.js';
 
 const API_BASE = getApiBase();
 const DARK_MODE_KEY = 'docmaster.ui.darkmode';
 const SIDEBAR_NAV_HIDDEN_KEY = 'docmaster.ui.sidebarNavHidden';
 const router = useRouter();
 const route = useRoute();
-
-const user = ref(null);
+const { user, fetchMe, clearUser } = useSessionUser();
 const darkMode = ref(false);
 /** Painel lateral (≥1280px); em viewports estreitas a sidebar já fica oculta por CSS. */
 const sidebarNavHidden = ref(false);
@@ -385,7 +385,11 @@ const mainTabs = [
   { key: 'usuario', label: 'Área do Usuário', icon: 'fa-user', to: '/area-do-usuario' },
 ];
 
-const allowedModules = computed(() => normalizeAllowedModules(user.value?.allowed_modules, !!user.value?.is_superuser));
+const allowedModules = computed(() => {
+  // Perfil ainda não carregado: não esconder menu lateral (evita /geracao/dispensa vazio até refresh).
+  if (user.value == null) return [...MODULE_KEYS];
+  return normalizeAllowedModules(user.value?.allowed_modules, !!user.value?.is_superuser);
+});
 const allowedModuleSet = computed(() => new Set(allowedModules.value));
 
 /** Perfil carregado: evita mostrar bloqueio antes do /api/me/ no App (router já validou sessão). */
@@ -562,15 +566,9 @@ function groupedChildren(page) {
   return ordered.length > 0 ? ordered : [{ key: 'Itens', title: 'Itens', items: children }];
 }
 
-async function fetchMe() {
-  try {
-    const res = await fetch(`${API_BASE}/api/me/`, { credentials: 'include' });
-    if (!res.ok) return;
-    const data = await res.json();
-    user.value = data;
-  } catch (e) {
-    console.warn('fetchMe failed', e);
-  }
+async function fetchMeIfNeeded() {
+  if (user.value) return;
+  await fetchMe();
 }
 
 async function logout() {
@@ -579,7 +577,7 @@ async function logout() {
   } catch (e) {
     console.warn('logout request failed', e);
   }
-  user.value = null;
+  clearUser();
   router.push('/login');
 }
 
@@ -610,7 +608,7 @@ onMounted(() => {
     sidebarNavHidden.value = false;
   }
   syncDarkModeRootClass(darkMode.value);
-  fetchMe();
+  fetchMeIfNeeded();
   if (
     ['dispensa', 'inexigibilidade', 'etp'].includes(activeMainTabKey.value)
     && allowedModuleSet.value.has(activeMainTabKey.value)

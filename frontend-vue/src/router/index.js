@@ -1,9 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 /** Import estático: evita chunk lazy `DispensaArt75IIRapidaReactPreview-*.js` (falha com index.html ou CDN em cache após deploy). */
 import DispensaArt75IIRapidaReactPreview from '../views/DispensaArt75IIRapidaReactPreview.vue';
-import { getApiBase } from '../utils/apiBase.js';
-
-const API_BASE = getApiBase();
+import { useSessionUser } from '../composables/useSessionUser.js';
 
 const routes = [
   {
@@ -293,7 +291,8 @@ const router = createRouter({
 
 /** Verifica autenticação: rotas sem meta.public exigem login. */
 router.beforeEach(async (to) => {
-  const me = await fetchMePayload();
+  const { fetchMe } = useSessionUser();
+  const me = await fetchMe();
   if (to.meta?.public) {
     if (me && to.name === 'Login') {
       return to.query?.redirect ? { path: to.query.redirect } : { path: '/' };
@@ -305,22 +304,6 @@ router.beforeEach(async (to) => {
   }
   /* Módulos sem permissão: a navegação prossegue; o App.vue mostra «Módulo Não Liberado». */
 });
-
-function fetchMePayload() {
-  return fetch(`${API_BASE}/api/me/`, { method: 'GET', credentials: 'include' })
-    .then(async (res) => {
-      if (res.status !== 200) return null;
-      const ctype = (res.headers.get('content-type') || '').toLowerCase();
-      if (!ctype.includes('application/json')) return null;
-      try {
-        const data = await res.json();
-        return data && typeof data === 'object' ? data : null;
-      } catch (_) {
-        return null;
-      }
-    })
-    .catch(() => null);
-}
 
 router.afterEach((to) => {
   document.title = to.meta?.title ? `${to.meta.title} – DocMasterIA` : 'DocMasterIA';

@@ -35,6 +35,7 @@ from backend.app.services.pncp_relatorio_itens import (
     nome_fornecedor_e_util_para_exibicao,
     texto_orgao_exibicao_relatorio_pesquisa_precos,
 )
+from backend.app.services.pncp_supplier_enrichment import receitaws_email_fallback_enabled
 from backend.app.services.pncp_relatorio_pdf_layout import (
     PDF_CAPA_RESPONSAVEL_MAX,
     PDF_CAPA_TITULO_COTACAO_MAX,

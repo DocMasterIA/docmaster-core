@@ -285,6 +285,19 @@ class HomologLookupGateTests(unittest.TestCase):
         self.assertTrue(_needs_homolog_pricing_lookup(it))
         self.assertTrue(_should_attempt_pncp_supplier_lookup(it, only_homolog=True))
 
+    def test_busca_pncp_somente_cnpj_sem_situacao(self):
+        it = {
+            "numero_pncp": "95587648000112-1-000045/2025",
+            "ano_compra": 2025,
+            "sequencial_compra": 45,
+            "numero_item": "3",
+            "cnpj_fornecedor": "12345678000195",
+            "fornecedor": "FORNECEDOR LTDA",
+            "valor_unitario": 121.0,
+            "valor_total": 12100.0,
+        }
+        self.assertTrue(_needs_homolog_pricing_lookup(it))
+
     def test_nao_busca_quando_homologado_ja_presente(self):
         it = {
             "numero_pncp": "95587648000112-1-000045/2025",

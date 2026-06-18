@@ -186,11 +186,16 @@ def _homolog_pricing_present(it: Dict[str, Any]) -> bool:
 
 
 def _needs_homolog_pricing_lookup(it: Dict[str, Any]) -> bool:
-    """Item homologado com chaves PNCP mas sem preço vencedor de /resultados."""
+    """Compra PNCP + item sem preço vencedor persistido de /resultados."""
     if _homolog_pricing_present(it):
         return False
     if not _pncp_compra_keys_present(it):
         return False
+    if not str(it.get("numero_item") or it.get("numeroItem") or "").strip():
+        return False
+    cnpj_f = re.sub(r"\D", "", str(it.get("cnpj_fornecedor") or ""))
+    if len(cnpj_f) == 14:
+        return True
     if item_homologado_para_busca_dict(it):
         return True
     return bool(it.get("temResultado"))
@@ -1533,6 +1538,64 @@ def _apply_brasilapi_enrichment_to_payload(
         snap_br["fornecedor_contato_fonte"] = "brasilapi_cnpj"
     changed = _merge_supplier_snap_into_payload(it, snap_br)
     return changed, brasil_fetches
+
+
+def enrich_homolog_pricing_for_payloads(
+    payloads: Iterable[Dict[str, Any]],
+    *,
+    max_lookups: Optional[int] = None,
+) -> int:
+    """
+    Consulta GET /resultados no PNCP só para preço homologado (sem BrasilAPI/e-mail).
+    Usado ao carregar cotações já salvas cujo fornecedor está completo mas falta preço vencedor.
+    """
+    lim = max_lookups
+    if lim is None:
+        lim = int(getattr(settings, "PNCP_ADD_SOURCE_MAX_PNCP_LOOKUPS", "48"))
+    cache: Dict[Tuple[str, int, int, str], Dict[str, Any]] = {}
+    lookups = 0
+    updated = 0
+    for it in payloads:
+        if not isinstance(it, dict):
+            continue
+        flatten_supplier_fields_in_payload(it)
+        _ensure_pncp_compra_keys(it)
+        if not _needs_homolog_pricing_lookup(it):
+            continue
+        if _positive_float(it.get("valor_total")) and _positive_float(it.get("valor_total_estimado")) is None:
+            it.setdefault("valor_total_estimado", it.get("valor_total"))
+        if _positive_float(it.get("valor_unitario")) and _positive_float(it.get("valor_unitario_estimado")) is None:
+            it.setdefault("valor_unitario_estimado", it.get("valor_unitario"))
+        np = str(it.get("numero_pncp") or it.get("numeroControlePNCP") or "").strip()
+        cnpj_org = _extract_cnpj_orgao(np)
+        ano, seq = _ano_seq_for_enrichment(
+            numero_pncp=np,
+            ano_compra=it.get("ano_compra"),
+            sequencial_compra=it.get("sequencial_compra"),
+            source=it,
+        )
+        if len(cnpj_org) != 14 or ano is None or seq is None:
+            continue
+        numero_item = _numero_item_from_payload(it)
+        situacao = str(
+            it.get("situacao_compra") or it.get("situacao") or it.get("situacaoCompraNome") or ""
+        ).strip()
+        key = (cnpj_org, int(ano), int(seq), numero_item)
+        if key not in cache:
+            if lookups >= lim:
+                continue
+            cache[key] = get_contract_supplier_snapshot_sync(
+                cnpj_org,
+                int(ano),
+                int(seq),
+                numero_item=numero_item or None,
+                situacao_compra=situacao,
+            )
+            lookups += 1
+        snap = cache.get(key) or {}
+        if _merge_homologated_pricing_into_payload(it, snap):
+            updated += 1
+    return updated
 
 
 def enrich_supplier_fields_in_payloads(

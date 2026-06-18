@@ -41,11 +41,11 @@
 
         <section class="item-prices">
           <div class="item-price-card">
-            <span>Valor médio do item</span>
+            <span>{{ resumoUsaPrecoHomologado ? 'Valor médio homologado' : 'Valor médio do item' }}</span>
             <strong>{{ formatCurrency(valorUnitarioRefletido) }}</strong>
           </div>
           <div class="item-price-card">
-            <span>Valor total</span>
+            <span>{{ resumoUsaPrecoHomologado ? 'Valor total homologado' : 'Valor total' }}</span>
             <strong>{{ formatCurrency(valorTotalRefletido) }}</strong>
           </div>
           <div class="item-price-card">
@@ -382,25 +382,23 @@ const unidadeRefletida = computed(() => {
 const valorUnitarioRefletido = computed(() => {
   const rows = itemCotacoesFiltradas.value;
 
-  // Prioriza valor_unitario válido (> 0) vindo das cotações filtradas.
   const units = rows
-    .map((x) => Number(x?.valor_unitario))
-    .filter((n) => Number.isFinite(n) && n > 0);
+    .map((x) => displayPnCpUnitario(x))
+    .filter((n) => n != null && Number.isFinite(n) && n > 0);
   if (units.length > 0) {
     return units.reduce((acc, n) => acc + n, 0) / units.length;
   }
 
-  // Fallback: deriva unitário de total/quantidade quando unitário vier ausente/zerado.
   const derivados = rows
     .map((x) => {
-      const total = Number(x?.valor_total);
+      const total = displayPnCpTotal(x);
       const qtd = Number.isFinite(Number(item.value?.quantidade))
         ? Number(item.value.quantidade)
         : Number(x?.quantidade);
-      if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(qtd) || qtd <= 0) return null;
+      if (total == null || !Number.isFinite(total) || total <= 0 || !Number.isFinite(qtd) || qtd <= 0) return null;
       return total / qtd;
     })
-    .filter((n) => Number.isFinite(n) && Number(n) > 0);
+    .filter((n) => n != null && Number.isFinite(n) && Number(n) > 0);
   if (derivados.length > 0) {
     return derivados.reduce((acc, n) => acc + Number(n), 0) / derivados.length;
   }
@@ -412,12 +410,10 @@ const valorUnitarioRefletido = computed(() => {
 });
 
 const valorTotalRefletido = computed(() => {
-  // Na página do item, o total deve refletir as cotações reais (somatório),
-  // respeitando o filtro atual de fonte/inciso quando houver.
   const rows = itemCotacoesFiltradas.value;
   const totals = rows
-    .map((x) => Number(x?.valor_total))
-    .filter((n) => Number.isFinite(n) && n >= 0);
+    .map((x) => displayPnCpTotal(x))
+    .filter((n) => n != null && Number.isFinite(n) && n >= 0);
   if (totals.length > 0) {
     return totals.reduce((acc, n) => acc + n, 0);
   }
@@ -427,11 +423,11 @@ const valorTotalRefletido = computed(() => {
       const qtd = Number.isFinite(Number(item.value?.quantidade))
         ? Number(item.value.quantidade)
         : Number(x?.quantidade);
-      const unit = Number(x?.valor_unitario);
-      if (!Number.isFinite(qtd) || qtd < 0 || !Number.isFinite(unit) || unit < 0) return null;
+      const unit = displayPnCpUnitario(x);
+      if (!Number.isFinite(qtd) || qtd < 0 || unit == null || !Number.isFinite(unit) || unit < 0) return null;
       return qtd * unit;
     })
-    .filter((n) => Number.isFinite(n));
+    .filter((n) => n != null && Number.isFinite(n));
   if (derivados.length > 0) {
     return derivados.reduce((acc, n) => acc + Number(n), 0);
   }
@@ -439,6 +435,10 @@ const valorTotalRefletido = computed(() => {
   const legacy = Number(item.value?.valor_total);
   return Number.isFinite(legacy) ? legacy : null;
 });
+
+const resumoUsaPrecoHomologado = computed(() =>
+  itemCotacoesFiltradas.value.some((r) => hasPnCpHomologadoPreco(r)),
+);
 
 const itemCotacoesFiltradas = computed(() => {
   const alvo = fonteSelecionada.value;

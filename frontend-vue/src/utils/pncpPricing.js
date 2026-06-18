@@ -68,8 +68,13 @@ export function extractPnCpHomologadoTotal(row) {
 export function displayPnCpUnitario(row) {
   const hom = extractPnCpHomologadoUnit(row);
   if (hom != null) return hom;
+  const homologado = isPnCpItemHomologado(row) || hasPnCpHomologadoPreco(row);
+  if (homologado) {
+    const ormUnit = pickPositiveNumber(row?.valor_unitario);
+    if (ormUnit != null) return ormUnit;
+  }
   const est = extractPnCpEstimadoUnit(row);
-  if (est != null) return est;
+  if (est != null && !homologado) return est;
   return pickPositiveNumber(row?.valor_unitario);
 }
 
@@ -77,12 +82,17 @@ export function displayPnCpTotal(row) {
   const hom = extractPnCpHomologadoTotal(row);
   if (hom != null) return hom;
   const src = mergedPnCpSource(row);
+  const homologado = isPnCpItemHomologado(row) || hasPnCpHomologadoPreco(row);
+  if (homologado) {
+    const ormTotal = pickPositiveNumber(row?.valor_total);
+    if (ormTotal != null) return ormTotal;
+  }
   const estTotal = pickPositiveNumber(
     src.valor_total_estimado,
     src.valorTotalEstimado,
     row?.valor_total_estimado,
   );
-  if (estTotal != null) return estTotal;
+  if (estTotal != null && !homologado) return estTotal;
   const unit = displayPnCpUnitario(row);
   const qtd = pickPositiveNumber(row?.quantidade, src.quantidade);
   if (unit != null && qtd != null) return unit * qtd;
@@ -103,7 +113,8 @@ export function hasPnCpEstimadoDistinto(row) {
 
 export function isPnCpItemHomologado(row) {
   const src = mergedPnCpSource(row);
-  if (src.item_homologado === true) return true;
+  if src.item_homologado === true) return true;
+  if (src.temResultado === true) return true;
   const sit = String(
     src.situacaoCompraItemNome || src.situacao_item || src.situacao || '',
   ).toLowerCase();

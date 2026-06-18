@@ -40,6 +40,7 @@ from backend.app.models import (
 )
 from backend.app.services.pncp_source_normalize import normalize_pncp_geo_in_payload
 from backend.app.services.pncp_supplier_enrichment import (
+    enrich_homolog_pricing_for_payloads,
     enrich_missing_supplier_fields_for_cotacao,
     enrich_supplier_fields_in_payloads,
     fornecedor_tem_cnpj_para_cotacao,
@@ -763,6 +764,17 @@ def _item_cotacao_dict(row: PncpCotacaoItemCotacao) -> Dict[str, Any]:
     ):
         if src.get(key) is not None:
             out[key] = src[key]
+
+    vu_h = _safe_float(src.get("valor_unitario_homologado") or src.get("valorUnitarioHomologado"))
+    vt_h = _safe_float(src.get("valor_total_homologado") or src.get("valorTotalHomologado"))
+    if vu_h is not None:
+        out["valor_unitario"] = vu_h
+    if vt_h is not None:
+        out["valor_total"] = vt_h
+    elif vu_h is not None:
+        q = _safe_float(row.quantidade) or _safe_float(src.get("quantidade_homologada"))
+        if q is not None and q > 0:
+            out["valor_total"] = vu_h * q
     return out
 
 
@@ -813,11 +825,9 @@ def _enrich_item_cotacoes_for_response(rows: List[PncpCotacaoItemCotacao]) -> No
     if not rows:
         return
     payloads = [_cotacao_row_to_enrich_payload(r) for r in rows]
-    enrich_supplier_fields_in_payloads(
+    enrich_homolog_pricing_for_payloads(
         payloads,
-        only_homologated=False,
-        max_pncp_lookups=min(24, max(1, len(payloads))),
-        enrich_external_email=False,
+        max_lookups=min(24, max(1, len(payloads))),
     )
     for row, payload in zip(rows, payloads):
         _persist_cotacao_pricing_from_payload(row, payload)

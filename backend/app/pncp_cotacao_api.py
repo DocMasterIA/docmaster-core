@@ -723,7 +723,7 @@ def _item_cotacao_dict(row: PncpCotacaoItemCotacao) -> Dict[str, Any]:
         src = {}
     bucket = _resolve_fonte_bucket(src, row.numero_pncp)
     inciso_resolvido = "inciso_i" if bucket == "governamentais" else ("inciso_ii" if bucket == "entesPublicos" else None)
-    return {
+    out: Dict[str, Any] = {
         "id": row.id,
         "item_id": row.item_id,
         "numero_pncp": row.numero_pncp or None,
@@ -749,6 +749,78 @@ def _item_cotacao_dict(row: PncpCotacaoItemCotacao) -> Dict[str, Any]:
         "inciso_resolvido": inciso_resolvido,
         "created_at": _iso_z(row.created_at),
     }
+    for key in (
+        "valor_unitario_homologado",
+        "valor_total_homologado",
+        "quantidade_homologada",
+        "valor_unitario_estimado",
+        "valor_total_estimado",
+        "valorUnitarioHomologado",
+        "valorTotalHomologado",
+        "situacaoCompraItemNome",
+        "temResultado",
+        "item_homologado",
+    ):
+        if src.get(key) is not None:
+            out[key] = src[key]
+    return out
+
+
+def _cotacao_row_to_enrich_payload(row: PncpCotacaoItemCotacao) -> Dict[str, Any]:
+    src = dict(row.source) if isinstance(row.source, dict) else {}
+    payload: Dict[str, Any] = {**src}
+    if row.numero_pncp:
+        payload.setdefault("numero_pncp", row.numero_pncp)
+    if row.ano_compra is not None:
+        payload.setdefault("ano_compra", row.ano_compra)
+    if row.sequencial_compra is not None:
+        payload.setdefault("sequencial_compra", row.sequencial_compra)
+    if row.numero_item:
+        payload.setdefault("numero_item", row.numero_item)
+    payload["valor_unitario"] = row.valor_unitario
+    payload["valor_total"] = row.valor_total
+    payload["quantidade"] = row.quantidade
+    payload["source"] = src
+    return payload
+
+
+def _pricing_fields_changed(row: PncpCotacaoItemCotacao, payload: Dict[str, Any], slim: Dict[str, Any]) -> bool:
+    vu = _safe_float(payload.get("valor_unitario"))
+    vt = _safe_float(payload.get("valor_total"))
+    if vu is not None and abs(vu - (_safe_float(row.valor_unitario) or 0)) > 1e-6:
+        return True
+    if vt is not None and abs(vt - (_safe_float(row.valor_total) or 0)) > 1e-6:
+        return True
+    return slim != (row.source if isinstance(row.source, dict) else {})
+
+
+def _persist_cotacao_pricing_from_payload(row: PncpCotacaoItemCotacao, payload: Dict[str, Any]) -> bool:
+    slim = _compact_item_source(payload)
+    if not _pricing_fields_changed(row, payload, slim):
+        return False
+    vu = _safe_float(payload.get("valor_unitario"))
+    vt = _safe_float(payload.get("valor_total"))
+    if vu is not None:
+        row.valor_unitario = vu
+    if vt is not None:
+        row.valor_total = vt
+    row.source = slim
+    row.save(update_fields=["valor_unitario", "valor_total", "source"])
+    return True
+
+
+def _enrich_item_cotacoes_for_response(rows: List[PncpCotacaoItemCotacao]) -> None:
+    if not rows:
+        return
+    payloads = [_cotacao_row_to_enrich_payload(r) for r in rows]
+    enrich_supplier_fields_in_payloads(
+        payloads,
+        only_homologated=False,
+        max_pncp_lookups=min(24, max(1, len(payloads))),
+        enrich_external_email=False,
+    )
+    for row, payload in zip(rows, payloads):
+        _persist_cotacao_pricing_from_payload(row, payload)
 
 
 def _norm_fonte_text(v: Any) -> str:
@@ -1590,6 +1662,14 @@ def pncp_research_sessions_item_cotacoes(request, sessao_id: int, item_id: int):
 
     if request.method == "GET":
         rows = list(item.cotacoes.all().order_by("-id"))
+        try:
+            _enrich_item_cotacoes_for_response(rows)
+        except Exception:
+            logger.exception(
+                "falha ao enriquecer preço homologado (GET cotacoes item_id=%s sessao_id=%s)",
+                item.id,
+                c.id,
+            )
         return JsonResponse(
             {
                 "ok": True,

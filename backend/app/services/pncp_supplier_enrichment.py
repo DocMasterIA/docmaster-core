@@ -165,11 +165,45 @@ def _pncp_compra_keys_present(it: Dict[str, Any]) -> bool:
     return ano is not None and seq is not None
 
 
+def _homolog_pricing_present(it: Dict[str, Any]) -> bool:
+    if not isinstance(it, dict):
+        return False
+    keys = (
+        "valor_unitario_homologado",
+        "valorUnitarioHomologado",
+        "valor_total_homologado",
+        "valorTotalHomologado",
+    )
+    for key in keys:
+        if _positive_float(it.get(key)) is not None:
+            return True
+    src = it.get("source")
+    if isinstance(src, dict):
+        for key in keys:
+            if _positive_float(src.get(key)) is not None:
+                return True
+    return False
+
+
+def _needs_homolog_pricing_lookup(it: Dict[str, Any]) -> bool:
+    """Item homologado com chaves PNCP mas sem preço vencedor de /resultados."""
+    if _homolog_pricing_present(it):
+        return False
+    if not _pncp_compra_keys_present(it):
+        return False
+    if item_homologado_para_busca_dict(it):
+        return True
+    return bool(it.get("temResultado"))
+
+
 def _should_attempt_pncp_supplier_lookup(it: Dict[str, Any], *, only_homolog: bool) -> bool:
     """
     Decide se consulta PNCP por fornecedor.
     Com chaves PNCP válidas, tenta sempre (mesmo não homologado / busca em lote).
+    Também consulta quando falta preço homologado em item já com fornecedor completo.
     """
+    if _pncp_compra_keys_present(it) and _needs_homolog_pricing_lookup(it):
+        return True
     if _payload_supplier_complete(it):
         return False
     if _pncp_compra_keys_present(it):

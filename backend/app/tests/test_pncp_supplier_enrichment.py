@@ -17,7 +17,8 @@ from backend.app.services.pncp_supplier_enrichment import (
     _enrich_payload_sort_key,
     _homolog_pricing_from_resultados,
     _merge_homologated_pricing_into_payload,
-    _needs_brasilapi_enrichment,
+    _needs_homolog_pricing_lookup,
+    _should_attempt_pncp_supplier_lookup,
     _parse_ano_seq_from_numero_pncp,
     _pncp_compra_keys_present,
     _should_attempt_pncp_supplier_lookup,
@@ -266,6 +267,34 @@ class HomologPricingTests(unittest.TestCase):
             "source": {"valor_unitario_homologado": 8.79},
         }
         self.assertAlmostEqual(preco_unitario_cotacao_fonte(row, quantidade_item=100), 8.79)
+
+
+class HomologLookupGateTests(unittest.TestCase):
+    def test_busca_pncp_quando_fornecedor_completo_mas_falta_homologado(self):
+        it = {
+            "numero_pncp": "95587648000112-1-000045/2025",
+            "ano_compra": 2025,
+            "sequencial_compra": 45,
+            "numero_item": "3",
+            "cnpj_fornecedor": "12345678000195",
+            "fornecedor": "FORNECEDOR LTDA",
+            "situacaoCompraItemNome": "Homologado",
+            "valor_unitario": 121.0,
+            "valor_total": 12100.0,
+        }
+        self.assertTrue(_needs_homolog_pricing_lookup(it))
+        self.assertTrue(_should_attempt_pncp_supplier_lookup(it, only_homolog=True))
+
+    def test_nao_busca_quando_homologado_ja_presente(self):
+        it = {
+            "numero_pncp": "95587648000112-1-000045/2025",
+            "cnpj_fornecedor": "12345678000195",
+            "fornecedor": "FORNECEDOR LTDA",
+            "valor_unitario_homologado": 8.79,
+            "valor_total_homologado": 879.0,
+        }
+        self.assertFalse(_needs_homolog_pricing_lookup(it))
+        self.assertFalse(_should_attempt_pncp_supplier_lookup(it, only_homolog=True))
 
 
 if __name__ == "__main__":

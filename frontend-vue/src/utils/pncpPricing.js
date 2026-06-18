@@ -35,7 +35,15 @@ export function extractPnCpEstimadoUnit(row) {
 }
 
 export function hasPnCpHomologadoPreco(row) {
-  return extractPnCpHomologadoUnit(row) != null;
+  const src = mergedPnCpSource(row);
+  return (
+    extractPnCpHomologadoUnit(row) != null
+    || pickPositiveNumber(
+      src.valor_total_homologado,
+      src.valorTotalHomologado,
+      row?.valor_total_homologado,
+    ) != null
+  );
 }
 
 export function extractPnCpHomologadoTotal(row) {
@@ -83,7 +91,7 @@ export function displayPnCpTotal(row) {
 
 /** Item homologado na PNCP mas preço vencedor ainda não veio de /resultados. */
 export function isPnCpHomologadoSemPrecoVencedor(row) {
-  return isPnCpItemHomologado(row) && extractPnCpHomologadoUnit(row) == null;
+  return isPnCpItemHomologado(row) && !hasPnCpHomologadoPreco(row);
 }
 
 export function hasPnCpEstimadoDistinto(row) {

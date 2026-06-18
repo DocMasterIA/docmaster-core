@@ -113,7 +113,7 @@ export function hasPnCpEstimadoDistinto(row) {
 
 export function isPnCpItemHomologado(row) {
   const src = mergedPnCpSource(row);
-  if src.item_homologado === true) return true;
+  if (src.item_homologado === true) return true;
   if (src.temResultado === true) return true;
   const sit = String(
     src.situacaoCompraItemNome || src.situacao_item || src.situacao || '',

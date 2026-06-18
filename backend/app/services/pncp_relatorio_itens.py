@@ -126,7 +126,7 @@ def _fmt_quantidade(q: Any) -> str:
 def preco_unitario_cotacao_fonte(it: Any, *, quantidade_item: Optional[float] = None) -> Optional[float]:
     """
     Preço unitário na fonte/inciso para um registro de cotação (ORM ou dict).
-    Prioriza valor_unitario; senão valor_total / quantidade (item da sessão, depois quantidade da linha).
+    Prioriza valor homologado (/resultados); depois valor_unitario; senão valor_total / quantidade.
     Retorna None quando não há como inferir (na agregação por item, tratar como 0 na média).
     """
 
@@ -134,6 +134,19 @@ def preco_unitario_cotacao_fonte(it: Any, *, quantidade_item: Optional[float] = 
         if isinstance(it, dict):
             return it.get(key)
         return getattr(it, key, None)
+
+    src = _get("source")
+    if not isinstance(src, dict):
+        src = {}
+
+    for key in ("valor_unitario_homologado", "valorUnitarioHomologado"):
+        for v in (src.get(key), _get(key)):
+            try:
+                f = float(v) if v is not None else None
+            except (TypeError, ValueError):
+                f = None
+            if f is not None and f > 0 and not (math.isnan(f) or math.isinf(f)):
+                return f
 
     vu = _get("valor_unitario")
     try:

@@ -10,10 +10,13 @@ from backend.app.services.pncp_relatorio_itens import (
     _pick_supplier_name_from_source,
     _pick_supplier_telefone_from_source,
     nome_fornecedor_e_util_para_exibicao,
+    preco_unitario_cotacao_fonte,
 )
 from backend.app.services.pncp_supplier_enrichment import (
     _ano_seq_for_enrichment,
     _enrich_payload_sort_key,
+    _homolog_pricing_from_resultados,
+    _merge_homologated_pricing_into_payload,
     _needs_brasilapi_enrichment,
     _parse_ano_seq_from_numero_pncp,
     _pncp_compra_keys_present,
@@ -229,6 +232,40 @@ class FonteEmAndamentoRelatorioTests(unittest.TestCase):
                 {"cnpj_fornecedor": "27.105.456/0001-72", "fornecedor": "EMPRESA TESTE LTDA"}
             )
         )
+
+
+class HomologPricingTests(unittest.TestCase):
+    def test_homolog_pricing_from_resultados_item(self):
+        data = {
+            "numeroItem": 3,
+            "valorUnitarioHomologado": 8.79,
+            "valorTotalHomologado": 879.0,
+            "quantidadeHomologada": 100,
+        }
+        out = _homolog_pricing_from_resultados(data, numero_item="3")
+        self.assertAlmostEqual(out["valor_unitario_homologado"], 8.79)
+        self.assertAlmostEqual(out["valor_total_homologado"], 879.0)
+        self.assertAlmostEqual(out["quantidade_homologada"], 100)
+
+    def test_merge_homologated_pricing_overwrites_estimado(self):
+        it = {
+            "valor_unitario": 17.27,
+            "valor_total": 1727.0,
+            "quantidade": 100,
+            "source": {"valor_unitario_estimado": 17.27},
+        }
+        snap = {"valor_unitario_homologado": 8.79, "valor_total_homologado": 879.0}
+        self.assertTrue(_merge_homologated_pricing_into_payload(it, snap))
+        self.assertAlmostEqual(it["valor_unitario"], 8.79)
+        self.assertAlmostEqual(it["valor_total"], 879.0)
+        self.assertAlmostEqual(it["source"]["valor_unitario_homologado"], 8.79)
+
+    def test_preco_unitario_cotacao_fonte_prioriza_homologado(self):
+        row = {
+            "valor_unitario": 17.27,
+            "source": {"valor_unitario_homologado": 8.79},
+        }
+        self.assertAlmostEqual(preco_unitario_cotacao_fonte(row, quantidade_item=100), 8.79)
 
 
 if __name__ == "__main__":

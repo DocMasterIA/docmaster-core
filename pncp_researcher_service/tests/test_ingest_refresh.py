@@ -41,6 +41,27 @@ def test_refresh_days_zero_always_fetches(refresh_db, monkeypatch):
     assert local_index.contract_needs_items_refresh("PNCP-1") is True
 
 
+def test_backfill_skips_itens_when_resultados_pending(refresh_db, monkeypatch):
+    """Backfill: contrato já no índice com homologado pendente → resultados-only (sem GET /itens)."""
+    monkeypatch.setattr(local_index, "effective_items_refresh_days", lambda: 0)
+    recent = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    with sqlite3.connect(local_index.PNCP_LOCAL_DB_PATH) as c:
+        local_index._migrate_pncp_itens_homolog_columns(c)
+        local_index._migrate_pncp_itens_supplier_columns(c)
+        c.execute(
+            """
+            INSERT INTO pncp_itens (
+                numero_pncp, descricao, item_fingerprint, updated_at,
+                situacao_item, fornecedor_elegivel, valor_unitario_homologado
+            ) VALUES (?, ?, ?, ?, ?, ?, NULL)
+            """,
+            ("PNCP-RES", "paracetamol 500mg", "1|paracetamol", recent, "Homologado", 1),
+        )
+        c.commit()
+    assert local_index.contract_has_items_needing_resultados("PNCP-RES") is True
+    assert local_index.contract_needs_items_refresh("PNCP-RES") is False
+
+
 def test_skip_when_items_are_fresh(refresh_db, monkeypatch):
     monkeypatch.setattr(local_index, "effective_items_refresh_days", lambda: 7)
     recent = datetime.utcnow().isoformat(timespec="seconds") + "Z"

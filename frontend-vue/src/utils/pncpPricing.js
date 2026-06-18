@@ -10,23 +10,19 @@ export function pickPositiveNumber(...vals) {
 
 /** Mescla source externo (ORM) com source aninhado (payload salvo na criação). */
 export function mergedPnCpSource(row) {
+  const raw = row?.sourceRaw && typeof row.sourceRaw === 'object' ? row.sourceRaw : {};
   const outer = row?.source && typeof row.source === 'object' ? row.source : {};
   const inner = outer?.source && typeof outer.source === 'object' ? outer.source : {};
-  return { ...inner, ...outer };
+  return { ...inner, ...raw, ...outer };
 }
 
 export function extractPnCpHomologadoUnit(row) {
   const src = mergedPnCpSource(row);
-  const explicit = pickPositiveNumber(
+  return pickPositiveNumber(
     src.valor_unitario_homologado,
     src.valorUnitarioHomologado,
     row?.valor_unitario_homologado,
   );
-  if (explicit) return explicit;
-  if (isPnCpItemHomologado(row)) {
-    return pickPositiveNumber(row?.valor_unitario);
-  }
-  return null;
 }
 
 export function extractPnCpEstimadoUnit(row) {
@@ -51,20 +47,43 @@ export function extractPnCpHomologadoTotal(row) {
   );
   if (direct) return direct;
   const unit = extractPnCpHomologadoUnit(row);
-  const qtd = pickPositiveNumber(row?.quantidade, src.quantidade);
+  const qtd = pickPositiveNumber(
+    src.quantidade_homologada,
+    src.quantidadeHomologada,
+    row?.quantidade,
+    src.quantidade,
+  );
   if (unit && qtd) return unit * qtd;
-  if (isPnCpItemHomologado(row)) {
-    return pickPositiveNumber(row?.valor_total);
-  }
   return null;
 }
 
 export function displayPnCpUnitario(row) {
-  return extractPnCpHomologadoUnit(row) ?? pickPositiveNumber(row?.valor_unitario);
+  const hom = extractPnCpHomologadoUnit(row);
+  if (hom != null) return hom;
+  const est = extractPnCpEstimadoUnit(row);
+  if (est != null) return est;
+  return pickPositiveNumber(row?.valor_unitario);
 }
 
 export function displayPnCpTotal(row) {
-  return extractPnCpHomologadoTotal(row) ?? pickPositiveNumber(row?.valor_total);
+  const hom = extractPnCpHomologadoTotal(row);
+  if (hom != null) return hom;
+  const src = mergedPnCpSource(row);
+  const estTotal = pickPositiveNumber(
+    src.valor_total_estimado,
+    src.valorTotalEstimado,
+    row?.valor_total_estimado,
+  );
+  if (estTotal != null) return estTotal;
+  const unit = displayPnCpUnitario(row);
+  const qtd = pickPositiveNumber(row?.quantidade, src.quantidade);
+  if (unit != null && qtd != null) return unit * qtd;
+  return pickPositiveNumber(row?.valor_total);
+}
+
+/** Item homologado na PNCP mas preço vencedor ainda não veio de /resultados. */
+export function isPnCpHomologadoSemPrecoVencedor(row) {
+  return isPnCpItemHomologado(row) && extractPnCpHomologadoUnit(row) == null;
 }
 
 export function hasPnCpEstimadoDistinto(row) {

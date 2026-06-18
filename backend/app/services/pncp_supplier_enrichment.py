@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import re
 import time
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -975,11 +976,81 @@ def _cadastro_tem_contato_util(cad: Dict[str, Any]) -> bool:
     return bool(tel or email)
 
 
+def _positive_float(v: Any) -> Optional[float]:
+    try:
+        n = float(v)
+    except (TypeError, ValueError):
+        return None
+    if n > 0 and not (math.isnan(n) or math.isinf(n)):
+        return n
+    return None
+
+
+def _iter_resultado_rows(data: Any) -> Iterable[Dict[str, Any]]:
+    if isinstance(data, list):
+        for row in data:
+            if isinstance(row, dict):
+                yield row
+        return
+    if not isinstance(data, dict):
+        return
+    inner = data.get("data")
+    if isinstance(inner, list):
+        for row in inner:
+            if isinstance(row, dict):
+                yield row
+        return
+    yield data
+
+
+def _homolog_pricing_from_resultados(data: Any, *, numero_item: str = "") -> Dict[str, Any]:
+    """Extrai valorUnitarioHomologado / valorTotalHomologado de GET /resultados."""
+    want = str(numero_item or "").strip()
+    picked: Optional[Dict[str, Any]] = None
+    for row in _iter_resultado_rows(data):
+        if want:
+            got = str(row.get("numeroItem") or row.get("ordemItem") or "").strip()
+            if got != want:
+                continue
+        vu = _positive_float(row.get("valorUnitarioHomologado"))
+        vt = _positive_float(row.get("valorTotalHomologado"))
+        qh = _positive_float(row.get("quantidadeHomologada"))
+        if vu is None and vt is None:
+            continue
+        picked = {
+            "valor_unitario_homologado": vu,
+            "valor_total_homologado": vt,
+            "quantidade_homologada": qh,
+            "valorUnitarioHomologado": vu,
+            "valorTotalHomologado": vt,
+            "quantidadeHomologada": qh,
+        }
+        if want:
+            break
+    return picked or {}
+
+
+def _copy_homolog_pricing_fields(src: Dict[str, Any], dst: Dict[str, Any]) -> None:
+    for k in (
+        "valor_unitario_homologado",
+        "valor_total_homologado",
+        "quantidade_homologada",
+        "valorUnitarioHomologado",
+        "valorTotalHomologado",
+        "quantidadeHomologada",
+    ):
+        v = src.get(k)
+        if v is not None and dst.get(k) is None:
+            dst[k] = v
+
+
 def _finalize_supplier_snapshot_sync(snap: Dict[str, str]) -> Dict[str, Any]:
     cnpj_fmt = str(snap.get("cnpj_fornecedor") or "").strip()
     nome = str(snap.get("fornecedor") or "").strip()
     if not cnpj_fmt and not nome:
-        return {"cnpj_fornecedor": "", "fornecedor": "", "fornecedor_cadastro": {}}
+        out: Dict[str, Any] = {"cnpj_fornecedor": "", "fornecedor": "", "fornecedor_cadastro": {}}
+        _copy_homolog_pricing_fields(snap, out)
+        return out
     precisa_brasil = bool(cnpj_fmt) and (
         not _fornecedor_tem_nome_util({"fornecedor": nome, "cnpj_fornecedor": cnpj_fmt})
         or not _cadastro_tem_contato_util({})
@@ -1003,10 +1074,12 @@ def _finalize_supplier_snapshot_sync(snap: Dict[str, str]) -> Dict[str, Any]:
                 out["email"] = em
             if tel:
                 out["telefone"] = tel
+        _copy_homolog_pricing_fields(snap, out)
         return out
     out = {"cnpj_fornecedor": cnpj_fmt, "fornecedor": nome, "fornecedor_cadastro": {}}
     if nome:
         out["fornecedor_fonte_nome"] = "pncp"
+    _copy_homolog_pricing_fields(snap, out)
     return out
 
 
@@ -1025,9 +1098,12 @@ def _supplier_snap_from_resultados_payload(
             got = str(row.get("numeroItem") or row.get("ordemItem") or "").strip()
             if got == want:
                 snap = _extract_supplier_snapshot(row)
-                if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
+                snap.update(_homolog_pricing_from_resultados(row, numero_item=want))
+                if snap.get("cnpj_fornecedor") or snap.get("fornecedor") or snap.get("valor_unitario_homologado"):
                     return snap
-    return _extract_supplier_snapshot(data)
+    snap = _extract_supplier_snapshot(data)
+    snap.update(_homolog_pricing_from_resultados(data, numero_item=numero_item))
+    return snap
 
 
 def _find_catalog_row(items_payload: Any, numero_item: str) -> Optional[Dict[str, Any]]:
@@ -1112,19 +1188,25 @@ def get_contract_supplier_snapshot_sync(
     n_item = str(numero_item or "").strip()
 
     if n_item:
+        homolog_acc: Dict[str, Any] = {}
+
         data = _get_json(f"{base}/itens/{n_item}/resultados")
         if data is not None:
+            homolog_acc.update(_homolog_pricing_from_resultados(data, numero_item=n_item))
             snap = _supplier_snap_from_resultados_payload(
                 data, numero_item=n_item, situacao_compra=sit
             )
+            snap.update(homolog_acc)
             if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
                 return _finalize_supplier_snapshot_sync(snap)
 
         data = _get_json(f"{base}/resultados")
         if data is not None:
+            homolog_acc.update(_homolog_pricing_from_resultados(data, numero_item=n_item))
             snap = _supplier_snap_from_resultados_payload(
                 data, numero_item=n_item, situacao_compra=sit
             )
+            snap.update(homolog_acc)
             if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
                 return _finalize_supplier_snapshot_sync(snap)
 
@@ -1132,6 +1214,7 @@ def get_contract_supplier_snapshot_sync(
         catalog = _find_catalog_row(itens_data, n_item)
         if catalog:
             snap = _extract_supplier_snapshot(catalog)
+            snap.update(homolog_acc)
             if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
                 return _finalize_supplier_snapshot_sync(snap)
 
@@ -1140,10 +1223,15 @@ def get_contract_supplier_snapshot_sync(
             snap = _supplier_snap_from_contratos_payload(
                 contratos, numero_item=n_item, situacao_compra=sit
             )
+            snap.update(homolog_acc)
             if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
                 out = _finalize_supplier_snapshot_sync(snap)
                 out["fornecedor_fonte"] = out.get("fornecedor_fonte") or "pncp_contrato"
                 return out
+        if homolog_acc:
+            out = dict(empty)
+            out.update(homolog_acc)
+            return out
         return _supplier_snapshot_compra_fallback(
             base,
             cnpj=cnpj,
@@ -1267,6 +1355,58 @@ def _payload_supplier_complete(it: Dict[str, Any]) -> bool:
     return has_cnpj and _fornecedor_tem_nome_util(it)
 
 
+def _merge_homologated_pricing_into_payload(it: Dict[str, Any], snap: Dict[str, Any]) -> bool:
+    """Mescla preços de /resultados e reflete em valor_unitario/valor_total do ORM."""
+    if not isinstance(snap, dict):
+        return False
+    vu = _positive_float(snap.get("valor_unitario_homologado") or snap.get("valorUnitarioHomologado"))
+    vt = _positive_float(snap.get("valor_total_homologado") or snap.get("valorTotalHomologado"))
+    qh = _positive_float(snap.get("quantidade_homologada") or snap.get("quantidadeHomologada"))
+    if vu is None and vt is None:
+        return False
+
+    changed = False
+    pairs = (
+        ("valor_unitario_homologado", vu),
+        ("valor_total_homologado", vt),
+        ("quantidade_homologada", qh),
+        ("valorUnitarioHomologado", vu),
+        ("valorTotalHomologado", vt),
+        ("quantidadeHomologada", qh),
+    )
+    for key, val in pairs:
+        if val is not None and it.get(key) != val:
+            it[key] = val
+            changed = True
+
+    src = it.get("source")
+    if not isinstance(src, dict):
+        src = {}
+    src_changed = False
+    for key, val in pairs:
+        if val is not None and src.get(key) != val:
+            src[key] = val
+            src_changed = True
+    if src_changed:
+        it["source"] = src
+        changed = True
+
+    if vu is not None and it.get("valor_unitario") != vu:
+        it["valor_unitario"] = vu
+        changed = True
+    if vt is not None and it.get("valor_total") != vt:
+        it["valor_total"] = vt
+        changed = True
+    elif vu is not None and vt is None:
+        q = qh or _positive_float(it.get("quantidade"))
+        if q is not None:
+            calc = vu * q
+            if it.get("valor_total") != calc:
+                it["valor_total"] = calc
+                changed = True
+    return changed
+
+
 def _merge_supplier_snap_into_payload(it: Dict[str, Any], snap: Dict[str, Any]) -> bool:
     """Mescla snapshot PNCP/BrasilAPI no dict do front; retorna True se alterou."""
     if not isinstance(snap, dict):
@@ -1316,6 +1456,8 @@ def _merge_supplier_snap_into_payload(it: Dict[str, Any], snap: Dict[str, Any]) 
         changed = True
     if changed:
         it["fornecedor_enriquecido_ao_adicionar"] = True
+    if _merge_homologated_pricing_into_payload(it, snap):
+        changed = True
     return changed
 
 
@@ -1405,6 +1547,8 @@ def enrich_supplier_fields_in_payloads(
         _ensure_pncp_compra_keys(it)
         normalize_pncp_geo_in_payload(it)
         flatten_supplier_fields_in_payload(it)
+        if _merge_homologated_pricing_into_payload(it, it):
+            enriched_count += 1
         if _promote_supplier_from_deep_walk(it):
             enriched_count += 1
 

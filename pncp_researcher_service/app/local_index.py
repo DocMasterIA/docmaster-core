@@ -917,11 +917,14 @@ def contract_needs_items_refresh(numero_pncp: str) -> bool:
     """
     True = deve buscar GET /itens no PNCP.
     Com PNCP_INGEST_ITEMS_REFRESH_DAYS > 0, pula contratos cujos itens foram buscados recentemente.
+    Em backfill (days=0), contratos já indexados com preço homologado pendente usam só GET /resultados.
     """
+    numero = str(numero_pncp or "").strip()
     days = effective_items_refresh_days()
     if days <= 0:
+        if numero and contract_has_items_needing_resultados(numero):
+            return False
         return True
-    numero = str(numero_pncp or "").strip()
     if not numero:
         return True
     with _conn() as c:

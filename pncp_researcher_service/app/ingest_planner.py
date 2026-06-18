@@ -41,7 +41,8 @@ from .local_index import (
 logger = logging.getLogger(__name__)
 
 PRIORITY_GAP = 50
-PRIORITY_RESULTADOS = 95
+# Acima de backlog (80): topup /resultados compete com fila de contratos sem itens.
+PRIORITY_RESULTADOS = 72
 PRIORITY_NORMAL = 100
 PRIORITY_BACKLOG_ITEMS = 80
 # Abaixo de catálogo-on-page (90) e gap (80): não compete com descoberta imediata.

@@ -103,6 +103,13 @@
                       Preço homologado
                     </span>
                     <span
+                      v-else-if="isPnCpHomologadoSemPrecoVencedor(r)"
+                      class="item-cotacao-card__homologado item-cotacao-card__homologado--pendente"
+                      title="Item homologado no PNCP; preço vencedor ainda não disponível no índice local (consulte o portal)"
+                    >
+                      Homologado (preço no portal)
+                    </span>
+                    <span
                       v-if="Boolean(r?.source?.similaridade_encontrada)"
                       class="item-cotacao-card__similaridade"
                       title="Cotação vinculada por similaridade semântica"
@@ -274,7 +281,7 @@
                   <strong>{{ formatQuantidadeCotacao(r) }}</strong>
                 </div>
                 <div class="item-cotacao-card__field">
-                  <span>{{ hasPnCpHomologadoPreco(r) ? 'Preço homologado (unit.)' : 'Valor médio do item' }}</span>
+                  <span>{{ hasPnCpHomologadoPreco(r) ? 'Preço homologado (unit.)' : (isPnCpHomologadoSemPrecoVencedor(r) ? 'Preço estimado (unit.)' : 'Valor médio do item') }}</span>
                   <strong
                     class="item-preco-valor"
                     :class="{ 'item-preco-valor--homologado': hasPnCpHomologadoPreco(r) }"
@@ -286,7 +293,7 @@
                   </small>
                 </div>
                 <div class="item-cotacao-card__field">
-                  <span>{{ hasPnCpHomologadoPreco(r) ? 'Total homologado' : 'Valor total' }}</span>
+                  <span>{{ hasPnCpHomologadoPreco(r) ? 'Total homologado' : (isPnCpHomologadoSemPrecoVencedor(r) ? 'Total estimado' : 'Valor total') }}</span>
                   <strong
                     class="item-preco-valor"
                     :class="{ 'item-preco-valor--homologado': hasPnCpHomologadoPreco(r) }"
@@ -322,8 +329,10 @@ import {
   displayPnCpTotal,
   displayPnCpUnitario,
   extractPnCpEstimadoUnit,
+  extractPnCpHomologadoUnit,
   hasPnCpEstimadoDistinto,
   hasPnCpHomologadoPreco,
+  isPnCpHomologadoSemPrecoVencedor,
 } from '../utils/pncpPricing';
 
 const route = useRoute();

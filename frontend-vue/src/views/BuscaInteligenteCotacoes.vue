@@ -312,6 +312,12 @@ import {
   isRegistryAutostartBulk,
   runBulkAutostartOnce,
 } from '../composables/usePncpBulkAutostart.js';
+import {
+  displayPnCpTotal,
+  displayPnCpUnitario,
+  extractPnCpHomologadoTotal,
+  extractPnCpHomologadoUnit,
+} from '../utils/pncpPricing';
 
 const route = useRoute();
 const router = useRouter();
@@ -1131,9 +1137,9 @@ async function runSearchWithContext({
         qtd: `${it.quantidade || '-'} ${it.unidade_medida || ''}`.trim(),
         quantidadeNum: it.quantidade ?? null,
         unidadeMedida: it.unidade_medida || null,
-        valor: formatCurrency(it.valor_unitario ?? it.valor_total ?? 0),
-        valorUnitario: it.valor_unitario ?? null,
-        valorTotal: it.valor_total ?? null,
+        valor: formatCurrency(displayPnCpUnitario({ sourceRaw: it })),
+        valorUnitario: displayPnCpUnitario({ sourceRaw: it }),
+        valorTotal: displayPnCpTotal({ sourceRaw: it }),
         score: Number.isFinite(Number(it.score_aprovacao)) ? Number(it.score_aprovacao) : 0,
         confiabilidade: it.confiabilidade || 'Média',
         risco: it.risco || 'Médio',
@@ -1314,6 +1320,10 @@ async function adicionarSelecionadosNaCotacao() {
       const cad = (raw.fornecedor_cadastro && typeof raw.fornecedor_cadastro === 'object')
         ? raw.fornecedor_cadastro
         : {};
+      const homUnit = extractPnCpHomologadoUnit({ sourceRaw: raw });
+      const homTotal = extractPnCpHomologadoTotal({ sourceRaw: raw, quantidade: r.quantidadeNum });
+      const unitSave = homUnit ?? r.valorUnitario ?? parseMoeda(r.valor);
+      const totalSave = homTotal ?? r.valorTotal ?? (unitSave && r.quantidadeNum ? unitSave * r.quantidadeNum : null);
       return {
       item_ref_id: r.itemId ?? null,
       esfera_administrativa: r.esferaAdministrativa || null,
@@ -1335,8 +1345,8 @@ async function adicionarSelecionadosNaCotacao() {
       quantidade: r.quantidadeNum,
       unidade_medida: r.unidadeMedida,
       modalidade: r.modalidade,
-      valor_unitario: r.valorUnitario ?? parseMoeda(r.valor),
-      valor_total: r.valorTotal,
+      valor_unitario: unitSave,
+      valor_total: totalSave,
       material_servico: r.normalizado,
       score_aprovacao: r.score,
       confiabilidade: r.confiabilidade,
@@ -1355,7 +1365,11 @@ async function adicionarSelecionadosNaCotacao() {
       situacaoCompraItemNome: r.sourceRaw?.situacaoCompraItemNome || r.sourceRaw?.situacao_item_exibicao || null,
       temResultado: r.sourceRaw?.temResultado ?? null,
       item_homologado: r.sourceRaw?.item_homologado ?? null,
-      valor_unitario_estimado: r.sourceRaw?.valor_unitario_estimado ?? null,
+      valor_unitario_estimado: r.sourceRaw?.valor_unitario_estimado ?? r.sourceRaw?.valor_unitario ?? null,
+      valor_total_estimado: r.sourceRaw?.valor_total_estimado ?? r.sourceRaw?.valor_total ?? null,
+      valor_unitario_homologado: r.sourceRaw?.valor_unitario_homologado ?? homUnit ?? null,
+      valor_total_homologado: r.sourceRaw?.valor_total_homologado ?? homTotal ?? null,
+      quantidade_homologada: r.sourceRaw?.quantidade_homologada ?? null,
       ano_compra: r.anoCompra ?? r.sourceRaw?.ano_compra ?? null,
       sequencial_compra: r.sequencialCompra ?? r.sourceRaw?.sequencial_compra ?? null,
       source: {

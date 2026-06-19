@@ -24,13 +24,36 @@ from backend.app.metrics import (
     record_llm_token_usage,
     record_platform_event,
 )
-from backend.app.slot_package_keys import resolve_slot_package_key
+from backend.app.slot_package_keys import is_clausulas_objeto_justificativa_package, resolve_slot_package_key
 
 logger = logging.getLogger(__name__)
 
 
 def _llm_base_url():
     return getattr(settings, "LLM_API_BASE_URL", "http://127.0.0.1:8002").rstrip("/")
+
+
+def _llm_base_url_for_proxy(path: str, payload: dict | None, request) -> str:
+    """Roteia generate de dispensa/inexigibilidade para gateway externo quando configurado."""
+    action = (path or "").strip("/").lower()
+    if action != "generate":
+        return _llm_base_url()
+    pkg = resolve_slot_package_key(payload, request)
+    if not is_clausulas_objeto_justificativa_package(pkg):
+        return _llm_base_url()
+    clausulas = getattr(settings, "LLM_CLAUSULAS_API_BASE_URL", "").strip().rstrip("/")
+    return clausulas or _llm_base_url()
+
+
+def _llm_proxy_timeout_seconds(path: str, payload: dict | None, request) -> int:
+    action = (path or "").strip("/").lower()
+    if action != "generate":
+        return 30
+    base = _llm_base_url_for_proxy(path, payload, request)
+    clausulas = getattr(settings, "LLM_CLAUSULAS_API_BASE_URL", "").strip().rstrip("/")
+    if clausulas and base.rstrip("/") == clausulas.rstrip("/"):
+        return int(getattr(settings, "LLM_CLAUSULAS_PROXY_TIMEOUT", 180))
+    return 120
 
 
 @api_login_required
@@ -43,7 +66,19 @@ def llm_proxy(request, path):
     if request.method not in ("GET", "POST"):
         return JsonResponse({"error": "Método não permitido"}, status=405)
 
-    base = _llm_base_url()
+    payload: dict = {}
+    raw_body = None
+    if request.method == "POST":
+        raw_body = request.body
+        if raw_body:
+            try:
+                parsed = json.loads(raw_body)
+                if isinstance(parsed, dict):
+                    payload = parsed
+            except (json.JSONDecodeError, TypeError, ValueError):
+                payload = {}
+
+    base = _llm_base_url_for_proxy(path, payload, request)
     url = f"{base}/api/llm/{path}"
     action = normalize_llm_action(path)
     prefeitura = prefeitura_label_from_request(request)
@@ -52,20 +87,12 @@ def llm_proxy(request, path):
         "X-DocMaster-Prefeitura": prefeitura,
     }
     result = "error"
-    payload: dict = {}
     try:
         if request.method == "GET":
             resp = requests.get(url, timeout=30)
         else:
-            raw_body = request.body
-            if raw_body:
-                try:
-                    parsed = json.loads(raw_body)
-                    if isinstance(parsed, dict):
-                        payload = parsed
-                except (json.JSONDecodeError, TypeError, ValueError):
-                    payload = {}
-            resp = requests.post(url, data=raw_body, headers=headers, timeout=120)
+            timeout = _llm_proxy_timeout_seconds(path, payload, request)
+            resp = requests.post(url, data=raw_body, headers=headers, timeout=timeout)
 
         try:
             data = resp.json()

@@ -9,6 +9,7 @@
 #
 # Qwen só para ETP: docker compose --profile qwen up -d qwen_llm_service
 # No rag_service: LLM_ETP_GENERATION_BASE_URL=http://qwen_llm_service:8015 (Ollama/llm_api segue em LLM_ORCHESTRATION_BASE_URL).
+# Objeto/justificativa dispensa+inexig: LLM_CLAUSULAS_GENERATION_BASE_URL (rag) e LLM_CLAUSULAS_API_BASE_URL (backend proxy).
 #
 # Métricas: GET /metrics — django-prometheus + docmaster_* (logins, gerações TR/DFD, pacotes)
 # Grafana:    http://127.0.0.1:3000  (na VPS; do PC use túnel SSH — ver docs/deploy/OBSERVABILIDADE-VPS.md)
@@ -157,6 +158,8 @@ services:
       - LLM_ORCHESTRATION_BASE_URL=http://llm_api:8002
       # Geração de texto de ETP via gateway Qwen (mesmo contrato /api/llm/generate):
       - LLM_ETP_GENERATION_BASE_URL=http://qwen_llm_service:8015
+      # Objeto + justificativa (dispensa / inexigibilidade — fill-tr-slots lite):
+      - LLM_CLAUSULAS_GENERATION_BASE_URL=${LLM_CLAUSULAS_GENERATION_BASE_URL:-http://qwen_llm_service:8015}
       - LLM_AGENT_BASE_URL=http://llm_agent:8003
       - TEXT_CORRECTOR_ENABLED=1
       - TEXT_CORRECTOR_BASE_URL=http://text_corrector_service:8011
@@ -183,6 +186,8 @@ services:
     container_name: backend
     environment:
       - LLM_API_BASE_URL=http://llm_api:8002
+      - LLM_CLAUSULAS_API_BASE_URL=${LLM_CLAUSULAS_API_BASE_URL:-http://qwen_llm_service:8015}
+      - LLM_CLAUSULAS_PROXY_TIMEOUT=${LLM_CLAUSULAS_PROXY_TIMEOUT:-180}
       - RAG_SERVICE_URL=http://rag_service:8004
       - PNCP_RESEARCHER_BASE_URL=http://pncp_researcher_service:8012
       # Django → rag_service (TR/DFD): alinhar com proxy_read_timeout no nginx (ex. 900s).

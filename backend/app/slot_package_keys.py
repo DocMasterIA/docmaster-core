@@ -40,3 +40,9 @@ def resolve_slot_package_key(payload: dict | None, request) -> str:
         if path.startswith(route_path):
             return package_key
     return ""
+
+
+def is_clausulas_objeto_justificativa_package(slot_package_key: str | None) -> bool:
+    """Dispensa/inexigibilidade — objeto/justificativa podem usar gateway externo (Qwen)."""
+    key = str(slot_package_key or "").strip().lower()
+    return key.startswith("dispensa_") or key.startswith("inexigibilidade_")

@@ -33,6 +33,13 @@ LLM_ORCHESTRATION_BASE_URL: str = os.getenv(
 # serviço (ex.: qwen_llm_service em 8015). Demais documentos continuam em LLM_ORCHESTRATION_BASE_URL.
 LLM_ETP_GENERATION_BASE_URL: str = os.getenv("LLM_ETP_GENERATION_BASE_URL", "").strip().rstrip("/")
 
+# Objeto + justificativa (dispensa / inexigibilidade via fill-tr-slots): gateway externo opcional.
+LLM_CLAUSULAS_GENERATION_BASE_URL: str = os.getenv(
+    "LLM_CLAUSULAS_GENERATION_BASE_URL", ""
+).strip().rstrip("/")
+
+_CLAUSULAS_PACKAGE_PREFIXES = ("dispensa_", "inexigibilidade_")
+
 # Base URL do llm_agent (para gerar estrutura de documentos)
 LLM_AGENT_BASE_URL: str = os.getenv(
     "LLM_AGENT_BASE_URL",
@@ -48,6 +55,19 @@ LLM_ORCHESTRATION_GENERATE_PATH: str = os.getenv(
 def _is_etp_document_type(document_type: str | None) -> bool:
     d = (document_type or "").strip().lower()
     return "etp" in d or "estudo" in d or d == "estudo_tecnico_preliminar"
+
+
+def is_clausulas_objeto_justificativa_package(slot_package_key: str | None) -> bool:
+    """Pacotes de dispensa/inexigibilidade cujo objeto/justificativa podem ir ao gateway externo."""
+    key = str(slot_package_key or "").strip().lower()
+    return any(key.startswith(prefix) for prefix in _CLAUSULAS_PACKAGE_PREFIXES)
+
+
+def llm_generation_base_url_for_clausulas(slot_package_key: str | None) -> str:
+    """URL do POST /api/llm/generate para objeto/justificativa (Qwen quando configurado)."""
+    if is_clausulas_objeto_justificativa_package(slot_package_key) and LLM_CLAUSULAS_GENERATION_BASE_URL:
+        return LLM_CLAUSULAS_GENERATION_BASE_URL
+    return LLM_ORCHESTRATION_BASE_URL
 
 
 def llm_generation_base_url_for_document_type(document_type: str | None) -> str:

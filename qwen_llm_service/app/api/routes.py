@@ -85,7 +85,15 @@ async def generate(body: GenerateRequest) -> dict[str, Any]:
         "done": True,
         "usage": {"input_tokens": inp, "output_tokens": out},
     }
-    return {"ok": True, "data": data}
+    return {
+        "ok": True,
+        "data": data,
+        "token_usage": {
+            "prompt_tokens": inp,
+            "completion_tokens": out,
+            "total_tokens": inp + out,
+        },
+    }
 
 
 @router.get("/usage-today")

@@ -450,6 +450,9 @@ LOGIN_URL = '/login'
 
 # Proxy para o serviço FastAPI de orquestração LLM (usa sessão Django para autorização)
 LLM_API_BASE_URL = os.environ.get("LLM_API_BASE_URL", "http://127.0.0.1:8002").rstrip("/")
+# Proxy /api/llm/generate — objeto/justificativa dispensa/inexigibilidade (ex.: qwen_llm_service:8015).
+LLM_CLAUSULAS_API_BASE_URL = os.environ.get("LLM_CLAUSULAS_API_BASE_URL", "").strip().rstrip("/")
+LLM_CLAUSULAS_PROXY_TIMEOUT = int(os.environ.get("LLM_CLAUSULAS_PROXY_TIMEOUT", "180"))
 
 # Pesquisador PNCP (FastAPI em pncp_researcher_service)
 PNCP_RESEARCHER_BASE_URL = os.environ.get("PNCP_RESEARCHER_BASE_URL", "http://127.0.0.1:8012").rstrip("/")

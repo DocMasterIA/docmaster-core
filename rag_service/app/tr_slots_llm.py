@@ -93,17 +93,30 @@ async def _call_llm_generate(
     *,
     user_context: Optional[Dict[str, Any]] = None,
     options: Optional[Dict[str, Any]] = None,
+    use_clausulas_gateway: bool = False,
 ) -> Dict[str, Any]:
     """POST na orquestração LLM; acumula tokens quando `llm_token_scope` está ativo."""
+    from .config import llm_generation_base_url_for_clausulas
+
+    slot_package_key = str((user_context or {}).get("slot_package_key") or "").strip()
+    base_url = (
+        llm_generation_base_url_for_clausulas(slot_package_key)
+        if use_clausulas_gateway
+        else LLM_ORCHESTRATION_BASE_URL
+    )
     async with httpx.AsyncClient(timeout=RAG_HTTP_TIMEOUT) as client:
         if token_scope_active():
             body = await llm_post_generate(
-                client, full_prompt, user_context=user_context, options=options
+                client,
+                full_prompt,
+                user_context=user_context,
+                options=options,
+                base_url=base_url,
             )
             return body if isinstance(body, dict) else {}
-        url = f"{LLM_ORCHESTRATION_BASE_URL}{LLM_ORCHESTRATION_GENERATE_PATH}"
+        url = f"{base_url.rstrip('/')}{LLM_ORCHESTRATION_GENERATE_PATH}"
         payload: Dict[str, Any] = {"prompt": full_prompt, "stream": False}
-        if options:
+        if options and base_url == LLM_ORCHESTRATION_BASE_URL:
             payload["options"] = options
         resp = await client.post(url, json=payload)
         resp.raise_for_status()
@@ -2453,12 +2466,15 @@ async def _fill_tr_slots_with_llm_work(
     llm_options = TR_SLOTS_OBJETO_JUSTIFICATIVA_LLM_OPTIONS if lite_fill else None
     try:
         body = await _call_llm_generate(
-            full_prompt, user_context=user_context, options=llm_options
+            full_prompt,
+            user_context=user_context,
+            options=llm_options,
+            use_clausulas_gateway=lite_fill,
         )
     except httpx.ConnectError as e:
         raise ValueError(
-            "Não foi possível conectar à orquestração LLM. "
-            "Verifique se llm_api está em execução (docker compose up -d llm_api ollama)."
+            "Não foi possível conectar ao serviço de IA (objeto/justificativa). "
+            "Verifique llm_api ou LLM_CLAUSULAS_GENERATION_BASE_URL (ex.: qwen_llm_service)."
         ) from e
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:

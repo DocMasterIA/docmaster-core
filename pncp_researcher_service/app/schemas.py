@@ -16,6 +16,7 @@ class HealthResponse(BaseModel):
     db_on_data_volume: bool = False
     index_hint: str = ""
     ingest: Optional[Dict[str, Any]] = None
+    ia: Optional[Dict[str, Any]] = None
 
 
 class GeoRecorte(BaseModel):

@@ -306,9 +306,11 @@ PNCP_HYBRID_MAX_LIVE_PAGES: int = _env_int("PNCP_HYBRID_MAX_LIVE_PAGES", 6)
 
 # Re-ranking leve com LLM para escolher os 3 melhores itens.
 PNCP_IA_RERANK_ENABLED: bool = _env_bool("PNCP_IA_RERANK_ENABLED", True)
+# Gateway IA da busca inteligente: llm_api (Ollama) ou qwen_llm_service:8015 (API externa).
 PNCP_IA_BASE_URL: str = os.getenv("PNCP_IA_BASE_URL", "http://llm_api:8002").rstrip("/")
 PNCP_IA_GENERATE_PATH: str = os.getenv("PNCP_IA_GENERATE_PATH", "/api/llm/generate")
 PNCP_IA_MODEL: str = os.getenv("PNCP_IA_MODEL", "").strip()
+# Ollama local ~4s; Qwen cloud precisa mais (compose.pncp usa 22s / 18s por padrão).
 PNCP_IA_TIMEOUT_SECONDS: float = float(os.getenv("PNCP_IA_TIMEOUT_SECONDS", "4.5"))
 PNCP_IA_MAX_CANDIDATES: int = _env_int("PNCP_IA_MAX_CANDIDATES", 36)
 

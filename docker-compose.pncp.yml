@@ -75,6 +75,15 @@ services:
       - PNCP_SEARCH_ONLY_HOMOLOGATED=${PNCP_SEARCH_ONLY_HOMOLOGATED:-1}
       - PNCP_SEARCH_ENRICH_HOMOLOG_MAX=${PNCP_SEARCH_ENRICH_HOMOLOG_MAX:-16}
       - PNCP_SEARCH_MIN_SCORE_APROVACAO=${PNCP_SEARCH_MIN_SCORE_APROVACAO:-50}
+      # Busca inteligente — rerank top-3 + resumo de item (mesmo contrato /api/llm/generate que llm_api).
+      # Requer qwen_llm_service Up (docker compose --profile qwen) na rede docmaster_net.
+      - PNCP_IA_BASE_URL=${PNCP_IA_BASE_URL:-http://qwen_llm_service:8015}
+      - PNCP_IA_MODEL=${PNCP_IA_MODEL:-}
+      - PNCP_IA_TIMEOUT_SECONDS=${PNCP_IA_TIMEOUT_SECONDS:-22}
+      - PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS=${PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS:-18}
+      - PNCP_IA_RERANK_ENABLED=${PNCP_IA_RERANK_ENABLED:-1}
+      - PNCP_IA_ITEM_RESUMO_ENABLED=${PNCP_IA_ITEM_RESUMO_ENABLED:-1}
+      - PNCP_IA_MAX_CANDIDATES=${PNCP_IA_MAX_CANDIDATES:-36}
       # Em backfill mode efetivo REFRESH=0; valor aqui aplica-se com BACKFILL_MODE=0.
       - PNCP_INGEST_ITEMS_REFRESH_DAYS=${PNCP_INGEST_ITEMS_REFRESH_DAYS:-3}
     volumes:

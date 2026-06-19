@@ -1871,18 +1871,31 @@ def _parse_ia_rerank_response(raw_text: str) -> List[Dict[str, Any]]:
     return out
 
 
-async def _ia_post_generate_plain(prompt: str) -> str:
-    """Chamada mínima ao mesmo endpoint usado no rerank (`/api/llm/generate`)."""
+async def _ia_post_generate(prompt: str, *, timeout_seconds: float) -> str:
+    """POST /api/llm/generate (llm_api ou qwen_llm_service) — rerank e resumo de item."""
     payload: Dict[str, Any] = {"prompt": prompt, "stream": False}
     if PNCP_IA_MODEL:
         payload["model"] = PNCP_IA_MODEL
     url = f"{PNCP_IA_BASE_URL}{PNCP_IA_GENERATE_PATH}"
-    timeout = httpx.Timeout(PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS)
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.post(url, json=payload)
-        resp.raise_for_status()
-        body = resp.json()
-    return str(((body or {}).get("data") or {}).get("response") or "").strip()
+    timeout = httpx.Timeout(max(1.0, float(timeout_seconds)))
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            body = resp.json()
+    except Exception:
+        return ""
+    if not isinstance(body, dict):
+        return ""
+    data = body.get("data")
+    if isinstance(data, dict):
+        return str(data.get("response") or data.get("text") or "").strip()
+    return str(body.get("response") or body.get("text") or "").strip()
+
+
+async def _ia_post_generate_plain(prompt: str) -> str:
+    """Resumo curto de item — timeout PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS."""
+    return await _ia_post_generate(prompt, timeout_seconds=PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS)
 
 
 def _sanitize_ia_interpretacao_item(text: str) -> str:
@@ -1995,19 +2008,9 @@ async def _rerank_top3_with_ia(
         valor_base_ref=valor_base_ref,
         variacao_pct_ref=variacao_pct_ref,
     )
-    payload: Dict[str, Any] = {"prompt": prompt, "stream": False}
-    if PNCP_IA_MODEL:
-        payload["model"] = PNCP_IA_MODEL
-    url = f"{PNCP_IA_BASE_URL}{PNCP_IA_GENERATE_PATH}"
-    timeout = httpx.Timeout(PNCP_IA_TIMEOUT_SECONDS)
-    try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.post(url, json=payload)
-            resp.raise_for_status()
-            body = resp.json()
-    except Exception:
+    text = await _ia_post_generate(prompt, timeout_seconds=PNCP_IA_TIMEOUT_SECONDS)
+    if not text:
         return []
-    text = str(((body or {}).get("data") or {}).get("response") or "")
     return _parse_ia_rerank_response(text)
 
 

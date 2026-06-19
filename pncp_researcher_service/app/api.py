@@ -7,7 +7,13 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 
-from .config import PNCP_INGEST_WORKER_ENABLED, PNCP_SEARCH_CODE_REV
+from .config import (
+    PNCP_IA_BASE_URL,
+    PNCP_IA_ITEM_RESUMO_ENABLED,
+    PNCP_IA_RERANK_ENABLED,
+    PNCP_INGEST_WORKER_ENABLED,
+    PNCP_SEARCH_CODE_REV,
+)
 from .ingest_coverage import ingest_coverage_status
 from .ingest_planner import plan_ingest_queue
 from .ingest_worker import ingest_worker_loop, process_ingest_batch
@@ -78,6 +84,11 @@ async def health() -> HealthResponse:
         db_on_data_volume=on_volume,
         index_hint=hint,
         ingest=ingest,
+        ia={
+            "base_url": PNCP_IA_BASE_URL,
+            "rerank_enabled": PNCP_IA_RERANK_ENABLED,
+            "item_resumo_enabled": PNCP_IA_ITEM_RESUMO_ENABLED,
+        },
     )
 
 

@@ -21,6 +21,8 @@
 # Config: ./config/prometheus.yml e ./config/grafana/provisioning/ (paths relativos a DEPLOY)
 #
 # PNCP 24/7: docker compose -f docker-compose.pncp.yml up -d  (ver docs/deploy/PNCP-RESEARCHER-24-7.md)
+# Busca inteligente PNCP (IA): PNCP_IA_BASE_URL=http://qwen_llm_service:8015 no docker-compose.pncp.yml
+# (qwen_llm_service precisa estar Up com profile qwen e ligado à docmaster_net — ver docker-compose.yml)
 # Não subir pncp_researcher_service neste ficheiro — evita recreate ao fazer up -d backend/grafana/etc.
 
 services:
@@ -91,6 +93,9 @@ services:
       - QWEN_AUDIT_LOG_DIR=/app/logs
     volumes:
       - ./qwen_llm_audit:/app/logs
+    networks:
+      - default
+      - docmaster_net
     restart: unless-stopped
 
   llm_agent:

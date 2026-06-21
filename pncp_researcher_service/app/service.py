@@ -2611,6 +2611,13 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     funil["ia_rerank_bulk"] = bool(busca_lote)
     funil["search_quality_first"] = bool(PNCP_SEARCH_QUALITY_FIRST)
     rerank_worth = _ia_bulk_rerank_worth_it(pool_mode, selection_pool)
+    try:
+        from .pack_size_match import extract_pack_hints_from_term
+
+        if extract_pack_hints_from_term(termo_busca_raw).pack_units is not None:
+            rerank_worth = True
+    except Exception:
+        pass
     funil["rerank_worth_ambiguous"] = bool(rerank_worth)
     funil["ia_rerank_bulk_skipped_clear"] = bool(
         busca_lote and ia_rerank_on and ia_rerank_allowed and selection_pool and not rerank_worth
@@ -2621,6 +2628,11 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
 
     if PNCP_LOCAL_RERANK_ENABLED and ia_rerank_allowed and selection_pool and rerank_worth:
         from .local_rerank import apply_local_rerank_top3
+        from .pack_size_match import extract_pack_hints_from_term
+
+        pack_term = extract_pack_hints_from_term(termo_busca_raw)
+        if pack_term.pack_units is not None:
+            funil["pack_units_referencia"] = pack_term.pack_units
 
         top3_local, local_ok = apply_local_rerank_top3(
             termo_efetivo,
@@ -2630,6 +2642,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             max_candidates=PNCP_LOCAL_RERANK_MAX_CANDIDATES,
             faixa_min=faixa_min,
             faixa_max=faixa_max,
+            termo_raw=termo_busca_raw,
         )
         if local_ok and top3_local:
             top3 = top3_local

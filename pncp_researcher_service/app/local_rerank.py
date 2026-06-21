@@ -56,7 +56,10 @@ def compute_local_rerank_score(
     termo_busca: str,
     item: Dict[str, Any],
     query_groups: List[List[str]],
+    *,
+    termo_raw: Optional[str] = None,
 ) -> float:
+    from .pack_size_match import pack_size_rerank_adjustment
     from .service import (
         _aggressive_similarity_score,
         _context_penalty,
@@ -72,9 +75,10 @@ def compute_local_rerank_score(
     sim = _aggressive_similarity_score(termo_busca, item) * 38.0
     ctx = _context_penalty(item, query_groups)
     base = _safe_float(item.get("score_aprovacao")) * 0.22
-    desc = _normalize_text(str(item.get("descricao_item") or ""))
+    desc = _normalize_text(str(item.get("descricao_item") or item.get("descricao") or ""))
     term_tokens = [t for t in _normalize_text(termo_busca).split() if len(t) >= 2]
     gen = _generic_penalty(desc, term_tokens)
+    pack_adj = pack_size_rerank_adjustment(termo_raw or termo_busca, item)
     pen = -18.0 if bool(item.get("match_agressivo")) else 0.0
     bon = 0.0
     if str(item.get("cnpj_fornecedor") or "").strip():
@@ -83,7 +87,7 @@ def compute_local_rerank_score(
         bon += 5.0
     if item.get("item_homologado") is True or item.get("temResultado") is True:
         bon += 4.0
-    return lit * 1.2 + sim + ctx + base + gen + pen + bon
+    return lit * 1.2 + sim + ctx + base + gen + pack_adj + pen + bon
 
 
 def apply_local_rerank_top3(
@@ -95,6 +99,7 @@ def apply_local_rerank_top3(
     max_candidates: int,
     faixa_min: Optional[float] = None,
     faixa_max: Optional[float] = None,
+    termo_raw: Optional[str] = None,
 ) -> Tuple[List[Dict[str, Any]], bool]:
     """
     Reordena candidatos e devolve top 3. Retorna (itens, usado).
@@ -103,9 +108,9 @@ def apply_local_rerank_top3(
         _classify_confiabilidade,
         _classify_risco,
         _filter_ia_rerank_candidates,
+        _is_federal_item,
         _preco_dentro_faixa,
         _safe_float,
-        _select_top3_prioritize_federal,
     )
 
     pool = _filter_ia_rerank_candidates(selection_pool)
@@ -116,10 +121,13 @@ def apply_local_rerank_top3(
         if len(in_band) >= 3:
             pool = in_band
     cap = max(6, min(int(max_candidates), len(pool)))
+    raw_term = (termo_raw or termo_busca or "").strip()
     ranked: List[Tuple[float, Dict[str, Any]]] = []
     for raw in pool[:cap]:
         row = dict(raw)
-        lr = compute_local_rerank_score(termo_busca, row, query_groups)
+        lr = compute_local_rerank_score(
+            termo_busca, row, query_groups, termo_raw=raw_term or None
+        )
         row["_local_rerank_score"] = round(lr, 3)
         ranked.append((lr, row))
     if not ranked:
@@ -129,18 +137,26 @@ def apply_local_rerank_top3(
     top_lr = ranked[0][0]
     for lr, row in ranked:
         out = dict(row)
-        out.pop("_local_rerank_score", None)
         rel = lr / max(top_lr, 1.0)
-        merged = int(max(0, min(100, _safe_float(out.get("score_aprovacao")))))
-        boosted = int(max(40, min(95, 42 + rel * 48)))
-        if boosted > merged:
-            out["score_aprovacao"] = boosted
-        final = int(max(0, min(100, _safe_float(out.get("score_aprovacao")))))
+        final = int(max(40, min(95, 42 + rel * 48)))
         out["score_aprovacao"] = final
+        out["local_rerank_score"] = round(lr, 3)
         out["confiabilidade"] = _classify_confiabilidade(final)
         out["risco"] = _classify_risco(final)
         out["status"] = "Aprovado" if final >= min_ok else "Revisar"
         out["local_rerank_usado"] = True
         scored_rows.append(out)
-    top3 = _select_top3_prioritize_federal(scored_rows)[:3]
+
+    # Mantém ordem do rerank; regra federal só quando há 3+ federais fortes (>=80).
+    federais_fortes = [
+        x
+        for x in scored_rows
+        if _is_federal_item(x) and _safe_float(x.get("score_aprovacao")) >= 80.0
+    ]
+    if len(federais_fortes) >= 3:
+        federais = [x for x in scored_rows if _is_federal_item(x)]
+        demais = [x for x in scored_rows if not _is_federal_item(x)]
+        top3 = (federais + demais)[:3]
+    else:
+        top3 = scored_rows[:3]
     return top3, len(top3) > 0

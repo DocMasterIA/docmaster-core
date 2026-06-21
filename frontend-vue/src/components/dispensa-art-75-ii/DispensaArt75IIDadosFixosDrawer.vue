@@ -91,15 +91,15 @@
               </div>
             </div>
             <h4 class="ixp-subsection-title">1.3 Responsável pela solicitação</h4>
-            <div class="ixp-grid-2">
+            <div class="ixp-grid-1">
               <div class="ixp-field">
                 <label>Nome do responsável</label>
-                <input
+                <textarea
                   :value="ctx.fixoResponsavel"
-                  class="da75-input da75-input--sm"
-                  list="da75-dl-solicitacao-responsavel-nome"
-                  placeholder="Digite o nome do responsável"
-                  @input="ctx.fixoResponsavel = capNome(String(($event.target).value || ''))"
+                  class="da75-textarea"
+                  rows="3"
+                  placeholder="Digite um ou mais nomes (Enter para nova linha)"
+                  @input="ctx.fixoResponsavel = capNomeMultiline(String(($event.target).value || ''))"
                 />
               </div>
               <div class="ixp-field">
@@ -207,14 +207,15 @@
                 placeholder="Ex: propostas@municipio.go.gov.br"
               />
             </div>
-            <div class="ixp-grid-2">
+            <div class="ixp-grid-1">
               <div class="ixp-field">
                 <label>Responsável pelo Termo de Referência — Nome</label>
-                <input
+                <textarea
                   :value="ctx.fixoTrResponsavelNome"
-                  class="da75-input da75-input--sm"
-                  list="da75-dl-tr-resp-nome"
-                  @input="ctx.fixoTrResponsavelNome = capNome(String(($event.target).value || ''))"
+                  class="da75-textarea"
+                  rows="3"
+                  placeholder="Digite um ou mais nomes (Enter para nova linha)"
+                  @input="ctx.fixoTrResponsavelNome = capNomeMultiline(String(($event.target).value || ''))"
                 />
               </div>
               <div class="ixp-field">
@@ -284,6 +285,7 @@
 <script setup>
 import {
   capitalizeFirstSignificantLetter as capFirst,
+  capitalizeNomeTituloMultilinePt as capNomeMultiline,
   capitalizeNomeTituloPt as capNome,
 } from '@/utils/itemValorCampos.js';
 import './dispensaArt75ii.css';

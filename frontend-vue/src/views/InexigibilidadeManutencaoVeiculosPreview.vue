@@ -199,13 +199,15 @@
 
             <article class="ixp-card">
               <h3>Responsável pelo Termo de Referência</h3>
-              <div class="ixp-body ixp-grid-2">
+              <div class="ixp-body ixp-grid-1">
                 <div class="ixp-field">
                   <label>Nome do responsável</label>
-                  <input
+                  <textarea
                     :value="responsavel"
-                    list="dl-tr-nome-assinante"
-                    @input="responsavel = tituloNomePt(String(($event.target).value || ''))"
+                    class="da75-textarea"
+                    rows="3"
+                    placeholder="Digite um ou mais nomes (Enter para nova linha)"
+                    @input="responsavel = tituloNomeMultilinePt(String(($event.target).value || ''))"
                   />
                 </div>
                 <div class="ixp-field">
@@ -405,15 +407,15 @@
               </div>
             </div>
             <h4 class="ixp-subsection-title">1.3 Responsável pela solicitação</h4>
-            <div class="ixp-grid-2">
+            <div class="ixp-grid-1">
               <div class="ixp-field">
                 <label>Nome do responsável</label>
-                <input
+                <textarea
                   :value="fixoResponsavel"
-                  class="da75-input da75-input--sm"
-                  list="dl-solicitacao-responsavel-nome"
-                  placeholder="Digite o nome do responsável"
-                  @input="fixoResponsavel = tituloNomePt(String(($event.target).value || ''))"
+                  class="da75-textarea"
+                  rows="3"
+                  placeholder="Digite um ou mais nomes (Enter para nova linha)"
+                  @input="fixoResponsavel = tituloNomeMultilinePt(String(($event.target).value || ''))"
                 />
               </div>
               <div class="ixp-field">
@@ -534,8 +536,10 @@ import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
 import {
   capitalizeEachWordLeadingPt,
   capitalizeFirstSignificantLetter as primeiraMaiuscula,
+  capitalizeNomeTituloMultilinePt as tituloNomeMultilinePt,
   capitalizeNomeTituloPt as tituloNomePt,
   formatMoedaBRLInput,
+  normNomeTituloMultiline,
   sanitizeQuantidadeInput,
 } from '@/utils/itemValorCampos.js';
 
@@ -807,8 +811,7 @@ function applyGlobalFormStatePayload(data) {
     fixoCargo.value = v ? tituloNomePt(v) : '';
   }
   if ('solicitacao_responsavel_nome' in data) {
-    const v = String(data.solicitacao_responsavel_nome || '').trim();
-    fixoResponsavel.value = v ? tituloNomePt(v) : '';
+    fixoResponsavel.value = normNomeTituloMultiline(data.solicitacao_responsavel_nome);
   }
   if ('solicitacao_responsavel_cargo' in data) {
     const v = String(data.solicitacao_responsavel_cargo || '').trim();
@@ -839,9 +842,9 @@ function applyGlobalFormStatePayload(data) {
     const v = String(data.dfd_assinatura_cargo || '').trim();
     fixoAssinaturaCargo.value = v ? tituloNomePt(v) : '';
   }
-  if ('tr_nome_assinante' in data) {
-    const v = String(data.tr_nome_assinante || '').trim();
-    responsavel.value = v ? tituloNomePt(v) : '';
+  if ('tr_nome_assinante' in data || 'nome_assinante_termo' in data || 'tr_termo_responsavel_nome' in data) {
+    const v = data.tr_nome_assinante ?? data.nome_assinante_termo ?? data.tr_termo_responsavel_nome;
+    responsavel.value = normNomeTituloMultiline(v);
   }
   if ('tr_cargo_assinante' in data) {
     const v = String(data.tr_cargo_assinante || '').trim();

@@ -58,6 +58,42 @@ export function capitalizeNomeTituloPt(value) {
     .join('');
 }
 
+/** Campos de nome/cargo que aceitam várias linhas (Enter) no formulário. */
+export const SLOT_NOME_MULTILINE_IDS = new Set([
+  'solicitacao_responsavel_nome',
+  'tr_termo_responsavel_nome',
+  'responsavel_tr_nome',
+]);
+
+/**
+ * Formata cada linha como nome/título; preserva quebras de linha digitadas pelo usuário.
+ * @param {string} value
+ */
+export function capitalizeNomeTituloMultilinePt(value) {
+  const raw = String(value ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  if (!raw.trim()) return raw;
+  return raw
+    .split('\n')
+    .map((line) => capitalizeNomeTituloPt(line))
+    .join('\n');
+}
+
+/**
+ * Normaliza texto multilinha vindo de preset/API (trim externo, linhas formatadas).
+ * @param {string} raw
+ */
+export function normNomeTituloMultiline(raw) {
+  const text = String(raw ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+  if (!text) return '';
+  return text
+    .split('\n')
+    .map((line) => {
+      const t = line.trim();
+      return t ? capitalizeNomeTituloPt(t) : '';
+    })
+    .join('\n');
+}
+
 /**
  * Quantidade: só dígitos e um separador decimal (`,` ou `.`). Sem milhares.
  * @param {string} value

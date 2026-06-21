@@ -142,13 +142,15 @@
 
             <article class="fe-card">
               <h3>Responsável pelo Termo de Referência</h3>
-              <div class="fe-body fe-grid-2">
+              <div class="fe-body fe-grid-1">
                 <div class="fe-field">
                   <label>Nome do responsável</label>
-                  <input
+                  <textarea
                     :value="responsavel"
-                    placeholder="Digite o nome"
-                    @input="responsavel = tituloNomePt(String(($event.target).value || ''))"
+                    class="da75-textarea"
+                    rows="3"
+                    placeholder="Digite um ou mais nomes (Enter para nova linha)"
+                    @input="responsavel = tituloNomeMultilinePt(String(($event.target).value || ''))"
                   />
                 </div>
                 <div class="fe-field">
@@ -299,14 +301,15 @@
               </div>
             </div>
             <h4 class="fe-subsection-title">1.3 Responsável pela solicitação</h4>
-            <div class="fe-grid-2">
+            <div class="fe-grid-1">
               <div class="fe-field">
                 <label>Nome do responsável</label>
-                <input
+                <textarea
                   :value="fixoResponsavel"
-                  list="dl-solicitacao-responsavel-nome"
-                  placeholder="Digite o nome do responsável"
-                  @input="fixoResponsavel = tituloNomePt(String(($event.target).value || ''))"
+                  class="da75-textarea"
+                  rows="3"
+                  placeholder="Digite um ou mais nomes (Enter para nova linha)"
+                  @input="fixoResponsavel = tituloNomeMultilinePt(String(($event.target).value || ''))"
                 />
               </div>
               <div class="fe-field">
@@ -416,10 +419,15 @@ import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
 import {
   capitalizeEachWordLeadingPt,
   capitalizeFirstSignificantLetter,
-  capitalizeNomeTituloPt as tituloNomePt,
+  capitalizeNomeTituloMultilinePt,
+  capitalizeNomeTituloPt,
+  normNomeTituloMultiline,
   formatMoedaBRLInput,
   sanitizeQuantidadeInput,
 } from '@/utils/itemValorCampos.js';
+
+const tituloNomePt = capitalizeNomeTituloPt;
+const tituloNomeMultilinePt = capitalizeNomeTituloMultilinePt;
 
 const LABEL_ORGAO_UNIDADE_RESP_EQUIP = capitalizeEachWordLeadingPt('Órgão / unidade responsável pelo equipamento');
 const PLACEHOLDER_ORGAO_UNIDADE = capitalizeEachWordLeadingPt('Digite o órgão');
@@ -613,8 +621,7 @@ function applyGlobalFormStatePayload(data) {
     cargo.value = v ? tituloNomePt(v) : '';
   }
   if ('solicitacao_responsavel_nome' in data) {
-    const v = String(data.solicitacao_responsavel_nome || '').trim();
-    fixoResponsavel.value = v ? tituloNomePt(v) : '';
+    fixoResponsavel.value = normNomeTituloMultiline(data.solicitacao_responsavel_nome);
   }
   if ('solicitacao_responsavel_cargo' in data) {
     const v = String(data.solicitacao_responsavel_cargo || '').trim();

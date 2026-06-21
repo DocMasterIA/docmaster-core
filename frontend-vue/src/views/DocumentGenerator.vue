@@ -265,9 +265,11 @@
                 <textarea
                   v-if="field.input === 'textarea'"
                   :id="'drawer-slot-' + field.id"
-                  v-model="slotForm[field.id]"
+                  :value="slotForm[field.id]"
                   class="gov-textarea doc-gen__slot-input"
                   rows="3"
+                  :placeholder="SLOT_NOME_MULTILINE_IDS.has(field.id) ? 'Digite um ou mais nomes (Enter para nova linha)' : undefined"
+                  @input="onSlotTextareaInput(field, $event)"
                 />
                 <select
                   v-else-if="field.input === 'select'"
@@ -525,7 +527,9 @@ import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/
 import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
 import {
   capitalizeFirstSignificantLetter,
+  capitalizeNomeTituloMultilinePt,
   capitalizeNomeTituloPt,
+  SLOT_NOME_MULTILINE_IDS,
   formatMoedaBRLInput,
   sanitizeQuantidadeInput,
 } from '@/utils/itemValorCampos.js';
@@ -679,7 +683,7 @@ const FLOW_CONFIG = {
             input: 'datalist',
           },
           { id: '_h_solicitacao_responsavel', label: '1.3 Responsável pela solicitação', input: 'heading', fullWidth: true },
-          { id: 'solicitacao_responsavel_nome', label: 'Nome do responsável', input: 'text' },
+          { id: 'solicitacao_responsavel_nome', label: 'Nome do responsável', input: 'textarea', fullWidth: true },
           {
             id: 'solicitacao_responsavel_cargo',
             label: 'Função / Cargo',
@@ -776,7 +780,7 @@ const FLOW_CONFIG = {
         title: 'Fiscalização',
         fields: [
           { id: 'fiscal_nome', label: 'Nome do fiscal de contratos', input: 'text' },
-          { id: 'responsavel_tr_nome', label: 'Nome do responsável', input: 'text' },
+          { id: 'responsavel_tr_nome', label: 'Nome do responsável', input: 'textarea', fullWidth: true },
           { id: 'responsavel_tr_cargo', label: 'Cargo/Função', input: 'text' },
           { id: 'modo_data', label: 'Modo da data', input: 'text' },
         ],
@@ -975,6 +979,13 @@ function isSlotNomeTituloFieldId(fieldId) {
   return SLOT_NOME_TITULO_IDS.has(String(fieldId || ''));
 }
 
+function onSlotTextareaInput(field, event) {
+  const raw = String(event?.target?.value ?? '');
+  slotForm[field.id] = SLOT_NOME_MULTILINE_IDS.has(field.id)
+    ? capitalizeNomeTituloMultilinePt(raw)
+    : raw;
+}
+
 function isSlotNomeTituloTextField(field) {
   return field?.input === 'text' && isSlotNomeTituloFieldId(field.id);
 }
@@ -1020,7 +1031,11 @@ function isFieldSuggestionsOpen(fieldId) {
 
 function selectFieldSuggestion(fieldId, value) {
   const raw = String(value ?? '');
-  slotForm[fieldId] = isSlotNomeTituloFieldId(fieldId) ? capitalizeNomeTituloPt(raw) : raw;
+  slotForm[fieldId] = SLOT_NOME_MULTILINE_IDS.has(fieldId)
+    ? capitalizeNomeTituloMultilinePt(raw)
+    : isSlotNomeTituloFieldId(fieldId)
+      ? capitalizeNomeTituloPt(raw)
+      : raw;
   suggestionOpenField.value = '';
 }
 
@@ -1318,8 +1333,18 @@ function buildTrSlotsOverride() {
     o.data_termo = dataTermo;
   }
 
-  const nomeAss = (f.tr_nome_assinante || '').trim();
-  const cargoAss = (f.tr_cargo_assinante || '').trim();
+  const nomeAss = (
+    f.tr_nome_assinante
+    || f.tr_termo_responsavel_nome
+    || f.responsavel_tr_nome
+    || ''
+  ).trim();
+  const cargoAss = (
+    f.tr_cargo_assinante
+    || f.tr_termo_responsavel_cargo
+    || f.responsavel_tr_cargo
+    || ''
+  ).trim();
   if (nomeAss) o.nome_assinante_termo = nomeAss;
   if (cargoAss) o.cargo_assinante_termo = cargoAss;
 

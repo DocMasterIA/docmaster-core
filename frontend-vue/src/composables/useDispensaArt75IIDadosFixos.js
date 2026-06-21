@@ -4,11 +4,10 @@ import {
   TRATAMENTO_CARGO,
   TRATAMENTO_NOME,
 } from '@/components/dispensa-art-75-ii/dispensaArt75iiShared.js';
-import { capitalizeNomeTituloPt } from '@/utils/itemValorCampos.js';
+import { capitalizeNomeTituloPt, normNomeTituloMultiline } from '@/utils/itemValorCampos.js';
 
 function normNomeTitulo(raw) {
-  const v = String(raw ?? '').trim();
-  return v ? capitalizeNomeTituloPt(v) : '';
+  return normNomeTituloMultiline(raw);
 }
 
 export const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';

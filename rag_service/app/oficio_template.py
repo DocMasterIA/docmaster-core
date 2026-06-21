@@ -20,6 +20,8 @@ from .tr_template import (
     numero_processo_valor_placeholder_tr,
     slots_numero_processo_display,
     split_paragraphs_on_double_newline,
+    _append_multiline_to_run,
+    _normalize_slot_block,
 )
 
 
@@ -57,12 +59,28 @@ def _replace_placeholder_in_paragraph_runs(paragraph, placeholder: str, replacem
 
     if start_idx == end_idx:
         txt = runs[start_idx].text or ""
-        runs[start_idx].text = txt[:start_off] + replacement + txt[end_off:]
+        before = txt[:start_off]
+        after = txt[end_off:]
+        run = runs[start_idx]
+        run.text = before
+        if "\n" in replacement:
+            _append_multiline_to_run(run, replacement)
+            if after:
+                run.add_text(after)
+        else:
+            run.text = before + replacement + after
         target_idx = start_idx
     else:
         prefix = (runs[start_idx].text or "")[:start_off]
         suffix = (runs[end_idx].text or "")[end_off:]
-        runs[start_idx].text = prefix + replacement + suffix
+        run = runs[start_idx]
+        run.text = prefix
+        if "\n" in replacement:
+            _append_multiline_to_run(run, replacement)
+            if suffix:
+                run.add_text(suffix)
+        else:
+            run.text = prefix + replacement + suffix
         for idx in range(start_idx + 1, end_idx + 1):
             runs[idx].text = ""
         target_idx = start_idx
@@ -173,7 +191,7 @@ def render_oficio_from_slots(
             (slots.sol_oficio_justificativa or slots.justificativa or "").strip()
         ),
         "(SOL_OFICIO_PRAZO_RESPOSTA)": slots.sol_oficio_prazo_resposta or "",
-        "(SOL_OFICIO_RESPONSAVEL_NOME)": slots.sol_oficio_responsavel_nome or "",
+        "(SOL_OFICIO_RESPONSAVEL_NOME)": _normalize_slot_block(slots.sol_oficio_responsavel_nome or ""),
         "(SOL_OFICIO_RESPONSAVEL_CARGO)": slots.sol_oficio_responsavel_cargo or "",
         "(SOL_OFICIO_RESPONSAVEL_SETOR)": slots.sol_oficio_responsavel_setor or slots.secretaria_usuario or "",
         "(SOL_OFICIO_CIDADE)": slots.cidade or "",

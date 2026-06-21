@@ -468,6 +468,25 @@ def _configure_items_table_columns(table, doc: Document, use_price_layout: bool 
                 row.cells[idx].width = width
 
 
+def _normalize_slot_block(text: str) -> str:
+    t = str(text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    # Preserva um par de quebras (parágrafo lógico); só colapsa 3+ linhas vazias a \n\n.
+    t = re.sub(r"\n{3,}", "\n\n", t)
+    return t
+
+
+def _append_multiline_to_run(run, text: str) -> None:
+    """Insere texto com quebras de linha Word (w:br) a partir de \\n."""
+    normalized = str(text or "").replace("\r\n", "\n").replace("\r", "\n")
+    parts = normalized.split("\n")
+    if not parts:
+        return
+    run.text = (run.text or "") + parts[0]
+    for part in parts[1:]:
+        run.add_break()
+        run.add_text(part)
+
+
 def _replace_placeholders_in_paragraphs(doc: Document, mapping: Dict[str, str]) -> None:
     def _replace_placeholder_in_paragraph_runs(paragraph, placeholder: str, replacement: str) -> bool:
         runs = paragraph.runs
@@ -498,11 +517,27 @@ def _replace_placeholders_in_paragraphs(doc: Document, mapping: Dict[str, str]) 
 
         if start_idx == end_idx:
             txt = runs[start_idx].text or ""
-            runs[start_idx].text = txt[:start_off] + replacement + txt[end_off:]
+            before = txt[:start_off]
+            after = txt[end_off:]
+            run = runs[start_idx]
+            run.text = before
+            if "\n" in replacement:
+                _append_multiline_to_run(run, replacement)
+                if after:
+                    run.add_text(after)
+            else:
+                run.text = before + replacement + after
         else:
             prefix = (runs[start_idx].text or "")[:start_off]
             suffix = (runs[end_idx].text or "")[end_off:]
-            runs[start_idx].text = prefix + replacement + suffix
+            run = runs[start_idx]
+            run.text = prefix
+            if "\n" in replacement:
+                _append_multiline_to_run(run, replacement)
+                if suffix:
+                    run.add_text(suffix)
+            else:
+                run.text = prefix + replacement + suffix
             for idx in range(start_idx + 1, end_idx + 1):
                 runs[idx].text = ""
         return True
@@ -1082,12 +1117,6 @@ def render_tr_from_slots(
     # deixando o TR gerado sem esse cabeçalho fixo.
     _clear_headers(doc)
 
-    def _normalize_slot_block(text: str) -> str:
-        t = str(text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
-        # Preserva um par de quebras (parágrafo lógico); só colapsa 3+ linhas vazias a \\n\\n.
-        t = re.sub(r"\n{3,}", "\n\n", t)
-        return t
-
     fluxo_ui = _resolve_dispensa_fluxo_ui(slots)
     justificativa_text = _normalize_slot_block(slots.justificativa or "")
     problema_text = _normalize_slot_block(slots.problema_administrativo or "")
@@ -1115,6 +1144,7 @@ def render_tr_from_slots(
 
     # Modelos dispensa: cargo abaixo do nome na assinatura = (TR_SECRETARIA_USUARIO), não só (TR_CARGO_*).
     cargo_assinatura_tr = (slots.cargo_assinante_termo or "").strip()
+    nome_assinante_tr = _normalize_slot_block(slots.nome_assinante_termo or "")
 
     data_termo_extenso = format_date_pt_br_extenso(slots.data_termo)
 
@@ -1145,7 +1175,7 @@ def render_tr_from_slots(
         "(TR_ENDERECO_ENTREGA)": slots.endereco_entrega or "",
         "(TR_EMAIL_ENVIO_PROPOSTAS)": slots.email_envio_propostas or "",
         "(TR_DATA_TERMO)": data_termo_extenso,
-        "(TR_NOME_ASSINANTE_TERMO)": slots.nome_assinante_termo or "",
+        "(TR_NOME_ASSINANTE_TERMO)": nome_assinante_tr,
         "(TR_CARGO_ASSINANTE_TERMO)": cargo_assinatura_tr,
         "(NUMERO_PROCESSO)": num_proc_tr_placeholder,
         "( NUMERO_PROCESSO )": num_proc_tr_placeholder,
@@ -1201,7 +1231,7 @@ def render_tr_from_slots(
         "(ENDERECO ENTREGA)": slots.endereco_entrega or "",
         "(E-mail de envio de propostas)": slots.email_envio_propostas or "",
         "(DATA DO TERMO)": data_termo_extenso,
-        "(NOME DO ASSINANTE DO TERMO)": slots.nome_assinante_termo or "",
+        "(NOME DO ASSINANTE DO TERMO)": nome_assinante_tr,
         "(CARGO DO ASSINANTE DO TERMO)": cargo_assinatura_tr,
     }
 

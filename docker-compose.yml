@@ -88,8 +88,8 @@ services:
       - .env
     environment:
       - PORT=8015
-      - QWEN_API_KEY=${QWEN_API_KEY:-}
-      - QWEN_API_BASE_URL=${QWEN_API_BASE_URL:-}
+      # QWEN_API_KEY e QWEN_API_BASE_URL vêm só do env_file (.env).
+      # Evita override vazio quando `docker compose up` roda sem `source .env`.
       - QWEN_MODEL=${QWEN_MODEL:-qwen3.6-plus}
       - QWEN_TIMEOUT=${QWEN_TIMEOUT:-120}
       - QWEN_DAILY_TOKEN_BUDGET=${QWEN_DAILY_TOKEN_BUDGET:-0}

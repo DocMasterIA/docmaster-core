@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-from .config import settings
+from .config import load_settings
 
 logger = logging.getLogger(__name__)
 
@@ -25,18 +25,21 @@ async def chat_completion(
     model: str | None,
     max_output_tokens: int | None = None,
 ) -> tuple[str, dict[str, Any]]:
-    api_key = settings.qwen_api_key.strip()
+    cfg = load_settings()
+    api_key = cfg.qwen_api_key.strip().strip('"').strip("'")
     if not api_key:
         raise QwenGatewayError("QWEN_API_KEY não configurada.", status_code=503)
 
-    m = (model or settings.qwen_model_default).strip()
-    max_out = max(1, min(int(max_output_tokens or settings.qwen_max_output_tokens), 32000))
+    m = (model or cfg.qwen_model_default).strip()
+    max_out = max(1, min(int(max_output_tokens or cfg.qwen_max_output_tokens), 32000))
 
-    url = f"{settings.qwen_api_base_url}/chat/completions"
+    url = f"{cfg.qwen_api_base_url}/chat/completions"
     payload: dict[str, Any] = {
         "model": m,
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_out,
+        # Modelos híbridos Qwen3.x exigem flag explícita em chamadas não-streaming.
+        "enable_thinking": False,
     }
 
     headers = {
@@ -45,7 +48,7 @@ async def chat_completion(
     }
 
     try:
-        async with httpx.AsyncClient(timeout=settings.qwen_timeout_seconds) as client:
+        async with httpx.AsyncClient(timeout=cfg.qwen_timeout_seconds, trust_env=False) as client:
             resp = await client.post(url, json=payload, headers=headers)
     except httpx.TimeoutException as e:
         raise QwenGatewayError(f"Timeout na API Qwen: {e}", status_code=504) from e
@@ -64,6 +67,12 @@ async def chat_completion(
         except Exception:
             if resp.text.strip():
                 detail = f"Não autorizado: {resp.text.strip()[:300]}"
+        logger.warning(
+            "Qwen API 401 model=%s url=%s body=%s",
+            m,
+            cfg.qwen_api_base_url,
+            resp.text[:500],
+        )
         raise QwenGatewayError(detail, status_code=401)
     if resp.status_code == 429:
         raise QwenGatewayError("Rate limit na API Qwen.", status_code=429)

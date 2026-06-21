@@ -25,7 +25,8 @@ async def chat_completion(
     model: str | None,
     max_output_tokens: int | None = None,
 ) -> tuple[str, dict[str, Any]]:
-    if not settings.qwen_api_key.strip():
+    api_key = settings.qwen_api_key.strip()
+    if not api_key:
         raise QwenGatewayError("QWEN_API_KEY não configurada.", status_code=503)
 
     m = (model or settings.qwen_model_default).strip()
@@ -39,7 +40,7 @@ async def chat_completion(
     }
 
     headers = {
-        "Authorization": f"Bearer {settings.qwen_api_key}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
 
@@ -52,7 +53,18 @@ async def chat_completion(
         raise QwenGatewayError(f"Erro de rede na API Qwen: {e}", status_code=502) from e
 
     if resp.status_code == 401:
-        raise QwenGatewayError("Não autorizado: verifique QWEN_API_KEY.", status_code=401)
+        detail = "Não autorizado: verifique QWEN_API_KEY (mesmo workspace/região do endpoint)."
+        try:
+            body401 = resp.json()
+            err = body401.get("error", {}) if isinstance(body401, dict) else {}
+            if isinstance(err, dict) and err.get("message"):
+                detail = f"Não autorizado: {err.get('message')}"
+            elif isinstance(body401, dict) and body401.get("message"):
+                detail = f"Não autorizado: {body401.get('message')}"
+        except Exception:
+            if resp.text.strip():
+                detail = f"Não autorizado: {resp.text.strip()[:300]}"
+        raise QwenGatewayError(detail, status_code=401)
     if resp.status_code == 429:
         raise QwenGatewayError("Rate limit na API Qwen.", status_code=429)
 

@@ -153,6 +153,7 @@
               type="password"
               class="gov-input"
               autocomplete="current-password"
+              maxlength="128"
               required
             />
           </div>
@@ -165,6 +166,7 @@
               class="gov-input"
               autocomplete="new-password"
               minlength="8"
+              maxlength="128"
               required
             />
             <p class="gov-text-soft gov-text-xs area-usuario__hint">Mínimo 8 caracteres.</p>
@@ -178,6 +180,7 @@
               class="gov-input"
               autocomplete="new-password"
               minlength="8"
+              maxlength="128"
               required
             />
           </div>
@@ -466,6 +469,11 @@ async function submitPasswordChange() {
   }
   if (passwordForm.new_password.length < 8) {
     passwordError.value = 'A nova senha deve ter pelo menos 8 caracteres.';
+    return;
+  }
+
+  if (passwordForm.new_password.length > 128 || passwordForm.current_password.length > 128) {
+    passwordError.value = 'Senha acima do limite permitido (128 caracteres).';
     return;
   }
 

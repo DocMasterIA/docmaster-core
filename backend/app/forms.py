@@ -2,9 +2,12 @@ from django import forms
 from backend.app.models import Template
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
+from django.core.validators import MaxLengthValidator
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+
+from backend.app.services.auth_security import PASSWORD_MAX_LENGTH
 
 class TemplateUploadForm(forms.ModelForm):
     class Meta:
@@ -141,19 +144,24 @@ class UserProfileForm(forms.ModelForm):
 
 
 class ChangePasswordForm(forms.Form):
+    _password_validators = [MaxLengthValidator(PASSWORD_MAX_LENGTH)]
+
     current_password = forms.CharField(
         label=_("Senha atual"),
         strip=False,
+        validators=_password_validators,
         widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}),
     )
     new_password1 = forms.CharField(
         label=_("Nova senha"),
         strip=False,
+        validators=_password_validators,
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
     )
     new_password2 = forms.CharField(
         label=_("Confirmar nova senha"),
         strip=False,
+        validators=_password_validators,
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
     )
 

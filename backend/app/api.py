@@ -17,6 +17,15 @@ from backend.app.forms import UserProfileForm, LoginForm, ChangePasswordForm
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login as auth_login, logout as auth_logout, update_session_auth_hash
 from backend.app.utils.utils import get_client_ip, is_locked, clear_failed_attempts, record_failed_attempt
+from backend.app.services.auth_security import (
+    clear_password_change_attempts,
+    invalidate_other_user_sessions,
+    is_password_change_locked,
+    password_change_lock_key_ip,
+    password_change_lock_key_user,
+    record_password_change_failed_attempt,
+)
+from backend.app.metrics import record_auth_password_change
 from django.conf import settings as django_settings
 from django.core.paginator import Paginator
 from django.utils import timezone
@@ -1295,13 +1304,26 @@ def api_me(request):
 def api_me_change_password(request):
     if request.method != "POST":
         return JsonResponse({"ok": False, "error": "Use POST"}, status=405)
+
+    user = request.user
+    ip_key = password_change_lock_key_ip(get_client_ip(request))
+    user_key = password_change_lock_key_user(user.pk)
+    if is_password_change_locked(ip_key) or is_password_change_locked(user_key):
+        record_auth_password_change(result="locked", user=user)
+        return JsonResponse(
+            {"ok": False, "error": "Muitas tentativas. Tente novamente em alguns minutos."},
+            status=429,
+        )
+
     try:
         data = json.loads(request.body)
     except (json.JSONDecodeError, TypeError):
         return JsonResponse({"ok": False, "error": "Corpo inválido"}, status=400)
+    if not isinstance(data, dict):
+        return JsonResponse({"ok": False, "error": "Corpo inválido"}, status=400)
 
     form = ChangePasswordForm(
-        request.user,
+        user,
         data={
             "current_password": data.get("current_password") or "",
             "new_password1": data.get("new_password") or data.get("new_password1") or "",
@@ -1309,9 +1331,22 @@ def api_me_change_password(request):
         },
     )
     if form.is_valid():
-        form.save()
-        update_session_auth_hash(request, request.user)
+        saved_user = form.save()
+        update_session_auth_hash(request, saved_user)
+        request.session.cycle_key()
+        invalidate_other_user_sessions(saved_user, keep_session_key=request.session.session_key)
+        clear_password_change_attempts(ip_key)
+        clear_password_change_attempts(user_key)
+        record_auth_password_change(result="success", user=saved_user)
         return JsonResponse({"ok": True, "message": "Senha alterada com sucesso."})
+
+    errors = form.errors.as_data()
+    if "current_password" in errors:
+        record_password_change_failed_attempt(ip_key)
+        record_password_change_failed_attempt(user_key)
+        record_auth_password_change(result="failure", user=user)
+    else:
+        record_auth_password_change(result="validation_error", user=user)
     return JsonResponse({"ok": False, "errors": form.errors}, status=400)
 
 

@@ -103,3 +103,42 @@ class ChangePasswordApiTests(TestCase):
         self.assertEqual(res.status_code, 400)
         errors = res.json().get("errors") or {}
         self.assertIn("new_password1", errors)
+
+    def test_rate_limit_after_wrong_current_password(self):
+        payload = json.dumps({
+            "current_password": "Errada!",
+            "new_password": "NovaSenha456!",
+            "confirm_password": "NovaSenha456!",
+        })
+        for _ in range(5):
+            res = self.client.post(self.url, data=payload, content_type="application/json")
+            self.assertEqual(res.status_code, 400)
+
+        res = self.client.post(self.url, data=payload, content_type="application/json")
+        self.assertEqual(res.status_code, 429)
+        self.assertIn("Muitas tentativas", res.json().get("error", ""))
+
+    def test_weak_new_password_does_not_trigger_lock(self):
+        payload = json.dumps({
+            "current_password": "SenhaAtual123!",
+            "new_password": "123",
+            "confirm_password": "123",
+        })
+        for _ in range(6):
+            res = self.client.post(self.url, data=payload, content_type="application/json")
+            self.assertEqual(res.status_code, 400)
+
+    def test_oversized_password_rejected(self):
+        long_pwd = "A" * 129 + "1!"
+        res = self.client.post(
+            self.url,
+            data=json.dumps({
+                "current_password": "SenhaAtual123!",
+                "new_password": long_pwd,
+                "confirm_password": long_pwd,
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 400)
+        errors = res.json().get("errors") or {}
+        self.assertIn("new_password1", errors)

@@ -46,6 +46,12 @@ docmaster_auth_logout_total = Counter(
     ["prefeitura"],
 )
 
+docmaster_auth_password_change_total = Counter(
+    "docmaster_auth_password_change_total",
+    "Tentativas de troca de senha (usuário autenticado)",
+    ["result", "prefeitura"],
+)
+
 docmaster_document_operations_total = Counter(
     "docmaster_document_operations_total",
     "Operações de geração / pipeline de documentos",
@@ -97,6 +103,10 @@ ALLOWED_LLM_TOKEN_FLUXOS = frozenset(
 
 KNOWN_AUTH_LOGIN_RESULTS = frozenset(
     {"success", "failure", "locked", "forbidden_prefeitura"}
+)
+
+KNOWN_AUTH_PASSWORD_CHANGE_RESULTS = frozenset(
+    {"success", "failure", "locked", "validation_error"}
 )
 
 KNOWN_LLM_ACTIONS = frozenset(
@@ -248,6 +258,19 @@ def record_auth_login(*, result: str, user=None, prefeitura: str | None = None) 
 def record_auth_logout(*, user=None, prefeitura: str | None = None) -> None:
     pref = prefeitura if prefeitura is not None else prefeitura_label(user)
     docmaster_auth_logout_total.labels(prefeitura=pref).inc()
+
+
+def normalize_auth_password_change_result(result: str) -> str:
+    r = (result or "failure").strip().lower()[:32]
+    return r if r in KNOWN_AUTH_PASSWORD_CHANGE_RESULTS else "failure"
+
+
+def record_auth_password_change(*, result: str, user=None, prefeitura: str | None = None) -> None:
+    pref = prefeitura if prefeitura is not None else prefeitura_label(user)
+    docmaster_auth_password_change_total.labels(
+        result=normalize_auth_password_change_result(result),
+        prefeitura=pref,
+    ).inc()
 
 
 def record_llm_token_usage(

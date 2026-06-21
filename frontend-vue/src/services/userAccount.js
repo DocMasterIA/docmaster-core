@@ -22,6 +22,9 @@ export async function changePassword({ currentPassword, newPassword, confirmPass
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    if (res.status === 429) {
+      throw new Error(data.error || 'Muitas tentativas. Aguarde alguns minutos e tente novamente.');
+    }
     const message = flattenErrors(data.errors) || data.error || 'Erro ao alterar senha.';
     throw new Error(message);
   }

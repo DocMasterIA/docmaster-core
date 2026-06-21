@@ -10,6 +10,13 @@ from dataclasses import dataclass
 from typing import Optional
 
 
+def _env_str(key: str, default: str = "") -> str:
+    raw = os.getenv(key)
+    if raw is None or not str(raw).strip():
+        return default
+    return str(raw).strip()
+
+
 def _env_int(key: str, default: int) -> int:
     raw = os.getenv(key)
     if raw is None or not raw.strip():
@@ -32,19 +39,35 @@ def _env_float(key: str, default: float) -> float:
 
 @dataclass(frozen=True)
 class Settings:
-    port: int = _env_int("PORT", 8015)
-    qwen_api_base_url: str = os.getenv(
-        "QWEN_API_BASE_URL",
-        "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    ).rstrip("/")
-    qwen_api_key: str = os.getenv("QWEN_API_KEY", "")
-    qwen_model_default: str = os.getenv("QWEN_MODEL", "qwen3.6-plus")
-    qwen_timeout_seconds: float = _env_float("QWEN_TIMEOUT", 120.0)
-    qwen_max_output_tokens: int = _env_int("QWEN_MAX_OUTPUT_TOKENS", 4096)
-    qwen_max_prompt_chars: int = _env_int("QWEN_MAX_PROMPT_CHARS", 120_000)
-    qwen_daily_token_budget: int = _env_int("QWEN_DAILY_TOKEN_BUDGET", 0)
-    qwen_estimated_chars_per_token: int = _env_int("QWEN_ESTIMATED_CHARS_PER_TOKEN", 4)
-    qwen_audit_log_dir: Optional[str] = os.getenv("QWEN_AUDIT_LOG_DIR") or None
+    port: int
+    qwen_api_base_url: str
+    qwen_api_key: str
+    qwen_model_default: str
+    qwen_timeout_seconds: float
+    qwen_max_output_tokens: int
+    qwen_max_prompt_chars: int
+    qwen_daily_token_budget: int
+    qwen_estimated_chars_per_token: int
+    qwen_audit_log_dir: Optional[str]
 
 
-settings = Settings()
+def load_settings() -> Settings:
+    audit = _env_str("QWEN_AUDIT_LOG_DIR")
+    return Settings(
+        port=_env_int("PORT", 8015),
+        qwen_api_base_url=_env_str(
+            "QWEN_API_BASE_URL",
+            "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        ).rstrip("/"),
+        qwen_api_key=_env_str("QWEN_API_KEY"),
+        qwen_model_default=_env_str("QWEN_MODEL", "qwen3.6-plus"),
+        qwen_timeout_seconds=_env_float("QWEN_TIMEOUT", 120.0),
+        qwen_max_output_tokens=_env_int("QWEN_MAX_OUTPUT_TOKENS", 4096),
+        qwen_max_prompt_chars=_env_int("QWEN_MAX_PROMPT_CHARS", 120_000),
+        qwen_daily_token_budget=_env_int("QWEN_DAILY_TOKEN_BUDGET", 0),
+        qwen_estimated_chars_per_token=_env_int("QWEN_ESTIMATED_CHARS_PER_TOKEN", 4),
+        qwen_audit_log_dir=audit or None,
+    )
+
+
+settings = load_settings()

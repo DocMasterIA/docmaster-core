@@ -160,15 +160,15 @@
               />
             </div>
             <h4 class="ixp-subsection-title">2.6 Responsável pela assinatura do DFD</h4>
-            <div class="ixp-grid-2">
+            <div class="ixp-grid-1">
               <div class="ixp-field">
                 <label>Nome do responsável</label>
-                <input
+                <textarea
                   :value="ctx.fixoAssinatura"
-                  class="da75-input da75-input--sm"
-                  list="da75-dl-dfd-assinatura-nome"
-                  placeholder="Digite o nome do responsável"
-                  @input="ctx.fixoAssinatura = capNome(String(($event.target).value || ''))"
+                  class="da75-textarea"
+                  rows="3"
+                  placeholder="Digite um ou mais nomes (Enter para nova linha)"
+                  @input="ctx.fixoAssinatura = capNomeMultiline(String(($event.target).value || ''))"
                 />
               </div>
               <div class="ixp-field">

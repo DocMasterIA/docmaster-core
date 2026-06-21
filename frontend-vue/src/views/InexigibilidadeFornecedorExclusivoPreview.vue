@@ -364,14 +364,15 @@
               />
             </div>
             <h4 class="fe-subsection-title">2.6 Responsável pela assinatura do DFD</h4>
-            <div class="fe-grid-2">
+            <div class="fe-grid-1">
               <div class="fe-field">
                 <label>Nome do responsável</label>
-                <input
+                <textarea
                   :value="fixoAssinatura"
-                  list="dl-dfd-assinatura-nome"
-                  placeholder="Digite o nome do responsável"
-                  @input="fixoAssinatura = tituloNomePt(String(($event.target).value || ''))"
+                  class="da75-textarea"
+                  rows="3"
+                  placeholder="Digite um ou mais nomes (Enter para nova linha)"
+                  @input="fixoAssinatura = tituloNomeMultilinePt(String(($event.target).value || ''))"
                 />
               </div>
               <div class="fe-field">
@@ -645,8 +646,7 @@ function applyGlobalFormStatePayload(data) {
     fixoFiscal.value = v ? tituloNomePt(v) : '';
   }
   if ('dfd_assinatura_nome' in data) {
-    const v = String(data.dfd_assinatura_nome || '').trim();
-    fixoAssinatura.value = v ? tituloNomePt(v) : '';
+    fixoAssinatura.value = normNomeTituloMultiline(data.dfd_assinatura_nome);
   }
   if ('dfd_assinatura_cargo' in data) {
     const v = String(data.dfd_assinatura_cargo || '').trim();

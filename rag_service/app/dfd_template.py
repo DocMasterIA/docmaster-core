@@ -28,6 +28,8 @@ from .tr_template import (
     numero_processo_valor_placeholder_tr,
     slots_numero_processo_display,
     split_paragraphs_on_double_newline,
+    _append_multiline_to_run,
+    _normalize_slot_block,
 )
 
 
@@ -91,11 +93,27 @@ def _replace_placeholder_in_paragraph_runs(paragraph, placeholder: str, replacem
 
     if start_idx == end_idx:
         txt = runs[start_idx].text or ""
-        runs[start_idx].text = txt[:start_off] + replacement + txt[end_off:]
+        before = txt[:start_off]
+        after = txt[end_off:]
+        run = runs[start_idx]
+        run.text = before
+        if "\n" in replacement:
+            _append_multiline_to_run(run, replacement)
+            if after:
+                run.add_text(after)
+        else:
+            run.text = before + replacement + after
     else:
         prefix = (runs[start_idx].text or "")[:start_off]
         suffix = (runs[end_idx].text or "")[end_off:]
-        runs[start_idx].text = prefix + replacement + suffix
+        run = runs[start_idx]
+        run.text = prefix
+        if "\n" in replacement:
+            _append_multiline_to_run(run, replacement)
+            if suffix:
+                run.add_text(suffix)
+        else:
+            run.text = prefix + replacement + suffix
         for idx in range(start_idx + 1, end_idx + 1):
             runs[idx].text = ""
     return True
@@ -265,7 +283,7 @@ def render_dfd_from_tr_slots(
         "(DFD_GESTOR_CONTRATOS)": slots.dfd_gestor_contratos or "",
         "(DFD_FISCAL_CONTRATOS)": slots.dfd_fiscal_contratos or "",
         "(DFD_CARGO_ASSINATURA)": slots.dfd_assinatura_cargo or "",
-        "(DFD_NOME_ASSINATURA)": slots.dfd_assinatura_nome or "",
+        "(DFD_NOME_ASSINATURA)": _normalize_slot_block(slots.dfd_assinatura_nome or ""),
         "(DFD_DATA)": dfd_data_text,
         # Placeholders legados (mesmo conteúdo que DFD_OBJETO_REFERENCIA / DFD_JUSTIFICATIVA)
         "(Descrever objeto do termo de referencia)": dfd_obj,
@@ -278,7 +296,7 @@ def render_dfd_from_tr_slots(
         "(GESTORA CONTRATOS)": slots.dfd_gestor_contratos or "",
         "(FISCAL CONTRATOS)": slots.dfd_fiscal_contratos or "",
         "(CARGO ASSINATURA DFD)": slots.dfd_assinatura_cargo or "",
-        "(NOME ASSINATURA DFD)": slots.dfd_assinatura_nome or "",
+        "(NOME ASSINATURA DFD)": _normalize_slot_block(slots.dfd_assinatura_nome or ""),
         "(DATA DFD)": dfd_data_text,
     }
 

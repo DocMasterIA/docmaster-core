@@ -709,7 +709,8 @@ const FLOW_CONFIG = {
           {
             id: 'dfd_assinatura_nome',
             label: 'Nome do responsável',
-            input: 'text',
+            input: 'textarea',
+            fullWidth: true,
             required: true,
           },
           {

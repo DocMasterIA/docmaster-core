@@ -63,6 +63,7 @@ export const SLOT_NOME_MULTILINE_IDS = new Set([
   'solicitacao_responsavel_nome',
   'tr_termo_responsavel_nome',
   'responsavel_tr_nome',
+  'dfd_assinatura_nome',
 ]);
 
 /**

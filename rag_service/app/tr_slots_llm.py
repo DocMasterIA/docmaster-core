@@ -1308,7 +1308,7 @@ def _enrich_objeto_with_quantidade(text: str, itens: List[ItemSlot]) -> str:
     return t
 
 
-def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
+def _dict_to_tr_slots(data: Dict[str, Any], *, preserve_objeto_normalize: bool = False) -> TRTemplateSlots:
     """Converte o dicionário retornado pela LLM em TRTemplateSlots."""
     disp = data.get("dispensa") or {}
     if isinstance(disp, dict):
@@ -1352,9 +1352,11 @@ def _dict_to_tr_slots(data: Dict[str, Any]) -> TRTemplateSlots:
     else:
         fiscal = FiscalSlots()
 
+    objeto_raw = str(data.get("objeto", "")).strip()
+    objeto = objeto_raw if preserve_objeto_normalize else _normalize_objeto(objeto_raw)
     # Campo dotacao NÃO deve ser preenchido pela IA: sempre vem vazio aqui.
     return TRTemplateSlots(
-        objeto=_normalize_objeto(str(data.get("objeto", "")).strip()),
+        objeto=objeto,
         objeto_escopo=str(data.get("objeto_escopo", "")).strip(),
         objeto_entregas=str(data.get("objeto_entregas", "")).strip(),
         objeto_resultados=str(data.get("objeto_resultados", "")).strip(),
@@ -2459,9 +2461,12 @@ async def _fill_tr_slots_with_llm_work(
             llm_generation_base_url_for_clausulas,
         )
 
-        slot_pk = str((user_context or {}).get("slot_package_key") or "").strip()
+        slot_pk = _package_key_from_override_or_context(override, user_context)
         clausulas_base = llm_generation_base_url_for_clausulas(slot_pk)
         rich_clausulas = clausulas_use_rich_prompt(clausulas_base)
+        llm_user_context = user_context
+        if slot_pk:
+            llm_user_context = {**(user_context or {}), "slot_package_key": slot_pk}
         if rich_clausulas:
             cloud_max_tokens = max(400, int(LLM_CLAUSULAS_CLOUD_MAX_TOKENS))
             full_prompt = build_clausulas_qwen_full_prompt(user_prompt)
@@ -2493,7 +2498,7 @@ async def _fill_tr_slots_with_llm_work(
     try:
         body = await _call_llm_generate(
             full_prompt,
-            user_context=user_context,
+            user_context=llm_user_context if lite_fill else user_context,
             options=llm_options,
             use_clausulas_gateway=lite_fill,
             cloud_max_tokens=cloud_max_tokens if lite_fill and rich_clausulas else None,
@@ -2529,7 +2534,7 @@ async def _fill_tr_slots_with_llm_work(
             "Falha ao interpretar JSON retornado pela LLM durante a geração do TR. "
             f"Detalhe do parser: {e.msg} (linha {e.lineno}, coluna {e.colno})."
         ) from e
-    llm_slots = _dict_to_tr_slots(parsed)
+    llm_slots = _dict_to_tr_slots(parsed, preserve_objeto_normalize=rich_clausulas if lite_fill else False)
     if lite_fill:
         return _finalize_lite_objeto_justificativa_slots(
             llm_slots,

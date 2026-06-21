@@ -72,7 +72,7 @@ def llm_generation_base_url_for_clausulas(slot_package_key: str | None) -> str:
 
 # Perfil de prompt para cláusulas: auto = rich no gateway cloud, lite no Ollama local.
 LLM_CLAUSULAS_PROMPT_PROFILE: str = os.getenv("LLM_CLAUSULAS_PROMPT_PROFILE", "auto").strip().lower()
-LLM_CLAUSULAS_CLOUD_MAX_TOKENS: int = _env_int("LLM_CLAUSULAS_CLOUD_MAX_TOKENS", 900)
+LLM_CLAUSULAS_CLOUD_MAX_TOKENS: int = _env_int("LLM_CLAUSULAS_CLOUD_MAX_TOKENS", 2048)
 
 
 def clausulas_gateway_is_cloud(base_url: str | None = None) -> bool:

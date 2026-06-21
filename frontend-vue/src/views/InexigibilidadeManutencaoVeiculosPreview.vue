@@ -532,6 +532,7 @@ import { useRoute } from 'vue-router';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
 import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
+import { requestClausulasObjetoJustificativaFast } from '@/utils/clausulasObjetoJustificativa.js';
 import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
 import {
   capitalizeEachWordLeadingPt,
@@ -1167,33 +1168,6 @@ function formatarTrechoQuilometragemRevisao(raw) {
   return oneLine;
 }
 
-function gerarObjetoTexto(contratado, setor, caracteristicas, tipoManutencaoValue = '', revisaoKmValue = '') {
-  const objeto = String(contratado || '').trim() || 'objeto não informado';
-  const destino = String(setor || '').trim() ? `, visando atender as demandas de ${String(setor).trim()}` : '';
-  const manutencao = String(tipoManutencaoValue || '').trim()
-    ? `, no escopo de manutenção ${String(tipoManutencaoValue).trim().toLowerCase()}`
-    : '';
-  const rkTrim = String(revisaoKmValue || '').trim();
-  const prev = String(tipoManutencaoValue || '').trim() === 'Preventiva';
-  const revisao = rkTrim && prev ? ` (marco de ${formatarTrechoQuilometragemRevisao(rkTrim)})` : '';
-  const detalhes = String(caracteristicas || '').trim() ? `, observadas as seguintes características mínimas: ${String(caracteristicas).trim()}` : '';
-  return `${primeiraMaiuscula(objeto)}${destino}${manutencao}${revisao}${detalhes}.`;
-}
-function gerarJustificativaTexto(contratado, setor, caracteristicas, tipoManutencaoValue = '', revisaoKmValue = '') {
-  const objeto = String(contratado || '').trim() || 'o objeto indicado';
-  const destino = String(setor || '').trim() ? ` do(a) ${String(setor).trim()}` : ' da Administração Pública';
-  const manutencao = String(tipoManutencaoValue || '').trim()
-    ? ` Considera-se a manutenção ${String(tipoManutencaoValue).trim().toLowerCase()} como eixo da contratação.`
-    : '';
-  const rkTrim = String(revisaoKmValue || '').trim();
-  const prev = String(tipoManutencaoValue || '').trim() === 'Preventiva';
-  const revisao = rkTrim && prev
-    ? ` Para calendário da preventiva, considera-se o intervalo de ${formatarTrechoQuilometragemRevisao(rkTrim)}.`
-    : '';
-  const detalhes = String(caracteristicas || '').trim() ? ` A contratação deverá observar as características mínimas informadas: ${String(caracteristicas).trim()}.` : '';
-  return `A presente contratação justifica-se pela necessidade de assegurar ${objeto} para atendimento das demandas${destino}, garantindo a continuidade, eficiência e adequada prestação dos serviços públicos.${manutencao}${revisao}${detalhes}`;
-}
-
 /** Texto para (DFD_OBJETO_REFERENCIA) — redacao em prosa; inexigibilidade Art. 74.I manutencao de veiculos. */
 function buildInexig74ManutencaoDfdObjetoReferencia() {
   const m = String(marca.value || '').trim();
@@ -1564,52 +1538,6 @@ function buildSlotsOverride() {
 
   return Object.keys(o).length ? o : null;
 }
-function parseClauseSections(text) {
-  const normalized = String(text || '').replace(/\r/g, '');
-  const sections = {
-    objeto: '',
-    justificativa: '',
-    escopo: '',
-    entregas: '',
-    resultados: '',
-  };
-  const lines = normalized.split('\n');
-  let current = '';
-  const keyByHeader = {
-    objeto: 'objeto',
-    justificativa: 'justificativa',
-    escopo: 'escopo',
-    entregas: 'entregas',
-    'resultados esperados': 'resultados',
-    resultados: 'resultados',
-  };
-  lines.forEach((line) => {
-    const trimmed = line.trim();
-    const low = trimmed.toLowerCase().replace(/[*:#-]/g, '').trim();
-    const headerMatch = Object.keys(keyByHeader).find((k) => low.startsWith(k));
-    if (headerMatch) {
-      current = keyByHeader[headerMatch];
-      const content = trimmed.replace(/^.*?:\s*/, '');
-      if (content && content !== trimmed) sections[current] += (sections[current] ? '\n' : '') + content;
-      return;
-    }
-    if (current) sections[current] += (sections[current] ? '\n' : '') + trimmed;
-  });
-  return sections;
-}
-function extractClausesFromSectionTexts(sectionTexts) {
-  const get = (...keys) => {
-    for (const key of keys) {
-      const value = sectionTexts?.[key];
-      if (typeof value === 'string' && value.trim()) return value.trim();
-    }
-    return '';
-  };
-  return {
-    objeto: get('objeto', 'objeto_licitacao', 'do_objeto'),
-    justificativa: get('justificativa', 'necessidade', 'fundamentacao', 'da_necessidade'),
-  };
-}
 async function onGenerateClauses() {
   isGeneratingClauses.value = true;
   generateError.value = '';
@@ -1621,72 +1549,27 @@ async function onGenerateClauses() {
       generateError.value = 'Preencha "O que será contratado?" e "Qual setor/secretaria será atendido?" para gerar objeto e justificativa.';
       return;
     }
-    const prompt = [
-      'Com base EXCLUSIVAMENTE nos dados abaixo, gere APENAS duas seções:',
-      'Objeto:',
-      'Justificativa:',
-      '',
-      'REGRAS OBRIGATÓRIAS:',
-      '- Não inventar órgão, secretaria, tipo de objeto, localidade, frota, veículos, alunos ou professores se não estiver explicitamente informado.',
-      '- Não reutilizar contexto de mensagens anteriores.',
-      '- Usar apenas os três campos fornecidos pelo usuário.',
-      '- Se faltar informação, escrever de forma genérica sem adicionar fatos novos.',
-      '',
-      `O que será contratado: ${contratado}`,
-      `Setor/secretaria atendido: ${setor}`,
-      `Características mínimas (opcional): ${caracteristicas || 'não informado'}`,
-      `Tipo de manutenção: ${isDispensaManutencaoRoute.value ? (tipoManutencao.value || 'não informado') : 'não se aplica'}`,
-      `Revisão/KM: ${isDispensaManutencaoRoute.value ? (revisaoKm.value || 'não informado') : 'não se aplica'}`,
-    ].join('\n');
-    async function requestClausesFast(promptText) {
-      const fastPrompt = [
-        promptText,
-        '',
-        'Formato obrigatório de resposta:',
-        'Objeto: <texto>',
-        'Justificativa: <texto>',
-        '',
-        'Não inclua nenhuma seção extra.',
-      ].join('\n');
-      const res = await fetch(`${API_BASE}/api/llm/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          prompt: fastPrompt,
-          stream: false,
-          slot_package_key: slotPackageKey.value,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      const text = data?.data?.response || data?.data?.text || data?.response || data?.text || '';
-      return { res, data: { ok: !!data?.ok, response: text } };
-    }
-    const { res, data } = await requestClausesFast(prompt);
-    if (!res.ok || !data.ok) {
-      generateError.value = res.status === 504
-        ? 'A IA demorou para responder (504 Gateway Timeout). Tente um prompt mais objetivo ou gere novamente em alguns instantes.'
-        : (data.error || data.detail || `Erro ${res.status} ao gerar cláusulas`);
+    const result = await requestClausulasObjetoJustificativaFast(API_BASE, {
+      contratado,
+      setor,
+      caracteristicas,
+      tipoManutencao: isDispensaManutencaoRoute.value ? tipoManutencao.value : '',
+      revisaoKm: isDispensaManutencaoRoute.value ? revisaoKm.value : '',
+      slotPackageKey: slotPackageKey.value,
+    });
+    if (!result.ok) {
+      generateError.value = result.errorMessage || 'Erro ao gerar cláusulas via IA.';
       return;
     }
-    const bySections = extractClausesFromSectionTexts(data.section_texts || {});
-    const text = data.generated_text || data.text || data.content || data.response || '';
-    const parsed = (bySections.objeto || bySections.justificativa)
-      ? bySections
-      : parseClauseSections(text);
-    if (!parsed.objeto && !parsed.justificativa && !String(text).trim()) {
-      clausulaObjeto.value = gerarObjetoTexto(contratado, setor, caracteristicas, tipoManutencao.value, revisaoKm.value);
-      clausulaJustificativa.value = gerarJustificativaTexto(contratado, setor, caracteristicas, tipoManutencao.value, revisaoKm.value);
+    if (!result.objeto && !result.justificativa) {
+      generateError.value = 'A IA não retornou objeto ou justificativa. Tente novamente.';
       return;
     }
-    clausulaObjeto.value = parsed.objeto || gerarObjetoTexto(contratado, setor, caracteristicas, tipoManutencao.value, revisaoKm.value);
-    clausulaJustificativa.value = parsed.justificativa || gerarJustificativaTexto(contratado, setor, caracteristicas, tipoManutencao.value, revisaoKm.value);
+    clausulaObjeto.value = result.objeto;
+    clausulaJustificativa.value = result.justificativa;
     await saveUserGlobalPreset();
   } catch (e) {
-    clausulaObjeto.value = gerarObjetoTexto(clausulaContratado.value, clausulaSetor.value, clausulaCaracteristicas.value, tipoManutencao.value, revisaoKm.value);
-    clausulaJustificativa.value = gerarJustificativaTexto(clausulaContratado.value, clausulaSetor.value, clausulaCaracteristicas.value, tipoManutencao.value, revisaoKm.value);
-    generateError.value = e?.message || 'Não foi possível gerar via IA; aplicamos a versão padrão local.';
-    await saveUserGlobalPreset();
+    generateError.value = e?.message || 'Não foi possível gerar via IA.';
   } finally {
     isGeneratingClauses.value = false;
   }

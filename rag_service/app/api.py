@@ -739,11 +739,18 @@ async def endpoint_fill_tr_slots(body: GenerateTRFromModelRequest):
 
     skip_ctx = bool(getattr(body, "skip_context_in_prompt", False))
     slots_override = _merge_user_context_into_tr_slots(body.slots_override, body.context)
+    ctx = body.context if isinstance(body.context, dict) else {}
+    if skip_ctx:
+        # Não injeta perfil/prefeitura no prompt, mas preserva roteamento Qwen (slot_package_key).
+        pk = str(ctx.get("slot_package_key") or "").strip()
+        user_context = {"slot_package_key": pk} if pk else None
+    else:
+        user_context = ctx or None
     try:
         slots, llm_usage = await fill_tr_slots_with_llm(
             user_prompt=body.user_prompt,
             slots_override=slots_override,
-            user_context=body.context if not skip_ctx else None,
+            user_context=user_context,
             skip_context_in_prompt=skip_ctx,
         )
         return {"ok": True, "slots": asdict(slots), "llm_token_usage": llm_usage}

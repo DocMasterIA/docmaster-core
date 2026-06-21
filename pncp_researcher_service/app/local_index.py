@@ -1673,7 +1673,7 @@ def build_search_query_tiers(termo_busca: str) -> List[SearchQueryTier]:
     Camadas de busca: estrita (100%) → núcleo → flexível (k-of-n).
     Prioriza match completo; relaxa para descrições PNCP mais curtas.
     """
-    from .config import PNCP_SEARCH_TIER_FLEX_RATIO
+    from .config import PNCP_SEARCH_ANCHOR_TIER_ENABLED, PNCP_SEARCH_TIER_FLEX_RATIO
 
     pre = preprocess_cotacao_search_term(termo_busca)
     raw = (pre or termo_busca or "").strip()
@@ -1718,7 +1718,7 @@ def build_search_query_tiers(termo_busca: str) -> List[SearchQueryTier]:
                 label="flex",
             )
         )
-    if len(core_groups) >= 2:
+    if PNCP_SEARCH_ANCHOR_TIER_ENABLED and len(core_groups) >= 2:
         anchor_groups = core_groups[:2]
         tiers.append(
             SearchQueryTier(

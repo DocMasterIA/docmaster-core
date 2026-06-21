@@ -79,26 +79,31 @@ Base path efetivo no serviço: `/api/pncp-research`.
 
 ## 4.2 Busca inteligente (`market_search_intelligent`)
 
-A versão inteligente usa `local_item_search` como fonte principal e aplica curadoria:
+A versão inteligente usa `local_item_search` (FTS5 + tiers) como fonte principal e aplica curadoria.
 
-1. **Pré-filtro forte**: `_is_strict_candidate_match`.
-2. **Scoring composto** por:
+**Modo qualidade** (`PNCP_SEARCH_QUALITY_FIRST=1`, rev. `2026-06-19-quality-qwen`): documentação em `docs/PNCP-BUSCA-INTELIGENTE-QUALIDADE.md`.
+
+1. **Tiers FTS**: strict → core → flex (ratio default **0.78**); tier anchor (2 palavras) **desligado** por default.
+2. **Pré-filtro forte**: `_is_strict_candidate_match`.
+3. **Scoring composto** por:
    - semântica por tokens (`_compute_match_score`);
    - recência (`_score_recency`);
    - coerência de preço (`_score_value_coherence`);
    - clareza/unidade (`_score_clarity_and_unit`);
    - penalidade de contexto incompatível (`_context_penalty`);
    - aderência literal ao termo (`_literal_match_score`).
-3. Reescala interna para separar melhor bons/ruins no conjunto atual.
-4. Ordena priorizando `literal_match`, depois `score_aprovacao`.
-5. Seleciona top 3 com qualidade + diversidade de órgão (`_select_top3_quality_first`).
-6. Opcional: rerank por IA (LLM) em lote de candidatos.
+4. **Sem reescala inflacionada** (35–100) em modo qualidade — scores absolutos.
+5. Relaxamento de termos só se pool &lt; 2; fallback agressivo desligado.
+6. Pools **literal** / **similar**; rerank IA também no pool **misto** (`PNCP_IA_RERANK_MIXED_POOL`).
+7. Top 3: `_select_top3_mixed_literal_similar` — máx. **1** similar no top 3 (`PNCP_SEARCH_MAX_SIMILAR_IN_TOP3`).
+8. **Rerank Qwen** (`PNCP_IA_BASE_URL`, timeout 22s) + **resumo** por item (18s).
 
 ### Blindagens atuais de estabilidade
 
 - Prompt de IA exige score variável (`0-100`) e JSON estrito.
 - Se IA devolver score muito baixo para item já forte (`ia<=15`, `base>=70`, `literal>=45`), o score base é preservado.
 - `confiabilidade`/`risco` sempre recalculados a partir do score final.
+- `stats.funil_busca` expõe pools, rerank e flags de qualidade para diagnose.
 
 ---
 
@@ -209,13 +214,25 @@ Em `config.py`:
 - `PNCP_LOCAL_BACKFILL_MONTHS`
 - `PNCP_LOCAL_INCLUDE_ITEMS`
 
-### Rerank IA
+### Busca inteligente — qualidade
+
+- `PNCP_SEARCH_QUALITY_FIRST`
+- `PNCP_SEARCH_TIER_FLEX_RATIO`
+- `PNCP_SEARCH_ANCHOR_TIER_ENABLED`
+- `PNCP_SEARCH_MAX_SIMILAR_IN_TOP3`
+- `PNCP_SEARCH_MIN_SCORE_APROVACAO`
+- `PNCP_SEARCH_CODE_REV`
+
+### Rerank / resumo IA (Qwen)
 
 - `PNCP_IA_RERANK_ENABLED`
-- `PNCP_IA_BASE_URL`
+- `PNCP_IA_RERANK_MIXED_POOL`
+- `PNCP_IA_BASE_URL` (default `http://qwen_llm_service:8015`)
 - `PNCP_IA_GENERATE_PATH`
 - `PNCP_IA_MODEL`
 - `PNCP_IA_TIMEOUT_SECONDS`
+- `PNCP_IA_ITEM_RESUMO_ENABLED`
+- `PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS`
 - `PNCP_IA_MAX_CANDIDATES`
 
 ---

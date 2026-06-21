@@ -8,6 +8,7 @@
     </header>
 
     <div class="area-usuario__grid">
+      <div class="area-usuario__left">
       <!-- Coluna esquerda: Perfil -->
       <section class="gov-surface area-usuario__profile">
         <div class="gov-surface__header">
@@ -120,6 +121,80 @@
         </div>
       </section>
 
+      <!-- Segurança: alterar senha -->
+      <section class="gov-surface area-usuario__security">
+        <div class="gov-surface__header">
+          <div>
+            <h2 class="gov-surface__title">Segurança</h2>
+            <p class="gov-surface__subtitle">Altere sua senha de acesso à plataforma.</p>
+          </div>
+        </div>
+
+        <div v-if="!showPasswordForm" class="area-usuario__security-intro">
+          <p class="gov-text-soft gov-text-sm">
+            Para sua segurança, confirme a senha atual antes de definir uma nova.
+          </p>
+          <button type="button" class="gov-btn gov-btn--outline" @click="openPasswordForm">
+            Alterar senha
+          </button>
+        </div>
+
+        <form
+          v-else
+          id="passwordForm"
+          class="area-usuario__form area-usuario__password-form"
+          @submit.prevent="submitPasswordChange"
+        >
+          <div class="gov-field">
+            <label class="gov-label" for="current_password">Senha atual</label>
+            <input
+              id="current_password"
+              v-model="passwordForm.current_password"
+              type="password"
+              class="gov-input"
+              autocomplete="current-password"
+              required
+            />
+          </div>
+          <div class="gov-field">
+            <label class="gov-label" for="new_password">Nova senha</label>
+            <input
+              id="new_password"
+              v-model="passwordForm.new_password"
+              type="password"
+              class="gov-input"
+              autocomplete="new-password"
+              minlength="8"
+              required
+            />
+            <p class="gov-text-soft gov-text-xs area-usuario__hint">Mínimo 8 caracteres.</p>
+          </div>
+          <div class="gov-field">
+            <label class="gov-label" for="confirm_password">Confirmar nova senha</label>
+            <input
+              id="confirm_password"
+              v-model="passwordForm.confirm_password"
+              type="password"
+              class="gov-input"
+              autocomplete="new-password"
+              minlength="8"
+              required
+            />
+          </div>
+
+          <p v-if="passwordError" class="area-usuario__msg area-usuario__msg--error">{{ passwordError }}</p>
+          <p v-if="passwordSuccess" class="area-usuario__msg area-usuario__msg--success">{{ passwordSuccess }}</p>
+
+          <div class="area-usuario__form-actions">
+            <button type="button" class="gov-btn gov-btn--outline" @click="cancelPasswordForm">Cancelar</button>
+            <button type="submit" class="gov-btn gov-btn--primary" :disabled="passwordSaving">
+              {{ passwordSaving ? 'Alterando...' : 'Alterar senha' }}
+            </button>
+          </div>
+        </form>
+      </section>
+      </div>
+
       <!-- Coluna direita: Meus Documentos -->
       <section class="gov-surface area-usuario__docs">
         <div class="area-usuario__docs-header">
@@ -205,6 +280,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
+import { changePassword } from '../services/userAccount.js';
 
 const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 
@@ -232,6 +308,16 @@ const avatarPreviewUrl = ref('');
 const profileSaving = ref(false);
 const profileError = ref('');
 const profileSuccess = ref('');
+
+const showPasswordForm = ref(false);
+const passwordSaving = ref(false);
+const passwordError = ref('');
+const passwordSuccess = ref('');
+const passwordForm = reactive({
+  current_password: '',
+  new_password: '',
+  confirm_password: '',
+});
 
 const docSearchQuery = ref('');
 const docSearchDebounce = ref(null);
@@ -343,6 +429,63 @@ async function submitProfile() {
     profileError.value = e.message || 'Erro ao atualizar.';
   } finally {
     profileSaving.value = false;
+  }
+}
+
+function resetPasswordForm() {
+  passwordForm.current_password = '';
+  passwordForm.new_password = '';
+  passwordForm.confirm_password = '';
+}
+
+function openPasswordForm() {
+  passwordError.value = '';
+  passwordSuccess.value = '';
+  resetPasswordForm();
+  showPasswordForm.value = true;
+}
+
+function cancelPasswordForm() {
+  showPasswordForm.value = false;
+  passwordError.value = '';
+  passwordSuccess.value = '';
+  resetPasswordForm();
+}
+
+async function submitPasswordChange() {
+  passwordError.value = '';
+  passwordSuccess.value = '';
+
+  if (!passwordForm.current_password || !passwordForm.new_password || !passwordForm.confirm_password) {
+    passwordError.value = 'Preencha todos os campos.';
+    return;
+  }
+  if (passwordForm.new_password !== passwordForm.confirm_password) {
+    passwordError.value = 'A confirmação não confere com a nova senha.';
+    return;
+  }
+  if (passwordForm.new_password.length < 8) {
+    passwordError.value = 'A nova senha deve ter pelo menos 8 caracteres.';
+    return;
+  }
+
+  passwordSaving.value = true;
+  try {
+    const data = await changePassword({
+      currentPassword: passwordForm.current_password,
+      newPassword: passwordForm.new_password,
+      confirmPassword: passwordForm.confirm_password,
+    });
+    passwordSuccess.value = data.message || 'Senha alterada com sucesso!';
+    resetPasswordForm();
+    setTimeout(() => {
+      passwordSuccess.value = '';
+      showPasswordForm.value = false;
+    }, 3000);
+  } catch (e) {
+    passwordError.value = e.message || 'Erro ao alterar senha.';
+  } finally {
+    passwordSaving.value = false;
   }
 }
 
@@ -477,6 +620,11 @@ onMounted(() => {
   grid-template-columns: 1fr 2fr;
   gap: 24px;
 }
+.area-usuario__left {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
 @media (max-width: 960px) {
   .area-usuario__grid {
     grid-template-columns: 1fr;
@@ -484,6 +632,22 @@ onMounted(() => {
 }
 .area-usuario__profile {
   padding: 20px 24px;
+}
+.area-usuario__security {
+  padding: 20px 24px;
+}
+.area-usuario__security-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 8px;
+}
+.area-usuario__password-form {
+  margin-top: 8px;
+}
+.area-usuario__hint {
+  margin: 6px 0 0;
 }
 .area-usuario__profile-body {
   margin-top: 8px;

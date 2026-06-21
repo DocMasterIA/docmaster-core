@@ -337,13 +337,22 @@ PNCP_SEARCH_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_SEARCH_ENRICH_HOMOLOG_MAX",
 PNCP_BULK_SEARCH_SQL_LIMIT: int = _env_int("PNCP_BULK_SEARCH_SQL_LIMIT", 200)
 # Score mínimo (0–100) para considerar item aderente na busca inteligente (antes ~60–70 implícito).
 PNCP_SEARCH_MIN_SCORE_APROVACAO: int = _env_int("PNCP_SEARCH_MIN_SCORE_APROVACAO", 50)
-# Marcador visível no /health para confirmar deploy do código de busca (manual-parity, tiers, etc.).
-PNCP_SEARCH_CODE_REV: str = os.getenv("PNCP_SEARCH_CODE_REV", "2026-06-17-manual-parity").strip()
+# Modo qualidade (recomendado com Qwen): tiers mais rígidos, menos fallback agressivo, rerank IA no pool misto.
+PNCP_SEARCH_QUALITY_FIRST: bool = _env_bool("PNCP_SEARCH_QUALITY_FIRST", True)
+# Máximo de slots «similaridade» no top 3 quando não há rerank IA (0 = só literal).
+PNCP_SEARCH_MAX_SIMILAR_IN_TOP3: int = _env_int("PNCP_SEARCH_MAX_SIMILAR_IN_TOP3", 1)
+# Tier «anchor» (2 palavras) — desligar melhora precisão; reduz recall em termos longos.
+PNCP_SEARCH_ANCHOR_TIER_ENABLED: bool = _env_bool("PNCP_SEARCH_ANCHOR_TIER_ENABLED", False)
+# Rerank IA também quando há mix literal+similar (antes só literal_only / similar_only).
+PNCP_IA_RERANK_MIXED_POOL: bool = _env_bool("PNCP_IA_RERANK_MIXED_POOL", True)
+# Marcador visável no /health para confirmar deploy do código de busca (manual-parity, tiers, etc.).
+PNCP_SEARCH_CODE_REV: str = os.getenv("PNCP_SEARCH_CODE_REV", "2026-06-19-quality-qwen").strip()
 # Descrições de cotação: até N tokens usam busca completa; acima disso cap de âncoras (recall).
 PNCP_SEARCH_ANCHOR_FULL_TERM_MAX: int = _env_int("PNCP_SEARCH_ANCHOR_FULL_TERM_MAX", 5)
 PNCP_SEARCH_ANCHOR_MAX_GROUPS: int = _env_int("PNCP_SEARCH_ANCHOR_MAX_GROUPS", 8)
-# Camada flexível: fração mínima de tokens do núcleo que devem casar (ex.: 0.65 = 65%).
-PNCP_SEARCH_TIER_FLEX_RATIO: float = float(os.getenv("PNCP_SEARCH_TIER_FLEX_RATIO", "0.65"))
+# Camada flexível: fração mínima de tokens do núcleo que devem casar (ex.: 0.78 = 78%).
+# Modo recall legado: PNCP_SEARCH_TIER_FLEX_RATIO=0.65
+PNCP_SEARCH_TIER_FLEX_RATIO: float = float(os.getenv("PNCP_SEARCH_TIER_FLEX_RATIO", "0.78"))
 
 # Bloqueio de itens ligados à prestação de serviço/locação no resultado de busca.
 PNCP_BLOCK_SERVICE_ITEMS: bool = _env_bool("PNCP_BLOCK_SERVICE_ITEMS", True)

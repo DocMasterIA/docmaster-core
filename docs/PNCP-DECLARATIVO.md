@@ -224,8 +224,9 @@ Plano detalhado: [`docs/PLANO-MODULO-COBERTURA-FORNECEDOR-PNCP.md`](PLANO-MODULO
 |----------------|-------------------|
 | FTS5 | `PNCP_FTS5_ENABLED=1`, `POST /local-index/fts-rebuild` |
 | Busca híbrida | `PNCP_HYBRID_*` — complementa com PNCP ao vivo se local &lt; 8 |
-| Busca inteligente | `POST /market-search/intelligent` → `local_item_search` + rerank LLM |
-| Rerank IA | `PNCP_IA_RERANK_*`, `llm_api:8002` |
+| Busca inteligente | `POST /market-search/intelligent` → FTS tiers + scoring + top 3 |
+| Modo qualidade | `PNCP_SEARCH_QUALITY_FIRST=1`, flex 0.78, rev. `2026-06-19-quality-qwen` — ver [`PNCP-BUSCA-INTELIGENTE-QUALIDADE.md`](PNCP-BUSCA-INTELIGENTE-QUALIDADE.md) |
+| Rerank / resumo IA | `PNCP_IA_*` → **`qwen_llm_service:8015`** (fallback recall: `llm_api:8002`) |
 | Bloqueio serviços | `PNCP_BLOCK_SERVICE_ITEMS=true` |
 
 Frontend: `frontend-vue/src/views/PncpResearcher.vue`, `BuscaManualCotacoes.vue`, `BuscaInteligenteCotacoes.vue`, `CotacaoDetalhe.vue`, `services/pncpResearch.js`.
@@ -389,7 +390,9 @@ Homologados/CNPJ exigem também **backend** e **frontend-vue** alinhados ao repo
 | [`docs/deploy/CHANGELOG-OPERACOES-2026-06.md`](deploy/CHANGELOG-OPERACOES-2026-06.md) | Changelog ops DESKTOP |
 | [`docs/PLANO-MODULO-COBERTURA-FORNECEDOR-PNCP.md`](PLANO-MODULO-COBERTURA-FORNECEDOR-PNCP.md) | Plano fornecedor |
 | [`docs/PESQUISADOR_PNCP_FUNCIONAMENTO_ATUAL.md`](PESQUISADOR_PNCP_FUNCIONAMENTO_ATUAL.md) | Fluxo pesquisador |
-| [`docs/PNCP_BUSCA_INTELIGENTE_IA.md`](PNCP_BUSCA_INTELIGENTE_IA.md) | Busca com IA |
+| [`docs/PNCP_BUSCA_INTELIGENTE_IA.md`](PNCP_BUSCA_INTELIGENTE_IA.md) | Busca inteligente + IA |
+| [`docs/PNCP-BUSCA-INTELIGENTE-QUALIDADE.md`](PNCP-BUSCA-INTELIGENTE-QUALIDADE.md) | Modo qualidade + Qwen rerank |
+| [`docs/QWEN-INTEGRACAO-DOCMASTER.md`](QWEN-INTEGRACAO-DOCMASTER.md) | Integração Qwen no DocMaster |
 
 ### RAG (módulo separado)
 
@@ -404,6 +407,7 @@ Homologados/CNPJ exigem também **backend** e **frontend-vue** alinhados ao repo
 | Fila + worker ingest (365d, 27 UFs) | **Implementado** no repositório; worker é o modo recomendado 24/7 |
 | Loop bash backfill | **Legado** — manter desligado com worker ativo |
 | FTS5 + busca híbrida | **Implementado** |
+| Busca inteligente modo qualidade + Qwen | **Implementado** (jun/2026) — deploy requer `QWEN_API_KEY` |
 | Filtro homologados | **Implementado** (researcher + frontend + backend) |
 | CNPJ on-demand (busca/cotação/PDF) | **Implementado** com limites configuráveis |
 | CNPJ em massa no índice (Fase B) | **Não implementado** |

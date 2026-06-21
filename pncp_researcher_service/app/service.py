@@ -40,6 +40,9 @@ from .config import (
     PNCP_SERVICE_BLOCK_TERMS,
     PNCP_SEARCH_ENRICH_HOMOLOG_MAX,
     PNCP_SEARCH_MIN_SCORE_APROVACAO,
+    PNCP_SEARCH_QUALITY_FIRST,
+    PNCP_SEARCH_MAX_SIMILAR_IN_TOP3,
+    PNCP_IA_RERANK_MIXED_POOL,
     PNCP_BULK_SEARCH_SQL_LIMIT,
 )
 from .pncp_client import (
@@ -1784,6 +1787,67 @@ def _enforce_faixa_no_top3(
     return out[:3]
 
 
+def _effective_min_score_aprovacao() -> int:
+    """Score mínimo; modo qualidade exige pelo menos 55."""
+    min_ok = int(PNCP_SEARCH_MIN_SCORE_APROVACAO)
+    if PNCP_SEARCH_QUALITY_FIRST and min_ok < 55:
+        return 55
+    return min_ok
+
+
+def _ia_rerank_pool_allowed(pool_mode: str) -> bool:
+    """Quando o pool é mix literal+similar, rerank IA ainda pode rodar (modo qualidade + Qwen)."""
+    if pool_mode in {"literal_only", "similar_only"}:
+        return True
+    if pool_mode == "mixed_fallback" and PNCP_IA_RERANK_MIXED_POOL:
+        return True
+    return False
+
+
+def _filter_ia_rerank_candidates(pool: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Prioriza candidatos fortes; em modo qualidade descarta fallback agressivo do scoring."""
+    rows = list(pool or [])
+    if PNCP_SEARCH_QUALITY_FIRST:
+        rows = [x for x in rows if not bool(x.get("match_agressivo"))]
+    rows.sort(
+        key=lambda x: (
+            0 if bool(x.get("match_agressivo")) else 1,
+            float(x.get("literal_match") or 0),
+            float(x.get("score_aprovacao") or 0),
+        ),
+        reverse=True,
+    )
+    return rows
+
+
+def _select_top3_mixed_literal_similar(
+    literal_scored: List[Dict[str, Any]],
+    similar_scored: List[Dict[str, Any]],
+    *,
+    max_similar: int,
+) -> List[Dict[str, Any]]:
+    """Completa top 3 com no máximo N slots de similaridade (resto literal)."""
+    base_literal = _select_top3_prioritize_federal(literal_scored)[:3]
+    cap = max(0, int(max_similar))
+    if cap <= 0:
+        return base_literal
+    faltantes = max(0, 3 - len(base_literal))
+    if faltantes <= 0:
+        return base_literal
+    usados = {id(x) for x in base_literal}
+    complemento = [x for x in similar_scored if id(x) not in usados]
+    take_similar = min(faltantes, cap)
+    base_similar = _select_top3_prioritize_federal(complemento)[:take_similar]
+    merged = base_literal + base_similar
+    if len(merged) < 3:
+        restantes = max(0, 3 - len(merged))
+        extra_literal = [
+            x for x in literal_scored if id(x) not in {id(y) for y in merged}
+        ]
+        merged = _merge_unique_items(merged, _select_top3_prioritize_federal(extra_literal)[:restantes])
+    return merged[:3]
+
+
 def _build_ia_rerank_prompt(
     termo_busca: str,
     candidatos: List[Dict[str, Any]],
@@ -1820,15 +1884,21 @@ def _build_ia_rerank_prompt(
             "Só inclua fora da faixa se **nenhum** candidato da lista estiver dentro — nesse caso explique na justificativa.\n"
         )
     return (
-        "Você é um avaliador de cotações PNCP.\n"
-        f"Termo de busca: {termo_busca}\n\n"
-        "Escolha EXATAMENTE 3 IDs mais aderentes ao termo, com boa leitura de descrição e preço coerente.\n"
-        "Priorize item principal no texto (não detalhe secundário de outro produto).\n"
-        "Quando o termo NÃO for médico, evite itens médicos/hospitalares.\n"
-        "Considere unidade/quantidade.\n"
+        "Você é um avaliador técnico de cotações PNCP para pesquisa de preços públicos (Lei 14.133/2021).\n"
+        f"Termo de busca do usuário: {termo_busca}\n\n"
+        "Tarefa: escolha EXATAMENTE 3 candidatos mais aderentes ao termo — produto/serviço principal, "
+        "não acessório genérico nem item de outro domínio.\n\n"
+        "REGRAS OBRIGATÓRIAS:\n"
+        "- Rejeite itens claramente de outra categoria (ex.: hospitalar se o termo não for médico).\n"
+        "- Prefira descrição que nomeie o núcleo material do termo (substância, objeto, especificação).\n"
+        "- Penalize descrições vagas, kits heterogêneos ou «diversos» sem vínculo com o termo.\n"
+        "- Considere unidade e quantidade quando relevantes.\n"
+        "- Diversifique órgãos quando possível (evite 3 linhas idênticas do mesmo contrato).\n"
+        "- score_aprovacao: use faixa real 40–95; não dê 90+ a item fraco só para preencher.\n"
         f"{faixa_txt}\n"
-        "Responda APENAS JSON válido neste formato:\n"
-        '{"selected":[{"id":"...","score_aprovacao":"0-100 (variável por item)","confiabilidade":"Alta|Média|Baixa","risco":"Baixo|Médio|Alto","justificativa":"..."}]}\n\n'
+        "Responda APENAS JSON válido:\n"
+        '{"selected":[{"id":"...","score_aprovacao":75,"confiabilidade":"Alta|Média|Baixa",'
+        '"risco":"Baixo|Médio|Alto","justificativa":"1 frase objetiva"}]}\n\n'
         f"Candidatos:\n{itens_txt}\n"
     )
 
@@ -2228,7 +2298,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         if _row_price_for_faixa(x) > 0.0
     ]
     median_val = median(valores) if valores else None
-    min_ok = int(PNCP_SEARCH_MIN_SCORE_APROVACAO)
+    min_ok = _effective_min_score_aprovacao()
 
     def _score_candidates(candidates: List[Dict[str, Any]], *, mode: str) -> List[Dict[str, Any]]:
         out_rows: List[Dict[str, Any]] = []
@@ -2376,18 +2446,23 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     funil["scored_estrito"] = len(scored)
     fallback_relaxado_usado = False
     fallback_agressivo_usado = False
+    relaxed_threshold = 2 if PNCP_SEARCH_QUALITY_FIRST else 3
+    aggressive_threshold = 1 if PNCP_SEARCH_QUALITY_FIRST else 2
     # Fallback: se a busca estrita não atingir massa crítica, abre variações claras.
-    if len(scored) < 3:
+    if len(scored) < relaxed_threshold:
         fallback_rows = _score_candidates(itens, mode="relaxed")
         funil["scored_relaxado"] = len(fallback_rows)
         fallback_relaxado_usado = bool(fallback_rows)
         scored = _merge_unique_items(scored, fallback_rows)
-    # Fallback agressivo: se ainda estiver fraco, tenta aproximação textual forte.
-    if len(scored) < 2:
+    # Fallback agressivo: só quando pool ainda está muito fraco (desligado cedo em modo qualidade).
+    if len(scored) < aggressive_threshold and not PNCP_SEARCH_QUALITY_FIRST:
         fallback_agressivo = _score_candidates(itens, mode="aggressive")
         funil["scored_agressivo"] = len(fallback_agressivo)
         fallback_agressivo_usado = bool(fallback_agressivo)
         scored = _merge_unique_items(scored, fallback_agressivo)
+    elif len(scored) < aggressive_threshold and PNCP_SEARCH_QUALITY_FIRST:
+        funil["scored_agressivo"] = 0
+        funil["fallback_agressivo_desligado"] = True
 
     # Blindagem final: remove qualquer item sem preço válido e, quando houver faixa, mantém só itens dentro.
     scored_pre_preco = len(scored)
@@ -2424,7 +2499,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             funil["scored_final_pool"] = len(scored)
 
     # Reescala para ampliar separação entre bons e ruins no conjunto atual.
-    if scored:
+    # Modo qualidade: mantém scores absolutos (evita inflar itens fracos para o top 3).
+    if scored and not PNCP_SEARCH_QUALITY_FIRST:
         raw_values = [_safe_float(x.get("score_bruto")) for x in scored]
         lo = min(raw_values)
         hi = max(raw_values)
@@ -2483,13 +2559,16 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
 
     top3: List[Dict[str, Any]] = []
     ia_used = False
-    # IA rerank apenas quando não houver risco de substituir literais por similaridade.
-    ia_rerank_allowed = pool_mode in {"literal_only", "similar_only"}
+    ia_rerank_allowed = _ia_rerank_pool_allowed(pool_mode)
+    funil["ia_rerank_pool_mode"] = pool_mode
+    funil["ia_rerank_allowed"] = bool(ia_rerank_allowed)
+    funil["search_quality_first"] = bool(PNCP_SEARCH_QUALITY_FIRST)
     if ia_rerank_on and ia_rerank_allowed and selection_pool:
-        limite_candidatos = max(6, min(PNCP_IA_MAX_CANDIDATES, len(selection_pool)))
-        pool_ia = list(selection_pool)
+        pool_ia_source = _filter_ia_rerank_candidates(selection_pool)
+        limite_candidatos = max(6, min(PNCP_IA_MAX_CANDIDATES, len(pool_ia_source)))
+        pool_ia = list(pool_ia_source)
         if faixa_min is not None and faixa_max is not None:
-            in_band_ia = [x for x in selection_pool if _preco_dentro_faixa(x, faixa_min, faixa_max)]
+            in_band_ia = [x for x in pool_ia if _preco_dentro_faixa(x, faixa_min, faixa_max)]
             if len(in_band_ia) >= 3:
                 pool_ia = in_band_ia
         candidatos_ia: List[Dict[str, Any]] = []
@@ -2552,12 +2631,12 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         elif pool_mode == "similar_only":
             top3 = _select_top3_prioritize_federal(similar_scored)[:3]
         else:
-            base_literal = _select_top3_prioritize_federal(literal_scored)[:3]
-            faltantes = max(0, 3 - len(base_literal))
-            usados = {id(x) for x in base_literal}
-            complemento = [x for x in similar_scored if id(x) not in usados]
-            base_similar = _select_top3_prioritize_federal(complemento)[:faltantes]
-            top3 = base_literal + base_similar
+            max_sim = int(PNCP_SEARCH_MAX_SIMILAR_IN_TOP3) if PNCP_SEARCH_QUALITY_FIRST else 3
+            top3 = _select_top3_mixed_literal_similar(
+                literal_scored,
+                similar_scored,
+                max_similar=max_sim,
+            )
 
     funil["top3_antes_completar"] = len(top3)
     top3 = _ensure_top3_from_pool(
@@ -2621,6 +2700,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     out_stats["federais_score_maior_igual_80"] = federais_score_80
     out_stats["ia_rerank_ativo"] = bool(ia_rerank_on)
     out_stats["ia_rerank_usado"] = ia_used
+    out_stats["search_quality_first"] = bool(PNCP_SEARCH_QUALITY_FIRST)
     out_stats["ia_interpretacao_item_ativo"] = bool(ia_resumo_on)
     out_stats["ia_interpretacao_item_usado"] = bool(ia_resumo_ok)
     out_stats["fallback_similaridade_ativo"] = True

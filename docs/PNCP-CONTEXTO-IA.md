@@ -18,7 +18,9 @@
 | [`deploy/PNCP-RESEARCHER-24-7.md`](deploy/PNCP-RESEARCHER-24-7.md) | Stack isolada |
 | [`deploy/PNCP-API-INDICE-LOCAL.md`](deploy/PNCP-API-INDICE-LOCAL.md) | Endpoints busca/FTS |
 | [`PESQUISADOR_PNCP_FUNCIONAMENTO_ATUAL.md`](PESQUISADOR_PNCP_FUNCIONAMENTO_ATUAL.md) | Fluxo pesquisador |
-| [`PNCP_BUSCA_INTELIGENTE_IA.md`](PNCP_BUSCA_INTELIGENTE_IA.md) | Busca com LLM |
+| [`PNCP_BUSCA_INTELIGENTE_IA.md`](PNCP_BUSCA_INTELIGENTE_IA.md) | Busca inteligente + IA (visão geral) |
+| [`PNCP-BUSCA-INTELIGENTE-QUALIDADE.md`](PNCP-BUSCA-INTELIGENTE-QUALIDADE.md) | **Modo qualidade** — tiers, rerank Qwen, envs |
+| [`QWEN-INTEGRACAO-DOCMASTER.md`](QWEN-INTEGRACAO-DOCMASTER.md) | Gateway Qwen (chave, deploy, consumidores) |
 | [`PNCP-TESTES-FORNECEDOR.md`](PNCP-TESTES-FORNECEDOR.md) | **Checklist de testes** homolog + CNPJ |
 | [`PNCP-FORNECEDOR-RELATORIO-REGRAS.md`](PNCP-FORNECEDOR-RELATORIO-REGRAS.md) | **Regras invariantes** — enrich, PDF, busca lote (não regredir) |
 
@@ -235,6 +237,23 @@ print(json.dumps(d.get('fornecedor'), indent=2))
 | **R5** | PDF texto «Não publicado PNCP (204)» | Jurídico |
 
 Detalhe: [`PLANO-MODULO-COBERTURA-FORNECEDOR-PNCP.md`](PLANO-MODULO-COBERTURA-FORNECEDOR-PNCP.md).
+
+### 4.9 Busca inteligente — modo qualidade + Qwen
+
+| Fact | Valor |
+|------|-------|
+| Endpoint | `POST /market-search/intelligent` |
+| Rev. código | `2026-06-19-quality-qwen` (`PNCP_SEARCH_CODE_REV`) |
+| IA default | `PNCP_IA_BASE_URL=http://qwen_llm_service:8015` |
+| Modo qualidade | `PNCP_SEARCH_QUALITY_FIRST=1` no `docker-compose.pncp.yml` |
+| Rerank | Até 36 candidatos; **também** pool misto literal+similar |
+| Top 3 | Máx. 1 slot por similaridade sem rerank (`PNCP_SEARCH_MAX_SIMILAR_IN_TOP3=1`) |
+
+**Pré-requisito Qwen:** `QWEN_API_KEY` + profile `qwen` no compose principal. Sem Qwen: heurística SQL/scoring only.
+
+Health: `GET /health` → `ia.base_url`, `ia.search_quality_first`, `ia.search_code_rev`.
+
+Guia completo: [`PNCP-BUSCA-INTELIGENTE-QUALIDADE.md`](PNCP-BUSCA-INTELIGENTE-QUALIDADE.md).
 
 ---
 

@@ -15,6 +15,8 @@ Guias operacionais para produção (servidor DESKTOP / `/home/docmaster`, WSL + 
 | Scripts PNCP (referência) | [PNCP-SCRIPTS-REFERENCIA.md](./PNCP-SCRIPTS-REFERENCIA.md) |
 | **Comandos operação PNCP** (monitorar, backup, deploy) | [PNCP-COMANDOS-OPERACAO.txt](./PNCP-COMANDOS-OPERACAO.txt) |
 | API índice local + FTS + busca V2 | [PNCP-API-INDICE-LOCAL.md](./PNCP-API-INDICE-LOCAL.md), [PNCP-V2-DEPLOY.md](./PNCP-V2-DEPLOY.md) |
+| **Busca inteligente qualidade + Qwen** | [PNCP-BUSCA-INTELIGENTE-QUALIDADE.md](../PNCP-BUSCA-INTELIGENTE-QUALIDADE.md) |
+| Integração Qwen (DocMaster) | [QWEN-INTEGRACAO-DOCMASTER.md](../QWEN-INTEGRACAO-DOCMASTER.md) |
 | Grafana / Prometheus | [OBSERVABILIDADE-VPS.md](./OBSERVABILIDADE-VPS.md) |
 | Estabilidade geral / WSL idle | [ESTABILIDADE-E-CLOUDFLARE.md](./ESTABILIDADE-E-CLOUDFLARE.md) |
 | Entrega de módulos (checklist) | [ENTREGA-MODULOS.md](./ENTREGA-MODULOS.md) |

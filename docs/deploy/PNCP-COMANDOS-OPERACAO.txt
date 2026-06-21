@@ -107,11 +107,17 @@ print('sem_itens', d['gaps']['contratos_sem_itens'])
 4. HEALTH / STATS / COVERAGE
 ================================================================================
 
-# Health (+ tamanho db)
+# Health (+ tamanho db + bloco ia / modo qualidade)
 docker exec pncp_researcher_service python -c "
-import urllib.request
-print(urllib.request.urlopen(
-  'http://127.0.0.1:8012/api/pncp-research/health', timeout=10).read().decode())
+import urllib.request, json
+d=json.loads(urllib.request.urlopen(
+  'http://127.0.0.1:8012/api/pncp-research/health', timeout=10).read())
+print('db_mb', d.get('db_size_mb'))
+ia=d.get('ia') or {}
+print('ia_base_url', ia.get('base_url'))
+print('search_quality_first', ia.get('search_quality_first'))
+print('search_code_rev', ia.get('search_code_rev'))
+print('rerank_enabled', ia.get('rerank_enabled'))
 "
 
 # Stats (contratos, itens, fornecedor)
@@ -445,6 +451,18 @@ PNCP_SEARCH_ONLY_HOMOLOGATED=1
 PNCP_SEARCH_ENRICH_HOMOLOG_MAX=16
 PNCP_LOCAL_BACKFILL_DAYS=365
 
+# Busca inteligente — modo qualidade + Qwen (ver docs/PNCP-BUSCA-INTELIGENTE-QUALIDADE.md)
+PNCP_SEARCH_QUALITY_FIRST=1
+PNCP_SEARCH_TIER_FLEX_RATIO=0.78
+PNCP_SEARCH_ANCHOR_TIER_ENABLED=0
+PNCP_SEARCH_MAX_SIMILAR_IN_TOP3=1
+PNCP_IA_RERANK_MIXED_POOL=1
+PNCP_SEARCH_MIN_SCORE_APROVACAO=55
+PNCP_IA_BASE_URL=http://qwen_llm_service:8015
+PNCP_IA_TIMEOUT_SECONDS=22
+PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS=18
+# Pré-requisito: QWEN_API_KEY + docker compose --profile qwen up -d qwen_llm_service
+
 ================================================================================
 13. LIMIARES — INTERPRETAÇÃO RÁPIDA
 ================================================================================
@@ -473,6 +491,8 @@ total_itens subindo + pending caindo = saudável
 ================================================================================
 
 docs/PNCP-CONTEXTO-IA.md          ← contexto completo ingest + fornecedor (IA)
+docs/PNCP-BUSCA-INTELIGENTE-QUALIDADE.md  ← busca inteligente modo qualidade + Qwen
+docs/QWEN-INTEGRACAO-DOCMASTER.md ← gateway Qwen (chave, deploy)
 docs/PNCP-DECLARATIVO.md
 docs/PLANO-MODULO-COBERTURA-FORNECEDOR-PNCP.md
 scripts/deploy-pncp-researcher-code.sh

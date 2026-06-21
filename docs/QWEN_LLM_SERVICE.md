@@ -1,194 +1,143 @@
-# Qwen LLM Service - Guia de Operação
+# Qwen LLM Service — microserviço gateway
 
-Este documento descreve o modulo `qwen_llm_service`: objetivo, contrato, configuracao, execucao e troubleshooting.
+Documentação **completa da integração** (todos os fluxos, envs, rede, deploy, pendências da API):  
+→ **[QWEN-INTEGRACAO-DOCMASTER.md](./QWEN-INTEGRACAO-DOCMASTER.md)**
 
-## 1) Objetivo
+Este ficheiro descreve apenas o **serviço** `qwen_llm_service`.
 
-O `qwen_llm_service` e um gateway FastAPI para Qwen (API OpenAI-compatible), expondo o mesmo contrato usado no `llm_api`:
+---
 
-- `POST /api/llm/generate`
+## Objetivo
 
-No projeto atual, ele pode ser usado pelo `rag_service` para geracao de ETP quando `LLM_ETP_GENERATION_BASE_URL` estiver configurado.
-
-## 2) Onde fica no projeto
-
-- Codigo: `qwen_llm_service/app/`
-- Dockerfile: `qwen_llm_service/Dockerfile`
-- Integracao compose: `docker-compose.yml` (service `qwen_llm_service`, profile `qwen`)
-
-## 3) Contrato da API
-
-### 3.1 Health
+Gateway FastAPI para a API Qwen (DashScope, modo OpenAI-compatible), expondo o mesmo contrato que o `llm_api`:
 
 - `GET /health`
-- Resposta esperada:
-
-```json
-{
-  "status": "ok",
-  "service": "qwen_llm_service"
-}
-```
-
-### 3.2 Generate
-
 - `POST /api/llm/generate`
-- Body:
+- `GET /api/llm/usage-today`
+
+---
+
+## Onde fica
+
+| Item | Caminho |
+|------|---------|
+| Código | `qwen_llm_service/app/` |
+| Dockerfile | `qwen_llm_service/Dockerfile` |
+| Compose | `docker-compose.yml` — serviço `qwen_llm_service`, **profile `qwen`** |
+| Rede | `default` + **`docmaster_net`** (acesso pelo PNCP researcher) |
+
+---
+
+## Contrato `POST /api/llm/generate`
+
+**Request:**
 
 ```json
 {
   "prompt": "texto de entrada",
-  "model": "qwen3.6-plus",
+  "model": "qwen-plus",
   "stream": false
 }
 ```
 
-- Resposta de sucesso:
+**Response:**
 
 ```json
 {
   "ok": true,
   "data": {
     "response": "...",
-    "model": "qwen3.6-plus",
+    "model": "qwen-plus",
     "done": true,
-    "usage": {
-      "input_tokens": 123,
-      "output_tokens": 45
-    }
+    "usage": { "input_tokens": 123, "output_tokens": 45 }
+  },
+  "token_usage": {
+    "prompt_tokens": 123,
+    "completion_tokens": 45,
+    "total_tokens": 168
   }
 }
 ```
 
-## 4) Variaveis de ambiente
+`stream=true` → **501** (não implementado; todos os consumidores usam `stream: false`).
 
-Principais variaveis em `qwen_llm_service/app/config.py`:
+---
 
-- `PORT` (default: `8015`)
-- `QWEN_API_BASE_URL` (default: `https://dashscope.aliyuncs.com/compatible-mode/v1`)
-- `QWEN_API_KEY` (**obrigatoria**)
-- `QWEN_MODEL` (default: `qwen3.6-plus`)
-- `QWEN_TIMEOUT` (default: `120`)
-- `QWEN_MAX_OUTPUT_TOKENS` (default: `4096`)
-- `QWEN_MAX_PROMPT_CHARS` (default: `120000`)
-- `QWEN_DAILY_TOKEN_BUDGET` (default: `0`, sem limite)
-- `QWEN_AUDIT_LOG_DIR` (opcional)
+## Variáveis de ambiente
 
-## 5) Execucao com Docker Compose
+Definidas em `qwen_llm_service/app/config.py`:
 
-No `docker-compose.yml`, o servico usa profile `qwen`.
+| Variável | Default | Notas |
+|----------|---------|-------|
+| `PORT` | `8015` | |
+| `QWEN_API_KEY` | — | **Obrigatória** em produção |
+| `QWEN_API_BASE_URL` | `https://dashscope.aliyuncs.com/compatible-mode/v1` | |
+| `QWEN_MODEL` | `qwen3.6-plus` | Deve existir na conta |
+| `QWEN_TIMEOUT` | `120` | Segundos |
+| `QWEN_MAX_OUTPUT_TOKENS` | `4096` | |
+| `QWEN_MAX_PROMPT_CHARS` | `120000` | |
+| `QWEN_DAILY_TOKEN_BUDGET` | `0` | `0` = ilimitado |
+| `QWEN_AUDIT_LOG_DIR` | `/app/logs` | JSONL diário |
 
-Subir:
+Exemplo: `qwen_llm_service/.env.example`
 
-```bash
-docker compose --profile qwen up -d qwen_llm_service
-```
+---
 
-Recriar:
-
-```bash
-docker compose --profile qwen up -d --build --force-recreate qwen_llm_service
-```
-
-Ver logs:
+## Subir com Docker
 
 ```bash
-docker compose logs --tail 200 qwen_llm_service
+# .env na raiz do compose com QWEN_API_KEY=...
+docker compose --profile qwen up -d --build qwen_llm_service
+docker compose logs --tail 100 qwen_llm_service
 ```
 
-## 6) Configuracao recomendada no .env
+---
 
-No arquivo `.env` usado pelo compose:
-
-```env
-QWEN_API_KEY=sua_chave_aqui
-QWEN_API_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-QWEN_MODEL=qwen3.6-plus
-```
-
-Importante:
-
-- use `--env-file /caminho/do/.env` se houver duvida sobre qual `.env` esta sendo lido;
-- `export` no shell nao e persistente entre sessoes.
-
-## 7) Testes rapidos
-
-### 7.1 Validar health local
+## Testes rápidos
 
 ```bash
 curl -sS http://127.0.0.1:8015/health
-```
 
-### 7.2 Validar endpoint local
-
-```bash
-curl -sS -X POST "http://127.0.0.1:8015/api/llm/generate" \
+curl -sS -X POST http://127.0.0.1:8015/api/llm/generate \
   -H "Content-Type: application/json" \
-  --data '{"prompt":"teste","stream":false}'
+  -d '{"prompt":"Responda só: OK","stream":false}'
+
+curl -sS http://127.0.0.1:8015/api/llm/usage-today
 ```
 
-### 7.3 Validar chave direto no provider
+**Provider direto** (validar chave antes de culpar o gateway):
 
 ```bash
 curl -sS -X POST "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions" \
   -H "Authorization: Bearer SUA_CHAVE" \
   -H "Content-Type: application/json" \
-  --data '{"model":"qwen3.6-plus","messages":[{"role":"user","content":"ping"}],"max_tokens":8}'
+  -d '{"model":"qwen-plus","messages":[{"role":"user","content":"ping"}],"max_tokens":8}'
 ```
 
-## 8) Erros comuns e diagnostico
+---
 
-### 8.1 `{"detail":"QWEN_API_KEY não configurada."}` (503)
+## Erros frequentes
 
-Causa:
+| HTTP / mensagem | Causa |
+|-----------------|-------|
+| 503 `QWEN_API_KEY não configurada` | Env vazia no container |
+| 401 `Não autorizado` | Chave inválida ou modelo/região |
+| 429 | Rate limit / budget (`QWEN_DAILY_TOKEN_BUDGET`) |
+| 502 timeout | `QWEN_TIMEOUT` ou rede |
 
-- variavel vazia no container.
-
-Verificar:
+Verificar env no container:
 
 ```bash
-docker compose exec -T qwen_llm_service sh -lc 'echo "len=${#QWEN_API_KEY}"'
+docker compose exec -T qwen_llm_service sh -c 'test -n "$QWEN_API_KEY" && echo OK || echo VAZIA'
+docker compose config | grep -A2 QWEN_
 ```
 
-### 8.2 `{"detail":"Não autorizado: verifique QWEN_API_KEY."}` (401 no provider)
+---
 
-Causa:
+## Quem consome este serviço
 
-- chave invalida, revogada, incorreta para o endpoint, ou nao carregada corretamente.
+Ver matriz completa em [QWEN-INTEGRACAO-DOCMASTER.md](./QWEN-INTEGRACAO-DOCMASTER.md):
 
-Verificar:
-
-- teste direto no provider (secao 7.3);
-- confirme `.env` correto com `docker compose config`.
-
-### 8.3 `You didn't provide an API key` no curl direto ao provider
-
-Causa:
-
-- comando usou `Bearer $QWEN_API_KEY`, mas a variavel estava vazia no shell.
-
-Verificar:
-
-```bash
-echo "len=${#QWEN_API_KEY}"
-```
-
-## 9) Integracao com rag_service (ETP)
-
-No `rag_service`, a escolha da base LLM por tipo de documento usa:
-
-- `LLM_ETP_GENERATION_BASE_URL` para ETP (quando definido);
-- fallback em `LLM_ORCHESTRATION_BASE_URL` para demais fluxos.
-
-No compose atual:
-
-- `LLM_ETP_GENERATION_BASE_URL=http://qwen_llm_service:8015`
-
-## 10) Checklist operacional rapido
-
-1. `docker compose --profile qwen up -d qwen_llm_service`
-2. `curl http://127.0.0.1:8015/health`
-3. confirmar env no container (`QWEN_API_KEY`, `QWEN_MODEL`)
-4. testar provider direto (chave)
-5. testar `/api/llm/generate` local
-6. validar fluxo ETP no `rag_service`
+- `rag_service` — ETP (`LLM_ETP_GENERATION_BASE_URL`), cláusulas (`LLM_CLAUSULAS_GENERATION_BASE_URL`)
+- `backend` — proxy inexigibilidade (`LLM_CLAUSULAS_API_BASE_URL`)
+- `pncp_researcher_service` — busca inteligente (`PNCP_IA_BASE_URL`)

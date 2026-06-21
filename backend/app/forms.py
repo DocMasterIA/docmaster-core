@@ -1,6 +1,7 @@
 from django import forms
 from backend.app.models import Template
 from django.contrib.auth import authenticate
+from django.contrib.auth.password_validation import validate_password
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -137,3 +138,57 @@ class UserProfileForm(forms.ModelForm):
             'first_name': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Nome'}),
             'last_name': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Sobrenome'}),
         }
+
+
+class ChangePasswordForm(forms.Form):
+    current_password = forms.CharField(
+        label=_("Senha atual"),
+        strip=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}),
+    )
+    new_password1 = forms.CharField(
+        label=_("Nova senha"),
+        strip=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
+    new_password2 = forms.CharField(
+        label=_("Confirmar nova senha"),
+        strip=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
+
+    def __init__(self, user, *args, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def clean_current_password(self):
+        current = self.cleaned_data.get("current_password")
+        if not self.user.has_usable_password():
+            raise ValidationError(
+                _("Sua conta ainda não possui senha definida. Entre em contato com o administrador.")
+            )
+        if not self.user.check_password(current):
+            raise ValidationError(_("Senha atual incorreta."))
+        return current
+
+    def clean_new_password1(self):
+        password = self.cleaned_data.get("new_password1")
+        if password:
+            validate_password(password, user=self.user)
+        return password
+
+    def clean(self):
+        cleaned = super().clean()
+        p1 = cleaned.get("new_password1")
+        p2 = cleaned.get("new_password2")
+        if p1 and p2 and p1 != p2:
+            self.add_error("new_password2", _("As senhas não conferem."))
+        current = cleaned.get("current_password")
+        if p1 and current and p1 == current:
+            self.add_error("new_password1", _("A nova senha deve ser diferente da senha atual."))
+        return cleaned
+
+    def save(self):
+        self.user.set_password(self.cleaned_data["new_password1"])
+        self.user.save(update_fields=["password"])
+        return self.user

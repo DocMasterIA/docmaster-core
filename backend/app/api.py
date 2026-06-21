@@ -13,9 +13,9 @@ import json, tempfile, traceback
 from django.http import JsonResponse, FileResponse, HttpResponse
 from django.core.files.base import ContentFile
 from backend.app.models import Template, TemplateSchema, DocumentInstance, Prefeitura, SubtopicoSecretaria, SlotValueCatalog, SlotFormState
-from backend.app.forms import UserProfileForm, LoginForm
+from backend.app.forms import UserProfileForm, LoginForm, ChangePasswordForm
 from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth import login as auth_login, logout as auth_logout
+from django.contrib.auth import login as auth_login, logout as auth_logout, update_session_auth_hash
 from backend.app.utils.utils import get_client_ip, is_locked, clear_failed_attempts, record_failed_attempt
 from django.conf import settings as django_settings
 from django.core.paginator import Paginator
@@ -1287,6 +1287,32 @@ def api_me(request):
             return JsonResponse({"ok": True, "message": "Dados atualizados com sucesso!"})
         return JsonResponse({"ok": False, "errors": form.errors}, status=400)
     return JsonResponse({"error": "Method not allowed"}, status=405)
+
+
+# API: alteração de senha do usuário logado (requer senha atual).
+@csrf_exempt
+@api_login_required
+def api_me_change_password(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Use POST"}, status=405)
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({"ok": False, "error": "Corpo inválido"}, status=400)
+
+    form = ChangePasswordForm(
+        request.user,
+        data={
+            "current_password": data.get("current_password") or "",
+            "new_password1": data.get("new_password") or data.get("new_password1") or "",
+            "new_password2": data.get("confirm_password") or data.get("new_password2") or "",
+        },
+    )
+    if form.is_valid():
+        form.save()
+        update_session_auth_hash(request, request.user)
+        return JsonResponse({"ok": True, "message": "Senha alterada com sucesso."})
+    return JsonResponse({"ok": False, "errors": form.errors}, status=400)
 
 
 # API: lista de documentos do usuário (paginação e busca).

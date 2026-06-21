@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 from .config import (
     PNCP_IA_BASE_URL,
     PNCP_IA_ITEM_RESUMO_ENABLED,
+    PNCP_IA_RERANK_BULK_ENABLED,
     PNCP_IA_RERANK_ENABLED,
     PNCP_INGEST_WORKER_ENABLED,
     PNCP_SEARCH_CODE_REV,
@@ -88,6 +89,7 @@ async def health() -> HealthResponse:
         ia={
             "base_url": PNCP_IA_BASE_URL,
             "rerank_enabled": PNCP_IA_RERANK_ENABLED,
+            "rerank_bulk_enabled": PNCP_IA_RERANK_BULK_ENABLED,
             "item_resumo_enabled": PNCP_IA_ITEM_RESUMO_ENABLED,
             "search_quality_first": PNCP_SEARCH_QUALITY_FIRST,
             "search_code_rev": PNCP_SEARCH_CODE_REV,

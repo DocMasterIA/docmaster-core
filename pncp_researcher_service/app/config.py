@@ -306,6 +306,12 @@ PNCP_HYBRID_MAX_LIVE_PAGES: int = _env_int("PNCP_HYBRID_MAX_LIVE_PAGES", 6)
 
 # Re-ranking leve com LLM para escolher os 3 melhores itens.
 PNCP_IA_RERANK_ENABLED: bool = _env_bool("PNCP_IA_RERANK_ENABLED", True)
+# Busca automática (busca_lote): 1× rerank Qwen por item quando ambíguo; resumo continua desligado.
+PNCP_IA_RERANK_BULK_ENABLED: bool = _env_bool("PNCP_IA_RERANK_BULK_ENABLED", False)
+PNCP_IA_BULK_MAX_CANDIDATES: int = _env_int("PNCP_IA_BULK_MAX_CANDIDATES", 12)
+PNCP_IA_BULK_TIMEOUT_SECONDS: float = float(os.getenv("PNCP_IA_BULK_TIMEOUT_SECONDS", "12"))
+# No lote, pula rerank quando literais têm score claro (reduz chamadas LLM).
+PNCP_IA_RERANK_BULK_ONLY_AMBIGUOUS: bool = _env_bool("PNCP_IA_RERANK_BULK_ONLY_AMBIGUOUS", True)
 # Gateway IA da busca inteligente: llm_api (Ollama) ou qwen_llm_service:8015 (API externa).
 PNCP_IA_BASE_URL: str = os.getenv("PNCP_IA_BASE_URL", "http://llm_api:8002").rstrip("/")
 PNCP_IA_GENERATE_PATH: str = os.getenv("PNCP_IA_GENERATE_PATH", "/api/llm/generate")

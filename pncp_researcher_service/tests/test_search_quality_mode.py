@@ -13,7 +13,10 @@ from app import config  # noqa: E402
 from app.service import (  # noqa: E402
     _effective_min_score_aprovacao,
     _filter_ia_rerank_candidates,
+    _ia_bulk_rerank_worth_it,
+    _ia_rerank_on_for_request,
     _ia_rerank_pool_allowed,
+    _ia_resumo_on_for_request,
     _select_top3_mixed_literal_similar,
 )
 
@@ -72,6 +75,29 @@ class SearchQualityModeTests(unittest.TestCase):
     def test_quality_first_default_in_config(self):
         self.assertTrue(config.PNCP_SEARCH_QUALITY_FIRST)
         self.assertFalse(config.PNCP_SEARCH_ANCHOR_TIER_ENABLED)
+
+    def test_bulk_ia_flags(self):
+        self.assertFalse(_ia_rerank_on_for_request(True))
+        self.assertTrue(_ia_rerank_on_for_request(False))
+        self.assertFalse(_ia_resumo_on_for_request(True))
+        prev = config.PNCP_IA_RERANK_BULK_ENABLED
+        try:
+            config.PNCP_IA_RERANK_BULK_ENABLED = True
+            self.assertTrue(_ia_rerank_on_for_request(True))
+        finally:
+            config.PNCP_IA_RERANK_BULK_ENABLED = prev
+
+    def test_bulk_rerank_skips_clear_literal_pool(self):
+        pool = [
+            {"literal_match": 90, "score_aprovacao": 88},
+            {"literal_match": 85, "score_aprovacao": 82},
+            {"literal_match": 40, "score_aprovacao": 55},
+        ]
+        self.assertFalse(_ia_bulk_rerank_worth_it("literal_only", pool))
+
+    def test_bulk_rerank_runs_on_mixed_pool(self):
+        pool = [{"literal_match": 90, "score_aprovacao": 88}]
+        self.assertTrue(_ia_bulk_rerank_worth_it("mixed_fallback", pool))
 
 
 if __name__ == "__main__":

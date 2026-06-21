@@ -29,6 +29,10 @@ from .config import (
     PNCP_HYBRID_MIN_LOCAL_RESULTS,
     PNCP_LOCAL_AUTO_INGEST,
     PNCP_IA_RERANK_ENABLED,
+    PNCP_IA_RERANK_BULK_ENABLED,
+    PNCP_IA_BULK_MAX_CANDIDATES,
+    PNCP_IA_BULK_TIMEOUT_SECONDS,
+    PNCP_IA_RERANK_BULK_ONLY_AMBIGUOUS,
     PNCP_IA_BASE_URL,
     PNCP_IA_GENERATE_PATH,
     PNCP_IA_MODEL,
@@ -1804,6 +1808,49 @@ def _ia_rerank_pool_allowed(pool_mode: str) -> bool:
     return False
 
 
+def _ia_rerank_on_for_request(busca_lote: bool) -> bool:
+    from . import config as _cfg
+
+    if not _cfg.PNCP_IA_RERANK_ENABLED:
+        return False
+    if busca_lote:
+        return bool(_cfg.PNCP_IA_RERANK_BULK_ENABLED)
+    return True
+
+
+def _ia_resumo_on_for_request(busca_lote: bool) -> bool:
+    from . import config as _cfg
+
+    if not _cfg.PNCP_IA_ITEM_RESUMO_ENABLED:
+        return False
+    return not busca_lote
+
+
+def _ia_bulk_rerank_worth_it(pool_mode: str, selection_pool: List[Dict[str, Any]]) -> bool:
+    """
+    No lote, chama LLM só quando o top heurístico é incerto (pool misto/similar
+    ou literais com scores próximos).
+    """
+    from . import config as _cfg
+
+    if not _cfg.PNCP_IA_RERANK_BULK_ONLY_AMBIGUOUS:
+        return True
+    if pool_mode in {"mixed_fallback", "similar_only"}:
+        return True
+    if pool_mode != "literal_only":
+        return True
+    rows = _filter_ia_rerank_candidates(selection_pool)[:8]
+    if len(rows) < 2:
+        return False
+    top_scores = [float(x.get("score_aprovacao") or 0) for x in rows[:6]]
+    top_literals = [float(x.get("literal_match") or 0) for x in rows[:6]]
+    if len(top_scores) >= 3 and (max(top_scores[:3]) - min(top_scores[:3])) <= 12:
+        return True
+    if len(top_literals) >= 3 and (max(top_literals[:3]) - min(top_literals[:3])) <= 15:
+        return True
+    return False
+
+
 def _filter_ia_rerank_candidates(pool: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Prioriza candidatos fortes; em modo qualidade descarta fallback agressivo do scoring."""
     rows = list(pool or [])
@@ -1856,11 +1903,19 @@ def _build_ia_rerank_prompt(
     faixa_max: Optional[float] = None,
     valor_base_ref: Optional[float] = None,
     variacao_pct_ref: Optional[float] = None,
+    bulk_mode: bool = False,
 ) -> str:
+    desc_limit = 140 if bulk_mode else 500
     linhas: List[str] = []
     for c in candidatos:
+        desc = str(c.get("descricao_item") or "").strip()
+        if len(desc) > desc_limit:
+            desc = desc[:desc_limit].rstrip() + "…"
+        mat = str(c.get("material_servico") or "").strip()
+        if bulk_mode and len(mat) > 80:
+            mat = mat[:80].rstrip() + "…"
         linhas.append(
-            f"- id={c.get('_ia_id')} | desc={c.get('descricao_item') or ''} | mat={c.get('material_servico') or ''} "
+            f"- id={c.get('_ia_id')} | desc={desc} | mat={mat} "
             f"| qtd={c.get('quantidade') or ''} {c.get('unidade_medida') or ''} | valor={c.get('valor_unitario') or c.get('valor_total') or ''} "
             f"| orgao={c.get('orgao') or ''} | uf={c.get('uf') or ''}"
         )
@@ -2067,6 +2122,8 @@ async def _rerank_top3_with_ia(
     faixa_max: Optional[float] = None,
     valor_base_ref: Optional[float] = None,
     variacao_pct_ref: Optional[float] = None,
+    bulk_mode: bool = False,
+    timeout_seconds: Optional[float] = None,
 ) -> List[Dict[str, Any]]:
     if not PNCP_IA_RERANK_ENABLED or not candidatos:
         return []
@@ -2077,8 +2134,10 @@ async def _rerank_top3_with_ia(
         faixa_max=faixa_max,
         valor_base_ref=valor_base_ref,
         variacao_pct_ref=variacao_pct_ref,
+        bulk_mode=bulk_mode,
     )
-    text = await _ia_post_generate(prompt, timeout_seconds=PNCP_IA_TIMEOUT_SECONDS)
+    tmo = float(timeout_seconds) if timeout_seconds is not None else float(PNCP_IA_TIMEOUT_SECONDS)
+    text = await _ia_post_generate(prompt, timeout_seconds=tmo)
     if not text:
         return []
     return _parse_ia_rerank_response(text)
@@ -2128,8 +2187,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                 "variacao_percentual_referencia": None,
             }
         )
-    ia_rerank_on = bool(PNCP_IA_RERANK_ENABLED) and not busca_lote
-    ia_resumo_on = bool(PNCP_IA_ITEM_RESUMO_ENABLED) and not busca_lote
+    ia_rerank_on = _ia_rerank_on_for_request(busca_lote)
+    ia_resumo_on = _ia_resumo_on_for_request(busca_lote)
     limit = max(50, search_payload.max_paginas * search_payload.tamanho_pagina)
     if busca_lote:
         limit = min(limit, max(80, int(PNCP_BULK_SEARCH_SQL_LIMIT)))
@@ -2562,10 +2621,17 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     ia_rerank_allowed = _ia_rerank_pool_allowed(pool_mode)
     funil["ia_rerank_pool_mode"] = pool_mode
     funil["ia_rerank_allowed"] = bool(ia_rerank_allowed)
+    funil["ia_rerank_bulk"] = bool(busca_lote)
     funil["search_quality_first"] = bool(PNCP_SEARCH_QUALITY_FIRST)
-    if ia_rerank_on and ia_rerank_allowed and selection_pool:
+    bulk_rerank_worth = (not busca_lote) or _ia_bulk_rerank_worth_it(pool_mode, selection_pool)
+    funil["ia_rerank_bulk_skipped_clear"] = bool(
+        busca_lote and ia_rerank_on and ia_rerank_allowed and selection_pool and not bulk_rerank_worth
+    )
+    if ia_rerank_on and ia_rerank_allowed and selection_pool and bulk_rerank_worth:
         pool_ia_source = _filter_ia_rerank_candidates(selection_pool)
-        limite_candidatos = max(6, min(PNCP_IA_MAX_CANDIDATES, len(pool_ia_source)))
+        max_cands = PNCP_IA_BULK_MAX_CANDIDATES if busca_lote else PNCP_IA_MAX_CANDIDATES
+        limite_candidatos = max(6, min(max_cands, len(pool_ia_source)))
+        rerank_timeout = PNCP_IA_BULK_TIMEOUT_SECONDS if busca_lote else PNCP_IA_TIMEOUT_SECONDS
         pool_ia = list(pool_ia_source)
         if faixa_min is not None and faixa_max is not None:
             in_band_ia = [x for x in pool_ia if _preco_dentro_faixa(x, faixa_min, faixa_max)]
@@ -2583,6 +2649,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             faixa_max=faixa_max,
             valor_base_ref=ref_value if ref_val_set else None,
             variacao_pct_ref=ref_var_pct if ref_var_set else None,
+            bulk_mode=busca_lote,
+            timeout_seconds=rerank_timeout,
         )
         if ia_selected:
             by_id = {str(c.get("_ia_id")): c for c in candidatos_ia}
@@ -2700,6 +2768,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     out_stats["federais_score_maior_igual_80"] = federais_score_80
     out_stats["ia_rerank_ativo"] = bool(ia_rerank_on)
     out_stats["ia_rerank_usado"] = ia_used
+    out_stats["ia_rerank_bulk_ativo"] = bool(busca_lote and ia_rerank_on)
     out_stats["search_quality_first"] = bool(PNCP_SEARCH_QUALITY_FIRST)
     out_stats["ia_interpretacao_item_ativo"] = bool(ia_resumo_on)
     out_stats["ia_interpretacao_item_usado"] = bool(ia_resumo_ok)

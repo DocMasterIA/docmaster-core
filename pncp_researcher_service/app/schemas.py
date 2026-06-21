@@ -94,7 +94,10 @@ class MarketSearchRequest(BaseModel):
     )
     busca_lote: Optional[bool] = Field(
         False,
-        description="Cotação com dezenas de itens: pula rerank/resumo LLM por item (mais rápido e estável).",
+        description=(
+            "Cotação com dezenas de itens: resumo LLM desligado; rerank opcional via "
+            "PNCP_IA_RERANK_BULK_ENABLED (menos candidatos/timeout que busca manual)."
+        ),
     )
 
     @field_validator("max_paginas")

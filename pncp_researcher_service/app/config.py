@@ -306,7 +306,13 @@ PNCP_HYBRID_MAX_LIVE_PAGES: int = _env_int("PNCP_HYBRID_MAX_LIVE_PAGES", 6)
 
 # Re-ranking leve com LLM para escolher os 3 melhores itens.
 PNCP_IA_RERANK_ENABLED: bool = _env_bool("PNCP_IA_RERANK_ENABLED", True)
-# Busca automática (busca_lote): 1× rerank Qwen por item quando ambíguo; resumo continua desligado.
+# Rerank local (sem LLM): rápido, default no lote; manual pode combinar com Qwen.
+PNCP_LOCAL_RERANK_ENABLED: bool = _env_bool("PNCP_LOCAL_RERANK_ENABLED", True)
+PNCP_LOCAL_RERANK_MAX_CANDIDATES: int = _env_int("PNCP_LOCAL_RERANK_MAX_CANDIDATES", 24)
+PNCP_LOCAL_RERANK_ONLY_AMBIGUOUS: bool = _env_bool("PNCP_LOCAL_RERANK_ONLY_AMBIGUOUS", True)
+# Manual: se rerank local produziu top3, não chama Qwen (mais rápido).
+PNCP_IA_RERANK_PREFER_LOCAL: bool = _env_bool("PNCP_IA_RERANK_PREFER_LOCAL", True)
+# Busca automática (busca_lote): 1× rerank Qwen por item quando ambíguo (lento); default off — use local.
 PNCP_IA_RERANK_BULK_ENABLED: bool = _env_bool("PNCP_IA_RERANK_BULK_ENABLED", False)
 PNCP_IA_BULK_MAX_CANDIDATES: int = _env_int("PNCP_IA_BULK_MAX_CANDIDATES", 12)
 PNCP_IA_BULK_TIMEOUT_SECONDS: float = float(os.getenv("PNCP_IA_BULK_TIMEOUT_SECONDS", "12"))

@@ -29,6 +29,10 @@ from .config import (
     PNCP_HYBRID_MIN_LOCAL_RESULTS,
     PNCP_LOCAL_AUTO_INGEST,
     PNCP_IA_RERANK_ENABLED,
+    PNCP_LOCAL_RERANK_ENABLED,
+    PNCP_LOCAL_RERANK_MAX_CANDIDATES,
+    PNCP_LOCAL_RERANK_ONLY_AMBIGUOUS,
+    PNCP_IA_RERANK_PREFER_LOCAL,
     PNCP_IA_RERANK_BULK_ENABLED,
     PNCP_IA_BULK_MAX_CANDIDATES,
     PNCP_IA_BULK_TIMEOUT_SECONDS,
@@ -1827,28 +1831,10 @@ def _ia_resumo_on_for_request(busca_lote: bool) -> bool:
 
 
 def _ia_bulk_rerank_worth_it(pool_mode: str, selection_pool: List[Dict[str, Any]]) -> bool:
-    """
-    No lote, chama LLM só quando o top heurístico é incerto (pool misto/similar
-    ou literais com scores próximos).
-    """
-    from . import config as _cfg
+    """Delega à heurística compartilhada (local + LLM)."""
+    from .local_rerank import rerank_worth_it_ambiguous
 
-    if not _cfg.PNCP_IA_RERANK_BULK_ONLY_AMBIGUOUS:
-        return True
-    if pool_mode in {"mixed_fallback", "similar_only"}:
-        return True
-    if pool_mode != "literal_only":
-        return True
-    rows = _filter_ia_rerank_candidates(selection_pool)[:8]
-    if len(rows) < 2:
-        return False
-    top_scores = [float(x.get("score_aprovacao") or 0) for x in rows[:6]]
-    top_literals = [float(x.get("literal_match") or 0) for x in rows[:6]]
-    if len(top_scores) >= 3 and (max(top_scores[:3]) - min(top_scores[:3])) <= 12:
-        return True
-    if len(top_literals) >= 3 and (max(top_literals[:3]) - min(top_literals[:3])) <= 15:
-        return True
-    return False
+    return rerank_worth_it_ambiguous(pool_mode, selection_pool)
 
 
 def _filter_ia_rerank_candidates(pool: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -2618,16 +2604,45 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
 
     top3: List[Dict[str, Any]] = []
     ia_used = False
+    local_rerank_used = False
     ia_rerank_allowed = _ia_rerank_pool_allowed(pool_mode)
     funil["ia_rerank_pool_mode"] = pool_mode
     funil["ia_rerank_allowed"] = bool(ia_rerank_allowed)
     funil["ia_rerank_bulk"] = bool(busca_lote)
     funil["search_quality_first"] = bool(PNCP_SEARCH_QUALITY_FIRST)
-    bulk_rerank_worth = (not busca_lote) or _ia_bulk_rerank_worth_it(pool_mode, selection_pool)
+    rerank_worth = _ia_bulk_rerank_worth_it(pool_mode, selection_pool)
+    funil["rerank_worth_ambiguous"] = bool(rerank_worth)
     funil["ia_rerank_bulk_skipped_clear"] = bool(
-        busca_lote and ia_rerank_on and ia_rerank_allowed and selection_pool and not bulk_rerank_worth
+        busca_lote and ia_rerank_on and ia_rerank_allowed and selection_pool and not rerank_worth
     )
-    if ia_rerank_on and ia_rerank_allowed and selection_pool and bulk_rerank_worth:
+    funil["local_rerank_skipped_clear"] = bool(
+        PNCP_LOCAL_RERANK_ENABLED and ia_rerank_allowed and selection_pool and not rerank_worth
+    )
+
+    if PNCP_LOCAL_RERANK_ENABLED and ia_rerank_allowed and selection_pool and rerank_worth:
+        from .local_rerank import apply_local_rerank_top3
+
+        top3_local, local_ok = apply_local_rerank_top3(
+            termo_efetivo,
+            selection_pool,
+            query_groups=query_groups,
+            min_ok=min_ok,
+            max_candidates=PNCP_LOCAL_RERANK_MAX_CANDIDATES,
+            faixa_min=faixa_min,
+            faixa_max=faixa_max,
+        )
+        if local_ok and top3_local:
+            top3 = top3_local
+            local_rerank_used = True
+
+    skip_qwen_after_local = local_rerank_used and PNCP_IA_RERANK_PREFER_LOCAL and len(top3) >= 1
+    if (
+        ia_rerank_on
+        and ia_rerank_allowed
+        and selection_pool
+        and rerank_worth
+        and not skip_qwen_after_local
+    ):
         pool_ia_source = _filter_ia_rerank_candidates(selection_pool)
         max_cands = PNCP_IA_BULK_MAX_CANDIDATES if busca_lote else PNCP_IA_MAX_CANDIDATES
         limite_candidatos = max(6, min(max_cands, len(pool_ia_source)))
@@ -2769,6 +2784,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     out_stats["ia_rerank_ativo"] = bool(ia_rerank_on)
     out_stats["ia_rerank_usado"] = ia_used
     out_stats["ia_rerank_bulk_ativo"] = bool(busca_lote and ia_rerank_on)
+    out_stats["local_rerank_ativo"] = bool(PNCP_LOCAL_RERANK_ENABLED)
+    out_stats["local_rerank_usado"] = bool(local_rerank_used)
     out_stats["search_quality_first"] = bool(PNCP_SEARCH_QUALITY_FIRST)
     out_stats["ia_interpretacao_item_ativo"] = bool(ia_resumo_on)
     out_stats["ia_interpretacao_item_usado"] = bool(ia_resumo_ok)

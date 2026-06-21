@@ -70,6 +70,29 @@ def llm_generation_base_url_for_clausulas(slot_package_key: str | None) -> str:
     return LLM_ORCHESTRATION_BASE_URL
 
 
+# Perfil de prompt para cláusulas: auto = rich no gateway cloud, lite no Ollama local.
+LLM_CLAUSULAS_PROMPT_PROFILE: str = os.getenv("LLM_CLAUSULAS_PROMPT_PROFILE", "auto").strip().lower()
+LLM_CLAUSULAS_CLOUD_MAX_TOKENS: int = _env_int("LLM_CLAUSULAS_CLOUD_MAX_TOKENS", 900)
+
+
+def clausulas_gateway_is_cloud(base_url: str | None = None) -> bool:
+    """True quando objeto/justificativa não usa o llm_api/Ollama local."""
+    url = (base_url or LLM_CLAUSULAS_GENERATION_BASE_URL or "").strip().rstrip("/")
+    if not url:
+        return False
+    return url != LLM_ORCHESTRATION_BASE_URL.rstrip("/")
+
+
+def clausulas_use_rich_prompt(base_url: str | None = None) -> bool:
+    """Rich = redação mais completa (Qwen); lite = genérico/curto (Ollama local)."""
+    profile = LLM_CLAUSULAS_PROMPT_PROFILE or "auto"
+    if profile == "lite":
+        return False
+    if profile == "rich":
+        return True
+    return clausulas_gateway_is_cloud(base_url)
+
+
 def llm_generation_base_url_for_document_type(document_type: str | None) -> str:
     """URL do POST /api/llm/generate conforme o tipo de documento (ETP opcionalmente via Qwen/outro gateway)."""
     if _is_etp_document_type(document_type) and LLM_ETP_GENERATION_BASE_URL:

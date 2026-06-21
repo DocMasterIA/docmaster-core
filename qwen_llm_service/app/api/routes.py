@@ -21,6 +21,7 @@ class GenerateRequest(BaseModel):
     prompt: str = Field(..., min_length=1)
     model: str | None = None
     stream: bool = False
+    max_tokens: int | None = Field(None, ge=16, le=32000)
 
 
 @router.post("/generate")
@@ -40,7 +41,10 @@ async def generate(body: GenerateRequest) -> dict[str, Any]:
 
     ratio = max(1, settings.qwen_estimated_chars_per_token)
     est_in = max(1, math.ceil(len(prompt) / ratio))
-    max_out = min(settings.qwen_max_output_tokens, 32000)
+    max_out = min(
+        int(body.max_tokens or settings.qwen_max_output_tokens),
+        32000,
+    )
 
     ok, err = check_pre_request(est_in, max_out)
     if not ok:

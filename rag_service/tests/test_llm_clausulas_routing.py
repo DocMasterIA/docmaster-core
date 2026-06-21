@@ -35,6 +35,19 @@ class ClausulasLlmRoutingTests(unittest.TestCase):
         finally:
             config.LLM_CLAUSULAS_GENERATION_BASE_URL = prev
 
+    def test_rich_prompt_auto_on_cloud(self):
+        prev_url = config.LLM_CLAUSULAS_GENERATION_BASE_URL
+        prev_profile = config.LLM_CLAUSULAS_PROMPT_PROFILE
+        try:
+            config.LLM_CLAUSULAS_GENERATION_BASE_URL = "http://qwen:8015"
+            config.LLM_CLAUSULAS_PROMPT_PROFILE = "auto"
+            self.assertTrue(config.clausulas_use_rich_prompt("http://qwen:8015"))
+            config.LLM_CLAUSULAS_PROMPT_PROFILE = "lite"
+            self.assertFalse(config.clausulas_use_rich_prompt("http://qwen:8015"))
+        finally:
+            config.LLM_CLAUSULAS_GENERATION_BASE_URL = prev_url
+            config.LLM_CLAUSULAS_PROMPT_PROFILE = prev_profile
+
 
 if __name__ == "__main__":
     unittest.main()

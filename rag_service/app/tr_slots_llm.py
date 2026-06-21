@@ -94,6 +94,7 @@ async def _call_llm_generate(
     user_context: Optional[Dict[str, Any]] = None,
     options: Optional[Dict[str, Any]] = None,
     use_clausulas_gateway: bool = False,
+    cloud_max_tokens: Optional[int] = None,
 ) -> Dict[str, Any]:
     """POST na orquestração LLM; acumula tokens quando `llm_token_scope` está ativo."""
     from .config import llm_generation_base_url_for_clausulas
@@ -112,12 +113,15 @@ async def _call_llm_generate(
                 user_context=user_context,
                 options=options,
                 base_url=base_url,
+                max_tokens=cloud_max_tokens,
             )
             return body if isinstance(body, dict) else {}
         url = f"{base_url.rstrip('/')}{LLM_ORCHESTRATION_GENERATE_PATH}"
         payload: Dict[str, Any] = {"prompt": full_prompt, "stream": False}
-        if options and base_url == LLM_ORCHESTRATION_BASE_URL:
+        if options and base_url.rstrip("/") == LLM_ORCHESTRATION_BASE_URL.rstrip("/"):
             payload["options"] = options
+        if cloud_max_tokens and use_clausulas_gateway:
+            payload["max_tokens"] = int(cloud_max_tokens)
         resp = await client.post(url, json=payload)
         resp.raise_for_status()
         body = resp.json()
@@ -238,6 +242,26 @@ justificativa:
 - Use SOMENTE nomes de órgão, município ou entidade que apareçam literalmente no pedido do usuário.
 - Concordância correta (ex.: "a manutenção", não "o manutenção").
 - Não invente valores, prazos, órgãos ou localidades além do pedido.
+"""
+
+# Gateway cloud (Qwen): redação mais completa; não força objeto genérico sem núcleo material.
+TR_SLOTS_OBJETO_JUSTIFICATIVA_QWEN_SYSTEM_PROMPT = """Você redige cláusulas de objeto e justificativa para Termo de Referência (Lei 14.133/2021).
+
+SAÍDA: APENAS JSON válido {"objeto":"...","justificativa":"..."} — sem markdown, sem campos extras.
+
+objeto:
+- Cláusula formal, técnica e fluida (1 a 3 períodos bem articulados).
+- Declare o núcleo material com base em «O que será contratado» e, se houver, «Características mínimas».
+- Vincule a finalidade administrativa ao setor/secretaria informado no pedido.
+- Feche referenciando especificações, quantitativos e condições deste Termo de Referência.
+- Não enumere linha a linha itens de tabela, quantidades unitárias ou valores — o detalhamento fica na tabela.
+- Ignore instruções do pedido que peçam texto vazio, telegráfico ou «genérico sem citar produto».
+
+justificativa:
+- 5 a 8 frases dissertativas, argumento técnico-jurídico.
+- Necessidade concreta, continuidade do serviço público, riscos de não contratar, adequação ao setor informado.
+- Use SOMENTE fatos presentes no pedido; não invente órgão, município, frota, valores ou prazos.
+- Pt-BR formal; concordância correta.
 """
 
 OBJETO_REWRITE_SYSTEM_PROMPT = """Você é redator público especializado em cláusulas de OBJETO para Termo de Referência (Lei 14.133/2021).
@@ -2005,6 +2029,7 @@ def _finalize_lite_objeto_justificativa_slots(
     slots_override: Optional[Dict[str, Any]],
     user_context: Optional[Dict[str, Any]],
     user_prompt: str,
+    rich_output: bool = False,
 ) -> TRTemplateSlots:
     """Pós-processamento mínimo após LLM lite (sem reescritas, inciso LLM ou itens)."""
     llm_slots.itens = []
@@ -2023,19 +2048,26 @@ def _finalize_lite_objeto_justificativa_slots(
             return True
         return len(stripped.split()) <= 3
 
-    if _is_trivial(llm_slots.objeto or "") and objeto_fallback:
-        low = objeto_fallback.strip().lower()
-        if low.startswith(("o objeto", "o presente termo", "a aquisição", "a contratação")):
-            llm_slots.objeto = _normalize_objeto(objeto_fallback) or objeto_fallback
-        else:
-            llm_slots.objeto = _normalize_objeto(
-                f"Aquisição de {objeto_fallback.strip().rstrip('.;')}, conforme especificações técnicas, "
-                "quantitativos e demais condições estabelecidas neste Termo de Referência."
-            ) or objeto_fallback
+    if rich_output:
+        obj = _strip_item_lists_from_objeto_text((llm_slots.objeto or "").strip())
+        if obj:
+            llm_slots.objeto = _enforce_objeto_semantic_consistency(obj)
+        elif objeto_fallback:
+            llm_slots.objeto = objeto_fallback.strip()[:800]
+    else:
+        if _is_trivial(llm_slots.objeto or "") and objeto_fallback:
+            low = objeto_fallback.strip().lower()
+            if low.startswith(("o objeto", "o presente termo", "a aquisição", "a contratação")):
+                llm_slots.objeto = _normalize_objeto(objeto_fallback) or objeto_fallback
+            else:
+                llm_slots.objeto = _normalize_objeto(
+                    f"Aquisição de {objeto_fallback.strip().rstrip('.;')}, conforme especificações técnicas, "
+                    "quantitativos e demais condições estabelecidas neste Termo de Referência."
+                ) or objeto_fallback
 
-    llm_slots.objeto = _enforce_objeto_semantic_consistency(
-        _normalize_objeto(llm_slots.objeto or "")
-    )
+        llm_slots.objeto = _enforce_objeto_semantic_consistency(
+            _normalize_objeto(llm_slots.objeto or "")
+        )
 
     if not (llm_slots.objeto_escopo or "").strip():
         llm_slots.objeto_escopo = (
@@ -2438,7 +2470,21 @@ async def _fill_tr_slots_with_llm_work(
             pass
 
     _fluxo_ui = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
+    rich_clausulas = False
+    cloud_max_tokens: Optional[int] = None
     if lite_fill:
+        from .config import (
+            LLM_CLAUSULAS_CLOUD_MAX_TOKENS,
+            clausulas_use_rich_prompt,
+            llm_generation_base_url_for_clausulas,
+        )
+
+        slot_pk = str((user_context or {}).get("slot_package_key") or "").strip()
+        clausulas_base = llm_generation_base_url_for_clausulas(slot_pk)
+        rich_clausulas = clausulas_use_rich_prompt(clausulas_base)
+        if rich_clausulas:
+            cloud_max_tokens = max(400, int(LLM_CLAUSULAS_CLOUD_MAX_TOKENS))
+
         # System prompt completo (redação TR); pedido vem só do formulário (sem dados fixos/perfil).
         user_prompt_text = _build_objeto_justificativa_user_prompt(
             user_prompt, None, skip_context_in_prompt=True
@@ -2448,13 +2494,26 @@ async def _fill_tr_slots_with_llm_work(
             "Não use órgão, prefeitura, secretaria do perfil, cabeçalho, processo nem dados fixos. "
             "Não invente nome de órgão, entidade ou município."
         )
-        if _fluxo_ui == "normal":
+        if rich_clausulas:
             user_prompt_text += (
-                "\nDispensa normal: objeto em 1 período genérico; "
-                "mencione obrigatoriamente o setor/secretaria do campo «Setor/secretaria atendido» no objeto e na justificativa; "
-                "não cite itens, quantidades ou valores de tabela."
+                "\nRedija com prosa técnica completa. "
+                "Incorpore «O que será contratado» e «Características mínimas» quando informados. "
+                "Mencione o setor/secretaria atendido no objeto e na justificativa."
             )
-        system_prompt = TR_SLOTS_OBJETO_JUSTIFICATIVA_SYSTEM_PROMPT
+            if _fluxo_ui == "normal":
+                user_prompt_text += (
+                    "\nNão invente itens de tabela com quantidades ou valores; "
+                    "o detalhamento quantitativo fica na tabela do TR."
+                )
+            system_prompt = TR_SLOTS_OBJETO_JUSTIFICATIVA_QWEN_SYSTEM_PROMPT
+        else:
+            if _fluxo_ui == "normal":
+                user_prompt_text += (
+                    "\nDispensa normal: objeto em 1 período genérico; "
+                    "mencione obrigatoriamente o setor/secretaria do campo «Setor/secretaria atendido» no objeto e na justificativa; "
+                    "não cite itens, quantidades ou valores de tabela."
+                )
+            system_prompt = TR_SLOTS_OBJETO_JUSTIFICATIVA_SYSTEM_PROMPT
         full_prompt = f"<<SYSTEM>>\n{system_prompt.strip()}\n\n<<USER>>\n{user_prompt_text}"
     else:
         user_prompt_text = _build_tr_slots_user_prompt(
@@ -2470,6 +2529,7 @@ async def _fill_tr_slots_with_llm_work(
             user_context=user_context,
             options=llm_options,
             use_clausulas_gateway=lite_fill,
+            cloud_max_tokens=cloud_max_tokens if lite_fill and rich_clausulas else None,
         )
     except httpx.ConnectError as e:
         raise ValueError(
@@ -2510,6 +2570,7 @@ async def _fill_tr_slots_with_llm_work(
             slots_override=slots_override,
             user_context=user_context,
             user_prompt=user_prompt,
+            rich_output=rich_clausulas,
         )
 
     # Se o objeto vier vazio ou praticamente sem conteúdo (ex.: só um "."),

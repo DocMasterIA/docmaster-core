@@ -124,6 +124,7 @@ async def llm_post_generate(
     model: str | None = None,
     options: dict[str, Any] | None = None,
     base_url: str | None = None,
+    max_tokens: int | None = None,
 ) -> dict[str, Any]:
     """POST /api/llm/generate com prefeitura e acumulação de tokens."""
     prefeitura = prefeitura_label_from_context(user_context)
@@ -133,8 +134,10 @@ async def llm_post_generate(
     if model:
         payload["model"] = model
     ollama_base = LLM_ORCHESTRATION_BASE_URL.rstrip("/")
-    if options and (base_url or ollama_base).rstrip("/") == ollama_base:
+    if options and root == ollama_base:
         payload["options"] = options
+    if max_tokens and root != ollama_base:
+        payload["max_tokens"] = int(max_tokens)
     resp = await client.post(url, json=payload, headers=_headers(prefeitura))
     resp.raise_for_status()
     body = resp.json()

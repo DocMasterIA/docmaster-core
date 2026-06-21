@@ -69,8 +69,8 @@ export function buildClausulasObjetoJustificativaPrompt(fields) {
   if (compact && variant === 'dispensa_normal') {
     return [
       'Redija em pt-BR, formal, só duas linhas rotuladas:',
-      'Objeto: uma oração genérica (sem itens/quantidades/valores).',
-      'Justificativa: um parágrafo curto.',
+      'Objeto: cláusula declarativa com o núcleo material informado e o setor atendido.',
+      'Justificativa: parágrafo argumentativo (5 a 8 frases).',
       `Contratação: ${contratado}`,
       `Setor: ${setor}`,
       caracteristicas ? `Características: ${caracteristicas}` : '',
@@ -93,8 +93,9 @@ export function buildClausulasObjetoJustificativaPrompt(fields) {
 
   if (variant === 'dispensa_normal') {
     lines.push(
-      '- Na cláusula de objeto: uma única oração institucional genérica; use o setor/secretaria informado.',
-      '- Não liste itens, quantidades, valores, marcas ou especificações de tabela no objeto nem na justificativa.',
+      '- Na cláusula de objeto: declare o núcleo material informado e vincule ao setor/secretaria.',
+      '- Justificativa: parágrafo argumentativo completo (5 a 8 frases), linguagem formal.',
+      '- Não enumere itens de tabela com quantidades, valores ou marcas — detalhe na tabela do TR.',
     );
   }
 

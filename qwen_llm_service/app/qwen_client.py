@@ -13,6 +13,18 @@ from .config import load_settings
 logger = logging.getLogger(__name__)
 
 
+def _split_system_user_prompt(prompt: str) -> tuple[str | None, str]:
+    """Extrai <<SYSTEM>> / <<USER>> usado pelo rag_service."""
+    raw = (prompt or "").strip()
+    if "<<SYSTEM>>" not in raw or "<<USER>>" not in raw:
+        return None, raw
+    _, rest = raw.split("<<SYSTEM>>", 1)
+    system_part, user_part = rest.split("<<USER>>", 1)
+    system = system_part.strip() or None
+    user = user_part.strip() or raw
+    return system, user
+
+
 class QwenGatewayError(Exception):
     def __init__(self, message: str, status_code: int = 502):
         self.message = message
@@ -34,9 +46,15 @@ async def chat_completion(
     max_out = max(1, min(int(max_output_tokens or cfg.qwen_max_output_tokens), 32000))
 
     url = f"{cfg.qwen_api_base_url}/chat/completions"
+    system_text, user_text = _split_system_user_prompt(prompt)
+    messages: list[dict[str, str]] = []
+    if system_text:
+        messages.append({"role": "system", "content": system_text})
+    messages.append({"role": "user", "content": user_text})
+
     payload: dict[str, Any] = {
         "model": m,
-        "messages": [{"role": "user", "content": prompt}],
+        "messages": messages,
         "max_tokens": max_out,
         # Modelos híbridos Qwen3.x exigem flag explícita em chamadas não-streaming.
         "enable_thinking": False,

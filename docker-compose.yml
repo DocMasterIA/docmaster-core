@@ -72,7 +72,8 @@ services:
 
   # Gateway Qwen (OpenAI-compatible). Mesmo contrato POST /api/llm/generate que o llm_api.
   # Ative: docker compose --profile qwen up -d qwen_llm_service
-  # Requer QWEN_API_KEY (env host ou arquivo .env na raiz do compose).
+  # .env na pasta do compose (obrigatório QWEN_API_KEY + QWEN_API_BASE_URL):
+  #   Singapura (workspace MaaS): https://ws-XXXX.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
   qwen_llm_service:
     profiles:
       - qwen
@@ -83,10 +84,14 @@ services:
     container_name: qwen_llm_service
     ports:
       - "8015:8015"
+    env_file:
+      - .env
     environment:
       - PORT=8015
       - QWEN_API_KEY=${QWEN_API_KEY:-}
+      - QWEN_API_BASE_URL=${QWEN_API_BASE_URL:-}
       - QWEN_MODEL=${QWEN_MODEL:-qwen3.6-plus}
+      - QWEN_TIMEOUT=${QWEN_TIMEOUT:-120}
       - QWEN_DAILY_TOKEN_BUDGET=${QWEN_DAILY_TOKEN_BUDGET:-0}
       - QWEN_MAX_OUTPUT_TOKENS=${QWEN_MAX_OUTPUT_TOKENS:-4096}
       - QWEN_MAX_PROMPT_CHARS=${QWEN_MAX_PROMPT_CHARS:-120000}

@@ -24,6 +24,7 @@ from backend.app.metrics import (
     record_llm_token_usage,
     record_platform_event,
 )
+from backend.app.clausulas_qwen_prompt import wrap_clausulas_prompt_for_qwen
 from backend.app.slot_package_keys import is_clausulas_objeto_justificativa_package, resolve_slot_package_key
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,24 @@ def _llm_base_url_for_proxy(path: str, payload: dict | None, request) -> str:
         return _llm_base_url()
     clausulas = getattr(settings, "LLM_CLAUSULAS_API_BASE_URL", "").strip().rstrip("/")
     return clausulas or _llm_base_url()
+
+
+def _uses_clausulas_qwen_gateway(base: str) -> bool:
+    clausulas = getattr(settings, "LLM_CLAUSULAS_API_BASE_URL", "").strip().rstrip("/")
+    ollama = _llm_base_url().rstrip("/")
+    return bool(clausulas and base.rstrip("/") == clausulas.rstrip("/") and clausulas != ollama)
+
+
+def _prepare_generate_payload(payload: dict, base: str) -> dict:
+    """Envolve prompt no system Qwen; Ollama local segue payload original."""
+    out = dict(payload or {})
+    if not _uses_clausulas_qwen_gateway(base):
+        return out
+    prompt = str(out.get("prompt") or "").strip()
+    if prompt and "<<SYSTEM>>" not in prompt:
+        out["prompt"] = wrap_clausulas_prompt_for_qwen(prompt)
+    out.setdefault("max_tokens", int(getattr(settings, "LLM_CLAUSULAS_CLOUD_MAX_TOKENS", 900)))
+    return out
 
 
 def _llm_proxy_timeout_seconds(path: str, payload: dict | None, request) -> int:
@@ -92,7 +111,8 @@ def llm_proxy(request, path):
             resp = requests.get(url, timeout=30)
         else:
             timeout = _llm_proxy_timeout_seconds(path, payload, request)
-            resp = requests.post(url, data=raw_body, headers=headers, timeout=timeout)
+            post_payload = _prepare_generate_payload(payload, base) if action == "generate" else payload
+            resp = requests.post(url, json=post_payload, headers=headers, timeout=timeout)
 
         try:
             data = resp.json()

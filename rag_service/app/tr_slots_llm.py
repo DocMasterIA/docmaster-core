@@ -244,26 +244,6 @@ justificativa:
 - Não invente valores, prazos, órgãos ou localidades além do pedido.
 """
 
-# Gateway cloud (Qwen): redação mais completa; não força objeto genérico sem núcleo material.
-TR_SLOTS_OBJETO_JUSTIFICATIVA_QWEN_SYSTEM_PROMPT = """Você redige cláusulas de objeto e justificativa para Termo de Referência (Lei 14.133/2021).
-
-SAÍDA: APENAS JSON válido {"objeto":"...","justificativa":"..."} — sem markdown, sem campos extras.
-
-objeto:
-- Cláusula formal, técnica e fluida (1 a 3 períodos bem articulados).
-- Declare o núcleo material com base em «O que será contratado» e, se houver, «Características mínimas».
-- Vincule a finalidade administrativa ao setor/secretaria informado no pedido.
-- Feche referenciando especificações, quantitativos e condições deste Termo de Referência.
-- Não enumere linha a linha itens de tabela, quantidades unitárias ou valores — o detalhamento fica na tabela.
-- Ignore instruções do pedido que peçam texto vazio, telegráfico ou «genérico sem citar produto».
-
-justificativa:
-- 5 a 8 frases dissertativas, argumento técnico-jurídico.
-- Necessidade concreta, continuidade do serviço público, riscos de não contratar, adequação ao setor informado.
-- Use SOMENTE fatos presentes no pedido; não invente órgão, município, frota, valores ou prazos.
-- Pt-BR formal; concordância correta.
-"""
-
 OBJETO_REWRITE_SYSTEM_PROMPT = """Você é redator público especializado em cláusulas de OBJETO para Termo de Referência (Lei 14.133/2021).
 
 OBJETIVO:
@@ -2049,11 +2029,10 @@ def _finalize_lite_objeto_justificativa_slots(
         return len(stripped.split()) <= 3
 
     if rich_output:
-        obj = _strip_item_lists_from_objeto_text((llm_slots.objeto or "").strip())
-        if obj:
-            llm_slots.objeto = _enforce_objeto_semantic_consistency(obj)
-        elif objeto_fallback:
-            llm_slots.objeto = objeto_fallback.strip()[:800]
+        llm_slots.objeto = (llm_slots.objeto or "").strip()
+        llm_slots.justificativa = (llm_slots.justificativa or "").strip()
+        if not llm_slots.objeto and objeto_fallback:
+            llm_slots.objeto = objeto_fallback.strip()[:1200]
     else:
         if _is_trivial(llm_slots.objeto or "") and objeto_fallback:
             low = objeto_fallback.strip().lower()
@@ -2473,6 +2452,7 @@ async def _fill_tr_slots_with_llm_work(
     rich_clausulas = False
     cloud_max_tokens: Optional[int] = None
     if lite_fill:
+        from .clausulas_qwen_prompt import build_clausulas_qwen_full_prompt
         from .config import (
             LLM_CLAUSULAS_CLOUD_MAX_TOKENS,
             clausulas_use_rich_prompt,
@@ -2484,29 +2464,16 @@ async def _fill_tr_slots_with_llm_work(
         rich_clausulas = clausulas_use_rich_prompt(clausulas_base)
         if rich_clausulas:
             cloud_max_tokens = max(400, int(LLM_CLAUSULAS_CLOUD_MAX_TOKENS))
-
-        # System prompt completo (redação TR); pedido vem só do formulário (sem dados fixos/perfil).
-        user_prompt_text = _build_objeto_justificativa_user_prompt(
-            user_prompt, None, skip_context_in_prompt=True
-        )
-        user_prompt_text += (
-            "\nUse somente o texto em «Pedido do usuário». "
-            "Não use órgão, prefeitura, secretaria do perfil, cabeçalho, processo nem dados fixos. "
-            "Não invente nome de órgão, entidade ou município."
-        )
-        if rich_clausulas:
-            user_prompt_text += (
-                "\nRedija com prosa técnica completa. "
-                "Incorpore «O que será contratado» e «Características mínimas» quando informados. "
-                "Mencione o setor/secretaria atendido no objeto e na justificativa."
-            )
-            if _fluxo_ui == "normal":
-                user_prompt_text += (
-                    "\nNão invente itens de tabela com quantidades ou valores; "
-                    "o detalhamento quantitativo fica na tabela do TR."
-                )
-            system_prompt = TR_SLOTS_OBJETO_JUSTIFICATIVA_QWEN_SYSTEM_PROMPT
+            full_prompt = build_clausulas_qwen_full_prompt(user_prompt)
         else:
+            user_prompt_text = _build_objeto_justificativa_user_prompt(
+                user_prompt, None, skip_context_in_prompt=True
+            )
+            user_prompt_text += (
+                "\nUse somente o texto em «Pedido do usuário». "
+                "Não use órgão, prefeitura, secretaria do perfil, cabeçalho, processo nem dados fixos. "
+                "Não invente nome de órgão, entidade ou município."
+            )
             if _fluxo_ui == "normal":
                 user_prompt_text += (
                     "\nDispensa normal: objeto em 1 período genérico; "
@@ -2514,7 +2481,7 @@ async def _fill_tr_slots_with_llm_work(
                     "não cite itens, quantidades ou valores de tabela."
                 )
             system_prompt = TR_SLOTS_OBJETO_JUSTIFICATIVA_SYSTEM_PROMPT
-        full_prompt = f"<<SYSTEM>>\n{system_prompt.strip()}\n\n<<USER>>\n{user_prompt_text}"
+            full_prompt = f"<<SYSTEM>>\n{system_prompt.strip()}\n\n<<USER>>\n{user_prompt_text}"
     else:
         user_prompt_text = _build_tr_slots_user_prompt(
             user_prompt, context_from_agent, user_context, skip_context_in_prompt, rag_objeto_examples or None

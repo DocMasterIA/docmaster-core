@@ -575,17 +575,12 @@ function buildSlotsOverrideForGerarClausulas() {
 function buildUserPromptGerarClausulas() {
   const car = String(objetoCaracteristicas.value || '').trim();
   return [
-    'Gere objeto e justificativa usando EXCLUSIVAMENTE os campos abaixo.',
-    'Não use órgão, prefeitura, secretaria do perfil, cabeçalho, processo, dados fixos nem qualquer outro dado.',
-    'Não invente nome de órgão, entidade ou município.',
-    '',
     `O que será contratado: ${objetoContratado.value}`,
     `Setor/secretaria atendido: ${objetoSetor.value}`,
-    car ? `Características mínimas: ${car}` : 'Características mínimas: não informado',
-    'Incorpore o núcleo material informado em «O que será contratado» e cite o setor/secretaria no objeto e na justificativa.',
-    'Redija com linguagem técnica e formal; evite texto telegráfico ou vazio.',
-    'Não enumere itens de tabela com quantidades ou valores — o detalhamento fica na tabela do TR.',
-  ].join('\n');
+    car ? `Características mínimas: ${car}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 async function gerar() {

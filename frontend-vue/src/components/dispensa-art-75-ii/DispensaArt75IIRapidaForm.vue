@@ -576,7 +576,7 @@ function buildSlotsOverride() {
 /** Só para fill-tr-slots (objeto/justificativa) — prompt curto ≈ curl ~4s no RAG. */
 function buildUserPromptFillTrSlots() {
   const contratado = String(objetoContratado.value || '').trim();
-  return `O que será contratado: ${contratado || 'Não informado'}`;
+  return contratado ? `O que será contratado: ${contratado}` : '';
 }
 
 /** Metadados no payload de gerar-tr-e-dfd; com cláusulas no override a 2ª LLM é pulada. */

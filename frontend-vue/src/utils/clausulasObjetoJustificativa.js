@@ -63,56 +63,14 @@ export function buildClausulasObjetoJustificativaPrompt(fields) {
   const contratado = String(fields.contratado || '').trim();
   const setor = String(fields.setor || '').trim();
   const caracteristicas = String(fields.caracteristicas || '').trim();
-  const variant = fields.variant || 'generic';
-  const compact = !!fields.compact;
 
-  if (compact && variant === 'dispensa_normal') {
-    return [
-      'Redija em pt-BR, formal, só duas linhas rotuladas:',
-      'Objeto: cláusula declarativa com o núcleo material informado e o setor atendido.',
-      'Justificativa: parágrafo argumentativo (5 a 8 frases).',
-      `Contratação: ${contratado}`,
-      `Setor: ${setor}`,
-      caracteristicas ? `Características: ${caracteristicas}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n');
-  }
-
-  const lines = [
-    'Com base EXCLUSIVAMENTE nos dados abaixo, gere APENAS duas seções:',
-    'Objeto:',
-    'Justificativa:',
-    '',
-    'REGRAS OBRIGATÓRIAS:',
-    '- Não inventar órgão, secretaria, produto, quantidade, valor ou localidade além do informado.',
-    '- Não reutilizar contexto de mensagens anteriores.',
-    '- Usar apenas os campos fornecidos pelo usuário.',
-    '- Se faltar informação, redija de forma genérica sem adicionar fatos novos.',
-  ];
-
-  if (variant === 'dispensa_normal') {
-    lines.push(
-      '- Na cláusula de objeto: declare o núcleo material informado e vincule ao setor/secretaria.',
-      '- Justificativa: parágrafo argumentativo completo (5 a 8 frases), linguagem formal.',
-      '- Não enumere itens de tabela com quantidades, valores ou marcas — detalhe na tabela do TR.',
-    );
-  }
-
-  lines.push(
-    '',
+  return [
     `O que será contratado: ${contratado}`,
     `Setor/secretaria atendido: ${setor}`,
-    `Características mínimas (opcional): ${caracteristicas || 'não informado'}`,
-    '',
-    'Formato obrigatório de resposta:',
-    'Objeto: <texto>',
-    'Justificativa: <texto>',
-    '',
-    'Não inclua nenhuma seção extra.',
-  );
-
-  return lines.join('\n');
+    caracteristicas ? `Características mínimas: ${caracteristicas}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 /** Limites Ollama para cláusulas curtas (objeto + justificativa) — alvo ~3s. */
@@ -139,6 +97,7 @@ export async function requestClausulasObjetoJustificativaFast(apiBase, options =
   const body = {
     prompt,
     stream: false,
+    max_tokens: 900,
   };
   const pkg = String(options.slotPackageKey || '').trim();
   if (pkg) body.slot_package_key = pkg;

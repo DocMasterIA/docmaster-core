@@ -92,11 +92,22 @@ def _alnum_space(s: str) -> str:
     return s
 
 
+_CALIBRE_LABEL_RE = re.compile(
+    r"\b(?:n|nr|num|nro|n\.?ro)\s*[º°]?\s*(\d+(?:[.,]\d+)?)",
+    flags=re.IGNORECASE,
+)
+
+
 def pre_clean_raw(text: str) -> str:
     s = (text or "").strip()
     if not s:
         return ""
     s = _SPACE_CHARS_RE.sub(" ", s)
+    # Preserva calibre (N° 4.0 → n4p0) antes de remover rótulos soltos.
+    s = _CALIBRE_LABEL_RE.sub(
+        lambda m: f" n{m.group(1).replace(',', '.').replace('.', 'p')} ",
+        s,
+    )
     s = _NUM_LABEL_RE.sub(" ", s)
     return s.strip()
 

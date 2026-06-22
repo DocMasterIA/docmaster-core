@@ -2448,8 +2448,11 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             elif search_tier == "flex":
                 tier_bonus = 2.0
             try:
+                from .product_category_match import product_category_strict_reject
                 from .product_spec_match import product_spec_rerank_adjustment, product_spec_strict_reject
 
+                if product_category_strict_reject(termo_busca_raw, it):
+                    continue
                 if mode == "strict" and product_spec_strict_reject(termo_busca_raw, it):
                     continue
                 spec_adj = product_spec_rerank_adjustment(termo_busca_raw, it)

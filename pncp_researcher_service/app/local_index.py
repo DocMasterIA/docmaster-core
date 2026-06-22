@@ -1563,6 +1563,9 @@ def _token_variants(token: str) -> List[str]:
     t = _normalize_search_text(token)
     if not t:
         return []
+    if re.match(r"^n\d+p\d+$", t.replace(" ", "")):
+        compact = t.replace(" ", "")
+        return [compact]
     variants = {t}
     # plural/singular simples para aumentar recall (pneu <-> pneus)
     if t.endswith("s") and len(t) > 3:
@@ -1605,9 +1608,13 @@ def _build_search_tokens(termo_busca: str) -> List[List[str]]:
     for tok in norm.split(" "):
         if not tok:
             continue
+        if tok in _SEARCH_ANCHOR_DROP:
+            continue
         if len(tok) >= 2:
             raw_tokens.append(tok)
         elif re.match(r"^\d+x\d+$", tok):
+            raw_tokens.append(tok)
+        elif re.match(r"^n\d+p\d+$", tok):
             raw_tokens.append(tok)
     return [_token_variants(tok) for tok in raw_tokens if _token_variants(tok)]
 
@@ -1641,6 +1648,17 @@ _SEARCH_GENERIC_DROP = frozenset(
         "tam",
         "medida",
         "formato",
+        "cor",
+        "cores",
+        "preta",
+        "preto",
+        "branca",
+        "branco",
+        "cinza",
+        "azul",
+        "verde",
+        "vermelha",
+        "vermelho",
     }
 )
 
@@ -1656,6 +1674,8 @@ def _is_spec_token_group(group: List[str]) -> bool:
     if re.match(r"^\d+x\d", head):
         return True
     if re.match(r"^\d+g\d*$", head):
+        return True
+    if re.match(r"^n\d+p\d+$", head):
         return True
     if re.search(r"\d", head) and re.search(r"(ml|mg|g|kg|mm|cm|un|und|cp|ui|vol|pct|mgml)$", head):
         return True
@@ -1692,6 +1712,11 @@ class SearchQueryTier:
     label: str
 
 
+def _is_calibre_token_group(group: List[str]) -> bool:
+    head = _token_group_head(group).replace(" ", "")
+    return bool(re.match(r"^n\d+p\d+$", head))
+
+
 def build_search_query_tiers(termo_busca: str) -> List[SearchQueryTier]:
     """
     Camadas de busca: estrita (100%) → núcleo → flexível (k-of-n).
@@ -1705,8 +1730,8 @@ def build_search_query_tiers(termo_busca: str) -> List[SearchQueryTier]:
     if not all_groups:
         return []
     term_strict, _meta = derive_anchor_search_term(raw)
-    strict_groups = _build_search_tokens(term_strict)
-    core_groups = _pick_core_token_groups(all_groups)
+    strict_groups = [g for g in _build_search_tokens(term_strict) if not _is_calibre_token_group(g)]
+    core_groups = [g for g in _pick_core_token_groups(all_groups) if not _is_calibre_token_group(g)]
     flex_ratio = max(0.5, min(1.0, float(PNCP_SEARCH_TIER_FLEX_RATIO)))
     tiers: List[SearchQueryTier] = []
     if strict_groups:
@@ -2404,6 +2429,14 @@ def local_item_search(
         if matched_tier is None:
             filtrados_token += 1
             continue
+        try:
+            from .product_category_match import product_category_strict_reject
+
+            if product_category_strict_reject(termo_busca, {"descricao_item": desc}):
+                filtrados_token += 1
+                continue
+        except Exception:
+            pass
         tier_hits[matched_tier.label] = int(tier_hits.get(matched_tier.label, 0)) + 1
         if only_homolog and not _row_passes_homolog_filter(r, somente_homologados=True):
             filtrados_nao_homolog += 1

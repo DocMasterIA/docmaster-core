@@ -2461,7 +2461,15 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                 tier_bonus = 6.0
             elif search_tier == "flex":
                 tier_bonus = 2.0
-            raw_score = sem + tbl + rec + coh + clar + pen + ref_fit + supplier_pen + tier_bonus
+            try:
+                from .product_spec_match import product_spec_rerank_adjustment, product_spec_strict_reject
+
+                if mode == "strict" and product_spec_strict_reject(termo_busca_raw, it):
+                    continue
+                spec_adj = product_spec_rerank_adjustment(termo_busca_raw, it)
+            except Exception:
+                spec_adj = 0.0
+            raw_score = sem + tbl + rec + coh + clar + pen + ref_fit + supplier_pen + tier_bonus + spec_adj
             score_0_100 = max(0, min(100, round(raw_score)))
             it2 = dict(it)
             it2["score_bruto"] = round(raw_score, 3)
@@ -2613,8 +2621,11 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     rerank_worth = _ia_bulk_rerank_worth_it(pool_mode, selection_pool)
     try:
         from .pack_size_match import extract_pack_hints_from_term
+        from .product_spec_match import product_spec_has_constraints
 
         if extract_pack_hints_from_term(termo_busca_raw).pack_units is not None:
+            rerank_worth = True
+        if product_spec_has_constraints(termo_busca_raw):
             rerank_worth = True
     except Exception:
         pass

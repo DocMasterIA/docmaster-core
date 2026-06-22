@@ -60,6 +60,7 @@ def compute_local_rerank_score(
     termo_raw: Optional[str] = None,
 ) -> float:
     from .pack_size_match import pack_size_rerank_adjustment
+    from .product_spec_match import product_spec_rerank_adjustment
     from .service import (
         _aggressive_similarity_score,
         _context_penalty,
@@ -79,6 +80,7 @@ def compute_local_rerank_score(
     term_tokens = [t for t in _normalize_text(termo_busca).split() if len(t) >= 2]
     gen = _generic_penalty(desc, term_tokens)
     pack_adj = pack_size_rerank_adjustment(termo_raw or termo_busca, item)
+    spec_adj = product_spec_rerank_adjustment(termo_raw or termo_busca, item)
     pen = -18.0 if bool(item.get("match_agressivo")) else 0.0
     bon = 0.0
     if str(item.get("cnpj_fornecedor") or "").strip():
@@ -87,7 +89,7 @@ def compute_local_rerank_score(
         bon += 5.0
     if item.get("item_homologado") is True or item.get("temResultado") is True:
         bon += 4.0
-    return lit * 1.2 + sim + ctx + base + gen + pack_adj + pen + bon
+    return lit * 1.2 + sim + ctx + base + gen + pack_adj + spec_adj + pen + bon
 
 
 def apply_local_rerank_top3(

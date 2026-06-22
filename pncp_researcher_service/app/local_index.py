@@ -1569,12 +1569,36 @@ def _token_variants(token: str) -> List[str]:
         variants.add(t[:-1])
     else:
         variants.add(f"{t}s")
+    if t in ("volumes", "volume"):
+        variants.update({"vol", "vols"})
+    if t == "vol":
+        variants.update({"volumes", "volume"})
+    mvol = re.match(r"^(\d+)vol$", t)
+    if mvol:
+        n = mvol.group(1)
+        variants.update({f"{n} volumes", f"{n} volume", f"{n} vol"})
+    mpct = re.match(r"^(\d+(?:\.\d+)?)pct$", t)
+    if mpct:
+        variants.add(f"{mpct.group(1)}%")
+    mmgml = re.match(r"^(\d+(?:\.\d+)?)mgml$", t)
+    if mmgml:
+        variants.add(f"{mmgml.group(1)}mg/ml")
     return sorted(v for v in variants if v)
+
+
+def _compact_spec_phrases_for_tokens(norm: str) -> str:
+    """Une specs multi-palavra em tokens únicos (recall: 10 volumes → 10vol, 50mg/ml → 50mgml)."""
+    s = norm or ""
+    s = re.sub(r"(\d+)\s+(volumes?|vol)\b", r"\1vol", s, flags=re.IGNORECASE)
+    s = re.sub(r"(\d+(?:\.\d+)?)\s*mg\s*/\s*ml\b", r"\1mgml", s, flags=re.IGNORECASE)
+    s = re.sub(r"(\d+(?:\.\d+)?)\s*%\b", r"\1pct", s)
+    return s
 
 
 def _build_search_tokens(termo_busca: str) -> List[List[str]]:
     pre = preprocess_cotacao_search_term(termo_busca)
     norm = _normalize_search_text(pre or termo_busca)
+    norm = _compact_spec_phrases_for_tokens(norm)
     if not norm:
         return []
     raw_tokens: List[str] = []
@@ -1633,7 +1657,7 @@ def _is_spec_token_group(group: List[str]) -> bool:
         return True
     if re.match(r"^\d+g\d*$", head):
         return True
-    if re.search(r"\d", head) and re.search(r"(ml|mg|g|kg|mm|cm|un|und|cp|ui)$", head):
+    if re.search(r"\d", head) and re.search(r"(ml|mg|g|kg|mm|cm|un|und|cp|ui|vol|pct|mgml)$", head):
         return True
     return False
 
@@ -1809,7 +1833,7 @@ def _search_token_hit(opt: str, words: set[str], normalized_text: str) -> bool:
         if dim in compact:
             return True
     # ex.: busca "120ml" vs descrição "120 ml" ou "frasco 120 ml"
-    m = re.match(r"^(\d+(?:[.,]\d+)?)(ml|mg|g|kg|l|lt|mcg|ui|un|und|cp|caps)$", opt)
+    m = re.match(r"^(\d+(?:[.,]\d+)?)(ml|mg|g|kg|l|lt|mcg|ui|un|und|cp|caps|vol|pct|mgml)$", opt)
     if m:
         num, unit = m.group(1), m.group(2)
         num_norm = num.replace(",", ".")
@@ -1817,6 +1841,15 @@ def _search_token_hit(opt: str, words: set[str], normalized_text: str) -> bool:
             return True
         compact = normalized_text.replace(" ", "")
         if f"{num_norm}{unit}" in compact or f"{num}{unit}" in compact:
+            return True
+        if unit == "vol":
+            if f"{num_norm} volumes" in normalized_text or f"{num_norm} volume" in normalized_text:
+                return True
+            if f"{num_norm}vol" in compact:
+                return True
+        if unit == "pct" and f"{num_norm}%" in normalized_text.replace(" ", ""):
+            return True
+        if unit == "mgml" and f"{num_norm}mg/ml" in compact.replace(" ", ""):
             return True
     return False
 

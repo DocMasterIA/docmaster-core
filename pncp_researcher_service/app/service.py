@@ -2453,7 +2453,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
 
                 if product_category_strict_reject(termo_busca_raw, it):
                     continue
-                if mode == "strict" and product_spec_strict_reject(termo_busca_raw, it):
+                if product_spec_strict_reject(termo_busca_raw, it):
                     continue
                 spec_adj = product_spec_rerank_adjustment(termo_busca_raw, it)
             except Exception:

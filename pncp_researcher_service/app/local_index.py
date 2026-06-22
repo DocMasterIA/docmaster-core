@@ -1566,6 +1566,8 @@ def _token_variants(token: str) -> List[str]:
     if re.match(r"^n\d+p\d+$", t.replace(" ", "")):
         compact = t.replace(" ", "")
         return [compact]
+    if re.match(r"^\d+(?:p\d+)?cmx\d+(?:p\d+)?m$", t.replace(" ", "")):
+        return [t.replace(" ", "")]
     variants = {t}
     # plural/singular simples para aumentar recall (pneu <-> pneus)
     if t.endswith("s") and len(t) > 3:
@@ -1595,6 +1597,12 @@ def _compact_spec_phrases_for_tokens(norm: str) -> str:
     s = re.sub(r"(\d+)\s+(volumes?|vol)\b", r"\1vol", s, flags=re.IGNORECASE)
     s = re.sub(r"(\d+(?:\.\d+)?)\s*mg\s*/\s*ml\b", r"\1mgml", s, flags=re.IGNORECASE)
     s = re.sub(r"(\d+(?:\.\d+)?)\s*%\b", r"\1pct", s)
+    s = re.sub(
+        r"(\d+(?:p\d+)?)cmx(\d+(?:p\d+)?)m\b",
+        r"\1cmx\2m",
+        s,
+        flags=re.IGNORECASE,
+    )
     return s
 
 
@@ -1633,6 +1641,11 @@ _SEARCH_ANCHOR_DROP = frozenset(
         "itens",
         "para",
         "com",
+        "de",
+        "da",
+        "do",
+        "das",
+        "dos",
         "caixa",
         "unidade",
         "unidades",
@@ -1676,6 +1689,8 @@ def _is_spec_token_group(group: List[str]) -> bool:
     if re.match(r"^\d+g\d*$", head):
         return True
     if re.match(r"^n\d+p\d+$", head):
+        return True
+    if re.match(r"^\d+(?:p\d+)?cmx\d+(?:p\d+)?m$", head.replace(" ", "")):
         return True
     if re.search(r"\d", head) and re.search(r"(ml|mg|g|kg|mm|cm|un|und|cp|ui|vol|pct|mgml)$", head):
         return True
@@ -2431,8 +2446,12 @@ def local_item_search(
             continue
         try:
             from .product_category_match import product_category_strict_reject
+            from .product_spec_match import product_spec_strict_reject
 
             if product_category_strict_reject(termo_busca, {"descricao_item": desc}):
+                filtrados_token += 1
+                continue
+            if product_spec_strict_reject(termo_busca, {"descricao_item": desc}):
                 filtrados_token += 1
                 continue
         except Exception:

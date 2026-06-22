@@ -247,6 +247,13 @@ def preprocess_cotacao_search_term(text: str) -> str:
     s = re.sub(r"\(\s*(\d+)\s*g[^)]*\)", r" \1g ", s, flags=re.IGNORECASE)
     s = re.sub(r"\b(\d+)\s*g\s*½\b", r"\1g", s, flags=re.IGNORECASE)
     s = re.sub(r"\b(\d+)\s*g\b", r"\1g", s, flags=re.IGNORECASE)
+    # Largura x comprimento (15CM X 2M → 15cmx2m)
+    s = re.sub(
+        r"(\d+(?:[.,]\d+)?)\s*cm\s*[xX×]\s*(\d+(?:[.,]\d+)?)\s*(?:m|mt|metros?)\b",
+        lambda m: f" {m.group(1).replace(',', '.').replace('.', 'p')}cmx{m.group(2).replace(',', '.').replace('.', 'p')}m ",
+        s,
+        flags=re.IGNORECASE,
+    )
     s = re.sub(
         r"(\d+)\s*[xX×]\s*(\d+[,.]?\d*)",
         lambda m: f"{m.group(1)}x{m.group(2).replace(',', '').replace('.', '')}",

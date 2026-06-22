@@ -18,6 +18,27 @@ _VOL_ML_RE = re.compile(r"(\d+(?:\.\d+)?)\s*ml\b", re.IGNORECASE)
 _VOL_LITRO_RE = re.compile(r"(\d+(?:\.\d+)?)\s*litros?\b", re.IGNORECASE)
 _VOL_L_SHORT_RE = re.compile(r"(?:^|[\s(])(\d+(?:\.\d+)?)\s+l(?:\s|$|itro)", re.IGNORECASE)
 _DOSE_MG_RE = re.compile(r"(\d+(?:\.\d+)?)\s*mg\b", re.IGNORECASE)
+_DIM_CM_X_M_RAW = re.compile(
+    r"(\d+(?:[.,]\d+)?)\s*cm\s*[xX×]\s*(\d+(?:[.,]\d+)?)\s*(?:m|mt|metros?)\b",
+    re.IGNORECASE,
+)
+_DIM_CM_X_M_NORM = re.compile(r"(\d+(?:p\d+)?)cmx(\d+(?:p\d+)?)m\b")
+_WIDTH_CM_RE = re.compile(
+    r"(?:largura|boca|faixa)\s*:?\s*(\d+(?:[.,]\d+)?)\s*cm\b",
+    re.IGNORECASE,
+)
+_WIDTH_CM_LOOSE = re.compile(r"(\d+(?:[.,]\d+)?)\s*cm\b", re.IGNORECASE)
+_LENGTH_M_EXPLICIT = re.compile(
+    r"(?:comprimento|comp)\s*:?\s*(\d+(?:[.,]\d+)?)\s*(?:m|mt|metros?)\b",
+    re.IGNORECASE,
+)
+_LENGTH_MT_LOOSE = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:mt|metros?)\b", re.IGNORECASE)
+
+_PRODUCT_LINE_EXCLUSIVE: Dict[str, frozenset] = {
+    "smarch": frozenset({"kinesio", "knesio", "cinesio"}),
+    "kinesio": frozenset({"smarch"}),
+    "knesio": frozenset({"smarch"}),
+}
 
 
 @dataclass
@@ -28,6 +49,8 @@ class ProductSpecHints:
     vol_l: Optional[float] = None
     percent: Optional[float] = None
     volumes: Optional[int] = None
+    width_cm: Optional[float] = None
+    length_m: Optional[float] = None
     sources: List[str] = field(default_factory=list)
 
     def has_constraints(self) -> bool:
@@ -40,6 +63,8 @@ class ProductSpecHints:
                 self.vol_l,
                 self.percent,
                 self.volumes,
+                self.width_cm,
+                self.length_m,
             )
         )
 
@@ -56,6 +81,62 @@ def _parse_int(raw: str) -> Optional[int]:
     if n is None:
         return None
     return int(round(n))
+
+
+def _parse_dim_num(raw: str) -> Optional[float]:
+    try:
+        return float(str(raw).replace(",", ".").replace("p", "."))
+    except (TypeError, ValueError):
+        return None
+
+
+def _extract_dimensions(
+    raw: str, norm: str, srcs: List[str], *, source: str
+) -> tuple[Optional[float], Optional[float]]:
+    width: Optional[float] = None
+    length: Optional[float] = None
+    for dm in _DIM_CM_X_M_RAW.finditer(raw):
+        width = _parse_dim_num(dm.group(1))
+        length = _parse_dim_num(dm.group(2))
+        srcs.append(f"{source}:dim_raw")
+        return width, length
+    for dm in _DIM_CM_X_M_NORM.finditer(norm):
+        width = _parse_dim_num(dm.group(1))
+        length = _parse_dim_num(dm.group(2))
+        srcs.append(f"{source}:dim_norm")
+        return width, length
+    for wm in _WIDTH_CM_RE.finditer(raw):
+        width = _parse_dim_num(wm.group(1))
+        srcs.append(f"{source}:width")
+        break
+    if width is None:
+        for wm in _WIDTH_CM_LOOSE.finditer(raw):
+            width = _parse_dim_num(wm.group(1))
+            srcs.append(f"{source}:width_loose")
+            break
+    for lm in _LENGTH_M_EXPLICIT.finditer(raw):
+        length = _parse_dim_num(lm.group(1))
+        srcs.append(f"{source}:length")
+        break
+    if length is None:
+        for lm in _LENGTH_MT_LOOSE.finditer(raw):
+            length = _parse_dim_num(lm.group(1))
+            srcs.append(f"{source}:length_mt")
+            break
+    return width, length
+
+
+def product_line_strict_reject(termo_raw: str, item: Dict[str, Any]) -> bool:
+    """Rejeita linha de produto incompatível (ex.: pedido Smarch, resultado Kinesio)."""
+    term_n = _norm_text(termo_raw)
+    item_n = _norm_text(_item_blob(item))
+    for anchor, excludes in _PRODUCT_LINE_EXCLUSIVE.items():
+        if anchor not in term_n:
+            continue
+        for ex in excludes:
+            if ex in item_n and anchor not in item_n:
+                return True
+    return False
 
 
 def _norm_text(text: str) -> str:
@@ -156,6 +237,12 @@ def extract_product_spec_from_text(text: str, *, source: str = "text") -> Produc
             srcs.append(f"{source}:dose")
             break
 
+    w, ln = _extract_dimensions(raw, norm, srcs, source=source)
+    if w is not None:
+        hints.width_cm = w
+    if ln is not None:
+        hints.length_m = ln
+
     hints.sources = srcs
     return hints
 
@@ -252,9 +339,23 @@ def product_spec_rerank_adjustment(termo_raw: str, item: Dict[str, Any]) -> floa
         else:
             adj -= 10.0
 
+    if term.width_cm is not None:
+        if got.width_cm is not None:
+            adj += 24.0 if _float_close(term.width_cm, got.width_cm, abs_tol=0.5) else -42.0
+        else:
+            adj -= 10.0
+
+    if term.length_m is not None:
+        if got.length_m is not None:
+            adj += 28.0 if _float_close(term.length_m, got.length_m, abs_tol=0.15) else -48.0
+        elif got.width_cm is None:
+            adj -= 12.0
+
     return adj
 
 
 def product_spec_strict_reject(termo_raw: str, item: Dict[str, Any]) -> bool:
     """True quando o item contradiz specs explícitas do pedido (filtro em modo strict)."""
+    if product_line_strict_reject(termo_raw, item):
+        return True
     return product_spec_rerank_adjustment(termo_raw, item) <= -38.0

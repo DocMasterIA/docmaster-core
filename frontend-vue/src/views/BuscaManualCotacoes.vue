@@ -280,6 +280,7 @@ import {
 } from '../services/pncpResearch';
 import { MUNICIPIOS_POR_UF } from '../data/brasilMunicipiosPorUf';
 import { buildRecortesGeograficosPayload, itemMatchesRecortesGeograficos } from '../utils/recortesGeograficos';
+import { displayPnCpUnitario, hasDisplayPnCpPrecoPositivo } from '../utils/pncpPricing';
 
 const route = useRoute();
 const router = useRouter();
@@ -712,13 +713,7 @@ async function buscarNoBackend() {
     }
     if (data?.ok && Array.isArray(data.itens)) {
       resultados.value = data.itens
-        .filter((it) => {
-          const vu = Number(it?.valor_unitario);
-          const vt = Number(it?.valor_total);
-          const v = Number.isFinite(vu) ? vu : (Number.isFinite(vt) ? vt : null);
-          // Não exibe itens zerados (R$ 0,00) na busca manual.
-          return v == null || v > 0;
-        })
+        .filter((it) => hasDisplayPnCpPrecoPositivo({ sourceRaw: it }))
         .map((it, idx) => {
         const descricaoLinha = it.descricao_item || it.objeto_resumido || '';
         const similaridadeBackend = Boolean(it?.similaridade_encontrada);
@@ -745,8 +740,8 @@ async function buscarNoBackend() {
         uf: it.uf || '-',
         municipio: it.municipio || null,
         data: it.data_publicacao || '-',
-        valor: formatCurrency(it.valor_unitario ?? it.valor_total ?? 0),
-        valorUnitario: it.valor_unitario ?? null,
+        valor: formatCurrency(displayPnCpUnitario({ sourceRaw: it })),
+        valorUnitario: displayPnCpUnitario({ sourceRaw: it }),
         valorTotal: it.valor_total ?? null,
         statusIa: (similaridadeParcial && conf === 'Alta') || fallbackPorSimilaridadeIa ? 'Média' : conf,
         observacao: it.modalidade || 'Importado do backend PNCP',
@@ -785,8 +780,9 @@ async function atualizarBaseLocalAgora() {
 }
 
 function formatCurrency(v) {
+  if (v == null || v === '') return 'R$ -';
   const n = Number(v);
-  if (Number.isNaN(n)) return 'R$ -';
+  if (!Number.isFinite(n)) return 'R$ -';
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 

@@ -317,6 +317,7 @@ import {
   displayPnCpUnitario,
   extractPnCpHomologadoTotal,
   extractPnCpHomologadoUnit,
+  hasDisplayPnCpPrecoPositivo,
 } from '../utils/pncpPricing';
 
 const route = useRoute();
@@ -1113,7 +1114,9 @@ async function runSearchWithContext({
     function mapBackendToRows(backend, geoKeyPart) {
       if (!backend?.ok || !Array.isArray(backend.itens)) return 0;
       lastBackend = backend;
-      const mapped = backend.itens.map((it, idx) => ({
+      const mapped = backend.itens
+        .filter((it) => hasDisplayPnCpPrecoPositivo({ sourceRaw: it }))
+        .map((it, idx) => ({
         esferaAdministrativa: classificarEsferaAdministrativa(it),
         incisoClassificacao: mapEsferaParaInciso(classificarEsferaAdministrativa(it)),
         id: `backend-${context?.id || 'none'}-${geoKeyPart}-${idx}-${it.numero_pncp || 'x'}-${it.numero_item ?? idx}`,
@@ -1275,8 +1278,9 @@ async function runSearchWithContext({
 }
 
 function formatCurrency(v) {
+  if (v == null || v === '') return 'R$ -';
   const n = Number(v);
-  if (Number.isNaN(n)) return 'R$ -';
+  if (!Number.isFinite(n)) return 'R$ -';
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 

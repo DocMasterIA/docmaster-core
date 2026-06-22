@@ -70,6 +70,7 @@ from .local_index import (
 )
 from .schemas import MarketSearchRequest
 from .search_text_clean import apply_item_display_cleanup, normalize_for_search, preprocess_cotacao_search_term
+from .pricing_display import filter_items_with_display_price, row_display_unit_price
 
 
 def _default_dates() -> tuple[str, str]:
@@ -1555,19 +1556,7 @@ def _safe_float(value: Any) -> float:
 
 
 def _row_price_for_faixa(it: Dict[str, Any]) -> float:
-    for key in (
-        "valor_unitario",
-        "valor_unitario_homologado",
-        "valor_unitario_estimado",
-        "valor_total",
-        "valor_total_homologado",
-        "valor_total_estimado",
-        "valor_global",
-    ):
-        v = _safe_float(it.get(key))
-        if v > 0.0:
-            return v
-    return 0.0
+    return row_display_unit_price(it)
 
 
 def _iter_search_term_fallbacks(termo_busca: str) -> List[str]:
@@ -2791,6 +2780,9 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
 
     for row in top3:
         apply_item_display_cleanup(row)
+
+    top3 = filter_items_with_display_price(top3)
+    funil["top3_com_preco_positivo"] = len(top3)
 
     ia_resumo_ok = False
     if ia_resumo_on and top3:

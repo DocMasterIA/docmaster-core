@@ -65,17 +65,64 @@ export function extractPnCpHomologadoTotal(row) {
   return null;
 }
 
+export function extractPnCpEstimadoTotal(row) {
+  const src = mergedPnCpSource(row);
+  const direct = pickPositiveNumber(
+    src.valor_total_estimado,
+    src.valorTotalEstimado,
+    row?.valor_total_estimado,
+  );
+  if (direct) return direct;
+  const unit = extractPnCpEstimadoUnit(row);
+  const qtd = pickPositiveNumber(
+    src.quantidade_estimada,
+    src.quantidadeEstimada,
+    row?.quantidade,
+    src.quantidade,
+  );
+  if (unit && qtd) return unit * qtd;
+  return null;
+}
+
+function deriveUnitFromTotal(row) {
+  const src = mergedPnCpSource(row);
+  const pairs = [
+    [extractPnCpHomologadoTotal(row), pickPositiveNumber(
+      src.quantidade_homologada,
+      src.quantidadeHomologada,
+      row?.quantidade,
+      src.quantidade,
+    )],
+    [pickPositiveNumber(src.valor_total, row?.valor_total), pickPositiveNumber(row?.quantidade, src.quantidade)],
+    [extractPnCpEstimadoTotal(row), pickPositiveNumber(
+      src.quantidade_estimada,
+      src.quantidadeEstimada,
+      row?.quantidade,
+      src.quantidade,
+    )],
+  ];
+  for (const [total, qtd] of pairs) {
+    if (total != null && qtd != null && qtd > 0) return total / qtd;
+  }
+  return null;
+}
+
 export function displayPnCpUnitario(row) {
+  const src = mergedPnCpSource(row);
   const hom = extractPnCpHomologadoUnit(row);
   if (hom != null) return hom;
   const homologado = isPnCpItemHomologado(row) || hasPnCpHomologadoPreco(row);
-  if (homologado) {
-    const ormUnit = pickPositiveNumber(row?.valor_unitario);
-    if (ormUnit != null) return ormUnit;
-  }
+  const ormUnit = pickPositiveNumber(src.valor_unitario, row?.valor_unitario);
+  if (homologado && ormUnit != null) return ormUnit;
   const est = extractPnCpEstimadoUnit(row);
-  if (est != null && !homologado) return est;
-  return pickPositiveNumber(row?.valor_unitario);
+  if (est != null) return est;
+  if (ormUnit != null) return ormUnit;
+  return deriveUnitFromTotal(row);
+}
+
+export function hasDisplayPnCpPrecoPositivo(row) {
+  const unit = displayPnCpUnitario(row);
+  return unit != null && unit > 0;
 }
 
 export function displayPnCpTotal(row) {
@@ -83,20 +130,14 @@ export function displayPnCpTotal(row) {
   if (hom != null) return hom;
   const src = mergedPnCpSource(row);
   const homologado = isPnCpItemHomologado(row) || hasPnCpHomologadoPreco(row);
-  if (homologado) {
-    const ormTotal = pickPositiveNumber(row?.valor_total);
-    if (ormTotal != null) return ormTotal;
-  }
-  const estTotal = pickPositiveNumber(
-    src.valor_total_estimado,
-    src.valorTotalEstimado,
-    row?.valor_total_estimado,
-  );
-  if (estTotal != null && !homologado) return estTotal;
+  const ormTotal = pickPositiveNumber(src.valor_total, row?.valor_total);
+  if (homologado && ormTotal != null) return ormTotal;
+  const estTotal = extractPnCpEstimadoTotal(row);
+  if (estTotal != null) return estTotal;
   const unit = displayPnCpUnitario(row);
   const qtd = pickPositiveNumber(row?.quantidade, src.quantidade);
   if (unit != null && qtd != null) return unit * qtd;
-  return pickPositiveNumber(row?.valor_total);
+  return ormTotal;
 }
 
 /** Item homologado na PNCP mas preço vencedor ainda não veio de /resultados. */

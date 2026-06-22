@@ -317,6 +317,7 @@ import {
   displayPnCpUnitario,
   extractPnCpHomologadoTotal,
   extractPnCpHomologadoUnit,
+  formatFaixaResumo,
   hasDisplayPnCpPrecoPositivo,
 } from '../utils/pncpPricing';
 
@@ -1094,6 +1095,7 @@ async function runSearchWithContext({
       && Number.isFinite(Number(variacaoCtx))
       && Number(variacaoCtx) >= 0;
 
+    const sentidoCtx = context?.variacao_sentido_referencia ?? 'ambos';
     const basePayload = {
       somente_homologados: !bulkMode,
       termo_busca: String(descricao).trim(),
@@ -1103,9 +1105,9 @@ async function runSearchWithContext({
       quantidade_referencia: context?.quantidade ?? null,
       unidade_medida_referencia: context?.unidade_medida ?? null,
       busca_lote: Boolean(bulkMode),
-      // Faixa por item só fora do lote — no bulk o backend ignora faixa/homolog estrito.
-      valor_base_referencia: faixaAtiva && !bulkMode ? Number(valorBaseCtx) : null,
-      variacao_percentual_referencia: faixaAtiva && !bulkMode ? Number(variacaoCtx) : null,
+      valor_base_referencia: faixaAtiva ? Number(valorBaseCtx) : null,
+      variacao_percentual_referencia: faixaAtiva ? Number(variacaoCtx) : null,
+      variacao_sentido_referencia: faixaAtiva ? sentidoCtx : null,
     };
 
     const aggregated = [];
@@ -1241,8 +1243,8 @@ async function runSearchWithContext({
         faixaMax: filtrosResp.faixa_regional_max,
         top3Final: lastBackend?.stats?.funil_busca?.top3_final ?? null,
       };
-      if (!bulkMode && faixaAtiva && apiN < 3) {
-        searchError.value = `Faixa de preço ativa (base R$ ${Number(valorBaseCtx).toFixed(2)} ±${Number(variacaoCtx)}%): API retornou ${apiN} cotação(ões). Desative a faixa ou amplie a variação para ver mais preços.`;
+      if (faixaAtiva && apiN < 3) {
+        searchError.value = `Faixa de preço ativa (${formatFaixaResumo(valorBaseCtx, variacaoCtx, sentidoCtx)}): API retornou ${apiN} cotação(ões). Amplie a variação ou ajuste o valor base.`;
       }
     } else if (!append && !bulkMode) {
       lastSearchDebug.value = {

@@ -280,7 +280,7 @@ import {
 } from '../services/pncpResearch';
 import { MUNICIPIOS_POR_UF } from '../data/brasilMunicipiosPorUf';
 import { buildRecortesGeograficosPayload, itemMatchesRecortesGeograficos } from '../utils/recortesGeograficos';
-import { displayPnCpUnitario, hasDisplayPnCpPrecoPositivo } from '../utils/pncpPricing';
+import { displayPnCpUnitario, formatFaixaResumo, hasDisplayPnCpPrecoPositivo, computeFaixaRegional } from '../utils/pncpPricing';
 
 const route = useRoute();
 const router = useRouter();
@@ -474,12 +474,8 @@ const faixaValorAtiva = computed(() => {
   if (base == null || base <= 0) return '';
   const p = Number.parseFloat(String(filtros.variacao || '0'));
   const perc = Number.isFinite(p) ? Math.max(0, p) : 0;
-  const fator = perc / 100;
   const sentido = ['baixo', 'cima', 'ambos'].includes(filtros.variacaoSentido) ? filtros.variacaoSentido : 'ambos';
-  const min = sentido === 'baixo' ? Math.max(0, base * (1 - fator)) : (sentido === 'cima' ? base : Math.max(0, base * (1 - fator)));
-  const max = sentido === 'baixo' ? base : (sentido === 'cima' ? base * (1 + fator) : base * (1 + fator));
-  const labelSentido = sentido === 'baixo' ? 'para baixo' : (sentido === 'cima' ? 'para cima' : 'para baixo/cima');
-  return `${formatCurrency(min)} até ${formatCurrency(max)} (${perc}% ${labelSentido})`;
+  return formatFaixaResumo(base, perc, sentido);
 });
 const resultadosFiltradosOrdenados = computed(() => {
   const base = [...resultados.value];
@@ -489,19 +485,11 @@ const resultadosFiltradosOrdenados = computed(() => {
 
   let filtrados = base;
   if (valorBase != null && valorBase > 0) {
-    const fator = variacaoValida / 100;
     const sentido = ['baixo', 'cima', 'ambos'].includes(filtros.variacaoSentido) ? filtros.variacaoSentido : 'ambos';
-    const min = sentido === 'baixo'
-      ? Math.max(0, valorBase * (1 - fator))
-      : (sentido === 'cima' ? valorBase : Math.max(0, valorBase * (1 - fator)));
-    const max = sentido === 'baixo'
-      ? valorBase
-      : (sentido === 'cima' ? valorBase * (1 + fator) : valorBase * (1 + fator));
+    const { min, max } = computeFaixaRegional(valorBase, variacaoValida, sentido);
     filtrados = base.filter((item) => {
-      // Usa valor numérico bruto do item para evitar ruído de formatação.
       const vBruto = item.valorUnitario ?? item.valorTotal ?? parseMoeda(item.valor);
       const v = Number(vBruto);
-      if (v == null) return false;
       if (!Number.isFinite(v)) return false;
       return v >= min && v <= max;
     });
@@ -656,6 +644,20 @@ function buildSimilarityFallbackTerms(query) {
   return out;
 }
 
+function faixaPayloadForApi() {
+  const valorBase = parseMoeda(filtros.valorBase);
+  const variacao = Number.parseFloat(String(filtros.variacao || '0'));
+  if (valorBase == null || valorBase <= 0 || !Number.isFinite(variacao) || variacao < 0) {
+    return {};
+  }
+  const sentido = ['baixo', 'cima', 'ambos'].includes(filtros.variacaoSentido) ? filtros.variacaoSentido : 'ambos';
+  return {
+    valor_base_referencia: valorBase,
+    variacao_percentual_referencia: variacao,
+    variacao_sentido_referencia: sentido,
+  };
+}
+
 async function buscarNoBackend() {
   if (!filtros.descricao.trim()) return;
   isSearching.value = true;
@@ -667,6 +669,7 @@ async function buscarNoBackend() {
         : null;
     const termoBuscaEfetivo = filtros.descricao.trim();
     const geo = geoApiSlice();
+    const faixaPayload = faixaPayloadForApi();
     let data = await searchLocalItems({
       termo_busca: termoBuscaEfetivo,
       ...geo,
@@ -683,6 +686,7 @@ async function buscarNoBackend() {
       const iaData = await intelligentMarketSearch({
         termo_busca: termoBuscaEfetivo,
         ...geo,
+        ...faixaPayload,
         codigo_modalidade: codigoModalidade,
         somente_homologados: true,
         max_paginas: 500,
@@ -699,6 +703,7 @@ async function buscarNoBackend() {
         const iaFallback = await intelligentMarketSearch({
           termo_busca: term,
           ...geo,
+          ...faixaPayload,
           codigo_modalidade: codigoModalidade,
           max_paginas: 500,
           tamanho_pagina: 200,

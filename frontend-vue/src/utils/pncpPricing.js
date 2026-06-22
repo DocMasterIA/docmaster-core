@@ -125,6 +125,35 @@ export function hasDisplayPnCpPrecoPositivo(row) {
   return unit != null && unit > 0;
 }
 
+/** Calcula min/max da faixa regional (espelha backend pricing_faixa). */
+export function computeFaixaRegional(valorBase, variacaoPct, sentido = 'ambos') {
+  const base = Number(valorBase);
+  const pct = Math.max(0, Number(variacaoPct));
+  if (!Number.isFinite(base) || base <= 0 || !Number.isFinite(pct)) {
+    return { min: null, max: null, sentido: 'ambos' };
+  }
+  const s = ['cima', 'baixo', 'ambos'].includes(String(sentido || '').toLowerCase())
+    ? String(sentido).toLowerCase()
+    : 'ambos';
+  const f = pct / 100;
+  if (s === 'baixo') return { min: Math.max(0, base * (1 - f)), max: base, sentido: s };
+  if (s === 'cima') return { min: base, max: base * (1 + f), sentido: s };
+  return { min: Math.max(0, base * (1 - f)), max: base * (1 + f), sentido: s };
+}
+
+/** Texto curto da faixa para mensagens de UI. */
+export function formatFaixaResumo(valorBase, variacaoPct, sentido = 'ambos') {
+  const { min, max, sentido: s } = computeFaixaRegional(valorBase, variacaoPct, sentido);
+  if (min == null || max == null) return '';
+  const baseFmt = Number(valorBase).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const minFmt = min.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const maxFmt = max.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const pct = Math.round(Number(variacaoPct));
+  if (s === 'baixo') return `base ${baseFmt}, até ${pct}% abaixo (${minFmt} – ${maxFmt})`;
+  if (s === 'cima') return `base ${baseFmt}, até ${pct}% acima (${minFmt} – ${maxFmt})`;
+  return `base ${baseFmt}, ±${pct}% (${minFmt} – ${maxFmt})`;
+}
+
 export function displayPnCpTotal(row) {
   const hom = extractPnCpHomologadoTotal(row);
   if (hom != null) return hom;

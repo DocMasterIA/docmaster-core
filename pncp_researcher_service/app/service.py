@@ -71,6 +71,12 @@ from .local_index import (
 from .schemas import MarketSearchRequest
 from .search_text_clean import apply_item_display_cleanup, normalize_for_search, preprocess_cotacao_search_term
 from .pricing_display import filter_items_with_display_price, row_display_unit_price
+from .pricing_faixa import (
+    compute_faixa_regional,
+    faixa_regional_ativa,
+    format_faixa_prompt_text,
+    normalize_variacao_sentido,
+)
 
 
 def _default_dates() -> tuple[str, str]:
@@ -1620,10 +1626,10 @@ def _build_manual_parity_top3(
     faixa_min: Optional[float] = None,
     faixa_max: Optional[float] = None,
     target: int = 3,
-    relax_faixa: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     Fallback da busca inteligente: mesma base da busca manual (índice local + preço).
+    Com faixa ativa, nunca relaxa — retorna menos de 3 se necessário.
     """
     tier_rank = {"strict": 0, "core": 1, "flex": 2, "anchor": 3}
     min_ok = int(PNCP_SEARCH_MIN_SCORE_APROVACAO)
@@ -1631,7 +1637,7 @@ def _build_manual_parity_top3(
     for it in itens:
         if _row_price_for_faixa(it) <= 0.0:
             continue
-        if not relax_faixa and faixa_min is not None and faixa_max is not None:
+        if faixa_min is not None and faixa_max is not None:
             if not _preco_dentro_faixa(it, faixa_min, faixa_max):
                 continue
         tier = str(it.get("search_tier") or "").lower()
@@ -1649,15 +1655,6 @@ def _build_manual_parity_top3(
         row["origem"] = row.get("origem") or "base_local_itens"
         row["_manual_rank"] = (tier_rank.get(tier, 4), -lit, -_row_price_for_faixa(it))
         pool.append(row)
-    if not pool and faixa_min is not None and not relax_faixa:
-        return _build_manual_parity_top3(
-            itens,
-            termo_busca,
-            faixa_min=faixa_min,
-            faixa_max=faixa_max,
-            target=target,
-            relax_faixa=True,
-        )
     pool.sort(key=lambda x: x["_manual_rank"])
     for row in pool:
         row.pop("_manual_rank", None)
@@ -1878,6 +1875,7 @@ def _build_ia_rerank_prompt(
     faixa_max: Optional[float] = None,
     valor_base_ref: Optional[float] = None,
     variacao_pct_ref: Optional[float] = None,
+    variacao_sentido_ref: Optional[str] = None,
     bulk_mode: bool = False,
 ) -> str:
     desc_limit = 140 if bulk_mode else 500
@@ -1904,14 +1902,12 @@ def _build_ia_rerank_prompt(
         and variacao_pct_ref is not None
         and variacao_pct_ref >= 0
     ):
-        faixa_txt = (
-            "\n**Faixa regional de preço (obrigatória):** o item de referência do usuário tem valor base "
-            f"R$ {valor_base_ref:.2f} com tolerância de ±{variacao_pct_ref:.1f}% sobre esse valor.\n"
-            f"Apenas candidatos cujo campo `valor` (preço unitário ou total exibido) estiver entre "
-            f"**R$ {faixa_min:.2f}** e **R$ {faixa_max:.2f}** podem ser escolhidos nos 3 IDs finais.\n"
-            "Se um candidato estiver fora dessa faixa, **não** o selecione; prefira o próximo mais aderente "
-            "ao termo **e** dentro da faixa.\n"
-            "Só inclua fora da faixa se **nenhum** candidato da lista estiver dentro — nesse caso explique na justificativa.\n"
+        faixa_txt = format_faixa_prompt_text(
+            valor_base=valor_base_ref,
+            variacao_pct=variacao_pct_ref,
+            faixa_min=faixa_min,
+            faixa_max=faixa_max,
+            sentido=variacao_sentido_ref,
         )
     return (
         "Você é um avaliador técnico de cotações PNCP para pesquisa de preços públicos (Lei 14.133/2021).\n"
@@ -2097,6 +2093,7 @@ async def _rerank_top3_with_ia(
     faixa_max: Optional[float] = None,
     valor_base_ref: Optional[float] = None,
     variacao_pct_ref: Optional[float] = None,
+    variacao_sentido_ref: Optional[str] = None,
     bulk_mode: bool = False,
     timeout_seconds: Optional[float] = None,
 ) -> List[Dict[str, Any]]:
@@ -2109,6 +2106,7 @@ async def _rerank_top3_with_ia(
         faixa_max=faixa_max,
         valor_base_ref=valor_base_ref,
         variacao_pct_ref=variacao_pct_ref,
+        variacao_sentido_ref=variacao_sentido_ref,
         bulk_mode=bulk_mode,
     )
     tmo = float(timeout_seconds) if timeout_seconds is not None else float(PNCP_IA_TIMEOUT_SECONDS)
@@ -2152,16 +2150,10 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     """
     # Reutiliza a mesma fonte da busca manual (itens PNCP normalizados)
     busca_lote = bool(getattr(payload, "busca_lote", False))
-    # Busca automática (696+ itens): mesmo recorte do índice que antes do filtro homolog/faixa por item.
+    # Lote: relaxa homolog estrito, mas mantém faixa de preço por item quando informada.
     search_payload = payload
     if busca_lote:
-        search_payload = payload.model_copy(
-            update={
-                "somente_homologados": False,
-                "valor_base_referencia": None,
-                "variacao_percentual_referencia": None,
-            }
-        )
+        search_payload = payload.model_copy(update={"somente_homologados": False})
     ia_rerank_on = _ia_rerank_on_for_request(busca_lote)
     ia_resumo_on = _ia_resumo_on_for_request(busca_lote)
     limit = max(50, search_payload.max_paginas * search_payload.tamanho_pagina)
@@ -2311,7 +2303,13 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     ref_unit = _normalize_unit(search_payload.unidade_medida_referencia)
     ref_val_set = search_payload.valor_base_referencia is not None
     ref_var_set = search_payload.variacao_percentual_referencia is not None
-    funil["faixa_ativa"] = bool(ref_val_set and ref_var_set)
+    ref_sentido = normalize_variacao_sentido(
+        getattr(search_payload, "variacao_sentido_referencia", None)
+    )
+    funil["faixa_ativa"] = faixa_regional_ativa(
+        search_payload.valor_base_referencia if ref_val_set else None,
+        search_payload.variacao_percentual_referencia if ref_var_set else None,
+    )
     try:
         ref_value = float(search_payload.valor_base_referencia) if ref_val_set else 0.0
     except (TypeError, ValueError):
@@ -2322,10 +2320,9 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         ref_var_pct = 0.0
     faixa_min: Optional[float] = None
     faixa_max: Optional[float] = None
-    if ref_val_set and ref_var_set and ref_value > 0 and ref_var_pct >= 0:
-        margem = ref_value * (ref_var_pct / 100.0)
-        faixa_min = max(0.0, ref_value - margem)
-        faixa_max = ref_value + margem
+    if funil["faixa_ativa"]:
+        faixa_min, faixa_max = compute_faixa_regional(ref_value, ref_var_pct, sentido=ref_sentido)
+        funil["variacao_sentido"] = ref_sentido
     valores = [
         _row_price_for_faixa(x)
         for x in itens
@@ -2677,6 +2674,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             faixa_max=faixa_max,
             valor_base_ref=ref_value if ref_val_set else None,
             variacao_pct_ref=ref_var_pct if ref_var_set else None,
+            variacao_sentido_ref=ref_sentido if funil.get("faixa_ativa") else None,
             bulk_mode=busca_lote,
             timeout_seconds=rerank_timeout,
         )
@@ -2688,6 +2686,9 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                 row = by_id.get(cid)
                 if not row:
                     continue
+                if faixa_min is not None and faixa_max is not None:
+                    if not _preco_dentro_faixa(row, faixa_min, faixa_max):
+                        continue
                 out = dict(row)
                 out.pop("_ia_id", None)
                 if picked.get("score_aprovacao") is not None:
@@ -2762,6 +2763,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         top3 = _merge_unique_items(top3, extra)[:3]
         if extra:
             funil["manual_parity_topup"] = len(extra)
+    if faixa_min is not None and faixa_max is not None and top3:
+        top3 = [x for x in top3 if _preco_dentro_faixa(x, faixa_min, faixa_max)]
     funil["top3_final"] = len(top3)
     if len(top3) < 3 and funil.get("scored_final_pool", 0) >= 3:
         funil["provavel_gargalo_top3"] = "selecao_top3_incompleta"
@@ -2847,6 +2850,9 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             "unidade_medida_referencia": payload.unidade_medida_referencia,
             "valor_base_referencia": payload.valor_base_referencia,
             "variacao_percentual_referencia": payload.variacao_percentual_referencia,
+            "variacao_sentido_referencia": (
+                ref_sentido if funil.get("faixa_ativa") else None
+            ),
             "faixa_regional_min": faixa_min,
             "faixa_regional_max": faixa_max,
         },

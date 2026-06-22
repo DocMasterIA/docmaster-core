@@ -88,6 +88,10 @@ class MarketSearchRequest(BaseModel):
         None,
         description="Variação percentual da faixa regional do item (ex.: 20 => +/-20%).",
     )
+    variacao_sentido_referencia: Optional[str] = Field(
+        None,
+        description="Sentido da variação: ambos (±), baixo (só abaixo do base) ou cima (só acima).",
+    )
     somente_homologados: Optional[bool] = Field(
         None,
         description="Se true, retorna só itens homologados/adjudicados. Omitido = usa PNCP_SEARCH_ONLY_HOMOLOGATED do serviço.",
@@ -99,6 +103,16 @@ class MarketSearchRequest(BaseModel):
             "PNCP_IA_RERANK_BULK_ENABLED (menos candidatos/timeout que busca manual)."
         ),
     )
+
+    @field_validator("variacao_sentido_referencia", mode="before")
+    @classmethod
+    def normalize_sentido(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        s = str(v).strip().lower()
+        if s in {"ambos", "baixo", "cima"}:
+            return s
+        return "ambos"
 
     @field_validator("max_paginas")
     @classmethod

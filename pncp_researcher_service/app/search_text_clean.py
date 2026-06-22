@@ -92,10 +92,23 @@ def _alnum_space(s: str) -> str:
     return s
 
 
-_CALIBRE_LABEL_RE = re.compile(
-    r"\b(?:n|nr|num|nro|n\.?ro)\s*[º°]?\s*(\d+(?:[.,]\d+)?)",
-    flags=re.IGNORECASE,
+_CALIBRE_LABEL_PATTERNS = (
+    re.compile(
+        r"\b(?:n|nr|num|nro|n\.?ro)\s*[º°]?\s*(\d+(?:[.,]\d+)?)",
+        flags=re.IGNORECASE,
+    ),
+    # «N.º 7.0» (ordinal colado)
+    re.compile(r"\bn\.?\s*º\s*(\d+(?:[.,]\d+)?)\b", flags=re.IGNORECASE),
+    # Dreno Penrose «N. 2», luva «N. 7.0»
+    re.compile(r"\bn\.\s*(\d+(?:[.,]\d+)?)\b", flags=re.IGNORECASE),
+    # «No 01», «Nº 02»
+    re.compile(r"\bno\.?\s*(\d+)\b", flags=re.IGNORECASE),
 )
+
+
+def _calibre_token_sub(match: re.Match[str]) -> str:
+    num = match.group(1).replace(",", ".").replace(".", "p")
+    return f" n{num} "
 
 
 def pre_clean_raw(text: str) -> str:
@@ -103,11 +116,9 @@ def pre_clean_raw(text: str) -> str:
     if not s:
         return ""
     s = _SPACE_CHARS_RE.sub(" ", s)
-    # Preserva calibre (N° 4.0 → n4p0) antes de remover rótulos soltos.
-    s = _CALIBRE_LABEL_RE.sub(
-        lambda m: f" n{m.group(1).replace(',', '.').replace('.', 'p')} ",
-        s,
-    )
+    # Preserva calibre (N° 4.0 → n4p0; N. 2 → n2; No 01 → n01) antes de remover rótulos.
+    for pat in _CALIBRE_LABEL_PATTERNS:
+        s = pat.sub(_calibre_token_sub, s)
     s = _NUM_LABEL_RE.sub(" ", s)
     return s.strip()
 

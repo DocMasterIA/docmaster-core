@@ -33,6 +33,42 @@ _LENGTH_M_EXPLICIT = re.compile(
     re.IGNORECASE,
 )
 _LENGTH_MT_LOOSE = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:mt|metros?)\b", re.IGNORECASE)
+_NEEDLE_CM_RE = re.compile(
+    r"agulh[ao]s?\s*(\d+(?:[.,]\d+)?)\s*cm\b",
+    re.IGNORECASE,
+)
+_CALIBRE_NORM_TOKEN_RE = re.compile(r"\bn(\d+(?:p\d+)?)\b")
+_AGULHADO_CALIBRE_RE = re.compile(
+    r"\bagulhad[oa]?\s*(\d+(?:[.,]\d+)?)\b",
+    re.IGNORECASE,
+)
+_NYLON_CALIBRE_RE = re.compile(
+    r"\bnylon\s+(\d+(?:[.,]\d+)?)\b",
+    re.IGNORECASE,
+)
+_LUVA_ESTERIL_SIZE_RE = re.compile(
+    r"\bluva\b[^.]{0,96}?\besteril\w*\s+(\d+(?:[.,]\d+)?)\b",
+    re.IGNORECASE,
+)
+_LUVA_TAMANHO_RE = re.compile(r"\btamanho\s+(\d{2})\b", re.IGNORECASE)
+_SUTURE_ZERO_RE = re.compile(r"\b(\d+)\s*-\s*0\b", re.IGNORECASE)
+_UNITS_PER_G_RE = re.compile(r"(\d+(?:[.,]\d+)?)\s*u\s*/\s*g\b", re.IGNORECASE)
+_COMBO_SPLIT_RE = re.compile(r"\s*\+\s*")
+
+_EXCIPIENT_TOKENS = frozenset(
+    {
+        "cloridrato",
+        "sodica",
+        "sodico",
+        "bissulfato",
+        "ampola",
+        "solucao",
+        "injetavel",
+        "comprimido",
+        "pomada",
+        "frasco",
+    }
+)
 
 _PRODUCT_LINE_EXCLUSIVE: Dict[str, frozenset] = {
     "smarch": frozenset({"kinesio", "knesio", "cinesio"}),
@@ -51,6 +87,9 @@ class ProductSpecHints:
     volumes: Optional[int] = None
     width_cm: Optional[float] = None
     length_m: Optional[float] = None
+    calibre: Optional[float] = None
+    needle_cm: Optional[float] = None
+    units_per_g: Optional[float] = None
     sources: List[str] = field(default_factory=list)
 
     def has_constraints(self) -> bool:
@@ -65,6 +104,9 @@ class ProductSpecHints:
                 self.volumes,
                 self.width_cm,
                 self.length_m,
+                self.calibre,
+                self.needle_cm,
+                self.units_per_g,
             )
         )
 
@@ -90,6 +132,70 @@ def _parse_dim_num(raw: str) -> Optional[float]:
         return None
 
 
+def _parse_calibre_token(tok: str) -> Optional[float]:
+    m = re.match(r"^n(\d+(?:p\d+)?)$", (tok or "").strip().lower())
+    if not m:
+        return None
+    return _parse_dim_num(m.group(1))
+
+
+def _extract_calibre(raw: str, norm: str, srcs: List[str], *, source: str) -> Optional[float]:
+    for tok in norm.split():
+        val = _parse_calibre_token(tok)
+        if val is not None:
+            srcs.append(f"{source}:calibre_norm")
+            return val
+    for am in _AGULHADO_CALIBRE_RE.finditer(raw):
+        val = _parse_num(am.group(1))
+        if val is not None:
+            srcs.append(f"{source}:agulhado")
+            return val
+    for nm in _NYLON_CALIBRE_RE.finditer(raw):
+        val = _parse_num(nm.group(1))
+        if val is not None:
+            srcs.append(f"{source}:nylon_num")
+            return val
+    for sm in _SUTURE_ZERO_RE.finditer(raw):
+        val = _parse_num(sm.group(1))
+        if val is not None:
+            srcs.append(f"{source}:suture_zero")
+            return val
+    if "luva" in norm:
+        for lm in _LUVA_ESTERIL_SIZE_RE.finditer(raw):
+            val = _parse_num(lm.group(1))
+            if val is not None:
+                srcs.append(f"{source}:luva_esteril")
+                return val
+        for tm in _LUVA_TAMANHO_RE.finditer(raw):
+            val = _parse_num(tm.group(1))
+            if val is not None and val >= 50:
+                srcs.append(f"{source}:luva_tamanho")
+                return val / 10.0
+    return None
+
+
+def _extract_needle_cm(raw: str, srcs: List[str], *, source: str) -> Optional[float]:
+    for nm in _NEEDLE_CM_RE.finditer(raw):
+        val = _parse_num(nm.group(1))
+        if val is not None:
+            srcs.append(f"{source}:needle_cm")
+            return val
+    return None
+
+
+def _extract_units_per_g(raw: str, srcs: List[str], *, source: str) -> Optional[float]:
+    for um in _UNITS_PER_G_RE.finditer(raw):
+        val = _parse_num(um.group(1))
+        if val is not None:
+            srcs.append(f"{source}:u_per_g")
+            return val
+    return None
+
+
+def _calibre_close(a: float, b: float) -> bool:
+    return _float_close(a, b, rel=0.02, abs_tol=0.25)
+
+
 def _extract_dimensions(
     raw: str, norm: str, srcs: List[str], *, source: str
 ) -> tuple[Optional[float], Optional[float]]:
@@ -111,6 +217,9 @@ def _extract_dimensions(
         break
     if width is None:
         for wm in _WIDTH_CM_LOOSE.finditer(raw):
+            prefix = raw[max(0, wm.start() - 24) : wm.start()].lower()
+            if "agulh" in prefix:
+                continue
             width = _parse_dim_num(wm.group(1))
             srcs.append(f"{source}:width_loose")
             break
@@ -124,6 +233,64 @@ def _extract_dimensions(
             srcs.append(f"{source}:length_mt")
             break
     return width, length
+
+
+def _term_primary_actives(term_n: str) -> List[str]:
+    skip = frozenset(
+        {
+            "de",
+            "da",
+            "do",
+            "com",
+            "para",
+            "em",
+            "solucao",
+            "injetavel",
+            "comprimido",
+            "pomada",
+            "estéril",
+            "esteril",
+            "suspensao",
+            "xarope",
+            "ampola",
+            "litro",
+            "litros",
+            "galao",
+        }
+    )
+    out: List[str] = []
+    for tok in term_n.split():
+        if len(tok) < 4 or tok in skip or re.match(r"^\d", tok):
+            continue
+        if tok.endswith("mg") or tok.endswith("ml") or tok.endswith("pct"):
+            continue
+        out.append(tok)
+        if len(out) >= 3:
+            break
+    return out
+
+
+def product_combo_strict_reject(termo_raw: str, item: Dict[str, Any]) -> bool:
+    """Rejeita associação medicamentosa quando o pedido cita um único princípio."""
+    raw = _item_blob(item)
+    if "+" not in raw:
+        return False
+    term_n = _norm_text(termo_raw)
+    primaries = _term_primary_actives(term_n)
+    if len(primaries) != 1:
+        return False
+    anchor = primaries[0]
+    if anchor not in term_n:
+        return False
+    item_n = _norm_text(raw)
+    for part in _COMBO_SPLIT_RE.split(raw):
+        part_n = _norm_text(part)
+        if not part_n or anchor in part_n:
+            continue
+        lead = part_n.split()[0] if part_n.split() else ""
+        if len(lead) >= 4 and lead not in _EXCIPIENT_TOKENS and lead not in term_n:
+            return True
+    return False
 
 
 def product_line_strict_reject(termo_raw: str, item: Dict[str, Any]) -> bool:
@@ -243,6 +410,18 @@ def extract_product_spec_from_text(text: str, *, source: str = "text") -> Produc
     if ln is not None:
         hints.length_m = ln
 
+    needle = _extract_needle_cm(raw, srcs, source=source)
+    if needle is not None:
+        hints.needle_cm = needle
+
+    cal = _extract_calibre(raw, norm, srcs, source=source)
+    if cal is not None:
+        hints.calibre = cal
+
+    u_g = _extract_units_per_g(raw, srcs, source=source)
+    if u_g is not None:
+        hints.units_per_g = u_g
+
     hints.sources = srcs
     return hints
 
@@ -351,6 +530,24 @@ def product_spec_rerank_adjustment(termo_raw: str, item: Dict[str, Any]) -> floa
         elif got.width_cm is None:
             adj -= 12.0
 
+    if term.calibre is not None:
+        if got.calibre is not None:
+            adj += 30.0 if _calibre_close(term.calibre, got.calibre) else -44.0
+        else:
+            adj -= 10.0
+
+    if term.needle_cm is not None:
+        if got.needle_cm is not None:
+            adj += 22.0 if _float_close(term.needle_cm, got.needle_cm, abs_tol=0.4) else -40.0
+        else:
+            adj -= 8.0
+
+    if term.units_per_g is not None:
+        if got.units_per_g is not None:
+            adj += 26.0 if _float_close(term.units_per_g, got.units_per_g, abs_tol=0.05) else -44.0
+        else:
+            adj -= 12.0
+
     return adj
 
 
@@ -358,4 +555,14 @@ def product_spec_strict_reject(termo_raw: str, item: Dict[str, Any]) -> bool:
     """True quando o item contradiz specs explícitas do pedido (filtro em modo strict)."""
     if product_line_strict_reject(termo_raw, item):
         return True
+    if product_combo_strict_reject(termo_raw, item):
+        return True
+    term = extract_product_spec_from_term(termo_raw)
+    got = extract_product_spec_from_item(item)
+    if term.calibre is not None and got.calibre is not None:
+        if not _calibre_close(term.calibre, got.calibre):
+            return True
+    if term.units_per_g is not None and got.units_per_g is not None:
+        if not _float_close(term.units_per_g, got.units_per_g, abs_tol=0.05):
+            return True
     return product_spec_rerank_adjustment(termo_raw, item) <= -38.0

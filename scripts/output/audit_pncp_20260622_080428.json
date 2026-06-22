@@ -1,0 +1,2979 @@
+[
+  {
+    "numero_item": 22,
+    "termo": "ABAIXADOR DE LINGUA C/100 UNIDADES",
+    "quantidade": 100.0,
+    "unidade": "PCT",
+    "valor_base": 5.64,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 178,
+      "similar_pool": 0,
+      "scored_final_pool": 178,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "ABAIXADOR DE LINGUA DE MADEIRA PCT C/ 100 UN",
+        "valor_unitario": 7.08,
+        "uf": "SP",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 2,
+        "descricao": "ABAIXADOR DE LÍNGUA EM MADEIRA - MATERIAL NÃO ESTÉRIL, DE USO MÉDICO, DESCARTÁVEL E USO ÚNICO - PCT COM 100 UND",
+        "valor_unitario": 6.85,
+        "uf": "GO",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "ABAIXADOR DE LÍNGUA DE MADEIRA C/100 UNIDD",
+        "valor_unitario": 5.03,
+        "uf": "SP",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 35,
+    "termo": "ACEBROFILINA 50 MG/5 ML XAROPE C/120ML",
+    "quantidade": 700.0,
+    "unidade": "UNID",
+    "valor_base": 11.65,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "dose_mg": 50.0,
+      "vol_ml": 5.0
+    },
+    "funil": {
+      "literal_pool": 105,
+      "similar_pool": 0,
+      "scored_final_pool": 105,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "ACEBROFILINA 50 MG/5ML - FRASCO 120 ML",
+        "valor_unitario": 15.15,
+        "uf": "PR",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "dose_mg": 50.0,
+          "vol_ml": 5.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "Lote 1 - 2 448838 - Acebrofilina Concentração: 5 mg/ml ACEBROFILINA INFANTIL 25 MG/5ML XAROPE - FRASCO COM 120 ML XAROPE",
+        "valor_unitario": 14.83,
+        "uf": "SP",
+        "score": 88,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 5.0,
+          "vol_ml": 5.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "Acebrofilina 50 mg 5 ml xarope adulto",
+        "valor_unitario": 9.5677,
+        "uf": "SP",
+        "score": 87,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "dose_mg": 50.0,
+          "vol_ml": 5.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 45,
+    "termo": "ACETATO DE MEDROXIPROGESTERONA SUSPENSÃO INJETÁVEL 50MG/ML",
+    "quantidade": 200.0,
+    "unidade": "AMP",
+    "valor_base": 16.13,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "conc_mg_per_ml": 50.0
+    },
+    "funil": {
+      "literal_pool": 12,
+      "similar_pool": 0,
+      "scored_final_pool": 12,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "ACETATO DE MEDROXIPROGESTERONA 50 MG/ML",
+        "valor_unitario": 16.49,
+        "uf": "GO",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 50.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "Acetato de Medroxiprogesterona 50 mg/ml",
+        "valor_unitario": 27.64,
+        "uf": "PB",
+        "score": 86,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "ACETATO DE MEDROXIPROGESTERONA 150mg INJETAVEL FRASCO 1ml",
+        "valor_unitario": 24.512,
+        "uf": "SP",
+        "score": 67,
+        "spec_adj": null,
+        "flags": [
+          "spec_fraca"
+        ],
+        "spec_item": {
+          "dose_mg": 150.0,
+          "vol_ml": 1.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 100,
+    "termo": "ADENOSINA 6 MG SOLUÇAO INJETAVEL",
+    "quantidade": 200.0,
+    "unidade": "UNID",
+    "valor_base": 13.5,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "dose_mg": 6.0
+    },
+    "funil": {
+      "literal_pool": 41,
+      "similar_pool": 0,
+      "scored_final_pool": 41,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "ADENOSINA 6 MG/ 2ML SOLUÇÃO INJETAVEL AMPOLA 2 ML",
+        "valor_unitario": 12.59,
+        "uf": "BA",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "dose_mg": 6.0,
+          "vol_ml": 2.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "ADENOSINA 6 MG/ 2 ML – SOLUÇÃO INJETÁVEL, ESTÉRIL, AMPOLA CONTÉM 2 ML",
+        "valor_unitario": 10.67,
+        "uf": "PE",
+        "score": 88,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "dose_mg": 6.0,
+          "vol_ml": 2.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "ADENOSINA 3 MG/ML SOLUÇÃO INJETÁVEL AMPOLA 2 ML",
+        "valor_unitario": 11.9,
+        "uf": "RS",
+        "score": 82,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 3.0,
+          "vol_ml": 2.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 5,
+    "termo": "ÁGUA OXIGENADA 10 VOLUMES",
+    "quantidade": 200.0,
+    "unidade": "UNID",
+    "valor_base": 7.93,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "volumes": 10
+    },
+    "funil": {
+      "literal_pool": 21,
+      "similar_pool": 0,
+      "scored_final_pool": 21,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "AGUA OXIGENADA DE 10 VOLUME COM 1.000 ML",
+        "valor_unitario": 6.58,
+        "uf": "SP",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_ml": 0.0,
+          "volumes": 10
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "AGUA OXIGENADA 10 VOL 1LT",
+        "valor_unitario": 6.81,
+        "uf": "GO",
+        "score": 87,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "volumes": 10
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "AGUA OXIGENADA 10 VOLUMES 1 LITRO",
+        "valor_unitario": 10.53,
+        "uf": "SP",
+        "score": 87,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_l": 1.0,
+          "volumes": 10
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 6,
+    "termo": "ÁLCOOL 70% FRASCO COM 1 LITRO",
+    "quantidade": 1500.0,
+    "unidade": "UNID",
+    "valor_base": 5.26,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "vol_l": 1.0,
+      "percent": 70.0
+    },
+    "funil": {
+      "literal_pool": 108,
+      "similar_pool": 0,
+      "scored_final_pool": 108,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "Alcool líquido 70%, frasco com 1 litro.",
+        "valor_unitario": 6.44,
+        "uf": "PR",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_l": 1.0,
+          "percent": 70.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "ALCOOL 70% FRASCO 1 LITRO",
+        "valor_unitario": 9.39,
+        "uf": "SP",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_l": 1.0,
+          "percent": 70.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "ALCOOL 70% - FRASCO COM 1 LITRO (SOL/SESAU)",
+        "valor_unitario": 4.56,
+        "uf": "SP",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_l": 1.0,
+          "percent": 70.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 7,
+    "termo": "ÁLCOOL GEL 70% EMBALAGEM DE 500ML",
+    "quantidade": 50.0,
+    "unidade": "UNID",
+    "valor_base": 15.03,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "vol_ml": 500.0,
+      "percent": 70.0
+    },
+    "funil": {
+      "literal_pool": 78,
+      "similar_pool": 0,
+      "scored_final_pool": 78,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "Alcool em gel 70%, acondicionado em frasco plastico de 500ml (embalagem com dados de identificacao do produto, marca do fabricante, data de ",
+        "valor_unitario": 8.0,
+        "uf": "RN",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_ml": 500.0,
+          "percent": 70.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "ALCOOL EM GEL 70 % , EMBALAGEM 500 ml",
+        "valor_unitario": 6.0,
+        "uf": "RS",
+        "score": 88,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_ml": 500.0,
+          "percent": 70.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "Alcool em gel, antisséptico, 70%, incolor, registro no ministério da saúde. Embalagem 450ma a 500ml",
+        "valor_unitario": 7.27,
+        "uf": "RS",
+        "score": 87,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_ml": 500.0,
+          "percent": 70.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 8,
+    "termo": "AMINOFILINA 24 MG/ ML SOLUÇÃO INJETÁVEL AMPOLA 10 ML",
+    "quantidade": 800.0,
+    "unidade": "UNID",
+    "valor_base": 6.19,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "conc_mg_per_ml": 24.0,
+      "vol_ml": 10.0
+    },
+    "funil": {
+      "literal_pool": 67,
+      "similar_pool": 0,
+      "scored_final_pool": 67,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "AMINOFILINA 24 MG/ML,SOLUÇÃO INJETAVEL EM AMPOLA 10 ML -",
+        "valor_unitario": 3.69,
+        "uf": "CE",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 24.0,
+          "vol_ml": 10.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "BR0292402 AMINOFILINA, DOSAGEM/CONCENTRAÇÃO: 24 MG/ML, SOLUÇÃO INJETÁVEL - AMPOLA 10,00 ML",
+        "valor_unitario": 2.3075,
+        "uf": "PR",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 24.0,
+          "vol_ml": 0.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "(L2) 6501.259-Aminofilina, 24 mg/ml, Solução injetável, Ampola, 10 ml, VIA DE ADMINISTRAÇÃO: Intravenosa, UNID. DE MEDIDA: Unitário",
+        "valor_unitario": 4.99,
+        "uf": "PR",
+        "score": 88,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 24.0,
+          "vol_ml": 10.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 9,
+    "termo": "BANDAGEM ELASTICA (FAIXA DE SMARCH) 10CM X 2M",
+    "quantidade": 40.0,
+    "unidade": "UNID",
+    "valor_base": 14.35,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 3,
+      "similar_pool": 0,
+      "scored_final_pool": 3,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "(L6) 6510.40085 - Faixa de Smarch, Confeccionada em borracha ou látex laminado especial caracterizada por bandagem elástica, MEDIDA: 10cm de",
+        "valor_unitario": 17.18,
+        "uf": "PR",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "width_cm": 10.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "(L3) 6510.40085 - Faixa de Smarch, Confeccionada em borracha ou látex laminado especial caracterizada por bandagem elástica, MEDIDA: 10cm de",
+        "valor_unitario": 16.96,
+        "uf": "PR",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "width_cm": 10.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "(L5) 6510.40085 - Faixa de Smarch, Confeccionada em borracha ou látex laminado especial caracterizada por bandagem elástica, MEDIDA: 10cm de",
+        "valor_unitario": 17.18,
+        "uf": "PR",
+        "score": 84,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "width_cm": 10.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 10,
+    "termo": "BANDAGEM ELASTICA (FAIXA DE SMARCH) 15CM X 2M",
+    "quantidade": 40.0,
+    "unidade": "UNID",
+    "valor_base": 20.61,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 3,
+      "similar_pool": 0,
+      "scored_final_pool": 3,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "(L10) 6510.40089 - Faixa de Smarch, Confeccionada em borracha ou látex laminado especial caracterizada por bandagem elástica, MEDIDA: 15cm d",
+        "valor_unitario": 17.83,
+        "uf": "PR",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "percent": 90.0,
+          "width_cm": 15.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "(L3) 6510.40089 - Faixa de Smarch, Confeccionada em borracha ou látex laminado especial caracterizada por bandagem elástica, MEDIDA: 15cm de",
+        "valor_unitario": 26.26,
+        "uf": "PR",
+        "score": 87,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "percent": 90.0,
+          "width_cm": 15.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "(L9) 6510.40089 - Faixa de Smarch, Confeccionada em borracha ou látex laminado especial caracterizada por bandagem elástica, MEDIDA: 15cm de",
+        "valor_unitario": 17.83,
+        "uf": "PR",
+        "score": 84,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "percent": 90.0,
+          "width_cm": 15.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 11,
+    "termo": "BICARBONATO DE SODIO 8,4% DE 10 ML",
+    "quantidade": 200.0,
+    "unidade": "UNID",
+    "valor_base": 1.21,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "vol_ml": 10.0,
+      "percent": 8.4
+    },
+    "funil": {
+      "literal_pool": 77,
+      "similar_pool": 0,
+      "scored_final_pool": 77,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "BICARBONATO SODIO 8,4% 10 ML INJ - AMPOLA",
+        "valor_unitario": 1.69,
+        "uf": "MT",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_ml": 10.0,
+          "percent": 8.4
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "BICARBONATO DE SÓDIO 8,4% 10 ML",
+        "valor_unitario": 1.64,
+        "uf": "GO",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_ml": 10.0,
+          "percent": 8.4
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "BICARBONATO DE SODIO 8,4 % AMPOLA 10 ML -",
+        "valor_unitario": 1.4718,
+        "uf": "SP",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_ml": 10.0,
+          "percent": 8.4
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 12,
+    "termo": "BUTILBROMETO DE ESCOPOLAMINA 4MG + DIPIRONA SODICA 500MG SOLUÇÃO INJETAVEL",
+    "quantidade": 4000.0,
+    "unidade": "UNID",
+    "valor_base": 1.83,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "dose_mg": 4.0
+    },
+    "funil": {
+      "literal_pool": 14,
+      "similar_pool": 0,
+      "scored_final_pool": 14,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "Butilbrometo de escopolamina 4mg/ml + Dipirona Sódica 500mg/ml Solução Injetável. Ampola 5 ml.",
+        "valor_unitario": 2.16,
+        "uf": "MG",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 4.0,
+          "vol_ml": 5.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "BUTILBROMETO DE ESCOPOLAMINA 4MG/ML + DIPIRONA SÓDICA 500MG/ML - SOLUÇÃO INJETÁVEL IM/IV - AMPOLA DE 5ML",
+        "valor_unitario": 2.24,
+        "uf": "PR",
+        "score": 87,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 4.0,
+          "vol_ml": 5.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "BUTILBROMETO DE ESCOPOLAMINA + DIPIRONA SÓDICA SOLUÇÃO INJETÁVEL 4MG + 500MG/ML - 5ML",
+        "valor_unitario": 2.6275,
+        "uf": "SP",
+        "score": 69,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 500.0,
+          "vol_ml": 5.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 13,
+    "termo": "CADEIRA DE BANHO ADULTO EM ALUMINIO",
+    "quantidade": 30.0,
+    "unidade": "UNID",
+    "valor_base": 358.75,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 5,
+      "similar_pool": 0,
+      "scored_final_pool": 5,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "CADEIRA de banho adulto, capacidade mínima de 135 kg, aproximadamente; largura do assento de, pelo menos, 40 cm; aço carbono, alumínio ou su",
+        "valor_unitario": 430.875,
+        "uf": "PB",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "width_cm": 40.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "CADEIRA de banho adulto, capacidade mínima de 135 kg, aproximadamente; largura do assento de, pelo menos, 40 cm; aço carbono, alumínio ou su",
+        "valor_unitario": 430.875,
+        "uf": "PB",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "width_cm": 40.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "0054113 - Cadeiras de banho para paciente adulto obeso construída em aço inoxidável capacidade mínima 200 kg, confeccionada em tubos redondo",
+        "valor_unitario": 713.33,
+        "uf": "RN",
+        "score": 75,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "width_cm": 25.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 14,
+    "termo": "CATETER DE OXIGÊNIO TIPO ÓCULOS ADULTO",
+    "quantidade": 1000.0,
+    "unidade": "UNID",
+    "valor_base": 1.58,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 14,
+      "similar_pool": 0,
+      "scored_final_pool": 14,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "Cateter para oxigênio nasal tipo óculos adulto.",
+        "valor_unitario": 0.93,
+        "uf": "SC",
+        "score": 76,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 2,
+        "descricao": "Cateter Nasal Para Oxigênio Cateter Nasal Para Oxigênio Modelo: Tipo Óculos, Aplicação: P/ Oxigenoterapia, Material: Tubo E Pronga De Silico",
+        "valor_unitario": 48.0,
+        "uf": "RJ",
+        "score": 78,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "CATETER DE OXIGENIO TIPO OCULOS. CONFECCIONADO EM PVC, ATOXICO E APIROGENICO. POSSUI PAREDES FINASE MALEAVEIS.CONECTOR .Y. LIGADO AO CONECTO",
+        "valor_unitario": 1.59,
+        "uf": "SP",
+        "score": 50,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 15,
+    "termo": "CATETER DE OXIGÊNIO TIPO ÓCULOS INFANTIL",
+    "quantidade": 200.0,
+    "unidade": "UNID",
+    "valor_base": 2.0,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 14,
+      "similar_pool": 0,
+      "scored_final_pool": 14,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "Cânula Nasal Tipo Óculos Infantil para Oxigenoterapia - Características: é utilizada para administrar oxigênio em pacientes que precisam de ",
+        "valor_unitario": 2.09,
+        "uf": "TO",
+        "score": 87,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 2,
+        "descricao": "CATETER DE OXIGÊNIO TIPO ÓCULOS INFANTIL/",
+        "valor_unitario": 1.55,
+        "uf": "RJ",
+        "score": 78,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "CATETER PARA OXIGENIO TIPO OCULOS INFANTIL: CATETER PARA OXIGÊNIO, TIPO ÓCULOS INFANTIL, CONFECCIONADO EM POLIVINIL, ATÓXICO, FLEXÍVEL, ESTÉ",
+        "valor_unitario": 1.73,
+        "uf": "BA",
+        "score": 76,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 16,
+    "termo": "CLAMP ESTÉRIL",
+    "quantidade": 400.0,
+    "unidade": "UNID",
+    "valor_base": 1.2,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 97,
+      "similar_pool": 0,
+      "scored_final_pool": 97,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "Clamp Umbilical de uso unico esterilizada por oxido de etileno",
+        "valor_unitario": 2.82,
+        "uf": "RS",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 2,
+        "descricao": "Clamp Estéril Umbilical",
+        "valor_unitario": 0.61,
+        "uf": "PR",
+        "score": 87,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "Clamp Umbilical de uso único esterilizada por óxido de etileno",
+        "valor_unitario": 2.82,
+        "uf": "RS",
+        "score": 87,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 17,
+    "termo": "CLOPIDOGREL 75 MG COMPRIMIDO",
+    "quantidade": 400.0,
+    "unidade": "UNID",
+    "valor_base": 0.74,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "dose_mg": 75.0
+    },
+    "funil": {
+      "literal_pool": 23,
+      "similar_pool": 0,
+      "scored_final_pool": 23,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "CLOPIDOGREL 75 MG COMP",
+        "valor_unitario": 0.5233,
+        "uf": "MG",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "dose_mg": 75.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "(L6) 6501.1249-Clopidogrel, Bissulfato, 75 mg, Comprimido revestido, Blister, VIA DE ADMINISTRAÇÃO: Oral, UNID. DE MEDIDA: Unitário",
+        "valor_unitario": 0.27,
+        "uf": "PR",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "dose_mg": 75.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "Clopidogrel 75 mg, comprimido",
+        "valor_unitario": 0.5466,
+        "uf": "MG",
+        "score": 88,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "dose_mg": 75.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 18,
+    "termo": "CLORETO DE SODIO 0,9% DE 10 ML",
+    "quantidade": 3000.0,
+    "unidade": "UNID",
+    "valor_base": 0.4,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "vol_ml": 10.0,
+      "percent": 0.9
+    },
+    "funil": {
+      "literal_pool": 96,
+      "similar_pool": 0,
+      "scored_final_pool": 96,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "CLORETO DE SÓDIO 0,9% AMPOLA 10 ML S.INJ -",
+        "valor_unitario": 0.8971,
+        "uf": "SP",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_ml": 10.0,
+          "percent": 0.9
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "SORO FISIOLÓGICO – CLORETO DE SÓDIO 0,9%. EMBALAGEM COM 10 ML. VALIDADE: 24 MESES",
+        "valor_unitario": 0.7,
+        "uf": "SP",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_ml": 10.0,
+          "percent": 0.9
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "CLORETO DE SODIO 0,9% AMPOLA 10 ML",
+        "valor_unitario": 0.69,
+        "uf": "SP",
+        "score": 88,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_ml": 10.0,
+          "percent": 0.9
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 19,
+    "termo": "CLORETO DE SODIO 10% DE 10 ML",
+    "quantidade": 3000.0,
+    "unidade": "UNID",
+    "valor_base": 0.73,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "vol_ml": 10.0,
+      "percent": 10.0
+    },
+    "funil": {
+      "literal_pool": 70,
+      "similar_pool": 0,
+      "scored_final_pool": 70,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "CLORETO DE SÓDIO, Concentração: 10%, Forma Farmacêutica: solução injetável, Unidade de Fornecimento: ampola 10mL.",
+        "valor_unitario": 0.83,
+        "uf": "AM",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_ml": 10.0,
+          "percent": 10.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "GRUPO FARMACOLOGICO: SOLUCAO FISIOLOGICA, PRINCIPIO ATIVO: CLORETO DE SODIO 0,9% APIROGENICA 10 ML, FORMA FARMACEUTICA: SOLUCAO, CONCENTRACA",
+        "valor_unitario": 107.2667,
+        "uf": "RJ",
+        "score": 76,
+        "spec_adj": null,
+        "flags": [
+          "spec_ruim"
+        ],
+        "spec_item": {
+          "vol_ml": 10.0,
+          "percent": 0.9
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "CLORETO SÓDIO 0,9 por cento 9MGML SOLUÇÃO INJETÁVEL AMPOLA 10ML",
+        "valor_unitario": 1.0233,
+        "uf": "ES",
+        "score": 75,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 9.0,
+          "vol_ml": 10.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 20,
+    "termo": "CLORETO DE SODIO 20% DE 10 ML",
+    "quantidade": 3000.0,
+    "unidade": "UNID",
+    "valor_base": 0.7,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "vol_ml": 10.0,
+      "percent": 20.0
+    },
+    "funil": {
+      "literal_pool": 52,
+      "similar_pool": 0,
+      "scored_final_pool": 52,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "CLORETO DE SÓDIO 20% ampola 10 mL",
+        "valor_unitario": 0.67,
+        "uf": "SC",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_ml": 10.0,
+          "percent": 20.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "CLORETO DE SÓDIO 20 %Ampola 10 Ml – Solução Hipertônica De Cloreto De Sódio.",
+        "valor_unitario": 0.61,
+        "uf": "MG",
+        "score": 86,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_ml": 10.0,
+          "percent": 20.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "CLORETO, de sodio 20% - 3,4 meq/ml solucao injetavel 10mL (RP MUNICIPIOS)",
+        "valor_unitario": 0.42,
+        "uf": "BA",
+        "score": 74,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_ml": 10.0,
+          "percent": 20.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 21,
+    "termo": "COLAGENASE 0,6 U/G POMADA DERMATOLÓGICA 30G",
+    "quantidade": 80.0,
+    "unidade": "UNID",
+    "valor_base": 15.0,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 3,
+      "similar_pool": 0,
+      "scored_final_pool": 3,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "(L2) 6501.57939-Colagenase, 1,2 U/g, Pomada Dermatológica, Bisnaga, 30 g, VIA DE ADMINISTRAÇÃO: Dermatológica, UNID. DE MEDIDA: Unitário",
+        "valor_unitario": 18.0,
+        "uf": "PR",
+        "score": 46,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 2,
+        "descricao": "Pomada dermatologica colagenase com Cloranfenicol. Pomada 0,6 u/g 0,01 g/g. Embalagem contendo 1 bisnaga de aluminio de 50 g 1 espatula plas",
+        "valor_unitario": 112.71,
+        "uf": "RJ",
+        "score": 41,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "COLAGENASE 0,6 U/G PURAComplemento: Bisnaga 30 gramasApresentação: Pomada Dermatológica",
+        "valor_unitario": 16.41,
+        "uf": "MG",
+        "score": 29,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 22,
+    "termo": "COLETOR DE MATERIAL PERFURO CORTANTE CAPACIDADE 7 LITROS",
+    "quantidade": 100.0,
+    "unidade": "UNID",
+    "valor_base": 4.67,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "vol_l": 7.0
+    },
+    "funil": {
+      "literal_pool": 17,
+      "similar_pool": 0,
+      "scored_final_pool": 17,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "0363484 - COLETOR PARA PÉRFURO CORTANTES CAPACIDADE TOTAL 7 LITROS COLETOR MATERIAL PÉRFURO-CORTANTE, MATERIAL:PAPELÃO, CAPACIDADE TOTAL:7 L",
+        "valor_unitario": 3.0686,
+        "uf": "RS",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_l": 7.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "Coletor de material perfurocortante impermeável, confeccionado em papelão ondulado, com alça dupla e travamento automático. composto de: Cai",
+        "valor_unitario": 9.47,
+        "uf": "AM",
+        "score": 72,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_l": 7.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "COLETOR DE MATERIAL PERFUROCORTANTE - CAPACIDADE VOLUMETRICA: 07 LITROS; REVESTIMENTO: DUPLO REVESTIMENTO INTERNO DE SACO PLASTICO; FUNCAO: ",
+        "valor_unitario": 8.01,
+        "uf": "MG",
+        "score": 70,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_l": 7.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 23,
+    "termo": "COLETOR DE MATERIAL PERFURO CAPACIDADE 13 LITROS",
+    "quantidade": 200.0,
+    "unidade": "UNID",
+    "valor_base": 6.03,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "vol_l": 13.0
+    },
+    "funil": {
+      "literal_pool": 17,
+      "similar_pool": 0,
+      "scored_final_pool": 17,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "COLETOR MATERIAL PÉRFUROCORTANTE MATERIAL: PAPELÃO, CAPACIDADE TOTAL: 13 L, ACESSÓRIOS: ALÇAS RÍGIDAS E TAMPA, COMPONENTES ADICIONAIS: REVES",
+        "valor_unitario": 4.24,
+        "uf": "RS",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_l": 13.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "COLETOR DE MATERIAL PERFURO CORTANTE 13 L C20",
+        "valor_unitario": 7.0,
+        "uf": "MG",
+        "score": 70,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_l": 13.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "COLETOR PARA MATERIAL PERFURO",
+        "valor_unitario": 5.02,
+        "uf": "SE",
+        "score": 69,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_l": 13.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 24,
+    "termo": "DIOSMINA 450MG + HESPERIDINA 50MG COMPRIMIDO REVESTIDO",
+    "quantidade": 15000.0,
+    "unidade": "UNID",
+    "valor_base": 1.09,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "dose_mg": 450.0
+    },
+    "funil": {
+      "literal_pool": 13,
+      "similar_pool": 0,
+      "scored_final_pool": 13,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "Diosmina 450mg; Hesperidina 50mg; Forma Farmaceutica Capsula/comprimido/comprimido Revestido; Forma de Apresentacao Capsula/comprimido/compr",
+        "valor_unitario": 1.591,
+        "uf": "SP",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "dose_mg": 450.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "DIOSMINA 450MG + HESPERIDINA 50MG - COMPRIMIDOS REVESTIDOS",
+        "valor_unitario": 0.5656,
+        "uf": "PR",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "dose_mg": 450.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "Diosmina + Hesperidina 450mg + 50mg comprimidos revestidos. Embalagem primária e secundária conforme a publicação do registro no Ministério ",
+        "valor_unitario": 0.755,
+        "uf": "PR",
+        "score": 72,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "dose_mg": 450.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 25,
+    "termo": "DOBUTAMINA 250MG/20ML SOLUÇAO INJETAVEL",
+    "quantidade": 100.0,
+    "unidade": "UNID",
+    "valor_base": 6.78,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "dose_mg": 250.0,
+      "vol_ml": 20.0
+    },
+    "funil": {
+      "literal_pool": 4,
+      "similar_pool": 0,
+      "scored_final_pool": 4,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "Dobutamina Cloridrato, De 250Mg, 20Ml, Solução Injetavel",
+        "valor_unitario": 6.15,
+        "uf": "PA",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "dose_mg": 250.0,
+          "vol_ml": 20.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "DOBUTAMINA, CLORIDRATO SOLUÇÃO INJETÁVEL 250MG SOLUÇÃO INJETÁVEL 20ML",
+        "valor_unitario": 6.36,
+        "uf": "BA",
+        "score": 76,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "dose_mg": 250.0,
+          "vol_ml": 20.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "DOBUTAMINA 250mg 20mL INJETÁVEL",
+        "valor_unitario": 9.2075,
+        "uf": "SP",
+        "score": 71,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "dose_mg": 250.0,
+          "vol_ml": 20.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 26,
+    "termo": "DRENO DE PEN ROSE ESTÉRIL N. 1",
+    "quantidade": 100.0,
+    "unidade": "UNID",
+    "valor_base": 2.49,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 22,
+      "similar_pool": 0,
+      "scored_final_pool": 22,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "DRENO DE PENROSE No 01 ESTERILIZADO",
+        "valor_unitario": 2.546,
+        "uf": "PR",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 2,
+        "descricao": "(ID116174) DRENO DE PENROSE, Material: latex natural; Tamanho/Capacidade: N 01; Esteril, flexivel, formato tubular, reto, uniforme em toda e",
+        "valor_unitario": 2.93,
+        "uf": "AM",
+        "score": 88,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "DRENO DE PENROSE S/ GAZE Nº 01",
+        "valor_unitario": 31.57,
+        "uf": "SP",
+        "score": 88,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 27,
+    "termo": "DRENO DE PEN ROSE ESTÉRIL N. 2",
+    "quantidade": 100.0,
+    "unidade": "UNID",
+    "valor_base": 2.38,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 22,
+      "similar_pool": 0,
+      "scored_final_pool": 22,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "DRENO DE PENROSE No 01 ESTERILIZADO",
+        "valor_unitario": 2.546,
+        "uf": "PR",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 2,
+        "descricao": "(ID116174) DRENO DE PENROSE, Material: latex natural; Tamanho/Capacidade: N 01; Esteril, flexivel, formato tubular, reto, uniforme em toda e",
+        "valor_unitario": 2.93,
+        "uf": "AM",
+        "score": 88,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "DRENO DE PENROSE S/ GAZE Nº 02",
+        "valor_unitario": 21.94,
+        "uf": "SP",
+        "score": 88,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 28,
+    "termo": "DRENO DE PEN ROSE ESTÉRIL N. 3",
+    "quantidade": 100.0,
+    "unidade": "UNID",
+    "valor_base": 2.33,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 22,
+      "similar_pool": 0,
+      "scored_final_pool": 22,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "DRENO DE PENROSE No 01 ESTERILIZADO",
+        "valor_unitario": 2.546,
+        "uf": "PR",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 2,
+        "descricao": "DRENO DE PENROSE S/ GAZE Nº 03",
+        "valor_unitario": 30.11,
+        "uf": "SP",
+        "score": 88,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "(ID116174) DRENO DE PENROSE, Material: latex natural; Tamanho/Capacidade: N 01; Esteril, flexivel, formato tubular, reto, uniforme em toda e",
+        "valor_unitario": 2.93,
+        "uf": "AM",
+        "score": 87,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 29,
+    "termo": "DRENO DE PEN ROSE ESTÉRIL N. 4",
+    "quantidade": 100.0,
+    "unidade": "UNID",
+    "valor_base": 2.53,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 22,
+      "similar_pool": 0,
+      "scored_final_pool": 22,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "DRENO DE PENROSE No 01 ESTERILIZADO",
+        "valor_unitario": 2.546,
+        "uf": "PR",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 2,
+        "descricao": "(ID116174) DRENO DE PENROSE, Material: latex natural; Tamanho/Capacidade: N 01; Esteril, flexivel, formato tubular, reto, uniforme em toda e",
+        "valor_unitario": 2.93,
+        "uf": "AM",
+        "score": 88,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "DRENO DE PENROSE S/ GAZE Nº 04",
+        "valor_unitario": 37.36,
+        "uf": "SP",
+        "score": 88,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 30,
+    "termo": "ESFIGMOMANOMETRO ADULTO",
+    "quantidade": 50.0,
+    "unidade": "UNID",
+    "valor_base": 302.48,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 6,
+      "similar_pool": 0,
+      "scored_final_pool": 6,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "ESFIGMOMANOMETRO ADULTO",
+        "valor_unitario": 329.0,
+        "uf": "RS",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 2,
+        "descricao": "ESFIGMOMANOMETRO ADULTO - TIPO: ANALÓGICO; MATERIAL DE CONFECÇÃO DABRAÇADEIRA: NYLON OU TECIDO EM ALGODÃO",
+        "valor_unitario": 287.77,
+        "uf": "GO",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "ESFIGMOMANOMETRO: Atendendo a legislacao vigente. Garantia contra defeitos de fabricacao. Prazo de validade minimo deve ser de 4/5 a partir ",
+        "valor_unitario": 103.93,
+        "uf": "PR",
+        "score": 81,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 31,
+    "termo": "ETOMIDATO 2 MG/ML 10 ML",
+    "quantidade": 500.0,
+    "unidade": "UNID",
+    "valor_base": 18.31,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "conc_mg_per_ml": 2.0,
+      "vol_ml": 10.0
+    },
+    "funil": {
+      "literal_pool": 8,
+      "similar_pool": 0,
+      "scored_final_pool": 8,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "(3080862) - ETOMIDATO - CONCENTRACAO/DOSAGEM 2 MG/ML,FORMA FARMACEUTICA SOLUCAO INJETAVEL,FORMA DE APRESENTACAO AMPOLA,VIA DE ADMINISTRACAO ",
+        "valor_unitario": 10.7668,
+        "uf": "PE",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 2.0,
+          "vol_ml": 10.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "ETOMIDATO 2 MG/ML",
+        "valor_unitario": 11.37,
+        "uf": "SP",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 2.0,
+          "vol_ml": 10.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "Cota exclusiva 1 - (3080862) - ETOMIDATO - CONCENTRACAO/DOSAGEM 2 MG/ML,FORMA FARMACEUTICA SOLUCAO INJETAVEL,FORMA DE APRESENTACAO AMPOLA,VI",
+        "valor_unitario": 12.7434,
+        "uf": "PE",
+        "score": 87,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 2.0,
+          "vol_ml": 10.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 32,
+    "termo": "FENITOINA 50 MG/ML SOLUÇÃO INJETÁVEL AMPOLA COM 5 ML",
+    "quantidade": 1500.0,
+    "unidade": "UNID",
+    "valor_base": 3.95,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "conc_mg_per_ml": 50.0,
+      "vol_ml": 5.0
+    },
+    "funil": {
+      "literal_pool": 11,
+      "similar_pool": 0,
+      "scored_final_pool": 11,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "(3168140) - FENITOINA - CONCENTRACAO/DOSAGEM 50 MG/ML,FORMA FARMACEUTICA SOLUCAO INJETAVEL,FORMA DE APRESENTACAO AMPOLA,VIA DE ADMINISTRACAO",
+        "valor_unitario": 2.2781,
+        "uf": "PE",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 50.0,
+          "vol_ml": 5.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "FENITOINA SODICA 50 MG/ML, AMPOLA COM 5 ML, SOLUÇÃO INJETAVEL",
+        "valor_unitario": 2.69,
+        "uf": "MG",
+        "score": 87,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 50.0,
+          "vol_ml": 5.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "FENITOINA SODICA 50 MG/ML, AMPOLA COM 5 ML, SOLUÇÃO INJETAVEL. (CÓDIGO COMPRASNET: 267107) (CATMAT 267107)",
+        "valor_unitario": 2.69,
+        "uf": "MG",
+        "score": 87,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 50.0,
+          "vol_ml": 5.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 33,
+    "termo": "FIO ALGODÃO/ POLIESTER N° 2.0 SEM AGULHA",
+    "quantidade": 288.0,
+    "unidade": "UNID",
+    "valor_base": 3.18,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 11,
+      "similar_pool": 0,
+      "scored_final_pool": 11,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "ALGODÃO/POLIÉSTER, 0, AZUL, 15X45CM, SEM AGULHA (AZUL). FIO INABSORVÍVEL, ESTÉRIL. ENVELOPE INDIVIDUAL, APROPRIADO AO MÉTODO DE ESTERILIZAÇÃ",
+        "valor_unitario": 2.29,
+        "uf": "MS",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "width_cm": 45.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "Camisa Gola Polo Masculina/ Feminina, Confeccionada Em Algodão e Poliéster, Malha Piquet fio 200, Com Fechamento por Botões, Mangas Curtas b",
+        "valor_unitario": 61.33,
+        "uf": "MG",
+        "score": 83,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "percent": 48.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "ALGODÃO/POLIÉSTER, 0, AZUL, 15X45 (SEM AGULHA)",
+        "valor_unitario": 4.19,
+        "uf": "MS",
+        "score": 82,
+        "spec_adj": null,
+        "flags": [
+          "categoria_errada"
+        ],
+        "spec_item": {
+          "width_cm": 45.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 34,
+    "termo": "FIO NYLON N° 4.0 COR PRETA COM AGULHA 2,5 CM",
+    "quantidade": 288.0,
+    "unidade": "UNID",
+    "valor_base": 2.02,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 6,
+      "similar_pool": 0,
+      "scored_final_pool": 6,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "FIO NYLON PRETO AGULHADO 0 COM AGULHA 3.0 CM",
+        "valor_unitario": 2.68,
+        "uf": "SP",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "width_cm": 3.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "AGULHA P/ SUTURA FIO DE NYLON 0 C/ AGULHA 3,5 MM",
+        "valor_unitario": 37.8,
+        "uf": "GO",
+        "score": 65,
+        "spec_adj": null,
+        "flags": [
+          "spec_fraca"
+        ],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "AGULHA P/ SUTURA FIO DE NYLON 3-0 C/ AGULHA 3 MM",
+        "valor_unitario": 60.1,
+        "uf": "GO",
+        "score": 64,
+        "spec_adj": null,
+        "flags": [
+          "spec_fraca"
+        ],
+        "spec_item": {}
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 35,
+    "termo": "FIO NYLON N° 4.0 COR PRETA COM AGULHA 3,5 CM",
+    "quantidade": 288.0,
+    "unidade": "UNID",
+    "valor_base": 2.02,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 6,
+      "similar_pool": 0,
+      "scored_final_pool": 6,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "FIO NYLON PRETO AGULHADO 0 COM AGULHA 3.0 CM",
+        "valor_unitario": 2.68,
+        "uf": "SP",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "width_cm": 3.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "AGULHA P/ SUTURA FIO DE NYLON 0 C/ AGULHA 3,5 MM",
+        "valor_unitario": 37.8,
+        "uf": "GO",
+        "score": 65,
+        "spec_adj": null,
+        "flags": [
+          "spec_fraca"
+        ],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "AGULHA P/ SUTURA FIO DE NYLON 3-0 C/ AGULHA 3 MM",
+        "valor_unitario": 60.1,
+        "uf": "GO",
+        "score": 64,
+        "spec_adj": null,
+        "flags": [
+          "spec_fraca"
+        ],
+        "spec_item": {}
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 36,
+    "termo": "FIO NYLON N° 4.0 COR PRETA COM AGULHA 4 CM",
+    "quantidade": 288.0,
+    "unidade": "UNID",
+    "valor_base": 2.16,
+    "variacao_pct": null,
+    "status": "atencao",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 5,
+      "similar_pool": 0,
+      "scored_final_pool": 5,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "AGULHA P/ SUTURA FIO DE NYLON 0 C/ AGULHA 3,5 MM",
+        "valor_unitario": 37.8,
+        "uf": "GO",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [
+          "spec_fraca"
+        ],
+        "spec_item": {}
+      },
+      {
+        "rank": 2,
+        "descricao": "AGULHA P/ SUTURA FIO DE NYLON 2-0 C/ AGULHA 3 MM",
+        "valor_unitario": 52.74,
+        "uf": "GO",
+        "score": 88,
+        "spec_adj": null,
+        "flags": [
+          "spec_fraca"
+        ],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "AGULHA P/ SUTURA FIO DE NYLON 3-0 C/ AGULHA 3 MM",
+        "valor_unitario": 60.1,
+        "uf": "GO",
+        "score": 87,
+        "spec_adj": null,
+        "flags": [
+          "spec_fraca"
+        ],
+        "spec_item": {}
+      }
+    ],
+    "top1_flags": "spec_fraca"
+  },
+  {
+    "numero_item": 37,
+    "termo": "FIO NYLON N° 5.0 COR PRETA COM AGULHA 2,5 CM",
+    "quantidade": 288.0,
+    "unidade": "UNID",
+    "valor_base": 2.03,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 6,
+      "similar_pool": 0,
+      "scored_final_pool": 6,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "FIO NYLON PRETO AGULHADO 0 COM AGULHA 3.0 CM",
+        "valor_unitario": 2.68,
+        "uf": "SP",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "width_cm": 3.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "AGULHA P/ SUTURA FIO DE NYLON 0 C/ AGULHA 3,5 MM",
+        "valor_unitario": 37.8,
+        "uf": "GO",
+        "score": 65,
+        "spec_adj": null,
+        "flags": [
+          "spec_fraca"
+        ],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "AGULHA P/ SUTURA FIO DE NYLON 3-0 C/ AGULHA 3 MM",
+        "valor_unitario": 60.1,
+        "uf": "GO",
+        "score": 64,
+        "spec_adj": null,
+        "flags": [
+          "spec_fraca"
+        ],
+        "spec_item": {}
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 38,
+    "termo": "FIO NYLON N° 6.0 COR PRETA COM AGULHA 2,5 CM",
+    "quantidade": 288.0,
+    "unidade": "UNID",
+    "valor_base": 2.03,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 6,
+      "similar_pool": 0,
+      "scored_final_pool": 6,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "FIO NYLON PRETO AGULHADO 0 COM AGULHA 3.0 CM",
+        "valor_unitario": 2.68,
+        "uf": "SP",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "width_cm": 3.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "AGULHA P/ SUTURA FIO DE NYLON 0 C/ AGULHA 3,5 MM",
+        "valor_unitario": 37.8,
+        "uf": "GO",
+        "score": 65,
+        "spec_adj": null,
+        "flags": [
+          "spec_fraca"
+        ],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "AGULHA P/ SUTURA FIO DE NYLON 3-0 C/ AGULHA 3 MM",
+        "valor_unitario": 60.1,
+        "uf": "GO",
+        "score": 64,
+        "spec_adj": null,
+        "flags": [
+          "spec_fraca"
+        ],
+        "spec_item": {}
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 39,
+    "termo": "FITA ADESIVA INDICADORA PARA AUTOCLAVE 19 MM X 30M",
+    "quantidade": 300.0,
+    "unidade": "UNID",
+    "valor_base": 6.17,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 2,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 2,
+      "similar_pool": 0,
+      "scored_final_pool": 2,
+      "top3_final": 2
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "FITA, adesiva, indicadora para autoclave, tipo zebrada, dimensoes 19 mm x 30 m",
+        "valor_unitario": 3.9,
+        "uf": "BA",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 2,
+        "descricao": "FITA, adesiva, indicadora para autoclave, tipo zebrada, dimensoes 19 mm x 30 m, com dorso de papel crepado recoberto com adesivo na face int",
+        "valor_unitario": 3.9,
+        "uf": "BA",
+        "score": 86,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "",
+        "valor_unitario": null,
+        "uf": "",
+        "flags": [
+          "vazio"
+        ]
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 40,
+    "termo": "FITA CIRÚRGICA MICROPOROSA 5 CM X 4,5 M",
+    "quantidade": 200.0,
+    "unidade": "UNID",
+    "valor_base": 5.7,
+    "variacao_pct": null,
+    "status": "suspeito",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 4,
+      "similar_pool": 0,
+      "scored_final_pool": 4,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "Fita cirúrgica microporosa hipoalérgica Rolo de 5 cm x 10m com capa.",
+        "valor_unitario": 4.34,
+        "uf": "RS",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [
+          "spec_ruim"
+        ],
+        "spec_item": {
+          "width_cm": 5.0,
+          "length_m": 10.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "FITA ADESIVA CIRÚRGICA 5CM X NO MÍNIMO 10M, EM NÃO TECIDO DE FIBRAS VISCOSAS, MICROPOROSA BRANCA, RESISTENTE, DE FÁCIL MANUSEIO. ESPECIFICAÇ",
+        "valor_unitario": 16.96,
+        "uf": "CE",
+        "score": 77,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "width_cm": 5.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "FITA ADESIVA CIRÚRGICA 5CM X NO MÍNIMO 10M, EM NÃO TECIDO DE FIBRAS VISCOSAS, MICROPOROSA BRANCA, RESISTENTE, DE FÁCIL MANUSEIO. ESPECIFICAÇ",
+        "valor_unitario": 16.96,
+        "uf": "CE",
+        "score": 77,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "width_cm": 5.0
+        }
+      }
+    ],
+    "top1_flags": "spec_ruim"
+  },
+  {
+    "numero_item": 41,
+    "termo": "FORMOL 4% 1 LITRO",
+    "quantidade": 10.0,
+    "unidade": "UNID",
+    "valor_base": 29.97,
+    "variacao_pct": null,
+    "status": "suspeito",
+    "n_resultados": 3,
+    "term_spec": {
+      "vol_l": 1.0,
+      "percent": 4.0
+    },
+    "funil": {
+      "literal_pool": 4,
+      "similar_pool": 0,
+      "scored_final_pool": 4,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "FORMOL 10% 1 LITRO",
+        "valor_unitario": 27.71,
+        "uf": "MS",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [
+          "spec_ruim"
+        ],
+        "spec_item": {
+          "vol_l": 1.0,
+          "percent": 10.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "FORMOL, a 10%, embalagem de 1 litro",
+        "valor_unitario": 29.93,
+        "uf": "BA",
+        "score": 86,
+        "spec_adj": null,
+        "flags": [
+          "spec_ruim"
+        ],
+        "spec_item": {
+          "vol_l": 1.0,
+          "percent": 10.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "FORMOL, a 10%, embalagem de 1 litro",
+        "valor_unitario": 12.19,
+        "uf": "BA",
+        "score": 84,
+        "spec_adj": null,
+        "flags": [
+          "spec_ruim"
+        ],
+        "spec_item": {
+          "vol_l": 1.0,
+          "percent": 10.0
+        }
+      }
+    ],
+    "top1_flags": "spec_ruim"
+  },
+  {
+    "numero_item": 42,
+    "termo": "GLICONATO DE CALCIO 10 % 10 ML",
+    "quantidade": 500.0,
+    "unidade": "UNID",
+    "valor_base": 3.18,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "vol_ml": 10.0,
+      "percent": 10.0
+    },
+    "funil": {
+      "literal_pool": 5,
+      "similar_pool": 0,
+      "scored_final_pool": 5,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "(ID110422) GLICONATO DE CALCIO, Forma Farmaceutica: solucao injetavel, Concentracao: 100mg/ml (10%), Forma De Apresentacao: ampola com 10ml.",
+        "valor_unitario": 4.06,
+        "uf": "AM",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 100.0,
+          "vol_ml": 10.0,
+          "percent": 10.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "Gliconato de Calcio 100mg/ml (10%); Forma Farmaceutica Solucao Injetavel; Forma de Apresentacao Ampola/frasco-ampola/seringa Preenchida 10ml",
+        "valor_unitario": 1.9605,
+        "uf": "SP",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 100.0,
+          "vol_ml": 10.0,
+          "percent": 10.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "GLICONATO DE CALCIO 10% 10ML INJ",
+        "valor_unitario": 1.72,
+        "uf": "MG",
+        "score": 85,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_ml": 10.0,
+          "percent": 10.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 43,
+    "termo": "GLICOSE 25 % - 10 ML SOLUÇÃO INJETAVEL",
+    "quantidade": 3000.0,
+    "unidade": "UNID",
+    "valor_base": 1.0,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "vol_ml": 10.0,
+      "percent": 25.0
+    },
+    "funil": {
+      "literal_pool": 13,
+      "similar_pool": 0,
+      "scored_final_pool": 13,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "SOLUÇÃO DE GLICOSE INJETAVEL 25% AMP 10ML",
+        "valor_unitario": 0.93,
+        "uf": "BA",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_ml": 10.0,
+          "percent": 25.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "Glicose 250mg/ml (25%); Forma Farmacêutica: Solução Injetável; Forma de Apresentação: Ampola/Frasco-ampola 10ml; Via de Administração: Intra",
+        "valor_unitario": 0.7933,
+        "uf": "SP",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 250.0,
+          "vol_ml": 10.0,
+          "percent": 25.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "GLICOSE 25% (250 MG/ML) SOL.INJ.IV- AMP C/10 ML",
+        "valor_unitario": 0.83,
+        "uf": "SP",
+        "score": 82,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 250.0,
+          "vol_ml": 10.0,
+          "percent": 25.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 44,
+    "termo": "GLICOSE 50 % - 10 ML SOLUÇÃO INJETAVEL",
+    "quantidade": 3000.0,
+    "unidade": "UNID",
+    "valor_base": 1.0,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "vol_ml": 10.0,
+      "percent": 50.0
+    },
+    "funil": {
+      "literal_pool": 30,
+      "similar_pool": 0,
+      "scored_final_pool": 30,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "6501.587-Dimenidrinato + Piridoxina, Cloridrato + Glicose + Frutose, 3 mg + 5 mg + 100 mg + 100 mg/ml, Solução injetável, Ampola, 10 ml, VIA",
+        "valor_unitario": 6.75,
+        "uf": "PR",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 100.0,
+          "vol_ml": 10.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "(L9) 6501.1347-Glicose, 500 mg/ml (50%), Solução injetável, Ampola, 10 ml, VIA DE ADMINISTRAÇÃO: Intravenosa, UNID. DE MEDIDA: Unitário",
+        "valor_unitario": 0.6,
+        "uf": "PR",
+        "score": 86,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 500.0,
+          "vol_ml": 10.0,
+          "percent": 50.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "SOLUÇÃO DE GLICOSE INJETAVEL 50% AMP 10ML",
+        "valor_unitario": 0.89,
+        "uf": "BA",
+        "score": 85,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_ml": 10.0,
+          "percent": 50.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 45,
+    "termo": "HALOPERIDOL 5 MG/ML AMP 1ML",
+    "quantidade": 400.0,
+    "unidade": "UNID",
+    "valor_base": 2.0,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "conc_mg_per_ml": 5.0,
+      "vol_ml": 1.0
+    },
+    "funil": {
+      "literal_pool": 15,
+      "similar_pool": 0,
+      "scored_final_pool": 15,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "HALOPERIDOL 5 MG/ML, AMPOLA COM 1ML, SOLUÇÃO INJETAVEL INTRAMUSCULAR. (CODIGO COMPRASNET: 292196) (CATMAT 292196)",
+        "valor_unitario": 2.64,
+        "uf": "MG",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 5.0,
+          "vol_ml": 1.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "HALOPERIDOL 5 MG/ML, AMPOLA 1ML -",
+        "valor_unitario": 4.39,
+        "uf": "CE",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 5.0,
+          "vol_ml": 1.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "HALOPERIDOL 5 MG/ML, AMPOLA COM 1ML, SOLUÇÃO INJETAVEL INTRAMUSCULAR",
+        "valor_unitario": 2.64,
+        "uf": "MG",
+        "score": 87,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 5.0,
+          "vol_ml": 1.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 46,
+    "termo": "HIDRALAZINA, CLORIDRATO 20 MG/ML",
+    "quantidade": 1500.0,
+    "unidade": "UNID",
+    "valor_base": 7.87,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "conc_mg_per_ml": 20.0
+    },
+    "funil": {
+      "literal_pool": 6,
+      "similar_pool": 0,
+      "scored_final_pool": 6,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "HIDRALAZINA CLORIDRATO 20 MG/ML SOLUÇÃO INJETÁVEL AMPOLA 1 ML",
+        "valor_unitario": 7.5857,
+        "uf": "RS",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 20.0,
+          "vol_ml": 1.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "HIDRALAZINA (CLORIDRATO) 20MG/ML C/1ML SOLUCAO INJETAVEL (AMPOLA)",
+        "valor_unitario": 6.12,
+        "uf": "CE",
+        "score": 86,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 20.0,
+          "vol_ml": 1.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "HIDRALAZINA (CLORIDRATO), Concentração: 20mg/mL, Forma Farmacêutica: solução injetável, Unidade de Fornecimento: ampola 1mL.",
+        "valor_unitario": 6.11,
+        "uf": "AM",
+        "score": 72,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "conc_mg_per_ml": 20.0,
+          "vol_ml": 1.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 47,
+    "termo": "HIPOCLORITO DE SÓDIO – GALÃO DE 5 LITROS",
+    "quantidade": 60.0,
+    "unidade": "UNID",
+    "valor_base": 20.26,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "vol_l": 5.0
+    },
+    "funil": {
+      "literal_pool": 50,
+      "similar_pool": 0,
+      "scored_final_pool": 50,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "HIPOCLORITO DE SÓDIO A 1% GALÃO DE 5 LITROS",
+        "valor_unitario": 130.27,
+        "uf": "PR",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_l": 5.0,
+          "percent": 1.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "HIPOCLORITO DE SÓDIO DE 2,0 A 2,5%: GALÃO 5 LITROS",
+        "valor_unitario": 22.58,
+        "uf": "SP",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_l": 5.0,
+          "percent": 2.5
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "HIPOCLORITO DE SODIO GALÃO 5 LITROSProduto composto de agentes alcalinizantes e cloro orgânico estabilizado. Aspecto Líquido, pH: 12±,1, Teo",
+        "valor_unitario": 19.22,
+        "uf": "MG",
+        "score": 88,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "vol_l": 5.0,
+          "percent": 5.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 48,
+    "termo": "ISOSSORBIDA, DINITRATO 5 MG COMPRIMIDO SUBLINGUAL",
+    "quantidade": 2000.0,
+    "unidade": "UNID",
+    "valor_base": 0.5,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {
+      "dose_mg": 5.0
+    },
+    "funil": {
+      "literal_pool": 5,
+      "similar_pool": 0,
+      "scored_final_pool": 5,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "(L10) 6501.799-Isossorbida, Dinitrato, 5 mg, Comprimido Sublingual, Blister, VIA DE ADMINISTRAÇÃO: Sublingual, UNID. DE MEDIDA: Unitário",
+        "valor_unitario": 0.37,
+        "uf": "PR",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "dose_mg": 5.0
+        }
+      },
+      {
+        "rank": 2,
+        "descricao": "ISOSSORBIDA DINITRATO 5MG COMPRIMIDO SUBLINGUAL",
+        "valor_unitario": 0.42,
+        "uf": "BA",
+        "score": 71,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "dose_mg": 5.0
+        }
+      },
+      {
+        "rank": 3,
+        "descricao": "(ID115460) ISOSSORBIDA (DINITRATO), Forma Farmaceutica: comprimido sublingual; Concentracao: 5mg.",
+        "valor_unitario": 0.52,
+        "uf": "AM",
+        "score": 70,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {
+          "dose_mg": 5.0
+        }
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 49,
+    "termo": "LUVA CIRÚRGICA ESTÉRIL Nº 6,5",
+    "quantidade": 300.0,
+    "unidade": "UNID",
+    "valor_base": 1.32,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 151,
+      "similar_pool": 0,
+      "scored_final_pool": 151,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "LUVA CIRÚRGICA ESTÉRIL N. 7.0",
+        "valor_unitario": 1.6,
+        "uf": "PB",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 2,
+        "descricao": "LUVA CIRURGICA ESTÉRIL N.7 - PAR",
+        "valor_unitario": 1.84,
+        "uf": "BA",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "LUVA CIRURGICA ESTÉRIL N. 7,5 - PAR",
+        "valor_unitario": 2.18,
+        "uf": "BA",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 50,
+    "termo": "LUVA CIRÚRGICA ESTÉRIL Nº 7,0",
+    "quantidade": 500.0,
+    "unidade": "UNID",
+    "valor_base": 1.3,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 151,
+      "similar_pool": 0,
+      "scored_final_pool": 151,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "LUVA CIRÚRGICA ESTÉRIL N. 7.0",
+        "valor_unitario": 1.6,
+        "uf": "PB",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 2,
+        "descricao": "LUVA CIRURGICA ESTÉRIL N.7 - PAR",
+        "valor_unitario": 1.84,
+        "uf": "BA",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "LUVA CIRURGICA ESTÉRIL N. 7,5 - PAR",
+        "valor_unitario": 2.18,
+        "uf": "BA",
+        "score": 88,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 51,
+    "termo": "LUVA CIRÚRGICA ESTÉRIL Nº 7,5",
+    "quantidade": 600.0,
+    "unidade": "UNID",
+    "valor_base": 1.3,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 151,
+      "similar_pool": 0,
+      "scored_final_pool": 151,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "LUVA CIRÚRGICA ESTÉRIL N. 7.0",
+        "valor_unitario": 1.6,
+        "uf": "PB",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 2,
+        "descricao": "LUVA CIRURGICA ESTÉRIL N.7 - PAR",
+        "valor_unitario": 1.84,
+        "uf": "BA",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "LUVA CIRURGICA ESTÉRIL N. 7,5 - PAR",
+        "valor_unitario": 2.18,
+        "uf": "BA",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      }
+    ],
+    "top1_flags": ""
+  },
+  {
+    "numero_item": 52,
+    "termo": "LUVA CIRÚRGICA ESTÉRIL Nº 8,0",
+    "quantidade": 400.0,
+    "unidade": "UNID",
+    "valor_base": 1.3,
+    "variacao_pct": null,
+    "status": "ok",
+    "n_resultados": 3,
+    "term_spec": {},
+    "funil": {
+      "literal_pool": 151,
+      "similar_pool": 0,
+      "scored_final_pool": 151,
+      "top3_final": 3
+    },
+    "top3": [
+      {
+        "rank": 1,
+        "descricao": "LUVA CIRÚRGICA ESTÉRIL N. 7.0",
+        "valor_unitario": 1.6,
+        "uf": "PB",
+        "score": 90,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 2,
+        "descricao": "LUVA CIRURGICA ESTÉRIL N.7 - PAR",
+        "valor_unitario": 1.84,
+        "uf": "BA",
+        "score": 89,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      },
+      {
+        "rank": 3,
+        "descricao": "LUVA CIRURGICA ESTÉRIL N. 7,5 - PAR",
+        "valor_unitario": 2.18,
+        "uf": "BA",
+        "score": 88,
+        "spec_adj": null,
+        "flags": [],
+        "spec_item": {}
+      }
+    ],
+    "top1_flags": ""
+  }
+]

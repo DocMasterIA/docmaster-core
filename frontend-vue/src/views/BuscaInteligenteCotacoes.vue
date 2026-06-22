@@ -114,8 +114,9 @@
         <span v-else-if="cotacaoResumo.totalItens > autoSearchProgress.total">
           ({{ cotacaoResumo.totalItens }} na cotação, {{ cotacaoResumo.completos }} já completos)
         </span>
-        <span v-if="autoSearchProgress.precos > 0 || autoSearchProgress.fail > 0">
+        <span v-if="autoSearchProgress.precos > 0 || autoSearchProgress.fail > 0 || autoSearchProgress.empty > 0">
           — {{ autoSearchProgress.precos }} preço(s), {{ autoSearchProgress.fail }} falha(s)
+          <span v-if="autoSearchProgress.empty > 0">, {{ autoSearchProgress.empty }} sem cotação</span>
         </span>
         ...
       </p>
@@ -123,9 +124,11 @@
         Última falha: {{ lastBulkFailure }}
       </p>
       <p v-else-if="autoSearchProgress.total > 0" class="bia-meta">
-        Busca automática concluída: {{ autoSearchProgress.done }} de {{ autoSearchProgress.total }} item(ns) processados,
+        Busca automática {{ autoSearchProgress.done < autoSearchProgress.total ? 'parcial' : 'concluída' }}:
+        {{ autoSearchProgress.done }} de {{ autoSearchProgress.total }} item(ns) processados,
         {{ autoSearchProgress.precos }} preço(s) encontrados
         <span v-if="autoSearchProgress.fail > 0">, {{ autoSearchProgress.fail }} falha(s) de rede</span>.
+        <span v-if="autoSearchProgress.empty > 0"> {{ autoSearchProgress.empty }} item(ns) sem cotação aderente.</span>
         <span v-if="cotacaoResumo.completos > 0 && !rebuscarCompletos">
           {{ cotacaoResumo.completos }} item(ns) já tinham 3+ preços salvos e foram ignorados
           (cotação: {{ cotacaoResumo.totalItens }} itens).
@@ -555,7 +558,7 @@ const variacaoSentidoGlobal = ref('ambos');
 const isAutoSearchingAll = ref(false);
 const isLoadingSessionItems = ref(false);
 const sessionItemsLoadHint = ref('');
-const autoSearchProgress = ref({ done: 0, total: 0, ok: 0, fail: 0, precos: 0, skipped: 0 });
+const autoSearchProgress = ref({ done: 0, total: 0, ok: 0, fail: 0, empty: 0, precos: 0, skipped: 0 });
 const lastBulkFailure = ref('');
 const cotacaoResumo = ref({
   totalItens: 0,
@@ -713,6 +716,8 @@ async function processOneBulkItem(ctx, {
   } else if (result?.ok) {
     autoSearchProgress.value.ok += 1;
     autoSearchProgress.value.precos += Number(result.exibidos || 0);
+  } else if (result?.empty) {
+    autoSearchProgress.value.empty += 1;
   } else {
     autoSearchProgress.value.fail += 1;
     const errMsg = String(result?.error || '').trim();
@@ -772,6 +777,7 @@ async function runBulkItemSearches(pendentes, {
     total: pendentes.length,
     ok: 0,
     fail: 0,
+    empty: 0,
     precos: 0,
     skipped: 0,
   };
@@ -831,9 +837,9 @@ async function runBulkItemSearches(pendentes, {
   }
   if (p.done < p.total) {
     const restantes = p.total - p.done;
-    if (p.precos > 0 || p.fail > 0) {
+    if (p.precos > 0 || p.fail > 0 || p.empty > 0) {
       searchError.value =
-        `Busca parcial (${p.done}/${p.total}): ${p.precos} preço(s), ${p.fail} falha(s). `
+        `Busca parcial (${p.done}/${p.total}): ${p.precos} preço(s), ${p.fail} falha(s), ${p.empty} sem cotação. `
         + `${restantes} item(ns) restante(s) — clique «Pesquisar UF» para continuar (resultados já encontrados são mantidos).`;
     } else {
       searchError.value =
@@ -847,6 +853,9 @@ async function runBulkItemSearches(pendentes, {
   } else if (p.precos === 0 && p.fail > 0) {
     searchError.value =
       `Falha de rede em ${p.fail} item(ns). Verifique o serviço PNCP e clique «Pesquisar UF» para tentar de novo.`;
+  } else if (p.precos === 0 && p.empty > 0) {
+    searchError.value =
+      `Nenhuma cotação aderente encontrada em ${p.empty} item(ns) já processados.`;
   } else if (p.precos === 0) {
     searchError.value = 'Nenhuma cotação aderente encontrada para os itens da cotação nas cidades/UF definidas.';
   }
@@ -1479,7 +1488,7 @@ onMounted(async () => {
   }
 
   if (!bulkAutostartRegistry.isRunning) {
-    autoSearchProgress.value = { done: 0, total: 0, ok: 0, fail: 0, precos: 0, skipped: 0 };
+    autoSearchProgress.value = { done: 0, total: 0, ok: 0, fail: 0, empty: 0, precos: 0, skipped: 0 };
     searchError.value = '';
   }
   try {

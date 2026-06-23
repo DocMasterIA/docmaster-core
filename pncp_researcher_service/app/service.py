@@ -2201,11 +2201,10 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     itens: List[Dict[str, Any]] = []
     base_stats: Dict[str, Any] = {}
     terms_tried: List[str] = []
-    fallback_terms = _iter_search_term_fallbacks(termo_busca_raw)
-    if busca_lote:
-        cap = max(1, int(PNCP_BULK_MAX_TERM_FALLBACKS))
-        fallback_terms = fallback_terms[:cap]
-    for term_try in fallback_terms:
+    bulk_term_cap = max(2, int(PNCP_BULK_MAX_TERM_FALLBACKS)) if busca_lote else 0
+    for i, term_try in enumerate(_iter_search_term_fallbacks(termo_busca_raw)):
+        if busca_lote and i >= bulk_term_cap:
+            break
         terms_tried.append(term_try)
         batch_result = local_item_search(
             term_try,
@@ -2245,13 +2244,15 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     hybrid_min = max(1, int(PNCP_HYBRID_MIN_LOCAL_RESULTS))
     local_priced = sum(1 for x in itens if _row_price_for_faixa(x) > 0.0)
     hybrid_allowed = PNCP_HYBRID_FALLBACK_ENABLED and (not busca_lote or PNCP_HYBRID_BULK_ENABLED)
-    if (
-        hybrid_allowed
-        and (len(itens) < hybrid_min or local_priced < hybrid_min)
-    ):
+    if busca_lote:
+        # Lote: só PNCP ao vivo se o índice local não trouxe nada com preço (evita 6 páginas/item).
+        need_hybrid = local_priced == 0
+    else:
+        need_hybrid = len(itens) < hybrid_min or local_priced < hybrid_min
+    if hybrid_allowed and need_hybrid:
         live_pages = max(1, min(int(PNCP_HYBRID_MAX_LIVE_PAGES), int(search_payload.max_paginas or 1)))
-        if busca_lote and PNCP_HYBRID_BULK_ENABLED:
-            live_pages = max(live_pages, min(int(PNCP_HYBRID_MAX_LIVE_PAGES), 3))
+        if busca_lote:
+            live_pages = min(live_pages, 2)
         live_payload = search_payload.model_copy(update={"max_paginas": live_pages})
         try:
             live_result = await market_search(live_payload)

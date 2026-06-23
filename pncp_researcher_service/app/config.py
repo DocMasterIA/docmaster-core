@@ -303,8 +303,8 @@ PNCP_FTS5_ENABLED: bool = _env_bool("PNCP_FTS5_ENABLED", True)
 PNCP_HYBRID_FALLBACK_ENABLED: bool = _env_bool("PNCP_HYBRID_FALLBACK_ENABLED", True)
 PNCP_HYBRID_MIN_LOCAL_RESULTS: int = _env_int("PNCP_HYBRID_MIN_LOCAL_RESULTS", 8)
 PNCP_HYBRID_MAX_LIVE_PAGES: int = _env_int("PNCP_HYBRID_MAX_LIVE_PAGES", 6)
-# Lote (busca_lote): PNCP ao vivo por item pode levar minutos — desligado por padrão.
-PNCP_HYBRID_BULK_ENABLED: bool = _env_bool("PNCP_HYBRID_BULK_ENABLED", False)
+# Lote (busca_lote): PNCP ao vivo só quando o índice local vem vazio (ver service.py).
+PNCP_HYBRID_BULK_ENABLED: bool = _env_bool("PNCP_HYBRID_BULK_ENABLED", True)
 
 # Re-ranking leve com LLM para escolher os 3 melhores itens.
 PNCP_IA_RERANK_ENABLED: bool = _env_bool("PNCP_IA_RERANK_ENABLED", True)
@@ -349,10 +349,10 @@ PNCP_SEARCH_ONLY_HOMOLOGATED: bool = _env_bool("PNCP_SEARCH_ONLY_HOMOLOGATED", T
 PNCP_SEARCH_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_SEARCH_ENRICH_HOMOLOG_MAX", 16)
 # Limite SQL no índice local quando busca_lote=true (evita varrer 100k linhas por item).
 PNCP_BULK_SEARCH_SQL_LIMIT: int = _env_int("PNCP_BULK_SEARCH_SQL_LIMIT", 200)
-# Lote: no máximo N variações de termo no índice local (evita 5–10 SQLs por item).
-PNCP_BULK_MAX_TERM_FALLBACKS: int = _env_int("PNCP_BULK_MAX_TERM_FALLBACKS", 2)
-# Teto de duração da busca inteligente em lote (segundos); 0 = sem teto no serviço.
-PNCP_BULK_SEARCH_MAX_SECONDS: float = float(os.getenv("PNCP_BULK_SEARCH_MAX_SECONDS", "40"))
+# Lote: teto de variações de termo (para quando o índice ainda não tem 3 preços).
+PNCP_BULK_MAX_TERM_FALLBACKS: int = _env_int("PNCP_BULK_MAX_TERM_FALLBACKS", 6)
+# Teto de duração da busca inteligente em lote (segundos); 0 = sem teto no endpoint.
+PNCP_BULK_SEARCH_MAX_SECONDS: float = float(os.getenv("PNCP_BULK_SEARCH_MAX_SECONDS", "90"))
 # Enrich PNCP ao vivo no top3 em lote (0 = só índice local — muito mais rápido).
 PNCP_BULK_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_BULK_ENRICH_HOMOLOG_MAX", 0)
 # Score mínimo (0–100) para considerar item aderente na busca inteligente (antes ~60–70 implícito).

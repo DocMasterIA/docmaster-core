@@ -16,7 +16,7 @@ from app.service import _bulk_search_timeout_response, market_search_intelligent
 
 
 class BulkSearchPerformanceTests(unittest.IsolatedAsyncioTestCase):
-    async def test_bulk_skips_hybrid_fallback_by_default(self):
+    async def test_bulk_skips_hybrid_when_local_has_priced(self):
         payload = MarketSearchRequest(
             termo_busca="ITEM TESTE BULK HIBRIDO",
             busca_lote=True,
@@ -43,9 +43,9 @@ class BulkSearchPerformanceTests(unittest.IsolatedAsyncioTestCase):
             await market_search_intelligent(payload)
             live_mock.assert_not_called()
 
-    async def test_bulk_limits_term_fallbacks(self):
+    async def test_bulk_tries_extra_term_when_first_empty(self):
         payload = MarketSearchRequest(
-            termo_busca="MEDICAMENTO LONGO COM VARIAS PALAVRAS EXTRA NO TERMO",
+            termo_busca="FIO NYLON N° 4.0 COR PRETA COM AGULHA 2,5 CM",
             busca_lote=True,
             max_paginas=3,
             somente_homologados=False,
@@ -54,13 +54,27 @@ class BulkSearchPerformanceTests(unittest.IsolatedAsyncioTestCase):
 
         def _track(term, **kwargs):
             calls.append(term)
+            if term.strip().lower() == "fio nylon agulha":
+                return {
+                    "ok": True,
+                    "itens": [
+                        {
+                            "descricao_item": "FIO NYLON AGULHA TESTE",
+                            "valor_unitario": 2.5,
+                            "numero_pncp": "9",
+                        }
+                    ],
+                    "stats": {},
+                }
             return {"ok": True, "itens": [], "stats": {}}
 
         with patch("app.service.local_item_search", side_effect=_track), patch(
             "app.service.market_search", new_callable=AsyncMock
         ):
-            await market_search_intelligent(payload)
-        self.assertLessEqual(len(calls), 2)
+            out = await market_search_intelligent(payload)
+        self.assertGreaterEqual(len(calls), 3)
+        self.assertIn("fio nylon agulha", [c.lower() for c in calls])
+        self.assertGreaterEqual(len(out.get("itens") or []), 1)
 
     def test_bulk_timeout_response_shape(self):
         payload = MarketSearchRequest(termo_busca="X", busca_lote=True)

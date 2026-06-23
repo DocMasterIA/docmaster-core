@@ -114,9 +114,8 @@
         <span v-else-if="cotacaoResumo.totalItens > autoSearchProgress.total">
           ({{ cotacaoResumo.totalItens }} na cotação, {{ cotacaoResumo.completos }} já completos)
         </span>
-        <span v-if="autoSearchProgress.precos > 0 || autoSearchProgress.fail > 0 || autoSearchProgress.empty > 0">
+        <span v-if="autoSearchProgress.precos > 0 || autoSearchProgress.fail > 0">
           — {{ autoSearchProgress.precos }} preço(s), {{ autoSearchProgress.fail }} falha(s)
-          <span v-if="autoSearchProgress.empty > 0">, {{ autoSearchProgress.empty }} sem cotação</span>
         </span>
         ...
       </p>
@@ -128,7 +127,6 @@
         {{ autoSearchProgress.done }} de {{ autoSearchProgress.total }} item(ns) processados,
         {{ autoSearchProgress.precos }} preço(s) encontrados
         <span v-if="autoSearchProgress.fail > 0">, {{ autoSearchProgress.fail }} falha(s) de rede</span>.
-        <span v-if="autoSearchProgress.empty > 0"> {{ autoSearchProgress.empty }} item(ns) sem cotação aderente.</span>
         <span v-if="cotacaoResumo.completos > 0 && !rebuscarCompletos">
           {{ cotacaoResumo.completos }} item(ns) já tinham 3+ preços salvos e foram ignorados
           (cotação: {{ cotacaoResumo.totalItens }} itens).
@@ -837,9 +835,9 @@ async function runBulkItemSearches(pendentes, {
   }
   if (p.done < p.total) {
     const restantes = p.total - p.done;
-    if (p.precos > 0 || p.fail > 0 || p.empty > 0) {
+    if (p.precos > 0 || p.fail > 0) {
       searchError.value =
-        `Busca parcial (${p.done}/${p.total}): ${p.precos} preço(s), ${p.fail} falha(s), ${p.empty} sem cotação. `
+        `Busca parcial (${p.done}/${p.total}): ${p.precos} preço(s), ${p.fail} falha(s). `
         + `${restantes} item(ns) restante(s) — clique «Pesquisar UF» para continuar (resultados já encontrados são mantidos).`;
     } else {
       searchError.value =
@@ -853,11 +851,6 @@ async function runBulkItemSearches(pendentes, {
   } else if (p.precos === 0 && p.fail > 0) {
     searchError.value =
       `Falha de rede em ${p.fail} item(ns). Verifique o serviço PNCP e clique «Pesquisar UF» para tentar de novo.`;
-  } else if (p.precos === 0 && p.empty > 0) {
-    searchError.value =
-      `Nenhuma cotação aderente encontrada em ${p.empty} item(ns) já processados.`;
-  } else if (p.precos === 0) {
-    searchError.value = 'Nenhuma cotação aderente encontrada para os itens da cotação nas cidades/UF definidas.';
   }
 }
 const totalSelecionados = computed(() => displayedRows.value.filter((x) => x.selecionado).length);

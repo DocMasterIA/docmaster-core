@@ -25,8 +25,12 @@ from .config import (
     PNCP_ITEM_AMOSTRA_LINHAS,
     PNCP_REQUIRE_TABLE_MATCH_WHEN_ITENS_EXIST,
     PNCP_HYBRID_FALLBACK_ENABLED,
+    PNCP_HYBRID_BULK_ENABLED,
     PNCP_HYBRID_MAX_LIVE_PAGES,
     PNCP_HYBRID_MIN_LOCAL_RESULTS,
+    PNCP_BULK_MAX_TERM_FALLBACKS,
+    PNCP_BULK_SEARCH_MAX_SECONDS,
+    PNCP_BULK_ENRICH_HOMOLOG_MAX,
     PNCP_LOCAL_AUTO_INGEST,
     PNCP_IA_RERANK_ENABLED,
     PNCP_LOCAL_RERANK_ENABLED,
@@ -2141,6 +2145,39 @@ def _infer_search_bottleneck(funil: Dict[str, Any], top3_n: int) -> str:
     return "indice_ou_termo"
 
 
+def _bulk_search_timeout_response(payload: MarketSearchRequest) -> Dict[str, Any]:
+    """Resposta vazia rápida quando o lote estoura o teto de tempo (não trava a fila)."""
+    tmo = max(1.0, float(PNCP_BULK_SEARCH_MAX_SECONDS or 40))
+    return {
+        "ok": True,
+        "filtros": {
+            "termo_busca": payload.termo_busca,
+            "uf": payload.uf,
+            "municipio": payload.municipio,
+            "recortes_geograficos": (
+                [r.model_dump() for r in payload.recortes_geograficos]
+                if payload.recortes_geograficos
+                else None
+            ),
+            "codigo_municipio_ibge": payload.codigo_municipio_ibge,
+            "codigo_modalidade": payload.codigo_modalidade,
+            "pagina_inicial": payload.pagina,
+            "max_paginas": payload.max_paginas,
+            "tamanho_pagina": payload.tamanho_pagina,
+            "fonte": "local_item_search",
+        },
+        "stats": {
+            "total_registros_ia": 0,
+            "total_selecionados_ia": 0,
+            "busca_lote_timeout": True,
+            "bulk_timeout_seconds": tmo,
+            "funil_busca": {"bulk_timeout": True},
+            "provavel_gargalo": "bulk_timeout",
+        },
+        "itens": [],
+    }
+
+
 async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, Any]:
     """
     Versão inteligente da busca manual:
@@ -2164,7 +2201,11 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     itens: List[Dict[str, Any]] = []
     base_stats: Dict[str, Any] = {}
     terms_tried: List[str] = []
-    for term_try in _iter_search_term_fallbacks(termo_busca_raw):
+    fallback_terms = _iter_search_term_fallbacks(termo_busca_raw)
+    if busca_lote:
+        cap = max(1, int(PNCP_BULK_MAX_TERM_FALLBACKS))
+        fallback_terms = fallback_terms[:cap]
+    for term_try in fallback_terms:
         terms_tried.append(term_try)
         batch_result = local_item_search(
             term_try,
@@ -2195,19 +2236,22 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         "filtrados_token_match": int(base_stats.get("filtrados_token_match") or 0),
         "filtrados_nao_homologados": int(base_stats.get("filtrados_nao_homologados") or 0),
         "busca_lote_relaxada": bool(busca_lote),
+        "hybrid_bulk_disabled": bool(busca_lote and not PNCP_HYBRID_BULK_ENABLED),
+        "bulk_max_term_fallbacks": int(PNCP_BULK_MAX_TERM_FALLBACKS) if busca_lote else None,
         "search_terms_tried": terms_tried,
     }
     hybrid_used = False
     hybrid_live_count = 0
     hybrid_min = max(1, int(PNCP_HYBRID_MIN_LOCAL_RESULTS))
     local_priced = sum(1 for x in itens if _row_price_for_faixa(x) > 0.0)
+    hybrid_allowed = PNCP_HYBRID_FALLBACK_ENABLED and (not busca_lote or PNCP_HYBRID_BULK_ENABLED)
     if (
-        PNCP_HYBRID_FALLBACK_ENABLED
+        hybrid_allowed
         and (len(itens) < hybrid_min or local_priced < hybrid_min)
     ):
         live_pages = max(1, min(int(PNCP_HYBRID_MAX_LIVE_PAGES), int(search_payload.max_paginas or 1)))
-        if busca_lote:
-            live_pages = max(live_pages, min(int(PNCP_HYBRID_MAX_LIVE_PAGES), 6))
+        if busca_lote and PNCP_HYBRID_BULK_ENABLED:
+            live_pages = max(live_pages, min(int(PNCP_HYBRID_MAX_LIVE_PAGES), 3))
         live_payload = search_payload.model_copy(update={"max_paginas": live_pages})
         try:
             live_result = await market_search(live_payload)
@@ -2781,6 +2825,9 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     enrich_n_top3 = 0
     if top3:
         enrich_cap = max(0, min(int(PNCP_SEARCH_ENRICH_HOMOLOG_MAX), len(top3)))
+        if busca_lote:
+            enrich_cap = min(enrich_cap, max(0, int(PNCP_BULK_ENRICH_HOMOLOG_MAX)))
+        funil["enrich_homolog_cap"] = enrich_cap
         if enrich_cap:
             enrich_n_top3 = await enrich_homolog_items_from_pncp(top3, max_n=enrich_cap)
 

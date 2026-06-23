@@ -122,7 +122,17 @@ async def market_search_intelligent_diagnose_endpoint(body: MarketSearchRequest)
 @router.post("/market-search/intelligent", response_model=MarketSearchResponse)
 async def market_search_intelligent_endpoint(body: MarketSearchRequest) -> MarketSearchResponse:
     try:
-        data = await market_search_intelligent(body)
+        from .config import PNCP_BULK_SEARCH_MAX_SECONDS
+        from .service import _bulk_search_timeout_response
+
+        if body.busca_lote and float(PNCP_BULK_SEARCH_MAX_SECONDS or 0) > 0:
+            tmo = max(8.0, float(PNCP_BULK_SEARCH_MAX_SECONDS))
+            try:
+                data = await asyncio.wait_for(market_search_intelligent(body), timeout=tmo)
+            except asyncio.TimeoutError:
+                data = _bulk_search_timeout_response(body)
+        else:
+            data = await market_search_intelligent(body)
         return MarketSearchResponse(**data)
     except PNCPClientError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e

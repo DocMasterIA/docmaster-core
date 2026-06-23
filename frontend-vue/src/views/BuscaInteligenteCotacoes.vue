@@ -543,9 +543,9 @@ function bulkSearchFailResult(err, { superseded = false, timeoutSec = 180 } = {}
   return { ok: false, exibidos: 0, aborted: false, error: msg };
 }
 
-const BULK_SEARCH_TIMEOUT_MS = 120000;
-const BULK_CONCURRENCY = 1;
-const BULK_ITEM_DELAY_MS = 200;
+const BULK_SEARCH_TIMEOUT_MS = 50000;
+const BULK_CONCURRENCY = 2;
+const BULK_ITEM_DELAY_MS = 0;
 
 const searchError = ref('');
 const lastSearchDebug = ref(null);
@@ -1171,7 +1171,7 @@ async function runSearchWithContext({
 
     let backendItensTotal = 0;
     const bulkSearchOpts = bulkMode
-      ? { timeoutMs: BULK_SEARCH_TIMEOUT_MS, maxAttempts: 2 }
+      ? { timeoutMs: BULK_SEARCH_TIMEOUT_MS, maxAttempts: 1 }
       : undefined;
 
     async function runGeoSearch(geoPayload, geoKeyPart) {

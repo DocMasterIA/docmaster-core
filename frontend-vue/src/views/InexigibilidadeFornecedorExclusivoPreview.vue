@@ -191,7 +191,7 @@
                 >
                   Gerar Documento com IA
                 </button>
-                <DocGenIaLoaderBlock v-if="isSubmitting" message="Gerando documento com IA…" />
+                <DocGenIaLoaderBlock v-if="isSubmitting" message="Aprofundando cláusulas e gerando documento…" />
                 <template v-if="documentReady">
                   <a v-if="documentTrUrl" :href="documentTrUrl" :download="documentTrFilename" class="fe-btn-secondary">Download TR (DOCX)</a>
                   <a v-if="documentDfdUrl" :href="documentDfdUrl" :download="documentDfdFilename" class="fe-btn-secondary">Download DFD (DOCX)</a>
@@ -416,6 +416,7 @@ import DocGenIaLoaderBlock from '@/components/DocGenIaLoaderBlock.vue';
 import DotacaoOrcamentariaBlock from '@/components/DotacaoOrcamentariaBlock.vue';
 import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
+import { requestInexigibilidadeClausulasDeepen, applyInexigibilidadeDeepenedClauses } from '@/utils/clausulasObjetoJustificativa.js';
 import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
 import {
   capitalizeEachWordLeadingPt,
@@ -939,7 +940,7 @@ function buildFornecedorExclusivo74ObjetoTrResumo(opts = {}) {
   return '';
 }
 
-function buildSlotsOverride() {
+function buildSlotsOverride(iaDeepen = null) {
   const o = {
     numero_processo: processoAtivo.value ? String(processo.value || '').trim() : '',
     orgao: String(orgao.value || '').trim(),
@@ -996,22 +997,31 @@ function buildSlotsOverride() {
   o.nome_assinante_termo = String(responsavel.value || '').trim();
   o.cargo_assinante_termo = String(responsavelCargo.value || '').trim();
 
-  const dfdObjRef = buildFornecedorExclusivo74DfdObjetoReferencia().trim();
-  const justTrDfd = buildFornecedorExclusivo74JustificativaTrDfd().trim();
-  const objetoTr = buildFornecedorExclusivo74ObjetoTrResumo({ forOficio: false }).trim();
-  const objetoOficioLinha = buildFornecedorExclusivo74ObjetoTrResumo({ forOficio: true }).trim();
-  if (dfdObjRef) o.dfd_objeto_referencia = dfdObjRef;
-  if (justTrDfd) {
-    o.justificativa = justTrDfd;
-    o.dfd_justificativa = justTrDfd;
-    o.sol_oficio_justificativa = justTrDfd;
+  if (iaDeepen) {
+    applyInexigibilidadeDeepenedClauses(o, iaDeepen);
   }
-  if (objetoTr) {
-    o.objeto = objetoTr;
+  if (!String(o.dfd_objeto_referencia || '').trim()) {
+    const dfdObjRef = buildFornecedorExclusivo74DfdObjetoReferencia().trim();
+    if (dfdObjRef) o.dfd_objeto_referencia = dfdObjRef;
   }
-  if (objetoOficioLinha) {
-    o.sol_oficio_objeto = objetoOficioLinha;
-    o.sol_oficio_assunto = objetoOficioLinha;
+  if (!String(o.justificativa || '').trim()) {
+    const justTrDfd = buildFornecedorExclusivo74JustificativaTrDfd().trim();
+    if (justTrDfd) {
+      o.justificativa = justTrDfd;
+      o.dfd_justificativa = justTrDfd;
+      o.sol_oficio_justificativa = justTrDfd;
+    }
+  }
+  if (!String(o.objeto || '').trim()) {
+    const objetoTr = buildFornecedorExclusivo74ObjetoTrResumo({ forOficio: false }).trim();
+    if (objetoTr) o.objeto = objetoTr;
+  }
+  if (!String(o.sol_oficio_objeto || '').trim()) {
+    const objetoOficioLinha = buildFornecedorExclusivo74ObjetoTrResumo({ forOficio: true }).trim();
+    if (objetoOficioLinha) {
+      o.sol_oficio_objeto = objetoOficioLinha;
+      o.sol_oficio_assunto = objetoOficioLinha;
+    }
   }
 
   return o;
@@ -1024,6 +1034,33 @@ function buildUserPrompt() {
     `Fornecedor: ${fornecedor.value || 'não informado'}`,
   ].join('\n');
 }
+function itensResumoForPrompt() {
+  return itens.value
+    .filter((x) => Object.values(x).some((v) => String(v || '').trim()))
+    .slice(0, 8)
+    .map((item) => [item.descricao, item.quantidade, item.unidade].filter((v) => String(v || '').trim()).join(' '))
+    .filter(Boolean)
+    .join('; ');
+}
+
+async function fetchInexigibilidadeDeepenedClauses() {
+  const result = await requestInexigibilidadeClausulasDeepen(API_BASE, {
+    variant: 'fornecedor_exclusivo',
+    slotPackageKey: SLOT_PACKAGE_KEY,
+    orgao: orgao.value,
+    orgaoResponsavel: orgao.value,
+    objetoEspecifico: objetoEspecificoContratacaoFe(),
+    equipamento: equipamento.value,
+    marca: marca.value,
+    modelo: modelo.value,
+    fornecedor: fornecedor.value,
+    cnpj: cnpj.value,
+    valorGlobal: valorGlobal.value,
+    itensResumo: itensResumoForPrompt(),
+  });
+  return result.ok ? result : null;
+}
+
 async function onSubmit() {
   generateError.value = '';
   successMessage.value = '';
@@ -1036,9 +1073,15 @@ async function onSubmit() {
   }
   isSubmitting.value = true;
   try {
+    let iaDeepen = null;
+    try {
+      iaDeepen = await fetchInexigibilidadeDeepenedClauses();
+    } catch {
+      iaDeepen = null;
+    }
     const payload = {
       user_prompt: buildUserPrompt(),
-      slots_override: buildSlotsOverride(),
+      slots_override: buildSlotsOverride(iaDeepen),
       slot_package_key: SLOT_PACKAGE_KEY,
     };
     const gerarUrl = buildGerarTrEDfdUrl(API_BASE);

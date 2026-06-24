@@ -25,6 +25,7 @@ from backend.app.metrics import (
     record_platform_event,
 )
 from backend.app.clausulas_qwen_prompt import wrap_clausulas_prompt_for_qwen
+from backend.app.inexigibilidade_qwen_prompt import wrap_inexigibilidade_prompt_for_qwen
 from backend.app.slot_package_keys import is_clausulas_objeto_justificativa_package, resolve_slot_package_key
 
 logger = logging.getLogger(__name__)
@@ -58,9 +59,18 @@ def _prepare_generate_payload(payload: dict, base: str) -> dict:
     if not _uses_clausulas_qwen_gateway(base):
         return out
     prompt = str(out.get("prompt") or "").strip()
-    if prompt and "<<SYSTEM>>" not in prompt:
+    if not prompt or "<<SYSTEM>>" in prompt:
+        return out
+    pkg = str(out.get("slot_package_key") or "").strip().lower()
+    if pkg.startswith("inexigibilidade_"):
+        out["prompt"] = wrap_inexigibilidade_prompt_for_qwen(prompt, pkg)
+        out.setdefault(
+            "max_tokens",
+            int(getattr(settings, "LLM_INEXIG_CLOUD_MAX_TOKENS", 1200)),
+        )
+    else:
         out["prompt"] = wrap_clausulas_prompt_for_qwen(prompt)
-    out.setdefault("max_tokens", int(getattr(settings, "LLM_CLAUSULAS_CLOUD_MAX_TOKENS", 900)))
+        out.setdefault("max_tokens", int(getattr(settings, "LLM_CLAUSULAS_CLOUD_MAX_TOKENS", 900)))
     return out
 
 

@@ -277,7 +277,7 @@
               >
                 Gerar documento com IA
               </button>
-              <DocGenIaLoaderBlock v-if="isSubmitting" message="Gerando documentos…" />
+              <DocGenIaLoaderBlock v-if="isSubmitting" :message="submitLoaderMessage" />
               <p v-if="generateError" class="da75-helper">{{ generateError }}</p>
               <p v-if="documentReady && successMessage" class="da75-helper">{{ successMessage }}</p>
               <div v-if="documentReady" class="da75-inline-actions">
@@ -532,7 +532,7 @@ import { useRoute } from 'vue-router';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
 import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
-import { requestClausulasObjetoJustificativaFast } from '@/utils/clausulasObjetoJustificativa.js';
+import { requestClausulasObjetoJustificativaFast, requestInexigibilidadeClausulasDeepen, applyInexigibilidadeDeepenedClauses } from '@/utils/clausulasObjetoJustificativa.js';
 import { formatCnpjBr, onCnpjInputKeydown } from '@/utils/cnpjFormat.js';
 import {
   capitalizeEachWordLeadingPt,
@@ -1375,7 +1375,7 @@ function buildInexigFornecedorExclusivoObjetoTrResumo(opts = {}) {
   return '';
 }
 
-function buildSlotsOverride() {
+function buildSlotsOverride(iaDeepen = null) {
   const o = {};
   const solDestNome = fixoNome.value.trim();
   const solDestCargo = fixoCargo.value.trim();
@@ -1498,27 +1498,54 @@ function buildSlotsOverride() {
   if (fixoTratCargo.value.trim()) o.senhor_senhora_genero = fixoTratCargo.value.trim();
 
   if (isInexigibilidadeManutencaoRoute.value) {
-    const dfdObjRef = buildInexig74ManutencaoDfdObjetoReferencia().trim();
-    const dfdJust = buildInexig74ManutencaoDfdJustificativa().trim();
-    if (dfdObjRef) o.dfd_objeto_referencia = dfdObjRef;
-    if (dfdJust) o.dfd_justificativa = dfdJust;
+    if (iaDeepen) {
+      applyInexigibilidadeDeepenedClauses(o, iaDeepen);
+    }
+    if (!String(o.dfd_objeto_referencia || '').trim()) {
+      const dfdObjRef = buildInexig74ManutencaoDfdObjetoReferencia().trim();
+      if (dfdObjRef) o.dfd_objeto_referencia = dfdObjRef;
+    }
+    if (!String(o.dfd_justificativa || '').trim() && !String(o.justificativa || '').trim()) {
+      const dfdJust = buildInexig74ManutencaoDfdJustificativa().trim();
+      if (dfdJust) {
+        o.dfd_justificativa = dfdJust;
+        o.justificativa = dfdJust;
+        o.sol_oficio_justificativa = dfdJust;
+      }
+    }
+    if (!String(o.objeto || '').trim()) {
+      const objetoTr = buildInexig74ManutencaoObjetoTrResumo().trim();
+      if (objetoTr) {
+        o.objeto = objetoTr;
+        o.sol_oficio_objeto = objetoTr;
+      }
+    }
   } else if (isFornecedorExclusivoRoute.value) {
-    const dfdObjFe = buildInexigFornecedorExclusivoDfdObjetoReferencia().trim();
-    const justFe = buildInexigFornecedorExclusivoJustificativaTrDfd().trim();
-    const objetoFeTr = buildInexigFornecedorExclusivoObjetoTrResumo({ forOficio: false }).trim();
-    const objetoFeOf = buildInexigFornecedorExclusivoObjetoTrResumo({ forOficio: true }).trim();
-    if (dfdObjFe) o.dfd_objeto_referencia = dfdObjFe;
-    if (justFe) {
-      o.justificativa = justFe;
-      o.dfd_justificativa = justFe;
-      o.sol_oficio_justificativa = justFe;
+    if (iaDeepen) {
+      applyInexigibilidadeDeepenedClauses(o, iaDeepen);
     }
-    if (objetoFeTr) {
-      o.objeto = objetoFeTr;
+    if (!String(o.dfd_objeto_referencia || '').trim()) {
+      const dfdObjFe = buildInexigFornecedorExclusivoDfdObjetoReferencia().trim();
+      if (dfdObjFe) o.dfd_objeto_referencia = dfdObjFe;
     }
-    if (objetoFeOf) {
-      o.sol_oficio_objeto = objetoFeOf;
-      o.sol_oficio_assunto = objetoFeOf;
+    if (!String(o.justificativa || '').trim()) {
+      const justFe = buildInexigFornecedorExclusivoJustificativaTrDfd().trim();
+      if (justFe) {
+        o.justificativa = justFe;
+        o.dfd_justificativa = justFe;
+        o.sol_oficio_justificativa = justFe;
+      }
+    }
+    if (!String(o.objeto || '').trim()) {
+      const objetoFeTr = buildInexigFornecedorExclusivoObjetoTrResumo({ forOficio: false }).trim();
+      if (objetoFeTr) o.objeto = objetoFeTr;
+    }
+    if (!String(o.sol_oficio_objeto || '').trim()) {
+      const objetoFeOf = buildInexigFornecedorExclusivoObjetoTrResumo({ forOficio: true }).trim();
+      if (objetoFeOf) {
+        o.sol_oficio_objeto = objetoFeOf;
+        o.sol_oficio_assunto = objetoFeOf;
+      }
     }
   }
 
@@ -1600,6 +1627,46 @@ function buildUserPrompt() {
   ];
   return lines.join('\n');
 }
+function itensResumoForPrompt() {
+  return itens.value
+    .filter((i) => Object.values(i).some(isFilled))
+    .slice(0, 8)
+    .map((i) => [i.descricao, i.quantidade, i.unidade].filter((v) => String(v || '').trim()).join(' '))
+    .filter(Boolean)
+    .join('; ');
+}
+
+async function fetchInexigibilidadeDeepenedClauses() {
+  if (!isInexigibilidadeManutencaoRoute.value && !isFornecedorExclusivoRoute.value) return null;
+  const variant = isFornecedorExclusivoRoute.value ? 'fornecedor_exclusivo' : 'manutencao';
+  const result = await requestInexigibilidadeClausulasDeepen(API_BASE, {
+    variant,
+    slotPackageKey: slotPackageKey.value,
+    orgao: orgao.value,
+    orgaoUnidadeVeiculo: orgaoUnidadeVeiculo.value,
+    orgaoResponsavel: orgaoResponsavelEquipamento.value || orgao.value,
+    marca: marca.value,
+    modelo: modelo.value,
+    placa: placa.value,
+    tipoManutencao: tipoManutencao.value,
+    revisaoKm: revisaoKm.value,
+    fornecedor: fornecedor.value,
+    cnpj: cnpj.value,
+    valorGlobal: valorGlobal.value,
+    objetoEspecifico: objetoEspecificoContratacaoIx(),
+    equipamento: equipamento.value,
+    itensResumo: itensResumoForPrompt(),
+  });
+  return result.ok ? result : null;
+}
+
+const submitLoaderMessage = computed(() => {
+  if (isInexigibilidadeManutencaoRoute.value || isFornecedorExclusivoRoute.value) {
+    return 'Aprofundando cláusulas e gerando documentos…';
+  }
+  return 'Gerando documentos…';
+});
+
 async function onSubmit() {
   generateError.value = '';
   successMessage.value = '';
@@ -1621,9 +1688,17 @@ async function onSubmit() {
   }
   isSubmitting.value = true;
   try {
+    let iaDeepen = null;
+    if (isInexigibilidadeManutencaoRoute.value || isFornecedorExclusivoRoute.value) {
+      try {
+        iaDeepen = await fetchInexigibilidadeDeepenedClauses();
+      } catch {
+        iaDeepen = null;
+      }
+    }
     const payload = {
       user_prompt: buildUserPrompt(),
-      slots_override: buildSlotsOverride(),
+      slots_override: buildSlotsOverride(iaDeepen),
       slot_package_key: slotPackageKey.value,
     };
     if (cabecalhoMergeTemplateId.value) payload.template_id = cabecalhoMergeTemplateId.value;

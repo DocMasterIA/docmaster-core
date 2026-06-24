@@ -39,10 +39,10 @@ export function parseClauseSections(text) {
   return sections;
 }
 
-/** Extrai objeto/justificativa de JSON (Qwen) ou fallback para seções Objeto:/Justificativa:. */
+/** Extrai objeto/justificativa/dfd_objeto_referencia de JSON (Qwen) ou fallback para seções. */
 export function parseClausulasResponseText(text) {
   const raw = String(text || '').trim();
-  if (!raw) return { objeto: '', justificativa: '' };
+  if (!raw) return { objeto: '', justificativa: '', dfd_objeto_referencia: '' };
   const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
   if (cleaned.startsWith('{')) {
     try {
@@ -50,13 +50,18 @@ export function parseClausulasResponseText(text) {
       return {
         objeto: String(parsed.objeto || '').trim(),
         justificativa: String(parsed.justificativa || '').trim(),
+        dfd_objeto_referencia: String(parsed.dfd_objeto_referencia || parsed.dfdObjetoReferencia || '').trim(),
       };
     } catch {
       /* fallback abaixo */
     }
   }
   const sections = parseClauseSections(raw);
-  return { objeto: sections.objeto || '', justificativa: sections.justificativa || '' };
+  return {
+    objeto: sections.objeto || '',
+    justificativa: sections.justificativa || '',
+    dfd_objeto_referencia: '',
+  };
 }
 
 export function extractClausesFromSectionTexts(sectionTexts) {
@@ -112,6 +117,154 @@ export const CLAUSULAS_LLM_OPTIONS = {
 };
 
 export const CLAUSULAS_CLOUD_MAX_TOKENS = 2048;
+export const INEXIG_CLAUSULAS_CLOUD_MAX_TOKENS = 1200;
+
+/**
+ * Aplica cláusulas aprofundadas (Qwen) nos slots de inexigibilidade.
+ * @param {Record<string, unknown>} slots
+ * @param {{ objeto?: string, justificativa?: string, dfd_objeto_referencia?: string } | null} ia
+ */
+export function applyInexigibilidadeDeepenedClauses(slots, ia) {
+  if (!ia || !slots) return;
+  const objeto = String(ia.objeto || '').trim();
+  const justificativa = String(ia.justificativa || '').trim();
+  const dfdObjRef = String(ia.dfd_objeto_referencia || '').trim();
+  if (objeto) {
+    slots.objeto = objeto;
+    slots.sol_oficio_objeto = objeto;
+  }
+  if (justificativa) {
+    slots.justificativa = justificativa;
+    slots.dfd_justificativa = justificativa;
+    slots.sol_oficio_justificativa = justificativa;
+  }
+  if (dfdObjRef) {
+    slots.dfd_objeto_referencia = dfdObjRef;
+  }
+}
+
+export function buildInexigibilidadeManutencaoPrompt(fields) {
+  const lines = [
+    'Modalidade: inexigibilidade art. 74, inciso I — manutenção veicular com fornecedor exclusivo.',
+    fields.orgao ? `Órgão: ${fields.orgao}` : '',
+    fields.orgaoUnidadeVeiculo ? `Unidade de lotação/uso do veículo: ${fields.orgaoUnidadeVeiculo}` : '',
+    fields.marca ? `Marca: ${fields.marca}` : '',
+    fields.modelo ? `Modelo: ${fields.modelo}` : '',
+    fields.placa ? `Placa: ${fields.placa}` : '',
+    fields.tipoManutencao ? `Tipo de manutenção: ${fields.tipoManutencao}` : '',
+    fields.revisaoKm ? `Revisão/KM: ${fields.revisaoKm}` : '',
+    fields.fornecedor ? `Fornecedor exclusivo: ${fields.fornecedor}` : '',
+    fields.cnpj ? `CNPJ do fornecedor: ${fields.cnpj}` : '',
+    fields.valorGlobal ? `Valor global estimado: ${fields.valorGlobal}` : '',
+    fields.itensResumo ? `Itens da contratação: ${fields.itensResumo}` : '',
+  ];
+  return lines.filter(Boolean).join('\n');
+}
+
+export function buildInexigibilidadeFornecedorExclusivoPrompt(fields) {
+  const lines = [
+    'Modalidade: inexigibilidade art. 74, inciso I — fornecedor exclusivo.',
+    fields.orgao ? `Órgão: ${fields.orgao}` : '',
+    fields.orgaoResponsavel ? `Unidade responsável pelo equipamento: ${fields.orgaoResponsavel}` : '',
+    fields.objetoEspecifico ? `Objeto específico: ${fields.objetoEspecifico}` : '',
+    fields.equipamento ? `Equipamento: ${fields.equipamento}` : '',
+    fields.marca ? `Marca: ${fields.marca}` : '',
+    fields.modelo ? `Modelo: ${fields.modelo}` : '',
+    fields.fornecedor ? `Fornecedor exclusivo: ${fields.fornecedor}` : '',
+    fields.cnpj ? `CNPJ do fornecedor: ${fields.cnpj}` : '',
+    fields.valorGlobal ? `Valor global estimado: ${fields.valorGlobal}` : '',
+    fields.itensResumo ? `Itens da contratação: ${fields.itensResumo}` : '',
+  ];
+  return lines.filter(Boolean).join('\n');
+}
+
+/**
+ * Aprofunda cláusulas de inexigibilidade via Qwen (POST /api/llm/generate).
+ * @returns {Promise<{ ok: boolean, objeto: string, justificativa: string, dfd_objeto_referencia: string, status: number, errorMessage: string }>}
+ */
+export async function requestInexigibilidadeClausulasDeepen(apiBase, options = {}) {
+  const variant = String(options.variant || 'manutencao').trim().toLowerCase();
+  const prompt =
+    variant === 'fornecedor_exclusivo'
+      ? buildInexigibilidadeFornecedorExclusivoPrompt(options)
+      : buildInexigibilidadeManutencaoPrompt(options);
+
+  const base = String(apiBase ?? getApiBase()).replace(/\/$/, '');
+  const url = base ? `${base}/api/llm/generate` : '/api/llm/generate';
+  const body = {
+    prompt,
+    stream: false,
+    max_tokens: options.maxTokens ?? INEXIG_CLAUSULAS_CLOUD_MAX_TOKENS,
+  };
+  const pkg = String(options.slotPackageKey || '').trim();
+  if (pkg) body.slot_package_key = pkg;
+
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(body),
+      signal: options.signal,
+    });
+  } catch (netErr) {
+    if (netErr?.name === 'AbortError') {
+      return { ok: false, objeto: '', justificativa: '', dfd_objeto_referencia: '', status: 0, errorMessage: 'Pedido cancelado.' };
+    }
+    return {
+      ok: false,
+      objeto: '',
+      justificativa: '',
+      dfd_objeto_referencia: '',
+      status: 0,
+      errorMessage: String(netErr?.message || netErr || 'Erro de rede'),
+    };
+  }
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.ok) {
+    const err =
+      res.status === 504
+        ? 'A IA demorou para responder (504). Tente novamente em instantes.'
+        : data?.error || data?.detail || `Erro ${res.status} ao aprofundar cláusulas`;
+    return {
+      ok: false,
+      objeto: '',
+      justificativa: '',
+      dfd_objeto_referencia: '',
+      status: res.status,
+      errorMessage: String(err),
+    };
+  }
+
+  const bySections = extractClausesFromSectionTexts(data.section_texts || {});
+  const text =
+    data.generated_text ||
+    data.text ||
+    data.content ||
+    data?.data?.response ||
+    data?.data?.text ||
+    data?.response ||
+    '';
+  const parsed =
+    bySections.objeto || bySections.justificativa
+      ? {
+          objeto: bySections.objeto,
+          justificativa: bySections.justificativa,
+          dfd_objeto_referencia: '',
+        }
+      : parseClausulasResponseText(text);
+
+  return {
+    ok: Boolean(parsed.objeto || parsed.justificativa || parsed.dfd_objeto_referencia),
+    objeto: String(parsed.objeto || '').trim(),
+    justificativa: String(parsed.justificativa || '').trim(),
+    dfd_objeto_referencia: String(parsed.dfd_objeto_referencia || '').trim(),
+    status: res.status,
+    errorMessage: '',
+  };
+}
 
 /**
  * @returns {Promise<{ ok: boolean, objeto: string, justificativa: string, status: number, errorMessage: string }>}

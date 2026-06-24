@@ -573,10 +573,16 @@ function buildSlotsOverride() {
   return Object.keys(o).length ? o : null;
 }
 
-/** Só para fill-tr-slots (objeto/justificativa) — prompt curto ≈ curl ~4s no RAG. */
+/** Só para fill-tr-slots (objeto/justificativa) — alinhado ao prompt da dispensa normal. */
 function buildUserPromptFillTrSlots() {
   const contratado = String(objetoContratado.value || '').trim();
-  return contratado ? `O que será contratado: ${contratado}` : '';
+  const setor = String(dadosFixos.fixoSetor || '').trim();
+  return [
+    contratado ? `O que será contratado: ${contratado}` : '',
+    setor ? `Setor/secretaria atendido: ${setor}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 /** Metadados no payload de gerar-tr-e-dfd; com cláusulas no override a 2ª LLM é pulada. */

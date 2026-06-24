@@ -241,7 +241,7 @@ objeto:
 - Se o pedido trouxer «Setor/secretaria atendido», inclua esse destino no objeto (finalidade/vinculação ao setor).
 
 justificativa:
-- Exatamente 3 parágrafos separados (use \\n\\n na string JSON). Pare após o 3º — proibido 4º parágrafo, resumo, repetição de ideias ou listas com marcadores (-, *, números).
+- Exatamente 3 parágrafos separados (use \\n\\n na string JSON). Pare após o 3º — proibido 4º parágrafo, resumo, eco, repetir o mesmo eixo (necessidade/riscos/benefícios) ou listas com marcadores.
 - 1º parágrafo: necessidade concreta para a Administração e para o setor/destino informados no pedido (3 a 4 frases técnicas).
 - 2º parágrafo: riscos técnicos e operacionais se a contratação não for realizada (continuidade, eficiência, segurança ou desempenho institucional).
 - 3º parágrafo: adequação da medida ao interesse público e continuidade administrativa; características mínimas somente se informadas.
@@ -2479,8 +2479,10 @@ async def _fill_tr_slots_with_llm_work(
         if slot_pk:
             llm_user_context = {**(user_context or {}), "slot_package_key": slot_pk}
         if rich_clausulas:
-            cloud_max_tokens = max(400, int(LLM_CLAUSULAS_CLOUD_MAX_TOKENS))
-            full_prompt = build_clausulas_qwen_full_prompt(user_prompt)
+            base_tokens = max(400, int(LLM_CLAUSULAS_CLOUD_MAX_TOKENS))
+            # Só a rápida tendia a ecoar após o 3º parágrafo; normal mantém teto configurável.
+            cloud_max_tokens = min(768, base_tokens) if _fluxo_ui == "rapida" else base_tokens
+            full_prompt = build_clausulas_qwen_full_prompt(user_prompt, fluxo_ui=_fluxo_ui)
         else:
             user_prompt_text = _build_objeto_justificativa_user_prompt(
                 user_prompt, None, skip_context_in_prompt=True

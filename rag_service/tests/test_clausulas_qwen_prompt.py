@@ -17,6 +17,22 @@ class ClausulasQwenPromptTests(unittest.TestCase):
         self.assertIn(CLAUSULAS_QWEN_SYSTEM_PROMPT[:40], full)
         self.assertIn("papel A4", full)
 
+    def test_rapida_fluxo_adds_user_hint(self):
+        full = build_clausulas_qwen_full_prompt(
+            "O que será contratado: reforma predial",
+            fluxo_ui="rapida",
+        )
+        self.assertIn("Dispensa rápida", full)
+        self.assertIn("pare após o 3º", full.lower())
+
+    def test_normal_fluxo_adds_setor_hint(self):
+        full = build_clausulas_qwen_full_prompt(
+            "O que será contratado: papel A4\nSetor/secretaria atendido: Administração",
+            fluxo_ui="normal",
+        )
+        self.assertIn("Dispensa normal", full)
+        self.assertIn("setor/secretaria", full.lower())
+
     def test_system_asks_json_only(self):
         self.assertIn('{"objeto"', CLAUSULAS_QWEN_SYSTEM_PROMPT)
 

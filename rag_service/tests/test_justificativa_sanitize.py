@@ -26,7 +26,28 @@ A realização da reforma assegura a preservação do patrimônio público munic
 - O ambiente funcional e seguro promove a eficiência operacional da máquina administrativa, melhorando a qualidade do atendimento à população."""
 
 
+SAMPLE_ECHO = """A deterioração avançada das instalações físicas do edifício sede compromete a habitabilidade dos ambientes e a segurança dos servidores e cidadãos que frequentam o órgão. A intervenção é imprescindível para sanar patologias construtivas identificadas, garantindo que a infraestrutura atenda aos padrões mínimos de funcionamento exigidos para a prestação dos serviços públicos.
+
+A não realização das obras acarretará riscos iminentes à integridade física dos ocupantes devido ao possível colapso de elementos estruturais ou falhas nas instalações elétricas e hidrossanitárias. Além disso, a degradação contínua do imóvel resultará em perda de eficiência operacional, com interrupções frequentes nas atividades administrativas e elevação exponencial dos custos de manutenção corretiva emergencial.
+
+A execução da reforma assegura a preservação do patrimônio público municipal e a continuidade administrativa ininterrupta, alinhando-se ao interesse público de manter um ambiente de trabalho seguro e adequado. A medida promove a otimização dos recursos públicos ao evitar a necessidade de relocação temporária dos setores ou a construção de novas instalações, garantindo a regularidade do atendimento à população.
+
+A deterioração avançada das instalações físicas do edifício sede representa um risco iminente à integridade física dos ocupantes, podendo acarretar danos estruturais e interrupção nas atividades administrativas. A não realização das obras comprometeria a continuidade operacional e resultaria em custos elevados de manutenção emergencial.
+
+A execução da reforma assegura a preservação do patrimônio público municipal, otimizando os recursos ao evitar relocação temporária dos setores ou construção de novas instalações. A medida garante um ambiente seguro e adequado para o funcionamento contínuo das atividades administrativas, alinhando-se aos interesses públicos."""
+
+
 class JustificativaSanitizeTests(unittest.TestCase):
+    def test_dedupes_semantic_echo_paragraphs(self):
+        out = normalize_justificativa_tres_paragrafos(SAMPLE_ECHO)
+        paras = [p for p in out.split("\n\n") if p.strip()]
+        self.assertEqual(len(paras), 3)
+        self.assertIn("patologias construtivas", paras[0].lower())
+        self.assertIn("não realização", paras[1].lower())
+        self.assertIn("execução da reforma", paras[2].lower())
+        self.assertNotIn("danos estruturais", out.lower())
+        self.assertNotIn("interesses públicos", out.lower())
+
     def test_strips_trailing_bullet_list(self):
         out = normalize_justificativa_tres_paragrafos(SAMPLE_BULLETS)
         paras = [p for p in out.split("\n\n") if p.strip()]

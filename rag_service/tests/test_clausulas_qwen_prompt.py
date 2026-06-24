@@ -23,7 +23,9 @@ class ClausulasQwenPromptTests(unittest.TestCase):
             fluxo_ui="rapida",
         )
         self.assertIn("Dispensa rápida", full)
-        self.assertIn("pare após o 3º", full.lower())
+        self.assertIn('"justificativa"', full)
+        self.assertIn("3 parágrafos", full.lower())
+        self.assertNotIn("problema_administrativo", CLAUSULAS_QWEN_SYSTEM_PROMPT)
 
     def test_normal_fluxo_adds_setor_hint(self):
         full = build_clausulas_qwen_full_prompt(

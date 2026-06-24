@@ -31,6 +31,10 @@ Na chave justificativa, use "\\n\\n" entre os três parágrafos.
 
 Use somente dados do pedido. Não invente órgão, município, processo, valores ou quantidades não informadas."""
 
+def clausulas_qwen_system_prompt(fluxo_ui: str = "") -> str:
+    """Geração lite: mesmo prompt para normal e rápida (3 parágrafos em «justificativa»)."""
+    return CLAUSULAS_QWEN_SYSTEM_PROMPT
+
 
 def build_clausulas_qwen_user_block(user_prompt: str) -> str:
     """Pedido do formulário, sem regras extras herdadas do modo Ollama."""
@@ -45,13 +49,14 @@ def build_clausulas_qwen_full_prompt(user_prompt: str, *, fluxo_ui: str = "") ->
     fluxo = str(fluxo_ui or "").strip().lower()
     if fluxo == "rapida":
         user_block += (
-            "\n\nDispensa rápida: justificativa em exatamente 3 parágrafos em prosa "
-            "(necessidade → riscos → interesse público). Pare após o 3º — proibido repetir, "
-            "resumir ou listar tópicos."
+            "\n\nDispensa rápida: mesmo padrão da normal — justificativa com exatamente 3 parágrafos "
+            "(\\n\\n entre eles) na chave justificativa; mencione o setor/secretaria do pedido; "
+            "responda só com {\"objeto\",\"justificativa\"}."
         )
     elif fluxo == "normal":
         user_block += (
             "\n\nDispensa normal: mencione o setor/secretaria do pedido no objeto e na justificativa; "
             "não cite itens, quantidades ou valores de tabela."
         )
-    return f"<<SYSTEM>>\n{CLAUSULAS_QWEN_SYSTEM_PROMPT.strip()}\n\n<<USER>>\n{user_block}"
+    system = clausulas_qwen_system_prompt(fluxo)
+    return f"<<SYSTEM>>\n{system.strip()}\n\n<<USER>>\n{user_block}"

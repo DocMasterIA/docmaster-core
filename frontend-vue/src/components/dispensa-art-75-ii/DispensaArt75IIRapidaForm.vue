@@ -200,6 +200,7 @@ import {
   buildFillTrSlotsUrl,
   describeFillTrSlotsNetworkFailure,
   fetchFillTrSlotsWithRetry,
+  formatJustificativaDisplayFromSlots,
 } from '@/utils/fetchFillTrSlots.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import {
@@ -222,6 +223,8 @@ const dadosFixos = useDispensaArt75IIDadosFixos(API_BASE, { cabecalho, processoA
 const objetoContratado = ref('');
 const objetoGerado = ref('');
 const justificativa = ref('');
+/** Slots de cláusulas da última IA (3 blocos na rápida: justificativa + problema + benefício). */
+const slotsClausulasIA = ref(null);
 const dotacaoAtiva = ref(false);
 const dotacao = ref('');
 const usuarioLocalidade = ref(null);
@@ -306,6 +309,7 @@ async function resetFormStateForNewRoute() {
   objetoContratado.value = '';
   objetoGerado.value = '';
   justificativa.value = '';
+  slotsClausulasIA.value = null;
   dotacaoAtiva.value = false;
   dotacao.value = '';
   modoData.value = '';
@@ -457,6 +461,7 @@ async function preencherObjetoEJustificativaInterno() {
   const contratado = String(objetoContratado.value || '').trim();
   objetoGerado.value = '';
   justificativa.value = '';
+  slotsClausulasIA.value = null;
   const fillUrl = buildFillTrSlotsUrl(API_BASE);
   const result = await fetchFillTrSlotsWithRetry(
     API_BASE,
@@ -477,10 +482,11 @@ async function preencherObjetoEJustificativaInterno() {
   }
   const slots = result.data.slots && typeof result.data.slots === 'object' ? result.data.slots : {};
   const obj = String(slots.objeto || '').trim();
-  const jus = String(slots.justificativa || '').trim();
+  const jus = formatJustificativaDisplayFromSlots(slots);
   if (!obj || !jus) {
     throw new Error('IA não retornou objeto/justificativa completos.');
   }
+  slotsClausulasIA.value = slots;
   objetoGerado.value = obj;
   justificativa.value = jus;
 }
@@ -560,9 +566,26 @@ function buildSlotsOverride() {
   if (dataTermo) o.data_termo = dataTermo;
   const objetoFinal = String(objetoGerado.value || objetoContratado.value || '').trim();
   if (objetoFinal) o.objeto = objetoFinal;
-  if (String(justificativa.value || '').trim()) o.justificativa = String(justificativa.value).trim();
+  const ia = slotsClausulasIA.value;
+  if (ia && typeof ia === 'object') {
+    const p1 = String(ia.justificativa || '').trim();
+    const p2 = String(ia.problema_administrativo || '').trim();
+    const p3 = String(ia.beneficio_esperado || '').trim();
+    const fullJus = formatJustificativaDisplayFromSlots(ia);
+    if (p1) o.justificativa = p1;
+    if (p2) o.problema_administrativo = p2;
+    if (p3) o.beneficio_esperado = p3;
+    if (fullJus) {
+      o.dfd_justificativa = fullJus;
+      o.sol_oficio_justificativa = fullJus;
+    }
+  } else if (String(justificativa.value || '').trim()) {
+    const j = String(justificativa.value).trim();
+    o.justificativa = j;
+    o.dfd_justificativa = j;
+    o.sol_oficio_justificativa = j;
+  }
   if (objetoFinal) o.sol_oficio_objeto = objetoFinal;
-  if (String(justificativa.value || '').trim()) o.sol_oficio_justificativa = String(justificativa.value).trim();
   if (dotacaoAtiva.value && String(dotacao.value || '').trim()) {
     const dotacaoTexto = String(dotacao.value).trim();
     o.dotacao = dotacaoTexto;

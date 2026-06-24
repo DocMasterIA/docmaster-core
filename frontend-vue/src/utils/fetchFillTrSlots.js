@@ -128,3 +128,13 @@ export function describeFillTrSlotsNetworkFailure(apiUrl) {
     `${apiUrl}`
   );
 }
+
+/** Texto integral para exibição (dispensa rápida: 3 blocos TR ou justificativa única). */
+export function formatJustificativaDisplayFromSlots(slots) {
+  if (!slots || typeof slots !== 'object') return '';
+  const p1 = String(slots.justificativa || '').trim();
+  const p2 = String(slots.problema_administrativo || '').trim();
+  const p3 = String(slots.beneficio_esperado || '').trim();
+  if (p2 || p3) return [p1, p2, p3].filter(Boolean).join('\n\n');
+  return p1;
+}

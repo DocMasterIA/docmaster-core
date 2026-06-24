@@ -107,7 +107,7 @@ def _split_paragraphs(text: str) -> List[str]:
 
 def normalize_justificativa_tres_paragrafos(text: str) -> str:
     """
-    Justificativa final: no máximo 3 parágrafos distintos.
+    Justificativa final (dispensa normal): no máximo 3 parágrafos distintos em um único campo.
     Remove listas, eco/resumo da LLM e parágrafos que repetem o mesmo eixo argumentativo.
     """
     cleaned = _strip_list_tail(text)
@@ -116,3 +116,38 @@ def normalize_justificativa_tres_paragrafos(text: str) -> str:
         return ""
     paras = _dedupe_paragraphs(paras, max_keep=3)
     return "\n\n".join(paras)
+
+
+def finalize_rapida_secao4_tres_blocos(
+    justificativa: str,
+    problema_administrativo: str,
+    beneficio_esperado: str,
+) -> tuple[str, str, str]:
+    """
+    Dispensa rápida — reparte nos 3 placeholders do TR o mesmo texto da normal
+    (1 campo justificativa, 3 parágrafos). Ignora eco em campos extras da LLM.
+    """
+    j = (justificativa or "").strip()
+    paras_j = _split_paragraphs(_strip_list_tail(j))
+
+    if len(paras_j) >= 2:
+        combined = j
+    else:
+        parts = [
+            j,
+            (problema_administrativo or "").strip(),
+            (beneficio_esperado or "").strip(),
+        ]
+        combined = "\n\n".join(p for p in parts if p)
+
+    normalized = normalize_justificativa_tres_paragrafos(combined)
+    paras = [p.strip() for p in normalized.split("\n\n") if p.strip()]
+    p1 = paras[0] if len(paras) > 0 else ""
+    p2 = paras[1] if len(paras) > 1 else ""
+    p3 = paras[2] if len(paras) > 2 else ""
+    return p1, p2, p3
+
+
+def join_justificativa_display(p1: str, p2: str, p3: str) -> str:
+    """Texto integral para exibição no formulário e cópias DFD/Ofício."""
+    return "\n\n".join(p for p in (p1, p2, p3) if (p or "").strip())

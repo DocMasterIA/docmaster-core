@@ -24,7 +24,10 @@ from .config import (
     RAG_HTTP_TIMEOUT,
 )
 from .objeto_clause_sanitize import sanitize_objeto_clause_pura as _sanitize_objeto_clause_pura
-from .justificativa_clause_sanitize import normalize_justificativa_tres_paragrafos
+from .justificativa_clause_sanitize import (
+    finalize_rapida_secao4_tres_blocos,
+    normalize_justificativa_tres_paragrafos,
+)
 from .llm_orchestration import llm_post_generate, token_scope_active
 from .retrieval import retrieve
 from .tr_template import (
@@ -2058,9 +2061,28 @@ def _finalize_lite_objeto_justificativa_slots(
             )
         )
 
-    llm_slots.justificativa = normalize_justificativa_tres_paragrafos(
-        (llm_slots.justificativa or "").strip()
-    )
+    fluxo_ui = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
+    if fluxo_ui == "rapida":
+        p1, p2, p3 = finalize_rapida_secao4_tres_blocos(
+            llm_slots.justificativa or "",
+            llm_slots.problema_administrativo or "",
+            llm_slots.beneficio_esperado or "",
+        )
+        llm_slots = replace(
+            llm_slots,
+            justificativa=p1,
+            problema_administrativo=p2,
+            beneficio_esperado=p3,
+        )
+    else:
+        llm_slots = replace(
+            llm_slots,
+            justificativa=normalize_justificativa_tres_paragrafos(
+                (llm_slots.justificativa or "").strip()
+            ),
+            problema_administrativo="",
+            beneficio_esperado="",
+        )
     if not (llm_slots.objeto_escopo or "").strip():
         llm_slots.objeto_escopo = (
             "O escopo compreende as atividades técnicas e operacionais indispensáveis à execução do objeto, "
@@ -2501,8 +2523,8 @@ async def _fill_tr_slots_with_llm_work(
                 )
             elif _fluxo_ui == "rapida":
                 user_prompt_text += (
-                    "\nDispensa rápida: justificativa em exatamente 3 parágrafos (\\n\\n entre eles), "
-                    "3 a 4 frases técnicas por parágrafo, sem verborragia nem repetição; pare após o 3º."
+                    "\nDispensa rápida: mesmo padrão da normal — justificativa em exatamente 3 parágrafos "
+                    "(\\n\\n entre eles); mencione o setor/secretaria do pedido; JSON só com objeto e justificativa."
                 )
             system_prompt = TR_SLOTS_OBJETO_JUSTIFICATIVA_SYSTEM_PROMPT
             full_prompt = f"<<SYSTEM>>\n{system_prompt.strip()}\n\n<<USER>>\n{user_prompt_text}"

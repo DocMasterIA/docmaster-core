@@ -1,7 +1,11 @@
 """Normalização da justificativa — exatamente 3 parágrafos."""
 import unittest
 
-from app.justificativa_clause_sanitize import normalize_justificativa_tres_paragrafos
+from app.justificativa_clause_sanitize import (
+    finalize_rapida_secao4_tres_blocos,
+    join_justificativa_display,
+    normalize_justificativa_tres_paragrafos,
+)
 
 
 SAMPLE_FIVE = """A deterioração avançada das instalações do prédio sede compromete a funcionalidade dos setores administrativos, exigindo intervenções técnicas imediatas para garantir a habitabilidade e a segurança dos servidores e cidadãos que frequentam o local diariamente.
@@ -37,7 +41,34 @@ A deterioração avançada das instalações físicas do edifício sede represen
 A execução da reforma assegura a preservação do patrimônio público municipal, otimizando os recursos ao evitar relocação temporária dos setores ou construção de novas instalações. A medida garante um ambiente seguro e adequado para o funcionamento contínuo das atividades administrativas, alinhando-se aos interesses públicos."""
 
 
+SAMPLE_RAPIDA_BULLETS = """A atual condição física do imóvel compromete a operacionalidade dos setores administrativos, exigindo intervenções corretivas para garantir a habitabilidade e o funcionamento adequado das rotinas de trabalho. A deterioração observada nas estruturas e acabamentos necessita de reparos imediatos para assegurar um ambiente laboral seguro e eficiente para os servidores públicos.
+
+A não realização das obras acarretará o agravamento dos danos estruturais, podendo resultar em interdição parcial ou total do prédio e na interrupção dos serviços públicos essenciais prestados à população. O colapso de sistemas prediais básicos implica riscos à segurança física dos ocupantes e gera custos elevados com manutenções emergenciais paliativas que não resolvem a causa raiz dos problemas.
+
+A execução direta das reformas atende ao princípio da eficiência administrativa ao restaurar a plena capacidade operativa do patrimônio público municipal. A medida preserva o valor do ativo imobiliário do ente federativo e assegura a continuidade da prestação de serviços administrativos com qualidade e regularidade.
+- A deterioração das instalações prediais representa um risco significativo à operacionalidade dos setores administrativos, comprometendo a continuidade dos serviços públicos essenciais.
+- As intervenções estruturais e de funcionalidade garantirão um ambiente seguro e eficiente para os servidores, preservando o valor do patrimônio público e assegurando a qualidade na prestação dos serviços administrativos."""
+
+
 class JustificativaSanitizeTests(unittest.TestCase):
+    def test_rapida_splits_three_blocks_and_strips_bullets(self):
+        p1, p2, p3 = finalize_rapida_secao4_tres_blocos(SAMPLE_RAPIDA_BULLETS, "", "")
+        self.assertIn("condição física", p1.lower())
+        self.assertIn("não realização", p2.lower())
+        self.assertIn("execução direta", p3.lower())
+        self.assertNotIn("- A deterioração", join_justificativa_display(p1, p2, p3))
+        self.assertEqual(len([x for x in (p1, p2, p3) if x]), 3)
+
+    def test_rapida_ignores_extra_fields_when_justificativa_has_three_paras(self):
+        p1, p2, p3 = finalize_rapida_secao4_tres_blocos(
+            "P1 necessidade.\n\nP2 riscos.\n\nP3 interesse.",
+            "Eco riscos repetido.",
+            "Eco benefício repetido.",
+        )
+        self.assertEqual(p1, "P1 necessidade.")
+        self.assertEqual(p2, "P2 riscos.")
+        self.assertEqual(p3, "P3 interesse.")
+
     def test_dedupes_semantic_echo_paragraphs(self):
         out = normalize_justificativa_tres_paragrafos(SAMPLE_ECHO)
         paras = [p for p in out.split("\n\n") if p.strip()]

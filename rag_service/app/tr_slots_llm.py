@@ -227,11 +227,13 @@ TR_SLOTS_OBJETO_JUSTIFICATIVA_SYSTEM_PROMPT = """Você redige apenas duas cláus
 REGRAS:
 - Responda APENAS com JSON válido: {"objeto": "...", "justificativa": "..."}
 - Não inclua outros campos, listas, itens, fiscal, dotação ou dispensa.
+- Objeto e justificativa são campos distintos: NUNCA misture justificativa no objeto.
 - Redação densa e técnica, sem verborragia nem repetição de ideias.
 
 objeto:
 - Uma cláusula formal declarativa (preferir 1 período completo; até 2 se necessário).
-- Núcleo material + finalidade administrativa + fechamento ("conforme quantidades e demais condições estabelecidas neste Termo de Referência" ou equivalente).
+- Descreva SOMENTE o que será contratado/adquirido e a finalidade administrativa (setor/destino quando informado).
+- PROIBIDO no objeto: fechamentos normativos do TR ("conforme especificações técnicas/quantidades do Termo de Referência", "a execução obedecerá rigorosamente…"), riscos da não contratação, necessidade jurídica ou argumentação de justificativa.
 - NÃO liste itens, quantidades, marcas, modelos, bullets ou "Inclui:" — detalhes ficam na tabela do TR.
 - Em dispensa normal com características informadas: texto genérico institucional, sem nomear produto, dosagem ou marca.
 - Se o pedido trouxer «Setor/secretaria atendido», inclua esse destino no objeto (finalidade/vinculação ao setor).
@@ -1009,7 +1011,7 @@ def _strip_item_lists_from_objeto_text(text: str) -> str:
     return text.rstrip(",;: ")
 
 
-def _normalize_objeto(text: str) -> str:
+from .objeto_clause_sanitize import sanitize_objeto_clause_pura as _sanitize_objeto_clause_pura
     """
     Normaliza o campo objeto para ficar mais formal e sem pontuação estranha no final.
     - Remove espaços extras.
@@ -1038,6 +1040,10 @@ def _normalize_objeto(text: str) -> str:
         r",?\s*no\s+valor\s+unit[áa]rio\s+compat[íi]vel\s+com\s+o\s+mercado\.?",
         r",?\s*com\s+valor\s+unit[áa]rio\s+compat[íi]vel\s+com\s+o\s+mercado\.?",
         r",?\s*com\s+pre[çc]o\s+compat[íi]vel\s+com\s+o\s+mercado\.?",
+        r",?\s*conforme especifica[cç][oõ]es t[eé]cnicas[^.]*termo de refer[eê]ncia[^.]*\.?",
+        r",?\s*conforme quantidades e demais condi[cç][oõ]es estabelecidas neste termo de refer[eê]ncia\.?",
+        r",?\s*conforme requisitos t[eé]cnicos e demais condi[cç][oõ]es estabelecidas neste termo de refer[eê]ncia\.?",
+        r",?\s*a execu[cç][aã]o obedecer[aá][^.]*\.?",
     ]
     for pat in objeto_remover:
         text = re.sub(pat, "", text, flags=re.IGNORECASE)
@@ -1107,16 +1113,13 @@ def _normalize_objeto(text: str) -> str:
             natureza = "Aquisição"
             if re.search(r"(?i)\b(servi[çc]o|manuten[çc][aã]o|loca[çc][aã]o|obra|engenharia)\b", base_for_clause):
                 natureza = "Contratação"
-            text = (
-                f"{natureza} de {base_for_clause}, conforme especificações técnicas, "
-                "quantitativos e demais condições estabelecidas neste Termo de Referência."
-            )
+            text = f"{natureza} de {base_for_clause}."
 
     # Remove reticências/múltiplos pontos e outros sinais fortes no final
     text = re.sub(r"[.。…;:,]+$", "", text).strip()
     if not text:
         return ""
-    return text
+    return _sanitize_objeto_clause_pura(text)
 
 
 def _expand_objeto_if_too_short(text: str) -> str:
@@ -1139,13 +1142,10 @@ def _expand_objeto_if_too_short(text: str) -> str:
         base = t
 
     # Reescrita mínima, mantendo padrão objetivo do fluxo.
-    return (
-        f"Aquisição de {base}, conforme especificações técnicas, quantitativos e demais "
-        "condições estabelecidas neste Termo de Referência."
-    )
+    return _sanitize_objeto_clause_pura(f"Aquisição de {base}.")
 
 
-def _enforce_objeto_semantic_consistency(text: str) -> str:
+def _enforce_objeto_semantic_consistency(text: str, *, add_tr_fechamento: bool = True) -> str:
     """
     Corrige incoerências comuns no objeto:
     - mistura indevida de aquisição x contratação;
@@ -1218,25 +1218,26 @@ def _enforce_objeto_semantic_consistency(text: str) -> str:
         elif has_goods_nature and not has_service_nature:
             t = re.sub(r"(?i)\bcontrata(?:ç|c)[aã]o\s+de\s+", "aquisição de ", t)
 
-    # Fechamento por natureza (aquisição x contratação).
-    is_aquisicao = bool(re.search(r"(?i)\b(aquisi(?:ç|c)[aã]o|fornecimento)\b", t)) and not has_service_nature
-    if is_aquisicao:
-        t = re.sub(
-            r"(?i),?\s*(visando|com\s+o\s+intuito\s+de)\s+atender\s+aos?\s+requisitos?\s+t[ée]cnicos?,?\s+quantitativos?\s+e\s+(demais\s+)?condi[çc][õo]es?\s+(delineadas|estabelecidas)\s+neste\s+termo\s+de\s+refer[êe]ncia\.?",
-            ", conforme quantidades e demais condições estabelecidas neste Termo de Referência",
-            t,
-        )
-        t = re.sub(
-            r"(?i),?\s*conforme\s+especifica(?:ç|c)[õo]es?\s+t[ée]cnicas?,?\s+quantitativos?\s+e\s+condi[çc][õo]es?\s+estabelecidas\s+neste\s+termo\s+de\s+refer[êe]ncia\.?",
-            ", conforme quantidades e demais condições estabelecidas neste Termo de Referência",
-            t,
-        )
-    else:
-        t = re.sub(
-            r"(?i),?\s*conforme\s+quantidades?\s+e\s+demais\s+condi[çc][õo]es?\s+estabelecidas\s+neste\s+termo\s+de\s+refer[êe]ncia\.?",
-            ", conforme requisitos técnicos e demais condições estabelecidas neste Termo de Referência",
-            t,
-        )
+    # Fechamento normativo do TR — só no pipeline integral do TR, não em cláusulas dispensa.
+    if add_tr_fechamento:
+        is_aquisicao = bool(re.search(r"(?i)\b(aquisi(?:ç|c)[aã]o|fornecimento)\b", t)) and not has_service_nature
+        if is_aquisicao:
+            t = re.sub(
+                r"(?i),?\s*(visando|com\s+o\s+intuito\s+de)\s+atender\s+aos?\s+requisitos?\s+t[ée]cnicos?,?\s+quantitativos?\s+e\s+(demais\s+)?condi[çc][õo]es?\s+(delineadas|estabelecidas)\s+neste\s+termo\s+de\s+refer[êe]ncia\.?",
+                ", conforme quantidades e demais condições estabelecidas neste Termo de Referência",
+                t,
+            )
+            t = re.sub(
+                r"(?i),?\s*conforme\s+especifica(?:ç|c)[õo]es?\s+t[ée]cnicas?,?\s+quantitativos?\s+e\s+condi[çc][õo]es?\s+estabelecidas\s+neste\s+termo\s+de\s+refer[êe]ncia\.?",
+                ", conforme quantidades e demais condições estabelecidas neste Termo de Referência",
+                t,
+            )
+        else:
+            t = re.sub(
+                r"(?i),?\s*conforme\s+quantidades?\s+e\s+demais\s+condi[çc][õo]es?\s+estabelecidas\s+neste\s+termo\s+de\s+refer[êe]ncia\.?",
+                ", conforme requisitos técnicos e demais condições estabelecidas neste Termo de Referência",
+                t,
+            )
 
     # Mantém liberdade de redação da IA: aqui só sanidade mínima.
     t = re.sub(r"\s{2,}", " ", t).strip()
@@ -2035,7 +2036,7 @@ def _finalize_lite_objeto_justificativa_slots(
         return len(stripped.split()) <= 3
 
     if rich_output:
-        llm_slots.objeto = (llm_slots.objeto or "").strip()
+        llm_slots.objeto = _sanitize_objeto_clause_pura((llm_slots.objeto or "").strip())
         llm_slots.justificativa = (llm_slots.justificativa or "").strip()
         if not llm_slots.objeto and objeto_fallback:
             llm_slots.objeto = objeto_fallback.strip()[:1200]
@@ -2046,12 +2047,14 @@ def _finalize_lite_objeto_justificativa_slots(
                 llm_slots.objeto = _normalize_objeto(objeto_fallback) or objeto_fallback
             else:
                 llm_slots.objeto = _normalize_objeto(
-                    f"Aquisição de {objeto_fallback.strip().rstrip('.;')}, conforme especificações técnicas, "
-                    "quantitativos e demais condições estabelecidas neste Termo de Referência."
+                    f"Aquisição de {objeto_fallback.strip().rstrip('.;')}."
                 ) or objeto_fallback
 
-        llm_slots.objeto = _enforce_objeto_semantic_consistency(
-            _normalize_objeto(llm_slots.objeto or "")
+        llm_slots.objeto = _sanitize_objeto_clause_pura(
+            _enforce_objeto_semantic_consistency(
+                _normalize_objeto(llm_slots.objeto or ""),
+                add_tr_fechamento=False,
+            )
         )
 
     if not (llm_slots.objeto_escopo or "").strip():

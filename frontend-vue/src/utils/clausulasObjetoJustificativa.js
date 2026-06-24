@@ -39,6 +39,37 @@ export function parseClauseSections(text) {
   return sections;
 }
 
+const OBJETO_JUSTIFICATIVA_BLEED = [
+  'a presente contratação justifica-se',
+  'justifica-se pela necessidade',
+  'caso não seja realizada',
+  'em caso de não contratação',
+];
+
+/** Remove fechamento normativo do TR e frases de justificativa no campo objeto. */
+export function sanitizeObjetoClausePura(text) {
+  let t = String(text || '').trim();
+  if (!t) return '';
+  const sentences = t.split(/(?<=[.!?])\s+/).filter(Boolean);
+  const kept = sentences.filter((sent) => {
+    const low = sent.toLowerCase().trim();
+    if (/^a execução obedecer/.test(low)) return false;
+    if (/^obedecerá rigorosamente/.test(low)) return false;
+    if (/^conforme (especifica|quantidades|requisitos)/.test(low)) return false;
+    if (OBJETO_JUSTIFICATIVA_BLEED.some((m) => low.includes(m))) return false;
+    return true;
+  });
+  t = kept.join(' ').trim();
+  t = t
+    .replace(/[,;]?\s*a execução obedecerá[^.]*\.?/gi, '')
+    .replace(/[,;]?\s*conforme especificações técnicas[^.]*termo de referência[^.]*\.?/gi, '')
+    .replace(/[,;]?\s*conforme quantidades e demais condições estabelecidas neste termo de referência\.?/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  if (t && !/[.!?]$/.test(t)) t = `${t}.`;
+  return t;
+}
+
 /** Extrai objeto/justificativa/dfd_objeto_referencia de JSON (Qwen) ou fallback para seções. */
 export function parseClausulasResponseText(text) {
   const raw = String(text || '').trim();
@@ -48,7 +79,7 @@ export function parseClausulasResponseText(text) {
     try {
       const parsed = JSON.parse(cleaned);
       return {
-        objeto: String(parsed.objeto || '').trim(),
+        objeto: sanitizeObjetoClausePura(parsed.objeto || ''),
         justificativa: String(parsed.justificativa || '').trim(),
         dfd_objeto_referencia: String(parsed.dfd_objeto_referencia || parsed.dfdObjetoReferencia || '').trim(),
       };
@@ -58,7 +89,7 @@ export function parseClausulasResponseText(text) {
   }
   const sections = parseClauseSections(raw);
   return {
-    objeto: sections.objeto || '',
+    objeto: sanitizeObjetoClausePura(sections.objeto || ''),
     justificativa: sections.justificativa || '',
     dfd_objeto_referencia: '',
   };
@@ -73,7 +104,7 @@ export function extractClausesFromSectionTexts(sectionTexts) {
     return '';
   };
   return {
-    objeto: get('objeto', 'objeto_licitacao', 'do_objeto'),
+    objeto: sanitizeObjetoClausePura(get('objeto', 'objeto_licitacao', 'do_objeto')),
     justificativa: get('justificativa', 'necessidade', 'fundamentacao', 'da_necessidade'),
     escopo: get('escopo', 'objeto_escopo'),
     entregas: get('entregas', 'objeto_entregas'),

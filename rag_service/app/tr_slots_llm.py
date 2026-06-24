@@ -222,11 +222,12 @@ REGRAS:
 - Use Lei 14.133/2021. Não invente dados que não possam ser inferidos do pedido (ex.: fiscal deixe vazio se não informado; dotação sempre deixe vazia, pois não é responsabilidade da IA preencher).
 """
 
-TR_SLOTS_OBJETO_JUSTIFICATIVA_SYSTEM_PROMPT = """Você redige apenas duas cláusulas para um Termo de Referência (Lei 14.133/2021), com base no pedido do usuário.
+TR_SLOTS_OBJETO_JUSTIFICATIVA_SYSTEM_PROMPT = """Você redige apenas duas cláusulas para um Termo de Referência (Lei 14.133/2021, dispensa — art. 75), com base no pedido do usuário.
 
 REGRAS:
 - Responda APENAS com JSON válido: {"objeto": "...", "justificativa": "..."}
 - Não inclua outros campos, listas, itens, fiscal, dotação ou dispensa.
+- Redação densa e técnica, sem verborragia nem repetição de ideias.
 
 objeto:
 - Uma cláusula formal declarativa (preferir 1 período completo; até 2 se necessário).
@@ -236,9 +237,12 @@ objeto:
 - Se o pedido trouxer «Setor/secretaria atendido», inclua esse destino no objeto (finalidade/vinculação ao setor).
 
 justificativa:
-- Parágrafo dissertativo de 3 a 6 frases, linguagem formal.
-- Necessidade para a Administração e para o setor/destino informados no pedido; riscos se não contratar.
-- Se o pedido trouxer «Setor/secretaria atendido», cite esse setor/secretaria explicitamente no objeto e na justificativa (use a redação do pedido).
+- Exatamente 3 parágrafos separados (use \\n\\n na string JSON), 2 a 4 frases objetivas em cada um.
+- 1º parágrafo: necessidade concreta para a Administração e para o setor/destino informados no pedido.
+- 2º parágrafo: riscos técnicos e operacionais se a contratação não for realizada (continuidade, eficiência, segurança ou desempenho institucional).
+- 3º parágrafo: adequação da medida ao interesse público e continuidade administrativa; características mínimas somente se informadas.
+- Linguagem formal; profundidade técnica proporcional ao objeto, sem frases genéricas de enchimento.
+- Se o pedido trouxer «Setor/secretaria atendido», cite esse setor/secretaria explicitamente no objeto e na justificativa.
 - Use SOMENTE nomes de órgão, município ou entidade que apareçam literalmente no pedido do usuário.
 - Concordância correta (ex.: "a manutenção", não "o manutenção").
 - Não invente valores, prazos, órgãos ou localidades além do pedido.
@@ -2483,7 +2487,13 @@ async def _fill_tr_slots_with_llm_work(
                 user_prompt_text += (
                     "\nDispensa normal: objeto em 1 período genérico; "
                     "mencione obrigatoriamente o setor/secretaria do campo «Setor/secretaria atendido» no objeto e na justificativa; "
+                    "justificativa em exatamente 3 parágrafos (\\n\\n entre eles); "
                     "não cite itens, quantidades ou valores de tabela."
+                )
+            elif _fluxo_ui == "rapida":
+                user_prompt_text += (
+                    "\nDispensa rápida: justificativa em exatamente 3 parágrafos (\\n\\n entre eles), "
+                    "técnicos e objetivos, sem verborragia."
                 )
             system_prompt = TR_SLOTS_OBJETO_JUSTIFICATIVA_SYSTEM_PROMPT
             full_prompt = f"<<SYSTEM>>\n{system_prompt.strip()}\n\n<<USER>>\n{user_prompt_text}"

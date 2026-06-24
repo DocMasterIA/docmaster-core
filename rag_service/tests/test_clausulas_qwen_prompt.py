@@ -20,9 +20,10 @@ class ClausulasQwenPromptTests(unittest.TestCase):
     def test_system_asks_json_only(self):
         self.assertIn('{"objeto"', CLAUSULAS_QWEN_SYSTEM_PROMPT)
 
-    def test_system_requires_depth(self):
-        self.assertIn("8 a 12 frases", CLAUSULAS_QWEN_SYSTEM_PROMPT)
+    def test_system_requires_three_paragraphs(self):
+        self.assertIn("exatamente 3 parágrafos", CLAUSULAS_QWEN_SYSTEM_PROMPT.lower())
         self.assertIn("proibido texto genérico", CLAUSULAS_QWEN_SYSTEM_PROMPT.lower())
+        self.assertNotIn("8 a 12 frases", CLAUSULAS_QWEN_SYSTEM_PROMPT)
 
 
 if __name__ == "__main__":

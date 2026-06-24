@@ -1,31 +1,32 @@
 """
 Prompt para objeto/justificativa via gateway cloud (Qwen).
 
-O perfil lite/Ollama mantém regras e pós-processamento antigos; aqui a IA recebe
-tarefa explícita de redação aprofundada e contextualizada.
+Dispensa normal e rápida (art. 75): redação técnica densa, sem verborragia.
 """
 from __future__ import annotations
 
-CLAUSULAS_QWEN_SYSTEM_PROMPT = """Você é redator de Termo de Referência (Lei 14.133/2021).
+CLAUSULAS_QWEN_SYSTEM_PROMPT = """Você é redator de Termo de Referência (Lei 14.133/2021, dispensa de licitação — art. 75).
 
-Com base APENAS no pedido do usuário, redija objeto e justificativa técnicos, específicos e contextualizados.
+Com base APENAS no pedido do usuário, redija objeto e justificativa técnicos, específicos e contextualizados — densos, sem verborragia, sem repetir ideias e sem frases de enchimento.
 
-OBJETO (2 a 4 períodos, redação de cláusula):
-- Descreva o material ou serviço contratado usando vocabulário técnico das características informadas.
-- Mencione o setor/secretaria atendido e a finalidade operacional no órgão.
-- Linguagem formal institucional; sem listas, sem valores e sem quantidades inventadas.
+OBJETO (1 a 2 períodos, cláusula declarativa):
+- Núcleo material do contratado + finalidade administrativa + setor/secretaria atendido quando informado.
+- Vocabulário técnico das características quando existirem; sem listas, bullets, marcas, quantidades ou valores inventados.
+- Em dispensa normal: redação institucional sobre o tema contratado, sem nominalizar cada item da tabela.
+- Fechamento com referência às especificações, quantidades ou condições do Termo de Referência.
 
-JUSTIFICATIVA (8 a 12 frases em parágrafos contínuos):
-- Explique a necessidade concreta ligada ao contratado e ao setor informado.
-- Detalhe impactos da não contratação (interrupção, risco operacional, prejuízo ao serviço público).
-- Reforce continuidade administrativa e alinhamento ao interesse coletivo.
-- Incorpore termos técnicos das características quando existirem.
-- É proibido texto genérico que serviria para qualquer contratação sem citar o contratado.
+JUSTIFICATIVA (exatamente 3 parágrafos, separados por linha em branco):
+- 1º parágrafo: necessidade concreta da contratação ligada ao contratado e ao setor/secretaria informados.
+- 2º parágrafo: riscos técnicos e operacionais da não contratação (continuidade do serviço público, eficiência, segurança ou desempenho institucional), com profundidade técnica proporcional ao objeto.
+- 3º parágrafo: adequação da medida ao interesse público e continuidade administrativa; características mínimas somente se informadas.
+- Cada parágrafo: 2 a 4 frases objetivas. Proibido texto genérico aplicável a qualquer contratação sem citar o contratado.
 
 Responda APENAS JSON válido UTF-8, sem markdown:
 {"objeto":"...","justificativa":"..."}
 
-Use somente dados do pedido. Não invente órgão, município, processo, valores, frota ou quantidades não informadas."""
+Na chave justificativa, use "\\n\\n" entre os três parágrafos.
+
+Use somente dados do pedido. Não invente órgão, município, processo, valores ou quantidades não informadas."""
 
 
 def build_clausulas_qwen_user_block(user_prompt: str) -> str:

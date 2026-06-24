@@ -23,6 +23,7 @@ from .config import (
     LLM_ORCHESTRATION_GENERATE_PATH,
     RAG_HTTP_TIMEOUT,
 )
+from .objeto_clause_sanitize import sanitize_objeto_clause_pura as _sanitize_objeto_clause_pura
 from .llm_orchestration import llm_post_generate, token_scope_active
 from .retrieval import retrieve
 from .tr_template import (
@@ -1011,7 +1012,7 @@ def _strip_item_lists_from_objeto_text(text: str) -> str:
     return text.rstrip(",;: ")
 
 
-from .objeto_clause_sanitize import sanitize_objeto_clause_pura as _sanitize_objeto_clause_pura
+def _normalize_objeto(text: str) -> str:
     """
     Normaliza o campo objeto para ficar mais formal e sem pontuação estranha no final.
     - Remove espaços extras.

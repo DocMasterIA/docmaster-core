@@ -24,6 +24,7 @@ from .config import (
     RAG_HTTP_TIMEOUT,
 )
 from .objeto_clause_sanitize import sanitize_objeto_clause_pura as _sanitize_objeto_clause_pura
+from .justificativa_clause_sanitize import normalize_justificativa_tres_paragrafos
 from .llm_orchestration import llm_post_generate, token_scope_active
 from .retrieval import retrieve
 from .tr_template import (
@@ -240,11 +241,11 @@ objeto:
 - Se o pedido trouxer «Setor/secretaria atendido», inclua esse destino no objeto (finalidade/vinculação ao setor).
 
 justificativa:
-- Exatamente 3 parágrafos separados (use \\n\\n na string JSON), 2 a 4 frases objetivas em cada um.
-- 1º parágrafo: necessidade concreta para a Administração e para o setor/destino informados no pedido.
+- Exatamente 3 parágrafos separados (use \\n\\n na string JSON). Pare após o 3º — proibido 4º parágrafo, resumo ou repetição de ideias.
+- 1º parágrafo: necessidade concreta para a Administração e para o setor/destino informados no pedido (3 a 4 frases técnicas).
 - 2º parágrafo: riscos técnicos e operacionais se a contratação não for realizada (continuidade, eficiência, segurança ou desempenho institucional).
 - 3º parágrafo: adequação da medida ao interesse público e continuidade administrativa; características mínimas somente se informadas.
-- Linguagem formal; profundidade técnica proporcional ao objeto, sem frases genéricas de enchimento.
+- Linguagem formal; profundidade técnica proporcional ao objeto, sem frases genéricas de enchimento nem eco entre parágrafos.
 - Se o pedido trouxer «Setor/secretaria atendido», cite esse setor/secretaria explicitamente no objeto e na justificativa.
 - Use SOMENTE nomes de órgão, município ou entidade que apareçam literalmente no pedido do usuário.
 - Concordância correta (ex.: "a manutenção", não "o manutenção").
@@ -2038,7 +2039,6 @@ def _finalize_lite_objeto_justificativa_slots(
 
     if rich_output:
         llm_slots.objeto = _sanitize_objeto_clause_pura((llm_slots.objeto or "").strip())
-        llm_slots.justificativa = (llm_slots.justificativa or "").strip()
         if not llm_slots.objeto and objeto_fallback:
             llm_slots.objeto = objeto_fallback.strip()[:1200]
     else:
@@ -2058,6 +2058,9 @@ def _finalize_lite_objeto_justificativa_slots(
             )
         )
 
+    llm_slots.justificativa = normalize_justificativa_tres_paragrafos(
+        (llm_slots.justificativa or "").strip()
+    )
     if not (llm_slots.objeto_escopo or "").strip():
         llm_slots.objeto_escopo = (
             "O escopo compreende as atividades técnicas e operacionais indispensáveis à execução do objeto, "
@@ -2497,7 +2500,7 @@ async def _fill_tr_slots_with_llm_work(
             elif _fluxo_ui == "rapida":
                 user_prompt_text += (
                     "\nDispensa rápida: justificativa em exatamente 3 parágrafos (\\n\\n entre eles), "
-                    "técnicos e objetivos, sem verborragia."
+                    "3 a 4 frases técnicas por parágrafo, sem verborragia nem repetição; pare após o 3º."
                 )
             system_prompt = TR_SLOTS_OBJETO_JUSTIFICATIVA_SYSTEM_PROMPT
             full_prompt = f"<<SYSTEM>>\n{system_prompt.strip()}\n\n<<USER>>\n{user_prompt_text}"

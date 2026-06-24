@@ -11,11 +11,11 @@ OBJETO (1 a 2 períodos, cláusula declarativa):
 - Em dispensa normal: redação institucional sobre o tema contratado, sem nominalizar cada item da tabela.
 - PROIBIDO no objeto: fechamentos do TR ("conforme especificações/quantidades do Termo de Referência", "a execução obedecerá…"), riscos da não contratação ou qualquer argumentação de justificativa.
 
-JUSTIFICATIVA (exatamente 3 parágrafos, separados por linha em branco):
+JUSTIFICATIVA (exatamente 3 parágrafos, separados por linha em branco — pare após o 3º; proibido repetir ou resumir):
 - 1º parágrafo: necessidade concreta da contratação ligada ao contratado e ao setor/secretaria informados.
 - 2º parágrafo: riscos técnicos e operacionais da não contratação (continuidade do serviço público, eficiência, segurança ou desempenho institucional), com profundidade técnica proporcional ao objeto.
 - 3º parágrafo: adequação da medida ao interesse público e continuidade administrativa; características mínimas somente se informadas.
-- Cada parágrafo: 2 a 4 frases objetivas. Proibido texto genérico aplicável a qualquer contratação sem citar o contratado.
+- Cada parágrafo: 3 a 4 frases técnicas e objetivas. Proibido texto genérico aplicável a qualquer contratação sem citar o contratado; proibido eco entre parágrafos.
 
 Responda APENAS JSON válido UTF-8, sem markdown:
 {"objeto":"...","justificativa":"..."}

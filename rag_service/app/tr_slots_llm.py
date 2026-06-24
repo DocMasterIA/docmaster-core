@@ -241,7 +241,7 @@ objeto:
 - Se o pedido trouxer «Setor/secretaria atendido», inclua esse destino no objeto (finalidade/vinculação ao setor).
 
 justificativa:
-- Exatamente 3 parágrafos separados (use \\n\\n na string JSON). Pare após o 3º — proibido 4º parágrafo, resumo ou repetição de ideias.
+- Exatamente 3 parágrafos separados (use \\n\\n na string JSON). Pare após o 3º — proibido 4º parágrafo, resumo, repetição de ideias ou listas com marcadores (-, *, números).
 - 1º parágrafo: necessidade concreta para a Administração e para o setor/destino informados no pedido (3 a 4 frases técnicas).
 - 2º parágrafo: riscos técnicos e operacionais se a contratação não for realizada (continuidade, eficiência, segurança ou desempenho institucional).
 - 3º parágrafo: adequação da medida ao interesse público e continuidade administrativa; características mínimas somente se informadas.

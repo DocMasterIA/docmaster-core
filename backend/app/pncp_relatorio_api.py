@@ -21,8 +21,9 @@ import json
 import logging
 import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from uuid import UUID
 
 from django.conf import settings
@@ -47,6 +48,9 @@ from backend.app.services.pncp_relatorio_verification_store import (
 from backend.app.services.pncp_supplier_enrichment import enrich_missing_supplier_fields_for_cotacao
 
 logger = logging.getLogger(__name__)
+
+_pdf_job_executor: Optional[ThreadPoolExecutor] = None
+_pdf_job_executor_lock = threading.Lock()
 
 DEFAULT_FORMULA_CALCULO = "media_aritmetica_precos_obtidos"
 FORMULA_LABELS = {
@@ -246,10 +250,12 @@ def _generate_relatorio_pdf_bytes(
                 cotacao.id,
                 max_lookups=settings.PNCP_RELATORIO_PDF_MAX_PNCP_LOOKUPS,
                 max_brasilapi_lookups=settings.PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS,
-                receitaws_allow_wait=True,
+                # Evita bloqueio longo por rate-limit da ReceitaWS no job em background.
+                receitaws_allow_wait=False,
                 receitaws_unlimited=False,
             )
             enriched_emails = True
+            itens_qs = cotacao.itens.prefetch_related("cotacoes")
         except Exception:
             logger.exception(
                 "enrich_missing_supplier_fields_for_cotacao falhou cotacao_id=%s",
@@ -276,7 +282,11 @@ def _generate_relatorio_pdf_bytes(
                 merge_parts.extend([capa_anexo_pdf, anexo_bytes])
             pdf_bytes = _merge_pdf_bytes(merge_parts)
         except Exception:
-            pass
+            logger.warning(
+                "relatorio_pdf: merge de anexos falhou cotacao_id=%s — entregando PDF sem anexos",
+                cotacao.id,
+                exc_info=True,
+            )
     save_verification_pdf(
         sessao_id=sessao_id,
         token=verification_token,
@@ -290,6 +300,35 @@ def _relatorio_pdf_jobs_dir() -> Path:
     p = Path(settings.MEDIA_ROOT) / "pncp_relatorio_pdf_jobs"
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def _get_pdf_job_executor() -> ThreadPoolExecutor:
+    """Pool dedicado — mais estável que ``threading.Thread(daemon=True)`` com Gunicorn/gevent."""
+    global _pdf_job_executor
+    if _pdf_job_executor is not None:
+        return _pdf_job_executor
+    with _pdf_job_executor_lock:
+        if _pdf_job_executor is None:
+            max_workers = int(getattr(settings, "PNCP_RELATORIO_PDF_JOB_WORKERS", 2) or 2)
+            _pdf_job_executor = ThreadPoolExecutor(
+                max_workers=max(1, max_workers),
+                thread_name_prefix="pncp_relatorio_pdf",
+            )
+        return _pdf_job_executor
+
+
+def _mark_job_meta_status(meta_path: Path, status: str, **extra: Any) -> None:
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except Exception:
+        meta = {}
+    meta["status"] = status
+    for key, value in extra.items():
+        meta[key] = value
+    try:
+        meta_path.write_text(json.dumps(meta), encoding="utf-8")
+    except OSError:
+        logger.warning("relatorio_pdf: não foi possível atualizar meta %s", meta_path)
 
 
 def _prune_stale_relatorio_pdf_jobs(jobs_dir: Path) -> None:
@@ -364,6 +403,8 @@ def _run_relatorio_pdf_job(
     jobs_dir = _relatorio_pdf_jobs_dir()
     meta_path = jobs_dir / f"{job_id}.meta.json"
     pdf_path = jobs_dir / f"{job_id}.pdf"
+    logger.info("relatorio_pdf job start job_id=%s sessao_id=%s", job_id, sessao_id)
+    _mark_job_meta_status(meta_path, "processing", started=timezone.now().isoformat())
     try:
         qs = PncpCotacao.objects.all()
         if not is_superuser:
@@ -410,10 +451,36 @@ def _run_relatorio_pdf_job(
         meta["status"] = "done"
         meta["filename"] = fname
         meta_path.write_text(json.dumps(meta), encoding="utf-8")
+        logger.info(
+            "relatorio_pdf job done job_id=%s sessao_id=%s bytes=%s",
+            job_id,
+            sessao_id,
+            len(pdf_bytes),
+        )
     except Exception as e:
+        logger.exception("relatorio_pdf job failed job_id=%s sessao_id=%s", job_id, sessao_id)
         _write_job_meta_error(meta_path, f"Falha ao gerar PDF ({e}).")
     finally:
         close_old_connections()
+
+
+def _submit_relatorio_pdf_job(**kwargs: Any) -> None:
+    job_id = str(kwargs.get("job_id") or "")
+    sessao_id = kwargs.get("sessao_id")
+
+    def _wrapper() -> None:
+        try:
+            _run_relatorio_pdf_job(**kwargs)
+        except Exception:
+            logger.exception(
+                "relatorio_pdf job crashed job_id=%s sessao_id=%s",
+                job_id,
+                sessao_id,
+            )
+            meta_path = _relatorio_pdf_jobs_dir() / f"{job_id}.meta.json"
+            _write_job_meta_error(meta_path, "Falha interna ao gerar PDF.")
+
+    _get_pdf_job_executor().submit(_wrapper)
 
 
 def _relatorio_pdf_request_body_validation(request) -> Tuple[Dict[str, Any] | None, JsonResponse | None]:
@@ -476,20 +543,16 @@ def pncp_cotacao_relatorio_pdf_start(request, sessao_id: int):
     meta_path.write_text(json.dumps(meta), encoding="utf-8")
 
     api_base = resolve_public_api_base_url(request)
-    threading.Thread(
-        target=_run_relatorio_pdf_job,
-        kwargs={
-            "job_id": job_id,
-            "user_id": request.user.id,
-            "is_superuser": request.user.is_superuser,
-            "sessao_id": sessao_id,
-            "titulo_rel": titulo_rel,
-            "incluir_anexos": incluir_anexos,
-            "anexo_fornecedor_url": anexo_url,
-            "api_base_url": api_base,
-        },
-        daemon=True,
-    ).start()
+    _submit_relatorio_pdf_job(
+        job_id=job_id,
+        user_id=request.user.id,
+        is_superuser=request.user.is_superuser,
+        sessao_id=sessao_id,
+        titulo_rel=titulo_rel,
+        incluir_anexos=incluir_anexos,
+        anexo_fornecedor_url=anexo_url,
+        api_base_url=api_base,
+    )
 
     return JsonResponse(
         {
@@ -518,8 +581,8 @@ def pncp_cotacao_relatorio_pdf_job_poll(request, sessao_id: int, job_id: UUID):
             return owner_err
 
         status = meta.get("status")
-        if status == "pending":
-            return JsonResponse({"status": "pending"}, status=202)
+        if status in ("pending", "processing"):
+            return JsonResponse({"status": status}, status=202)
         if status == "error":
             return JsonResponse(
                 {

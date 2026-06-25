@@ -206,7 +206,7 @@
             </div>
             <div class="ixp-grid-1">
               <div class="ixp-field">
-                <label>Responsável pelo Termo de Referência — Nome</label>
+                <label>Nome do responsável</label>
                 <textarea
                   :value="ctx.fixoTrResponsavelNome"
                   class="da75-textarea"
@@ -220,6 +220,7 @@
                 <input
                   :value="ctx.fixoTrResponsavelCargo"
                   class="da75-input da75-input--sm"
+                  placeholder="Digite o cargo"
                   @input="ctx.fixoTrResponsavelCargo = capNome(String(($event.target).value || ''))"
                 />
               </div>

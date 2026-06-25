@@ -508,12 +508,19 @@ export async function downloadCotacaoRelatorioPdf(
     }
 
     const pollData = await pollRes.json();
-    if (pollData?.status === 'pending') {
+    if (pollData?.status === 'error') {
+      throw new Error(
+        pollData.detail || pollData.error || 'Erro ao gerar o PDF no servidor.',
+      );
+    }
+    if (pollData?.status === 'pending' || pollData?.status === 'processing') {
       await sleep(POLL_MS);
       continue;
     }
     if (pollData?.status !== 'done' || !pollData?.file_url) {
-      throw new Error('Resposta inesperada ao consultar o estado do PDF.');
+      throw new Error(
+        pollData?.detail || pollData?.error || 'Resposta inesperada ao consultar o estado do PDF.',
+      );
     }
 
     const fileUrl = `${API_BASE}${pollData.file_url}`;

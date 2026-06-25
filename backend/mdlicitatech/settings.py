@@ -494,6 +494,8 @@ PNCP_RELATORIO_PDF_RECEITAWS_EMAIL = os.environ.get("PNCP_RELATORIO_PDF_RECEITAW
 )
 # Máx. consultas HTTP novas (cnpj.ws/ReceitaWS) por geração de PDF; 0 = ilimitado (lento).
 PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS", "48"))
+# Workers do pool de geração assíncrona de PDF (POST …/relatorio/pdf/start).
+PNCP_RELATORIO_PDF_JOB_WORKERS = int(os.environ.get("PNCP_RELATORIO_PDF_JOB_WORKERS", "2"))
 # PDF (job assíncrono): aguarda ~22s após 429 e tenta de novo (APIs limitam ~3 req/min).
 PNCP_CNPJ_EMAIL_RATE_LIMIT_WAIT_SEC = int(os.environ.get("PNCP_CNPJ_EMAIL_RATE_LIMIT_WAIT_SEC", "22"))
 # Intervalo mínimo entre consultas HTTP de e-mail (respeita ~3/min das APIs gratuitas).

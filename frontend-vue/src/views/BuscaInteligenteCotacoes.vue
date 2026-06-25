@@ -114,8 +114,8 @@
         <span v-else-if="cotacaoResumo.totalItens > autoSearchProgress.total">
           ({{ cotacaoResumo.totalItens }} na cotação, {{ cotacaoResumo.completos }} já completos)
         </span>
-        <span v-if="autoSearchProgress.precos > 0 || autoSearchProgress.fail > 0">
-          — {{ autoSearchProgress.precos }} preço(s), {{ autoSearchProgress.fail }} falha(s)
+        <span v-if="autoSearchProgress.precos > 0 || autoSearchProgress.fail > 0 || autoSearchProgress.skipped > 0">
+          — {{ autoSearchProgress.precos }} preço(s), {{ autoSearchProgress.fail }} falha(s)<span v-if="autoSearchProgress.skipped > 0">, {{ autoSearchProgress.skipped }} ignorado(s)</span>
         </span>
         ...
       </p>
@@ -126,6 +126,7 @@
         Busca automática {{ autoSearchProgress.done < autoSearchProgress.total ? 'parcial' : 'concluída' }}:
         {{ autoSearchProgress.done }} de {{ autoSearchProgress.total }} item(ns) processados,
         {{ autoSearchProgress.precos }} preço(s) encontrados
+        <span v-if="autoSearchProgress.skipped > 0">, {{ autoSearchProgress.skipped }} item(ns) já com 3+ na tabela</span>
         <span v-if="autoSearchProgress.fail > 0">, {{ autoSearchProgress.fail }} falha(s) de rede</span>.
         <span v-if="cotacaoResumo.completos > 0 && !rebuscarCompletos">
           {{ cotacaoResumo.completos }} item(ns) já tinham 3+ preços salvos e foram ignorados
@@ -678,7 +679,7 @@ async function processOneBulkItem(ctx, {
     autoSearchProgress.value.done += 1;
     return { stop: false };
   }
-  if (itemRowsCount(ctx.id) > 0) {
+  if (itemRowsCount(ctx.id) >= 3) {
     autoSearchProgress.value.done += 1;
     autoSearchProgress.value.skipped += 1;
     autoSearchProgress.value.ok += 1;

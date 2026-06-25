@@ -103,6 +103,11 @@ class BulkSearchPerformanceTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(kw.get("filtrar_fornecedor_para_exibicao", True))
         self.assertEqual(kw.get("enrich_homolog_max"), 6)
 
+    async def test_bulk_enrich_top3_default_enabled(self):
+        from app.config import PNCP_BULK_ENRICH_HOMOLOG_MAX
+
+        self.assertGreaterEqual(int(PNCP_BULK_ENRICH_HOMOLOG_MAX), 1)
+
     def test_bulk_timeout_response_shape(self):
         payload = MarketSearchRequest(termo_busca="X", busca_lote=True)
         out = _bulk_search_timeout_response(payload)

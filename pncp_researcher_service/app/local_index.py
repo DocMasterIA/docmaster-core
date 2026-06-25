@@ -2137,6 +2137,7 @@ async def enrich_homolog_items_from_pncp(
     """Consulta /resultados (+ contratos) para homologados sem CNPJ no índice."""
     if max_n <= 0 or not itens:
         return 0
+    from .supplier_resolver import item_fornecedor_valido_para_busca
     from .pncp_client import get_contract_supplier_snapshot, create_pncp_http_client
 
     enriched = 0
@@ -2145,7 +2146,7 @@ async def enrich_homolog_items_from_pncp(
         for entry in itens:
             if enriched >= max_n:
                 break
-            if str(entry.get("cnpj_fornecedor") or "").strip():
+            if item_fornecedor_valido_para_busca(entry):
                 continue
             if not entry.get("item_homologado"):
                 continue

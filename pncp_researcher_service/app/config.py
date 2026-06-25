@@ -353,8 +353,8 @@ PNCP_BULK_SEARCH_SQL_LIMIT: int = _env_int("PNCP_BULK_SEARCH_SQL_LIMIT", 200)
 PNCP_BULK_MAX_TERM_FALLBACKS: int = _env_int("PNCP_BULK_MAX_TERM_FALLBACKS", 6)
 # Teto de duração da busca inteligente em lote (segundos); 0 = sem teto no endpoint.
 PNCP_BULK_SEARCH_MAX_SECONDS: float = float(os.getenv("PNCP_BULK_SEARCH_MAX_SECONDS", "90"))
-# Enrich PNCP ao vivo no top3 em lote (0 = só índice local — muito mais rápido).
-PNCP_BULK_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_BULK_ENRICH_HOMOLOG_MAX", 0)
+# Enrich PNCP ao vivo no top3 em lote (homologados sem CNPJ antes do filtro de fornecedor).
+PNCP_BULK_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_BULK_ENRICH_HOMOLOG_MAX", 3)
 # Enrich síncrono por tentativa de termo em busca_lote (menor que PNCP_SEARCH_ENRICH_HOMOLOG_MAX).
 PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX", 6)
 # Score mínimo (0–100) para considerar item aderente na busca inteligente (antes ~60–70 implícito).

@@ -2228,6 +2228,12 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         priced_n = sum(1 for x in itens if _row_price_for_faixa(x) > 0.0)
         if priced_n >= 3:
             break
+        # Lote: se o índice já tem preço, não varre 6 termos (top3 + enrich PNCP fecha o resto).
+        if busca_lote and priced_n >= 1:
+            break
+        # Lote sem preço: no máximo 3 termos antes do híbrido (evita ~6× SQL/item vazio).
+        if busca_lote and priced_n == 0 and i >= 2:
+            break
         if len(itens) >= limit:
             break
     base_items = {"ok": True, "itens": itens, "stats": base_stats}
@@ -2830,6 +2836,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         funil["provavel_gargalo_top3"] = "homologados_sem_preco_indice"
 
     enrich_n_top3 = 0
+    top3_antes_filtro_fornecedor = len(top3)
     if top3:
         enrich_cap = max(0, min(int(PNCP_SEARCH_ENRICH_HOMOLOG_MAX), len(top3)))
         if busca_lote:
@@ -2842,6 +2849,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         apply_item_display_cleanup(row)
 
     top3 = filter_items_for_search_display(top3)
+    funil["top3_antes_filtro_fornecedor"] = top3_antes_filtro_fornecedor
+    funil["top3_apos_filtro_fornecedor"] = len(top3)
     funil["top3_com_preco_positivo"] = len(top3)
 
     ia_resumo_ok = False

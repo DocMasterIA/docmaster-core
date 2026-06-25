@@ -270,14 +270,17 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
-  addItemsToResearchSession,
-  addCotacoesToItemInResearchSession,
   backfillLocalIndex,
   getResearchSession,
   getLocalIndexStats,
   intelligentMarketSearch,
   searchLocalItems,
 } from '../services/pncpResearch';
+import {
+  formatCotacaoSaveFeedback,
+  persistCotacoesToResearchSession,
+  shouldClearSavedSelection,
+} from '../utils/pncpSaveCotacoes';
 import { MUNICIPIOS_POR_UF } from '../data/brasilMunicipiosPorUf';
 import { buildRecortesGeograficosPayload, itemMatchesRecortesGeograficos } from '../utils/recortesGeograficos';
 import { displayPnCpUnitario, formatFaixaResumo, hasDisplayPnCpPrecoPositivo, computeFaixaRegional } from '../utils/pncpPricing';
@@ -945,28 +948,22 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
   }
   isSavingSelecionados.value = true;
   try {
-    let totalInseridos = 0;
-    for (let i = 0; i < enviar.length; i += BATCH_SIZE) {
-      const lote = enviar.slice(i, i + BATCH_SIZE);
-      if (itemId.value) {
-        const res = await addCotacoesToItemInResearchSession(sessionId, itemId.value, lote);
-        totalInseridos += Number(res.cotacoes_inseridas ?? lote.length);
-      } else {
-        const res = await addItemsToResearchSession(sessionId, lote);
-        totalInseridos += Number(res.itens_inseridos ?? lote.length);
-      }
-    }
-    saveMessage.value = itemId.value
-      ? `${totalInseridos} cotação(ões) adicionadas ao item #${itemId.value}.`
-      : `${totalInseridos} item(ns) adicionados à cotação ${sessionId}.`;
-    if (totalInseridos > 0) {
+    const stats = await persistCotacoesToResearchSession(sessionId, enviar, {
+      routeItemId: itemId.value,
+      batchSize: BATCH_SIZE,
+    });
+    saveMessage.value = formatCotacaoSaveFeedback(stats, {
+      routeItemId: itemId.value,
+      semFornecedorUi: semFornecedor,
+    });
+    if (shouldClearSavedSelection(stats, enviar.length)) {
       resultados.value = resultados.value.map((r) => (r.selecionado ? { ...r, selecionado: false } : r));
-      if (goToCotacao) {
-        if (itemId.value) {
-          await router.push(`/pesquisador-pncp/cotacoes/${sessionId}/itens/${itemId.value}`);
-        } else {
-          await router.push(`/pesquisador-pncp/cotacoes/${sessionId}`);
-        }
+    }
+    if (goToCotacao && (stats.inseridas > 0 || stats.itensNovos > 0)) {
+      if (itemId.value) {
+        await router.push(`/pesquisador-pncp/cotacoes/${sessionId}/itens/${itemId.value}`);
+      } else {
+        await router.push(`/pesquisador-pncp/cotacoes/${sessionId}`);
       }
     }
   } catch (err) {

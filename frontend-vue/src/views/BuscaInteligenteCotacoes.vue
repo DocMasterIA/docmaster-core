@@ -294,12 +294,15 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
-  addCotacoesToItemInResearchSession,
-  addItemsToResearchSession,
   fetchAllItemsForBulkSearch,
   getResearchSession,
   intelligentMarketSearch,
 } from '../services/pncpResearch';
+import {
+  formatCotacaoSaveFeedback,
+  persistCotacoesToResearchSession,
+  shouldClearSavedSelection,
+} from '../utils/pncpSaveCotacoes';
 import { MUNICIPIOS_POR_UF } from '../data/brasilMunicipiosPorUf';
 import { buildRecortesGeograficosPayload } from '../utils/recortesGeograficos';
 import {
@@ -1124,7 +1127,7 @@ async function runSearchWithContext({
         esferaAdministrativa: classificarEsferaAdministrativa(it),
         incisoClassificacao: mapEsferaParaInciso(classificarEsferaAdministrativa(it)),
         id: `backend-${context?.id || 'none'}-${geoKeyPart}-${idx}-${it.numero_pncp || 'x'}-${it.numero_item ?? idx}`,
-        itemId: context?.id || null,
+        itemId: context?.id ?? itemId.value ?? null,
         itemRefLabel: context?.descricao_item || '-',
         sourceRaw: it,
         numeroPncp: it.numero_pncp || null,
@@ -1404,49 +1407,28 @@ async function adicionarSelecionadosNaCotacao() {
   }
   try {
     isSavingSelecionados.value = true;
-    const selectedWithItem = enviar.filter((x) => Number.isFinite(Number(x.item_ref_id || x.itemId)));
-    if (selectedWithItem.length > 0) {
-      const byItem = new Map();
-      for (const row of selectedWithItem) {
-        const iid = Number(row.item_ref_id || row.itemId);
-        if (!byItem.has(iid)) byItem.set(iid, []);
-        byItem.get(iid).push(row);
-      }
-      const entries = [...byItem.entries()];
-      let total = 0;
-      let done = 0;
-      const CONCURRENCY = 4;
-      let nextIdx = 0;
-      async function saveWorker() {
-        while (nextIdx < entries.length) {
-          const batchIdx = nextIdx;
-          nextIdx += 1;
-          const [iid, arr] = entries[batchIdx];
-          saveMessage.value = `Salvando... ${done + 1}/${entries.length} item(ns)`;
-          const res = await addCotacoesToItemInResearchSession(sessionId, iid, arr);
-          total += Number(res?.cotacoes_inseridas || arr.length);
-          done += 1;
-          saveMessage.value = `Salvando... ${done}/${entries.length} item(ns)`;
+    const stats = await persistCotacoesToResearchSession(sessionId, enviar, {
+      routeItemId: itemId.value,
+      onProgress: ({ done, total }) => {
+        if (total > 1) {
+          saveMessage.value = `Salvando... ${done}/${total} item(ns)`;
         }
+      },
+    });
+    saveMessage.value = formatCotacaoSaveFeedback(stats, {
+      routeItemId: itemId.value,
+      semFornecedorUi: semFornecedor,
+    });
+    if (shouldClearSavedSelection(stats, enviar.length)) {
+      const selectedIds = new Set(displayedRows.value.filter((r) => r.selecionado).map((r) => r.id));
+      rows.value = rows.value.filter((r) => !selectedIds.has(r.id));
+    }
+    if (stats.inseridas > 0 || stats.itensNovos > 0) {
+      if (itemId.value) {
+        await router.push(`/pesquisador-pncp/cotacoes/${sessionId}/itens/${itemId.value}`);
+      } else {
+        await router.push(`/pesquisador-pncp/cotacoes/${sessionId}`);
       }
-      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, entries.length) }, () => saveWorker()));
-      saveMessage.value = `${total} cotação(ões) adicionadas aos itens da cotação.`;
-      const selectedIds = new Set(displayedRows.value.filter((r) => r.selecionado).map((r) => r.id));
-      rows.value = rows.value.filter((r) => !selectedIds.has(r.id));
-      await router.push(`/pesquisador-pncp/cotacoes/${sessionId}`);
-    } else if (itemId.value) {
-      const res = await addCotacoesToItemInResearchSession(sessionId, itemId.value, enviar);
-      const inseridas = Number(res?.cotacoes_inseridas ?? 0);
-      const ignoradas = Number(res?.cotacoes_ignoradas_duplicadas ?? 0);
-      saveMessage.value = ignoradas > 0
-        ? `${inseridas} cotação(ões) adicionadas ao item (${ignoradas} duplicada(s) ignorada(s)).`
-        : `${inseridas || enviar.length} cotação(ões) adicionadas ao item.`;
-      const selectedIds = new Set(displayedRows.value.filter((r) => r.selecionado).map((r) => r.id));
-      rows.value = rows.value.filter((r) => !selectedIds.has(r.id));
-      await router.push(`/pesquisador-pncp/cotacoes/${sessionId}`);
-    } else {
-      const res = await addItemsToResearchSession(sessionId, enviar);
-      saveMessage.value = `${res.itens_inseridos ?? enviar.length} item(ns) adicionados à cotação.`;
     }
   } catch (err) {
     saveMessage.value = `Falha ao salvar: ${err.message || 'erro desconhecido'}`;

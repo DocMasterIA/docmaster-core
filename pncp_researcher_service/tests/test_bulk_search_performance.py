@@ -76,6 +76,33 @@ class BulkSearchPerformanceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("fio nylon agulha", [c.lower() for c in calls])
         self.assertGreaterEqual(len(out.get("itens") or []), 1)
 
+    async def test_bulk_local_search_defers_supplier_filter(self):
+        payload = MarketSearchRequest(
+            termo_busca="ITEM TESTE BULK FILTRO",
+            busca_lote=True,
+            somente_homologados=False,
+        )
+        fake = {
+            "ok": True,
+            "itens": [
+                {
+                    "descricao_item": "ITEM TESTE",
+                    "valor_unitario": 10.0,
+                    "fornecedor": "Não se aplica",
+                    "numero_pncp": "1",
+                }
+            ],
+            "stats": {},
+        }
+        with patch("app.service.local_item_search", return_value=fake) as local_mock, patch(
+            "app.service.market_search", new_callable=AsyncMock
+        ):
+            await market_search_intelligent(payload)
+        self.assertGreaterEqual(local_mock.call_count, 1)
+        kw = local_mock.call_args.kwargs
+        self.assertFalse(kw.get("filtrar_fornecedor_para_exibicao", True))
+        self.assertEqual(kw.get("enrich_homolog_max"), 6)
+
     def test_bulk_timeout_response_shape(self):
         payload = MarketSearchRequest(termo_busca="X", busca_lote=True)
         out = _bulk_search_timeout_response(payload)

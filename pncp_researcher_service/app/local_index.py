@@ -51,7 +51,7 @@ from .supplier_resolver import (
     resolve_from_item_catalog_row,
     resolve_from_resultados_payload,
 )
-from .pricing_display import filter_items_for_search_display
+from .pricing_display import filter_items_for_search_display, filter_items_with_display_price
 
 
 def _sqlite_pncp_search_norm(value: Any) -> str:
@@ -2323,6 +2323,8 @@ def local_item_search(
     limit: int = 500,
     cleanup_for_display: bool = True,
     somente_homologados: Optional[bool] = None,
+    filtrar_fornecedor_para_exibicao: bool = True,
+    enrich_homolog_max: Optional[int] = None,
 ) -> Dict[str, Any]:
     ensure_local_index()
     only_homolog = _resolve_somente_homologados_flag(somente_homologados)
@@ -2481,12 +2483,18 @@ def local_item_search(
         if len(itens) >= max(1, min(int(limit), 5000)):
             break
 
-    enrich_max = max(0, int(PNCP_SEARCH_ENRICH_HOMOLOG_MAX))
+    enrich_max = max(
+        0,
+        int(enrich_homolog_max if enrich_homolog_max is not None else PNCP_SEARCH_ENRICH_HOMOLOG_MAX),
+    )
     enrich_n = 0
     if enrich_max and candidatos_enrich:
         enrich_n = _enrich_homolog_items_from_pncp_sync(candidatos_enrich, max_n=enrich_max)
 
-    itens = filter_items_for_search_display(itens)
+    if filtrar_fornecedor_para_exibicao:
+        itens = filter_items_for_search_display(itens)
+    else:
+        itens = filter_items_with_display_price(itens)
     com_fornecedor = sum(1 for it in itens if str(it.get("cnpj_fornecedor") or "").strip())
 
     return {

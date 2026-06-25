@@ -56,6 +56,7 @@ from .config import (
     PNCP_SEARCH_MAX_SIMILAR_IN_TOP3,
     PNCP_IA_RERANK_MIXED_POOL,
     PNCP_BULK_SEARCH_SQL_LIMIT,
+    PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX,
 )
 from .pncp_client import (
     PNCPClientError,
@@ -2215,6 +2216,10 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             limit=limit,
             cleanup_for_display=False,
             somente_homologados=search_payload.somente_homologados,
+            filtrar_fornecedor_para_exibicao=not busca_lote,
+            enrich_homolog_max=(
+                max(0, int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX)) if busca_lote else None
+            ),
         )
         if not base_stats:
             base_stats = dict(batch_result.get("stats") or {})
@@ -2235,6 +2240,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         "filtrados_token_match": int(base_stats.get("filtrados_token_match") or 0),
         "filtrados_nao_homologados": int(base_stats.get("filtrados_nao_homologados") or 0),
         "busca_lote_relaxada": bool(busca_lote),
+        "busca_lote_fornecedor_filter_final_only": bool(busca_lote),
         "hybrid_bulk_disabled": bool(busca_lote and not PNCP_HYBRID_BULK_ENABLED),
         "bulk_max_term_fallbacks": int(PNCP_BULK_MAX_TERM_FALLBACKS) if busca_lote else None,
         "search_terms_tried": terms_tried,

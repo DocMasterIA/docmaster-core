@@ -355,6 +355,8 @@ PNCP_BULK_MAX_TERM_FALLBACKS: int = _env_int("PNCP_BULK_MAX_TERM_FALLBACKS", 6)
 PNCP_BULK_SEARCH_MAX_SECONDS: float = float(os.getenv("PNCP_BULK_SEARCH_MAX_SECONDS", "90"))
 # Enrich PNCP ao vivo no top3 em lote (0 = só índice local — muito mais rápido).
 PNCP_BULK_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_BULK_ENRICH_HOMOLOG_MAX", 0)
+# Enrich síncrono por tentativa de termo em busca_lote (menor que PNCP_SEARCH_ENRICH_HOMOLOG_MAX).
+PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX", 6)
 # Score mínimo (0–100) para considerar item aderente na busca inteligente (antes ~60–70 implícito).
 PNCP_SEARCH_MIN_SCORE_APROVACAO: int = _env_int("PNCP_SEARCH_MIN_SCORE_APROVACAO", 50)
 # Modo qualidade (recomendado com Qwen): tiers mais rígidos, menos fallback agressivo, rerank IA no pool misto.

@@ -144,25 +144,15 @@
 <script setup>
 import { reactive } from 'vue';
 
-const cargos = [
-  'Prefeito(a)',
-  'Secretário(a) Municipal',
-  'Diretor(a) de Departamento',
-  'Coordenador(a)',
-  'Chefe de Setor',
-  'Gestor(a) de Contratos',
-  'Fiscal de Contratos',
-];
-
 const sections = [
   {
     key: 'solicitacao',
     title: '1. Solicitação / Ofício',
     fields: [
       { id: 'solicitacao_destinatario_nome', label: '1.1 A quem é direcionada a solicitação? Nome', input: 'text' },
-      { id: 'solicitacao_destinatario_cargo', label: '1.1 Função / Cargo', input: 'datalist' },
+      { id: 'solicitacao_destinatario_cargo', label: '1.1 Cargo', input: 'text' },
       { id: 'solicitacao_responsavel_nome', label: '1.2 Responsável pela Solicitação? Nome', input: 'textarea', fullWidth: true },
-      { id: 'solicitacao_responsavel_cargo', label: '1.2 Função / Cargo', input: 'datalist' },
+      { id: 'solicitacao_responsavel_cargo', label: '1.2 Cargo', input: 'text' },
     ],
   },
   {
@@ -174,7 +164,7 @@ const sections = [
       { id: 'dfd_email', label: 'E-mail', input: 'email', required: true },
       { id: 'dfd_gestor', label: 'Nome do(a) Gestor(a) de Contratos', input: 'text', required: true },
       { id: 'dfd_fiscal', label: 'Nome do(a) Fiscal de Contratos', input: 'text', required: true },
-      { id: 'dfd_assinatura_cargo', label: 'Função / Cargo do responsável pela assinatura da DFD', input: 'datalist', required: true },
+      { id: 'dfd_assinatura_cargo', label: 'Cargo do responsável pela assinatura da DFD', input: 'text', required: true },
     ],
   },
   {
@@ -188,7 +178,7 @@ const sections = [
       { id: 'tr_data_automatica', label: 'Inserir data atual automaticamente', input: 'checkbox', checkboxHint: 'Inserir data atual automaticamente.' },
       { id: 'tr_heading', label: 'Assinatura do Termo', input: 'heading', fullWidth: true },
       { id: 'tr_nome_assinante', label: 'Nome de quem assinará o Termo de Referência', input: 'textarea', fullWidth: true },
-      { id: 'tr_cargo_assinante', label: 'Função / Cargo de quem assina o Termo', input: 'datalist' },
+      { id: 'tr_cargo_assinante', label: 'Cargo de quem assina o Termo', input: 'text' },
     ],
   },
 ];
@@ -222,8 +212,7 @@ for (const section of sections) {
     if (field.input === 'heading') continue;
     form[field.id] = field.input === 'checkbox' ? false : '';
     if (field.input === 'text' || field.input === 'email' || field.input === 'datalist') {
-      const isCargoField = field.input === 'datalist';
-      const base = isCargoField ? cargos : (FIELD_PRESETS[field.id] || []);
+      const base = FIELD_PRESETS[field.id] || [];
       fieldOptions[field.id] = [...base];
     }
   }

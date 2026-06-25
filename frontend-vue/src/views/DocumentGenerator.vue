@@ -643,19 +643,7 @@ const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
 const LIBRARY_TEMPLATE_ID_KEY = '__library_template_id__';
 const LIBRARY_TEMPLATE_NAME_KEY = '__library_template_name__';
 
-/** Sugestões para Função/Cargo (o usuário pode digitar outro valor). */
-const CARGO_DATALIST_OPTIONS = [
-  'Prefeito(a)',
-  'Secretário(a) Municipal',
-  'Diretor(a) de Departamento',
-  'Coordenador(a)',
-  'Chefe de Setor',
-  'Procurador(a) do Município',
-  'Fiscal de Contratos',
-  'Gestor(a) de Contratos',
-  'Outro (registrar no campo)',
-];
-
+/** Sugestões por campo (selecionáveis), com suporte a adicionar novos valores. */
 const FLOW_CONFIG = {
   DispensaArt75IManutencaoVeiculos: {
     title: 'Assistente de Criação - Dispensa de Licitação - Art. 75, Inciso I - Manutenção de Veículos (Lei nº 14.133/2021)',
@@ -679,15 +667,15 @@ const FLOW_CONFIG = {
           },
           {
             id: 'solicitacao_destinatario_cargo',
-            label: '1.2 A quem é direcionada a solicitação — Função / Cargo',
-            input: 'datalist',
+            label: '1.2 A quem é direcionada a solicitação — Cargo',
+            input: 'text',
           },
           { id: '_h_solicitacao_responsavel', label: '1.3 Responsável pela solicitação', input: 'heading', fullWidth: true },
           { id: 'solicitacao_responsavel_nome', label: 'Nome do responsável', input: 'textarea', fullWidth: true },
           {
             id: 'solicitacao_responsavel_cargo',
-            label: 'Função / Cargo',
-            input: 'datalist',
+            label: 'Cargo',
+            input: 'text',
           },
         ],
       },
@@ -715,7 +703,7 @@ const FLOW_CONFIG = {
           },
           {
             id: 'dfd_assinatura_cargo',
-            label: 'Função / Cargo',
+            label: 'Cargo',
             input: 'text',
             required: true,
           },
@@ -782,7 +770,7 @@ const FLOW_CONFIG = {
         fields: [
           { id: 'fiscal_nome', label: 'Nome do fiscal de contratos', input: 'text' },
           { id: 'responsavel_tr_nome', label: 'Nome do responsável', input: 'textarea', fullWidth: true },
-          { id: 'responsavel_tr_cargo', label: 'Cargo/Função', input: 'text' },
+          { id: 'responsavel_tr_cargo', label: 'Cargo', input: 'text' },
           { id: 'modo_data', label: 'Modo da data', input: 'text' },
         ],
       },
@@ -1225,8 +1213,7 @@ function resetSlotFormAndSections() {
       if (field.input === 'heading') continue;
       slotForm[field.id] = field.input === 'checkbox' ? false : '';
       if (field.input === 'text' || field.input === 'email' || field.input === 'datalist') {
-        const isCargoField = field.input === 'datalist';
-        const base = isCargoField ? CARGO_DATALIST_OPTIONS : (SLOT_FIELD_PRESETS[field.id] || []);
+        const base = SLOT_FIELD_PRESETS[field.id] || [];
         slotFieldOptions[field.id] = [...base];
       }
     }

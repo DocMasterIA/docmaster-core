@@ -154,7 +154,7 @@
                   />
                 </div>
                 <div class="fe-field">
-                  <label>Cargo/Função</label>
+                  <label>Cargo</label>
                   <input
                     :value="responsavelCargo"
                     placeholder="Digite o cargo"
@@ -292,10 +292,9 @@
                 </select>
               </div>
               <div class="fe-field fe-col-2">
-                <label>1.2 A quem é direcionada a solicitação — Função/Cargo</label>
+                <label>1.2 A quem é direcionada a solicitação — Cargo</label>
                 <input
                   :value="cargo"
-                  list="dl-solicitacao-destinatario-cargo"
                   @input="cargo = tituloNomePt(String(($event.target).value || ''))"
                 />
               </div>
@@ -313,11 +312,10 @@
                 />
               </div>
               <div class="fe-field">
-                <label>Função / Cargo</label>
+                <label>Cargo</label>
                 <input
                   :value="fixoResponsavelCargo"
-                  list="dl-solicitacao-responsavel-cargo"
-                  placeholder="Digite a função ou cargo"
+                  placeholder="Digite o cargo"
                   @input="fixoResponsavelCargo = tituloNomePt(String(($event.target).value || ''))"
                 />
               </div>
@@ -376,11 +374,10 @@
                 />
               </div>
               <div class="fe-field">
-                <label>Função / Cargo</label>
+                <label>Cargo</label>
                 <input
                   :value="fixoAssinaturaCargo"
-                  list="dl-dfd-assinatura-cargo"
-                  placeholder="Digite a função ou cargo"
+                  placeholder="Digite o cargo"
                   @input="fixoAssinaturaCargo = tituloNomePt(String(($event.target).value || ''))"
                 />
               </div>
@@ -396,16 +393,13 @@
     <datalist id="dl-processo-numero"><option v-for="v in (slotFieldOptions.processo_numero || [])" :key="`pn-${v}`" :value="v" /></datalist>
     <datalist id="dl-orgao"><option v-for="v in mergedOrgaoOptions" :key="`org-${v}`" :value="v" /></datalist>
     <datalist id="dl-solicitacao-destinatario-nome"><option v-for="v in (slotFieldOptions.solicitacao_destinatario_nome || [])" :key="`sdn-${v}`" :value="v" /></datalist>
-    <datalist id="dl-solicitacao-destinatario-cargo"><option v-for="v in (slotFieldOptions.solicitacao_destinatario_cargo || [])" :key="`sdc-${v}`" :value="v" /></datalist>
     <datalist id="dl-solicitacao-responsavel-nome"><option v-for="v in (slotFieldOptions.solicitacao_responsavel_nome || [])" :key="`srn-${v}`" :value="v" /></datalist>
-    <datalist id="dl-solicitacao-responsavel-cargo"><option v-for="v in (slotFieldOptions.solicitacao_responsavel_cargo || [])" :key="`src-${v}`" :value="v" /></datalist>
     <datalist id="dl-dfd-setor-requisitante"><option v-for="v in (slotFieldOptions.dfd_setor_requisitante || [])" :key="`dsr-${v}`" :value="v" /></datalist>
     <datalist id="dl-dfd-responsavel-demanda"><option v-for="v in (slotFieldOptions.dfd_responsavel_demanda || [])" :key="`drd-${v}`" :value="v" /></datalist>
     <datalist id="dl-dfd-email"><option v-for="v in (slotFieldOptions.dfd_email || [])" :key="`de-${v}`" :value="v" /></datalist>
     <datalist id="dl-dfd-gestor-contratos"><option v-for="v in (slotFieldOptions.dfd_gestor_contratos || [])" :key="`dgc-${v}`" :value="v" /></datalist>
     <datalist id="dl-dfd-fiscal-contratos"><option v-for="v in (slotFieldOptions.dfd_fiscal_contratos || [])" :key="`dfc-${v}`" :value="v" /></datalist>
     <datalist id="dl-dfd-assinatura-nome"><option v-for="v in (slotFieldOptions.dfd_assinatura_nome || [])" :key="`dan-${v}`" :value="v" /></datalist>
-    <datalist id="dl-dfd-assinatura-cargo"><option v-for="v in (slotFieldOptions.dfd_assinatura_cargo || [])" :key="`dac-${v}`" :value="v" /></datalist>
   </div>
 </template>
 
@@ -1192,7 +1186,7 @@ const secoes = computed(() => [
     completo: campoPreenchido(responsavel.value) && campoPreenchido(responsavelCargo.value),
     linhas: [
       ['Responsável', responsavel.value || 'Não informado', campoPreenchido(responsavel.value)],
-      ['Cargo/Função', responsavelCargo.value || 'Não informado', campoPreenchido(responsavelCargo.value)],
+      ['Cargo', responsavelCargo.value || 'Não informado', campoPreenchido(responsavelCargo.value)],
     ],
   },
   {

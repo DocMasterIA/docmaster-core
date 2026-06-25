@@ -211,10 +211,10 @@
                   />
                 </div>
                 <div class="ixp-field">
-                  <label>Cargo / função</label>
+                  <label>Cargo</label>
                   <input
                     :value="responsavelCargo"
-                    list="dl-tr-cargo-assinante"
+                    placeholder="Digite o cargo"
                     @input="responsavelCargo = tituloNomePt(String(($event.target).value || ''))"
                   />
                 </div>
@@ -396,12 +396,11 @@
                 </select>
               </div>
               <div class="ixp-field ixp-col-2">
-                <label>1.2 A quem é direcionada a solicitação — função / cargo</label>
+                <label>1.2 A quem é direcionada a solicitação — Cargo</label>
                 <input
                   :value="fixoCargo"
                   class="da75-input da75-input--sm"
-                  list="dl-solicitacao-destinatario-cargo"
-                  placeholder="Digite a função ou cargo"
+                  placeholder="Digite o cargo"
                   @input="fixoCargo = tituloNomePt(String(($event.target).value || ''))"
                 />
               </div>
@@ -419,11 +418,10 @@
                 />
               </div>
               <div class="ixp-field">
-                <label>Função / cargo</label>
+                <label>Cargo</label>
                 <input
                   :value="fixoResponsavelCargo"
                   class="da75-input da75-input--sm"
-                  list="dl-solicitacao-responsavel-cargo"
                   placeholder="Digite o cargo"
                   @input="fixoResponsavelCargo = tituloNomePt(String(($event.target).value || ''))"
                 />
@@ -487,11 +485,10 @@
                 />
               </div>
               <div class="ixp-field">
-                <label>Função / cargo</label>
+                <label>Cargo</label>
                 <input
                   :value="fixoAssinaturaCargo"
                   class="da75-input da75-input--sm"
-                  list="dl-dfd-assinatura-cargo"
                   placeholder="Digite o cargo"
                   @input="fixoAssinaturaCargo = tituloNomePt(String(($event.target).value || ''))"
                 />
@@ -510,19 +507,15 @@
     <datalist id="dl-fornecedor"><option v-for="v in (slotFieldOptions.fornecedor || [])" :key="`f-${v}`" :value="v" /></datalist>
     <datalist id="dl-fiscal"><option v-for="v in (slotFieldOptions.fiscal || [])" :key="`fi-${v}`" :value="v" /></datalist>
     <datalist id="dl-tr-nome-assinante"><option v-for="v in (slotFieldOptions.tr_nome_assinante || [])" :key="`na-${v}`" :value="v" /></datalist>
-    <datalist id="dl-tr-cargo-assinante"><option v-for="v in (slotFieldOptions.tr_cargo_assinante || [])" :key="`ca-${v}`" :value="v" /></datalist>
     <datalist id="dl-clausula-setor"><option v-for="v in (slotFieldOptions.clausula_setor || [])" :key="`cs-${v}`" :value="v" /></datalist>
     <datalist id="dl-solicitacao-destinatario-nome"><option v-for="v in (slotFieldOptions.solicitacao_destinatario_nome || [])" :key="`sdn-${v}`" :value="v" /></datalist>
-    <datalist id="dl-solicitacao-destinatario-cargo"><option v-for="v in (slotFieldOptions.solicitacao_destinatario_cargo || [])" :key="`sdc-${v}`" :value="v" /></datalist>
     <datalist id="dl-solicitacao-responsavel-nome"><option v-for="v in (slotFieldOptions.solicitacao_responsavel_nome || [])" :key="`srn-${v}`" :value="v" /></datalist>
-    <datalist id="dl-solicitacao-responsavel-cargo"><option v-for="v in (slotFieldOptions.solicitacao_responsavel_cargo || [])" :key="`src-${v}`" :value="v" /></datalist>
     <datalist id="dl-dfd-setor-requisitante"><option v-for="v in (slotFieldOptions.dfd_setor_requisitante || [])" :key="`dsr-${v}`" :value="v" /></datalist>
     <datalist id="dl-dfd-responsavel-demanda"><option v-for="v in (slotFieldOptions.dfd_responsavel_demanda || [])" :key="`drd-${v}`" :value="v" /></datalist>
     <datalist id="dl-dfd-email"><option v-for="v in (slotFieldOptions.dfd_email || [])" :key="`de-${v}`" :value="v" /></datalist>
     <datalist id="dl-dfd-gestor-contratos"><option v-for="v in (slotFieldOptions.dfd_gestor_contratos || [])" :key="`dgc-${v}`" :value="v" /></datalist>
     <datalist id="dl-dfd-fiscal-contratos"><option v-for="v in (slotFieldOptions.dfd_fiscal_contratos || [])" :key="`dfc-${v}`" :value="v" /></datalist>
     <datalist id="dl-dfd-assinatura-nome"><option v-for="v in (slotFieldOptions.dfd_assinatura_nome || [])" :key="`dan-${v}`" :value="v" /></datalist>
-    <datalist id="dl-dfd-assinatura-cargo"><option v-for="v in (slotFieldOptions.dfd_assinatura_cargo || [])" :key="`dac-${v}`" :value="v" /></datalist>
   </div>
 </template>
 
@@ -1906,7 +1899,7 @@ const secoes = computed(() => {
     { titulo: 'Dotação orçamentária', completo: !dotacaoAtiva.value || isFilled(dotacao.value), linhas: [['Situação', dotacaoAtiva.value ? 'Informar dotação' : 'Não informada', true], ['Dotação', dotacaoAtiva.value ? dotacao.value || 'Não informada' : 'Não se aplica', !dotacaoAtiva.value || isFilled(dotacao.value)]] },
     { titulo: 'Itens', completo: itensValidos.length > 0 && isFilled(valorGlobal.value), linhas: [['Itens lançados', String(itensValidos.length), itensValidos.length > 0], ['Valor global', valorGlobal.value || 'Não informado', isFilled(valorGlobal.value)]] },
     { titulo: 'Fiscalização', completo: isFilled(fiscal.value), linhas: [['Fiscal', fiscal.value || 'Não informado', isFilled(fiscal.value)]] },
-    { titulo: 'Responsável pelo TR', completo: isFilled(responsavel.value) && isFilled(responsavelCargo.value), linhas: [['Responsável', responsavel.value || 'Não informado', isFilled(responsavel.value)], ['Cargo/função', responsavelCargo.value || 'Não informado', isFilled(responsavelCargo.value)]] },
+    { titulo: 'Responsável pelo TR', completo: isFilled(responsavel.value) && isFilled(responsavelCargo.value), linhas: [['Responsável', responsavel.value || 'Não informado', isFilled(responsavel.value)], ['Cargo', responsavelCargo.value || 'Não informado', isFilled(responsavelCargo.value)]] },
     { titulo: 'Data', completo: isFilled(modoData.value) && (modoData.value !== 'Data manual' || isFilled(dataManual.value)), linhas: [['Modo', modoData.value || 'Não informado', isFilled(modoData.value)], ['Data', modoData.value === 'Data manual' ? dataManual.value || 'Não informada' : 'Não se aplica', modoData.value !== 'Data manual' || isFilled(dataManual.value)]] },
   ];
 });

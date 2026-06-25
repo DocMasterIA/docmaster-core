@@ -80,12 +80,11 @@
                 </select>
               </div>
               <div class="ixp-field ixp-col-2">
-                <label>1.2 A quem é direcionada a solicitação — Função / Cargo</label>
+                <label>1.2 A quem é direcionada a solicitação — Cargo</label>
                 <input
                   :value="ctx.fixoCargo"
                   class="da75-input da75-input--sm"
-                  list="da75-dl-solicitacao-destinatario-cargo"
-                  placeholder="Digite a função ou cargo"
+                  placeholder="Digite o cargo"
                   @input="ctx.fixoCargo = capNome(String(($event.target).value || ''))"
                 />
               </div>
@@ -103,11 +102,10 @@
                 />
               </div>
               <div class="ixp-field">
-                <label>Função / Cargo</label>
+                <label>Cargo</label>
                 <input
                   :value="ctx.fixoResponsavelCargo"
                   class="da75-input da75-input--sm"
-                  list="da75-dl-solicitacao-responsavel-cargo"
                   placeholder="Digite o cargo"
                   @input="ctx.fixoResponsavelCargo = capNome(String(($event.target).value || ''))"
                 />
@@ -172,11 +170,10 @@
                 />
               </div>
               <div class="ixp-field">
-                <label>Função / Cargo</label>
+                <label>Cargo</label>
                 <input
                   :value="ctx.fixoAssinaturaCargo"
                   class="da75-input da75-input--sm"
-                  list="da75-dl-dfd-assinatura-cargo"
                   placeholder="Digite o cargo"
                   @input="ctx.fixoAssinaturaCargo = capNome(String(($event.target).value || ''))"
                 />
@@ -219,11 +216,10 @@
                 />
               </div>
               <div class="ixp-field">
-                <label>Cargo / Função</label>
+                <label>Cargo</label>
                 <input
                   :value="ctx.fixoTrResponsavelCargo"
                   class="da75-input da75-input--sm"
-                  list="da75-dl-tr-resp-cargo"
                   @input="ctx.fixoTrResponsavelCargo = capNome(String(($event.target).value || ''))"
                 />
               </div>
@@ -239,14 +235,8 @@
       <datalist id="da75-dl-solicitacao-destinatario-nome">
         <option v-for="v in (ctx.slotFieldOptions.solicitacao_destinatario_nome || [])" :key="`sdn-${v}`" :value="v" />
       </datalist>
-      <datalist id="da75-dl-solicitacao-destinatario-cargo">
-        <option v-for="v in (ctx.slotFieldOptions.solicitacao_destinatario_cargo || [])" :key="`sdc-${v}`" :value="v" />
-      </datalist>
       <datalist id="da75-dl-solicitacao-responsavel-nome">
         <option v-for="v in (ctx.slotFieldOptions.solicitacao_responsavel_nome || [])" :key="`srn-${v}`" :value="v" />
-      </datalist>
-      <datalist id="da75-dl-solicitacao-responsavel-cargo">
-        <option v-for="v in (ctx.slotFieldOptions.solicitacao_responsavel_cargo || [])" :key="`src-${v}`" :value="v" />
       </datalist>
       <datalist id="da75-dl-dfd-setor-requisitante">
         <option v-for="v in (ctx.slotFieldOptions.dfd_setor_requisitante || [])" :key="`dsr-${v}`" :value="v" />
@@ -266,17 +256,11 @@
       <datalist id="da75-dl-dfd-assinatura-nome">
         <option v-for="v in (ctx.slotFieldOptions.dfd_assinatura_nome || [])" :key="`dan-${v}`" :value="v" />
       </datalist>
-      <datalist id="da75-dl-dfd-assinatura-cargo">
-        <option v-for="v in (ctx.slotFieldOptions.dfd_assinatura_cargo || [])" :key="`dac-${v}`" :value="v" />
-      </datalist>
       <datalist id="da75-dl-tr-email-propostas">
         <option v-for="v in (ctx.slotFieldOptions.tr_email_recebimento_propostas || [])" :key="`trem-${v}`" :value="v" />
       </datalist>
       <datalist id="da75-dl-tr-resp-nome">
         <option v-for="v in (ctx.slotFieldOptions.tr_termo_responsavel_nome || [])" :key="`trn-${v}`" :value="v" />
-      </datalist>
-      <datalist id="da75-dl-tr-resp-cargo">
-        <option v-for="v in (ctx.slotFieldOptions.tr_termo_responsavel_cargo || [])" :key="`trc-${v}`" :value="v" />
       </datalist>
     </aside>
   </Teleport>

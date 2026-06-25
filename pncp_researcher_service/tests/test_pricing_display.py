@@ -67,6 +67,16 @@ class PricingDisplayTests(unittest.TestCase):
         self.assertEqual(out[0]["fornecedor"], "FORNECEDORA OK LTDA")
         self.assertEqual(out[1]["cnpj_fornecedor"], "12.345.678/0001-95")
 
+    def test_filter_manual_vs_price_only_equivalence_on_valid_rows(self):
+        valid = [
+            {"valor_unitario_estimado": 5.0, "fornecedor": "ACME LTDA"},
+            {"valor_unitario_estimado": 3.0, "cnpj_fornecedor": "12.345.678/0001-95"},
+        ]
+        self.assertEqual(
+            filter_items_for_search_display(valid),
+            filter_items_with_display_price(valid),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

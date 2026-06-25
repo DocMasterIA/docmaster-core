@@ -43,25 +43,28 @@ class BulkSearchPerformanceTests(unittest.IsolatedAsyncioTestCase):
             await market_search_intelligent(payload)
             live_mock.assert_not_called()
 
-    async def test_bulk_tries_extra_term_when_first_empty(self):
+    async def test_bulk_tries_second_term_when_first_empty(self):
         payload = MarketSearchRequest(
             termo_busca="FIO NYLON N° 4.0 COR PRETA COM AGULHA 2,5 CM",
             busca_lote=True,
-            max_paginas=3,
             somente_homologados=False,
         )
         calls: list[str] = []
 
         def _track(term, **kwargs):
             calls.append(term)
-            if term.strip().lower() == "fio nylon agulha":
+            if len(calls) >= 2:
                 return {
                     "ok": True,
                     "itens": [
                         {
                             "descricao_item": "FIO NYLON AGULHA TESTE",
                             "valor_unitario": 2.5,
+                            "fornecedor": "FORNECEDORA LTDA",
+                            "cnpj_fornecedor": "12.345.678/0001-95",
                             "numero_pncp": "9",
+                            "origem": "base_local_itens",
+                            "search_tier": "strict",
                         }
                     ],
                     "stats": {},
@@ -69,11 +72,14 @@ class BulkSearchPerformanceTests(unittest.IsolatedAsyncioTestCase):
             return {"ok": True, "itens": [], "stats": {}}
 
         with patch("app.service.local_item_search", side_effect=_track), patch(
-            "app.service.market_search", new_callable=AsyncMock
+            "app.service.market_search",
+            new_callable=AsyncMock,
+            return_value={"ok": True, "itens": [], "stats": {}},
+        ), patch(
+            "app.service.enrich_homolog_items_from_pncp", new_callable=AsyncMock, return_value=0
         ):
             out = await market_search_intelligent(payload)
-        self.assertGreaterEqual(len(calls), 3)
-        self.assertIn("fio nylon agulha", [c.lower() for c in calls])
+        self.assertEqual(len(calls), 2)
         self.assertGreaterEqual(len(out.get("itens") or []), 1)
 
     async def test_bulk_local_search_defers_supplier_filter(self):

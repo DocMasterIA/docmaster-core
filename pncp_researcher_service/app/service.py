@@ -74,7 +74,7 @@ from .local_index import (
 )
 from .schemas import MarketSearchRequest
 from .search_text_clean import apply_item_display_cleanup, normalize_for_search, preprocess_cotacao_search_term
-from .pricing_display import filter_items_with_display_price, row_display_unit_price
+from .pricing_display import filter_items_for_search_display, row_display_unit_price
 from .pricing_faixa import (
     compute_faixa_regional,
     faixa_regional_ativa,
@@ -2835,7 +2835,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     for row in top3:
         apply_item_display_cleanup(row)
 
-    top3 = filter_items_with_display_price(top3)
+    top3 = filter_items_for_search_display(top3)
     funil["top3_com_preco_positivo"] = len(top3)
 
     ia_resumo_ok = False

@@ -14,7 +14,32 @@ from .config import PNCP_SUPPLIER_ELIGIBLE_SITUATIONS, PNCP_SUPPLIER_SKIP_SITUAT
 _CNPJ_RE = re.compile(r"\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}")
 
 GENERIC_SUPPLIER_NAMES = frozenset(
-    {"demais", "nao informado", "não informado", "epp", "me", "mei", "outros", "n/a"}
+    {
+        "demais",
+        "nao informado",
+        "não informado",
+        "nao informada",
+        "não informada",
+        "epp",
+        "me",
+        "mei",
+        "outros",
+        "n/a",
+        "na",
+        "n.a",
+        "n.a.",
+        "nao se aplica",
+        "não se aplica",
+        "nao aplicavel",
+        "não aplicavel",
+        "não aplicável",
+        "sem fornecedor",
+        "nao consta",
+        "não consta",
+        "inexistente",
+        "-",
+        "—",
+    }
 )
 
 SUPPLIER_NAME_KEYS = (
@@ -76,6 +101,45 @@ def nome_fornecedor_e_util(nome: str) -> bool:
     if _CNPJ_RE.fullmatch(s.replace(" ", "")) or len(cnpj_digits(s)) == 14:
         return False
     return True
+
+
+def _fornecedor_nomes_no_item(it: Dict[str, Any]) -> List[str]:
+    names: List[str] = []
+    if not isinstance(it, dict):
+        return names
+    for key in (*SUPPLIER_NAME_KEYS, "fornecedor_nome", "nome_fornecedor"):
+        v = str(it.get(key) or "").strip()
+        if v:
+            names.append(v)
+    cad = it.get("fornecedor_cadastro")
+    if isinstance(cad, dict):
+        for k in ("razao_social", "nome_fantasia", "razaoSocial", "nomeFantasia"):
+            v = str(cad.get(k) or "").strip()
+            if v:
+                names.append(v)
+    return names
+
+
+def item_fornecedor_valido_para_busca(it: Dict[str, Any]) -> bool:
+    """
+    Resultado exibível na pesquisa de preços: CNPJ de fornecedor (14 dígitos)
+    ou razão social útil — rejeita placeholders como «Não se aplica».
+    """
+    if not isinstance(it, dict):
+        return False
+    cnpj = cnpj_digits(
+        it.get("cnpj_fornecedor")
+        or it.get("cnpjFornecedor")
+        or it.get("niFornecedor")
+        or it.get("cnpj")
+        or ""
+    )
+    if len(cnpj) == 14:
+        return True
+    names = _fornecedor_nomes_no_item(it)
+    if not names:
+        return False
+    return any(nome_fornecedor_e_util(n) for n in names)
 
 
 def _fonte_sufixada(prefix: str, sufixo: str) -> str:

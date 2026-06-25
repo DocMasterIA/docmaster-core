@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from django.utils import timezone
 
+from backend.app.services.pncp_supplier_placeholders import GENERIC_SUPPLIER_NAMES
 from backend.app.services.pncp_supplier_enrichment import (
     _nome_e_somente_cnpj_formatado,
     _promote_supplier_from_deep_walk,
@@ -326,7 +327,7 @@ def nome_fornecedor_e_util_para_exibicao(nome: str) -> bool:
     if len(n) <= 2:
         return False
     low = re.sub(r"\s+", " ", n).strip().lower()
-    if low in {"demais", "nao informado", "não informado", "epp", "me", "mei", "outros"}:
+    if low in GENERIC_SUPPLIER_NAMES:
         return False
     if low.startswith("pncp_"):
         return False

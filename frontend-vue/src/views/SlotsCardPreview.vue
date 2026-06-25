@@ -111,11 +111,11 @@
                       v-model="form[field.id]"
                       class="gov-input"
                       :list="`field-dl-${field.id}`"
-                      placeholder="Escolha ou digite o cargo"
+                      placeholder="Digite o nome"
                     />
                     <datalist :id="`field-dl-${field.id}`">
                       <option
-                        v-for="opt in fieldOptions[field.id] || cargos"
+                        v-for="opt in fieldOptions[field.id] || []"
                         :key="`${field.id}-${opt}`"
                         :value="opt"
                       />
@@ -150,9 +150,7 @@ const sections = [
     title: '1. Solicitação / Ofício',
     fields: [
       { id: 'solicitacao_destinatario_nome', label: '1.1 A quem é direcionada a solicitação? Nome', input: 'text' },
-      { id: 'solicitacao_destinatario_cargo', label: '1.1 Cargo', input: 'text' },
       { id: 'solicitacao_responsavel_nome', label: '1.2 Responsável pela Solicitação? Nome', input: 'textarea', fullWidth: true },
-      { id: 'solicitacao_responsavel_cargo', label: '1.2 Cargo', input: 'text' },
     ],
   },
   {
@@ -164,7 +162,7 @@ const sections = [
       { id: 'dfd_email', label: 'E-mail', input: 'email', required: true },
       { id: 'dfd_gestor', label: 'Nome do(a) Gestor(a) de Contratos', input: 'text', required: true },
       { id: 'dfd_fiscal', label: 'Nome do(a) Fiscal de Contratos', input: 'text', required: true },
-      { id: 'dfd_assinatura_cargo', label: 'Cargo do responsável pela assinatura da DFD', input: 'text', required: true },
+      { id: 'dfd_assinatura_nome', label: 'Nome do responsável pela assinatura da DFD', input: 'textarea', fullWidth: true, required: true },
     ],
   },
   {
@@ -178,7 +176,6 @@ const sections = [
       { id: 'tr_data_automatica', label: 'Inserir data atual automaticamente', input: 'checkbox', checkboxHint: 'Inserir data atual automaticamente.' },
       { id: 'tr_heading', label: 'Assinatura do Termo', input: 'heading', fullWidth: true },
       { id: 'tr_nome_assinante', label: 'Nome de quem assinará o Termo de Referência', input: 'textarea', fullWidth: true },
-      { id: 'tr_cargo_assinante', label: 'Cargo de quem assina o Termo', input: 'text' },
     ],
   },
 ];

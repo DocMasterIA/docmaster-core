@@ -51,6 +51,7 @@ from .supplier_resolver import (
     resolve_from_item_catalog_row,
     resolve_from_resultados_payload,
 )
+from .pricing_display import filter_items_for_search_display
 
 
 def _sqlite_pncp_search_norm(value: Any) -> str:
@@ -2484,7 +2485,9 @@ def local_item_search(
     enrich_n = 0
     if enrich_max and candidatos_enrich:
         enrich_n = _enrich_homolog_items_from_pncp_sync(candidatos_enrich, max_n=enrich_max)
-        com_fornecedor = sum(1 for it in itens if str(it.get("cnpj_fornecedor") or "").strip())
+
+    itens = filter_items_for_search_display(itens)
+    com_fornecedor = sum(1 for it in itens if str(it.get("cnpj_fornecedor") or "").strip())
 
     return {
         "ok": True,

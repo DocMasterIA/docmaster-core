@@ -210,14 +210,6 @@
                     @input="responsavel = tituloNomeMultilinePt(String(($event.target).value || ''))"
                   />
                 </div>
-                <div class="ixp-field">
-                  <label>Cargo</label>
-                  <input
-                    :value="responsavelCargo"
-                    placeholder="Digite o cargo"
-                    @input="responsavelCargo = tituloNomePt(String(($event.target).value || ''))"
-                  />
-                </div>
               </div>
             </article>
 
@@ -387,24 +379,6 @@
                 />
               </div>
             </div>
-            <div class="ixp-grid-3">
-              <div class="ixp-field">
-                <label>Tratamento</label>
-                <select v-model="fixoTratCargo" class="da75-select da75-select--sm">
-                  <option value="">Selecione</option>
-                  <option v-for="op in tratamentoCargo" :key="op" :value="op">{{ op }}</option>
-                </select>
-              </div>
-              <div class="ixp-field ixp-col-2">
-                <label>1.2 A quem é direcionada a solicitação — Cargo</label>
-                <input
-                  :value="fixoCargo"
-                  class="da75-input da75-input--sm"
-                  placeholder="Digite o cargo"
-                  @input="fixoCargo = tituloNomePt(String(($event.target).value || ''))"
-                />
-              </div>
-            </div>
             <h4 class="ixp-subsection-title">1.3 Responsável pela solicitação</h4>
             <div class="ixp-grid-1">
               <div class="ixp-field">
@@ -415,15 +389,6 @@
                   rows="3"
                   placeholder="Digite um ou mais nomes (Enter para nova linha)"
                   @input="fixoResponsavel = tituloNomeMultilinePt(String(($event.target).value || ''))"
-                />
-              </div>
-              <div class="ixp-field">
-                <label>Cargo</label>
-                <input
-                  :value="fixoResponsavelCargo"
-                  class="da75-input da75-input--sm"
-                  placeholder="Digite o cargo"
-                  @input="fixoResponsavelCargo = tituloNomePt(String(($event.target).value || ''))"
                 />
               </div>
             </div>
@@ -482,15 +447,6 @@
                   rows="3"
                   placeholder="Digite um ou mais nomes (Enter para nova linha)"
                   @input="fixoAssinatura = tituloNomeMultilinePt(String(($event.target).value || ''))"
-                />
-              </div>
-              <div class="ixp-field">
-                <label>Cargo</label>
-                <input
-                  :value="fixoAssinaturaCargo"
-                  class="da75-input da75-input--sm"
-                  placeholder="Digite o cargo"
-                  @input="fixoAssinaturaCargo = tituloNomePt(String(($event.target).value || ''))"
                 />
               </div>
             </div>
@@ -1416,9 +1372,10 @@ function buildSlotsOverride(iaDeepen = null) {
   }
   if (dataTermo) o.data_termo = dataTermo;
 
-  if (responsavel.value.trim()) o.nome_assinante_termo = responsavel.value.trim();
-  if (responsavelCargo.value.trim()) o.cargo_assinante_termo = responsavelCargo.value.trim();
-  if (responsavelCargo.value.trim()) o.secretaria_usuario = responsavelCargo.value.trim();
+  if (responsavel.value.trim()) {
+    o.nome_assinante_termo = responsavel.value.trim();
+    o.secretaria_usuario = responsavel.value.trim();
+  }
 
   // Tipo/revisão só na dispensa art. 75, I — na inexigibilidade 74, I não usar isto como objeto do ofício/TR.
   const manutencaoFallbackParts =
@@ -1899,7 +1856,7 @@ const secoes = computed(() => {
     { titulo: 'Dotação orçamentária', completo: !dotacaoAtiva.value || isFilled(dotacao.value), linhas: [['Situação', dotacaoAtiva.value ? 'Informar dotação' : 'Não informada', true], ['Dotação', dotacaoAtiva.value ? dotacao.value || 'Não informada' : 'Não se aplica', !dotacaoAtiva.value || isFilled(dotacao.value)]] },
     { titulo: 'Itens', completo: itensValidos.length > 0 && isFilled(valorGlobal.value), linhas: [['Itens lançados', String(itensValidos.length), itensValidos.length > 0], ['Valor global', valorGlobal.value || 'Não informado', isFilled(valorGlobal.value)]] },
     { titulo: 'Fiscalização', completo: isFilled(fiscal.value), linhas: [['Fiscal', fiscal.value || 'Não informado', isFilled(fiscal.value)]] },
-    { titulo: 'Responsável pelo TR', completo: isFilled(responsavel.value) && isFilled(responsavelCargo.value), linhas: [['Responsável', responsavel.value || 'Não informado', isFilled(responsavel.value)], ['Cargo', responsavelCargo.value || 'Não informado', isFilled(responsavelCargo.value)]] },
+    { titulo: 'Responsável pelo TR', completo: isFilled(responsavel.value), linhas: [['Responsável', responsavel.value || 'Não informado', isFilled(responsavel.value)]] },
     { titulo: 'Data', completo: isFilled(modoData.value) && (modoData.value !== 'Data manual' || isFilled(dataManual.value)), linhas: [['Modo', modoData.value || 'Não informado', isFilled(modoData.value)], ['Data', modoData.value === 'Data manual' ? dataManual.value || 'Não informada' : 'Não se aplica', modoData.value !== 'Data manual' || isFilled(dataManual.value)]] },
   ];
 });

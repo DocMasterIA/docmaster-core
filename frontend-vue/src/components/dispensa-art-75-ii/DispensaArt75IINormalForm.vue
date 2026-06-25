@@ -702,12 +702,10 @@ function buildSlotsOverride() {
   }
   if (String(dadosFixos.fixoEnderecoEntrega || '').trim()) o.endereco_entrega = String(dadosFixos.fixoEnderecoEntrega).trim();
   if (String(dadosFixos.fixoEmailPropostas || '').trim()) o.email_envio_propostas = String(dadosFixos.fixoEmailPropostas).trim();
-  if (String(dadosFixos.fixoTrResponsavelNome || '').trim()) o.nome_assinante_termo = String(dadosFixos.fixoTrResponsavelNome).trim();
-  const trCargoAssinatura = String(dadosFixos.fixoTrResponsavelCargo || '').trim();
-  if (trCargoAssinatura) {
-    o.cargo_assinante_termo = trCargoAssinatura;
-    // Modelo TR (dispensa): linha abaixo do nome = (TR_SECRETARIA_USUARIO).
-    o.secretaria_usuario = trCargoAssinatura;
+  if (String(dadosFixos.fixoTrResponsavelNome || '').trim()) {
+    const trNome = String(dadosFixos.fixoTrResponsavelNome).trim();
+    o.nome_assinante_termo = trNome;
+    o.secretaria_usuario = trNome;
   }
   if (dotacaoAtiva.value && String(dotacao.value || '').trim()) {
     const dotacaoTexto = String(dotacao.value).trim();

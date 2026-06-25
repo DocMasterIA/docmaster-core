@@ -153,14 +153,6 @@
                     @input="responsavel = tituloNomeMultilinePt(String(($event.target).value || ''))"
                   />
                 </div>
-                <div class="fe-field">
-                  <label>Cargo</label>
-                  <input
-                    :value="responsavelCargo"
-                    placeholder="Digite o cargo"
-                    @input="responsavelCargo = tituloNomePt(String(($event.target).value || ''))"
-                  />
-                </div>
               </div>
             </article>
 
@@ -283,22 +275,6 @@
                 />
               </div>
             </div>
-            <div class="fe-grid-3">
-              <div class="fe-field">
-                <label>Tratamento</label>
-                <select v-model="tratCargo" class="da75-select da75-select--sm">
-                  <option value="">Selecione</option>
-                  <option v-for="o in tratamentoCargo" :key="o" :value="o">{{ o }}</option>
-                </select>
-              </div>
-              <div class="fe-field fe-col-2">
-                <label>1.2 A quem é direcionada a solicitação — Cargo</label>
-                <input
-                  :value="cargo"
-                  @input="cargo = tituloNomePt(String(($event.target).value || ''))"
-                />
-              </div>
-            </div>
             <h4 class="fe-subsection-title">1.3 Responsável pela solicitação</h4>
             <div class="fe-grid-1">
               <div class="fe-field">
@@ -309,14 +285,6 @@
                   rows="3"
                   placeholder="Digite um ou mais nomes (Enter para nova linha)"
                   @input="fixoResponsavel = tituloNomeMultilinePt(String(($event.target).value || ''))"
-                />
-              </div>
-              <div class="fe-field">
-                <label>Cargo</label>
-                <input
-                  :value="fixoResponsavelCargo"
-                  placeholder="Digite o cargo"
-                  @input="fixoResponsavelCargo = tituloNomePt(String(($event.target).value || ''))"
                 />
               </div>
             </div>
@@ -371,14 +339,6 @@
                   rows="3"
                   placeholder="Digite um ou mais nomes (Enter para nova linha)"
                   @input="fixoAssinatura = tituloNomeMultilinePt(String(($event.target).value || ''))"
-                />
-              </div>
-              <div class="fe-field">
-                <label>Cargo</label>
-                <input
-                  :value="fixoAssinaturaCargo"
-                  placeholder="Digite o cargo"
-                  @input="fixoAssinaturaCargo = tituloNomePt(String(($event.target).value || ''))"
                 />
               </div>
             </div>
@@ -951,7 +911,7 @@ function buildSlotsOverride(iaDeepen = null) {
     sol_oficio_destinatario_cargo: String(cargo.value || '').trim(),
     sol_oficio_responsavel_nome: String(fixoResponsavel.value || '').trim(),
     sol_oficio_responsavel_cargo: String(fixoResponsavelCargo.value || '').trim(),
-    secretaria_usuario: String((responsavelCargo.value || '').trim()),
+    secretaria_usuario: String((responsavel.value || '').trim()),
     dfd_setor_requisitante: String((fixoSetor.value || orgao.value || '').trim()),
     dfd_responsavel_demanda: String(fixoDemanda.value || '').trim(),
     dfd_email: String(fixoEmail.value || '').trim(),
@@ -989,7 +949,6 @@ function buildSlotsOverride(iaDeepen = null) {
   const fiscalNome = String((fixoFiscal.value || fiscal.value || '')).trim();
   o.fiscal = fiscalNome ? { nome: fiscalNome } : undefined;
   o.nome_assinante_termo = String(responsavel.value || '').trim();
-  o.cargo_assinante_termo = String(responsavelCargo.value || '').trim();
 
   if (iaDeepen) {
     applyInexigibilidadeDeepenedClauses(o, iaDeepen);
@@ -1183,10 +1142,9 @@ const secoes = computed(() => [
   },
   {
     titulo: 'Responsável pelo TR',
-    completo: campoPreenchido(responsavel.value) && campoPreenchido(responsavelCargo.value),
+    completo: campoPreenchido(responsavel.value),
     linhas: [
       ['Responsável', responsavel.value || 'Não informado', campoPreenchido(responsavel.value)],
-      ['Cargo', responsavelCargo.value || 'Não informado', campoPreenchido(responsavelCargo.value)],
     ],
   },
   {

@@ -71,24 +71,6 @@
                 />
               </div>
             </div>
-            <div class="ixp-grid-3">
-              <div class="ixp-field">
-                <label>Tratamento</label>
-                <select v-model="ctx.fixoTratCargo" class="da75-select da75-select--sm">
-                  <option value="">Selecione</option>
-                  <option v-for="op in ctx.tratamentoCargo" :key="op" :value="op">{{ op }}</option>
-                </select>
-              </div>
-              <div class="ixp-field ixp-col-2">
-                <label>1.2 A quem é direcionada a solicitação — Cargo</label>
-                <input
-                  :value="ctx.fixoCargo"
-                  class="da75-input da75-input--sm"
-                  placeholder="Digite o cargo"
-                  @input="ctx.fixoCargo = capNome(String(($event.target).value || ''))"
-                />
-              </div>
-            </div>
             <h4 class="ixp-subsection-title">1.3 Responsável pela solicitação</h4>
             <div class="ixp-grid-1">
               <div class="ixp-field">
@@ -99,15 +81,6 @@
                   rows="3"
                   placeholder="Digite um ou mais nomes (Enter para nova linha)"
                   @input="ctx.fixoResponsavel = capNomeMultiline(String(($event.target).value || ''))"
-                />
-              </div>
-              <div class="ixp-field">
-                <label>Cargo</label>
-                <input
-                  :value="ctx.fixoResponsavelCargo"
-                  class="da75-input da75-input--sm"
-                  placeholder="Digite o cargo"
-                  @input="ctx.fixoResponsavelCargo = capNome(String(($event.target).value || ''))"
                 />
               </div>
             </div>
@@ -169,15 +142,6 @@
                   @input="ctx.fixoAssinatura = capNomeMultiline(String(($event.target).value || ''))"
                 />
               </div>
-              <div class="ixp-field">
-                <label>Cargo</label>
-                <input
-                  :value="ctx.fixoAssinaturaCargo"
-                  class="da75-input da75-input--sm"
-                  placeholder="Digite o cargo"
-                  @input="ctx.fixoAssinaturaCargo = capNome(String(($event.target).value || ''))"
-                />
-              </div>
             </div>
           </div>
         </article>
@@ -213,15 +177,6 @@
                   rows="3"
                   placeholder="Digite um ou mais nomes (Enter para nova linha)"
                   @input="ctx.fixoTrResponsavelNome = capNomeMultiline(String(($event.target).value || ''))"
-                />
-              </div>
-              <div class="ixp-field">
-                <label>Cargo</label>
-                <input
-                  :value="ctx.fixoTrResponsavelCargo"
-                  class="da75-input da75-input--sm"
-                  placeholder="Digite o cargo"
-                  @input="ctx.fixoTrResponsavelCargo = capNome(String(($event.target).value || ''))"
                 />
               </div>
             </div>

@@ -395,7 +395,7 @@
                     type="text"
                     class="gov-input doc-gen__slot-input"
                     autocomplete="off"
-                    :placeholder="field.placeholder || 'Escolha ou digite o cargo'"
+                    :placeholder="field.placeholder || 'Digite o nome'"
                     @focus="openFieldSuggestions(field.id)"
                     @input="onSlotNomeTituloDrawerInput(field, $event)"
                   />
@@ -404,7 +404,7 @@
                     :id="'drawer-slot-' + field.id"
                     v-model="slotForm[field.id]"
                     class="gov-input doc-gen__slot-input"
-                    :placeholder="field.placeholder || 'Escolha ou digite o cargo'"
+                    :placeholder="field.placeholder || 'Digite o nome'"
                     @focus="openFieldSuggestions(field.id)"
                     @input="openFieldSuggestions(field.id)"
                   />
@@ -659,24 +659,8 @@ const FLOW_CONFIG = {
             options: ['Ao senhor', 'A senhora'],
           },
           { id: 'solicitacao_destinatario_nome', label: '1.1 A quem é direcionada a solicitação — Nome', input: 'text' },
-          {
-            id: 'solicitacao_destinatario_tratamento_cargo',
-            label: 'Tratamento',
-            input: 'select',
-            options: ['Senhor', 'Senhora'],
-          },
-          {
-            id: 'solicitacao_destinatario_cargo',
-            label: '1.2 A quem é direcionada a solicitação — Cargo',
-            input: 'text',
-          },
           { id: '_h_solicitacao_responsavel', label: '1.3 Responsável pela solicitação', input: 'heading', fullWidth: true },
           { id: 'solicitacao_responsavel_nome', label: 'Nome do responsável', input: 'textarea', fullWidth: true },
-          {
-            id: 'solicitacao_responsavel_cargo',
-            label: 'Cargo',
-            input: 'text',
-          },
         ],
       },
       {
@@ -699,12 +683,6 @@ const FLOW_CONFIG = {
             label: 'Nome do responsável',
             input: 'textarea',
             fullWidth: true,
-            required: true,
-          },
-          {
-            id: 'dfd_assinatura_cargo',
-            label: 'Cargo',
-            input: 'text',
             required: true,
           },
         ],
@@ -770,7 +748,6 @@ const FLOW_CONFIG = {
         fields: [
           { id: 'fiscal_nome', label: 'Nome do fiscal de contratos', input: 'text' },
           { id: 'responsavel_tr_nome', label: 'Nome do responsável', input: 'textarea', fullWidth: true },
-          { id: 'responsavel_tr_cargo', label: 'Cargo', input: 'text' },
           { id: 'modo_data', label: 'Modo da data', input: 'text' },
         ],
       },
@@ -940,17 +917,13 @@ const ITEM_VALOR_SLOT_IDS = new Set(['item_descricao', 'item_quantidade', 'item_
 /** Campos de nome próprio / cargo / setor nos fluxos TR+DFD+Ofício (drawer Dados fixos). */
 const SLOT_NOME_TITULO_IDS = new Set([
   'solicitacao_destinatario_nome',
-  'solicitacao_destinatario_cargo',
   'solicitacao_responsavel_nome',
-  'solicitacao_responsavel_cargo',
   'dfd_setor_requisitante',
   'dfd_responsavel_demanda',
   'dfd_gestor_contratos',
   'dfd_fiscal_contratos',
   'dfd_assinatura_nome',
-  'dfd_assinatura_cargo',
   'tr_termo_responsavel_nome',
-  'tr_termo_responsavel_cargo',
   'orgao_unidade',
   'objeto_especifico',
   'equipamento',
@@ -959,7 +932,6 @@ const SLOT_NOME_TITULO_IDS = new Set([
   'fornecedor_nome',
   'fiscal_nome',
   'responsavel_tr_nome',
-  'responsavel_tr_cargo',
   'setor_responsavel',
   'responsavel_tecnico',
 ]);
@@ -1327,14 +1299,10 @@ function buildTrSlotsOverride() {
     || f.responsavel_tr_nome
     || ''
   ).trim();
-  const cargoAss = (
-    f.tr_cargo_assinante
-    || f.tr_termo_responsavel_cargo
-    || f.responsavel_tr_cargo
-    || ''
-  ).trim();
-  if (nomeAss) o.nome_assinante_termo = nomeAss;
-  if (cargoAss) o.cargo_assinante_termo = cargoAss;
+  if (nomeAss) {
+    o.nome_assinante_termo = nomeAss;
+    if (!o.secretaria_usuario) o.secretaria_usuario = nomeAss;
+  }
 
   const objetoManualTR = (f.tr_objeto_manual || '').trim();
   const objetoEscopo = (f.tr_objeto_escopo || '').trim();

@@ -322,7 +322,7 @@ import {
   extractPnCpHomologadoTotal,
   extractPnCpHomologadoUnit,
   formatFaixaResumo,
-  hasDisplayPnCpPrecoPositivo,
+  passesPnCpSearchDisplayGate,
 } from '../utils/pncpPricing';
 
 const route = useRoute();
@@ -1122,7 +1122,7 @@ async function runSearchWithContext({
       if (!backend?.ok || !Array.isArray(backend.itens)) return 0;
       lastBackend = backend;
       const mapped = backend.itens
-        .filter((it) => hasDisplayPnCpPrecoPositivo({ sourceRaw: it }))
+        .filter((it) => passesPnCpSearchDisplayGate({ sourceRaw: it }))
         .map((it, idx) => ({
         esferaAdministrativa: classificarEsferaAdministrativa(it),
         incisoClassificacao: mapEsferaParaInciso(classificarEsferaAdministrativa(it)),

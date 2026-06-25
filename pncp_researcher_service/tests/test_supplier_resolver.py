@@ -74,6 +74,27 @@ class TestSupplierResolver(unittest.TestCase):
         self.assertFalse(nome_fornecedor_e_util("pncp_resultado_item"))
         self.assertTrue(nome_fornecedor_e_util("FORNECEDORA EXEMPLO LTDA"))
 
+    def test_nome_fornecedor_rejeita_nao_se_aplica(self):
+        from app.supplier_resolver import item_fornecedor_valido_para_busca, nome_fornecedor_e_util
+
+        self.assertFalse(nome_fornecedor_e_util("Não se aplica"))
+        self.assertFalse(nome_fornecedor_e_util("nao se aplica"))
+        self.assertFalse(
+            item_fornecedor_valido_para_busca(
+                {"fornecedor": "Não se aplica", "valor_unitario_estimado": 10.0}
+            )
+        )
+        self.assertTrue(
+            item_fornecedor_valido_para_busca(
+                {"cnpj_fornecedor": "12.345.678/0001-95", "valor_unitario_estimado": 10.0}
+            )
+        )
+        self.assertTrue(
+            item_fornecedor_valido_para_busca(
+                {"fornecedor": "FORNECEDORA EXEMPLO LTDA", "valor_unitario_estimado": 10.0}
+            )
+        )
+
     def test_resultado_compra_match_numero_item(self):
         payload = _fixture("resultado_compra_lista.json")
         res = resolve_from_resultados_payload(

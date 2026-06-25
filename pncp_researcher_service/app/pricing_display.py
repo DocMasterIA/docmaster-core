@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+from .supplier_resolver import item_fornecedor_valido_para_busca
+
 
 def _safe_float(value: Any) -> float:
     if value is None or value == "":
@@ -67,6 +69,18 @@ def filter_items_with_display_price(items: list[Dict[str, Any]]) -> list[Dict[st
     out: list[Dict[str, Any]] = []
     for row in items:
         item = dict(row)
+        if normalize_item_pricing_for_response(item):
+            out.append(item)
+    return out
+
+
+def filter_items_for_search_display(items: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
+    """Preço positivo + fornecedor válido (CNPJ ou razão social; sem placeholders PNCP)."""
+    out: list[Dict[str, Any]] = []
+    for row in items:
+        item = dict(row)
+        if not item_fornecedor_valido_para_busca(item):
+            continue
         if normalize_item_pricing_for_response(item):
             out.append(item)
     return out

@@ -73,6 +73,10 @@ class SupplierNameDisplayTests(unittest.TestCase):
         self.assertFalse(nome_fornecedor_e_util_para_exibicao("pncp_resultado_item_item"))
         self.assertTrue(nome_fornecedor_e_util_para_exibicao("FORNECEDORA EXEMPLO LTDA"))
 
+    def test_rejeita_nao_se_aplica(self):
+        self.assertFalse(nome_fornecedor_e_util_para_exibicao("Não se aplica"))
+        self.assertFalse(nome_fornecedor_e_util_para_exibicao("nao se aplica"))
+
     def test_pick_name_ignora_fornecedor_fonte(self):
         src = {
             "cnpj_fornecedor": "57.836.642/0001-42",

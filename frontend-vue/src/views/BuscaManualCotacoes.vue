@@ -283,7 +283,7 @@ import {
 } from '../utils/pncpSaveCotacoes';
 import { MUNICIPIOS_POR_UF } from '../data/brasilMunicipiosPorUf';
 import { buildRecortesGeograficosPayload, itemMatchesRecortesGeograficos } from '../utils/recortesGeograficos';
-import { displayPnCpUnitario, formatFaixaResumo, hasDisplayPnCpPrecoPositivo, computeFaixaRegional } from '../utils/pncpPricing';
+import { displayPnCpUnitario, formatFaixaResumo, passesPnCpSearchDisplayGate, computeFaixaRegional } from '../utils/pncpPricing';
 
 const route = useRoute();
 const router = useRouter();
@@ -721,7 +721,7 @@ async function buscarNoBackend() {
     }
     if (data?.ok && Array.isArray(data.itens)) {
       resultados.value = data.itens
-        .filter((it) => hasDisplayPnCpPrecoPositivo({ sourceRaw: it }))
+        .filter((it) => passesPnCpSearchDisplayGate({ sourceRaw: it }))
         .map((it, idx) => {
         const descricaoLinha = it.descricao_item || it.objeto_resumido || '';
         const similaridadeBackend = Boolean(it?.similaridade_encontrada);

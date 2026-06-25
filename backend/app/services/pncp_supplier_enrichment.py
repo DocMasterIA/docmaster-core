@@ -17,6 +17,7 @@ from backend.app.services.pncp_cnpj_email_cache import (
     set_cached_cnpj_sem_email,
 )
 from backend.app.models import PncpCotacaoItemCotacao
+from backend.app.services.pncp_supplier_placeholders import GENERIC_SUPPLIER_NAMES
 from backend.app.services.pncp_source_normalize import normalize_pncp_geo_in_payload
 
 logger = logging.getLogger(__name__)
@@ -303,7 +304,7 @@ def _walk_supplier_candidates(obj: Any, *, path: str = "", acc: Optional[List[Di
 
 def _extract_supplier_snapshot(payload: Any) -> Dict[str, str]:
     cands = _walk_supplier_candidates(payload)
-    generic_names = {"demais", "nao informado", "não informado", "epp", "me", "mei", "outros"}
+    generic_names = GENERIC_SUPPLIER_NAMES
     best: Dict[str, str] | None = None
     for cand in cands:
         if _is_orgao_path(cand.get("path", "")):
@@ -432,7 +433,7 @@ def flatten_supplier_fields_in_payload(it: Dict[str, Any]) -> None:
                 if not v or _nome_e_somente_cnpj_formatado(v):
                     continue
                 low = re.sub(r"\s+", " ", v).strip().lower()
-                if low in {"demais", "nao informado", "não informado", "epp", "me", "mei", "outros"}:
+                if low in GENERIC_SUPPLIER_NAMES:
                     continue
                 if low.startswith("pncp_"):
                     continue
@@ -446,7 +447,7 @@ def _fornecedor_display_name_from_source(src: Dict[str, Any]) -> str:
     """Nome legível em qualquer camada do payload (topo, source aninhado, cadastro)."""
     # Não chamar flatten_supplier_fields_in_payload aqui: flatten usa _fornecedor_tem_nome_util,
     # que delega a esta função — recursão infinita (500 ao carregar sessão / PDF).
-    generic = {"demais", "nao informado", "não informado", "epp", "me", "mei", "outros"}
+    generic = GENERIC_SUPPLIER_NAMES
     for layer in _supplier_payload_layers(src):
         cad = layer.get("fornecedor_cadastro")
         if isinstance(cad, dict):
@@ -492,7 +493,7 @@ def _nome_e_somente_cnpj_formatado(nome: str) -> bool:
 def _nome_fornecedor_util_para_flatten(nome: str, *, cnpj_raw: str = "") -> bool:
     if not nome:
         return False
-    generic = {"demais", "nao informado", "não informado", "epp", "me", "mei", "outros"}
+    generic = GENERIC_SUPPLIER_NAMES
     nome_norm = re.sub(r"\s+", " ", nome).strip().lower()
     if nome_norm in generic:
         return False
@@ -537,7 +538,7 @@ def _fornecedor_tem_nome_util(src: Dict[str, Any]) -> bool:
     nome = _fornecedor_display_name_from_source(src)
     if not nome:
         return False
-    generic_names = {"demais", "nao informado", "não informado", "epp", "me", "mei", "outros"}
+    generic_names = GENERIC_SUPPLIER_NAMES
     nome_norm = re.sub(r"\s+", " ", nome).strip().lower()
     if nome_norm in generic_names:
         return False

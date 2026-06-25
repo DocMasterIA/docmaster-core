@@ -125,6 +125,74 @@ export function hasDisplayPnCpPrecoPositivo(row) {
   return unit != null && unit > 0;
 }
 
+const FORNECEDOR_PLACEHOLDER = new Set([
+  'demais',
+  'nao informado',
+  'não informado',
+  'nao informada',
+  'não informada',
+  'epp',
+  'me',
+  'mei',
+  'outros',
+  'n/a',
+  'na',
+  'n.a',
+  'n.a.',
+  'nao se aplica',
+  'não se aplica',
+  'nao aplicavel',
+  'não aplicavel',
+  'não aplicável',
+  'sem fornecedor',
+  'nao consta',
+  'não consta',
+  'inexistente',
+  '-',
+  '—',
+]);
+
+function cnpjDigits14(row) {
+  const src = mergedPnCpSource(row);
+  const raw = row?.cnpjFornecedor || src.cnpj_fornecedor || src.cnpjFornecedor || src.niFornecedor || src.cnpj || '';
+  const digits = String(raw).replace(/\D/g, '');
+  return digits.length === 14 ? digits : '';
+}
+
+function fornecedorNomeUtil(nome) {
+  const n = String(nome || '').trim();
+  if (n.length < 3) return false;
+  const low = n.replace(/\s+/g, ' ').toLowerCase();
+  if (FORNECEDOR_PLACEHOLDER.has(low)) return false;
+  if (low.startsWith('pncp_')) return false;
+  if (/^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$/.test(n.replace(/\s/g, ''))) return false;
+  if (low.replace(/\D/g, '').length === 14) return false;
+  return true;
+}
+
+/** CNPJ 14 dígitos ou razão social útil (exclui «Não se aplica» e similares). */
+export function hasValidPnCpFornecedorParaBusca(row) {
+  if (cnpjDigits14(row)) return true;
+  const src = mergedPnCpSource(row);
+  const names = [
+    row?.fornecedor,
+    src.fornecedor,
+    src.nomeRazaoSocialFornecedor,
+    src.fornecedor_nome,
+    src.nome_fornecedor,
+    src.fornecedor_cadastro?.razao_social,
+    src.fornecedor_cadastro?.nome_fantasia,
+  ]
+    .map((v) => String(v || '').trim())
+    .filter(Boolean);
+  return names.some(fornecedorNomeUtil);
+}
+
+/** Preço positivo + fornecedor válido para exibir na pesquisa. */
+export function passesPnCpSearchDisplayGate(row) {
+  return hasDisplayPnCpPrecoPositivo(row) && hasValidPnCpFornecedorParaBusca(row);
+}
+
 /** Calcula min/max da faixa regional (espelha backend pricing_faixa). */
 export function computeFaixaRegional(valorBase, variacaoPct, sentido = 'ambos') {
   const base = Number(valorBase);

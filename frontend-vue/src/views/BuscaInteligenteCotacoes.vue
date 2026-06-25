@@ -136,13 +136,13 @@
         Cotação: {{ cotacaoResumo.totalItens }} itens • {{ cotacaoResumo.incompletos }} incompletos (&lt; 3 preços salvos)
         • {{ cotacaoResumo.completos }} completos (ignorados na busca automática).
       </p>
-      <p v-if="lastSearchDebug" class="bia-meta">
+      <p v-if="lastSearchDebug && !isAutoSearchingAll" class="bia-meta">
         Última busca ({{ lastSearchDebug.termo }}):
         API retornou <strong>{{ lastSearchDebug.apiItens }}</strong>,
         exibindo <strong>{{ lastSearchDebug.exibidos }}</strong>
         <span v-if="lastSearchDebug.faixaAtiva"> • faixa R$ {{ lastSearchDebug.faixaMin }}–{{ lastSearchDebug.faixaMax }}</span>
         <span v-if="lastSearchDebug.apiItens > lastSearchDebug.exibidos" class="bia-meta--error">
-          — perda no front (dedupe/layout); recarregue após deploy do Vue
+          — {{ lastSearchDebug.apiItens - lastSearchDebug.exibidos }} filtrado(s) no front (preço ou fornecedor inválido)
         </span>
       </p>
       <p v-if="itemContext" class="bia-meta">
@@ -1248,7 +1248,7 @@ async function runSearchWithContext({
         faixaMax: filtrosResp.faixa_regional_max,
         top3Final: lastBackend?.stats?.funil_busca?.top3_final ?? null,
       };
-      if (faixaAtiva && apiN < 3) {
+      if (faixaAtiva && apiN < 3 && !bulkMode) {
         searchError.value = `Faixa de preço ativa (${formatFaixaResumo(valorBaseCtx, variacaoCtx, sentidoCtx)}): API retornou ${apiN} cotação(ões). Amplie a variação ou ajuste o valor base.`;
       }
     } else if (!append && !bulkMode) {
@@ -1411,7 +1411,7 @@ async function adicionarSelecionadosNaCotacao() {
       routeItemId: itemId.value,
       onProgress: ({ done, total }) => {
         if (total > 1) {
-          saveMessage.value = `Salvando... ${done}/${total} item(ns)`;
+          saveMessage.value = `Salvando... ${done}/${total}`;
         }
       },
     });

@@ -107,7 +107,7 @@ class BulkSearchPerformanceTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(local_mock.call_count, 1)
         kw = local_mock.call_args.kwargs
         self.assertFalse(kw.get("filtrar_fornecedor_para_exibicao", True))
-        self.assertEqual(kw.get("enrich_homolog_max"), 6)
+        self.assertEqual(kw.get("enrich_homolog_max"), 0)
 
     async def test_bulk_enrich_top3_default_enabled(self):
         from app.config import PNCP_BULK_ENRICH_HOMOLOG_MAX

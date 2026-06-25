@@ -1123,7 +1123,7 @@ async function runSearchWithContext({
       if (!backend?.ok || !Array.isArray(backend.itens)) return 0;
       lastBackend = backend;
       const mapped = backend.itens
-        .filter((it) => passesPnCpSearchDisplayGate({ sourceRaw: it }))
+        .filter((it) => passesPnCpSearchDisplayGate({ sourceRaw: it }, { requireCnpjForSave: bulkMode }))
         .map((it, idx) => ({
         esferaAdministrativa: classificarEsferaAdministrativa(it),
         incisoClassificacao: mapEsferaParaInciso(classificarEsferaAdministrativa(it)),

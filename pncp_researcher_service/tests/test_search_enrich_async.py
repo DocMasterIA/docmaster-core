@@ -82,6 +82,27 @@ class TestSearchEnrichAsync(unittest.TestCase):
 
         asyncio.run(_run())
 
+    def test_enrich_runs_for_name_only_without_cnpj(self):
+        async def _run():
+            item = _sample_item()
+            item["fornecedor"] = "FORNECEDORA EXEMPLO LTDA"
+            mock_client = MagicMock()
+            mock_client.aclose = AsyncMock()
+            snap = {
+                "cnpj_fornecedor": "12.345.678/0001-95",
+                "fornecedor": "FORNECEDORA EXEMPLO LTDA",
+            }
+            with patch("app.pncp_client.create_pncp_http_client", return_value=mock_client):
+                with patch(
+                    "app.pncp_client.get_contract_supplier_snapshot",
+                    new=AsyncMock(return_value=snap),
+                ) as snap_mock:
+                    n = await enrich_homolog_items_from_pncp([item], max_n=1)
+            self.assertEqual(n, 1)
+            snap_mock.assert_called_once()
+
+        asyncio.run(_run())
+
     def test_enrich_skips_when_supplier_already_valid(self):
         async def _run():
             item = _sample_item()

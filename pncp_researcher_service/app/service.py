@@ -56,7 +56,6 @@ from .config import (
     PNCP_SEARCH_MAX_SIMILAR_IN_TOP3,
     PNCP_IA_RERANK_MIXED_POOL,
     PNCP_BULK_SEARCH_SQL_LIMIT,
-    PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX,
 )
 from .pncp_client import (
     PNCPClientError,
@@ -75,7 +74,11 @@ from .local_index import (
 )
 from .schemas import MarketSearchRequest
 from .search_text_clean import apply_item_display_cleanup, normalize_for_search, preprocess_cotacao_search_term
-from .pricing_display import filter_items_for_search_display, row_display_unit_price
+from .pricing_display import (
+    filter_items_for_bulk_salvar_response,
+    filter_items_for_search_display,
+    row_display_unit_price,
+)
 from .pricing_faixa import (
     compute_faixa_regional,
     faixa_regional_ativa,
@@ -2217,9 +2220,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             cleanup_for_display=False,
             somente_homologados=search_payload.somente_homologados,
             filtrar_fornecedor_para_exibicao=not busca_lote,
-            enrich_homolog_max=(
-                max(0, int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX)) if busca_lote else None
-            ),
+            enrich_homolog_max=0 if busca_lote else None,
         )
         if not base_stats:
             base_stats = dict(batch_result.get("stats") or {})
@@ -2838,17 +2839,27 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     enrich_n_top3 = 0
     top3_antes_filtro_fornecedor = len(top3)
     if top3:
+        from .supplier_resolver import item_fornecedor_tem_cnpj_para_salvar
+
         enrich_cap = max(0, min(int(PNCP_SEARCH_ENRICH_HOMOLOG_MAX), len(top3)))
         if busca_lote:
             enrich_cap = min(enrich_cap, max(0, int(PNCP_BULK_ENRICH_HOMOLOG_MAX)))
+        need_enrich = [x for x in top3 if not item_fornecedor_tem_cnpj_para_salvar(x)]
         funil["enrich_homolog_cap"] = enrich_cap
-        if enrich_cap:
-            enrich_n_top3 = await enrich_homolog_items_from_pncp(top3, max_n=enrich_cap)
+        funil["enrich_homolog_candidatos"] = len(need_enrich)
+        if enrich_cap and need_enrich:
+            enrich_n_top3 = await enrich_homolog_items_from_pncp(
+                need_enrich,
+                max_n=min(enrich_cap, len(need_enrich)),
+            )
 
     for row in top3:
         apply_item_display_cleanup(row)
 
-    top3 = filter_items_for_search_display(top3)
+    if busca_lote:
+        top3 = filter_items_for_bulk_salvar_response(top3)
+    else:
+        top3 = filter_items_for_search_display(top3)
     funil["top3_antes_filtro_fornecedor"] = top3_antes_filtro_fornecedor
     funil["top3_apos_filtro_fornecedor"] = len(top3)
     funil["top3_com_preco_positivo"] = len(top3)

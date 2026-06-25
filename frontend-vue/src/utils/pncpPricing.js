@@ -188,9 +188,18 @@ export function hasValidPnCpFornecedorParaBusca(row) {
   return names.some(fornecedorNomeUtil);
 }
 
+/** CNPJ 14 dígitos — exigido para salvar cotação no backend. */
+export function hasCnpjFornecedorSalvar(row) {
+  return Boolean(cnpjDigits14(row));
+}
+
 /** Preço positivo + fornecedor válido para exibir na pesquisa. */
-export function passesPnCpSearchDisplayGate(row) {
-  return hasDisplayPnCpPrecoPositivo(row) && hasValidPnCpFornecedorParaBusca(row);
+export function passesPnCpSearchDisplayGate(row, { requireCnpjForSave = false } = {}) {
+  if (!hasDisplayPnCpPrecoPositivo(row)) return false;
+  if (requireCnpjForSave) {
+    return hasCnpjFornecedorSalvar(row) && hasValidPnCpFornecedorParaBusca(row);
+  }
+  return hasValidPnCpFornecedorParaBusca(row);
 }
 
 /** Calcula min/max da faixa regional (espelha backend pricing_faixa). */

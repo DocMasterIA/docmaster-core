@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from .supplier_resolver import item_fornecedor_valido_para_busca
+from .supplier_resolver import item_fornecedor_tem_cnpj_para_salvar, item_fornecedor_valido_para_busca
 
 
 def _safe_float(value: Any) -> float:
@@ -69,6 +69,20 @@ def filter_items_with_display_price(items: list[Dict[str, Any]]) -> list[Dict[st
     out: list[Dict[str, Any]] = []
     for row in items:
         item = dict(row)
+        if normalize_item_pricing_for_response(item):
+            out.append(item)
+    return out
+
+
+def filter_items_for_bulk_salvar_response(items: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
+    """Lote/autostart: só retorna linhas salváveis (CNPJ + preço + fornecedor não-placeholder)."""
+    out: list[Dict[str, Any]] = []
+    for row in items:
+        item = dict(row)
+        if not item_fornecedor_tem_cnpj_para_salvar(item):
+            continue
+        if not item_fornecedor_valido_para_busca(item):
+            continue
         if normalize_item_pricing_for_response(item):
             out.append(item)
     return out

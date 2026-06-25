@@ -2137,41 +2137,56 @@ async def enrich_homolog_items_from_pncp(
     """Consulta /resultados (+ contratos) para homologados sem CNPJ no índice."""
     if max_n <= 0 or not itens:
         return 0
-    from .supplier_resolver import item_fornecedor_valido_para_busca
+    import asyncio
+
+    from .supplier_resolver import item_fornecedor_tem_cnpj_para_salvar
     from .pncp_client import get_contract_supplier_snapshot, create_pncp_http_client
 
-    enriched = 0
+    eligible: List[Dict[str, Any]] = []
+    for entry in itens:
+        if item_fornecedor_tem_cnpj_para_salvar(entry):
+            continue
+        if not entry.get("item_homologado"):
+            continue
+        cnpj = re.sub(r"\D", "", str(entry.get("numero_pncp") or "").split("-")[0])
+        ano = entry.get("ano_compra")
+        seq = entry.get("sequencial_compra")
+        ni = str(entry.get("numero_item") or "").strip()
+        if len(cnpj) != 14 or not ano or not seq:
+            continue
+        eligible.append(entry)
+        if len(eligible) >= max_n:
+            break
+
+    if not eligible:
+        return 0
+
     client = create_pncp_http_client()
+
+    async def _enrich_one(entry: Dict[str, Any]) -> int:
+        cnpj = re.sub(r"\D", "", str(entry.get("numero_pncp") or "").split("-")[0])
+        ano = entry.get("ano_compra")
+        seq = entry.get("sequencial_compra")
+        ni = str(entry.get("numero_item") or "").strip()
+        snap = await get_contract_supplier_snapshot(
+            cnpj,
+            ano,
+            seq,
+            numero_item=ni or None,
+            situacao_compra=str(entry.get("situacao_compra") or entry.get("situacao") or ""),
+            client=client,
+        )
+        if not str(snap.get("cnpj_fornecedor") or "").strip():
+            return 0
+        entry.update({k: v for k, v in snap.items() if v})
+        entry["fornecedor_busca_pncp"] = True
+        return 1
+
     try:
-        for entry in itens:
-            if enriched >= max_n:
-                break
-            if item_fornecedor_valido_para_busca(entry):
-                continue
-            if not entry.get("item_homologado"):
-                continue
-            cnpj = re.sub(r"\D", "", str(entry.get("numero_pncp") or "").split("-")[0])
-            ano = entry.get("ano_compra")
-            seq = entry.get("sequencial_compra")
-            ni = str(entry.get("numero_item") or "").strip()
-            if len(cnpj) != 14 or not ano or not seq:
-                continue
-            snap = await get_contract_supplier_snapshot(
-                cnpj,
-                ano,
-                seq,
-                numero_item=ni or None,
-                situacao_compra=str(entry.get("situacao_compra") or entry.get("situacao") or ""),
-                client=client,
-            )
-            if not str(snap.get("cnpj_fornecedor") or "").strip():
-                continue
-            entry.update({k: v for k, v in snap.items() if v})
-            entry["fornecedor_busca_pncp"] = True
-            enriched += 1
+        results = await asyncio.gather(*[_enrich_one(e) for e in eligible])
+        return sum(int(x) for x in results)
     finally:
         await client.aclose()
-    return enriched
 
 
 def _enrich_homolog_items_from_pncp_sync(itens: List[Dict[str, Any]], *, max_n: int) -> int:

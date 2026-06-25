@@ -30,6 +30,28 @@ test('aceita CNPJ 14 dígitos mesmo sem razão social', () => {
   assert.equal(passesPnCpSearchDisplayGate(row), true);
 });
 
+test('em lote exige CNPJ para exibir (alinha com save)', () => {
+  const row = {
+    sourceRaw: {
+      valor_unitario_estimado: 10,
+      fornecedor: 'FORNECEDORA EXEMPLO LTDA',
+    },
+  };
+  assert.equal(passesPnCpSearchDisplayGate(row), true);
+  assert.equal(passesPnCpSearchDisplayGate(row, { requireCnpjForSave: true }), false);
+});
+
+test('em lote aceita linha com CNPJ', () => {
+  const row = {
+    sourceRaw: {
+      valor_unitario_estimado: 10,
+      cnpj_fornecedor: '12.345.678/0001-95',
+      fornecedor: 'FORNECEDORA EXEMPLO LTDA',
+    },
+  };
+  assert.equal(passesPnCpSearchDisplayGate(row, { requireCnpjForSave: true }), true);
+});
+
 test('aceita razão social útil com preço', () => {
   const row = {
     sourceRaw: {

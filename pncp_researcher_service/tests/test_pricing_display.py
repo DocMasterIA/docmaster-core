@@ -3,6 +3,7 @@
 import unittest
 
 from app.pricing_display import (
+    filter_items_for_bulk_salvar_response,
     filter_items_for_search_display,
     filter_items_with_display_price,
     normalize_item_pricing_for_response,
@@ -66,6 +67,21 @@ class PricingDisplayTests(unittest.TestCase):
         self.assertEqual(len(out), 2)
         self.assertEqual(out[0]["fornecedor"], "FORNECEDORA OK LTDA")
         self.assertEqual(out[1]["cnpj_fornecedor"], "12.345.678/0001-95")
+
+    def test_filter_bulk_requires_cnpj(self):
+        rows = [
+            {"valor_unitario_estimado": 5.0, "fornecedor": "FORNECEDORA OK LTDA"},
+            {"valor_unitario_estimado": 3.0, "cnpj_fornecedor": "12.345.678/0001-95"},
+            {
+                "valor_unitario_estimado": 4.0,
+                "cnpj_fornecedor": "12.345.678/0001-95",
+                "fornecedor": "Não se aplica",
+            },
+        ]
+        out = filter_items_for_bulk_salvar_response(rows)
+        self.assertEqual(len(out), 2)
+        for row in out:
+            self.assertTrue(str(row.get("cnpj_fornecedor") or "").strip())
 
     def test_filter_manual_vs_price_only_equivalence_on_valid_rows(self):
         valid = [

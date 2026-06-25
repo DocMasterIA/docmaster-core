@@ -120,6 +120,20 @@ def _fornecedor_nomes_no_item(it: Dict[str, Any]) -> List[str]:
     return names
 
 
+def item_fornecedor_tem_cnpj_para_salvar(it: Dict[str, Any]) -> bool:
+    """Cotação no backend exige CNPJ de fornecedor (14 dígitos)."""
+    if not isinstance(it, dict):
+        return False
+    cnpj = cnpj_digits(
+        it.get("cnpj_fornecedor")
+        or it.get("cnpjFornecedor")
+        or it.get("niFornecedor")
+        or it.get("cnpj")
+        or ""
+    )
+    return len(cnpj) == 14
+
+
 def item_fornecedor_valido_para_busca(it: Dict[str, Any]) -> bool:
     """
     Resultado exibível na pesquisa de preços: CNPJ de fornecedor (14 dígitos)

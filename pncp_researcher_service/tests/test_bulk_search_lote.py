@@ -194,12 +194,14 @@ class BulkSearchSupplierFilterTests(unittest.IsolatedAsyncioTestCase):
             _homolog_item(desc="ITEM TESTE BULK HOMOLOG C", price=9.0, numero_item="3"),
         ]
 
+        from app.supplier_resolver import item_fornecedor_tem_cnpj_para_salvar
+
         async def _enrich_fix(itens, max_n=3):
             n = 0
             for it in itens:
                 if n >= max_n:
                     break
-                if item_fornecedor_valido_para_busca(it):
+                if item_fornecedor_tem_cnpj_para_salvar(it):
                     continue
                 it["cnpj_fornecedor"] = "12.345.678/0001-95"
                 it["fornecedor"] = "FORNECEDORA EXEMPLO LTDA"

@@ -2229,13 +2229,13 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         batch = list(batch_result.get("itens") or [])
         itens = _merge_local_item_batches(itens, batch)
         if busca_lote and batch and int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX) > 0:
-            from .supplier_resolver import item_fornecedor_valido_para_busca
+            from .supplier_resolver import item_fornecedor_tem_cnpj_para_salvar
 
             local_cap = max(0, int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX))
             enrich_pool = [
                 x
                 for x in itens
-                if x.get("item_homologado") and not item_fornecedor_valido_para_busca(x)
+                if x.get("item_homologado") and not item_fornecedor_tem_cnpj_para_salvar(x)
             ]
             if enrich_pool:
                 local_enriched = await enrich_homolog_items_from_pncp(
@@ -2526,16 +2526,30 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                 tier_bonus = 2.0
             try:
                 from .product_category_match import product_category_strict_reject
-                from .product_spec_match import product_spec_rerank_adjustment, product_spec_strict_reject
+                from .product_spec_match import (
+                    product_spec_rerank_adjustment,
+                    product_spec_strict_reject,
+                    product_spec_strong_core_match,
+                )
 
                 if product_category_strict_reject(termo_busca_raw, it):
                     continue
                 if product_spec_strict_reject(termo_busca_raw, it):
                     continue
                 spec_adj = product_spec_rerank_adjustment(termo_busca_raw, it)
+                spec_strong = product_spec_strong_core_match(termo_busca_raw, it)
             except Exception:
                 spec_adj = 0.0
+                spec_strong = False
+            if spec_strong:
+                sem = max(sem, 32.0)
+                literal_match = max(literal_match, 24.0)
+                if not cnpj_f and it.get("item_homologado"):
+                    supplier_pen = min(supplier_pen, -6.0)
             raw_score = sem + tbl + rec + coh + clar + pen + ref_fit + supplier_pen + tier_bonus + spec_adj
+            if spec_strong:
+                raw_score += 8.0
+                raw_score = max(raw_score, float(min_ok))
             score_0_100 = max(0, min(100, round(raw_score)))
             it2 = dict(it)
             it2["score_bruto"] = round(raw_score, 3)

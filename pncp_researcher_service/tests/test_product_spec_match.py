@@ -14,6 +14,7 @@ from app.product_spec_match import (  # noqa: E402
     extract_product_spec_from_term,
     product_spec_rerank_adjustment,
     product_spec_strict_reject,
+    product_spec_strong_core_match,
 )
 
 
@@ -35,6 +36,17 @@ class ProductSpecMatchTests(unittest.TestCase):
         h = extract_product_spec_from_term("ACETATO DE MEDROXIPROGESTERONA SUSPENSAO INJETAVEL 50MG/ML")
         self.assertEqual(h.conc_mg_per_ml, 50.0)
         self.assertIsNone(h.dose_mg)
+
+    def test_alcool_gel_500ml_strong_core_match(self):
+        termo = "ÁLCOOL GEL 70% EMBALAGEM DE 500ML"
+        item = {
+            "descricao_item": (
+                "Lote 55736 - ÁLCOOL ETÍLICO EM GEL, HIDRATADO 70%, EMBALAGEM DE 500 ML"
+            ),
+        }
+        self.assertTrue(product_spec_strong_core_match(termo, item))
+        self.assertFalse(product_spec_strict_reject(termo, item))
+        self.assertGreaterEqual(product_spec_rerank_adjustment(termo, item), 35.0)
 
     def test_penalize_adenosina_3_vs_6mg(self):
         termo = "ADENOSINA 6 MG SOLUCAO INJETAVEL"

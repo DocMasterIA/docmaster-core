@@ -283,7 +283,7 @@ import {
 } from '../utils/pncpSaveCotacoes';
 import { MUNICIPIOS_POR_UF } from '../data/brasilMunicipiosPorUf';
 import { buildRecortesGeograficosPayload, itemMatchesRecortesGeograficos } from '../utils/recortesGeograficos';
-import { displayPnCpUnitario, formatFaixaResumo, passesPnCpSearchDisplayGate, computeFaixaRegional } from '../utils/pncpPricing';
+import { canSalvarCotacaoPnCp, displayPnCpUnitario, extractCnpjFornecedorSalvar, formatFaixaResumo, passesPnCpSearchDisplayGate, computeFaixaRegional } from '../utils/pncpPricing';
 
 const route = useRoute();
 const router = useRouter();
@@ -863,11 +863,8 @@ function toggleSelecionado(id) {
   resultados.value = resultados.value.map((r) => (r.id === id ? { ...r, selecionado: !r.selecionado } : r));
 }
 
-function rowTemCnpjFornecedor(row) {
-  const raw = (row?.sourceRaw && typeof row.sourceRaw === 'object') ? row.sourceRaw : {};
-  const digits = String(row?.cnpjFornecedor || raw.cnpj_fornecedor || raw.cnpjFornecedor || '')
-    .replace(/\D/g, '');
-  return digits.length === 14;
+function rowSalvavelNaCotacao(row) {
+  return canSalvarCotacaoPnCp(row);
 }
 
 async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
@@ -880,9 +877,9 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
   saveMessage.value = '';
   const faixaBaseSelecionada = parseMoeda(filtros.valorBase);
   const brutos = resultados.value.filter((r) => r.selecionado);
-  const semFornecedor = brutos.filter((r) => !rowTemCnpjFornecedor(r)).length;
+  const semFornecedor = brutos.filter((r) => !rowSalvavelNaCotacao(r)).length;
   const registros = brutos
-    .filter((r) => rowTemCnpjFornecedor(r))
+    .filter((r) => rowSalvavelNaCotacao(r))
     .map((r) => {
       const raw = (r.sourceRaw && typeof r.sourceRaw === 'object') ? r.sourceRaw : {};
       const cad = (raw.fornecedor_cadastro && typeof raw.fornecedor_cadastro === 'object')
@@ -907,7 +904,7 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
       data_publicacao: toNullableText(r.data),
       material_servico: toNullableText(r.sourceRaw?.material_servico),
       fornecedor: toNullableText(r.fornecedor || raw.fornecedor),
-      cnpj_fornecedor: toNullableText(r.cnpjFornecedor || raw.cnpj_fornecedor),
+      cnpj_fornecedor: toNullableText(extractCnpjFornecedorSalvar(r) || r.cnpjFornecedor || raw.cnpj_fornecedor),
       fornecedor_cadastro: Object.keys(cad).length ? cad : null,
       telefone: raw.telefone || cad.telefone || cad.ddd_telefone_1 || null,
       email: raw.email || cad.email || null,

@@ -323,11 +323,11 @@ import {
 import {
   displayPnCpTotal,
   displayPnCpUnitario,
+  canSalvarCotacaoPnCp,
   extractCnpjFornecedorSalvar,
   extractPnCpHomologadoTotal,
   extractPnCpHomologadoUnit,
   formatFaixaResumo,
-  hasCnpjFornecedorSalvar,
   passesPnCpSearchDisplayGate,
 } from '../utils/pncpPricing';
 
@@ -866,7 +866,7 @@ async function runBulkItemSearches(pendentes, {
 }
 const totalSelecionados = computed(() => displayedRows.value.filter((x) => x.selecionado).length);
 const totalSalvaveis = computed(
-  () => displayedRows.value.filter((r) => hasCnpjFornecedorSalvar(r)).length,
+  () => displayedRows.value.filter((r) => canSalvarCotacaoPnCp(r)).length,
 );
 const allDisplayedSelecionados = computed(
   () => displayedRows.value.length > 0 && displayedRows.value.every((x) => x.selecionado),
@@ -1326,9 +1326,9 @@ async function adicionarSelecionadosNaCotacao() {
     return;
   }
   const brutos = displayedRows.value.filter((r) => r.selecionado);
-  const semFornecedor = brutos.filter((r) => !hasCnpjFornecedorSalvar(r)).length;
+  const semFornecedor = brutos.filter((r) => !canSalvarCotacaoPnCp(r)).length;
   const selecionados = brutos
-    .filter((r) => hasCnpjFornecedorSalvar(r))
+    .filter((r) => canSalvarCotacaoPnCp(r))
     .map((r) => {
       const raw = (r.sourceRaw && typeof r.sourceRaw === 'object') ? r.sourceRaw : {};
       const cad = (raw.fornecedor_cadastro && typeof raw.fornecedor_cadastro === 'object')

@@ -551,6 +551,37 @@ def product_spec_rerank_adjustment(termo_raw: str, item: Dict[str, Any]) -> floa
     return adj
 
 
+def product_spec_strong_core_match(termo_raw: str, item: Dict[str, Any]) -> bool:
+    """
+    Specs numéricas do pedido batem com o item (ex.: 70% + 500 ml) mesmo quando a
+    redação PNCP difere («álcool gel» vs «álcool etílico em gel hidratado»).
+    """
+    adj = product_spec_rerank_adjustment(termo_raw, item)
+    if adj < 35.0:
+        return False
+    term = extract_product_spec_from_term(termo_raw)
+    got = extract_product_spec_from_item(item)
+    checks = 0
+    hits = 0
+    if term.percent is not None and got.percent is not None:
+        checks += 1
+        if _float_close(term.percent, got.percent, abs_tol=0.5):
+            hits += 1
+    if term.vol_ml is not None and got.vol_ml is not None:
+        checks += 1
+        if _float_close(term.vol_ml, got.vol_ml, abs_tol=1.0):
+            hits += 1
+    if term.vol_l is not None and got.vol_l is not None:
+        checks += 1
+        if _float_close(term.vol_l, got.vol_l, abs_tol=0.01):
+            hits += 1
+    if checks >= 2:
+        return hits == checks
+    if checks == 1 and hits == 1 and adj >= 40.0:
+        return True
+    return adj >= 42.0
+
+
 def product_spec_strict_reject(termo_raw: str, item: Dict[str, Any]) -> bool:
     """True quando o item contradiz specs explícitas do pedido (filtro em modo strict)."""
     if product_line_strict_reject(termo_raw, item):
@@ -565,4 +596,6 @@ def product_spec_strict_reject(termo_raw: str, item: Dict[str, Any]) -> bool:
     if term.units_per_g is not None and got.units_per_g is not None:
         if not _float_close(term.units_per_g, got.units_per_g, abs_tol=0.05):
             return True
+    if product_spec_strong_core_match(termo_raw, item):
+        return False
     return product_spec_rerank_adjustment(termo_raw, item) <= -38.0

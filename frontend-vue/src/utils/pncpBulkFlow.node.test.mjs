@@ -6,6 +6,7 @@ import {
   passesPnCpSearchDisplayGate,
   hasDisplayPnCpPrecoPositivo,
   hasCnpjFornecedorSalvar,
+  canSalvarCotacaoPnCp,
   extractCnpjFornecedorSalvar,
 } from './pncpPricing.js';
 
@@ -75,6 +76,21 @@ test('niFornecedor conta para hasCnpjFornecedorSalvar (mesma regra do save)', ()
   };
   assert.equal(hasCnpjFornecedorSalvar(row), true);
   assert.ok(extractCnpjFornecedorSalvar(row));
+});
+
+test('homologado com chaves PNCP pode salvar sem CNPJ no índice (enrich no backend)', () => {
+  const row = {
+    numeroPncp: '12345678000195-1-000001',
+    anoCompra: 2024,
+    sequencialCompra: 1,
+    sourceRaw: {
+      valor_unitario_homologado: 5,
+      fornecedor: 'FORNECEDORA EXEMPLO LTDA',
+      item_homologado: true,
+    },
+  };
+  assert.equal(hasCnpjFornecedorSalvar(row), false);
+  assert.equal(canSalvarCotacaoPnCp(row), true);
 });
 
 test('aceita razão social útil com preço', () => {

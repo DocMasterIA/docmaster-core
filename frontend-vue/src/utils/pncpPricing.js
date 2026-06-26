@@ -213,6 +213,28 @@ export function hasCnpjFornecedorSalvar(row) {
   return Boolean(cnpjDigits14(row));
 }
 
+function pncpCompraKeysForEnrich(row) {
+  const src = mergedPnCpSource(row);
+  const np = String(row?.numeroPncp || src.numero_pncp || src.numeroControlePNCP || '').trim();
+  const orgDigits = np.replace(/\D/g, '').slice(0, 14);
+  if (orgDigits.length !== 14) return false;
+  const ano = row?.anoCompra ?? src.ano_compra;
+  const seq = row?.sequencialCompra ?? src.sequencial_compra;
+  if (ano == null || seq == null) return false;
+  const hom = row?.sourceRaw?.item_homologado ?? src.item_homologado;
+  if (hom === false) return false;
+  return true;
+}
+
+/**
+ * Pode enviar ao backend para gravar: CNPJ já presente ou homologado com chaves PNCP
+ * (o Django enriquece fornecedor via /resultados antes de persistir).
+ */
+export function canSalvarCotacaoPnCp(row) {
+  if (hasCnpjFornecedorSalvar(row)) return true;
+  return pncpCompraKeysForEnrich(row) && hasValidPnCpFornecedorParaBusca(row);
+}
+
 /** Preço positivo + fornecedor válido para exibir na pesquisa. */
 export function passesPnCpSearchDisplayGate(row, { requireCnpjForSave = false } = {}) {
   if (!hasDisplayPnCpPrecoPositivo(row)) return false;

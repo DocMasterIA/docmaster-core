@@ -2322,12 +2322,13 @@ async def enrich_homolog_items_from_pncp(
         return 0
     import asyncio
 
-    from .supplier_resolver import item_fornecedor_valido_para_busca
+    from .supplier_resolver import item_fornecedor_tem_cnpj_para_salvar
     from .pncp_client import get_contract_supplier_snapshot, create_pncp_http_client
 
     eligible: List[Dict[str, Any]] = []
     for entry in itens:
-        if item_fornecedor_valido_para_busca(entry):
+        # Homologado com razão social mas sem CNPJ no índice ainda precisa de /resultados.
+        if item_fornecedor_tem_cnpj_para_salvar(entry):
             continue
         if not entry.get("item_homologado"):
             continue

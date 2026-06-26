@@ -1669,6 +1669,175 @@ def _build_manual_parity_top3(
     return _select_top3_prioritize_federal(pool)[: max(1, int(target))]
 
 
+def _bulk_recall_enrich_cap(pool_len: int) -> int:
+    """Teto de enrich PNCP em busca_lote (recall manual): prioriza cobertura de CNPJ."""
+    if pool_len <= 0:
+        return 0
+    cap = max(int(PNCP_SEARCH_ENRICH_HOMOLOG_MAX), int(PNCP_BULK_ENRICH_HOMOLOG_MAX))
+    return min(pool_len, max(0, cap))
+
+
+def _build_bulk_manual_recall_pool(
+    itens: List[Dict[str, Any]],
+    *,
+    termo_busca: str,
+    termo_busca_raw: str,
+    faixa_min: Optional[float],
+    faixa_max: Optional[float],
+    min_ok: int,
+) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """
+    Recall de lote alinhado à busca manual: índice local + faixa de preço, sem top3/scoring eliminatório.
+    """
+    tier_rank = {"strict": 0, "core": 1, "flex": 2, "anchor": 3}
+    pool: List[Dict[str, Any]] = []
+    skipped_sem_preco = 0
+    skipped_faixa = 0
+    for it in itens:
+        if _row_price_for_faixa(it) <= 0.0:
+            skipped_sem_preco += 1
+            continue
+        if faixa_min is not None and faixa_max is not None:
+            if not _preco_dentro_faixa(it, faixa_min, faixa_max):
+                skipped_faixa += 1
+                continue
+        tier = str(it.get("search_tier") or "").lower()
+        lit = round(_literal_match_score(termo_busca, it), 3)
+        score_base = 78 if tier == "strict" else 72 if tier == "core" else 65 if tier == "flex" else 58
+        spec_adj = 0.0
+        spec_strong = False
+        try:
+            from .product_spec_match import product_spec_rerank_adjustment, product_spec_strong_core_match
+
+            spec_adj = float(product_spec_rerank_adjustment(termo_busca_raw, it))
+            spec_strong = product_spec_strong_core_match(termo_busca_raw, it)
+        except Exception:
+            pass
+        if spec_strong:
+            score_base = max(score_base, int(min_ok) + 8)
+        score_base = int(max(0, min(100, round(score_base + min(20.0, spec_adj * 0.28)))))
+        row = dict(it)
+        row["literal_match"] = lit
+        row["score_bruto"] = float(score_base)
+        row["score_aprovacao"] = score_base
+        row["confiabilidade"] = _classify_confiabilidade(score_base)
+        row["risco"] = _classify_risco(score_base)
+        row["status"] = "Aprovado" if score_base >= min_ok else "Revisar"
+        row["similaridade_encontrada"] = tier in ("flex", "anchor") or lit < 6.0
+        row["match_bulk_manual_recall"] = True
+        row["origem"] = row.get("origem") or "base_local_itens"
+        row["_bulk_rank"] = (tier_rank.get(tier, 4), -lit, -score_base, -_row_price_for_faixa(it))
+        pool.append(row)
+    pool.sort(key=lambda x: x["_bulk_rank"])
+    for row in pool:
+        row.pop("_bulk_rank", None)
+    funil = {
+        "bulk_manual_recall": True,
+        "recall_pool_bruto": len(pool),
+        "eliminados_sem_preco_recall": skipped_sem_preco,
+        "eliminados_faixa_preco_recall": skipped_faixa,
+    }
+    return pool, funil
+
+
+async def _finalize_bulk_manual_recall_response(
+    *,
+    payload: MarketSearchRequest,
+    search_payload: MarketSearchRequest,
+    base_stats: Dict[str, Any],
+    funil: Dict[str, Any],
+    itens: List[Dict[str, Any]],
+    termo_efetivo: str,
+    termo_busca_raw: str,
+    faixa_min: Optional[float],
+    faixa_max: Optional[float],
+    ref_sentido: str,
+    service_blocked_count: int,
+    hybrid_used: bool,
+    hybrid_live_count: int,
+    min_ok: int,
+) -> Dict[str, Any]:
+    recall_pool, recall_funil = _build_bulk_manual_recall_pool(
+        itens,
+        termo_busca=termo_efetivo,
+        termo_busca_raw=termo_busca_raw,
+        faixa_min=faixa_min,
+        faixa_max=faixa_max,
+        min_ok=min_ok,
+    )
+    funil.update(recall_funil)
+    funil["recall_antes_filtro_fornecedor"] = len(recall_pool)
+
+    enrich_n = 0
+    enrich_cap = _bulk_recall_enrich_cap(len(recall_pool))
+    funil["enrich_homolog_cap"] = enrich_cap
+    if recall_pool and enrich_cap:
+        enrich_n = await enrich_homolog_items_from_pncp(recall_pool, max_n=enrich_cap)
+
+    for row in recall_pool:
+        apply_item_display_cleanup(row)
+
+    out_items = filter_items_for_search_display(recall_pool)
+    funil["recall_apos_filtro_fornecedor"] = len(out_items)
+    funil["top3_antes_filtro_fornecedor"] = len(recall_pool)
+    funil["top3_apos_filtro_fornecedor"] = len(out_items)
+    funil["top3_final"] = len(out_items)
+    funil["modo_resposta"] = "bulk_manual_recall"
+
+    out_stats = dict(base_stats or {})
+    out_stats["total_registros_ia"] = len(recall_pool)
+    out_stats["total_selecionados_ia"] = len(out_items)
+    out_stats["regra_selecao"] = "bulk_manual_recall_faixa"
+    out_stats["search_quality_first"] = bool(PNCP_SEARCH_QUALITY_FIRST)
+    out_stats["ia_rerank_ativo"] = False
+    out_stats["ia_rerank_usado"] = False
+    out_stats["ia_rerank_bulk_ativo"] = False
+    out_stats["local_rerank_ativo"] = False
+    out_stats["local_rerank_usado"] = False
+    out_stats["ia_interpretacao_item_ativo"] = False
+    out_stats["ia_interpretacao_item_usado"] = False
+    out_stats["servico_bloqueio_ativo"] = bool(PNCP_BLOCK_SERVICE_ITEMS)
+    out_stats["servico_bloqueados"] = int(service_blocked_count)
+    out_stats["hybrid_fallback_used"] = hybrid_used
+    out_stats["hybrid_live_count"] = hybrid_live_count
+    out_stats["enriquecidos_pncp_na_busca"] = enrich_n
+    out_stats["itens_com_cnpj_fornecedor"] = sum(
+        1 for x in out_items if str(x.get("cnpj_fornecedor") or "").strip()
+    )
+    out_stats["funil_busca"] = funil
+    out_stats["provavel_gargalo"] = _infer_search_bottleneck(funil, len(out_items))
+    out_stats["min_score_aprovacao"] = min_ok
+
+    return {
+        "ok": True,
+        "filtros": {
+            "termo_busca": payload.termo_busca,
+            "uf": payload.uf,
+            "municipio": payload.municipio,
+            "recortes_geograficos": (
+                [r.model_dump() for r in payload.recortes_geograficos]
+                if payload.recortes_geograficos
+                else None
+            ),
+            "codigo_municipio_ibge": payload.codigo_municipio_ibge,
+            "codigo_modalidade": payload.codigo_modalidade,
+            "pagina_inicial": payload.pagina,
+            "max_paginas": payload.max_paginas,
+            "tamanho_pagina": payload.tamanho_pagina,
+            "fonte": "local_item_search",
+            "quantidade_referencia": payload.quantidade_referencia,
+            "unidade_medida_referencia": payload.unidade_medida_referencia,
+            "valor_base_referencia": search_payload.valor_base_referencia,
+            "variacao_percentual_referencia": search_payload.variacao_percentual_referencia,
+            "variacao_sentido_referencia": ref_sentido if funil.get("faixa_ativa") else None,
+            "faixa_regional_min": faixa_min,
+            "faixa_regional_max": faixa_max,
+        },
+        "stats": out_stats,
+        "itens": out_items,
+    }
+
+
 def _ia_item_key(it: Dict[str, Any]) -> str:
     return "|".join(
         [
@@ -2188,13 +2357,11 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     - usa o mesmo índice local de itens PNCP (local_item_search);
     - aplica score 0-100 por item;
     - retorna exatamente 3 cotações com diversidade de órgão.
+    - em busca_lote (autostart cotação): recall alinhado à busca manual (todos na faixa).
     """
     # Reutiliza a mesma fonte da busca manual (itens PNCP normalizados)
     busca_lote = bool(getattr(payload, "busca_lote", False))
-    # Lote: relaxa homolog estrito, mas mantém faixa de preço por item quando informada.
     search_payload = payload
-    if busca_lote:
-        search_payload = payload.model_copy(update={"somente_homologados": False})
     ia_rerank_on = _ia_rerank_on_for_request(busca_lote)
     ia_resumo_on = _ia_resumo_on_for_request(busca_lote)
     limit = max(50, search_payload.max_paginas * search_payload.tamanho_pagina)
@@ -2407,6 +2574,24 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     ]
     median_val = median(valores) if valores else None
     min_ok = _effective_min_score_aprovacao()
+
+    if busca_lote:
+        return await _finalize_bulk_manual_recall_response(
+            payload=payload,
+            search_payload=search_payload,
+            base_stats=base_stats,
+            funil=funil,
+            itens=itens,
+            termo_efetivo=termo_efetivo,
+            termo_busca_raw=termo_busca_raw,
+            faixa_min=faixa_min,
+            faixa_max=faixa_max,
+            ref_sentido=ref_sentido,
+            service_blocked_count=service_blocked_count,
+            hybrid_used=hybrid_used,
+            hybrid_live_count=hybrid_live_count,
+            min_ok=min_ok,
+        )
 
     def _score_candidates(candidates: List[Dict[str, Any]], *, mode: str) -> List[Dict[str, Any]]:
         out_rows: List[Dict[str, Any]] = []

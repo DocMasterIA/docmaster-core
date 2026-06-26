@@ -1112,7 +1112,7 @@ async function runSearchWithContext({
 
     const sentidoCtx = context?.variacao_sentido_referencia ?? 'ambos';
     const basePayload = {
-      somente_homologados: !bulkMode,
+      somente_homologados: true,
       termo_busca: String(descricao).trim(),
       codigo_modalidade: null,
       max_paginas: bulkMode ? 3 : 500,

@@ -10,7 +10,7 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from app.config import PNCP_BULK_ENRICH_HOMOLOG_MAX, PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX
+from app.config import PNCP_BULK_ENRICH_HOMOLOG_MAX, PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX, PNCP_SEARCH_ENRICH_HOMOLOG_MAX
 from app.schemas import MarketSearchRequest
 from app.service import market_search_intelligent
 from app.supplier_resolver import item_fornecedor_valido_para_busca
@@ -178,9 +178,45 @@ class BulkSearchSupplierFilterTests(unittest.IsolatedAsyncioTestCase):
 
         enrich_mock.assert_called()
         funil = (out.get("stats") or {}).get("funil_busca") or {}
-        self.assertGreater(funil.get("top3_antes_filtro_fornecedor", 0), 0)
-        self.assertEqual(funil.get("top3_apos_filtro_fornecedor"), 0)
+        self.assertGreater(funil.get("recall_antes_filtro_fornecedor", 0), 0)
+        self.assertEqual(funil.get("recall_apos_filtro_fornecedor"), 0)
         self.assertEqual(out.get("itens") or [], [])
+
+    async def test_bulk_recall_returns_all_in_faixa_not_top3(self):
+        payload = MarketSearchRequest(
+            termo_busca="ALCOOL GEL 70",
+            busca_lote=True,
+            somente_homologados=True,
+            valor_base_referencia=15.03,
+            variacao_percentual_referencia=50.0,
+            variacao_sentido_referencia="ambos",
+        )
+        pool = [
+            _homolog_item(
+                desc=f"ALCOOL GEL 70% 500ML LOTE {i}",
+                price=10.0 + i * 0.5,
+                fornecedor="FORNECEDORA EXEMPLO LTDA",
+                cnpj="12.345.678/0001-95",
+                numero_item=str(i),
+            )
+            for i in range(1, 8)
+        ]
+        with patch(
+            "app.service.local_item_search", return_value=_local_result(pool)
+        ), patch(
+            "app.service.market_search",
+            new_callable=AsyncMock,
+            return_value={"ok": True, "itens": [], "stats": {}},
+        ), patch(
+            "app.service.enrich_homolog_items_from_pncp", new_callable=AsyncMock, return_value=0
+        ):
+            out = await market_search_intelligent(payload)
+
+        itens = out.get("itens") or []
+        self.assertEqual(len(itens), 7)
+        funil = (out.get("stats") or {}).get("funil_busca") or {}
+        self.assertTrue(funil.get("bulk_manual_recall"))
+        self.assertEqual((out.get("stats") or {}).get("regra_selecao"), "bulk_manual_recall_faixa")
 
     async def test_bulk_returns_items_when_async_enrich_fixes_supplier(self):
         payload = MarketSearchRequest(
@@ -275,7 +311,8 @@ class BulkSearchSupplierFilterTests(unittest.IsolatedAsyncioTestCase):
             await market_search_intelligent(payload)
         self.assertTrue(enrich_mock.called)
         cap = enrich_mock.call_args.kwargs.get("max_n")
-        self.assertLessEqual(cap, max(0, int(PNCP_BULK_ENRICH_HOMOLOG_MAX)))
+        expected_cap = min(len(pool), max(int(PNCP_SEARCH_ENRICH_HOMOLOG_MAX), int(PNCP_BULK_ENRICH_HOMOLOG_MAX)))
+        self.assertLessEqual(cap, expected_cap)
         self.assertGreaterEqual(cap, 1)
 
 

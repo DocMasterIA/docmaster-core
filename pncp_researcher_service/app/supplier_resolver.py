@@ -74,6 +74,9 @@ class SupplierResolution:
     situacao_item: str = ""
     situacao_compra: str = ""
     fornecedor_cadastro: Dict[str, Any] = field(default_factory=dict)
+    valor_unitario_homologado: Optional[float] = None
+    valor_total_homologado: Optional[float] = None
+    quantidade_homologada: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -366,7 +369,7 @@ def resolve_from_resultados_payload(
                 situacao_item = str(
                     row.get("situacaoCompraItemNome") or row.get("situacaoItemNome") or ""
                 ).strip()
-                if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
+                if snap.get("cnpj_fornecedor") or snap.get("fornecedor") or _row_has_homolog_pricing(row):
                     return _build_resolution(
                         snap,
                         fonte=_fonte_sufixada(fonte_prefix, "item"),
@@ -376,7 +379,7 @@ def resolve_from_resultados_payload(
                     )
     for row in entries:
         snap = extract_best_supplier_from_payload(row)
-        if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
+        if snap.get("cnpj_fornecedor") or snap.get("fornecedor") or _row_has_homolog_pricing(row):
             situacao_item = str(
                 row.get("situacaoCompraItemNome") or row.get("situacaoItemNome") or ""
             ).strip()
@@ -390,13 +393,14 @@ def resolve_from_resultados_payload(
                 situacao_compra=situacao_compra,
                 item_row=row,
             )
-    if not entries and payload is not None:
+    if not entries and payload is not None and isinstance(payload, dict):
         snap = extract_best_supplier_from_payload(payload)
-        if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
+        if snap.get("cnpj_fornecedor") or snap.get("fornecedor") or _row_has_homolog_pricing(payload):
             return _build_resolution(
                 snap,
                 fonte=fonte_prefix,
                 situacao_compra=situacao_compra,
+                item_row=payload,
             )
     return SupplierResolution(situacao_compra=str(situacao_compra or "").strip())
 
@@ -482,6 +486,30 @@ def merge_with_cadastro(
     return out
 
 
+def _apply_homolog_pricing_to_resolution(
+    res: SupplierResolution,
+    item_row: Optional[Dict[str, Any]],
+) -> SupplierResolution:
+    if not isinstance(item_row, dict):
+        return res
+    pricing = extract_homologated_pricing(item_row)
+    vu = pricing.get("valor_unitario_homologado")
+    vt = pricing.get("valor_total_homologado")
+    qh = pricing.get("quantidade_homologada")
+    if vu is not None:
+        res.valor_unitario_homologado = vu
+    if vt is not None:
+        res.valor_total_homologado = vt
+    if qh is not None:
+        res.quantidade_homologada = qh
+    return res
+
+
+def _row_has_homolog_pricing(row: Dict[str, Any]) -> bool:
+    p = extract_homologated_pricing(row)
+    return p.get("valor_unitario_homologado") is not None or p.get("valor_total_homologado") is not None
+
+
 def _build_resolution(
     snap: Dict[str, str],
     *,
@@ -491,7 +519,7 @@ def _build_resolution(
     item_row: Optional[Dict[str, Any]] = None,
 ) -> SupplierResolution:
     elegivel = item_elegivel(item_row, situacao_compra=situacao_compra)
-    return SupplierResolution(
+    res = SupplierResolution(
         cnpj_fornecedor=str(snap.get("cnpj_fornecedor") or "").strip(),
         fornecedor=str(snap.get("fornecedor") or "").strip(),
         fornecedor_fonte=fonte,
@@ -499,6 +527,7 @@ def _build_resolution(
         situacao_item=situacao_item,
         situacao_compra=str(situacao_compra or "").strip(),
     )
+    return _apply_homolog_pricing_to_resolution(res, item_row)
 
 
 def extract_item_numbers_prioritized(items_payload: Any, *, max_items: int = 8) -> List[str]:
@@ -658,12 +687,21 @@ def find_catalog_item_row(items_payload: Any, numero_item: str) -> Optional[Dict
 
 
 def resolution_to_api_dict(res: SupplierResolution) -> Dict[str, Any]:
-    """Formato consumido por busca/cotação (`cnpj_fornecedor`, `fornecedor`, …)."""
+    """Formato consumido por busca/cotação (`cnpj_fornecedor`, `fornecedor`, preço homologado, …)."""
     out: Dict[str, Any] = {
         "cnpj_fornecedor": res.cnpj_fornecedor,
         "fornecedor": res.fornecedor,
         "fornecedor_cadastro": dict(res.fornecedor_cadastro or {}),
     }
+    if res.valor_unitario_homologado is not None:
+        out["valor_unitario_homologado"] = res.valor_unitario_homologado
+        out["valor_unitario"] = res.valor_unitario_homologado
+    if res.valor_total_homologado is not None:
+        out["valor_total_homologado"] = res.valor_total_homologado
+        if res.valor_unitario_homologado is None:
+            out["valor_total"] = res.valor_total_homologado
+    if res.quantidade_homologada is not None:
+        out["quantidade_homologada"] = res.quantidade_homologada
     if res.fornecedor_fonte:
         out["fornecedor_fonte"] = res.fornecedor_fonte
         if res.fornecedor and "brasilapi" not in res.fornecedor_fonte:

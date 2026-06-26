@@ -6,6 +6,7 @@ from app.pricing_display import (
     filter_items_for_bulk_salvar_response,
     filter_items_for_search_display,
     filter_items_with_display_price,
+    item_matches_faixa_band,
     normalize_item_pricing_for_response,
     row_display_unit_price,
 )
@@ -92,6 +93,43 @@ class PricingDisplayTests(unittest.TestCase):
             filter_items_for_search_display(valid),
             filter_items_with_display_price(valid),
         )
+
+    def test_merge_homologated_pricing_from_snap(self):
+        it = {
+            "valor_unitario": 8.0,
+            "valor_unitario_estimado": 8.0,
+            "item_homologado": True,
+        }
+        snap = {"valor_unitario_homologado": 12.5, "valor_total_homologado": 125.0, "quantidade_homologada": 10}
+        from app.pricing_display import merge_homologated_pricing_from_snap
+
+        self.assertTrue(merge_homologated_pricing_from_snap(it, snap))
+        self.assertAlmostEqual(it["valor_unitario_homologado"], 12.5)
+        self.assertAlmostEqual(it["valor_unitario"], 12.5)
+        self.assertAlmostEqual(row_display_unit_price(it), 12.5)
+
+    def test_item_needs_homolog_pricing_lookup_with_estimado_only(self):
+        from app.pricing_display import item_needs_homolog_pricing_lookup
+
+        it = {
+            "item_homologado": True,
+            "valor_unitario": 8.0,
+            "valor_unitario_estimado": 8.0,
+            "numero_pncp": "12345678000195-1-000001",
+            "ano_compra": 2024,
+            "sequencial_compra": 1,
+            "numero_item": "3",
+        }
+        self.assertTrue(item_needs_homolog_pricing_lookup(it))
+
+    def test_faixa_band_aceita_estimado_quando_homologado_fora(self):
+        lo, hi = 3.735, 11.205
+        it = {
+            "valor_unitario_homologado": 12.5,
+            "valor_unitario_estimado": 9.0,
+            "valor_unitario": 12.5,
+        }
+        self.assertTrue(item_matches_faixa_band(it, lo, hi))
 
 
 if __name__ == "__main__":

@@ -550,7 +550,7 @@ function bulkSearchFailResult(err, { superseded = false, timeoutSec = 180 } = {}
   return { ok: false, exibidos: 0, aborted: false, error: msg };
 }
 
-const BULK_SEARCH_TIMEOUT_MS = 125000;
+const BULK_SEARCH_TIMEOUT_MS = 185000;
 const BULK_CONCURRENCY = 1;
 const BULK_ITEM_DELAY_MS = 50;
 
@@ -1379,8 +1379,8 @@ async function adicionarSelecionadosNaCotacao() {
       situacaoCompraItemNome: r.sourceRaw?.situacaoCompraItemNome || r.sourceRaw?.situacao_item_exibicao || null,
       temResultado: r.sourceRaw?.temResultado ?? null,
       item_homologado: r.sourceRaw?.item_homologado ?? null,
-      valor_unitario_estimado: r.sourceRaw?.valor_unitario_estimado ?? r.sourceRaw?.valor_unitario ?? null,
-      valor_total_estimado: r.sourceRaw?.valor_total_estimado ?? r.sourceRaw?.valor_total ?? null,
+      valor_unitario_estimado: r.sourceRaw?.valor_unitario_estimado ?? null,
+      valor_total_estimado: r.sourceRaw?.valor_total_estimado ?? null,
       valor_unitario_homologado: r.sourceRaw?.valor_unitario_homologado ?? homUnit ?? null,
       valor_total_homologado: r.sourceRaw?.valor_total_homologado ?? homTotal ?? null,
       quantidade_homologada: r.sourceRaw?.quantidade_homologada ?? null,

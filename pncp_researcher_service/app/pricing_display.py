@@ -16,6 +16,88 @@ def _safe_float(value: Any) -> float:
         return 0.0
 
 
+def _optional_positive(value: Any) -> Optional[float]:
+    v = _safe_float(value)
+    return v if v > 0.0 else None
+
+
+def homolog_pricing_present(it: Dict[str, Any]) -> bool:
+    vu = _optional_positive(it.get("valor_unitario_homologado"))
+    vt = _optional_positive(it.get("valor_total_homologado"))
+    return vu is not None or vt is not None
+
+
+def item_needs_homolog_pricing_lookup(it: Dict[str, Any]) -> bool:
+    """Item homologado indexado sem preço vencedor de /resultados."""
+    if homolog_pricing_present(it):
+        return False
+    if not it.get("item_homologado"):
+        return False
+    import re
+
+    cnpj = re.sub(r"\D", "", str(it.get("numero_pncp") or "").split("-")[0])
+    ano = it.get("ano_compra")
+    seq = it.get("sequencial_compra")
+    ni = str(it.get("numero_item") or "").strip()
+    return len(cnpj) == 14 and bool(ano) and bool(seq) and bool(ni)
+
+
+def merge_homologated_pricing_from_snap(it: Dict[str, Any], snap: Dict[str, Any]) -> bool:
+    """Mescla preços de /resultados no item da busca (paridade Django save)."""
+    if not isinstance(snap, dict):
+        return False
+    vu = _optional_positive(
+        snap.get("valor_unitario_homologado") or snap.get("valorUnitarioHomologado")
+    )
+    vt = _optional_positive(snap.get("valor_total_homologado") or snap.get("valorTotalHomologado"))
+    qh = _optional_positive(snap.get("quantidade_homologada") or snap.get("quantidadeHomologada"))
+    if vu is None and vt is None:
+        return False
+
+    changed = False
+    for key, val in (
+        ("valor_unitario_homologado", vu),
+        ("valor_total_homologado", vt),
+        ("quantidade_homologada", qh),
+    ):
+        if val is not None and it.get(key) != val:
+            it[key] = val
+            changed = True
+
+    if vu is not None and it.get("valor_unitario") != vu:
+        it["valor_unitario"] = vu
+        changed = True
+    if vt is not None and it.get("valor_total") != vt:
+        it["valor_total"] = vt
+        changed = True
+    elif vu is not None and vt is None:
+        q = qh or _optional_positive(it.get("quantidade"))
+        if q is not None:
+            calc = vu * q
+            if it.get("valor_total") != calc:
+                it["valor_total"] = calc
+                changed = True
+    if changed:
+        it["preco_homologado_pncp"] = True
+    return changed
+
+
+def item_matches_faixa_band(it: Dict[str, Any], lo: float, hi: float) -> bool:
+    """
+    Gate de faixa na busca: aceita se homologado ou estimado estiver na banda.
+    Evita perder item aderente quando o índice já tem homologado fora da faixa
+    mas o estimado (referência do catálogo) ainda cai na tolerância configurada.
+    """
+    hom = _optional_positive(it.get("valor_unitario_homologado"))
+    est = _optional_positive(it.get("valor_unitario_estimado"))
+    if hom is not None and lo <= hom <= hi:
+        return True
+    if est is not None and lo <= est <= hi:
+        return True
+    p = row_display_unit_price(it)
+    return p > 0.0 and lo <= p <= hi
+
+
 def row_display_unit_price(it: Dict[str, Any]) -> float:
     """
     Preço unitário positivo para exibição e faixa regional.

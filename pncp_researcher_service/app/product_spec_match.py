@@ -12,6 +12,12 @@ from typing import Any, Dict, List, Optional
 from .search_text_clean import normalize_for_search
 
 _CONC_MG_ML_RE = re.compile(r"(\d+(?:\.\d+)?)\s*mg\s*/\s*ml\b", re.IGNORECASE)
+# Xarope/suspensão: 30MG/5ML = 30 mg por 5 ml de apresentação (≠ 30 mg/ml).
+_MG_PER_DOSE_VOL_RE = re.compile(
+    r"(\d+(?:[.,]\d+)?)\s*mg\s*/\s*(\d+(?:[.,]\d+)?)\s*ml\b",
+    re.IGNORECASE,
+)
+_MAX_PRESENTATION_DOSE_VOL_ML = 30.0
 _PERCENT_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(?:%|pct\b)", re.IGNORECASE)
 _VOLUMES_RE = re.compile(r"(\d+)\s*(?:volumes?|vol\.?)\b", re.IGNORECASE)
 _VOL_ML_RE = re.compile(r"(\d+(?:\.\d+)?)\s*ml\b", re.IGNORECASE)
@@ -81,6 +87,7 @@ _PRODUCT_LINE_EXCLUSIVE: Dict[str, frozenset] = {
 class ProductSpecHints:
     conc_mg_per_ml: Optional[float] = None
     dose_mg: Optional[float] = None
+    presentation_vol_ml: Optional[float] = None
     vol_ml: Optional[float] = None
     vol_l: Optional[float] = None
     percent: Optional[float] = None
@@ -98,6 +105,7 @@ class ProductSpecHints:
             for v in (
                 self.conc_mg_per_ml,
                 self.dose_mg,
+                self.presentation_vol_ml,
                 self.vol_ml,
                 self.vol_l,
                 self.percent,
@@ -337,7 +345,29 @@ def extract_product_spec_from_text(text: str, *, source: str = "text") -> Produc
             srcs.append(f"{source}:pct_raw")
             break
 
+    dose_vol_ml_exclude: set[float] = set()
+    for dm in _MG_PER_DOSE_VOL_RE.finditer(raw):
+        dose = _parse_num(dm.group(1))
+        dose_vol = _parse_num(dm.group(2))
+        if dose is None or dose_vol is None or dose_vol <= 0:
+            continue
+        tail = raw[dm.end() : dm.end() + 12].lower()
+        if tail.lstrip().startswith("/"):
+            continue
+        if dose_vol > _MAX_PRESENTATION_DOSE_VOL_ML:
+            continue
+        if hints.dose_mg is None:
+            hints.dose_mg = dose
+        hints.presentation_vol_ml = dose_vol
+        if hints.conc_mg_per_ml is None:
+            hints.conc_mg_per_ml = dose / dose_vol
+        dose_vol_ml_exclude.add(dose_vol)
+        srcs.append(f"{source}:dose_per_vol")
+        break
+
     for cm in re.finditer(r"(\d+(?:[.,]\d+)?)\s*mg\s*/\s*ml", raw, re.IGNORECASE):
+        if hints.presentation_vol_ml is not None:
+            break
         hints.conc_mg_per_ml = _parse_num(cm.group(1))
         srcs.append(f"{source}:conc_raw")
         break
@@ -387,14 +417,17 @@ def extract_product_spec_from_text(text: str, *, source: str = "text") -> Produc
     vol_ml_vals: List[float] = []
     for vml in _VOL_ML_RE.finditer(norm):
         val = _parse_num(vml.group(1))
-        if val is not None:
-            vol_ml_vals.append(val)
+        if val is None:
+            continue
+        if any(abs(val - ex) <= 0.05 for ex in dose_vol_ml_exclude):
+            continue
+        vol_ml_vals.append(val)
     if vol_ml_vals:
-        # Apresentação injetável: menor ml costuma ser frasco; concentração usa mg/ml separado.
-        hints.vol_ml = min(vol_ml_vals) if len(vol_ml_vals) == 1 else vol_ml_vals[0]
+        # Frasco (ex.: 100 ml): ignorar ml da apresentação mg/5ml já excluído acima.
+        hints.vol_ml = max(vol_ml_vals) if len(vol_ml_vals) > 1 else vol_ml_vals[0]
         srcs.append(f"{source}:ml")
 
-    if hints.conc_mg_per_ml is None:
+    if hints.dose_mg is None and hints.conc_mg_per_ml is None:
         for dm in _DOSE_MG_RE.finditer(norm):
             end = dm.end()
             tail = norm[end : end + 8].lstrip()
@@ -497,7 +530,17 @@ def product_spec_rerank_adjustment(termo_raw: str, item: Dict[str, Any]) -> floa
 
     if term.dose_mg is not None:
         if got.dose_mg is not None:
-            adj += 28.0 if _float_close(term.dose_mg, got.dose_mg, abs_tol=0.1) else -48.0
+            dose_ok = _float_close(term.dose_mg, got.dose_mg, abs_tol=0.1)
+            if dose_ok:
+                adj += 28.0
+            elif (
+                term.presentation_vol_ml is not None
+                and got.presentation_vol_ml is not None
+                and _float_close(term.presentation_vol_ml, got.presentation_vol_ml, abs_tol=1.0)
+            ):
+                adj -= 52.0
+            else:
+                adj -= 48.0
         elif got.conc_mg_per_ml is None:
             adj -= 10.0
 
@@ -582,6 +625,17 @@ def product_spec_strong_core_match(termo_raw: str, item: Dict[str, Any]) -> bool
     return adj >= 42.0
 
 
+def _dose_per_presentation_mismatch(term: ProductSpecHints, got: ProductSpecHints) -> bool:
+    """Ex.: pedido 30MG/5ML vs item 15MG/5ML pediátrico."""
+    if term.dose_mg is None or got.dose_mg is None:
+        return False
+    if term.presentation_vol_ml is None or got.presentation_vol_ml is None:
+        return False
+    if not _float_close(term.presentation_vol_ml, got.presentation_vol_ml, abs_tol=1.0):
+        return False
+    return not _float_close(term.dose_mg, got.dose_mg, abs_tol=0.1)
+
+
 def product_spec_strict_reject(termo_raw: str, item: Dict[str, Any]) -> bool:
     """True quando o item contradiz specs explícitas do pedido (filtro em modo strict)."""
     if product_line_strict_reject(termo_raw, item):
@@ -590,6 +644,8 @@ def product_spec_strict_reject(termo_raw: str, item: Dict[str, Any]) -> bool:
         return True
     term = extract_product_spec_from_term(termo_raw)
     got = extract_product_spec_from_item(item)
+    if _dose_per_presentation_mismatch(term, got):
+        return True
     if term.calibre is not None and got.calibre is not None:
         if not _calibre_close(term.calibre, got.calibre):
             return True

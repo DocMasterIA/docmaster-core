@@ -10,7 +10,9 @@ Registro rápido de bugs/observações reportados em campo (não substitui issue
 
 **Comportamento esperado (código):** prioridade homologado → unitário canônico → estimado (`pricing_display.py`, `pncpPricing.js`).
 
-**Status:** investigado (jun/2026) — **causa provável confirmada no código + dados**; correção ainda não implementada.
+**Status:** **corrigido no researcher (jun/2026)** — enrich da busca agora traz `valorUnitarioHomologado` de `/resultados` (paridade Django). Índice SQLite ainda pode ter estimado até backfill `/resultados` (causa 1); badge UI (C) pendente.
+
+**Correção aplicada:** `enrich_homolog_items_from_pncp` + `get_contract_supplier_snapshot` + `resolution_to_api_dict` — ver `pricing_display.merge_homologated_pricing_from_snap`.
 
 **Escopo (comparação correta):**
 
@@ -119,7 +121,9 @@ Prioridade de código correta quando `valor_unitario_homologado` existe. Gap: í
 - **Estrutural:** lote usar o mesmo ramo pós-índice que `busca_lote=false` (com caps timeout/enrich) — [`PNCP-PLANO-PARIDADE-BUSCA.md`](PNCP-PLANO-PARIDADE-BUSCA.md) Fase B; runbook: [`PNCP-IMPLEMENTACAO-PARIDADE-LOTE.md`](PNCP-IMPLEMENTACAO-PARIDADE-LOTE.md).  
 - **Paliativo:** rever `priced_n >= 1` break; alinhar `need_hybrid`; teste regressão em `test_bulk_search_lote.py` (mesmos `numero_pncp` isolado vs lote).
 
-**Status:** aberto — implementação pendente.
+**Status:** **implementado** (ondas 1–2) — detalhe em [`PNCP-PARIDADE-LOTE-STATUS-IMPLEMENTADO.md`](PNCP-PARIDADE-LOTE-STATUS-IMPLEMENTADO.md). Validar em campo (ex.: álcool gel 70% 500 ml) após `git pull` + recreate PNCP + rebuild frontend.
+
+**Pendente:** homologado vs estimado (§ acima); tempo total autostart em cotações grandes; confirmação `top3_final: 3` no funil em produção.
 
 ---
 
@@ -129,7 +133,7 @@ Prioridade de código correta quando `valor_unitario_homologado` existe. Gap: í
 
 **Hipótese técnica (resumo):** `busca_lote: true`, fila serial, enrich duplicado, pipeline `busca_lote_top3_parity` vs motor completo do `?itemId=`.
 
-**Status:** aberto — ver plano de paridade e [`PNCP-ANALISE-CODIGO-IA-ITEM-VS-LOTE.md`](PNCP-ANALISE-CODIGO-IA-ITEM-VS-LOTE.md).
+**Status:** parcialmente endereçado — pipeline intelligent + caps SQL/termo (ver [`PNCP-PARIDADE-LOTE-STATUS-IMPLEMENTADO.md`](PNCP-PARIDADE-LOTE-STATUS-IMPLEMENTADO.md)). Lentidão relativa pode persistir (1 item/vez, até 6 termos × 2000 linhas).
 
 ---
 

@@ -119,6 +119,38 @@ class ProductSpecMatchTests(unittest.TestCase):
         sg = compute_local_rerank_score("ALCOOL 70%", good, qg, termo_raw=termo)
         self.assertGreater(sg, sb)
 
+    def test_ambroxol_30mg_5ml_parse_frasco_100ml(self):
+        termo = "AMBROXOL, CLORIDRATO – XAROPE 30MG/5ML, FRASCO COM 100ML + COPO DOSADOR"
+        h = extract_product_spec_from_term(termo)
+        self.assertEqual(h.dose_mg, 30.0)
+        self.assertEqual(h.presentation_vol_ml, 5.0)
+        self.assertEqual(h.vol_ml, 100.0)
+        self.assertAlmostEqual(h.conc_mg_per_ml, 6.0, places=2)
+
+    def test_ambroxol_rejeita_15mg_pediatrico(self):
+        termo = "AMBROXOL, CLORIDRATO – XAROPE 30MG/5ML, FRASCO COM 100ML + COPO DOSADOR"
+        ped = {
+            "descricao_item": (
+                "AMBROXOL - XAROPE 15MG/5ML - PEDIATRICO – FRASCO 100ML (CLORIDRATO DE AMBROXOL)"
+            ),
+        }
+        adult = {
+            "descricao_item": (
+                "Ambroxol, cloridrato de - Xarope adulto 30 mg/5ml (6mg/ml) - Frasco de 100 ou 120 ml"
+            ),
+        }
+        catalog = {
+            "descricao_item": (
+                "GRUPO FARMACOLOGICO: EXPECTORANTES, PRINCIPIO ATIVO: AMBROXOL CLORIDRATO, "
+                "FORMA FARMACEUTICA: XAROPE, CONCENTRACAO / DOSAGEM: 30MG/5ML, VOLUME: 120ML"
+            ),
+        }
+        self.assertTrue(product_spec_strict_reject(termo, ped))
+        self.assertFalse(product_spec_strict_reject(termo, adult))
+        self.assertFalse(product_spec_strict_reject(termo, catalog))
+        self.assertLess(product_spec_rerank_adjustment(termo, ped), -40)
+        self.assertGreater(product_spec_rerank_adjustment(termo, adult), 20)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -500,6 +500,41 @@ async def _try_contratos_supplier(
     return None
 
 
+async def _fetch_homolog_pricing_only(
+    client: httpx.AsyncClient,
+    base: str,
+    *,
+    numero_item: str,
+    situacao_compra: str,
+) -> Dict[str, Any]:
+    """GET /resultados quando só falta preço homologado (sem fornecedor novo)."""
+    n_item = str(numero_item or "").strip()
+    if not n_item:
+        return {}
+    sit = str(situacao_compra or "").strip()
+    res_data = await _fetch_json_pncp(client, f"{base}/itens/{n_item}/resultados")
+    if res_data is not None:
+        res = resolve_from_resultados_payload(
+            res_data,
+            numero_item=n_item,
+            situacao_compra=sit,
+            fonte_prefix="pncp_resultado_item",
+        )
+        if res.valor_unitario_homologado is not None or res.valor_total_homologado is not None:
+            return resolution_to_api_dict(res)
+    root_data = await _fetch_json_pncp(client, f"{base}/resultados")
+    if root_data is not None:
+        res = resolve_from_resultados_payload(
+            root_data,
+            numero_item=n_item,
+            situacao_compra=sit,
+            fonte_prefix="pncp_resultado_compra",
+        )
+        if res.valor_unitario_homologado is not None or res.valor_total_homologado is not None:
+            return resolution_to_api_dict(res)
+    return {}
+
+
 async def get_contract_supplier_snapshot(
     cnpj_orgao: str,
     ano_compra: Any,
@@ -570,6 +605,11 @@ async def get_contract_supplier_snapshot(
             )
             if out:
                 return out
+            pricing_only = await _fetch_homolog_pricing_only(
+                client, base, numero_item=n_item, situacao_compra=sit_compra
+            )
+            if pricing_only:
+                return {**empty, **pricing_only}
             return empty
 
         nums: List[str] = []

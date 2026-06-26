@@ -34,6 +34,7 @@ from app.supplier_resolver import (  # noqa: E402
     resolve_from_resultados_payload,
     resolve_item_supplier_offline,
     resolve_from_item_catalog_row,
+    resolution_to_api_dict,
 )
 
 
@@ -169,6 +170,23 @@ class TestSupplierResolver(unittest.TestCase):
         self.assertEqual(out["valor_unitario_homologado"], 21.48)
         self.assertEqual(out["valor_total_homologado"], 170121.6)
         self.assertEqual(out["quantidade_homologada"], 7920.0)
+
+    def test_resolve_resultados_pricing_only(self):
+        payload = {
+            "data": [
+                {
+                    "numeroItem": 3,
+                    "valorUnitarioHomologado": 9.99,
+                    "valorTotalHomologado": 99.9,
+                    "quantidadeHomologada": 10,
+                }
+            ]
+        }
+        res = resolve_from_resultados_payload(payload, numero_item="3")
+        self.assertAlmostEqual(res.valor_unitario_homologado, 9.99)
+        api = resolution_to_api_dict(res)
+        self.assertAlmostEqual(api["valor_unitario_homologado"], 9.99)
+        self.assertAlmostEqual(api["valor_unitario"], 9.99)
 
     def test_item_row_needs_resultado_fetch(self):
         self.assertTrue(item_row_needs_resultado_fetch({"temResultado": True}))

@@ -2317,20 +2317,22 @@ async def enrich_homolog_items_from_pncp(
     *,
     max_n: int,
 ) -> int:
-    """Consulta /resultados (+ contratos) para homologados sem CNPJ no índice."""
+    """Consulta /resultados para CNPJ/nome e preço homologado (valorUnitarioHomologado)."""
     if max_n <= 0 or not itens:
         return 0
     import asyncio
 
+    from .pricing_display import item_needs_homolog_pricing_lookup, merge_homologated_pricing_from_snap
     from .supplier_resolver import item_fornecedor_tem_cnpj_para_salvar
     from .pncp_client import get_contract_supplier_snapshot, create_pncp_http_client
 
     eligible: List[Dict[str, Any]] = []
     for entry in itens:
-        # Homologado com razão social mas sem CNPJ no índice ainda precisa de /resultados.
-        if item_fornecedor_tem_cnpj_para_salvar(entry):
-            continue
-        if not entry.get("item_homologado"):
+        needs_supplier = (
+            not item_fornecedor_tem_cnpj_para_salvar(entry) and bool(entry.get("item_homologado"))
+        )
+        needs_pricing = item_needs_homolog_pricing_lookup(entry)
+        if not needs_supplier and not needs_pricing:
             continue
         cnpj = re.sub(r"\D", "", str(entry.get("numero_pncp") or "").split("-")[0])
         ano = entry.get("ano_compra")
@@ -2360,11 +2362,14 @@ async def enrich_homolog_items_from_pncp(
             situacao_compra=str(entry.get("situacao_compra") or entry.get("situacao") or ""),
             client=client,
         )
-        if not str(snap.get("cnpj_fornecedor") or "").strip():
-            return 0
-        entry.update({k: v for k, v in snap.items() if v})
-        entry["fornecedor_busca_pncp"] = True
-        return 1
+        changed = 0
+        if str(snap.get("cnpj_fornecedor") or "").strip():
+            entry.update({k: v for k, v in snap.items() if v not in (None, "", {})})
+            entry["fornecedor_busca_pncp"] = True
+            changed = 1
+        if merge_homologated_pricing_from_snap(entry, snap):
+            changed = 1
+        return changed
 
     try:
         results = await asyncio.gather(*[_enrich_one(e) for e in eligible])
@@ -2525,9 +2530,11 @@ def local_item_search(
     somente_homologados: Optional[bool] = None,
     filtrar_fornecedor_para_exibicao: bool = True,
     enrich_homolog_max: Optional[int] = None,
+    termo_product_spec: Optional[str] = None,
 ) -> Dict[str, Any]:
     ensure_local_index()
     only_homolog = _resolve_somente_homologados_flag(somente_homologados)
+    termo_spec_filter = (termo_product_spec or termo_busca or "").strip() or termo_busca
     termo_efetivo, term_meta = derive_anchor_search_term(termo_busca)
     search_tiers = build_search_query_tiers(termo_busca)
     token_groups = _build_search_tokens(termo_efetivo)
@@ -2651,10 +2658,10 @@ def local_item_search(
             from .product_category_match import product_category_strict_reject
             from .product_spec_match import product_spec_strict_reject
 
-            if product_category_strict_reject(termo_busca, {"descricao_item": desc}):
+            if product_category_strict_reject(termo_spec_filter, {"descricao_item": desc}):
                 filtrados_token += 1
                 continue
-            if product_spec_strict_reject(termo_busca, {"descricao_item": desc}):
+            if product_spec_strict_reject(termo_spec_filter, {"descricao_item": desc}):
                 filtrados_token += 1
                 continue
         except Exception:

@@ -33,6 +33,8 @@
 | [../PLANO-MODULO-COBERTURA-FORNECEDOR-PNCP.md](../PLANO-MODULO-COBERTURA-FORNECEDOR-PNCP.md) | Plano fornecedor |
 | [../PLANO-FONTES-PRECOS-MULTIPLAS-PLATAFORMAS.md](../PLANO-FONTES-PRECOS-MULTIPLAS-PLATAFORMAS.md) | TCE, BNC, BLL e outras fontes de preço |
 | [../PNCP-IMPLEMENTACAO-PARIDADE-LOTE.md](../PNCP-IMPLEMENTACAO-PARIDADE-LOTE.md) | Runbook implementação + checkpoints |
+| [../PNCP-PARIDADE-LOTE-STATUS-IMPLEMENTADO.md](../PNCP-PARIDADE-LOTE-STATUS-IMPLEMENTADO.md) | **Status:** o que foi codado (ondas 1–2) vs notas/análise |
+| [../PNCP-NOTAS-PENDENCIAS.md](../PNCP-NOTAS-PENDENCIAS.md) | Bugs/observações de campo |
 | [../PNCP-ANALISE-CODIGO-IA-ITEM-VS-LOTE.md](../PNCP-ANALISE-CODIGO-IA-ITEM-VS-LOTE.md) | Análise código: `?itemId=` vs `busca_lote` |
 | [../PNCP-PLANO-PARIDADE-BUSCA.md](../PNCP-PLANO-PARIDADE-BUSCA.md) | Paridade busca lote vs individual |
 

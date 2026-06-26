@@ -80,6 +80,7 @@ from .schemas import MarketSearchRequest
 from .search_text_clean import apply_item_display_cleanup, normalize_for_search, preprocess_cotacao_search_term
 from .pricing_display import (
     filter_items_for_search_display,
+    item_matches_faixa_band,
     row_display_unit_price,
 )
 from .pricing_faixa import (
@@ -1878,8 +1879,7 @@ def _ia_item_key(it: Dict[str, Any]) -> str:
 
 
 def _preco_dentro_faixa(it: Dict[str, Any], lo: float, hi: float) -> bool:
-    v = _row_price_for_faixa(it)
-    return v > 0.0 and lo <= v <= hi
+    return item_matches_faixa_band(it, lo, hi)
 
 
 def _ensure_top3_from_pool(
@@ -2402,7 +2402,14 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         limit = max(200, int(PNCP_BULK_INTELLIGENT_SQL_LIMIT))
     termo_busca_raw = search_payload.termo_busca
     termo_efetivo, term_meta = derive_anchor_search_term(termo_busca_raw)
-    termo_spec = termo_efetivo if term_meta.get("termo_truncado") else termo_busca_raw
+    from .product_spec_match import product_spec_has_constraints
+
+    if product_spec_has_constraints(termo_busca_raw):
+        termo_spec = termo_busca_raw
+    elif term_meta.get("termo_truncado"):
+        termo_spec = termo_efetivo
+    else:
+        termo_spec = termo_busca_raw
     itens: List[Dict[str, Any]] = []
     base_stats: Dict[str, Any] = {}
     terms_tried: List[str] = []
@@ -2431,6 +2438,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             enrich_homolog_max=(
                 max(0, int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX)) if bulk_legacy else None
             ),
+            termo_product_spec=termo_spec,
         )
         if not base_stats:
             base_stats = dict(batch_result.get("stats") or {})

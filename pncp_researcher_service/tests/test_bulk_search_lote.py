@@ -10,7 +10,7 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from app.config import PNCP_BULK_ENRICH_HOMOLOG_MAX
+from app.config import PNCP_BULK_ENRICH_HOMOLOG_MAX, PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX
 from app.schemas import MarketSearchRequest
 from app.service import market_search_intelligent
 from app.supplier_resolver import item_fornecedor_valido_para_busca
@@ -112,7 +112,7 @@ class BulkSearchLoteRecallTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(kw.get("filtrar_fornecedor_para_exibicao", False))
         self.assertIsNone(kw.get("enrich_homolog_max"))
 
-    async def test_bulk_skips_sync_local_enrich_in_index(self):
+    async def test_bulk_uses_local_enrich_in_index(self):
         payload = MarketSearchRequest(termo_busca="ITEM TESTE BULK", busca_lote=True)
         with patch("app.service.local_item_search", return_value=_local_result([])) as local_mock, patch(
             "app.service.market_search",
@@ -122,11 +122,11 @@ class BulkSearchLoteRecallTests(unittest.IsolatedAsyncioTestCase):
             await market_search_intelligent(payload)
         kw = local_mock.call_args.kwargs
         self.assertFalse(kw.get("filtrar_fornecedor_para_exibicao", True))
-        self.assertEqual(kw.get("enrich_homolog_max"), 0)
+        self.assertEqual(kw.get("enrich_homolog_max"), max(0, int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX)))
 
 
 class BulkSearchSupplierFilterTests(unittest.IsolatedAsyncioTestCase):
-    async def test_bulk_drops_name_only_supplier_without_cnpj(self):
+    async def test_bulk_keeps_name_only_supplier_for_display_recall(self):
         payload = MarketSearchRequest(
             termo_busca="ITEM NOME SEM CNPJ",
             busca_lote=True,
@@ -150,8 +150,11 @@ class BulkSearchSupplierFilterTests(unittest.IsolatedAsyncioTestCase):
         ):
             out = await market_search_intelligent(payload)
 
-        self.assertEqual(out.get("itens") or [], [])
+        itens = out.get("itens") or []
+        self.assertGreaterEqual(len(itens), 1)
+        self.assertTrue(item_fornecedor_valido_para_busca(itens[0]))
 
+    async def test_bulk_drops_placeholder_supplier_without_enrich(self):
         payload = MarketSearchRequest(
             termo_busca="ITEM TESTE BULK HOMOLOG",
             busca_lote=True,

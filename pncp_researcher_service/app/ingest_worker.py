@@ -30,7 +30,11 @@ from .config import (
 )
 from .ingest_backpressure import compute_ingest_backpressure
 from .ingest_maintenance import requeue_processing_tasks, run_ingest_self_healing
-from .ingest_planner import plan_ingest_queue, topup_contract_items_if_starved
+from .ingest_planner import (
+    enqueue_contracts_needing_resultados,
+    plan_ingest_queue,
+    topup_contract_items_if_starved,
+)
 from .ingest_runtime import (
     configure_service_logging,
     mark_worker_started,
@@ -70,6 +74,7 @@ from .pncp_client import (
 logger = logging.getLogger(__name__)
 
 _last_topup_mono: float = 0.0
+_last_resultados_topup_mono: float = 0.0
 _last_gap_check_mono: float = 0.0
 GAP_CHECK_INTERVAL_SECONDS: float = 120.0
 TOPUP_MIN_INTERVAL_SECONDS: float = 30.0
@@ -353,7 +358,7 @@ async def _run_catalog_task(task: Dict[str, Any], *, client: Any, timeout: float
 
 
 async def process_ingest_batch() -> Dict[str, Any]:
-    global _last_topup_mono
+    global _last_topup_mono, _last_resultados_topup_mono
     ensure_local_index()
     backfill = is_ingest_backfill_mode()
     task_timeout = max(30.0, float(PNCP_INGEST_TASK_TIMEOUT_SECONDS))
@@ -392,6 +397,15 @@ async def process_ingest_batch() -> Dict[str, Any]:
             starving = bool(bp["starving"])
             catalog_heavy = bool(bp["catalog_heavy"])
             pause_catalog = bool(bp["pause_catalog"])
+
+    if (now_mono - _last_resultados_topup_mono) >= TOPUP_MIN_INTERVAL_SECONDS:
+        try:
+            res_top = enqueue_contracts_needing_resultados()
+            if res_top:
+                logger.info("ingest topup resultados enfileirados=%s", res_top)
+        except Exception:
+            logger.exception("ingest topup resultados falhou")
+        _last_resultados_topup_mono = now_mono
 
     if catalog_heavy and pause_catalog:
         logger.info(

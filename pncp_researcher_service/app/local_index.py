@@ -1185,19 +1185,193 @@ def _item_row_likely_has_resultado(
     return False
 
 
+_SQL_ITEM_NEEDS_RESULTADOS_PREDICATE = """
+    (
+        {p}valor_unitario_homologado IS NULL
+        OR TRIM(COALESCE({p}cnpj_fornecedor, '')) = ''
+    )
+    AND (
+        {p}fornecedor_elegivel = 1
+        OR LOWER(COALESCE({p}situacao_item, '')) LIKE '%homolog%'
+        OR LOWER(COALESCE({p}situacao_item, '')) LIKE '%adjudic%'
+        OR LOWER(COALESCE({p}situacao_item, '')) LIKE '%result%'
+    )
+"""
+
+
+def _item_needs_resultados_sql(alias: str = "") -> str:
+    prefix = f"{alias}." if alias else ""
+    return _SQL_ITEM_NEEDS_RESULTADOS_PREDICATE.format(p=prefix)
+
+
+def count_items_needing_catalog_metadata_sync() -> int:
+    """Itens com raw_json mas sem situacao_item materializada (impede topup de /resultados)."""
+    ensure_local_index()
+    with _conn() as c:
+        row = c.execute(
+            """
+            SELECT COUNT(*) AS n FROM pncp_itens
+            WHERE raw_json_zlib IS NOT NULL
+              AND (
+                    TRIM(COALESCE(situacao_item, '')) = ''
+                    OR fornecedor_elegivel = 0
+                  )
+            """
+        ).fetchone()
+    return int(row["n"] or 0)
+
+
+def sync_catalog_metadata_from_raw_json(
+    *,
+    batch_size: int = 5000,
+    max_batches: int = 1,
+) -> Dict[str, Any]:
+    """
+    Preenche situacao_item, fornecedor_elegivel e preços estimados a partir do catálogo PNCP
+    comprimido em raw_json_zlib. Necessário em bases ingeridas antes da Fase A de fornecedor.
+    """
+    lim = max(1, int(batch_size))
+    batches = max(1, int(max_batches))
+    scanned = 0
+    updated = 0
+    homolog_marked = 0
+    elegivel_marked = 0
+    ensure_local_index()
+    for _ in range(batches):
+        with _conn() as c:
+            _migrate_pncp_itens_homolog_columns(c)
+            _migrate_pncp_itens_supplier_columns(c)
+            rows = c.execute(
+                """
+                SELECT id, raw_json_zlib, situacao_item, fornecedor_elegivel,
+                       valor_unitario_estimado, valor_total_estimado, quantidade_estimada
+                FROM pncp_itens
+                WHERE raw_json_zlib IS NOT NULL
+                  AND (
+                        TRIM(COALESCE(situacao_item, '')) = ''
+                        OR fornecedor_elegivel = 0
+                      )
+                LIMIT ?
+                """,
+                (lim,),
+            ).fetchall()
+        if not rows:
+            break
+        batch_updated = 0
+        with _conn() as c:
+            for row in rows:
+                scanned += 1
+                catalog = _decompress_zlib_json_blob(row["raw_json_zlib"])
+                if not isinstance(catalog, dict):
+                    continue
+                sit_item = str(
+                    catalog.get("situacaoCompraItemNome")
+                    or catalog.get("situacaoCompraItem")
+                    or catalog.get("situacaoItemNome")
+                    or ""
+                ).strip()
+                elegivel = 1 if item_elegivel(catalog) else 0
+                vu_est = _safe_float(catalog.get("valorUnitarioEstimado"))
+                vt_est = _safe_float(catalog.get("valorTotal") or catalog.get("valorTotalEstimado"))
+                q_est = _safe_float(catalog.get("quantidade"))
+                cur_sit = str(row["situacao_item"] or "").strip()
+                cur_eleg = int(row["fornecedor_elegivel"] or 0)
+                needs = (
+                    (not cur_sit and sit_item)
+                    or (cur_eleg == 0 and elegivel == 1)
+                    or (row["valor_unitario_estimado"] is None and vu_est is not None)
+                )
+                if not needs:
+                    continue
+                c.execute(
+                    """
+                    UPDATE pncp_itens SET
+                        situacao_item = CASE
+                            WHEN TRIM(COALESCE(situacao_item, '')) = '' AND ? != ''
+                            THEN ? ELSE situacao_item END,
+                        fornecedor_elegivel = CASE
+                            WHEN fornecedor_elegivel = 0 AND ? = 1 THEN 1
+                            ELSE fornecedor_elegivel END,
+                        valor_unitario_estimado = COALESCE(valor_unitario_estimado, ?),
+                        valor_total_estimado = COALESCE(valor_total_estimado, ?),
+                        quantidade_estimada = COALESCE(quantidade_estimada, ?),
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        sit_item,
+                        sit_item,
+                        elegivel,
+                        vu_est,
+                        vt_est,
+                        q_est,
+                        datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                        int(row["id"]),
+                    ),
+                )
+                batch_updated += 1
+                if sit_item and "homolog" in sit_item.lower():
+                    homolog_marked += 1
+                if elegivel == 1:
+                    elegivel_marked += 1
+            c.commit()
+        updated += batch_updated
+        if len(rows) < lim:
+            break
+    remaining = count_items_needing_catalog_metadata_sync()
+    out = {
+        "ok": True,
+        "scanned": scanned,
+        "updated": updated,
+        "homolog_marked": homolog_marked,
+        "elegivel_marked": elegivel_marked,
+        "remaining": remaining,
+    }
+    if updated:
+        logger.info("sync catalog metadata: %s", out)
+    return out
+
+
+def count_contracts_needing_resultados() -> int:
+    ensure_local_index()
+    with _conn() as c:
+        _migrate_pncp_itens_homolog_columns(c)
+        row = c.execute(
+            f"""
+            SELECT COUNT(DISTINCT numero_pncp) AS n
+            FROM pncp_itens
+            WHERE {_item_needs_resultados_sql()}
+            """
+        ).fetchone()
+    return int(row["n"] or 0)
+
+
 def contract_has_items_needing_resultados(numero_pncp: str) -> bool:
-    """True se há linhas em pncp_itens elegíveis sem valor homologado persistido."""
+    """True se há linhas elegíveis sem preço homologado ou CNPJ de fornecedor persistido."""
     numero = str(numero_pncp or "").strip()
     if not numero:
         return False
     ensure_local_index()
     with _conn() as c:
         _migrate_pncp_itens_homolog_columns(c)
+        _migrate_pncp_itens_supplier_columns(c)
+        hit = c.execute(
+            f"""
+            SELECT 1 FROM pncp_itens
+            WHERE numero_pncp = ? AND {_item_needs_resultados_sql()}
+            LIMIT 1
+            """,
+            (numero,),
+        ).fetchone()
+        if hit:
+            return True
         rows = c.execute(
             """
             SELECT situacao_item, fornecedor_elegivel, raw_json_zlib
             FROM pncp_itens
-            WHERE numero_pncp = ? AND valor_unitario_homologado IS NULL
+            WHERE numero_pncp = ?
+              AND valor_unitario_homologado IS NULL
+              AND TRIM(COALESCE(cnpj_fornecedor, '')) = ''
             LIMIT 50
             """,
             (numero,),
@@ -1223,10 +1397,11 @@ def list_item_stubs_for_resultados_fetch(numero_pncp: str) -> List[Dict[str, Any
     with _conn() as c:
         _migrate_pncp_itens_homolog_columns(c)
         rows = c.execute(
-            """
+            f"""
             SELECT numero_item, situacao_item, fornecedor_elegivel, raw_json_zlib
             FROM pncp_itens
-            WHERE numero_pncp = ? AND valor_unitario_homologado IS NULL
+            WHERE numero_pncp = ?
+              AND {_item_needs_resultados_sql()}
             """,
             (numero,),
         ).fetchall()
@@ -1259,15 +1434,10 @@ def list_contracts_needing_resultados(limit: int) -> List[str]:
     with _conn() as c:
         _migrate_pncp_itens_homolog_columns(c)
         rows = c.execute(
-            """
+            f"""
             SELECT DISTINCT i.numero_pncp AS numero_pncp
             FROM pncp_itens i
-            WHERE i.valor_unitario_homologado IS NULL
-              AND (
-                    i.fornecedor_elegivel = 1
-                    OR LOWER(COALESCE(i.situacao_item, '')) LIKE '%homolog%'
-                    OR LOWER(COALESCE(i.situacao_item, '')) LIKE '%adjudic%'
-                  )
+            WHERE {_item_needs_resultados_sql('i')}
             ORDER BY i.updated_at DESC
             LIMIT ?
             """,
@@ -1291,12 +1461,12 @@ def apply_resultados_to_stored_items(
         _migrate_pncp_itens_homolog_columns(c)
         _migrate_pncp_itens_supplier_columns(c)
         rows = c.execute(
-            """
+            f"""
             SELECT id, numero_item, quantidade, valor_unitario, valor_total,
                    valor_unitario_estimado, valor_total_estimado, quantidade_estimada,
-                   situacao_item, situacao_compra, raw_json_zlib
+                   situacao_item, situacao_compra, cnpj_fornecedor, fornecedor
             FROM pncp_itens
-            WHERE numero_pncp = ? AND valor_unitario_homologado IS NULL
+            WHERE numero_pncp = ? AND {_item_needs_resultados_sql()}
             """,
             (numero,),
         ).fetchall()
@@ -1309,7 +1479,20 @@ def apply_resultados_to_stored_items(
             vu_hom = homolog["valor_unitario_homologado"]
             vt_hom = homolog["valor_total_homologado"]
             q_hom = homolog["quantidade_homologada"]
-            if vu_hom is None and vt_hom is None and q_hom is None:
+            has_homolog = vu_hom is not None or vt_hom is not None or q_hom is not None
+
+            sit_compra_row = str(row["situacao_compra"] or "").strip()
+            res = resolve_from_resultados_payload(
+                resultado,
+                numero_item=ni or None,
+                situacao_compra=sit_compra_row,
+                fonte_prefix="pncp_resultado_enrich",
+            )
+            cnpj_forn = str(res.cnpj_fornecedor or "").strip()
+            fornecedor = str(res.fornecedor or "").strip()
+            fornecedor_fonte = str(res.fornecedor_fonte or "").strip()
+            has_supplier = bool(cnpj_forn or fornecedor)
+            if not has_homolog and not has_supplier:
                 continue
 
             vu_est = _safe_float(row["valor_unitario_estimado"])
@@ -1322,35 +1505,34 @@ def apply_resultados_to_stored_items(
             if q_est is None:
                 q_est = _safe_float(row["quantidade"])
 
-            qtd = q_hom if q_hom is not None else q_est
-            valor_unit = vu_hom if vu_hom is not None else vu_est
-            valor_total = vt_hom if vt_hom is not None else vt_est
+            if has_homolog:
+                qtd = q_hom if q_hom is not None else q_est
+                valor_unit = vu_hom if vu_hom is not None else vu_est
+                valor_total = vt_hom if vt_hom is not None else vt_est
+                resultado_resolvido_at = now
+            else:
+                qtd = q_est
+                valor_unit = vu_est
+                valor_total = vt_est
+                resultado_resolvido_at = None
 
-            sit_compra_row = str(row["situacao_compra"] or "").strip()
-            res = resolve_from_resultados_payload(
-                resultado,
-                numero_item=ni or None,
-                situacao_compra=sit_compra_row,
-                fonte_prefix="pncp_resultado_enrich",
-            )
-            cnpj_forn = str(res.cnpj_fornecedor or "").strip()
-            fornecedor = str(res.fornecedor or "").strip()
-            fornecedor_fonte = str(res.fornecedor_fonte or "").strip()
-            fornecedor_resolvido_at = now if (cnpj_forn or fornecedor) else None
+            fornecedor_resolvido_at = now if has_supplier else None
+            sit_item_upd = str(res.situacao_item or row["situacao_item"] or "").strip() or None
 
             c.execute(
                 """
                 UPDATE pncp_itens SET
-                    quantidade=?,
-                    valor_unitario=?,
-                    valor_total=?,
+                    quantidade=COALESCE(?, quantidade),
+                    valor_unitario=COALESCE(?, valor_unitario),
+                    valor_total=COALESCE(?, valor_total),
                     valor_unitario_estimado=COALESCE(valor_unitario_estimado, ?),
                     valor_total_estimado=COALESCE(valor_total_estimado, ?),
                     quantidade_estimada=COALESCE(quantidade_estimada, ?),
-                    valor_unitario_homologado=?,
-                    valor_total_homologado=?,
-                    quantidade_homologada=?,
-                    resultado_resolvido_at=?,
+                    valor_unitario_homologado=COALESCE(?, valor_unitario_homologado),
+                    valor_total_homologado=COALESCE(?, valor_total_homologado),
+                    quantidade_homologada=COALESCE(?, quantidade_homologada),
+                    resultado_resolvido_at=COALESCE(?, resultado_resolvido_at),
+                    situacao_item=COALESCE(?, situacao_item),
                     updated_at=?,
                     cnpj_fornecedor=COALESCE(?, cnpj_fornecedor),
                     fornecedor=COALESCE(?, fornecedor),
@@ -1359,16 +1541,17 @@ def apply_resultados_to_stored_items(
                 WHERE id=?
                 """,
                 (
-                    qtd,
-                    valor_unit,
-                    valor_total,
+                    qtd if has_homolog else None,
+                    valor_unit if has_homolog else None,
+                    valor_total if has_homolog else None,
                     vu_est,
                     vt_est,
                     q_est,
                     vu_hom,
                     vt_hom,
                     q_hom,
-                    now,
+                    resultado_resolvido_at,
+                    sit_item_upd,
                     now,
                     cnpj_forn or None,
                     fornecedor or None,
@@ -2139,12 +2322,12 @@ async def enrich_homolog_items_from_pncp(
         return 0
     import asyncio
 
-    from .supplier_resolver import item_fornecedor_tem_cnpj_para_salvar
+    from .supplier_resolver import item_fornecedor_valido_para_busca
     from .pncp_client import get_contract_supplier_snapshot, create_pncp_http_client
 
     eligible: List[Dict[str, Any]] = []
     for entry in itens:
-        if item_fornecedor_tem_cnpj_para_salvar(entry):
+        if item_fornecedor_valido_para_busca(entry):
             continue
         if not entry.get("item_homologado"):
             continue

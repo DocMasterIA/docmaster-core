@@ -153,7 +153,7 @@ def revive_dead_tasks(*, limit: int, min_dead_age_seconds: int) -> int:
 
 def purge_redundant_pending_item_tasks(*, limit: int = 5000) -> int:
     """Remove da fila pending contract_items que já não precisam refresh (itens recentes)."""
-    from .local_index import contract_needs_items_refresh
+    from .local_index import contract_needs_items_refresh, contract_has_items_needing_resultados
 
     lim = max(1, int(limit))
     with _queue_conn() as c:
@@ -166,11 +166,14 @@ def purge_redundant_pending_item_tasks(*, limit: int = 5000) -> int:
             """,
             (lim,),
         ).fetchall()
-    ids = [
-        int(r["id"])
-        for r in rows
-        if not contract_needs_items_refresh(str(r["numero_pncp"] or ""))
-    ]
+    ids = []
+    for r in rows:
+        numero = str(r["numero_pncp"] or "")
+        if contract_needs_items_refresh(numero):
+            continue
+        if contract_has_items_needing_resultados(numero):
+            continue
+        ids.append(int(r["id"]))
     if not ids:
         return 0
     now = _utc_now_iso()

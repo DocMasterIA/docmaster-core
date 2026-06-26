@@ -203,6 +203,15 @@ PNCP_INGEST_FETCH_ITEM_RESULTADOS: bool = _env_bool("PNCP_INGEST_FETCH_ITEM_RESU
 # Enfileira contratos já indexados que ainda não têm preço homologado (só /resultados, sem /itens).
 PNCP_INGEST_RESULTADOS_TOPUP_ENABLED: bool = _env_bool("PNCP_INGEST_RESULTADOS_TOPUP_ENABLED", True)
 PNCP_INGEST_RESULTADOS_TOPUP_LIMIT: int = _env_int("PNCP_INGEST_RESULTADOS_TOPUP_LIMIT", 400)
+# Sincroniza situacao_item / fornecedor_elegivel do raw_json_zlib (bases antigas sem colunas materializadas).
+PNCP_INGEST_SYNC_CATALOG_BATCH: int = _env_int("PNCP_INGEST_SYNC_CATALOG_BATCH", 25000)
+
+
+def effective_resultados_topup_limit() -> int:
+    base = max(1, int(PNCP_INGEST_RESULTADOS_TOPUP_LIMIT))
+    if is_ingest_backfill_mode():
+        return max(base, 2000)
+    return base
 
 
 def is_ingest_backfill_mode() -> bool:
@@ -356,7 +365,7 @@ PNCP_BULK_SEARCH_MAX_SECONDS: float = float(os.getenv("PNCP_BULK_SEARCH_MAX_SECO
 # Enrich PNCP ao vivo no top3 em lote (homologados sem CNPJ antes do filtro de fornecedor).
 PNCP_BULK_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_BULK_ENRICH_HOMOLOG_MAX", 3)
 # Enrich síncrono por tentativa de termo em busca_lote (menor que PNCP_SEARCH_ENRICH_HOMOLOG_MAX).
-PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX", 0)
+PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX", 6)
 # Score mínimo (0–100) para considerar item aderente na busca inteligente (antes ~60–70 implícito).
 PNCP_SEARCH_MIN_SCORE_APROVACAO: int = _env_int("PNCP_SEARCH_MIN_SCORE_APROVACAO", 50)
 # Modo qualidade (recomendado com Qwen): tiers mais rígidos, menos fallback agressivo, rerank IA no pool misto.

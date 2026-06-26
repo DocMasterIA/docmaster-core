@@ -26,6 +26,7 @@ from .schemas import (
     HealthResponse,
     IngestPlanRequest,
     LocalBackfillRequest,
+    LocalSyncCatalogRequest,
     ResearchSessionAddItemsRequest,
     ResearchSessionCreateRequest,
     ResearchSessionUpdateRequest,
@@ -45,6 +46,8 @@ from .local_index import (
     local_index_stats,
     ingest_operational_status,
     local_index_operational_status,
+    sync_catalog_metadata_from_raw_json,
+    count_contracts_needing_resultados,
     enrich_local_search_result,
     local_item_search,
     local_search,
@@ -223,6 +226,20 @@ async def local_index_fts_status_endpoint():
 async def local_index_fts_rebuild_endpoint():
     try:
         return rebuild_fts_index()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/local-index/sync-catalog-metadata")
+async def local_index_sync_catalog_metadata_endpoint(body: LocalSyncCatalogRequest):
+    """Materializa situacao_item e fornecedor_elegivel a partir do raw_json_zlib (bases antigas)."""
+    try:
+        out = sync_catalog_metadata_from_raw_json(
+            batch_size=body.batch_size,
+            max_batches=body.max_batches,
+        )
+        out["contracts_needing_resultados"] = count_contracts_needing_resultados()
+        return out
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 

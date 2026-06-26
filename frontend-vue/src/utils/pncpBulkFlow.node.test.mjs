@@ -5,6 +5,8 @@ import {
   hasValidPnCpFornecedorParaBusca,
   passesPnCpSearchDisplayGate,
   hasDisplayPnCpPrecoPositivo,
+  hasCnpjFornecedorSalvar,
+  extractCnpjFornecedorSalvar,
 } from './pncpPricing.js';
 
 test('rejeita fornecedor Não se aplica na busca', () => {
@@ -50,6 +52,29 @@ test('em lote aceita linha com CNPJ', () => {
     },
   };
   assert.equal(passesPnCpSearchDisplayGate(row, { requireCnpjForSave: true }), true);
+});
+
+test('em lote aceita CNPJ em niFornecedor (campo PNCP comum)', () => {
+  const row = {
+    sourceRaw: {
+      valor_unitario_estimado: 10,
+      niFornecedor: '12345678000195',
+      fornecedor: 'FORNECEDORA EXEMPLO LTDA',
+    },
+  };
+  assert.equal(passesPnCpSearchDisplayGate(row, { requireCnpjForSave: true }), true);
+});
+
+test('niFornecedor conta para hasCnpjFornecedorSalvar (mesma regra do save)', () => {
+  const row = {
+    sourceRaw: {
+      valor_unitario_estimado: 10,
+      niFornecedor: '12345678000195',
+      fornecedor: 'FORNECEDORA EXEMPLO LTDA',
+    },
+  };
+  assert.equal(hasCnpjFornecedorSalvar(row), true);
+  assert.ok(extractCnpjFornecedorSalvar(row));
 });
 
 test('aceita razão social útil com preço', () => {

@@ -152,11 +152,31 @@ const FORNECEDOR_PLACEHOLDER = new Set([
   '—',
 ]);
 
-function cnpjDigits14(row) {
+/** Mesmas chaves que o backend PNCP usa para CNPJ de fornecedor homologado. */
+export function cnpjDigits14(row) {
   const src = mergedPnCpSource(row);
-  const raw = row?.cnpjFornecedor || src.cnpj_fornecedor || src.cnpjFornecedor || src.niFornecedor || src.cnpj || '';
+  const cad = src.fornecedor_cadastro && typeof src.fornecedor_cadastro === 'object'
+    ? src.fornecedor_cadastro
+    : {};
+  const raw = row?.cnpjFornecedor
+    || src.cnpj_fornecedor
+    || src.cnpjFornecedor
+    || src.cnpjCpfFornecedor
+    || src.niFornecedor
+    || src.ni_fornecedor
+    || src.cnpj
+    || cad.cnpj
+    || cad.cnpj_fornecedor
+    || '';
   const digits = String(raw).replace(/\D/g, '');
   return digits.length === 14 ? digits : '';
+}
+
+/** CNPJ formatado para payload de save (14 dígitos ou vazio). */
+export function extractCnpjFornecedorSalvar(row) {
+  const d = cnpjDigits14(row);
+  if (!d) return null;
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
 }
 
 function fornecedorNomeUtil(nome) {

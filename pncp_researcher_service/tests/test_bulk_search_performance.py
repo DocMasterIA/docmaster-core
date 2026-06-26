@@ -11,6 +11,7 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+from app.config import PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX
 from app.schemas import MarketSearchRequest
 from app.service import _bulk_search_timeout_response, market_search_intelligent
 
@@ -107,7 +108,7 @@ class BulkSearchPerformanceTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(local_mock.call_count, 1)
         kw = local_mock.call_args.kwargs
         self.assertFalse(kw.get("filtrar_fornecedor_para_exibicao", True))
-        self.assertEqual(kw.get("enrich_homolog_max"), 0)
+        self.assertEqual(kw.get("enrich_homolog_max"), max(0, int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX)))
 
     async def test_bulk_enrich_top3_default_enabled(self):
         from app.config import PNCP_BULK_ENRICH_HOMOLOG_MAX

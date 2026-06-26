@@ -84,14 +84,24 @@ export function shouldClearSavedSelection(stats, attempted) {
   return handled && stats.duplicadas > 0;
 }
 
-async function saveItemCotacoesBatched(sessionId, itemId, rows, batchSize, stats, onProgress) {
+async function saveItemCotacoesBatched(sessionId, itemId, rows, batchSize, stats, onProgress, progressCtx) {
   const iid = Number(itemId);
   for (let i = 0; i < rows.length; i += batchSize) {
     const lote = rows.slice(i, i + batchSize);
     const res = await addCotacoesToItemInResearchSession(sessionId, iid, lote);
     accumulateCotacaoSaveResponse(stats, res);
+    if (progressCtx) {
+      progressCtx.cotacoesEnviadas += lote.length;
+    }
     if (typeof onProgress === 'function') {
-      onProgress({ itemId: iid, lote: Math.floor(i / batchSize) + 1 });
+      onProgress({
+        itemId: iid,
+        lote: Math.floor(i / batchSize) + 1,
+        cotacoesEnviadas: progressCtx?.cotacoesEnviadas ?? lote.length,
+        totalCotacoes: progressCtx?.totalCotacoes ?? rows.length,
+        done: progressCtx?.itemsDone ?? 0,
+        total: progressCtx?.itemsTotal ?? 1,
+      });
     }
   }
 }
@@ -114,10 +124,16 @@ export async function persistCotacoesToResearchSession(
   const enriched = attachRouteItemId(rows, routeItemId);
   const { byItem, orphans } = partitionCotacoesByItem(enriched);
   const entries = [...byItem.entries()];
+  const totalCotacoes = enriched.length;
+  const progressCtx = {
+    totalCotacoes,
+    cotacoesEnviadas: 0,
+    itemsTotal: entries.length,
+    itemsDone: 0,
+  };
 
   if (entries.length > 0) {
     let nextIdx = 0;
-    let done = 0;
     const workers = Math.min(concurrency, entries.length);
 
     async function worker() {
@@ -125,13 +141,25 @@ export async function persistCotacoesToResearchSession(
         const idx = nextIdx;
         nextIdx += 1;
         const [iid, arr] = entries[idx];
+        await saveItemCotacoesBatched(
+          sessionId,
+          iid,
+          arr,
+          batchSize,
+          stats,
+          onProgress,
+          progressCtx,
+        );
+        progressCtx.itemsDone += 1;
         if (typeof onProgress === 'function') {
-          onProgress({ done, total: entries.length, itemId: iid, phase: 'item' });
-        }
-        await saveItemCotacoesBatched(sessionId, iid, arr, batchSize, stats);
-        done += 1;
-        if (typeof onProgress === 'function') {
-          onProgress({ done, total: entries.length, itemId: iid, phase: 'item' });
+          onProgress({
+            done: progressCtx.itemsDone,
+            total: progressCtx.itemsTotal,
+            cotacoesEnviadas: progressCtx.cotacoesEnviadas,
+            totalCotacoes: progressCtx.totalCotacoes,
+            itemId: iid,
+            phase: 'item',
+          });
         }
       }
     }

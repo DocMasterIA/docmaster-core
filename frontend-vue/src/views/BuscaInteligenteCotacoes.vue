@@ -21,6 +21,9 @@
         <div class="bia-summary-card">
           <span>Resultados</span>
           <strong>{{ displayedRows.length }}</strong>
+          <span v-if="totalSalvaveis < displayedRows.length" class="bia-meta">
+            ({{ totalSalvaveis }} com CNPJ para salvar)
+          </span>
         </div>
         <div class="bia-summary-card">
           <span>Media</span>
@@ -320,9 +323,11 @@ import {
 import {
   displayPnCpTotal,
   displayPnCpUnitario,
+  extractCnpjFornecedorSalvar,
   extractPnCpHomologadoTotal,
   extractPnCpHomologadoUnit,
   formatFaixaResumo,
+  hasCnpjFornecedorSalvar,
   passesPnCpSearchDisplayGate,
 } from '../utils/pncpPricing';
 
@@ -679,7 +684,9 @@ async function processOneBulkItem(ctx, {
     autoSearchProgress.value.done += 1;
     return { stop: false };
   }
-  if (itemRowsCount(ctx.id) >= 3) {
+  const salvosNoBackend = Number(ctx?.total_cotacoes_item || 0);
+  const linhasNaSessao = itemRowsCount(ctx.id);
+  if (salvosNoBackend >= 3 || linhasNaSessao >= 3) {
     autoSearchProgress.value.done += 1;
     autoSearchProgress.value.skipped += 1;
     autoSearchProgress.value.ok += 1;
@@ -858,6 +865,9 @@ async function runBulkItemSearches(pendentes, {
   }
 }
 const totalSelecionados = computed(() => displayedRows.value.filter((x) => x.selecionado).length);
+const totalSalvaveis = computed(
+  () => displayedRows.value.filter((r) => hasCnpjFornecedorSalvar(r)).length,
+);
 const allDisplayedSelecionados = computed(
   () => displayedRows.value.length > 0 && displayedRows.value.every((x) => x.selecionado),
 );
@@ -888,8 +898,7 @@ function riscoClass(value) {
 }
 
 const displayedRows = computed(() => {
-  const base = [...rows.value];
-  const filtrados = base;
+  const filtrados = [...rows.value];
   // Ordena sempre por score decrescente e, em seguida, por valor unitário crescente.
   filtrados.sort((a, b) => {
     const sa = Number(a.score ?? 0);
@@ -1123,7 +1132,7 @@ async function runSearchWithContext({
       if (!backend?.ok || !Array.isArray(backend.itens)) return 0;
       lastBackend = backend;
       const mapped = backend.itens
-        .filter((it) => passesPnCpSearchDisplayGate({ sourceRaw: it }, { requireCnpjForSave: bulkMode }))
+        .filter((it) => passesPnCpSearchDisplayGate({ sourceRaw: it }))
         .map((it, idx) => ({
         esferaAdministrativa: classificarEsferaAdministrativa(it),
         incisoClassificacao: mapEsferaParaInciso(classificarEsferaAdministrativa(it)),
@@ -1158,7 +1167,7 @@ async function runSearchWithContext({
         interpretacaoIa: String(it.ia_interpretacao_item || '').trim() || null,
         similaridadeEncontrada: Boolean(it.similaridade_encontrada),
         fornecedor: String(it.fornecedor || '').trim() || null,
-        cnpjFornecedor: String(it.cnpj_fornecedor || it.cnpjFornecedor || '').trim() || null,
+        cnpjFornecedor: extractCnpjFornecedorSalvar({ sourceRaw: it }),
         selecionado: false,
         backendItensCount: backend.itens.length,
       }));
@@ -1309,13 +1318,6 @@ function toggleSelecionarGrupo(group) {
   rows.value = rows.value.map((r) => (ids.has(r.id) ? { ...r, selecionado: mark } : r));
 }
 
-function rowTemCnpjFornecedor(row) {
-  const raw = (row?.sourceRaw && typeof row.sourceRaw === 'object') ? row.sourceRaw : {};
-  const digits = String(row?.cnpjFornecedor || raw.cnpj_fornecedor || raw.cnpjFornecedor || '')
-    .replace(/\D/g, '');
-  return digits.length === 14;
-}
-
 async function adicionarSelecionadosNaCotacao() {
   if (isSavingSelecionados.value) return;
   const sessionId = Number(cotacaoId.value);
@@ -1324,9 +1326,9 @@ async function adicionarSelecionadosNaCotacao() {
     return;
   }
   const brutos = displayedRows.value.filter((r) => r.selecionado);
-  const semFornecedor = brutos.filter((r) => !rowTemCnpjFornecedor(r)).length;
+  const semFornecedor = brutos.filter((r) => !hasCnpjFornecedorSalvar(r)).length;
   const selecionados = brutos
-    .filter((r) => rowTemCnpjFornecedor(r))
+    .filter((r) => hasCnpjFornecedorSalvar(r))
     .map((r) => {
       const raw = (r.sourceRaw && typeof r.sourceRaw === 'object') ? r.sourceRaw : {};
       const cad = (raw.fornecedor_cadastro && typeof raw.fornecedor_cadastro === 'object')
@@ -1367,7 +1369,7 @@ async function adicionarSelecionadosNaCotacao() {
       similaridade_encontrada: Boolean(r.similaridadeEncontrada),
       data_publicacao: r.data,
       fornecedor: r.fornecedor || null,
-      cnpj_fornecedor: r.cnpjFornecedor || null,
+      cnpj_fornecedor: extractCnpjFornecedorSalvar(r) || r.cnpjFornecedor || null,
       fornecedor_cadastro: Object.keys(cad).length ? cad : null,
       telefone: raw.telefone || cad.telefone || cad.ddd_telefone_1 || null,
       email: raw.email || cad.email || null,
@@ -1387,7 +1389,7 @@ async function adicionarSelecionadosNaCotacao() {
       source: {
         ...raw,
         fornecedor: r.fornecedor || null,
-        cnpj_fornecedor: r.cnpjFornecedor || null,
+        cnpj_fornecedor: extractCnpjFornecedorSalvar(r) || r.cnpjFornecedor || null,
       },
     };
     });
@@ -1410,9 +1412,16 @@ async function adicionarSelecionadosNaCotacao() {
     isSavingSelecionados.value = true;
     const stats = await persistCotacoesToResearchSession(sessionId, enviar, {
       routeItemId: itemId.value,
-      onProgress: ({ done, total }) => {
-        if (total > 1) {
-          saveMessage.value = `Salvando... ${done}/${total}`;
+      onProgress: ({ done, total, cotacoesEnviadas, totalCotacoes }) => {
+        const nCot = Number(totalCotacoes) || enviar.length;
+        const env = Number(cotacoesEnviadas) || 0;
+        if (nCot > 0) {
+          saveMessage.value = `Salvando... ${env}/${nCot} cotação(ões)`;
+          if (Number(total) > 1) {
+            saveMessage.value += ` — item ${done}/${total} da cotação`;
+          }
+        } else if (Number(total) > 1) {
+          saveMessage.value = `Salvando... item ${done}/${total} da cotação`;
         }
       },
     });

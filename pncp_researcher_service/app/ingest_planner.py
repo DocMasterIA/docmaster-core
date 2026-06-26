@@ -15,6 +15,8 @@ from .config import (
     PNCP_INGEST_QUEUE_MAX_PENDING,
     PNCP_INGEST_RESULTADOS_TOPUP_ENABLED,
     PNCP_INGEST_RESULTADOS_TOPUP_LIMIT,
+    PNCP_INGEST_SYNC_CATALOG_BATCH,
+    effective_resultados_topup_limit,
     PNCP_MODALIDADES_DEFAULT,
     PNCP_UFS_DEFAULT,
     effective_items_refresh_days,
@@ -36,6 +38,9 @@ from .local_index import (
     _resolve_backfill_start_page,
     ensure_local_index,
     list_contracts_needing_resultados,
+    count_items_needing_catalog_metadata_sync,
+    count_contracts_needing_resultados,
+    sync_catalog_metadata_from_raw_json,
 )
 
 logger = logging.getLogger(__name__)
@@ -227,7 +232,7 @@ def enqueue_contracts_needing_resultados(limit: Optional[int] = None) -> int:
     """
     if not PNCP_INGEST_RESULTADOS_TOPUP_ENABLED:
         return 0
-    lim = max(1, int(limit or PNCP_INGEST_RESULTADOS_TOPUP_LIMIT))
+    lim = max(1, int(limit or effective_resultados_topup_limit()))
     ensure_local_index()
     numeros = list_contracts_needing_resultados(lim)
     n = 0
@@ -317,6 +322,13 @@ def plan_ingest_queue(
         else:
             items_enqueued = enqueue_contracts_without_items(limit=backlog_lim)
 
+    catalog_sync: Dict[str, Any] = {"skipped": True}
+    if count_items_needing_catalog_metadata_sync() > 0:
+        catalog_sync = sync_catalog_metadata_from_raw_json(
+            batch_size=max(1000, int(PNCP_INGEST_SYNC_CATALOG_BATCH)),
+            max_batches=1,
+        )
+
     resultados_enqueued = enqueue_contracts_needing_resultados()
 
     return {
@@ -340,4 +352,6 @@ def plan_ingest_queue(
         "catalog_pending_before": bp.get("catalog_pending"),
         "contract_items_enqueued": items_enqueued,
         "resultados_enqueued": resultados_enqueued,
+        "contracts_needing_resultados": count_contracts_needing_resultados(),
+        "catalog_metadata_sync": catalog_sync,
     }

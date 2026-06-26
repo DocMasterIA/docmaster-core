@@ -196,6 +196,21 @@ class LocalBackfillRequest(BaseModel):
     )
 
 
+class LocalSyncCatalogRequest(BaseModel):
+    batch_size: int = Field(
+        25000,
+        ge=100,
+        le=100000,
+        description="Itens por lote ao materializar situacao_item/fornecedor_elegivel do raw_json.",
+    )
+    max_batches: int = Field(
+        1,
+        ge=1,
+        le=200,
+        description="Quantos lotes executar nesta chamada.",
+    )
+
+
 class ResearchSessionCreateRequest(BaseModel):
     """Corpo para criar uma ordem de pesquisa (cotação) persistida no serviço PNCP."""
 

@@ -178,11 +178,11 @@ class BulkSearchSupplierFilterTests(unittest.IsolatedAsyncioTestCase):
 
         enrich_mock.assert_called()
         funil = (out.get("stats") or {}).get("funil_busca") or {}
-        self.assertGreater(funil.get("recall_antes_filtro_fornecedor", 0), 0)
-        self.assertEqual(funil.get("recall_apos_filtro_fornecedor"), 0)
+        self.assertGreater(funil.get("top3_antes_filtro_fornecedor", 0), 0)
+        self.assertEqual(funil.get("top3_apos_filtro_fornecedor"), 0)
         self.assertEqual(out.get("itens") or [], [])
 
-    async def test_bulk_recall_returns_all_in_faixa_not_top3(self):
+    async def test_bulk_lote_returns_up_to_3_when_pool_has_more(self):
         payload = MarketSearchRequest(
             termo_busca="ALCOOL GEL 70",
             busca_lote=True,
@@ -198,6 +198,7 @@ class BulkSearchSupplierFilterTests(unittest.IsolatedAsyncioTestCase):
                 fornecedor="FORNECEDORA EXEMPLO LTDA",
                 cnpj="12.345.678/0001-95",
                 numero_item=str(i),
+                numero_pncp=f"1234567800019{i}-1-000001",
             )
             for i in range(1, 8)
         ]
@@ -213,10 +214,11 @@ class BulkSearchSupplierFilterTests(unittest.IsolatedAsyncioTestCase):
             out = await market_search_intelligent(payload)
 
         itens = out.get("itens") or []
-        self.assertEqual(len(itens), 7)
+        self.assertEqual(len(itens), 3)
         funil = (out.get("stats") or {}).get("funil_busca") or {}
-        self.assertTrue(funil.get("bulk_manual_recall"))
-        self.assertEqual((out.get("stats") or {}).get("regra_selecao"), "bulk_manual_recall_faixa")
+        self.assertGreaterEqual(funil.get("candidates_exibiveis", 0), 3)
+        self.assertEqual(funil.get("top3_final"), 3)
+        self.assertEqual((out.get("stats") or {}).get("regra_selecao"), "bulk_top3_manual_parity")
 
     async def test_bulk_returns_items_when_async_enrich_fixes_supplier(self):
         payload = MarketSearchRequest(

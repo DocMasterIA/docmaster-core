@@ -1687,7 +1687,7 @@ def _build_bulk_manual_recall_pool(
     min_ok: int,
 ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
-    Recall de lote alinhado à busca manual: índice local + faixa de preço, sem top3/scoring eliminatório.
+    Recall de lote: candidatos na faixa (mesma base da busca manual), sem scoring eliminatório.
     """
     tier_rank = {"strict": 0, "core": 1, "flex": 2, "anchor": 3}
     pool: List[Dict[str, Any]] = []
@@ -1740,7 +1740,7 @@ def _build_bulk_manual_recall_pool(
     return pool, funil
 
 
-async def _finalize_bulk_manual_recall_response(
+async def _finalize_busca_lote_top3_response(
     *,
     payload: MarketSearchRequest,
     search_payload: MarketSearchRequest,
@@ -1757,7 +1757,10 @@ async def _finalize_bulk_manual_recall_response(
     hybrid_live_count: int,
     min_ok: int,
 ) -> Dict[str, Any]:
-    recall_pool, recall_funil = _build_bulk_manual_recall_pool(
+    """
+    Autostart cotação: até 3 preços por item, escolhidos do mesmo pool da busca manual (faixa + índice).
+    """
+    candidate_pool, pool_funil = _build_bulk_manual_recall_pool(
         itens,
         termo_busca=termo_efetivo,
         termo_busca_raw=termo_busca_raw,
@@ -1765,29 +1768,39 @@ async def _finalize_bulk_manual_recall_response(
         faixa_max=faixa_max,
         min_ok=min_ok,
     )
-    funil.update(recall_funil)
-    funil["recall_antes_filtro_fornecedor"] = len(recall_pool)
+    funil.update(pool_funil)
+    funil["candidates_na_faixa"] = len(candidate_pool)
 
     enrich_n = 0
-    enrich_cap = _bulk_recall_enrich_cap(len(recall_pool))
+    enrich_cap = _bulk_recall_enrich_cap(len(candidate_pool))
     funil["enrich_homolog_cap"] = enrich_cap
-    if recall_pool and enrich_cap:
-        enrich_n = await enrich_homolog_items_from_pncp(recall_pool, max_n=enrich_cap)
+    if candidate_pool and enrich_cap:
+        enrich_n = await enrich_homolog_items_from_pncp(candidate_pool, max_n=enrich_cap)
 
-    for row in recall_pool:
+    for row in candidate_pool:
         apply_item_display_cleanup(row)
 
-    out_items = filter_items_for_search_display(recall_pool)
-    funil["recall_apos_filtro_fornecedor"] = len(out_items)
-    funil["top3_antes_filtro_fornecedor"] = len(recall_pool)
-    funil["top3_apos_filtro_fornecedor"] = len(out_items)
-    funil["top3_final"] = len(out_items)
-    funil["modo_resposta"] = "bulk_manual_recall"
+    display_pool = filter_items_for_search_display(candidate_pool)
+    funil["candidates_exibiveis"] = len(display_pool)
+    funil["top3_antes_filtro_fornecedor"] = len(candidate_pool)
+    funil["top3_apos_filtro_fornecedor"] = len(display_pool)
+
+    top3 = _select_top3_prioritize_federal(display_pool)[:3]
+    top3 = _ensure_top3_from_pool(
+        top3,
+        display_pool,
+        target=3,
+        termo_busca=termo_efetivo,
+        faixa_min=faixa_min,
+        faixa_max=faixa_max,
+    )
+    funil["top3_final"] = len(top3)
+    funil["modo_resposta"] = "busca_lote_top3_parity"
 
     out_stats = dict(base_stats or {})
-    out_stats["total_registros_ia"] = len(recall_pool)
-    out_stats["total_selecionados_ia"] = len(out_items)
-    out_stats["regra_selecao"] = "bulk_manual_recall_faixa"
+    out_stats["total_registros_ia"] = len(candidate_pool)
+    out_stats["total_selecionados_ia"] = len(top3)
+    out_stats["regra_selecao"] = "bulk_top3_manual_parity"
     out_stats["search_quality_first"] = bool(PNCP_SEARCH_QUALITY_FIRST)
     out_stats["ia_rerank_ativo"] = False
     out_stats["ia_rerank_usado"] = False
@@ -1802,10 +1815,10 @@ async def _finalize_bulk_manual_recall_response(
     out_stats["hybrid_live_count"] = hybrid_live_count
     out_stats["enriquecidos_pncp_na_busca"] = enrich_n
     out_stats["itens_com_cnpj_fornecedor"] = sum(
-        1 for x in out_items if str(x.get("cnpj_fornecedor") or "").strip()
+        1 for x in top3 if str(x.get("cnpj_fornecedor") or "").strip()
     )
     out_stats["funil_busca"] = funil
-    out_stats["provavel_gargalo"] = _infer_search_bottleneck(funil, len(out_items))
+    out_stats["provavel_gargalo"] = _infer_search_bottleneck(funil, len(top3))
     out_stats["min_score_aprovacao"] = min_ok
 
     return {
@@ -1834,7 +1847,7 @@ async def _finalize_bulk_manual_recall_response(
             "faixa_regional_max": faixa_max,
         },
         "stats": out_stats,
-        "itens": out_items,
+        "itens": top3,
     }
 
 
@@ -2357,7 +2370,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     - usa o mesmo índice local de itens PNCP (local_item_search);
     - aplica score 0-100 por item;
     - retorna exatamente 3 cotações com diversidade de órgão.
-    - em busca_lote (autostart cotação): recall alinhado à busca manual (todos na faixa).
+    - em busca_lote (autostart): até 3 preços por item, pool = busca manual + faixa.
     """
     # Reutiliza a mesma fonte da busca manual (itens PNCP normalizados)
     busca_lote = bool(getattr(payload, "busca_lote", False))
@@ -2576,7 +2589,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     min_ok = _effective_min_score_aprovacao()
 
     if busca_lote:
-        return await _finalize_bulk_manual_recall_response(
+        return await _finalize_busca_lote_top3_response(
             payload=payload,
             search_payload=search_payload,
             base_stats=base_stats,

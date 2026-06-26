@@ -31,6 +31,10 @@
 | [../deploy/PNCP-INGESTAO-INDEX-24-7.md](../deploy/PNCP-INGESTAO-INDEX-24-7.md) | Guia operacional DESKTOP |
 | [../deploy/PNCP-COMANDOS-OPERACAO.txt](../deploy/PNCP-COMANDOS-OPERACAO.txt) | Comandos copy-paste |
 | [../PLANO-MODULO-COBERTURA-FORNECEDOR-PNCP.md](../PLANO-MODULO-COBERTURA-FORNECEDOR-PNCP.md) | Plano fornecedor |
+| [../PLANO-FONTES-PRECOS-MULTIPLAS-PLATAFORMAS.md](../PLANO-FONTES-PRECOS-MULTIPLAS-PLATAFORMAS.md) | TCE, BNC, BLL e outras fontes de preço |
+| [../PNCP-IMPLEMENTACAO-PARIDADE-LOTE.md](../PNCP-IMPLEMENTACAO-PARIDADE-LOTE.md) | Runbook implementação + checkpoints |
+| [../PNCP-ANALISE-CODIGO-IA-ITEM-VS-LOTE.md](../PNCP-ANALISE-CODIGO-IA-ITEM-VS-LOTE.md) | Análise código: `?itemId=` vs `busca_lote` |
+| [../PNCP-PLANO-PARIDADE-BUSCA.md](../PNCP-PLANO-PARIDADE-BUSCA.md) | Paridade busca lote vs individual |
 
 ---
 

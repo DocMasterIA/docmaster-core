@@ -46,6 +46,10 @@ def _local_result(itens: list[dict]) -> dict:
     return {"ok": True, "itens": itens, "stats": {"sql_rows_fetched": len(itens)}}
 
 
+def _patch_bulk_legacy():
+    return patch("app.service.PNCP_BULK_USE_INTELLIGENT_PIPELINE", False)
+
+
 class BulkSearchLoteRecallTests(unittest.IsolatedAsyncioTestCase):
     async def test_bulk_stops_term_fallbacks_after_one_priced_hit(self):
         payload = MarketSearchRequest(
@@ -59,7 +63,7 @@ class BulkSearchLoteRecallTests(unittest.IsolatedAsyncioTestCase):
             calls.append(term)
             return _local_result([_homolog_item()])
 
-        with patch("app.service.local_item_search", side_effect=_track), patch(
+        with _patch_bulk_legacy(), patch("app.service.local_item_search", side_effect=_track), patch(
             "app.service.market_search",
             new_callable=AsyncMock,
             return_value={"ok": True, "itens": [], "stats": {}},
@@ -82,7 +86,7 @@ class BulkSearchLoteRecallTests(unittest.IsolatedAsyncioTestCase):
             calls.append(term)
             return _local_result([])
 
-        with patch("app.service.local_item_search", side_effect=_empty), patch(
+        with _patch_bulk_legacy(), patch("app.service.local_item_search", side_effect=_empty), patch(
             "app.service.market_search",
             new_callable=AsyncMock,
             return_value={"ok": True, "itens": [], "stats": {}},
@@ -114,7 +118,7 @@ class BulkSearchLoteRecallTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_bulk_uses_local_enrich_in_index(self):
         payload = MarketSearchRequest(termo_busca="ITEM TESTE BULK", busca_lote=True)
-        with patch("app.service.local_item_search", return_value=_local_result([])) as local_mock, patch(
+        with _patch_bulk_legacy(), patch("app.service.local_item_search", return_value=_local_result([])) as local_mock, patch(
             "app.service.market_search",
             new_callable=AsyncMock,
             return_value={"ok": True, "itens": [], "stats": {}},
@@ -216,9 +220,9 @@ class BulkSearchSupplierFilterTests(unittest.IsolatedAsyncioTestCase):
         itens = out.get("itens") or []
         self.assertEqual(len(itens), 3)
         funil = (out.get("stats") or {}).get("funil_busca") or {}
-        self.assertGreaterEqual(funil.get("candidates_exibiveis", 0), 3)
         self.assertEqual(funil.get("top3_final"), 3)
-        self.assertEqual((out.get("stats") or {}).get("regra_selecao"), "bulk_top3_manual_parity")
+        self.assertEqual(funil.get("modo_resposta"), "bulk_intelligent_top3")
+        self.assertIn("scored_final_pool", funil)
 
     async def test_bulk_returns_items_when_async_enrich_fixes_supplier(self):
         payload = MarketSearchRequest(
@@ -316,6 +320,67 @@ class BulkSearchSupplierFilterTests(unittest.IsolatedAsyncioTestCase):
         expected_cap = min(len(pool), max(int(PNCP_SEARCH_ENRICH_HOMOLOG_MAX), int(PNCP_BULK_ENRICH_HOMOLOG_MAX)))
         self.assertLessEqual(cap, expected_cap)
         self.assertGreaterEqual(cap, 1)
+
+
+class BulkIntelligentPipelineFlagTests(unittest.IsolatedAsyncioTestCase):
+    async def test_bulk_intelligent_pipeline_is_default(self):
+        payload = MarketSearchRequest(
+            termo_busca="ITEM TESTE BULK HOMOLOG",
+            busca_lote=True,
+            somente_homologados=False,
+        )
+        pool = [
+            _homolog_item(
+                price=10.0 + i,
+                fornecedor="FORNECEDORA OK LTDA",
+                cnpj="12.345.678/0001-95",
+                numero_item=str(i + 1),
+                numero_pncp=f"12345678000195-1-00000{i + 1}",
+            )
+            for i in range(3)
+        ]
+        with patch("app.service.local_item_search", return_value=_local_result(pool)), patch(
+            "app.service.market_search",
+            new_callable=AsyncMock,
+            return_value={"ok": True, "itens": [], "stats": {}},
+        ), patch(
+            "app.service.enrich_homolog_items_from_pncp", new_callable=AsyncMock, return_value=0
+        ):
+            out = await market_search_intelligent(payload)
+
+        funil = (out.get("stats") or {}).get("funil_busca") or {}
+        self.assertTrue(funil.get("bulk_intelligent_pipeline"))
+        self.assertEqual(funil.get("modo_resposta"), "bulk_intelligent_top3")
+        self.assertIn("scored_final_pool", funil)
+        self.assertGreaterEqual(len(out.get("itens") or []), 1)
+
+    async def test_bulk_legacy_uses_parity_finalize_when_flag_off(self):
+        payload = MarketSearchRequest(
+            termo_busca="ITEM TESTE BULK HOMOLOG",
+            busca_lote=True,
+            somente_homologados=False,
+        )
+        pool = [
+            _homolog_item(
+                price=10.0 + i,
+                fornecedor="FORNECEDORA OK LTDA",
+                cnpj="12.345.678/0001-95",
+                numero_item=str(i + 1),
+            )
+            for i in range(3)
+        ]
+        with _patch_bulk_legacy(), patch("app.service.local_item_search", return_value=_local_result(pool)), patch(
+            "app.service.market_search",
+            new_callable=AsyncMock,
+            return_value={"ok": True, "itens": [], "stats": {}},
+        ), patch(
+            "app.service.enrich_homolog_items_from_pncp", new_callable=AsyncMock, return_value=0
+        ):
+            out = await market_search_intelligent(payload)
+
+        funil = (out.get("stats") or {}).get("funil_busca") or {}
+        self.assertFalse(funil.get("bulk_intelligent_pipeline"))
+        self.assertEqual(funil.get("modo_resposta"), "busca_lote_top3_parity")
 
 
 class BulkSearchHybridTests(unittest.IsolatedAsyncioTestCase):

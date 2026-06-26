@@ -32,6 +32,8 @@ from .config import (
     PNCP_BULK_SEARCH_MAX_SECONDS,
     PNCP_BULK_ENRICH_HOMOLOG_MAX,
     PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX,
+    PNCP_BULK_USE_INTELLIGENT_PIPELINE,
+    PNCP_BULK_INTELLIGENT_SQL_LIMIT,
     PNCP_LOCAL_AUTO_INGEST,
     PNCP_IA_RERANK_ENABLED,
     PNCP_LOCAL_RERANK_ENABLED,
@@ -2374,20 +2376,24 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     """
     # Reutiliza a mesma fonte da busca manual (itens PNCP normalizados)
     busca_lote = bool(getattr(payload, "busca_lote", False))
+    bulk_intelligent = bool(busca_lote and PNCP_BULK_USE_INTELLIGENT_PIPELINE)
+    bulk_legacy = bool(busca_lote and not bulk_intelligent)
     search_payload = payload
     ia_rerank_on = _ia_rerank_on_for_request(busca_lote)
     ia_resumo_on = _ia_resumo_on_for_request(busca_lote)
     limit = max(50, search_payload.max_paginas * search_payload.tamanho_pagina)
-    if busca_lote:
+    if bulk_legacy:
         limit = min(limit, max(80, int(PNCP_BULK_SEARCH_SQL_LIMIT)))
+    elif bulk_intelligent:
+        limit = min(limit, max(200, int(PNCP_BULK_INTELLIGENT_SQL_LIMIT)))
     termo_busca_raw = search_payload.termo_busca
     termo_efetivo, term_meta = derive_anchor_search_term(termo_busca_raw)
     itens: List[Dict[str, Any]] = []
     base_stats: Dict[str, Any] = {}
     terms_tried: List[str] = []
-    bulk_term_cap = max(2, int(PNCP_BULK_MAX_TERM_FALLBACKS)) if busca_lote else 0
+    bulk_term_cap = max(2, int(PNCP_BULK_MAX_TERM_FALLBACKS)) if bulk_legacy else 0
     for i, term_try in enumerate(_iter_search_term_fallbacks(termo_busca_raw)):
-        if busca_lote and i >= bulk_term_cap:
+        if bulk_legacy and i >= bulk_term_cap:
             break
         terms_tried.append(term_try)
         batch_result = local_item_search(
@@ -2399,16 +2405,16 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             limit=limit,
             cleanup_for_display=False,
             somente_homologados=search_payload.somente_homologados,
-            filtrar_fornecedor_para_exibicao=not busca_lote,
+            filtrar_fornecedor_para_exibicao=not bulk_legacy,
             enrich_homolog_max=(
-                max(0, int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX)) if busca_lote else None
+                max(0, int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX)) if bulk_legacy else None
             ),
         )
         if not base_stats:
             base_stats = dict(batch_result.get("stats") or {})
         batch = list(batch_result.get("itens") or [])
         itens = _merge_local_item_batches(itens, batch)
-        if busca_lote and batch and int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX) > 0:
+        if bulk_legacy and batch and int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX) > 0:
             from .supplier_resolver import item_fornecedor_tem_cnpj_para_salvar
 
             local_cap = max(0, int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX))
@@ -2427,11 +2433,11 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         priced_n = sum(1 for x in itens if _row_price_for_faixa(x) > 0.0)
         if priced_n >= 3:
             break
-        # Lote: se o índice já tem preço, não varre 6 termos (top3 + enrich PNCP fecha o resto).
-        if busca_lote and priced_n >= 1:
+        # Lote legado: se o índice já tem preço, não varre 6 termos (top3 + enrich PNCP fecha o resto).
+        if bulk_legacy and priced_n >= 1:
             break
-        # Lote sem preço: no máximo 3 termos antes do híbrido (evita ~6× SQL/item vazio).
-        if busca_lote and priced_n == 0 and i >= 2:
+        # Lote legado sem preço: no máximo 3 termos antes do híbrido (evita ~6× SQL/item vazio).
+        if bulk_legacy and priced_n == 0 and i >= 2:
             break
         if len(itens) >= limit:
             break
@@ -2444,26 +2450,27 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         "sql_rows_fetched": int(base_stats.get("sql_rows_fetched") or 0),
         "filtrados_token_match": int(base_stats.get("filtrados_token_match") or 0),
         "filtrados_nao_homologados": int(base_stats.get("filtrados_nao_homologados") or 0),
-        "busca_lote_relaxada": bool(busca_lote),
-        "busca_lote_fornecedor_filter_final_only": bool(busca_lote),
-        "hybrid_bulk_disabled": bool(busca_lote and not PNCP_HYBRID_BULK_ENABLED),
-        "bulk_max_term_fallbacks": int(PNCP_BULK_MAX_TERM_FALLBACKS) if busca_lote else None,
-        "bulk_local_enrich_max": int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX) if busca_lote else None,
+        "bulk_intelligent_pipeline": bulk_intelligent,
+        "busca_lote_relaxada": bool(bulk_legacy),
+        "busca_lote_fornecedor_filter_final_only": bool(bulk_legacy),
+        "hybrid_bulk_disabled": bool(bulk_legacy and not PNCP_HYBRID_BULK_ENABLED),
+        "bulk_max_term_fallbacks": int(PNCP_BULK_MAX_TERM_FALLBACKS) if bulk_legacy else None,
+        "bulk_local_enrich_max": int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX) if bulk_legacy else None,
         "search_terms_tried": terms_tried,
     }
     hybrid_used = False
     hybrid_live_count = 0
     hybrid_min = max(1, int(PNCP_HYBRID_MIN_LOCAL_RESULTS))
     local_priced = sum(1 for x in itens if _row_price_for_faixa(x) > 0.0)
-    hybrid_allowed = PNCP_HYBRID_FALLBACK_ENABLED and (not busca_lote or PNCP_HYBRID_BULK_ENABLED)
-    if busca_lote:
-        # Lote: só PNCP ao vivo se o índice local não trouxe nada com preço (evita 6 páginas/item).
+    hybrid_allowed = PNCP_HYBRID_FALLBACK_ENABLED and (not bulk_legacy or PNCP_HYBRID_BULK_ENABLED)
+    if bulk_legacy:
+        # Lote legado: só PNCP ao vivo se o índice local não trouxe nada com preço (evita 6 páginas/item).
         need_hybrid = local_priced == 0
     else:
         need_hybrid = len(itens) < hybrid_min or local_priced < hybrid_min
     if hybrid_allowed and need_hybrid:
         live_pages = max(1, min(int(PNCP_HYBRID_MAX_LIVE_PAGES), int(search_payload.max_paginas or 1)))
-        if busca_lote:
+        if bulk_legacy:
             live_pages = min(live_pages, 2)
         live_payload = search_payload.model_copy(update={"max_paginas": live_pages})
         try:
@@ -2588,7 +2595,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     median_val = median(valores) if valores else None
     min_ok = _effective_min_score_aprovacao()
 
-    if busca_lote:
+    if bulk_legacy:
         return await _finalize_busca_lote_top3_response(
             payload=payload,
             search_payload=search_payload,
@@ -3058,6 +3065,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     if faixa_min is not None and faixa_max is not None and top3:
         top3 = [x for x in top3 if _preco_dentro_faixa(x, faixa_min, faixa_max)]
     funil["top3_final"] = len(top3)
+    if bulk_intelligent:
+        funil["modo_resposta"] = "bulk_intelligent_top3"
     if len(top3) < 3 and funil.get("scored_final_pool", 0) >= 3:
         funil["provavel_gargalo_top3"] = "selecao_top3_incompleta"
     elif len(top3) < 3 and funil.get("local_com_preco", 0) >= 3 and funil.get("scored_final_pool", 0) < 3:

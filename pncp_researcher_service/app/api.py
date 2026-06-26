@@ -125,11 +125,13 @@ async def market_search_intelligent_diagnose_endpoint(body: MarketSearchRequest)
 @router.post("/market-search/intelligent", response_model=MarketSearchResponse)
 async def market_search_intelligent_endpoint(body: MarketSearchRequest) -> MarketSearchResponse:
     try:
-        from .config import PNCP_BULK_SEARCH_MAX_SECONDS
+        from .config import PNCP_BULK_SEARCH_MAX_SECONDS, PNCP_BULK_USE_INTELLIGENT_PIPELINE
         from .service import _bulk_search_timeout_response
 
         if body.busca_lote and float(PNCP_BULK_SEARCH_MAX_SECONDS or 0) > 0:
             tmo = max(8.0, float(PNCP_BULK_SEARCH_MAX_SECONDS))
+            if PNCP_BULK_USE_INTELLIGENT_PIPELINE:
+                tmo = max(tmo, 120.0)
             try:
                 data = await asyncio.wait_for(market_search_intelligent(body), timeout=tmo)
             except asyncio.TimeoutError:

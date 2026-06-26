@@ -550,7 +550,7 @@ function bulkSearchFailResult(err, { superseded = false, timeoutSec = 180 } = {}
   return { ok: false, exibidos: 0, aborted: false, error: msg };
 }
 
-const BULK_SEARCH_TIMEOUT_MS = 95000;
+const BULK_SEARCH_TIMEOUT_MS = 125000;
 const BULK_CONCURRENCY = 1;
 const BULK_ITEM_DELAY_MS = 50;
 

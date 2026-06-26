@@ -366,6 +366,10 @@ PNCP_BULK_SEARCH_MAX_SECONDS: float = float(os.getenv("PNCP_BULK_SEARCH_MAX_SECO
 PNCP_BULK_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_BULK_ENRICH_HOMOLOG_MAX", 3)
 # Enrich síncrono por tentativa de termo em busca_lote (menor que PNCP_SEARCH_ENRICH_HOMOLOG_MAX).
 PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX", 6)
+# Lote: usa o mesmo pipeline de scoring/top3 que busca_lote=false (paridade ?itemId=).
+PNCP_BULK_USE_INTELLIGENT_PIPELINE: bool = _env_bool("PNCP_BULK_USE_INTELLIGENT_PIPELINE", True)
+# SQL cap quando PNCP_BULK_USE_INTELLIGENT_PIPELINE=1 (recall maior que legado 200).
+PNCP_BULK_INTELLIGENT_SQL_LIMIT: int = _env_int("PNCP_BULK_INTELLIGENT_SQL_LIMIT", 2000)
 # Score mínimo (0–100) para considerar item aderente na busca inteligente (antes ~60–70 implícito).
 PNCP_SEARCH_MIN_SCORE_APROVACAO: int = _env_int("PNCP_SEARCH_MIN_SCORE_APROVACAO", 50)
 # Modo qualidade (recomendado com Qwen): tiers mais rígidos, menos fallback agressivo, rerank IA no pool misto.

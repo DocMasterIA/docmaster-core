@@ -143,9 +143,20 @@ class TestSearchRecallHelpers(unittest.TestCase):
         term = "AGULHA HIPODÊRMICA TAMANHO: 13 X 4,5 (26 G½) CX C/100 UNIDADES."
         alts = _iter_search_term_fallbacks(term)
         self.assertTrue(alts)
-        self.assertEqual(alts[0], term)
         joined = " ".join(alts).lower()
         self.assertIn("13x45", joined)
+        self.assertIn(term.lower().strip("."), joined.lower())
+
+    def test_search_term_fallbacks_long_description_prioriza_ancora(self):
+        term = (
+            "ÁLCOOL GEL 70% EMBALAGEM DE 500ML - ÁLCOOL EM GEL 70% EMBALAGEM COM 500ML, "
+            "COM DOSADOR PUMP. CONFORME EDITAL."
+        )
+        alts = _iter_search_term_fallbacks(term, prefer_anchor_first=True)
+        self.assertTrue(alts)
+        eff, meta = derive_anchor_search_term(term)
+        self.assertTrue(meta.get("termo_truncado"))
+        self.assertEqual(alts[0], eff)
 
     def test_manual_parity_top3_usa_preco_estimado(self):
         itens = [

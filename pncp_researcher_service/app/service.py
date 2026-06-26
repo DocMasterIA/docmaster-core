@@ -34,6 +34,7 @@ from .config import (
     PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX,
     PNCP_BULK_USE_INTELLIGENT_PIPELINE,
     PNCP_BULK_INTELLIGENT_SQL_LIMIT,
+    PNCP_BULK_INTELLIGENT_MAX_TERM_FALLBACKS,
     PNCP_LOCAL_AUTO_INGEST,
     PNCP_IA_RERANK_ENABLED,
     PNCP_LOCAL_RERANK_ENABLED,
@@ -1575,9 +1576,10 @@ def _row_price_for_faixa(it: Dict[str, Any]) -> float:
     return row_display_unit_price(it)
 
 
-def _iter_search_term_fallbacks(termo_busca: str) -> List[str]:
+def _iter_search_term_fallbacks(termo_busca: str, *, prefer_anchor_first: bool = False) -> List[str]:
     """
     Termos alternativos alinhados à busca manual (prefixos / núcleo / âncora).
+    prefer_anchor_first: edital longo — âncora/preprocess antes do texto bruto (lote + recall).
     """
     raw = (termo_busca or "").strip()
     if not raw:
@@ -1595,10 +1597,21 @@ def _iter_search_term_fallbacks(termo_busca: str) -> List[str]:
         seen.add(key)
         out.append(s)
 
-    push(raw)
-    push(preprocess_cotacao_search_term(raw) or raw)
-    eff, _meta = derive_anchor_search_term(raw)
-    push(eff)
+    pre = preprocess_cotacao_search_term(raw) or raw
+    eff, term_meta = derive_anchor_search_term(raw)
+    truncated = bool(term_meta.get("termo_truncado"))
+    use_anchor_first = prefer_anchor_first or truncated or len(_build_search_tokens(raw)) > 8
+
+    if use_anchor_first:
+        push(eff)
+        if pre.lower() != eff.lower():
+            push(pre)
+        push(raw)
+    else:
+        push(raw)
+        if pre.lower() != raw.lower():
+            push(pre)
+        push(eff)
     for tier in build_search_query_tiers(raw):
         if tier.label in ("strict", "core"):
             push(tier.termo)
@@ -2385,15 +2398,24 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     if bulk_legacy:
         limit = min(limit, max(80, int(PNCP_BULK_SEARCH_SQL_LIMIT)))
     elif bulk_intelligent:
-        limit = min(limit, max(200, int(PNCP_BULK_INTELLIGENT_SQL_LIMIT)))
+        # Não herdar max_paginas=3×80 do frontend — paridade com item isolado (~2000 linhas).
+        limit = max(200, int(PNCP_BULK_INTELLIGENT_SQL_LIMIT))
     termo_busca_raw = search_payload.termo_busca
     termo_efetivo, term_meta = derive_anchor_search_term(termo_busca_raw)
+    termo_spec = termo_efetivo if term_meta.get("termo_truncado") else termo_busca_raw
     itens: List[Dict[str, Any]] = []
     base_stats: Dict[str, Any] = {}
     terms_tried: List[str] = []
     bulk_term_cap = max(2, int(PNCP_BULK_MAX_TERM_FALLBACKS)) if bulk_legacy else 0
-    for i, term_try in enumerate(_iter_search_term_fallbacks(termo_busca_raw)):
+    bulk_intelligent_term_cap = max(3, int(PNCP_BULK_INTELLIGENT_MAX_TERM_FALLBACKS)) if bulk_intelligent else 0
+    term_fallbacks = _iter_search_term_fallbacks(
+        termo_busca_raw,
+        prefer_anchor_first=bool(bulk_intelligent),
+    )
+    for i, term_try in enumerate(term_fallbacks):
         if bulk_legacy and i >= bulk_term_cap:
+            break
+        if bulk_intelligent and i >= bulk_intelligent_term_cap:
             break
         terms_tried.append(term_try)
         batch_result = local_item_search(
@@ -2456,6 +2478,11 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         "hybrid_bulk_disabled": bool(bulk_legacy and not PNCP_HYBRID_BULK_ENABLED),
         "bulk_max_term_fallbacks": int(PNCP_BULK_MAX_TERM_FALLBACKS) if bulk_legacy else None,
         "bulk_local_enrich_max": int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX) if bulk_legacy else None,
+        "bulk_intelligent_sql_limit": int(PNCP_BULK_INTELLIGENT_SQL_LIMIT) if bulk_intelligent else None,
+        "bulk_intelligent_max_term_fallbacks": int(PNCP_BULK_INTELLIGENT_MAX_TERM_FALLBACKS)
+        if bulk_intelligent
+        else None,
+        "termo_truncado": bool(term_meta.get("termo_truncado")),
         "search_terms_tried": terms_tried,
     }
     hybrid_used = False
@@ -2737,12 +2764,12 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                     product_spec_strong_core_match,
                 )
 
-                if product_category_strict_reject(termo_busca_raw, it):
+                if product_category_strict_reject(termo_spec, it):
                     continue
-                if product_spec_strict_reject(termo_busca_raw, it):
+                if product_spec_strict_reject(termo_spec, it):
                     continue
-                spec_adj = product_spec_rerank_adjustment(termo_busca_raw, it)
-                spec_strong = product_spec_strong_core_match(termo_busca_raw, it)
+                spec_adj = product_spec_rerank_adjustment(termo_spec, it)
+                spec_strong = product_spec_strong_core_match(termo_spec, it)
             except Exception:
                 spec_adj = 0.0
                 spec_strong = False

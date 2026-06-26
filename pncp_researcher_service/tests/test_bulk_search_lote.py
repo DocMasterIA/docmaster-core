@@ -323,6 +323,27 @@ class BulkSearchSupplierFilterTests(unittest.IsolatedAsyncioTestCase):
 
 
 class BulkIntelligentPipelineFlagTests(unittest.IsolatedAsyncioTestCase):
+    async def test_bulk_intelligent_uses_full_sql_limit_not_frontend_cap(self):
+        payload = MarketSearchRequest(
+            termo_busca="ITEM TESTE BULK HOMOLOG",
+            busca_lote=True,
+            max_paginas=3,
+            tamanho_pagina=80,
+            somente_homologados=False,
+        )
+        with patch("app.service.local_item_search", return_value=_local_result([])) as local_mock, patch(
+            "app.service.market_search",
+            new_callable=AsyncMock,
+            return_value={"ok": True, "itens": [], "stats": {}},
+        ), patch(
+            "app.service.enrich_homolog_items_from_pncp", new_callable=AsyncMock, return_value=0
+        ):
+            await market_search_intelligent(payload)
+        kw = local_mock.call_args.kwargs
+        from app.config import PNCP_BULK_INTELLIGENT_SQL_LIMIT
+
+        self.assertGreaterEqual(int(kw.get("limit") or 0), int(PNCP_BULK_INTELLIGENT_SQL_LIMIT))
+
     async def test_bulk_intelligent_pipeline_is_default(self):
         payload = MarketSearchRequest(
             termo_busca="ITEM TESTE BULK HOMOLOG",

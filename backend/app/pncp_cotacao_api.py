@@ -50,6 +50,7 @@ from backend.app.services.pncp_relatorio_itens import (
     agrupar_itens_relatorio_pesquisa_precos,
     preco_unitario_cotacao_fonte,
     resumo_calculo_precos,
+    soma_totais_fontes_item,
     texto_orgao_exibicao_relatorio_pesquisa_precos,
 )
 from backend.app.services.pncp_relatorio_pdf import extrair_cnpjs_dos_itens
@@ -945,8 +946,8 @@ def _item_search_context_dict(row: PncpCotacaoItem, fontes: Dict[str, Any]) -> D
 
 def _itens_refletidos_for_session(sessao_id: int, formula_id: str) -> Dict[int, Dict[str, Any]]:
     """
-    Por item: média aritmética dos preços unitários por fonte (ausência = 0),
-    peso igual entre fontes; total = média × quantidade do item.
+    Por item: média aritmética dos preços unitários por fonte (ausência = 0);
+    total = soma dos totais homologados/efetivos por fonte (paridade CotacaoItemDetalhe).
     O parâmetro formula_id está reservado para compatibilidade; a fórmula da sessão
     aplica-se em calculo_precos (entre itens), não neste payload.
     """
@@ -974,20 +975,21 @@ def _itens_refletidos_for_session(sessao_id: int, formula_id: str) -> Dict[int, 
         quantidade_item_map[iid] = q_item if q_item is not None and q_item > 0 else None
         unidade_item_map[iid] = _norm_unidade(it.get("unidade_medida"))
 
-    bucket: Dict[int, List[float]] = defaultdict(list)
+    bucket: Dict[int, List[PncpCotacaoItemCotacao]] = defaultdict(list)
+    bucket_units: Dict[int, List[float]] = defaultdict(list)
     for row in PncpCotacaoItemCotacao.objects.filter(cotacao_id=sessao_id).order_by("item_id", "id"):
         item_id = int(row.item_id)
+        bucket[item_id].append(row)
         q_item = quantidade_item_map.get(item_id)
         u = preco_unitario_cotacao_fonte(row, quantidade_item=q_item)
-        bucket[item_id].append(0.0 if u is None else float(u))
+        bucket_units[item_id].append(0.0 if u is None else float(u))
 
-    for item_id, units in bucket.items():
+    for item_id, units in bucket_units.items():
         n = len(units)
         mean_u = (sum(units) / n) if n else None
         qtd_ref = quantidade_item_map.get(item_id)
-        total_ref = None
-        if mean_u is not None and qtd_ref is not None and qtd_ref > 0:
-            total_ref = mean_u * qtd_ref
+        rows = bucket.get(item_id) or []
+        total_ref = soma_totais_fontes_item(rows, quantidade_item=qtd_ref)
         uref = (unidade_item_map.get(item_id) or "").strip()
         out[item_id] = {
             "quantidade_refletida": qtd_ref,

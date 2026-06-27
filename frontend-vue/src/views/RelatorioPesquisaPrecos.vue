@@ -510,6 +510,8 @@ function quantidadeExibicao(g) {
 }
 
 function calcularTotalItemNum(g) {
+  const totalGrupo = Number(g?.valor_total_item);
+  if (Number.isFinite(totalGrupo) && totalGrupo >= 0) return totalGrupo;
   return quantidadeParaNumero(quantidadeExibicao(g)) * moedaParaNumero(g?.media_fmt);
 }
 

@@ -7,10 +7,15 @@ from backend.app.services.pncp_relatorio_itens import (
     _fonte_pncp_em_andamento_sem_fornecedor,
     _fornecedor_exibicao_relatorio,
     _pick_supplier_email_from_source,
+    _pick_supplier_name_from_brasilapi_cad,
     _pick_supplier_name_from_source,
     _pick_supplier_telefone_from_source,
+    _supplier_name_index_com_brasilapi,
+    fonte_dict_de_item,
     nome_fornecedor_e_util_para_exibicao,
+    preco_total_cotacao_fonte,
     preco_unitario_cotacao_fonte,
+    soma_totais_fontes_item,
 )
 from backend.app.services.pncp_supplier_enrichment import (
     _ano_seq_for_enrichment,
@@ -312,6 +317,73 @@ class HomologLookupGateTests(unittest.TestCase):
         }
         self.assertFalse(_needs_homolog_pricing_lookup(it))
         self.assertFalse(_should_attempt_pncp_supplier_lookup(it, only_homolog=True))
+
+
+class BrasilApiNomePdfTests(unittest.TestCase):
+    def test_pick_name_from_brasilapi_cad(self):
+        cad = {"razao_social": "EMPRESA BRASIL API LTDA", "nome_fantasia": "FANTASIA"}
+        self.assertEqual(_pick_supplier_name_from_brasilapi_cad(cad), "EMPRESA BRASIL API LTDA")
+
+    def test_fonte_dict_preenche_nome_via_brasilapi_cache(self):
+        class _It:
+            modalidade = "PNCP"
+            municipio = "São Paulo"
+            uf = "SP"
+            orgao = "Órgão teste"
+            numero_pncp = "123"
+            quantidade = 1
+            created_at = None
+            source = {"cnpj_fornecedor": "27.105.456/0001-72"}
+
+        cache = {
+            "27105456000172": {
+                "razao_social": "EMPRESA TESTE LTDA",
+                "email": "contato@empresa.com.br",
+            }
+        }
+        row = fonte_dict_de_item(_It(), tz=None, brasilapi_cache=cache)
+        self.assertEqual(row["fornecedor"], "EMPRESA TESTE LTDA")
+        self.assertEqual(row["cnpj"], "27.105.456/0001-72")
+
+    def test_supplier_index_com_brasilapi(self):
+        class _It:
+            source = {"cnpj_fornecedor": "27.105.456/0001-72"}
+
+        cache = {"27105456000172": {"razao_social": "EMPRESA INDEX LTDA"}}
+        idx = _supplier_name_index_com_brasilapi([_It()], cache)
+        self.assertEqual(idx.get("27.105.456/0001-72"), "EMPRESA INDEX LTDA")
+
+
+class ItemTotalHomologadoTests(unittest.TestCase):
+    def _row(self, *, vt_h, vu_h=None, qh=None, q_item=6000):
+        src = {"valor_total_homologado": vt_h, "temResultado": True, "item_homologado": True}
+        if vu_h is not None:
+            src["valor_unitario_homologado"] = vu_h
+        if qh is not None:
+            src["quantidade_homologada"] = qh
+
+        class _R:
+            source = src
+            valor_total = vt_h
+            valor_unitario = vu_h
+            quantidade = qh or q_item
+
+        return _R()
+
+    def test_soma_totais_homologados_tres_fontes(self):
+        """Paridade CotacaoItemDetalhe: total = soma dos totais homologados, não qtd×média."""
+        members = [
+            self._row(vt_h=97171.67, vu_h=123.84, qh=2354),
+            self._row(vt_h=97171.67, vu_h=123.84, qh=2354),
+            self._row(vt_h=97171.66, vu_h=123.84, qh=2354),
+        ]
+        total = soma_totais_fontes_item(members, quantidade_item=6000)
+        self.assertAlmostEqual(total, 291515.0, places=0)
+        self.assertNotAlmostEqual(total, 6000 * 123.84, delta=1000)
+
+    def test_preco_total_prioriza_valor_total_homologado(self):
+        row = self._row(vt_h=97171.67, vu_h=123.84, qh=2354)
+        self.assertAlmostEqual(preco_total_cotacao_fonte(row), 97171.67, places=2)
 
 
 if __name__ == "__main__":

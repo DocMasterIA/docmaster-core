@@ -14,6 +14,7 @@ import re
 from collections import Counter, defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
+from django.conf import settings
 from django.utils import timezone
 
 from backend.app.services.pncp_supplier_placeholders import GENERIC_SUPPLIER_NAMES
@@ -183,6 +184,112 @@ def preco_unitario_cotacao_fonte(it: Any, *, quantidade_item: Optional[float] = 
             pass
 
     return None
+
+
+def _positive_price(value: Any) -> Optional[float]:
+    try:
+        f = float(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+    if f is None or f <= 0 or math.isnan(f) or math.isinf(f):
+        return None
+    return f
+
+
+def _cotacao_row_source_dict(it: Any) -> Dict[str, Any]:
+    if isinstance(it, dict):
+        src = it.get("source")
+    else:
+        src = getattr(it, "source", None)
+    return src if isinstance(src, dict) else {}
+
+
+def _item_tem_preco_homologado(it: Any, src: Dict[str, Any]) -> bool:
+    def _get(key: str) -> Any:
+        if isinstance(it, dict):
+            return it.get(key)
+        return getattr(it, key, None)
+
+    for key in (
+        "valor_unitario_homologado",
+        "valorUnitarioHomologado",
+        "valor_total_homologado",
+        "valorTotalHomologado",
+    ):
+        if _positive_price(src.get(key)) is not None or _positive_price(_get(key)) is not None:
+            return True
+    return False
+
+
+def _item_parece_homologado_pricing(it: Any, src: Dict[str, Any]) -> bool:
+    if src.get("item_homologado") is True or src.get("temResultado") is True:
+        return True
+    sit = str(
+        src.get("situacaoCompraItemNome")
+        or src.get("situacao_item")
+        or src.get("situacao")
+        or ""
+    ).lower()
+    return "homolog" in sit or "adjudic" in sit
+
+
+def preco_total_cotacao_fonte(it: Any, *, quantidade_item: Optional[float] = None) -> Optional[float]:
+    """
+    Total na fonte — paridade com ``displayPnCpTotal`` (CotacaoItemDetalhe.vue).
+    Prioriza valor_total_homologado; depois ORM homologado; estimado; unitário × qtd.
+    """
+
+    def _get(key: str) -> Any:
+        if isinstance(it, dict):
+            return it.get(key)
+        return getattr(it, key, None)
+
+    src = _cotacao_row_source_dict(it)
+
+    for key in ("valor_total_homologado", "valorTotalHomologado"):
+        v = _positive_price(src.get(key)) or _positive_price(_get(key))
+        if v is not None:
+            return v
+
+    unit_h = preco_unitario_cotacao_fonte(it, quantidade_item=quantidade_item)
+    for qkey in ("quantidade_homologada", "quantidadeHomologada"):
+        q = _positive_price(src.get(qkey))
+        if unit_h is not None and q is not None:
+            return unit_h * q
+
+    homologado = _item_parece_homologado_pricing(it, src) or _item_tem_preco_homologado(it, src)
+    vt = _positive_price(_get("valor_total"))
+    if homologado and vt is not None:
+        return vt
+
+    for key in ("valor_total_estimado", "valorTotalEstimado"):
+        v = _positive_price(src.get(key))
+        if v is not None:
+            return v
+
+    q_line = _positive_price(_get("quantidade")) or _positive_price(src.get("quantidade"))
+    q_item = _positive_price(quantidade_item)
+    q = q_line or q_item
+    if unit_h is not None and q is not None:
+        return unit_h * q
+
+    return vt
+
+
+def soma_totais_fontes_item(
+    members: List[Any],
+    *,
+    quantidade_item: Optional[float] = None,
+) -> Optional[float]:
+    """Soma dos totais por fonte (0–N cotações) — «Valor total homologado» na tela do item."""
+    totals: List[float] = []
+    for m in members or []:
+        t = preco_total_cotacao_fonte(m, quantidade_item=quantidade_item)
+        if t is not None:
+            totals.append(float(t))
+    if not totals:
+        return None
+    return sum(totals)
 
 
 def _valor_numerico_item(it: Any, *, quantidade_base: Optional[float] = None) -> Optional[float]:
@@ -674,6 +781,37 @@ def _format_orgao_com_local(orgao: Any, municipio: Any, uf: Any) -> str:
     return org or "—"
 
 
+def _pick_supplier_name_from_brasilapi_cad(cad: Dict[str, Any]) -> str:
+    if not isinstance(cad, dict) or not cad:
+        return ""
+    for k in ("razao_social", "nome_fantasia", "razaoSocial", "nomeFantasia"):
+        v = str(cad.get(k) or "").strip()
+        if nome_fornecedor_e_util_para_exibicao(v):
+            return v
+    return ""
+
+
+def _lookup_brasilapi_cadastro_cached(
+    cnpj_fornecedor: str,
+    cache: Dict[str, Dict[str, Any]],
+    *,
+    fetches_remaining: Optional[List[int]] = None,
+) -> Dict[str, Any]:
+    """BrasilAPI por CNPJ com cache na requisição (nome + contato)."""
+    d = re.sub(r"\D", "", str(cnpj_fornecedor or ""))
+    if len(d) != 14:
+        return {}
+    if d in cache:
+        return cache[d]
+    if fetches_remaining is not None and fetches_remaining[0] <= 0:
+        return {}
+    _, cad = fetch_brasilapi_fornecedor_por_cnpj(d)
+    cache[d] = cad if isinstance(cad, dict) else {}
+    if fetches_remaining is not None:
+        fetches_remaining[0] -= 1
+    return cache[d]
+
+
 def _completar_contato_brasilapi_se_faltar(
     *,
     cnpj_fornecedor: str,
@@ -686,13 +824,7 @@ def _completar_contato_brasilapi_se_faltar(
     em = str(email or "").strip()
     if tel and em:
         return tel, em
-    d = re.sub(r"\D", "", str(cnpj_fornecedor or ""))
-    if len(d) != 14:
-        return tel, em
-    if d not in cache:
-        _, cad = fetch_brasilapi_fornecedor_por_cnpj(d)
-        cache[d] = cad if isinstance(cad, dict) else {}
-    cad = cache.get(d) or {}
+    cad = _lookup_brasilapi_cadastro_cached(cnpj_fornecedor, cache)
     if not tel:
         tel = str(
             cad.get("telefone")
@@ -746,6 +878,23 @@ def fonte_dict_de_item(
 
     cnpj_fornecedor = _pick_supplier_cnpj_from_source(src)
     fornecedor = _pick_supplier_name_from_source(src)
+    telefone = _pick_supplier_telefone_from_source(src)
+    email = _pick_supplier_email_from_source(src)
+    if brasilapi_cache is not None and cnpj_fornecedor and (
+        not fornecedor or not telefone or _email_contato_ausente(email)
+    ):
+        cad_br = _lookup_brasilapi_cadastro_cached(cnpj_fornecedor, brasilapi_cache)
+        if not fornecedor:
+            fornecedor = _pick_supplier_name_from_brasilapi_cad(cad_br)
+        if not telefone:
+            telefone = str(
+                cad_br.get("telefone")
+                or cad_br.get("ddd_telefone_1")
+                or cad_br.get("ddd_telefone_2")
+                or ""
+            ).strip()
+        if _email_contato_ausente(email):
+            email = str(cad_br.get("email") or "").strip()
     fornecedor = _fornecedor_exibicao_relatorio(
         src,
         fornecedor=fornecedor,
@@ -781,15 +930,6 @@ def fonte_dict_de_item(
 
     ajuste = _pick_source(src, "ajuste", "observacao_frete", "frete", default="Sem frete")
 
-    telefone = _pick_supplier_telefone_from_source(src)
-    email = _pick_supplier_email_from_source(src)
-    if brasilapi_cache is not None and cnpj_fornecedor and (not telefone or _email_contato_ausente(email)):
-        telefone, email = _completar_contato_brasilapi_se_faltar(
-            cnpj_fornecedor=cnpj_fornecedor,
-            telefone=telefone,
-            email=email if not _email_contato_ausente(email) else "",
-            cache=brasilapi_cache,
-        )
     if receitaws_pdf_state is not None and cnpj_fornecedor and _email_contato_ausente(email):
         email = _completar_email_receitaws_pdf(
             cnpj_fornecedor=cnpj_fornecedor,
@@ -866,6 +1006,60 @@ def _prefetch_emails_cnpj_para_linhas(
         prefetch_cnpj_emails(cnpjs, state=state)
 
 
+def _cnpjs_sem_nome_das_linhas(members: List[Any]) -> List[str]:
+    seen: set[str] = set()
+    out: List[str] = []
+    for it in members:
+        src = _source_efetivo_linha_cotacao(it)
+        flatten_supplier_fields_in_payload(src)
+        _promote_supplier_from_deep_walk(src)
+        if _pick_supplier_name_from_source(src):
+            continue
+        cnpj = _pick_supplier_cnpj_from_source(src)
+        d = re.sub(r"\D", "", str(cnpj or ""))
+        if len(d) != 14 or d in seen:
+            continue
+        seen.add(d)
+        out.append(d)
+    return out
+
+
+def _prefetch_fornecedor_nomes_brasilapi_para_linhas(
+    members: List[Any],
+    cache: Dict[str, Dict[str, Any]],
+    *,
+    max_lookups: Optional[int] = None,
+) -> None:
+    """Pré-carrega razão social (BrasilAPI) para CNPJs sem nome nas linhas do PDF."""
+    if max_lookups is None:
+        max_lookups = int(getattr(settings, "PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS", 64))
+    if max_lookups <= 0:
+        return
+    budget = [max_lookups]
+    for d in _cnpjs_sem_nome_das_linhas(members):
+        if budget[0] <= 0:
+            break
+        _lookup_brasilapi_cadastro_cached(d, cache, fetches_remaining=budget)
+
+
+def _supplier_name_index_com_brasilapi(
+    members: List[Any],
+    brasilapi_cache: Dict[str, Dict[str, Any]],
+) -> Dict[str, str]:
+    """Índice CNPJ→nome das linhas + cadastros BrasilAPI já em cache."""
+    idx = _build_supplier_name_index(members)
+    for d, cad in brasilapi_cache.items():
+        if len(re.sub(r"\D", "", str(d or ""))) != 14:
+            continue
+        cnpj_fmt = _normalize_cnpj(d)
+        if cnpj_fmt in idx:
+            continue
+        nome = _pick_supplier_name_from_brasilapi_cad(cad)
+        if nome:
+            idx[cnpj_fmt] = nome
+    return idx
+
+
 def agrupar_itens_relatorio_pesquisa_precos(
     itens: List[Any],
     *,
@@ -907,15 +1101,19 @@ def agrupar_itens_relatorio_pesquisa_precos(
             order_keys.append(key)
         buckets[key].append(it)
 
-    if receitaws_pdf_state:
-        all_members = [m for members in buckets.values() for m in members]
+    all_members = [m for members in buckets.values() for m in members]
+    global_supplier_idx: Optional[Dict[str, str]] = None
+    if include_fontes and all_members:
+        _prefetch_fornecedor_nomes_brasilapi_para_linhas(all_members, brasilapi_cache)
+        global_supplier_idx = _supplier_name_index_com_brasilapi(all_members, brasilapi_cache)
+    if receitaws_pdf_state and all_members:
         _prefetch_emails_cnpj_para_linhas(all_members, receitaws_pdf_state)
 
     grupos: List[Dict[str, Any]] = []
     for ordem, key in enumerate(order_keys, start=1):
         members = buckets[key]
         members.sort(key=lambda x: int(getattr(x, "pk", 0) or 0))
-        supplier_name_idx = _build_supplier_name_index(members) if include_fontes else None
+        supplier_name_idx = global_supplier_idx
 
         first = members[0]
         nome = (getattr(first, "descricao_item", None) or "—")[:500]
@@ -937,6 +1135,10 @@ def agrupar_itens_relatorio_pesquisa_precos(
         vals = unit_slots
         media_valor: Optional[float] = (sum(unit_slots) / n_fontes) if n_fontes else None
         media_fmt = f"R$ {_formatar_moeda_br(media_valor)}" if media_valor is not None else "—"
+        valor_total_item = soma_totais_fontes_item(members, quantidade_item=q_first)
+        valor_total_item_fmt = (
+            f"R$ {_formatar_moeda_br(valor_total_item)}" if valor_total_item is not None else "—"
+        )
 
         n_cot = len(members)
         if n_cot >= MIN_FONTES_SITUACAO_VALIDA:
@@ -970,6 +1172,8 @@ def agrupar_itens_relatorio_pesquisa_precos(
                 "valores_fontes": vals,
                 "media_valor": media_valor,
                 "media_fmt": media_fmt,
+                "valor_total_item": valor_total_item,
+                "valor_total_item_fmt": valor_total_item_fmt,
                 "situacao": situacao,
                 "fontes": fontes,
             }
@@ -1020,14 +1224,19 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
             continue
         cotacoes_por_item[int(item_id)].append(c)
 
-    if receitaws_pdf_state and cotacoes:
-        _prefetch_emails_cnpj_para_linhas(list(cotacoes), receitaws_pdf_state)
+    cotacoes_list = list(cotacoes or [])
+    global_supplier_idx: Optional[Dict[str, str]] = None
+    if include_fontes and cotacoes_list:
+        _prefetch_fornecedor_nomes_brasilapi_para_linhas(cotacoes_list, brasilapi_cache)
+        global_supplier_idx = _supplier_name_index_com_brasilapi(cotacoes_list, brasilapi_cache)
+    if receitaws_pdf_state and cotacoes_list:
+        _prefetch_emails_cnpj_para_linhas(cotacoes_list, receitaws_pdf_state)
 
     grupos: List[Dict[str, Any]] = []
     for ordem, it in enumerate(itens, start=1):
         item_id = int(getattr(it, "id", 0) or 0)
         members = sorted(cotacoes_por_item.get(item_id, []), key=lambda x: int(getattr(x, "pk", 0) or 0))
-        supplier_name_idx = _build_supplier_name_index(members) if include_fontes else None
+        supplier_name_idx = global_supplier_idx
 
         nome = (getattr(it, "descricao_item", None) or "—")[:500]
         und = (getattr(it, "unidade_medida", None) or "").strip()[:64]
@@ -1048,6 +1257,10 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
         vals = unit_slots
         valor_calc = (sum(unit_slots) / n_fontes) if n_fontes else None
         valor_fmt = f"R$ {_formatar_moeda_br(valor_calc)}" if valor_calc is not None else "—"
+        valor_total_item = soma_totais_fontes_item(members, quantidade_item=qtd_item_f)
+        valor_total_item_fmt = (
+            f"R$ {_formatar_moeda_br(valor_total_item)}" if valor_total_item is not None else "—"
+        )
 
         quantidades: List[float] = []
         for m in members:
@@ -1103,6 +1316,8 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
                 "valores_fontes": vals,
                 "media_valor": valor_calc,
                 "media_fmt": valor_fmt,
+                "valor_total_item": valor_total_item,
+                "valor_total_item_fmt": valor_total_item_fmt,
                 "situacao": situacao,
                 "fontes": fontes,
             }

@@ -1020,6 +1020,10 @@ function buildContextFromItem(it) {
     src?.precoBase,
     faixa?.valor_base,
     faixa?.valorBase,
+    // Paridade CotacaoDetalhe / listagem: preço refletido ou ORM quando não há valor_base explícito.
+    it?.valor_unitario_refletido,
+    it?.valor_unitario,
+    it?.valor_total,
   );
   let variacaoRef = parseNumericRef(
     src?.variacao_percentual,
@@ -1032,7 +1036,7 @@ function buildContextFromItem(it) {
   if (Number.isFinite(Number(variacaoPercentualGlobal.value)) && Number(variacaoPercentualGlobal.value) >= 0) {
     variacaoRef = Number(variacaoPercentualGlobal.value);
   }
-  // Faixa de preço só quando há valor base explícito (source/faixa/sessão) — não usar valor_unitario do item.
+  // Valor base: source/faixa do item; senão preço refletido (média das cotações salvas) ou ORM.
   if (
     (variacaoRef === null || !Number.isFinite(variacaoRef))
     && valorBaseRef != null

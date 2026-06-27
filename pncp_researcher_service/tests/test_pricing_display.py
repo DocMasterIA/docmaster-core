@@ -149,6 +149,15 @@ class PricingDisplayTests(unittest.TestCase):
         }
         self.assertFalse(item_matches_faixa_band(it, lo, hi, sentido="baixo"))
 
+    def test_faixa_cima_rejeita_preco_abaixo_do_base_caso_real(self):
+        """Base R$ 3.419 +50% cima → mínimo é o base; R$ 3.070 deve ser rejeitado."""
+        base = 3419.0
+        lo, hi = base, base * 1.5
+        it = {"valor_unitario_homologado": 3070.0, "valor_unitario": 3070.0}
+        self.assertFalse(item_matches_faixa_band(it, lo, hi, sentido="cima"))
+        it_ok = {"valor_unitario_homologado": 3500.0, "valor_unitario": 3500.0}
+        self.assertTrue(item_matches_faixa_band(it_ok, lo, hi, sentido="cima"))
+
 
 if __name__ == "__main__":
     unittest.main()

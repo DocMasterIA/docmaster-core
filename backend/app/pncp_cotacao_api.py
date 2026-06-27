@@ -50,7 +50,6 @@ from backend.app.services.pncp_relatorio_itens import (
     agrupar_itens_relatorio_pesquisa_precos,
     preco_unitario_cotacao_fonte,
     resumo_calculo_precos,
-    soma_totais_fontes_item,
     texto_orgao_exibicao_relatorio_pesquisa_precos,
 )
 from backend.app.services.pncp_relatorio_pdf import extrair_cnpjs_dos_itens
@@ -947,7 +946,7 @@ def _item_search_context_dict(row: PncpCotacaoItem, fontes: Dict[str, Any]) -> D
 def _itens_refletidos_for_session(sessao_id: int, formula_id: str) -> Dict[int, Dict[str, Any]]:
     """
     Por item: média aritmética dos preços unitários por fonte (ausência = 0);
-    total = soma dos totais homologados/efetivos por fonte (paridade CotacaoItemDetalhe).
+    total homologado refletido = média unitária × quantidade do item.
     O parâmetro formula_id está reservado para compatibilidade; a fórmula da sessão
     aplica-se em calculo_precos (entre itens), não neste payload.
     """
@@ -988,8 +987,9 @@ def _itens_refletidos_for_session(sessao_id: int, formula_id: str) -> Dict[int, 
         n = len(units)
         mean_u = (sum(units) / n) if n else None
         qtd_ref = quantidade_item_map.get(item_id)
-        rows = bucket.get(item_id) or []
-        total_ref = soma_totais_fontes_item(rows, quantidade_item=qtd_ref)
+        total_ref = None
+        if mean_u is not None and qtd_ref is not None and qtd_ref > 0:
+            total_ref = mean_u * qtd_ref
         uref = (unidade_item_map.get(item_id) or "").strip()
         out[item_id] = {
             "quantidade_refletida": qtd_ref,
@@ -1419,11 +1419,16 @@ def pncp_research_sessions_items_search_context(request, sessao_id: int):
         "notasFiscais": 0,
         "similaridadeEncontrada": 0,
     }
+    filtros = c.filtros if isinstance(c.filtros, dict) else {}
+    formula_id = _resolve_formula_calculo_id(filtros)
+    refletidos = _itens_refletidos_for_session(c.id, formula_id)
     itens_payload = [
-        _item_search_context_dict(row, fontes_counts.get(int(row.id), dict(empty_fontes)))
+        {
+            **_item_search_context_dict(row, fontes_counts.get(int(row.id), dict(empty_fontes))),
+            **refletidos.get(int(row.id), {}),
+        }
         for row in page_rows
     ]
-    filtros = c.filtros if isinstance(c.filtros, dict) else {}
     return JsonResponse(
         {
             "ok": True,

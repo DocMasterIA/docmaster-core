@@ -13,9 +13,7 @@ from backend.app.services.pncp_relatorio_itens import (
     _supplier_name_index_com_brasilapi,
     fonte_dict_de_item,
     nome_fornecedor_e_util_para_exibicao,
-    preco_total_cotacao_fonte,
     preco_unitario_cotacao_fonte,
-    soma_totais_fontes_item,
 )
 from backend.app.services.pncp_supplier_enrichment import (
     _ano_seq_for_enrichment,
@@ -355,35 +353,19 @@ class BrasilApiNomePdfTests(unittest.TestCase):
 
 
 class ItemTotalHomologadoTests(unittest.TestCase):
-    def _row(self, *, vt_h, vu_h=None, qh=None, q_item=6000):
-        src = {"valor_total_homologado": vt_h, "temResultado": True, "item_homologado": True}
-        if vu_h is not None:
-            src["valor_unitario_homologado"] = vu_h
-        if qh is not None:
-            src["quantidade_homologada"] = qh
-
-        class _R:
-            source = src
-            valor_total = vt_h
-            valor_unitario = vu_h
-            quantidade = qh or q_item
-
-        return _R()
-
-    def test_soma_totais_homologados_tres_fontes(self):
-        """Paridade CotacaoItemDetalhe: total = soma dos totais homologados, não qtd×média."""
+    def test_total_item_e_media_unit_vezes_quantidade(self):
+        """Valor total homologado = média unitária × quantidade do item (não soma dos totais PNCP)."""
         members = [
-            self._row(vt_h=97171.67, vu_h=123.84, qh=2354),
-            self._row(vt_h=97171.67, vu_h=123.84, qh=2354),
-            self._row(vt_h=97171.66, vu_h=123.84, qh=2354),
+            {"source": {"valor_unitario_homologado": 600.0}, "valor_unitario": 600.0},
+            {"source": {"valor_unitario_homologado": 616.48}, "valor_unitario": 616.48},
         ]
-        total = soma_totais_fontes_item(members, quantidade_item=6000)
-        self.assertAlmostEqual(total, 291515.0, places=0)
-        self.assertNotAlmostEqual(total, 6000 * 123.84, delta=1000)
-
-    def test_preco_total_prioriza_valor_total_homologado(self):
-        row = self._row(vt_h=97171.67, vu_h=123.84, qh=2354)
-        self.assertAlmostEqual(preco_total_cotacao_fonte(row), 97171.67, places=2)
+        units = [preco_unitario_cotacao_fonte(m) for m in members]
+        media = sum(units) / len(units)
+        self.assertAlmostEqual(media, 608.24, places=2)
+        total = media * 100
+        self.assertAlmostEqual(total, 60824.0, places=0)
+        # Soma dos totais homologados de referência (ex. areia) seria outro número — não usar.
+        self.assertNotAlmostEqual(total, 600.0 * 2354 + 616.48 * 2354, delta=1)
 
 
 if __name__ == "__main__":

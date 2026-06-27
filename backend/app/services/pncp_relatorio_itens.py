@@ -186,112 +186,6 @@ def preco_unitario_cotacao_fonte(it: Any, *, quantidade_item: Optional[float] = 
     return None
 
 
-def _positive_price(value: Any) -> Optional[float]:
-    try:
-        f = float(value) if value is not None else None
-    except (TypeError, ValueError):
-        return None
-    if f is None or f <= 0 or math.isnan(f) or math.isinf(f):
-        return None
-    return f
-
-
-def _cotacao_row_source_dict(it: Any) -> Dict[str, Any]:
-    if isinstance(it, dict):
-        src = it.get("source")
-    else:
-        src = getattr(it, "source", None)
-    return src if isinstance(src, dict) else {}
-
-
-def _item_tem_preco_homologado(it: Any, src: Dict[str, Any]) -> bool:
-    def _get(key: str) -> Any:
-        if isinstance(it, dict):
-            return it.get(key)
-        return getattr(it, key, None)
-
-    for key in (
-        "valor_unitario_homologado",
-        "valorUnitarioHomologado",
-        "valor_total_homologado",
-        "valorTotalHomologado",
-    ):
-        if _positive_price(src.get(key)) is not None or _positive_price(_get(key)) is not None:
-            return True
-    return False
-
-
-def _item_parece_homologado_pricing(it: Any, src: Dict[str, Any]) -> bool:
-    if src.get("item_homologado") is True or src.get("temResultado") is True:
-        return True
-    sit = str(
-        src.get("situacaoCompraItemNome")
-        or src.get("situacao_item")
-        or src.get("situacao")
-        or ""
-    ).lower()
-    return "homolog" in sit or "adjudic" in sit
-
-
-def preco_total_cotacao_fonte(it: Any, *, quantidade_item: Optional[float] = None) -> Optional[float]:
-    """
-    Total na fonte — paridade com ``displayPnCpTotal`` (CotacaoItemDetalhe.vue).
-    Prioriza valor_total_homologado; depois ORM homologado; estimado; unitário × qtd.
-    """
-
-    def _get(key: str) -> Any:
-        if isinstance(it, dict):
-            return it.get(key)
-        return getattr(it, key, None)
-
-    src = _cotacao_row_source_dict(it)
-
-    for key in ("valor_total_homologado", "valorTotalHomologado"):
-        v = _positive_price(src.get(key)) or _positive_price(_get(key))
-        if v is not None:
-            return v
-
-    unit_h = preco_unitario_cotacao_fonte(it, quantidade_item=quantidade_item)
-    for qkey in ("quantidade_homologada", "quantidadeHomologada"):
-        q = _positive_price(src.get(qkey))
-        if unit_h is not None and q is not None:
-            return unit_h * q
-
-    homologado = _item_parece_homologado_pricing(it, src) or _item_tem_preco_homologado(it, src)
-    vt = _positive_price(_get("valor_total"))
-    if homologado and vt is not None:
-        return vt
-
-    for key in ("valor_total_estimado", "valorTotalEstimado"):
-        v = _positive_price(src.get(key))
-        if v is not None:
-            return v
-
-    q_line = _positive_price(_get("quantidade")) or _positive_price(src.get("quantidade"))
-    q_item = _positive_price(quantidade_item)
-    q = q_line or q_item
-    if unit_h is not None and q is not None:
-        return unit_h * q
-
-    return vt
-
-
-def soma_totais_fontes_item(
-    members: List[Any],
-    *,
-    quantidade_item: Optional[float] = None,
-) -> Optional[float]:
-    """Soma dos totais por fonte (0–N cotações) — «Valor total homologado» na tela do item."""
-    totals: List[float] = []
-    for m in members or []:
-        t = preco_total_cotacao_fonte(m, quantidade_item=quantidade_item)
-        if t is not None:
-            totals.append(float(t))
-    if not totals:
-        return None
-    return sum(totals)
-
-
 def _valor_numerico_item(it: Any, *, quantidade_base: Optional[float] = None) -> Optional[float]:
     vt = getattr(it, "valor_total", None)
     if vt is not None:
@@ -1135,7 +1029,9 @@ def agrupar_itens_relatorio_pesquisa_precos(
         vals = unit_slots
         media_valor: Optional[float] = (sum(unit_slots) / n_fontes) if n_fontes else None
         media_fmt = f"R$ {_formatar_moeda_br(media_valor)}" if media_valor is not None else "—"
-        valor_total_item = soma_totais_fontes_item(members, quantidade_item=q_first)
+        valor_total_item: Optional[float] = None
+        if media_valor is not None and q_first is not None and q_first > 0:
+            valor_total_item = float(media_valor) * float(q_first)
         valor_total_item_fmt = (
             f"R$ {_formatar_moeda_br(valor_total_item)}" if valor_total_item is not None else "—"
         )
@@ -1257,7 +1153,9 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
         vals = unit_slots
         valor_calc = (sum(unit_slots) / n_fontes) if n_fontes else None
         valor_fmt = f"R$ {_formatar_moeda_br(valor_calc)}" if valor_calc is not None else "—"
-        valor_total_item = soma_totais_fontes_item(members, quantidade_item=qtd_item_f)
+        valor_total_item: Optional[float] = None
+        if valor_calc is not None and qtd_item_f is not None and qtd_item_f > 0:
+            valor_total_item = float(valor_calc) * float(qtd_item_f)
         valor_total_item_fmt = (
             f"R$ {_formatar_moeda_br(valor_total_item)}" if valor_total_item is not None else "—"
         )

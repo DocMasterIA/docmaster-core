@@ -410,28 +410,18 @@ const valorUnitarioRefletido = computed(() => {
 });
 
 const valorTotalRefletido = computed(() => {
-  const rows = itemCotacoesFiltradas.value;
-  const totals = rows
-    .map((x) => displayPnCpTotal(x))
-    .filter((n) => n != null && Number.isFinite(n) && n >= 0);
-  if (totals.length > 0) {
-    return totals.reduce((acc, n) => acc + n, 0);
+  const unit = valorUnitarioRefletido.value;
+  const qtd = quantidadeRefletida.value;
+  if (
+    unit != null
+    && Number.isFinite(unit)
+    && unit > 0
+    && qtd != null
+    && Number.isFinite(Number(qtd))
+    && Number(qtd) > 0
+  ) {
+    return unit * Number(qtd);
   }
-
-  const derivados = rows
-    .map((x) => {
-      const qtd = Number.isFinite(Number(item.value?.quantidade))
-        ? Number(item.value.quantidade)
-        : Number(x?.quantidade);
-      const unit = displayPnCpUnitario(x);
-      if (!Number.isFinite(qtd) || qtd < 0 || unit == null || !Number.isFinite(unit) || unit < 0) return null;
-      return qtd * unit;
-    })
-    .filter((n) => n != null && Number.isFinite(n));
-  if (derivados.length > 0) {
-    return derivados.reduce((acc, n) => acc + Number(n), 0);
-  }
-
   const legacy = Number(item.value?.valor_total);
   return Number.isFinite(legacy) ? legacy : null;
 });

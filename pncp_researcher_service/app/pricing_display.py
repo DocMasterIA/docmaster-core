@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+from .pricing_faixa import normalize_variacao_sentido
 from .supplier_resolver import item_fornecedor_tem_cnpj_para_salvar, item_fornecedor_valido_para_busca
 
 
@@ -82,20 +83,32 @@ def merge_homologated_pricing_from_snap(it: Dict[str, Any], snap: Dict[str, Any]
     return changed
 
 
-def item_matches_faixa_band(it: Dict[str, Any], lo: float, hi: float) -> bool:
+def item_matches_faixa_band(
+    it: Dict[str, Any],
+    lo: float,
+    hi: float,
+    *,
+    sentido: Optional[str] = None,
+) -> bool:
     """
-    Gate de faixa na busca: aceita se homologado ou estimado estiver na banda.
-    Evita perder item aderente quando o índice já tem homologado fora da faixa
-    mas o estimado (referência do catálogo) ainda cai na tolerância configurada.
+    Gate de faixa na busca.
+
+    - ``ambos`` (±): aceita se homologado **ou** estimado estiver na banda (recall).
+    - ``cima`` / ``baixo``: usa só o preço canônico de exibição — direção respeitada.
     """
+    sent = normalize_variacao_sentido(sentido) if sentido is not None else "ambos"
+    p = row_display_unit_price(it)
+    if p > 0.0 and lo <= p <= hi:
+        return True
+    if sent != "ambos":
+        return False
     hom = _optional_positive(it.get("valor_unitario_homologado"))
     est = _optional_positive(it.get("valor_unitario_estimado"))
     if hom is not None and lo <= hom <= hi:
         return True
     if est is not None and lo <= est <= hi:
         return True
-    p = row_display_unit_price(it)
-    return p > 0.0 and lo <= p <= hi
+    return False
 
 
 def row_display_unit_price(it: Dict[str, Any]) -> float:

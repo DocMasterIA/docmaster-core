@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextvars import ContextVar
 from datetime import date, datetime, timedelta
 from statistics import mean, median
 from typing import Any, Dict, List, Optional
@@ -1776,6 +1777,7 @@ async def _finalize_busca_lote_top3_response(
     """
     Autostart cotação: até 3 preços por item, escolhidos do mesmo pool da busca manual (faixa + índice).
     """
+    _set_faixa_sentido_ctx(ref_sentido if funil.get("faixa_ativa") else None)
     candidate_pool, pool_funil = _build_bulk_manual_recall_pool(
         itens,
         termo_busca=termo_efetivo,
@@ -1878,8 +1880,15 @@ def _ia_item_key(it: Dict[str, Any]) -> str:
     )
 
 
+_faixa_sentido_ctx: ContextVar[Optional[str]] = ContextVar("pncp_faixa_sentido", default=None)
+
+
+def _set_faixa_sentido_ctx(sentido: Optional[str]) -> None:
+    _faixa_sentido_ctx.set(sentido)
+
+
 def _preco_dentro_faixa(it: Dict[str, Any], lo: float, hi: float) -> bool:
-    return item_matches_faixa_band(it, lo, hi)
+    return item_matches_faixa_band(it, lo, hi, sentido=_faixa_sentido_ctx.get())
 
 
 def _ensure_top3_from_pool(
@@ -2622,6 +2631,9 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     if funil["faixa_ativa"]:
         faixa_min, faixa_max = compute_faixa_regional(ref_value, ref_var_pct, sentido=ref_sentido)
         funil["variacao_sentido"] = ref_sentido
+        _set_faixa_sentido_ctx(ref_sentido)
+    else:
+        _set_faixa_sentido_ctx(None)
     valores = [
         _row_price_for_faixa(x)
         for x in itens

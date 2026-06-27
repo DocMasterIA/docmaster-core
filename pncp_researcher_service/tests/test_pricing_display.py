@@ -129,7 +129,25 @@ class PricingDisplayTests(unittest.TestCase):
             "valor_unitario_estimado": 9.0,
             "valor_unitario": 12.5,
         }
-        self.assertTrue(item_matches_faixa_band(it, lo, hi))
+        self.assertTrue(item_matches_faixa_band(it, lo, hi, sentido="ambos"))
+
+    def test_faixa_band_cima_rejeita_homologado_abaixo_com_estimado_na_faixa(self):
+        lo, hi = 100.0, 120.0
+        it = {
+            "valor_unitario_homologado": 85.0,
+            "valor_unitario_estimado": 115.0,
+            "valor_unitario": 85.0,
+        }
+        self.assertFalse(item_matches_faixa_band(it, lo, hi, sentido="cima"))
+
+    def test_faixa_band_baixo_rejeita_homologado_acima_com_estimado_na_faixa(self):
+        lo, hi = 80.0, 100.0
+        it = {
+            "valor_unitario_homologado": 105.0,
+            "valor_unitario_estimado": 90.0,
+            "valor_unitario": 105.0,
+        }
+        self.assertFalse(item_matches_faixa_band(it, lo, hi, sentido="baixo"))
 
 
 if __name__ == "__main__":

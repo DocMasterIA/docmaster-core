@@ -35,6 +35,11 @@
         </div>
       </section>
 
+      <p v-if="faixaGlobalResumo" class="bia-faixa-banner">
+        Faixa global: <strong>{{ faixaGlobalResumo }}</strong>
+        <span class="bia-faixa-banner__hint">(definida em «Itens da cotação» → Salvar variação global)</span>
+      </p>
+
       <section class="bia-filters">
         <div class="bia-geo-panel">
           <div class="bia-geo-panel__top">
@@ -144,7 +149,7 @@
         Última busca ({{ lastSearchDebug.termo }}):
         API retornou <strong>{{ lastSearchDebug.apiItens }}</strong>,
         exibindo <strong>{{ lastSearchDebug.exibidos }}</strong>
-        <span v-if="lastSearchDebug.faixaAtiva"> • faixa R$ {{ lastSearchDebug.faixaMin }}–{{ lastSearchDebug.faixaMax }}</span>
+        <span v-if="lastSearchDebug.faixaAtiva"> • {{ lastSearchDebug.faixaResumo || `faixa R$ ${lastSearchDebug.faixaMin}–${lastSearchDebug.faixaMax}` }}</span>
         <span v-if="lastSearchDebug.apiItens > lastSearchDebug.exibidos" class="bia-meta--error">
           — {{ lastSearchDebug.apiItens - lastSearchDebug.exibidos }} filtrado(s) no front (preço ou fornecedor inválido)
         </span>
@@ -562,6 +567,17 @@ const itemContext = ref(null);
 const allItemContexts = ref([]);
 const variacaoPercentualGlobal = ref(null);
 const variacaoSentidoGlobal = ref('ambos');
+
+const faixaGlobalResumo = computed(() => {
+  const pct = Number(variacaoPercentualGlobal.value);
+  if (!Number.isFinite(pct) || pct < 0) return '';
+  const sentido = ['cima', 'baixo', 'ambos'].includes(variacaoSentidoGlobal.value)
+    ? variacaoSentidoGlobal.value
+    : 'ambos';
+  if (sentido === 'cima') return `até ${Math.round(pct)}% acima do valor base (só para cima)`;
+  if (sentido === 'baixo') return `até ${Math.round(pct)}% abaixo do valor base (só para baixo)`;
+  return `±${Math.round(pct)}% (ambos os lados)`;
+});
 const isAutoSearchingAll = ref(false);
 const isLoadingSessionItems = ref(false);
 const sessionItemsLoadHint = ref('');
@@ -981,6 +997,17 @@ async function applyFilters() {
   });
 }
 
+function parseSentidoRef(...vals) {
+  for (const v of vals) {
+    const raw = String(v || '').trim().toLowerCase();
+    if (!raw) continue;
+    if (['cima', 'baixo', 'ambos'].includes(raw)) return raw;
+    if (raw === 'acima' || raw === 'para cima' || raw === 'pra cima') return 'cima';
+    if (raw === 'abaixo' || raw === 'para baixo' || raw === 'pra baixo') return 'baixo';
+  }
+  return null;
+}
+
 function buildContextFromItem(it) {
   const src = it?.source || {};
   const faixa = src?.faixa_regional || src?.faixaRegional || {};
@@ -1014,7 +1041,14 @@ function buildContextFromItem(it) {
   ) {
     variacaoRef = Number(variacaoPercentualGlobal.value);
   }
-  const sentidoRaw = String(variacaoSentidoGlobal.value || 'ambos').trim().toLowerCase();
+  const sentidoFromItem = parseSentidoRef(
+    src?.variacao_sentido,
+    src?.variacaoSentido,
+    faixa?.variacao_sentido,
+    faixa?.sentido,
+  );
+  const sentidoRaw = sentidoFromItem
+    || String(variacaoSentidoGlobal.value || 'ambos').trim().toLowerCase();
   const sentidoRef = ['cima', 'baixo', 'ambos'].includes(sentidoRaw) ? sentidoRaw : 'ambos';
   const fator = Number.isFinite(Number(variacaoRef)) ? Math.max(0, Number(variacaoRef)) / 100 : null;
   let valorMinRef = null;
@@ -1256,6 +1290,10 @@ async function runSearchWithContext({
         faixaAtiva: Boolean(filtrosResp.faixa_regional_min != null && filtrosResp.faixa_regional_max != null),
         faixaMin: filtrosResp.faixa_regional_min,
         faixaMax: filtrosResp.faixa_regional_max,
+        faixaSentido: filtrosResp.variacao_sentido_referencia || sentidoCtx,
+        faixaResumo: faixaAtiva
+          ? formatFaixaResumo(valorBaseCtx, variacaoCtx, filtrosResp.variacao_sentido_referencia || sentidoCtx)
+          : '',
         top3Final: lastBackend?.stats?.funil_busca?.top3_final ?? null,
       };
       if (faixaAtiva && apiN < 3 && !bulkMode) {
@@ -1741,6 +1779,22 @@ function onVariacaoInput(event) {
 .bia-summary-card span { font-size: 11px; text-transform: uppercase; color: #64748b; }
 .bia-summary-card strong { font-size: 20px; color: #0f172a; }
 .bia-summary-card--highlight strong { color: #0f4c81; }
+
+.bia-faixa-banner {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #c5d9ef;
+  background: #eef5fc;
+  font-size: 13px;
+  color: #1e3a5f;
+}
+.bia-faixa-banner__hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #64748b;
+}
 
 .bia-filters { display: block; }
 .bia-controls { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }

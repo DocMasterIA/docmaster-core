@@ -7,8 +7,23 @@ from typing import Optional, Tuple
 SENTIDOS_VALIDOS = frozenset({"ambos", "baixo", "cima"})
 
 
+_SENTIDO_ALIASES = {
+    "para cima": "cima",
+    "pra cima": "cima",
+    "acima": "cima",
+    "up": "cima",
+    "para baixo": "baixo",
+    "pra baixo": "baixo",
+    "abaixo": "baixo",
+    "down": "baixo",
+    "both": "ambos",
+    "±": "ambos",
+}
+
+
 def normalize_variacao_sentido(sentido: Optional[str]) -> str:
     s = str(sentido or "ambos").strip().lower()
+    s = _SENTIDO_ALIASES.get(s, s)
     return s if s in SENTIDOS_VALIDOS else "ambos"
 
 

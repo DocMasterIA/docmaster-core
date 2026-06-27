@@ -496,6 +496,8 @@ PNCP_RELATORIO_PDF_RECEITAWS_EMAIL = os.environ.get("PNCP_RELATORIO_PDF_RECEITAW
 PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS", "48"))
 # Workers do pool de geração assíncrona de PDF (POST …/relatorio/pdf/start).
 PNCP_RELATORIO_PDF_JOB_WORKERS = int(os.environ.get("PNCP_RELATORIO_PDF_JOB_WORKERS", "2"))
+# Job em «processing» além deste tempo (s) → poll devolve 422 (worker gevent morto / fila presa).
+PNCP_RELATORIO_PDF_JOB_STALE_SEC = int(os.environ.get("PNCP_RELATORIO_PDF_JOB_STALE_SEC", "2700"))
 # PDF (job assíncrono): aguarda ~22s após 429 e tenta de novo (APIs limitam ~3 req/min).
 PNCP_CNPJ_EMAIL_RATE_LIMIT_WAIT_SEC = int(os.environ.get("PNCP_CNPJ_EMAIL_RATE_LIMIT_WAIT_SEC", "22"))
 # Intervalo mínimo entre consultas HTTP de e-mail (respeita ~3/min das APIs gratuitas).

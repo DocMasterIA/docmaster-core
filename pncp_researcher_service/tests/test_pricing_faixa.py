@@ -27,6 +27,10 @@ class PricingFaixaTests(unittest.TestCase):
     def test_sentido_invalido_cai_em_ambos(self):
         self.assertEqual(normalize_variacao_sentido("invalid"), "ambos")
 
+    def test_sentido_aliases_pt(self):
+        self.assertEqual(normalize_variacao_sentido("Para cima"), "cima")
+        self.assertEqual(normalize_variacao_sentido("pra baixo"), "baixo")
+
 
 class ManualParityFaixaTests(unittest.TestCase):
     def test_nao_relaxa_faixa_estreita(self):

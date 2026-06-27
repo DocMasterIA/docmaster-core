@@ -51,6 +51,8 @@ logger = logging.getLogger(__name__)
 
 _pdf_job_executor: Optional[ThreadPoolExecutor] = None
 _pdf_job_executor_lock = threading.Lock()
+_gevent_pdf_pool: Any = None
+_gevent_pdf_pool_lock = threading.Lock()
 
 DEFAULT_FORMULA_CALCULO = "media_aritmetica_precos_obtidos"
 FORMULA_LABELS = {
@@ -243,8 +245,9 @@ def _generate_relatorio_pdf_bytes(
     verification_token = issue_verification_token()
     url_qr = _url_qr_download_pdf_verificacao(api_base_url, sessao_id, verification_token)
     # Enriquecimento PNCP/BrasilAPI: ligado por omissão; desligar com PNCP_RELATORIO_PDF_SKIP_ENRICH.
-    enriched_emails = False
+    enrich_ran = False
     if not settings.PNCP_RELATORIO_PDF_SKIP_ENRICH:
+        enrich_ran = True
         try:
             enrich_missing_supplier_fields_for_cotacao(
                 cotacao.id,
@@ -254,7 +257,6 @@ def _generate_relatorio_pdf_bytes(
                 receitaws_allow_wait=False,
                 receitaws_unlimited=False,
             )
-            enriched_emails = True
             itens_qs = cotacao.itens.prefetch_related("cotacoes")
         except Exception:
             logger.exception(
@@ -269,7 +271,8 @@ def _generate_relatorio_pdf_bytes(
         url_verificacao=url_qr,
         anexo_fornecedor_url=anexo_fornecedor_url,
         formula_id=formula_id,
-        skip_email_http_prefetch=enriched_emails,
+        # Evita segunda rodada lenta de ReceitaWS no montar_contexto após enrich (ou tentativa).
+        skip_email_http_prefetch=enrich_ran,
     )
     if anexos_merge:
         try:
@@ -302,19 +305,40 @@ def _relatorio_pdf_jobs_dir() -> Path:
     return p
 
 
+def _pdf_job_worker_count() -> int:
+    return max(1, int(getattr(settings, "PNCP_RELATORIO_PDF_JOB_WORKERS", 2) or 2))
+
+
 def _get_pdf_job_executor() -> ThreadPoolExecutor:
-    """Pool dedicado — mais estável que ``threading.Thread(daemon=True)`` com Gunicorn/gevent."""
+    """Fallback quando não há hub gevent (runserver, testes, gunicorn sync)."""
     global _pdf_job_executor
     if _pdf_job_executor is not None:
         return _pdf_job_executor
     with _pdf_job_executor_lock:
         if _pdf_job_executor is None:
-            max_workers = int(getattr(settings, "PNCP_RELATORIO_PDF_JOB_WORKERS", 2) or 2)
             _pdf_job_executor = ThreadPoolExecutor(
-                max_workers=max(1, max_workers),
+                max_workers=_pdf_job_worker_count(),
                 thread_name_prefix="pncp_relatorio_pdf",
             )
         return _pdf_job_executor
+
+
+def _spawn_relatorio_pdf_worker(fn) -> None:
+    """WeasyPrint + HTTP bloqueiam — não rodar no greenlet do Gunicorn/gevent."""
+    try:
+        from gevent import get_hub
+        from gevent.threadpool import ThreadPool
+
+        if get_hub() is not None:
+            global _gevent_pdf_pool
+            with _gevent_pdf_pool_lock:
+                if _gevent_pdf_pool is None:
+                    _gevent_pdf_pool = ThreadPool(_pdf_job_worker_count())
+            _gevent_pdf_pool.spawn(fn)
+            return
+    except Exception:
+        pass
+    _get_pdf_job_executor().submit(fn)
 
 
 def _mark_job_meta_status(meta_path: Path, status: str, **extra: Any) -> None:
@@ -345,6 +369,36 @@ def _prune_stale_relatorio_pdf_jobs(jobs_dir: Path) -> None:
             (jobs_dir / f"{stem}.pdf").unlink(missing_ok=True)
         except OSError:
             pass
+
+
+def _job_meta_iso_ts(meta: Dict[str, Any], *keys: str) -> Optional[str]:
+    for key in keys:
+        raw = meta.get(key)
+        if raw:
+            return str(raw)
+    return None
+
+
+def _relatorio_pdf_job_stale(meta: Dict[str, Any]) -> bool:
+    """Job em processing há demais (worker morto ou fila presa no gevent)."""
+    max_sec = int(getattr(settings, "PNCP_RELATORIO_PDF_JOB_STALE_SEC", 2700) or 0)
+    if max_sec <= 0:
+        return False
+    stamp = _job_meta_iso_ts(meta, "started", "queued", "created")
+    if not stamp:
+        return False
+    try:
+        from django.utils.dateparse import parse_datetime
+
+        dt = parse_datetime(stamp)
+        if dt is None:
+            return False
+        if timezone.is_naive(dt):
+            dt = timezone.make_aware(dt, timezone.get_current_timezone())
+        age = (timezone.now() - dt).total_seconds()
+        return age > max_sec
+    except Exception:
+        return False
 
 
 def _write_job_meta_error(meta_path: Path, message: str) -> None:
@@ -480,7 +534,7 @@ def _submit_relatorio_pdf_job(**kwargs: Any) -> None:
             meta_path = _relatorio_pdf_jobs_dir() / f"{job_id}.meta.json"
             _write_job_meta_error(meta_path, "Falha interna ao gerar PDF.")
 
-    _get_pdf_job_executor().submit(_wrapper)
+    _spawn_relatorio_pdf_worker(_wrapper)
 
 
 def _relatorio_pdf_request_body_validation(request) -> Tuple[Dict[str, Any] | None, JsonResponse | None]:
@@ -541,6 +595,7 @@ def pncp_cotacao_relatorio_pdf_start(request, sessao_id: int):
     }
     meta_path = jobs_dir / f"{job_id}.meta.json"
     meta_path.write_text(json.dumps(meta), encoding="utf-8")
+    _mark_job_meta_status(meta_path, "processing", queued=timezone.now().isoformat())
 
     api_base = resolve_public_api_base_url(request)
     _submit_relatorio_pdf_job(
@@ -582,6 +637,13 @@ def pncp_cotacao_relatorio_pdf_job_poll(request, sessao_id: int, job_id: UUID):
 
         status = meta.get("status")
         if status in ("pending", "processing"):
+            if status == "processing" and _relatorio_pdf_job_stale(meta):
+                msg = (
+                    "A geração do PDF excedeu o tempo limite no servidor. "
+                    "Tente gerar novamente; se persistir, contacte o suporte."
+                )
+                _write_job_meta_error(_relatorio_pdf_jobs_dir() / f"{job_key}.meta.json", msg)
+                return JsonResponse({"status": "error", "detail": msg}, status=422)
             return JsonResponse({"status": status}, status=202)
         if status == "error":
             return JsonResponse(

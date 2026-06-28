@@ -260,6 +260,24 @@ export function computeFaixaRegional(valorBase, variacaoPct, sentido = 'ambos') 
   return { min: Math.max(0, base * (1 - f)), max: base * (1 + f), sentido: s };
 }
 
+/** Preço unitário dentro da faixa regional (paridade manual + researcher). */
+export function unitPriceWithinFaixaRegional(unitPrice, valorBase, variacaoPct, sentido = 'ambos') {
+  const u = Number(unitPrice);
+  const { min, max } = computeFaixaRegional(valorBase, variacaoPct, sentido);
+  if (min == null || max == null || !Number.isFinite(u) || u <= 0) return false;
+  return u >= min && u <= max;
+}
+
+/** Linha PNCP (sourceRaw) dentro da faixa — usa displayPnCpUnitario. */
+export function pnCpRowWithinFaixaRegional(row, valorBase, variacaoPct, sentido = 'ambos') {
+  return unitPriceWithinFaixaRegional(
+    displayPnCpUnitario(row),
+    valorBase,
+    variacaoPct,
+    sentido,
+  );
+}
+
 /** Texto curto da faixa para mensagens de UI. */
 export function formatFaixaResumo(valorBase, variacaoPct, sentido = 'ambos') {
   const { min, max, sentido: s } = computeFaixaRegional(valorBase, variacaoPct, sentido);

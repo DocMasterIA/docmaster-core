@@ -329,11 +329,13 @@ import {
   displayPnCpTotal,
   displayPnCpUnitario,
   canSalvarCotacaoPnCp,
+  computeFaixaRegional,
   extractCnpjFornecedorSalvar,
   extractPnCpHomologadoTotal,
   extractPnCpHomologadoUnit,
   formatFaixaResumo,
   passesPnCpSearchDisplayGate,
+  pnCpRowWithinFaixaRegional,
 } from '../utils/pncpPricing';
 
 const route = useRoute();
@@ -1013,18 +1015,23 @@ function buildContextFromItem(it) {
   const faixa = src?.faixa_regional || src?.faixaRegional || {};
   const fontes = it?.fontes_contagem || {};
   const totalCotacoesItem = itemTotalCotacoesSalvas(it);
-  const valorBaseRef = parseNumericRef(
+  let valorBaseRef = parseNumericRef(
+    faixa?.valor_base,
+    faixa?.valorBase,
     src?.valor_base,
     src?.valorBase,
     src?.preco_base,
     src?.precoBase,
-    faixa?.valor_base,
-    faixa?.valorBase,
-    // Paridade CotacaoDetalhe / listagem: preço refletido ou ORM quando não há valor_base explícito.
     it?.valor_unitario_refletido,
     it?.valor_unitario,
-    it?.valor_total,
   );
+  if (valorBaseRef == null) {
+    const qtdBase = parseNumericRef(it?.quantidade);
+    const totalRef = parseNumericRef(it?.valor_total_refletido, it?.valor_total);
+    if (qtdBase != null && qtdBase > 0 && totalRef != null && Number.isFinite(totalRef)) {
+      valorBaseRef = totalRef / qtdBase;
+    }
+  }
   let variacaoRef = parseNumericRef(
     src?.variacao_percentual,
     src?.variacaoPercentual,
@@ -1054,22 +1061,16 @@ function buildContextFromItem(it) {
     faixa?.variacao_sentido,
     faixa?.sentido,
   ) || 'ambos';
-  const fator = Number.isFinite(Number(variacaoRef)) ? Math.max(0, Number(variacaoRef)) / 100 : null;
-  let valorMinRef = null;
-  let valorMaxRef = null;
-  if (valorBaseRef != null && Number.isFinite(Number(valorBaseRef)) && fator != null) {
-    const vb = Number(valorBaseRef);
-    if (sentidoRef === 'baixo') {
-      valorMinRef = Math.max(0, vb * (1 - fator));
-      valorMaxRef = vb;
-    } else if (sentidoRef === 'cima') {
-      valorMinRef = vb;
-      valorMaxRef = vb * (1 + fator);
-    } else {
-      valorMinRef = Math.max(0, vb * (1 - fator));
-      valorMaxRef = vb * (1 + fator);
-    }
-  }
+  const faixaCalc = (
+    valorBaseRef != null
+    && Number.isFinite(Number(valorBaseRef))
+    && Number(valorBaseRef) > 0
+    && variacaoRef != null
+    && Number.isFinite(Number(variacaoRef))
+    && Number(variacaoRef) >= 0
+  )
+    ? computeFaixaRegional(Number(valorBaseRef), Number(variacaoRef), sentidoRef)
+    : { min: null, max: null };
   return {
     id: it.id,
     descricao_item: String(it?.descricao_item || '').trim(),
@@ -1078,8 +1079,8 @@ function buildContextFromItem(it) {
     valor_base_referencia: valorBaseRef,
     variacao_percentual_referencia: variacaoRef,
     variacao_sentido_referencia: sentidoRef,
-    valor_min_referencia: valorMinRef,
-    valor_max_referencia: valorMaxRef,
+    valor_min_referencia: faixaCalc.min,
+    valor_max_referencia: faixaCalc.max,
     uf_padrao: String(it?.uf || '').trim().toUpperCase() || null,
     total_cotacoes_item: totalCotacoesItem,
   };
@@ -1140,15 +1141,22 @@ async function runSearchWithContext({
     const recortes = buildRecortesGeograficosPayload(filtros.cidades);
     const valorBaseCtx = context?.valor_base_referencia ?? null;
     const variacaoCtx = context?.variacao_percentual_referencia ?? null;
-    const faixaAtiva =
-      valorBaseCtx != null
-      && Number.isFinite(Number(valorBaseCtx))
-      && Number(valorBaseCtx) > 0
-      && variacaoCtx != null
-      && Number.isFinite(Number(variacaoCtx))
-      && Number(variacaoCtx) >= 0;
-
     const sentidoCtx = context?.variacao_sentido_referencia ?? 'ambos';
+    const faixaMinCtx = context?.valor_min_referencia;
+    const faixaMaxCtx = context?.valor_max_referencia;
+    const faixaAtiva = faixaMinCtx != null
+      && faixaMaxCtx != null
+      && Number.isFinite(Number(faixaMinCtx))
+      && Number.isFinite(Number(faixaMaxCtx));
+
+    const globalVariacaoDefinida = Number.isFinite(Number(variacaoPercentualGlobal.value))
+      && Number(variacaoPercentualGlobal.value) >= 0;
+    if (context && globalVariacaoDefinida && !faixaAtiva && !bulkMode) {
+      searchError.value =
+        'Faixa global ativa, mas este item não tem valor BASE salvo. '
+        + 'Preencha a coluna BASE em «Itens da cotação» e clique Salvar antes de pesquisar.';
+      return { ok: false, exibidos: 0, empty: true };
+    }
     const basePayload = {
       somente_homologados: true,
       termo_busca: String(descricao).trim(),
@@ -1170,7 +1178,18 @@ async function runSearchWithContext({
       if (!backend?.ok || !Array.isArray(backend.itens)) return 0;
       lastBackend = backend;
       const mapped = backend.itens
-        .filter((it) => passesPnCpSearchDisplayGate({ sourceRaw: it }))
+        .filter((it) => {
+          if (!passesPnCpSearchDisplayGate({ sourceRaw: it })) return false;
+          if (faixaAtiva) {
+            return pnCpRowWithinFaixaRegional(
+              { sourceRaw: it },
+              valorBaseCtx,
+              variacaoCtx,
+              sentidoCtx,
+            );
+          }
+          return true;
+        })
         .map((it, idx) => ({
         esferaAdministrativa: classificarEsferaAdministrativa(it),
         incisoClassificacao: mapEsferaParaInciso(classificarEsferaAdministrativa(it)),

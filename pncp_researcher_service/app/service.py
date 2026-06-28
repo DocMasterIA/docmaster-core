@@ -2618,12 +2618,13 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     ref_unit = _normalize_unit(search_payload.unidade_medida_referencia)
     ref_val_set = search_payload.valor_base_referencia is not None
     ref_var_set = search_payload.variacao_percentual_referencia is not None
-    ref_sentido = normalize_variacao_sentido(
-        getattr(search_payload, "variacao_sentido_referencia", None)
-    )
+    _raw_sentido = getattr(search_payload, "variacao_sentido_referencia", None)
     funil["faixa_ativa"] = faixa_regional_ativa(
         search_payload.valor_base_referencia if ref_val_set else None,
         search_payload.variacao_percentual_referencia if ref_var_set else None,
+    )
+    ref_sentido = (
+        normalize_variacao_sentido(_raw_sentido) if _raw_sentido is not None else "ambos"
     )
     try:
         ref_value = float(search_payload.valor_base_referencia) if ref_val_set else 0.0
@@ -2765,7 +2766,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                 continue
             if faixa_min is not None and faixa_max is not None:
                 # Regra de negócio: com valor base + variação informados, faixa é obrigatória.
-                if not _preco_dentro_faixa(it, faixa_min, faixa_max):
+                if not _preco_dentro_faixa(it, faixa_min, faixa_max, sentido=ref_sentido):
                     continue
             if ref_value > 0 and row_value > 0:
                 v_dev = abs(row_value - ref_value) / max(ref_value, 1e-9)
@@ -2862,7 +2863,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     funil["eliminados_sem_preco"] = max(0, scored_pre_preco - len(scored))
     if faixa_min is not None and faixa_max is not None:
         before_faixa = len(scored)
-        scored = [x for x in scored if _preco_dentro_faixa(x, faixa_min, faixa_max)]
+        scored = [x for x in scored if _preco_dentro_faixa(x, faixa_min, faixa_max, sentido=ref_sentido)]
         funil["eliminados_faixa_preco"] = max(0, before_faixa - len(scored))
         funil["faixa_min"] = faixa_min
         funil["faixa_max"] = faixa_max
@@ -3118,7 +3119,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         if extra:
             funil["manual_parity_topup"] = len(extra)
     if faixa_min is not None and faixa_max is not None and top3:
-        top3 = [x for x in top3 if _preco_dentro_faixa(x, faixa_min, faixa_max)]
+        top3 = [x for x in top3 if _preco_dentro_faixa(x, faixa_min, faixa_max, sentido=ref_sentido)]
     funil["top3_final"] = len(top3)
     if bulk_intelligent:
         funil["modo_resposta"] = "bulk_intelligent_top3"

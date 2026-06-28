@@ -19,16 +19,7 @@
             <section class="da75-block da75-block--muted">
               <h3>Dados básicos</h3>
               <div class="da75-block__body">
-                <div
-                  class="da75-row"
-                  :class="
-                    isFornecedorExclusivoRoute
-                      ? 'da75-row--basic-4'
-                      : isInexigibilidadeManutencaoRoute
-                        ? 'da75-row--basic'
-                        : 'da75-row--basic'
-                  "
-                >
+                <div class="da75-row da75-row--basic">
                   <div class="da75-field">
                     <label class="da75-label da75-label--compact">Cabeçalho do documento</label>
                     <select v-model="cabecalhoDocumento" class="da75-select da75-select--sm">
@@ -46,10 +37,6 @@
                       @input="onOrgaoInput($event)"
                     />
                   </div>
-                  <label class="da75-check da75-check--inline">
-                    <input v-model="processoAtivo" type="checkbox" />
-                    Processo (opcional)
-                  </label>
                   <div v-if="isFornecedorExclusivoRoute" class="da75-field">
                     <label class="da75-label da75-label--compact">{{ LABEL_ORGAO_UNIDADE_RESP_EQUIP }}</label>
                     <input
@@ -68,6 +55,10 @@
                       @input="onOrgaoUnidadeVeiculoInput($event)"
                     />
                   </div>
+                  <label class="da75-check da75-check--inline">
+                    <input v-model="processoAtivo" type="checkbox" />
+                    Processo (opcional)
+                  </label>
                 </div>
                 <div v-if="processoAtivo" class="da75-max-xs da75-mt">
                   <label class="da75-label">Número do processo (opcional)</label>

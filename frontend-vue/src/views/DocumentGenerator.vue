@@ -534,6 +534,11 @@ import {
   sanitizeQuantidadeInput,
 } from '@/utils/itemValorCampos.js';
 import '@/components/dispensa-art-75-ii/dispensaArt75ii.css';
+import {
+  clearDeprecatedCargoPresetFields,
+  LEGACY_CARGO_SLOT_FORM_IDS,
+  stripDeprecatedCargoSlotsOverride,
+} from '@/components/dispensa-art-75-ii/dispensaArt75iiShared.js';
 import { useSessionUser } from '@/composables/useSessionUser.js';
 
 // Em dev: '' → proxy Vite `/api`
@@ -639,6 +644,7 @@ const slotStateSaveDebounce = ref(null);
 const templatePresetSaveDebounce = ref(null);
 const isHydratingSlotState = ref(false);
 const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
+const LEGACY_CARGO_SLOT_FORM_IDS_SET = new Set(LEGACY_CARGO_SLOT_FORM_IDS);
 /** Chaves reservadas no preset global (backend) para cabeçalho/rodapé da Biblioteca. */
 const LIBRARY_TEMPLATE_ID_KEY = '__library_template_id__';
 const LIBRARY_TEMPLATE_NAME_KEY = '__library_template_name__';
@@ -1076,7 +1082,7 @@ function collectSlotFormStatePayload() {
 
 /** Preset global: slots do assistente + template da biblioteca (merge no backend). */
 function buildGlobalPresetPayload() {
-  const data = showSlotsCard.value ? collectSlotFormStatePayload() : {};
+  const data = clearDeprecatedCargoPresetFields(showSlotsCard.value ? collectSlotFormStatePayload() : {});
   // Campo opcional só na sessão — remove do preset global (merge no backend).
   data.numero_processo = '';
   if (selectedTemplate.value?.id) {
@@ -1137,6 +1143,7 @@ async function loadSlotFormState() {
       for (const field of section.fields) {
         if (field.input === 'heading') continue;
         if (field.id === 'numero_processo') continue;
+        if (LEGACY_CARGO_SLOT_FORM_IDS_SET.has(field.id)) continue;
         if (!(field.id in data)) continue;
         const value = data[field.id];
         if (field.input === 'checkbox') {
@@ -1226,17 +1233,11 @@ function buildTrSlotsOverride() {
   if (fiscalNome) o.dfd_fiscal_contratos = fiscalNome;
 
   const solDestNome = (f.solicitacao_destinatario_nome || '').trim();
-  const solDestCargo = (f.solicitacao_destinatario_cargo || '').trim();
   const solDestTratNome = (f.solicitacao_destinatario_tratamento_nome || '').trim();
-  const solDestTratCargo = (f.solicitacao_destinatario_tratamento_cargo || '').trim();
   const solRespNome = (f.solicitacao_responsavel_nome || '').trim();
-  const solRespCargo = (f.solicitacao_responsavel_cargo || '').trim();
   if (solDestNome) o.sol_oficio_destinatario_nome = solDestNome;
-  if (solDestCargo) o.sol_oficio_destinatario_cargo = solDestCargo;
   if (solDestTratNome) o.ao_senhor_genero = solDestTratNome;
-  if (solDestTratCargo) o.senhor_senhora_genero = solDestTratCargo;
   if (solRespNome) o.sol_oficio_responsavel_nome = solRespNome;
-  if (solRespCargo) o.sol_oficio_responsavel_cargo = solRespCargo;
 
   const itemDescricao = (f.item_descricao || '').trim();
   const itemQuantidade = (f.item_quantidade || '').trim();
@@ -1253,8 +1254,6 @@ function buildTrSlotsOverride() {
       valor_total: itemValorTotal,
     }];
   }
-  const trCargoAssinante = (f.tr_cargo_assinante || '').trim();
-  if (trCargoAssinante) o.secretaria_usuario = trCargoAssinante;
   const setor = (f.dfd_setor_requisitante || '').trim();
   if (setor) o.dfd_setor_requisitante = setor;
 
@@ -1268,8 +1267,6 @@ function buildTrSlotsOverride() {
   const dfdGestor = (f.dfd_gestor_contratos || '').trim();
   if (dfdGestor) o.dfd_gestor_contratos = dfdGestor;
 
-  const dfdAssCargo = (f.dfd_assinatura_cargo || '').trim();
-  if (dfdAssCargo) o.dfd_assinatura_cargo = dfdAssCargo;
   const dfdAssNome = (f.dfd_assinatura_nome || '').trim();
   if (dfdAssNome) o.dfd_assinatura_nome = dfdAssNome;
 
@@ -1301,7 +1298,6 @@ function buildTrSlotsOverride() {
   ).trim();
   if (nomeAss) {
     o.nome_assinante_termo = nomeAss;
-    if (!o.secretaria_usuario) o.secretaria_usuario = nomeAss;
   }
 
   const objetoManualTR = (f.tr_objeto_manual || '').trim();
@@ -1322,14 +1318,10 @@ function buildTrSlotsOverride() {
   const justificativa = (f.justificativa || f.justificativa_inviabilidade || '').trim();
   if (justificativa) o.justificativa = justificativa;
 
-  const setorResp = (f.setor_responsavel || '').trim();
-  if (setorResp && !o.secretaria_usuario) o.secretaria_usuario = setorResp;
-  if (setor && !o.secretaria_usuario) o.secretaria_usuario = setor;
-
   const fundamentoLegal = resolveSolOficioFundamentoLegal(dispensaLogicalRouteName.value);
   if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;
 
-  return Object.keys(o).length ? o : null;
+  return stripDeprecatedCargoSlotsOverride(o);
 }
 
 /** Texto extra anexado ao prompt para a IA considerar todos os campos preenchidos. */

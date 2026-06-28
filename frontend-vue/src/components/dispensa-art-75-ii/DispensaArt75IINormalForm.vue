@@ -257,6 +257,7 @@ import {
   moedaParaNumero,
   quantidadeParaNumero,
   primeiraMaiuscula,
+  stripDeprecatedCargoSlotsOverride,
 } from './dispensaArt75iiShared.js';
 import './dispensaArt75ii.css';
 import DispensaArt75IIDadosFixosDrawer from './DispensaArt75IIDadosFixosDrawer.vue';
@@ -438,21 +439,16 @@ async function resetFormStateForNewRoute() {
   dadosFixos.orgaoProfileName = '';
   dadosFixos.fixoTratNome = '';
   dadosFixos.fixoNome = '';
-  dadosFixos.fixoTratCargo = '';
-  dadosFixos.fixoCargo = '';
   dadosFixos.fixoResponsavel = '';
-  dadosFixos.fixoResponsavelCargo = '';
   dadosFixos.fixoSetor = '';
   dadosFixos.fixoDemanda = '';
   dadosFixos.fixoEmail = '';
   dadosFixos.fixoGestor = '';
   dadosFixos.fixoFiscal = '';
   dadosFixos.fixoAssinatura = '';
-  dadosFixos.fixoAssinaturaCargo = '';
   dadosFixos.fixoEnderecoEntrega = TEXTO_PADRAO_ENDERECO_PROPOSTAS;
   dadosFixos.fixoEmailPropostas = '';
   dadosFixos.fixoTrResponsavelNome = '';
-  dadosFixos.fixoTrResponsavelCargo = '';
   await reloadPresetCabecalhosOrgao();
 }
 
@@ -561,7 +557,7 @@ function slotsOverrideWithoutClauseDraft(raw) {
   delete o.sol_oficio_justificativa;
   delete o.itens;
   delete o.valor_total;
-  return Object.keys(o).length ? o : null;
+  return stripDeprecatedCargoSlotsOverride(o);
 }
 
 /** Só os campos do bloco «Objeto da contratação» — sem Dados básicos, dados fixos ou tabela de itens. */
@@ -668,17 +664,11 @@ function buildSlotsOverride() {
   applyUsuarioLocalidadeToSlots(o, usuarioLocalidade.value);
   o.dispensa_fluxo_ui = 'normal';
   const destNome = String(dadosFixos.fixoNome || '').trim();
-  const destCargo = String(dadosFixos.fixoCargo || '').trim();
   const respNome = String(dadosFixos.fixoResponsavel || '').trim();
-  const respCargo = String(dadosFixos.fixoResponsavelCargo || '').trim();
   const tratNome = String(dadosFixos.fixoTratNome || '').trim();
-  const tratCargo = String(dadosFixos.fixoTratCargo || '').trim();
   if (destNome) o.sol_oficio_destinatario_nome = destNome;
-  if (destCargo) o.sol_oficio_destinatario_cargo = destCargo;
   if (respNome) o.sol_oficio_responsavel_nome = respNome;
-  if (respCargo) o.sol_oficio_responsavel_cargo = respCargo;
   if (tratNome) o.ao_senhor_genero = tratNome;
-  if (tratCargo) o.senhor_senhora_genero = tratCargo;
   const setorFormulario = String(objetoSetor.value || '').trim();
   if (setorFormulario) {
     o.dfd_setor_requisitante = setorFormulario;
@@ -694,7 +684,6 @@ function buildSlotsOverride() {
     o.fiscal = { nome: fn };
   }
   if (String(dadosFixos.fixoAssinatura || '').trim()) o.dfd_assinatura_nome = String(dadosFixos.fixoAssinatura).trim();
-  if (String(dadosFixos.fixoAssinaturaCargo || '').trim()) o.dfd_assinatura_cargo = String(dadosFixos.fixoAssinaturaCargo).trim();
   if (processoAtivo.value && String(processo.value || '').trim()) {
     const np = String(processo.value).trim();
     o.numero_processo = np;
@@ -703,9 +692,7 @@ function buildSlotsOverride() {
   if (String(dadosFixos.fixoEnderecoEntrega || '').trim()) o.endereco_entrega = String(dadosFixos.fixoEnderecoEntrega).trim();
   if (String(dadosFixos.fixoEmailPropostas || '').trim()) o.email_envio_propostas = String(dadosFixos.fixoEmailPropostas).trim();
   if (String(dadosFixos.fixoTrResponsavelNome || '').trim()) {
-    const trNome = String(dadosFixos.fixoTrResponsavelNome).trim();
-    o.nome_assinante_termo = trNome;
-    o.secretaria_usuario = trNome;
+    o.nome_assinante_termo = String(dadosFixos.fixoTrResponsavelNome).trim();
   }
   if (dotacaoAtiva.value && String(dotacao.value || '').trim()) {
     const dotacaoTexto = String(dotacao.value).trim();
@@ -748,7 +735,7 @@ function buildSlotsOverride() {
   }
   const fundamentoLegal = resolveSolOficioFundamentoLegal(String(route.name || ''));
   if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;
-  return Object.keys(o).length ? o : null;
+  return stripDeprecatedCargoSlotsOverride(o);
 }
 
 function buildUserPrompt() {

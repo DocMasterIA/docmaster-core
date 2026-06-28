@@ -476,6 +476,7 @@ export async function downloadCotacaoRelatorioPdf(
   const pollUrl = `${API_BASE}${startPayload.poll_path}`;
   const POLL_MS = 1500;
   const MAX_WAIT_MS = 40 * 60 * 1000;
+  const POLL_NETWORK_RETRIES = 12;
   const t0 = Date.now();
 
   while (Date.now() - t0 < MAX_WAIT_MS) {
@@ -483,10 +484,19 @@ export async function downloadCotacaoRelatorioPdf(
       throw new DOMException('Aborted', 'AbortError');
     }
     let pollRes;
-    try {
-      pollRes = await fetch(pollUrl, { credentials: 'include', signal });
-    } catch (err) {
-      throw mapNetworkError(err, 'poll');
+    let pollNetworkRetries = 0;
+    while (true) {
+      try {
+        pollRes = await fetch(pollUrl, { credentials: 'include', signal });
+        break;
+      } catch (err) {
+        if (isNetworkFetchError(err) && pollNetworkRetries < POLL_NETWORK_RETRIES) {
+          pollNetworkRetries += 1;
+          await sleep(POLL_MS * Math.min(4, pollNetworkRetries));
+          continue;
+        }
+        throw mapNetworkError(err, 'poll');
+      }
     }
     const pollCtype = (pollRes.headers.get('content-type') || '').toLowerCase();
 

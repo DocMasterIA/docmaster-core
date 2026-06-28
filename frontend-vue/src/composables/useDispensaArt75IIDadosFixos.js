@@ -1,7 +1,7 @@
 import { computed, reactive, ref } from 'vue';
 import {
+  clearDeprecatedCargoPresetFields,
   TEXTO_PADRAO_ENDERECO_PROPOSTAS,
-  TRATAMENTO_CARGO,
   TRATAMENTO_NOME,
 } from '@/components/dispensa-art-75-ii/dispensaArt75iiShared.js';
 import { capitalizeNomeTituloPt, normNomeTituloMultiline } from '@/utils/itemValorCampos.js';
@@ -29,20 +29,16 @@ export const DA75_FIXOS_CATALOG_KEYS = [
   'cabecalho_documento',
   'orgao',
   'solicitacao_destinatario_nome',
-  'solicitacao_destinatario_cargo',
   'solicitacao_responsavel_nome',
-  'solicitacao_responsavel_cargo',
   'dfd_setor_requisitante',
   'dfd_responsavel_demanda',
   'dfd_email',
   'dfd_gestor_contratos',
   'dfd_fiscal_contratos',
   'dfd_assinatura_nome',
-  'dfd_assinatura_cargo',
   'tr_endereco_entrega_propostas',
   'tr_email_recebimento_propostas',
   'tr_termo_responsavel_nome',
-  'tr_termo_responsavel_cargo',
 ];
 
 /**
@@ -66,50 +62,39 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
 
   const fixoTratNome = ref('');
   const fixoNome = ref('');
-  const fixoTratCargo = ref('');
-  const fixoCargo = ref('');
   const fixoResponsavel = ref('');
-  const fixoResponsavelCargo = ref('');
   const fixoSetor = ref('');
   const fixoDemanda = ref('');
   const fixoEmail = ref('');
   const fixoGestor = ref('');
   const fixoFiscal = ref('');
   const fixoAssinatura = ref('');
-  const fixoAssinaturaCargo = ref('');
   const fixoEnderecoEntrega = ref(TEXTO_PADRAO_ENDERECO_PROPOSTAS);
   const fixoEmailPropostas = ref('');
   const fixoTrResponsavelNome = ref('');
-  const fixoTrResponsavelCargo = ref('');
 
   const tratamentoNome = TRATAMENTO_NOME;
-  const tratamentoCargo = TRATAMENTO_CARGO;
 
   function collectPresetPayload() {
-    return {
+    return clearDeprecatedCargoPresetFields({
       cabecalho_documento: cabecalho.value,
       // Processo (opcional) não entra no preset/perfil — só limpa merge antigo no servidor.
       processo_ativo: false,
       processo_numero: '',
       orgao: orgao.value,
       solicitacao_tratamento_nome: fixoTratNome.value,
-      solicitacao_tratamento_cargo: fixoTratCargo.value,
       solicitacao_destinatario_nome: fixoNome.value,
-      solicitacao_destinatario_cargo: fixoCargo.value,
       solicitacao_responsavel_nome: fixoResponsavel.value,
-      solicitacao_responsavel_cargo: fixoResponsavelCargo.value,
       dfd_setor_requisitante: fixoSetor.value,
       dfd_responsavel_demanda: fixoDemanda.value,
       dfd_email: fixoEmail.value,
       dfd_gestor_contratos: fixoGestor.value,
       dfd_fiscal_contratos: fixoFiscal.value,
       dfd_assinatura_nome: fixoAssinatura.value,
-      dfd_assinatura_cargo: fixoAssinaturaCargo.value,
       tr_endereco_entrega_propostas: fixoEnderecoEntrega.value,
       tr_email_recebimento_propostas: fixoEmailPropostas.value,
       tr_termo_responsavel_nome: fixoTrResponsavelNome.value,
-      tr_termo_responsavel_cargo: fixoTrResponsavelCargo.value,
-    };
+    });
   }
 
   function applyPresetPayload(data) {
@@ -117,18 +102,14 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     if ('cabecalho_documento' in data) cabecalho.value = String(data.cabecalho_documento || '');
     if ('orgao' in data) orgao.value = normNomeTitulo(data.orgao);
     if ('solicitacao_tratamento_nome' in data) fixoTratNome.value = String(data.solicitacao_tratamento_nome || '');
-    if ('solicitacao_tratamento_cargo' in data) fixoTratCargo.value = String(data.solicitacao_tratamento_cargo || '');
     if ('solicitacao_destinatario_nome' in data) fixoNome.value = normNomeTitulo(data.solicitacao_destinatario_nome);
-    if ('solicitacao_destinatario_cargo' in data) fixoCargo.value = normNomeTitulo(data.solicitacao_destinatario_cargo);
     if ('solicitacao_responsavel_nome' in data) fixoResponsavel.value = normNomeTitulo(data.solicitacao_responsavel_nome);
-    if ('solicitacao_responsavel_cargo' in data) fixoResponsavelCargo.value = normNomeTitulo(data.solicitacao_responsavel_cargo);
     if ('dfd_setor_requisitante' in data) fixoSetor.value = normNomeTitulo(data.dfd_setor_requisitante);
     if ('dfd_responsavel_demanda' in data) fixoDemanda.value = normNomeTitulo(data.dfd_responsavel_demanda);
     if ('dfd_email' in data) fixoEmail.value = String(data.dfd_email || '');
     if ('dfd_gestor_contratos' in data) fixoGestor.value = normNomeTitulo(data.dfd_gestor_contratos);
     if ('dfd_fiscal_contratos' in data) fixoFiscal.value = normNomeTitulo(data.dfd_fiscal_contratos);
     if ('dfd_assinatura_nome' in data) fixoAssinatura.value = normNomeTitulo(data.dfd_assinatura_nome);
-    if ('dfd_assinatura_cargo' in data) fixoAssinaturaCargo.value = normNomeTitulo(data.dfd_assinatura_cargo);
     if ('tr_endereco_entrega_propostas' in data) {
       const endereco = String(data.tr_endereco_entrega_propostas || '').trim();
       fixoEnderecoEntrega.value = endereco || TEXTO_PADRAO_ENDERECO_PROPOSTAS;
@@ -137,9 +118,6 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
       fixoEmailPropostas.value = String(data.tr_email_recebimento_propostas || '');
     }
     if ('tr_termo_responsavel_nome' in data) fixoTrResponsavelNome.value = normNomeTitulo(data.tr_termo_responsavel_nome);
-    if ('tr_termo_responsavel_cargo' in data) {
-      fixoTrResponsavelCargo.value = normNomeTitulo(data.tr_termo_responsavel_cargo);
-    }
   }
 
   function buildCatalogEntries() {
@@ -147,20 +125,16 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
       ['cabecalho_documento', cabecalho.value],
       ['orgao', orgao.value],
       ['solicitacao_destinatario_nome', fixoNome.value],
-      ['solicitacao_destinatario_cargo', fixoCargo.value],
       ['solicitacao_responsavel_nome', fixoResponsavel.value],
-      ['solicitacao_responsavel_cargo', fixoResponsavelCargo.value],
       ['dfd_setor_requisitante', fixoSetor.value],
       ['dfd_responsavel_demanda', fixoDemanda.value],
       ['dfd_email', fixoEmail.value],
       ['dfd_gestor_contratos', fixoGestor.value],
       ['dfd_fiscal_contratos', fixoFiscal.value],
       ['dfd_assinatura_nome', fixoAssinatura.value],
-      ['dfd_assinatura_cargo', fixoAssinaturaCargo.value],
       ['tr_endereco_entrega_propostas', fixoEnderecoEntrega.value],
       ['tr_email_recebimento_propostas', fixoEmailPropostas.value],
       ['tr_termo_responsavel_nome', fixoTrResponsavelNome.value],
-      ['tr_termo_responsavel_cargo', fixoTrResponsavelCargo.value],
     ];
     return pairs
       .map(([field_key, value]) => ({ field_key, value: String(value || '').trim() }))
@@ -241,7 +215,7 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
       const res = await fetch(url, { credentials: 'include' });
       if (!res.ok) return;
       const payload = await res.json().catch(() => ({}));
-      applyPresetPayload(payload?.data || {});
+      applyPresetPayload(clearDeprecatedCargoPresetFields(payload?.data || {}));
     } catch {
       // silencioso
     }
@@ -301,7 +275,7 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     if (!hit) return;
     const trimmed = String(hit.name || '').trim();
     orgaoProfileName.value = trimmed ? capitalizeNomeTituloPt(trimmed) : '';
-    applyPresetPayload(hit.data || {});
+    applyPresetPayload(clearDeprecatedCargoPresetFields(hit.data || {}));
   }
 
   function newOrgaoProfile() {
@@ -360,24 +334,18 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     mergedOrgaoOptions,
     slotFieldOptions,
     tratamentoNome,
-    tratamentoCargo,
     fixoTratNome,
     fixoNome,
-    fixoTratCargo,
-    fixoCargo,
     fixoResponsavel,
-    fixoResponsavelCargo,
     fixoSetor,
     fixoDemanda,
     fixoEmail,
     fixoGestor,
     fixoFiscal,
     fixoAssinatura,
-    fixoAssinaturaCargo,
     fixoEnderecoEntrega,
     fixoEmailPropostas,
     fixoTrResponsavelNome,
-    fixoTrResponsavelCargo,
     loadSlotCatalogSuggestions,
     loadUserGlobalPreset,
     saveUserGlobalPreset,

@@ -959,7 +959,7 @@ def _prefetch_fornecedor_nomes_brasilapi_para_linhas(
 ) -> None:
     """Pré-carrega razão social (BrasilAPI/cnpj.ws) para CNPJs sem nome nas linhas do PDF."""
     if max_lookups is None:
-        max_lookups = int(getattr(settings, "PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS", 0))
+        max_lookups = int(getattr(settings, "PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS", 384))
     budget: Optional[List[int]] = None
     if max_lookups > 0:
         budget = [max_lookups]

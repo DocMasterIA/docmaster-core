@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import math
 import re
+import threading
 import time
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -15,6 +16,11 @@ from backend.app.services.pncp_cnpj_email_cache import (
     is_cnpj_email_negative_cached,
     set_cached_cnpj_email,
     set_cached_cnpj_sem_email,
+)
+from backend.app.services.pncp_cnpj_nome_cache import (
+    get_cached_cnpj_cadastro,
+    get_cached_cnpj_nome,
+    set_cached_cnpj_nome,
 )
 from backend.app.models import PncpCotacaoItemCotacao
 from backend.app.services.pncp_supplier_placeholders import GENERIC_SUPPLIER_NAMES, coerce_supplier_name_text
@@ -34,6 +40,9 @@ _DEFAULT_TIMEOUT = (2.5, 5.0)
 # BrasilAPI costuma responder rápido; timeout um pouco maior que PNCP interno.
 _BRASILAPI_TIMEOUT = (2.0, 5.0)
 _RECEITAWS_TIMEOUT = 10
+_BRASILAPI_MIN_INTERVAL_SEC = 0.08
+_last_brasilapi_http_ts = 0.0
+_brasilapi_http_lock = threading.Lock()
 
 
 def _normalize_cnpj(raw: Any) -> str:
@@ -593,6 +602,7 @@ def fetch_brasilapi_fornecedor_por_cnpj(cnpj_formatted: str) -> tuple[str, Dict[
     if len(d) != 14:
         return "", {}
     url = BRASILAPI_CNPJ_URL.format(cnpj_digits=d)
+    _pace_brasilapi_http()
     payload = _get_json(url, timeout=_BRASILAPI_TIMEOUT)
     if not isinstance(payload, dict):
         return "", {}
@@ -659,6 +669,19 @@ def brasilapi_lookup_under_limit(fetches: int, lim: int) -> bool:
     return fetches < lim
 
 
+def _pace_brasilapi_http() -> None:
+    global _last_brasilapi_http_ts
+    min_iv = float(getattr(settings, "PNCP_BRASILAPI_MIN_INTERVAL_SEC", _BRASILAPI_MIN_INTERVAL_SEC) or 0)
+    if min_iv <= 0:
+        return
+    with _brasilapi_http_lock:
+        now = time.time()
+        wait = min_iv - (now - _last_brasilapi_http_ts)
+        if wait > 0:
+            time.sleep(wait)
+        _last_brasilapi_http_ts = time.time()
+
+
 def _fetch_cnpj_ws_cadastro_http(cnpj_digits: str) -> tuple[str, Dict[str, Any]]:
     """Fallback quando BrasilAPI falha ou rate-limit (razão social + contato)."""
     if len(cnpj_digits) != 14:
@@ -718,17 +741,25 @@ def _fetch_cnpj_ws_cadastro_http(cnpj_digits: str) -> tuple[str, Dict[str, Any]]
 
 def fetch_fornecedor_cadastro_por_cnpj(cnpj_formatted: str) -> tuple[str, Dict[str, Any]]:
     """
-    Razão social por CNPJ: BrasilAPI → cnpj.ws.
+    Razão social por CNPJ: cache persistente → BrasilAPI → cnpj.ws.
     Só retorna cadastro com nome útil (nunca cacheia «Não informado»).
     """
+    cached_nome = get_cached_cnpj_nome(cnpj_formatted)
+    cached_cad = get_cached_cnpj_cadastro(cnpj_formatted)
+    if _nome_cadastro_util(cached_nome) or _cadastro_tem_nome_util(cached_cad):
+        nome = cached_nome or str(cached_cad.get("razao_social") or cached_cad.get("nome_fantasia") or "").strip()
+        return nome, cached_cad
+
     nome, cad = fetch_brasilapi_fornecedor_por_cnpj(cnpj_formatted)
     if _nome_cadastro_util(nome) or _cadastro_tem_nome_util(cad):
         if not nome and _cadastro_tem_nome_util(cad):
             nome = str(cad.get("razao_social") or cad.get("nome_fantasia") or "").strip()
+        set_cached_cnpj_nome(cnpj_formatted, nome, cadastro=cad, fonte="brasilapi")
         return nome, cad
     d = _cnpj_digits(cnpj_formatted)
     nome_ws, cad_ws = _fetch_cnpj_ws_cadastro_http(d)
     if _nome_cadastro_util(nome_ws) or _cadastro_tem_nome_util(cad_ws):
+        set_cached_cnpj_nome(cnpj_formatted, nome_ws, cadastro=cad_ws, fonte="cnpj.ws")
         return nome_ws, cad_ws
     return "", {}
 

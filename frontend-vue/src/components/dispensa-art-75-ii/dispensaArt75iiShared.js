@@ -3,6 +3,50 @@ import { capitalizeFirstSignificantLetter } from '../../utils/itemValorCampos.js
 export const DATA_OPTIONS = ['Data automática', 'Datado e assinado digitalmente', 'Data manual'];
 export const TRATAMENTO_NOME = ['Ao senhor', 'A senhora'];
 export const TRATAMENTO_CARGO = ['Senhor', 'Senhora'];
+
+/** IDs de campos no assistente DocumentGenerator (preset global). */
+export const LEGACY_CARGO_SLOT_FORM_IDS = [
+  'solicitacao_destinatario_cargo',
+  'solicitacao_destinatario_tratamento_cargo',
+  'solicitacao_responsavel_cargo',
+  'dfd_assinatura_cargo',
+  'tr_cargo_assinante',
+  'tr_termo_responsavel_cargo',
+];
+
+/** Preset/dados fixos — removidos do drawer; limpar no save para não ressurgir no merge do backend. */
+export const DA75_DEPRECATED_CARGO_PRESET_KEYS = [
+  'solicitacao_tratamento_cargo',
+  'solicitacao_destinatario_cargo',
+  'solicitacao_responsavel_cargo',
+  'dfd_assinatura_cargo',
+  'tr_termo_responsavel_cargo',
+];
+
+/** slots_override — não enviar à geração TR/DFD/Ofício (fantasmas de presets antigos). */
+export const DA75_DEPRECATED_CARGO_OVERRIDE_KEYS = [
+  'sol_oficio_destinatario_cargo',
+  'sol_oficio_responsavel_cargo',
+  'dfd_assinatura_cargo',
+  'senhor_senhora_genero',
+  'cargo_assinante_termo',
+  'secretaria_usuario',
+];
+
+export function clearDeprecatedCargoPresetFields(data) {
+  if (!data || typeof data !== 'object') return data;
+  const out = { ...data };
+  for (const key of DA75_DEPRECATED_CARGO_PRESET_KEYS) out[key] = '';
+  for (const key of LEGACY_CARGO_SLOT_FORM_IDS) out[key] = '';
+  return out;
+}
+
+export function stripDeprecatedCargoSlotsOverride(raw) {
+  if (!raw || typeof raw !== 'object') return raw;
+  const o = { ...raw };
+  for (const key of DA75_DEPRECATED_CARGO_OVERRIDE_KEYS) delete o[key];
+  return Object.keys(o).length ? o : null;
+}
 export const TEXTO_PADRAO_ENDERECO_PROPOSTAS =
   'As propostas poderão ser entregues no Setor de Compras Central da XXXXXXXXX - XX, localizado na rua XXXXXXXXXXX, Nº XXX, XXXXX, no horário das 07h00min às 11h00min e das 13h00min às 17h00min, de segunda a sexta-feira.';
 

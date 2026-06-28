@@ -270,8 +270,8 @@ def _generate_relatorio_pdf_bytes(
         url_verificacao=url_qr,
         anexo_fornecedor_url=anexo_fornecedor_url,
         formula_id=formula_id,
-        # Segunda passada só consulta HTTP para CNPJs ainda sem e-mail (cache DB evita duplicata).
-        skip_email_http_prefetch=False,
+        # Enrich já consultou e-mail (cache); 2ª passada no agrupar pode levar dezenas de minutos.
+        skip_email_http_prefetch=True,
     )
     if anexos_merge:
         try:
@@ -594,7 +594,6 @@ def pncp_cotacao_relatorio_pdf_start(request, sessao_id: int):
     }
     meta_path = jobs_dir / f"{job_id}.meta.json"
     meta_path.write_text(json.dumps(meta), encoding="utf-8")
-    _mark_job_meta_status(meta_path, "processing", queued=timezone.now().isoformat())
 
     api_base = resolve_public_api_base_url(request)
     _submit_relatorio_pdf_job(

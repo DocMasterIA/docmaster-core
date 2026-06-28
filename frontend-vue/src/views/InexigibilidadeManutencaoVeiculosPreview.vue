@@ -848,7 +848,6 @@ function buildCatalogEntries() {
     ['fornecedor', fornecedor.value],
     ['fiscal', fiscal.value],
     ['tr_nome_assinante', responsavel.value],
-    ['tr_cargo_assinante', responsavelCargo.value],
     ['solicitacao_destinatario_nome', fixoNome.value],
     ['solicitacao_destinatario_cargo', fixoCargo.value],
     ['solicitacao_responsavel_nome', fixoResponsavel.value],

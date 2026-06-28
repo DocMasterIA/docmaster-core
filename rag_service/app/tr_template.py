@@ -1094,6 +1094,31 @@ def _scrub_valor_total_placeholders_sem_preco(doc: Document, slots: TRTemplateSl
         p.text = pat.sub("", t).strip()
 
 
+def _remove_paragraph_element(paragraph: Paragraph) -> None:
+    el = paragraph._element
+    parent = el.getparent()
+    if parent is not None:
+        parent.remove(el)
+
+
+def _para_visible_text(paragraph: Paragraph) -> str:
+    return (paragraph.text or "").replace("\u00a0", " ").strip()
+
+
+def _remove_tr_assinatura_cargo_line(doc: Document) -> None:
+    """Remove linha vazia abaixo do nome (ex-(TR_SECRETARIA_USUARIO) / cargo do assinante)."""
+    paras = list(doc.paragraphs)
+    last_text_idx = -1
+    for i, p in enumerate(paras):
+        if _para_visible_text(p):
+            last_text_idx = i
+    if last_text_idx < 0:
+        return
+    for i in range(len(paras) - 1, last_text_idx, -1):
+        if not _para_visible_text(paras[i]):
+            _remove_paragraph_element(paras[i])
+
+
 def render_tr_from_slots(
     slots: TRTemplateSlots,
     template_path: Optional[Path | str] = None,
@@ -1110,6 +1135,10 @@ def render_tr_from_slots(
     tpl_path = Path(template_path) if template_path else TEMPLATE_PATH_DEFAULT
     if not tpl_path.exists():
         raise FileNotFoundError(f"Template TR não encontrado: {tpl_path}")
+
+    from .deprecated_cargo_slots import clear_deprecated_cargo_fields
+
+    slots = clear_deprecated_cargo_fields(slots)
 
     doc = Document(str(tpl_path))
 
@@ -1142,8 +1171,8 @@ def render_tr_from_slots(
     num_proc_display = slots_numero_processo_display(slots)
     num_proc_tr_placeholder = numero_processo_valor_placeholder_tr(num_proc_display)
 
-    # Modelos dispensa: cargo abaixo do nome na assinatura = (TR_SECRETARIA_USUARIO), não só (TR_CARGO_*).
-    cargo_assinatura_tr = (slots.cargo_assinante_termo or "").strip()
+    # Cargo/função abaixo do nome na assinatura foi descontinuado no produto.
+    cargo_assinatura_tr = ""
     nome_assinante_tr = _normalize_slot_block(slots.nome_assinante_termo or "")
 
     data_termo_extenso = format_date_pt_br_extenso(slots.data_termo)
@@ -1167,7 +1196,7 @@ def render_tr_from_slots(
         "(TR_DOTACAO)": slots.dotacao or "",
         "(DOTACAO_NUMERO)": slots.dotacao or "",
         "( DOTACAO_NUMERO )": slots.dotacao or "",
-        "(TR_SECRETARIA_USUARIO)": cargo_assinatura_tr or slots.secretaria_usuario or "",
+        "(TR_SECRETARIA_USUARIO)": "",
         "(TR_NOME_USUARIO)": slots.nome_usuario or "",
         "(TR_CIDADE_ESTADO)": slots.cidade_estado or "",
         "(TR_CIDADE)": slots.cidade or "",
@@ -1187,8 +1216,8 @@ def render_tr_from_slots(
         "( MODELO )": slots.modelo or "",
         "(NUMERO_PLACA)": slots.numero_placa or "",
         "( NUMERO_PLACA )": slots.numero_placa or "",
-        "(ORGAO)": slots.orgao or slots.secretaria_usuario or "",
-        "( ORGAO )": slots.orgao or slots.secretaria_usuario or "",
+        "(ORGAO)": slots.orgao or "",
+        "( ORGAO )": slots.orgao or "",
         "(VALOR_TOTAL)": valor_total_placeholder,
         "( VALOR_TOTAL )": valor_total_placeholder,
         "(FORNECEDOR)": slots.fornecedor or "",
@@ -1222,7 +1251,7 @@ def render_tr_from_slots(
         "(Inserir Dotação)": slots.dotacao or "",
         "(Inserir Dotação)(Feito direto pelo usuário)": slots.dotacao or "",
         "(Feito direto pelo usuário)": "",
-        "(SECRETARIA DO USUARIO)": slots.secretaria_usuario or "",
+        "(SECRETARIA DO USUARIO)": "",
         "(Nome do USUARIO)": slots.nome_usuario or "",
         "(CIDADE - ESTADO)": slots.cidade_estado or "",
         "(CIDADE)": slots.cidade or "",
@@ -1232,11 +1261,12 @@ def render_tr_from_slots(
         "(E-mail de envio de propostas)": slots.email_envio_propostas or "",
         "(DATA DO TERMO)": data_termo_extenso,
         "(NOME DO ASSINANTE DO TERMO)": nome_assinante_tr,
-        "(CARGO DO ASSINANTE DO TERMO)": cargo_assinatura_tr,
+        "(CARGO DO ASSINANTE DO TERMO)": "",
     }
 
     _replace_placeholders_in_paragraphs(doc, mapping)
     split_paragraphs_on_double_newline(doc)
+    _remove_tr_assinatura_cargo_line(doc)
     _fix_respetiva_typo_in_document(doc)
     _apply_art74_i_dotacao_paragraph_branch(doc, tpl_path, slots.dotacao, slots)
     _apply_art74_i_remove_valor_total_processo_sem_precos(doc, tpl_path, slots)

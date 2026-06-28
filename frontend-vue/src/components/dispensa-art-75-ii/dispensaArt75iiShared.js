@@ -31,6 +31,7 @@ export const DA75_DEPRECATED_CARGO_OVERRIDE_KEYS = [
   'senhor_senhora_genero',
   'cargo_assinante_termo',
   'secretaria_usuario',
+  'tr_cargo_assinante',
 ];
 
 export function clearDeprecatedCargoPresetFields(data) {

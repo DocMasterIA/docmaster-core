@@ -39,6 +39,10 @@ GENERIC_SUPPLIER_NAMES = frozenset(
         "inexistente",
         "-",
         "—",
+        "true",
+        "false",
+        "none",
+        "null",
     }
 )
 
@@ -94,6 +98,8 @@ def normalize_cnpj(raw: Any) -> str:
 
 
 def nome_fornecedor_e_util(nome: str) -> bool:
+    if isinstance(nome, bool) or isinstance(nome, (int, float)):
+        return False
     s = re.sub(r"\s+", " ", str(nome or "").strip()).lower()
     if not s or len(s) < 3:
         return False
@@ -106,13 +112,26 @@ def nome_fornecedor_e_util(nome: str) -> bool:
     return True
 
 
+def sanitize_fornecedor_nome(raw: Any) -> str:
+    """Texto de razão social ou vazio (rejeita bool, placeholders PNCP, CNPJ no campo nome)."""
+    if isinstance(raw, bool) or isinstance(raw, (int, float)):
+        return ""
+    s = str(raw or "").strip()
+    if nome_fornecedor_e_util(s):
+        return s
+    return ""
+
+
 def _fornecedor_nomes_no_item(it: Dict[str, Any]) -> List[str]:
     names: List[str] = []
     if not isinstance(it, dict):
         return names
     for key in (*SUPPLIER_NAME_KEYS, "fornecedor_nome", "nome_fornecedor"):
-        v = str(it.get(key) or "").strip()
-        if v:
+        raw = it.get(key)
+        if isinstance(raw, bool):
+            continue
+        v = str(raw or "").strip()
+        if v and nome_fornecedor_e_util(v):
             names.append(v)
     cad = it.get("fornecedor_cadastro")
     if isinstance(cad, dict):
@@ -264,10 +283,12 @@ def walk_supplier_candidates(
         cnpj = ""
         for k, v in obj.items():
             kk = str(k or "").strip().lower()
-            vv = str(v or "").strip()
+            if isinstance(v, bool):
+                continue
+            vv = sanitize_fornecedor_nome(v)
             if not vv:
                 continue
-            if any(x in kk for x in SUPPLIER_NAME_KEYS) and len(vv) > 2:
+            if any(x in kk for x in SUPPLIER_NAME_KEYS):
                 nome = vv
             if any(x in kk for x in CNPJ_KEYS):
                 m = _CNPJ_RE.search(vv)
@@ -521,7 +542,7 @@ def _build_resolution(
     elegivel = item_elegivel(item_row, situacao_compra=situacao_compra)
     res = SupplierResolution(
         cnpj_fornecedor=str(snap.get("cnpj_fornecedor") or "").strip(),
-        fornecedor=str(snap.get("fornecedor") or "").strip(),
+        fornecedor=sanitize_fornecedor_nome(snap.get("fornecedor")),
         fornecedor_fonte=fonte,
         fornecedor_elegivel=elegivel,
         situacao_item=situacao_item,
@@ -688,9 +709,10 @@ def find_catalog_item_row(items_payload: Any, numero_item: str) -> Optional[Dict
 
 def resolution_to_api_dict(res: SupplierResolution) -> Dict[str, Any]:
     """Formato consumido por busca/cotação (`cnpj_fornecedor`, `fornecedor`, preço homologado, …)."""
+    fornecedor = sanitize_fornecedor_nome(res.fornecedor)
     out: Dict[str, Any] = {
         "cnpj_fornecedor": res.cnpj_fornecedor,
-        "fornecedor": res.fornecedor,
+        "fornecedor": fornecedor,
         "fornecedor_cadastro": dict(res.fornecedor_cadastro or {}),
     }
     if res.valor_unitario_homologado is not None:

@@ -335,6 +335,7 @@ import {
   extractPnCpHomologadoUnit,
   formatFaixaResumo,
   passesPnCpSearchDisplayGate,
+  pickFornecedorDisplayName,
   pnCpRowWithinFaixaRegional,
 } from '../utils/pncpPricing';
 
@@ -1223,7 +1224,7 @@ async function runSearchWithContext({
         status: it.status || 'Aprovado',
         interpretacaoIa: String(it.ia_interpretacao_item || '').trim() || null,
         similaridadeEncontrada: Boolean(it.similaridade_encontrada),
-        fornecedor: String(it.fornecedor || '').trim() || null,
+        fornecedor: pickFornecedorDisplayName({ sourceRaw: it }),
         cnpjFornecedor: extractCnpjFornecedorSalvar({ sourceRaw: it }),
         selecionado: false,
         backendItensCount: backend.itens.length,
@@ -1429,7 +1430,7 @@ async function adicionarSelecionadosNaCotacao() {
       status: r.status,
       similaridade_encontrada: Boolean(r.similaridadeEncontrada),
       data_publicacao: r.data,
-      fornecedor: r.fornecedor || null,
+      fornecedor: pickFornecedorDisplayName(r),
       cnpj_fornecedor: extractCnpjFornecedorSalvar(r) || r.cnpjFornecedor || null,
       fornecedor_cadastro: Object.keys(cad).length ? cad : null,
       telefone: raw.telefone || cad.telefone || cad.ddd_telefone_1 || null,
@@ -1449,7 +1450,7 @@ async function adicionarSelecionadosNaCotacao() {
       sequencial_compra: r.sequencialCompra ?? r.sourceRaw?.sequencial_compra ?? null,
       source: {
         ...raw,
-        fornecedor: r.fornecedor || null,
+        fornecedor: pickFornecedorDisplayName(r),
         cnpj_fornecedor: extractCnpjFornecedorSalvar(r) || r.cnpjFornecedor || null,
       },
     };

@@ -180,14 +180,47 @@ export function extractCnpjFornecedorSalvar(row) {
 }
 
 function fornecedorNomeUtil(nome) {
+  if (nome === true || nome === false || nome === null || nome === undefined) return false;
+  if (typeof nome === 'number') return false;
   const n = String(nome || '').trim();
   if (n.length < 3) return false;
   const low = n.replace(/\s+/g, ' ').toLowerCase();
   if (FORNECEDOR_PLACEHOLDER.has(low)) return false;
+  if (['true', 'false', 'none', 'null'].includes(low)) return false;
   if (low.startsWith('pncp_')) return false;
   if (/^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$/.test(n.replace(/\s/g, ''))) return false;
   if (low.replace(/\D/g, '').length === 14) return false;
   return true;
+}
+
+/** Primeira razão social útil no row/source (ignora True, placeholders PNCP, CNPJ no campo nome). */
+export function pickFornecedorDisplayName(row) {
+  const src = mergedPnCpSource(row);
+  const cad = src.fornecedor_cadastro && typeof src.fornecedor_cadastro === 'object'
+    ? src.fornecedor_cadastro
+    : {};
+  const candidates = [
+    row?.fornecedor,
+    src.fornecedor,
+    src.nomeRazaoSocialFornecedor,
+    src.fornecedor_nome,
+    src.nome_fornecedor,
+    cad.razao_social,
+    cad.nome_fantasia,
+  ];
+  for (const c of candidates) {
+    if (fornecedorNomeUtil(c)) return String(c).trim();
+  }
+  return null;
+}
+
+/** Total = média unitária arredondada (2 casas, como na tela) × quantidade. */
+export function totalDeMediaUnitariaExibida(media, quantidade) {
+  const m = Number(media);
+  const q = Number(quantidade);
+  if (!Number.isFinite(m) || !Number.isFinite(q) || m <= 0 || q <= 0) return null;
+  const mediaExibida = Math.round(m * 100) / 100;
+  return Math.round(mediaExibida * q * 100) / 100;
 }
 
 /** CNPJ 14 dígitos ou razão social útil (exclui «Não se aplica» e similares). */

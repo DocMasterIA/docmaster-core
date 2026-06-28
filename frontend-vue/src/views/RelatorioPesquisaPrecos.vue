@@ -284,6 +284,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { getResearchSession } from '../services/pncpResearch';
+import { totalDeMediaUnitariaExibida } from '../utils/pncpPricing';
 
 const DOCUMENTO_TECNICO_LEAD =
   'Documento técnico consolidado com metodologia, análise técnica, rastreabilidade das cotações e conclusão para suporte à contratação.';
@@ -512,7 +513,9 @@ function quantidadeExibicao(g) {
 function calcularTotalItemNum(g) {
   const totalGrupo = Number(g?.valor_total_item);
   if (Number.isFinite(totalGrupo) && totalGrupo >= 0) return totalGrupo;
-  return quantidadeParaNumero(quantidadeExibicao(g)) * moedaParaNumero(g?.media_fmt);
+  const qtd = quantidadeParaNumero(quantidadeExibicao(g));
+  const media = moedaParaNumero(g?.media_fmt);
+  return totalDeMediaUnitariaExibida(media, qtd) ?? 0;
 }
 
 function chaveGrupo(it) {

@@ -14,12 +14,14 @@ from backend.app.services.pncp_relatorio_itens import (
     fonte_dict_de_item,
     nome_fornecedor_e_util_para_exibicao,
     preco_unitario_cotacao_fonte,
+    total_item_de_media_unitaria_exibida,
 )
 from backend.app.services.pncp_supplier_enrichment import (
     _ano_seq_for_enrichment,
     _enrich_payload_sort_key,
     _homolog_pricing_from_resultados,
     _merge_homologated_pricing_into_payload,
+    _needs_brasilapi_enrichment,
     _needs_homolog_pricing_lookup,
     _should_attempt_pncp_supplier_lookup,
     _parse_ano_seq_from_numero_pncp,
@@ -79,6 +81,19 @@ class SupplierNameDisplayTests(unittest.TestCase):
     def test_rejeita_nao_se_aplica(self):
         self.assertFalse(nome_fornecedor_e_util_para_exibicao("Não se aplica"))
         self.assertFalse(nome_fornecedor_e_util_para_exibicao("nao se aplica"))
+
+    def test_rejeita_boolean_serializado_como_true(self):
+        self.assertFalse(nome_fornecedor_e_util_para_exibicao(True))
+        self.assertFalse(nome_fornecedor_e_util_para_exibicao("True"))
+        self.assertFalse(nome_fornecedor_e_util_para_exibicao("true"))
+
+    def test_pick_name_ignora_fornecedor_boolean(self):
+        src = {
+            "cnpj_fornecedor": "57.836.642/0001-42",
+            "fornecedor": True,
+            "fornecedor_cadastro": {"razao_social": "EMPRESA BOOL LTDA"},
+        }
+        self.assertEqual(_pick_supplier_name_from_source(src), "EMPRESA BOOL LTDA")
 
     def test_pick_name_ignora_fornecedor_fonte(self):
         src = {
@@ -343,6 +358,28 @@ class BrasilApiNomePdfTests(unittest.TestCase):
         self.assertEqual(row["fornecedor"], "EMPRESA TESTE LTDA")
         self.assertEqual(row["cnpj"], "27.105.456/0001-72")
 
+    def test_fonte_dict_brasilapi_substitui_nome_true(self):
+        class _It:
+            modalidade = "PNCP"
+            municipio = "São Paulo"
+            uf = "SP"
+            orgao = "Órgão teste"
+            numero_pncp = "123"
+            quantidade = 1
+            created_at = None
+            source = {
+                "cnpj_fornecedor": "27.105.456/0001-72",
+                "fornecedor": True,
+            }
+
+        cache = {
+            "27105456000172": {
+                "razao_social": "EMPRESA BRASIL API LTDA",
+            }
+        }
+        row = fonte_dict_de_item(_It(), tz=None, brasilapi_cache=cache)
+        self.assertEqual(row["fornecedor"], "EMPRESA BRASIL API LTDA")
+
     def test_supplier_index_com_brasilapi(self):
         class _It:
             source = {"cnpj_fornecedor": "27.105.456/0001-72"}
@@ -362,10 +399,22 @@ class ItemTotalHomologadoTests(unittest.TestCase):
         units = [preco_unitario_cotacao_fonte(m) for m in members]
         media = sum(units) / len(units)
         self.assertAlmostEqual(media, 608.24, places=2)
-        total = media * 100
-        self.assertAlmostEqual(total, 60824.0, places=0)
+        total = total_item_de_media_unitaria_exibida(media, 100)
+        self.assertAlmostEqual(total, 60824.0, places=2)
         # Soma dos totais homologados de referência (ex. areia) seria outro número — não usar.
         self.assertNotAlmostEqual(total, 600.0 * 2354 + 616.48 * 2354, delta=1)
+
+    def test_total_usa_media_exibida_arredondada(self):
+        """100 × R$ 6,34 (média exibida) = R$ 634,00 — não R$ 634,33 da média bruta 6,3433…"""
+        media_bruta = (6.34 + 6.35 + 6.34) / 3
+        self.assertAlmostEqual(media_bruta, 6.343333, places=4)
+        total = total_item_de_media_unitaria_exibida(media_bruta, 100)
+        self.assertEqual(total, 634.0)
+
+    def test_total_200_por_2188_exibido(self):
+        """200 × R$ 21,88 exibido = R$ 4.376,00 (média bruta 21,875)."""
+        total = total_item_de_media_unitaria_exibida(21.875, 200)
+        self.assertEqual(total, 4376.0)
 
 
 if __name__ == "__main__":

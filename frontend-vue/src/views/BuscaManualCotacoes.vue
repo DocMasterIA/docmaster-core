@@ -283,7 +283,7 @@ import {
 } from '../utils/pncpSaveCotacoes';
 import { MUNICIPIOS_POR_UF } from '../data/brasilMunicipiosPorUf';
 import { buildRecortesGeograficosPayload, itemMatchesRecortesGeograficos } from '../utils/recortesGeograficos';
-import { canSalvarCotacaoPnCp, displayPnCpUnitario, extractCnpjFornecedorSalvar, formatFaixaResumo, passesPnCpSearchDisplayGate, computeFaixaRegional } from '../utils/pncpPricing';
+import { canSalvarCotacaoPnCp, displayPnCpUnitario, extractCnpjFornecedorSalvar, formatFaixaResumo, passesPnCpSearchDisplayGate, computeFaixaRegional, pickFornecedorDisplayName } from '../utils/pncpPricing';
 
 const route = useRoute();
 const router = useRouter();
@@ -904,7 +904,7 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
       origem: 'busca_manual',
       data_publicacao: toNullableText(r.data),
       material_servico: toNullableText(r.sourceRaw?.material_servico),
-      fornecedor: toNullableText(r.fornecedor || raw.fornecedor),
+      fornecedor: toNullableText(pickFornecedorDisplayName(r)),
       cnpj_fornecedor: toNullableText(extractCnpjFornecedorSalvar(r) || r.cnpjFornecedor || raw.cnpj_fornecedor),
       fornecedor_cadastro: Object.keys(cad).length ? cad : null,
       telefone: raw.telefone || cad.telefone || cad.ddd_telefone_1 || null,

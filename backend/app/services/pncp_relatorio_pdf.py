@@ -34,6 +34,7 @@ from backend.app.services.pncp_relatorio_itens import (
     agrupar_itens_relatorio_pesquisa_precos,
     nome_fornecedor_e_util_para_exibicao,
     texto_orgao_exibicao_relatorio_pesquisa_precos,
+    total_item_de_media_unitaria_exibida,
 )
 from backend.app.services.pncp_supplier_enrichment import (
     pdf_receitaws_max_http_lookups,
@@ -462,10 +463,10 @@ def montar_contexto_relatorio(
         if total_item is None:
             qtd = _parse_qtd_br(g.get("quantidade_fmt"))
             try:
-                media = float(g.get("media_valor")) if g.get("media_valor") is not None else 0.0
+                media = float(g.get("media_valor")) if g.get("media_valor") is not None else None
             except (TypeError, ValueError):
-                media = 0.0
-            total_item = (qtd * media) if (qtd > 0 and media > 0) else 0.0
+                media = None
+            total_item = total_item_de_media_unitaria_exibida(media, qtd) or 0.0
         g["valor_total_item"] = total_item
         g["valor_total_item_fmt"] = f"R$ {_formatar_moeda_br(total_item)}"
         valor_total_estimado += total_item

@@ -17,7 +17,7 @@ from backend.app.services.pncp_cnpj_email_cache import (
     set_cached_cnpj_sem_email,
 )
 from backend.app.models import PncpCotacaoItemCotacao
-from backend.app.services.pncp_supplier_placeholders import GENERIC_SUPPLIER_NAMES
+from backend.app.services.pncp_supplier_placeholders import GENERIC_SUPPLIER_NAMES, coerce_supplier_name_text
 from backend.app.services.pncp_source_normalize import normalize_pncp_geo_in_payload
 
 logger = logging.getLogger(__name__)
@@ -416,8 +416,8 @@ def flatten_supplier_fields_in_payload(it: Dict[str, Any]) -> None:
             cad = layer.get("fornecedor_cadastro")
             if isinstance(cad, dict):
                 for k in ("razao_social", "nome_fantasia", "razaoSocial", "nomeFantasia"):
-                    v = str(cad.get(k) or "").strip()
-                    if v and not _nome_e_somente_cnpj_formatado(v):
+                    v = coerce_supplier_name_text(cad.get(k))
+                    if v and _nome_fornecedor_util_para_flatten(v):
                         it["fornecedor"] = v
                         _promote_supplier_contact_from_layers(it)
                         return
@@ -429,17 +429,14 @@ def flatten_supplier_fields_in_payload(it: Dict[str, Any]) -> None:
                 "razaoSocialFornecedor",
                 "razao_social",
             ):
-                v = str(layer.get(k) or "").strip()
-                if not v or _nome_e_somente_cnpj_formatado(v):
-                    continue
-                low = re.sub(r"\s+", " ", v).strip().lower()
-                if low in GENERIC_SUPPLIER_NAMES:
-                    continue
-                if low.startswith("pncp_"):
+                v = coerce_supplier_name_text(layer.get(k))
+                if not v or not _nome_fornecedor_util_para_flatten(v):
                     continue
                 it["fornecedor"] = v
                 _promote_supplier_contact_from_layers(it)
                 return
+    elif not _nome_fornecedor_util_para_flatten(coerce_supplier_name_text(it.get("fornecedor"))):
+        it.pop("fornecedor", None)
     _promote_supplier_contact_from_layers(it)
 
 
@@ -452,7 +449,7 @@ def _fornecedor_display_name_from_source(src: Dict[str, Any]) -> str:
         cad = layer.get("fornecedor_cadastro")
         if isinstance(cad, dict):
             for k in ("razao_social", "nome_fantasia", "razaoSocial", "nomeFantasia"):
-                v = str(cad.get(k) or "").strip()
+                v = coerce_supplier_name_text(cad.get(k))
                 if not v or _nome_e_somente_cnpj_formatado(v):
                     continue
                 low = re.sub(r"\s+", " ", v).strip().lower()
@@ -467,7 +464,7 @@ def _fornecedor_display_name_from_source(src: Dict[str, Any]) -> str:
             "razaoSocialFornecedor",
             "razao_social",
         ):
-            v = str(layer.get(k) or "").strip()
+            v = coerce_supplier_name_text(layer.get(k))
             if not v:
                 continue
             low = re.sub(r"\s+", " ", v).strip().lower()
@@ -491,6 +488,7 @@ def _nome_e_somente_cnpj_formatado(nome: str) -> bool:
 
 
 def _nome_fornecedor_util_para_flatten(nome: str, *, cnpj_raw: str = "") -> bool:
+    nome = coerce_supplier_name_text(nome)
     if not nome:
         return False
     generic = GENERIC_SUPPLIER_NAMES
@@ -516,7 +514,7 @@ def _fornecedor_tem_nome_util_topo(src: Dict[str, Any]) -> bool:
     cad = src.get("fornecedor_cadastro")
     if isinstance(cad, dict):
         for k in ("razao_social", "nome_fantasia", "razaoSocial", "nomeFantasia"):
-            v = str(cad.get(k) or "").strip()
+            v = coerce_supplier_name_text(cad.get(k))
             if _nome_fornecedor_util_para_flatten(v, cnpj_raw=cnpj_raw):
                 return True
     for k in (
@@ -527,7 +525,7 @@ def _fornecedor_tem_nome_util_topo(src: Dict[str, Any]) -> bool:
         "razaoSocialFornecedor",
         "razao_social",
     ):
-        v = str(src.get(k) or "").strip()
+        v = coerce_supplier_name_text(src.get(k))
         if _nome_fornecedor_util_para_flatten(v, cnpj_raw=cnpj_raw):
             return True
     return False

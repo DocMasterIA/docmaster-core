@@ -51,6 +51,7 @@ from backend.app.services.pncp_relatorio_itens import (
     preco_unitario_cotacao_fonte,
     resumo_calculo_precos,
     texto_orgao_exibicao_relatorio_pesquisa_precos,
+    total_item_de_media_unitaria_exibida,
 )
 from backend.app.services.pncp_relatorio_pdf import extrair_cnpjs_dos_itens
 
@@ -1002,14 +1003,12 @@ def _itens_refletidos_for_session(sessao_id: int, formula_id: str) -> Dict[int, 
         n = len(units)
         mean_u = (sum(units) / n) if n else None
         qtd_ref = quantidade_item_map.get(item_id)
-        total_ref = None
-        if mean_u is not None and qtd_ref is not None and qtd_ref > 0:
-            total_ref = mean_u * qtd_ref
+        total_ref = total_item_de_media_unitaria_exibida(mean_u, qtd_ref)
         uref = (unidade_item_map.get(item_id) or "").strip()
         out[item_id] = {
             "quantidade_refletida": qtd_ref,
             "unidade_medida_refletida": uref or ("UN" if qtd_ref else None),
-            "valor_unitario_refletido": mean_u,
+            "valor_unitario_refletido": round(mean_u, 2) if mean_u is not None else None,
             "valor_total_refletido": total_ref,
         }
     return out

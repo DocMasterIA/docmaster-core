@@ -47,6 +47,7 @@ from .supplier_resolver import (
     item_homologado_para_busca,
     item_elegivel,
     nome_fornecedor_e_util,
+    sanitize_fornecedor_nome,
     resolution_to_api_dict,
     resolve_from_item_catalog_row,
     resolve_from_resultados_payload,
@@ -1023,7 +1024,7 @@ def upsert_contract_items(
             else:
                 res = resolve_from_item_catalog_row(r, situacao_compra=sit_compra_row)
             cnpj_forn = str(res.cnpj_fornecedor or "").strip()
-            fornecedor = str(res.fornecedor or "").strip()
+            fornecedor = sanitize_fornecedor_nome(res.fornecedor)
             fornecedor_fonte = str(res.fornecedor_fonte or "").strip()
             fornecedor_resolvido_at = now if (cnpj_forn or fornecedor) else None
             resultado_resolvido_at = now if has_homolog else None
@@ -1489,7 +1490,7 @@ def apply_resultados_to_stored_items(
                 fonte_prefix="pncp_resultado_enrich",
             )
             cnpj_forn = str(res.cnpj_fornecedor or "").strip()
-            fornecedor = str(res.fornecedor or "").strip()
+            fornecedor = sanitize_fornecedor_nome(res.fornecedor)
             fornecedor_fonte = str(res.fornecedor_fonte or "").strip()
             has_supplier = bool(cnpj_forn or fornecedor)
             if not has_homolog and not has_supplier:
@@ -2157,7 +2158,7 @@ def _supplier_fields_from_local_row(r: sqlite3.Row) -> Dict[str, Any]:
     Fornecedor para busca local: colunas persistidas (futuro) ou JSON do item em raw_json_zlib.
     """
     cnpj_db = str(_row_get(r, "cnpj_fornecedor", "") or "").strip()
-    nome_db = str(_row_get(r, "fornecedor", "") or "").strip()
+    nome_db = sanitize_fornecedor_nome(_row_get(r, "fornecedor", ""))
     fonte_db = str(_row_get(r, "fornecedor_fonte", "") or "").strip()
     elegivel_db = _row_get(r, "fornecedor_elegivel", 0)
 

@@ -96,6 +96,16 @@ class TestSupplierResolver(unittest.TestCase):
             )
         )
 
+    def test_nome_fornecedor_rejeita_boolean_true(self):
+        from app.supplier_resolver import nome_fornecedor_e_util, sanitize_fornecedor_nome
+
+        self.assertFalse(nome_fornecedor_e_util(True))
+        self.assertFalse(nome_fornecedor_e_util("True"))
+        self.assertFalse(nome_fornecedor_e_util("true"))
+        self.assertEqual(sanitize_fornecedor_nome(True), "")
+        self.assertEqual(sanitize_fornecedor_nome("True"), "")
+        self.assertEqual(sanitize_fornecedor_nome("FORNECEDORA OK LTDA"), "FORNECEDORA OK LTDA")
+
     def test_resultado_compra_match_numero_item(self):
         payload = _fixture("resultado_compra_lista.json")
         res = resolve_from_resultados_payload(

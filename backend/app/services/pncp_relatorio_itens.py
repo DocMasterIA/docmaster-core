@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from django.conf import settings
 from django.utils import timezone
 
-from backend.app.services.pncp_supplier_placeholders import GENERIC_SUPPLIER_NAMES
+from backend.app.services.pncp_supplier_placeholders import GENERIC_SUPPLIER_NAMES, coerce_supplier_name_text
 from backend.app.services.pncp_supplier_enrichment import (
     _nome_e_somente_cnpj_formatado,
     _promote_supplier_from_deep_walk,
@@ -109,6 +109,27 @@ def _formatar_moeda_br(v: Any) -> str:
     inteiro_fmt = _inteiro_milhar_br(inteiro)
     body = f"{inteiro_fmt},{frac}"
     return f"-{body}" if neg else body
+
+
+def total_item_de_media_unitaria_exibida(
+    media_valor: Optional[float],
+    quantidade: Optional[float],
+) -> Optional[float]:
+    """
+    Total homologado refletido = média unitária (2 casas, como na exibição) × quantidade.
+
+    Evita divergência tipo R$ 6,34 × 100 = R$ 634,33 quando a média bruta é 6,3433…
+    """
+    if media_valor is None or quantidade is None:
+        return None
+    try:
+        q = float(quantidade)
+        m = float(media_valor)
+    except (TypeError, ValueError):
+        return None
+    if q <= 0 or m <= 0 or math.isnan(q) or math.isinf(q) or math.isnan(m) or math.isinf(m):
+        return None
+    return round(round(m, 2) * q, 2)
 
 
 def _fmt_quantidade(q: Any) -> str:
@@ -324,7 +345,7 @@ def _supplier_name_key_is_metadata(key: str) -> bool:
 
 def nome_fornecedor_e_util_para_exibicao(nome: str) -> bool:
     """Nome legível (não placeholder PNCP nem o próprio CNPJ no campo de razão social)."""
-    n = str(nome or "").strip()
+    n = coerce_supplier_name_text(nome)
     if len(n) <= 2:
         return False
     low = re.sub(r"\s+", " ", n).strip().lower()
@@ -423,7 +444,7 @@ def _fornecedor_exibicao_relatorio(
     cnpj_fornecedor: str,
     supplier_name_by_cnpj: Optional[Dict[str, str]] = None,
 ) -> str:
-    if fornecedor:
+    if fornecedor and nome_fornecedor_e_util_para_exibicao(fornecedor):
         return fornecedor
     if cnpj_fornecedor and supplier_name_by_cnpj:
         nome = str(supplier_name_by_cnpj.get(cnpj_fornecedor) or "").strip()
@@ -446,7 +467,7 @@ def _pick_supplier_name_from_source(src: Dict[str, Any]) -> str:
     cad = src.get("fornecedor_cadastro")
     if isinstance(cad, dict):
         for k in ("razao_social", "nome_fantasia", "razaoSocial", "nomeFantasia"):
-            v = str(cad.get(k) or "").strip()
+            v = coerce_supplier_name_text(cad.get(k))
             if nome_fornecedor_e_util_para_exibicao(v):
                 return v
     # Não parar no primeiro campo preenchido: «fornecedor» costuma repetir o CNPJ
@@ -455,7 +476,7 @@ def _pick_supplier_name_from_source(src: Dict[str, Any]) -> str:
         v = src.get(k)
         if v is None:
             continue
-        s = str(v).strip()
+        s = coerce_supplier_name_text(v)
         if nome_fornecedor_e_util_para_exibicao(s):
             return s
     # Busca aninhada por chaves de fornecedor, sem cair em contexto de órgão.
@@ -466,7 +487,7 @@ def _pick_supplier_name_from_source(src: Dict[str, Any]) -> str:
             continue
         k = key.lower()
         if any(t in k for t in ("fornecedor", "razaosocial", "razao_social", "nomefornecedor", "nome_fornecedor")):
-            s = str(value or "").strip()
+            s = coerce_supplier_name_text(value)
             if nome_fornecedor_e_util_para_exibicao(s):
                 return s
     return ""
@@ -775,11 +796,15 @@ def fonte_dict_de_item(
     telefone = _pick_supplier_telefone_from_source(src)
     email = _pick_supplier_email_from_source(src)
     if brasilapi_cache is not None and cnpj_fornecedor and (
-        not fornecedor or not telefone or _email_contato_ausente(email)
+        not nome_fornecedor_e_util_para_exibicao(fornecedor)
+        or not telefone
+        or _email_contato_ausente(email)
     ):
         cad_br = _lookup_brasilapi_cadastro_cached(cnpj_fornecedor, brasilapi_cache)
-        if not fornecedor:
-            fornecedor = _pick_supplier_name_from_brasilapi_cad(cad_br)
+        if not nome_fornecedor_e_util_para_exibicao(fornecedor):
+            nome_br = _pick_supplier_name_from_brasilapi_cad(cad_br)
+            if nome_br:
+                fornecedor = nome_br
         if not telefone:
             telefone = str(
                 cad_br.get("telefone")
@@ -1029,9 +1054,7 @@ def agrupar_itens_relatorio_pesquisa_precos(
         vals = unit_slots
         media_valor: Optional[float] = (sum(unit_slots) / n_fontes) if n_fontes else None
         media_fmt = f"R$ {_formatar_moeda_br(media_valor)}" if media_valor is not None else "—"
-        valor_total_item: Optional[float] = None
-        if media_valor is not None and q_first is not None and q_first > 0:
-            valor_total_item = float(media_valor) * float(q_first)
+        valor_total_item = total_item_de_media_unitaria_exibida(media_valor, q_first)
         valor_total_item_fmt = (
             f"R$ {_formatar_moeda_br(valor_total_item)}" if valor_total_item is not None else "—"
         )
@@ -1153,9 +1176,7 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
         vals = unit_slots
         valor_calc = (sum(unit_slots) / n_fontes) if n_fontes else None
         valor_fmt = f"R$ {_formatar_moeda_br(valor_calc)}" if valor_calc is not None else "—"
-        valor_total_item: Optional[float] = None
-        if valor_calc is not None and qtd_item_f is not None and qtd_item_f > 0:
-            valor_total_item = float(valor_calc) * float(qtd_item_f)
+        valor_total_item = total_item_de_media_unitaria_exibida(valor_calc, qtd_item_f)
         valor_total_item_fmt = (
             f"R$ {_formatar_moeda_br(valor_total_item)}" if valor_total_item is not None else "—"
         )

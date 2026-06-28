@@ -333,6 +333,7 @@ import {
   hasPnCpEstimadoDistinto,
   hasPnCpHomologadoPreco,
   isPnCpHomologadoSemPrecoVencedor,
+  totalDeMediaUnitariaExibida,
 } from '../utils/pncpPricing';
 
 const route = useRoute();
@@ -420,7 +421,7 @@ const valorTotalRefletido = computed(() => {
     && Number.isFinite(Number(qtd))
     && Number(qtd) > 0
   ) {
-    return unit * Number(qtd);
+    return totalDeMediaUnitariaExibida(unit, Number(qtd));
   }
   const legacy = Number(item.value?.valor_total);
   return Number.isFinite(legacy) ? legacy : null;

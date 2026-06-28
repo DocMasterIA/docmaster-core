@@ -149,6 +149,16 @@ class PricingDisplayTests(unittest.TestCase):
         }
         self.assertFalse(item_matches_faixa_band(it, lo, hi, sentido="baixo"))
 
+    def test_faixa_band_none_sentido_nao_usa_recall_estimado(self):
+        """Sem sentido explícito: só preço canônico (não recall via estimado)."""
+        lo, hi = 100.0, 120.0
+        it = {
+            "valor_unitario_homologado": 85.0,
+            "valor_unitario_estimado": 115.0,
+            "valor_unitario": 85.0,
+        }
+        self.assertFalse(item_matches_faixa_band(it, lo, hi, sentido=None))
+
     def test_faixa_cima_rejeita_preco_abaixo_do_base_caso_real(self):
         """Base R$ 3.419 +50% cima → mínimo é o base; R$ 3.070 deve ser rejeitado."""
         base = 3419.0

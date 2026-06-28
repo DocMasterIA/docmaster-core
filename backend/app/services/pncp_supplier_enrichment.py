@@ -797,9 +797,6 @@ def fetch_cnpj_email_externo(
             mem[d] = ""
         return ""
 
-    if state is not None and state.get("rate_limited") and not state.get("allow_rate_limit_wait"):
-        return ""
-
     if _http_limit_reached(state):
         return ""
 
@@ -820,8 +817,14 @@ def fetch_cnpj_email_externo(
     em = ""
     fonte = ""
     tried_providers = 0
+    allow_wait = bool(state and state.get("allow_rate_limit_wait"))
+    blocked_providers: set[str] = set()
+    if state is not None and not allow_wait:
+        blocked_providers = state.setdefault("rate_limited_providers", set())
     for fetch_fn, nome_fonte in ((_fetch_cnpj_ws_email_http, "cnpj.ws"), (_fetch_receitaws_email_http, "receitaws")):
-        if state is not None and state.get("rate_limited") and not state.get("allow_rate_limit_wait"):
+        if nome_fonte in blocked_providers:
+            continue
+        if state is not None and state.get("rate_limited") and allow_wait:
             break
         if _http_limit_reached(state):
             break
@@ -830,7 +833,7 @@ def fetch_cnpj_email_externo(
         if got:
             em, fonte = got, nome_fonte
             break
-        if rl and wait_sec > 0 and state is not None and state.get("allow_rate_limit_wait"):
+        if rl and wait_sec > 0 and state is not None and allow_wait:
             time.sleep(wait_sec)
             state["rate_limited"] = False
             if not _http_limit_reached(state):
@@ -840,7 +843,11 @@ def fetch_cnpj_email_externo(
                     break
                 if rl2:
                     state["rate_limited"] = True
-        if rl and not (state and state.get("allow_rate_limit_wait")):
+        elif rl and not allow_wait:
+            blocked_providers.add(nome_fonte)
+            continue
+        elif rl and allow_wait:
+            state["rate_limited"] = True
             break
 
     if em:
@@ -1771,7 +1778,7 @@ def enrich_supplier_fields_in_payloads(
             and bool(getattr(settings, "PNCP_CNPJ_EMAIL_PREFETCH_UNLIMITED", False))
         )
         max_http = receitaws_max_http
-        if max_http is None and receitaws_allow_wait and not unlimited:
+        if max_http is None and not unlimited:
             max_http = pdf_receitaws_max_http_lookups()
         rw_state = new_cnpj_email_fetch_state(
             allow_rate_limit_wait=receitaws_allow_wait,

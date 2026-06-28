@@ -931,7 +931,20 @@ def _total_cotacoes_from_fontes(fontes: Dict[str, Any]) -> int:
     )
 
 
-def _item_search_context_dict(row: PncpCotacaoItem, fontes: Dict[str, Any]) -> Dict[str, Any]:
+def _item_search_context_dict(
+    row: PncpCotacaoItem,
+    fontes: Dict[str, Any],
+    *,
+    filtros_sessao: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    filtros_sessao = filtros_sessao if isinstance(filtros_sessao, dict) else {}
+    sentido_global = str(filtros_sessao.get("variacao_sentido_global") or "").strip().lower()
+    if sentido_global not in {"cima", "baixo", "ambos"}:
+        sentido_global = "ambos"
+    variacao_global = _safe_float(
+        filtros_sessao.get("variacao_percentual_global")
+        or filtros_sessao.get("variacao_global_percentual")
+    )
     return {
         "id": row.id,
         "descricao_item": row.descricao_item or None,
@@ -940,6 +953,8 @@ def _item_search_context_dict(row: PncpCotacaoItem, fontes: Dict[str, Any]) -> D
         "uf": row.uf or None,
         "source": row.source if isinstance(row.source, dict) else {},
         "fontes_contagem": fontes,
+        "variacao_sentido_global": sentido_global,
+        "variacao_percentual_global": variacao_global,
     }
 
 
@@ -1424,7 +1439,11 @@ def pncp_research_sessions_items_search_context(request, sessao_id: int):
     refletidos = _itens_refletidos_for_session(c.id, formula_id)
     itens_payload = [
         {
-            **_item_search_context_dict(row, fontes_counts.get(int(row.id), dict(empty_fontes))),
+            **_item_search_context_dict(
+                row,
+                fontes_counts.get(int(row.id), dict(empty_fontes)),
+                filtros_sessao=filtros,
+            ),
             **refletidos.get(int(row.id), {}),
         }
         for row in page_rows

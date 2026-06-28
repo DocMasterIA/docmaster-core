@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .config import PNCP_MAX_PAGINAS_PER_REQUEST
+from .pricing_faixa import normalize_variacao_sentido
 
 
 class HealthResponse(BaseModel):
@@ -109,10 +110,10 @@ class MarketSearchRequest(BaseModel):
     def normalize_sentido(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return None
-        s = str(v).strip().lower()
-        if s in {"ambos", "baixo", "cima"}:
-            return s
-        return "ambos"
+        s = str(v).strip()
+        if not s:
+            return None
+        return normalize_variacao_sentido(s)
 
     @field_validator("max_paginas")
     @classmethod

@@ -414,7 +414,8 @@ def montar_contexto_relatorio(
             itens,
             cotacoes,
             receitaws_email_fallback=pdf_receitaws_email,
-            receitaws_allow_wait=pdf_receitaws_email,
+            # Job PDF: cache-first, sem sleep 21s entre HTTP (estoura timeout do worker).
+            receitaws_allow_wait=False,
             receitaws_unlimited=False,
             receitaws_max_http=pdf_email_max,
         )
@@ -422,7 +423,7 @@ def montar_contexto_relatorio(
         grupos, total_linhas = agrupar_itens_relatorio_pesquisa_precos(
             itens,
             receitaws_email_fallback=pdf_receitaws_email,
-            receitaws_allow_wait=pdf_receitaws_email,
+            receitaws_allow_wait=False,
             receitaws_unlimited=False,
             receitaws_max_http=pdf_email_max,
         )

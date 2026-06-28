@@ -101,6 +101,7 @@ def apply_local_rerank_top3(
     max_candidates: int,
     faixa_min: Optional[float] = None,
     faixa_max: Optional[float] = None,
+    faixa_sentido: Optional[str] = None,
     termo_raw: Optional[str] = None,
 ) -> Tuple[List[Dict[str, Any]], bool]:
     """
@@ -119,7 +120,10 @@ def apply_local_rerank_top3(
     if not pool:
         return [], False
     if faixa_min is not None and faixa_max is not None:
-        in_band = [x for x in pool if _preco_dentro_faixa(x, faixa_min, faixa_max)]
+        in_band = [
+            x for x in pool
+            if _preco_dentro_faixa(x, faixa_min, faixa_max, sentido=faixa_sentido)
+        ]
         if len(in_band) >= 3:
             pool = in_band
     cap = max(6, min(int(max_candidates), len(pool)))

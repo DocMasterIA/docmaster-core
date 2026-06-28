@@ -1045,15 +1045,15 @@ function buildContextFromItem(it) {
   ) {
     variacaoRef = Number(variacaoPercentualGlobal.value);
   }
-  const sentidoFromItem = parseSentidoRef(
+  // Variação % e direção são globais da sessão; item.source não deve sobrepor o salvo em CotacaoDetalhe.
+  const sentidoRef = parseSentidoRef(
+    it?.variacao_sentido_global,
+    variacaoSentidoGlobal.value,
     src?.variacao_sentido,
     src?.variacaoSentido,
     faixa?.variacao_sentido,
     faixa?.sentido,
-  );
-  const sentidoRaw = sentidoFromItem
-    || String(variacaoSentidoGlobal.value || 'ambos').trim().toLowerCase();
-  const sentidoRef = ['cima', 'baixo', 'ambos'].includes(sentidoRaw) ? sentidoRaw : 'ambos';
+  ) || 'ambos';
   const fator = Number.isFinite(Number(variacaoRef)) ? Math.max(0, Number(variacaoRef)) / 100 : null;
   let valorMinRef = null;
   let valorMaxRef = null;

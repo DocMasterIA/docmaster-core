@@ -676,6 +676,7 @@ async function buscarNoBackend() {
     let data = await searchLocalItems({
       termo_busca: termoBuscaEfetivo,
       ...geo,
+      ...faixaPayload,
       codigo_modalidade: codigoModalidade,
       somente_homologados: true,
       // Busca agressiva para varrer o máximo possível (backend limita teto de segurança).

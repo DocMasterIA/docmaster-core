@@ -244,18 +244,17 @@ def _generate_relatorio_pdf_bytes(
     formula_id = _resolve_formula_calculo_id(cotacao.filtros or {})
     verification_token = issue_verification_token()
     url_qr = _url_qr_download_pdf_verificacao(api_base_url, sessao_id, verification_token)
-    # Enriquecimento PNCP/BrasilAPI: ligado por omissão; desligar com PNCP_RELATORIO_PDF_SKIP_ENRICH.
-    enrich_ran = False
+    # Enriquecimento PNCP/BrasilAPI/e-mail: ligado por omissão; desligar com PNCP_RELATORIO_PDF_SKIP_ENRICH.
     if not settings.PNCP_RELATORIO_PDF_SKIP_ENRICH:
-        enrich_ran = True
         try:
             enrich_missing_supplier_fields_for_cotacao(
                 cotacao.id,
                 max_lookups=settings.PNCP_RELATORIO_PDF_MAX_PNCP_LOOKUPS,
                 max_brasilapi_lookups=settings.PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS,
-                # Evita bloqueio longo por rate-limit da ReceitaWS no job em background.
+                # Sem pacing 21s (timeout no job); cache persistente + fallback ReceitaWS.
                 receitaws_allow_wait=False,
                 receitaws_unlimited=False,
+                receitaws_max_http=settings.PNCP_RELATORIO_PDF_MAX_RECEITAWS_LOOKUPS,
             )
             itens_qs = cotacao.itens.prefetch_related("cotacoes")
         except Exception:
@@ -271,8 +270,8 @@ def _generate_relatorio_pdf_bytes(
         url_verificacao=url_qr,
         anexo_fornecedor_url=anexo_fornecedor_url,
         formula_id=formula_id,
-        # Evita segunda rodada lenta de ReceitaWS no montar_contexto após enrich (ou tentativa).
-        skip_email_http_prefetch=enrich_ran,
+        # Segunda passada só consulta HTTP para CNPJs ainda sem e-mail (cache DB evita duplicata).
+        skip_email_http_prefetch=False,
     )
     if anexos_merge:
         try:

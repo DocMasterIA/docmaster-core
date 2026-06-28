@@ -96,11 +96,15 @@ def item_matches_faixa_band(
     - ``ambos`` (±): aceita se homologado **ou** estimado estiver na banda (recall).
     - ``cima`` / ``baixo``: usa só o preço canônico de exibição — direção respeitada.
     """
-    sent = normalize_variacao_sentido(sentido) if sentido is not None else "ambos"
     p = row_display_unit_price(it)
     if p > 0.0 and lo <= p <= hi:
         return True
-    if sent != "ambos":
+    # Recall homologado/estimado só com sentido explícito «ambos» (±).
+    # Com None/cima/baixo usa só o preço canônico — evita aceitar estimado na faixa
+    # quando o homologado exibido está fora da direção pedida.
+    if sentido is None:
+        return False
+    if normalize_variacao_sentido(sentido) != "ambos":
         return False
     hom = _optional_positive(it.get("valor_unitario_homologado"))
     est = _optional_positive(it.get("valor_unitario_estimado"))

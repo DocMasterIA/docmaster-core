@@ -1887,8 +1887,15 @@ def _set_faixa_sentido_ctx(sentido: Optional[str]) -> None:
     _faixa_sentido_ctx.set(sentido)
 
 
-def _preco_dentro_faixa(it: Dict[str, Any], lo: float, hi: float) -> bool:
-    return item_matches_faixa_band(it, lo, hi, sentido=_faixa_sentido_ctx.get())
+def _preco_dentro_faixa(
+    it: Dict[str, Any],
+    lo: float,
+    hi: float,
+    *,
+    sentido: Optional[str] = None,
+) -> bool:
+    eff = sentido if sentido is not None else _faixa_sentido_ctx.get()
+    return item_matches_faixa_band(it, lo, hi, sentido=eff)
 
 
 def _ensure_top3_from_pool(
@@ -2985,6 +2992,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             max_candidates=PNCP_LOCAL_RERANK_MAX_CANDIDATES,
             faixa_min=faixa_min,
             faixa_max=faixa_max,
+            faixa_sentido=ref_sentido if funil.get("faixa_ativa") else None,
             termo_raw=termo_busca_raw,
         )
         if local_ok and top3_local:

@@ -22,9 +22,11 @@
                 <div
                   class="da75-row"
                   :class="
-                    isFornecedorExclusivoRoute || isInexigibilidadeManutencaoRoute
+                    isFornecedorExclusivoRoute
                       ? 'da75-row--basic-4'
-                      : 'da75-row--basic'
+                      : isInexigibilidadeManutencaoRoute
+                        ? 'da75-row--basic'
+                        : 'da75-row--basic'
                   "
                 >
                   <div class="da75-field">
@@ -34,7 +36,7 @@
                       <option v-for="op in cabecalhoOptions" :key="op.id" :value="op.name">{{ op.name }}</option>
                     </select>
                   </div>
-                  <div class="da75-field">
+                  <div v-if="!isInexigibilidadeManutencaoRoute" class="da75-field">
                     <label class="da75-label da75-label--compact">{{ LABEL_ORGAO_UNIDADE }}</label>
                     <input
                       :value="orgao"
@@ -717,11 +719,13 @@ const CATALOG_KEYS = [
 ];
 
 function collectGlobalFormStatePayload() {
-  return {
+  const payload = {
     cabecalho_documento: cabecalhoDocumento.value,
     processo_ativo: false,
     processo_numero: '',
-    orgao: orgao.value,
+    orgao: isInexigibilidadeManutencaoRoute.value ? '' : orgao.value,
+    orgao_unidade_veiculo: orgaoUnidadeVeiculo.value,
+    orgao_responsavel_equipamento: orgaoResponsavelEquipamento.value,
     solicitacao_destinatario_nome: fixoNome.value,
     solicitacao_destinatario_cargo: fixoCargo.value,
     solicitacao_responsavel_nome: fixoResponsavel.value,
@@ -743,14 +747,30 @@ function collectGlobalFormStatePayload() {
     ao_senhor_genero: fixoTratNome.value,
     senhor_senhora_genero: fixoTratCargo.value,
   };
+  return payload;
 }
 
 function applyGlobalFormStatePayload(data) {
   if (!data || typeof data !== 'object') return;
   if ('cabecalho_documento' in data) cabecalhoDocumento.value = String(data.cabecalho_documento || '');
+  if ('orgao_unidade_veiculo' in data) {
+    const t = String(data.orgao_unidade_veiculo || '').trim();
+    orgaoUnidadeVeiculo.value = t ? tituloNomePt(t) : '';
+  }
+  if ('orgao_responsavel_equipamento' in data) {
+    const t = String(data.orgao_responsavel_equipamento || '').trim();
+    orgaoResponsavelEquipamento.value = t ? tituloNomePt(t) : '';
+  }
   if ('orgao' in data) {
     const t = String(data.orgao || '').trim();
-    orgao.value = t ? tituloNomePt(t) : '';
+    if (isInexigibilidadeManutencaoRoute.value) {
+      if (!orgaoUnidadeVeiculo.value.trim() && t) {
+        orgaoUnidadeVeiculo.value = tituloNomePt(t);
+      }
+      orgao.value = '';
+    } else {
+      orgao.value = t ? tituloNomePt(t) : '';
+    }
   }
   if ('solicitacao_destinatario_nome' in data) {
     const v = String(data.solicitacao_destinatario_nome || '').trim();
@@ -1193,7 +1213,7 @@ function buildInexig74ManutencaoObjetoTrResumo() {
   const m = String(marca.value || '').trim();
   const mod = String(modelo.value || '').trim();
   const pl = String(placa.value || '').trim();
-  const org = String(orgaoUnidadeVeiculo.value || orgao.value || '').trim();
+  const org = String(orgaoUnidadeVeiculo.value || '').trim();
   const partesVeic = [];
   if (m) partesVeic.push(`marca ${m}`);
   if (mod) partesVeic.push(`modelo ${mod}`);
@@ -1335,7 +1355,8 @@ function buildSlotsOverride(iaDeepen = null) {
   if (solRespNome) o.sol_oficio_responsavel_nome = solRespNome;
   if (solRespCargo) o.sol_oficio_responsavel_cargo = solRespCargo;
 
-  const setor = (fixoSetor.value || orgao.value).trim();
+  const setorOrgFallback = isInexigibilidadeManutencaoRoute.value ? orgaoUnidadeVeiculo.value : orgao.value;
+  const setor = (fixoSetor.value || setorOrgFallback).trim();
   if (setor) {
     o.dfd_setor_requisitante = setor;
   }
@@ -1556,10 +1577,9 @@ function buildUserPrompt() {
     `Gerar documento com base nos dados preenchidos para ${String(route.meta?.title || 'a rota atual')}.`,
     `Cabeçalho do documento: ${cabecalhoDocumento.value || 'Não informado'}`,
     `Processo: ${processoAtivo.value ? (processo.value || 'Não informado') : 'Não se aplica'}`,
-    `Órgão: ${orgao.value || 'Não informado'}`,
     ...(isInexigibilidadeManutencaoRoute.value
-      ? [`Unidade de lotação ou uso do veículo: ${orgaoUnidadeVeiculo.value || 'Não informado'}`]
-      : []),
+      ? [`${LABEL_ORGAO_UNIDADE_VEICULO}: ${orgaoUnidadeVeiculo.value || 'Não informado'}`]
+      : [`Órgão: ${orgao.value || 'Não informado'}`]),
     ...(isManutencaoVeiculosRoute.value
       ? [`Veículo: ${marca.value || '-'} ${modelo.value || '-'} / Placa ${placa.value || '-'}`]
       : []),
@@ -1592,7 +1612,7 @@ async function fetchInexigibilidadeDeepenedClauses() {
   const result = await requestInexigibilidadeClausulasDeepen(API_BASE, {
     variant,
     slotPackageKey: slotPackageKey.value,
-    orgao: orgao.value,
+    orgao: isInexigibilidadeManutencaoRoute.value ? orgaoUnidadeVeiculo.value : orgao.value,
     orgaoUnidadeVeiculo: orgaoUnidadeVeiculo.value,
     orgaoResponsavel: orgaoResponsavelEquipamento.value || orgao.value,
     marca: marca.value,
@@ -1804,19 +1824,20 @@ const secoes = computed(() => {
       completo: (
         isFilled(cabecalhoDocumento.value)
         && (!processoAtivo.value || isFilled(processo.value))
-        && isFilled(orgao.value)
-        && (!isFornecedorExclusivoRoute.value || isFilled(orgaoResponsavelEquipamento.value))
-        && (!isInexigibilidadeManutencaoRoute.value || isFilled(orgaoUnidadeVeiculo.value))
+        && (
+          isInexigibilidadeManutencaoRoute.value
+            ? isFilled(orgaoUnidadeVeiculo.value)
+            : isFilled(orgao.value) && (!isFornecedorExclusivoRoute.value || isFilled(orgaoResponsavelEquipamento.value))
+        )
       ),
       linhas: [
         ['Cabeçalho', cabecalhoDocumento.value || 'Não informado', isFilled(cabecalhoDocumento.value)],
         ['Processo', processoAtivo.value ? processo.value || 'Não informado' : 'Não se aplica', !processoAtivo.value || isFilled(processo.value)],
-        ['Órgão', orgao.value || 'Não informado', isFilled(orgao.value)],
-        ...(isFornecedorExclusivoRoute.value
-          ? [[LABEL_ORGAO_UNIDADE_RESP_EQUIP, orgaoResponsavelEquipamento.value || 'Não informado', isFilled(orgaoResponsavelEquipamento.value)]]
-          : []),
         ...(isInexigibilidadeManutencaoRoute.value
           ? [[LABEL_ORGAO_UNIDADE_VEICULO, orgaoUnidadeVeiculo.value || 'Não informado', isFilled(orgaoUnidadeVeiculo.value)]]
+          : [['Órgão', orgao.value || 'Não informado', isFilled(orgao.value)]]),
+        ...(isFornecedorExclusivoRoute.value
+          ? [[LABEL_ORGAO_UNIDADE_RESP_EQUIP, orgaoResponsavelEquipamento.value || 'Não informado', isFilled(orgaoResponsavelEquipamento.value)]]
           : []),
       ],
     },

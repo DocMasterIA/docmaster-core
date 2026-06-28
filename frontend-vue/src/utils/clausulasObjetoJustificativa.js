@@ -175,10 +175,10 @@ export function applyInexigibilidadeDeepenedClauses(slots, ia) {
 }
 
 export function buildInexigibilidadeManutencaoPrompt(fields) {
+  const orgVeiculo = String(fields.orgaoUnidadeVeiculo || fields.orgao || '').trim();
   const lines = [
     'Modalidade: inexigibilidade art. 74, inciso I — manutenção veicular com fornecedor exclusivo.',
-    fields.orgao ? `Órgão: ${fields.orgao}` : '',
-    fields.orgaoUnidadeVeiculo ? `Unidade de lotação/uso do veículo: ${fields.orgaoUnidadeVeiculo}` : '',
+    orgVeiculo ? `Órgão/unidade do veículo: ${orgVeiculo}` : '',
     fields.marca ? `Marca: ${fields.marca}` : '',
     fields.modelo ? `Modelo: ${fields.modelo}` : '',
     fields.placa ? `Placa: ${fields.placa}` : '',

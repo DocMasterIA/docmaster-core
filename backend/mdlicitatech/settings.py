@@ -485,7 +485,7 @@ PNCP_RELATORIO_PDF_SKIP_ENRICH = os.environ.get("PNCP_RELATORIO_PDF_SKIP_ENRICH"
     "no",
 )
 PNCP_RELATORIO_PDF_MAX_PNCP_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_PNCP_LOOKUPS", "96"))
-PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS", "64"))
+PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS = int(os.environ.get("PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS", "0"))
 # PDF: fallback ReceitaWS quando BrasilAPI omite e-mail (rate limit ~3/min no plano gratuito).
 PNCP_RELATORIO_PDF_RECEITAWS_EMAIL = os.environ.get("PNCP_RELATORIO_PDF_RECEITAWS_EMAIL", "true").strip().lower() not in (
     "0",

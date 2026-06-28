@@ -22,7 +22,7 @@ from backend.app.services.pncp_supplier_enrichment import (
     _nome_e_somente_cnpj_formatado,
     _promote_supplier_from_deep_walk,
     _supplier_payload_layers,
-    fetch_brasilapi_fornecedor_por_cnpj,
+    fetch_fornecedor_cadastro_por_cnpj,
     fetch_cnpj_email_externo,
     flatten_supplier_fields_in_payload,
     new_cnpj_email_fetch_state,
@@ -443,6 +443,7 @@ def _fornecedor_exibicao_relatorio(
     fornecedor: str,
     cnpj_fornecedor: str,
     supplier_name_by_cnpj: Optional[Dict[str, str]] = None,
+    brasilapi_cache: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> str:
     if fornecedor and nome_fornecedor_e_util_para_exibicao(fornecedor):
         return fornecedor
@@ -450,6 +451,11 @@ def _fornecedor_exibicao_relatorio(
         nome = str(supplier_name_by_cnpj.get(cnpj_fornecedor) or "").strip()
         if nome_fornecedor_e_util_para_exibicao(nome):
             return nome
+    if cnpj_fornecedor and brasilapi_cache is not None:
+        cad = _lookup_brasilapi_cadastro_cached(cnpj_fornecedor, brasilapi_cache)
+        nome_br = _pick_supplier_name_from_brasilapi_cad(cad)
+        if nome_fornecedor_e_util_para_exibicao(nome_br):
+            return nome_br
     if _fonte_pncp_em_andamento_sem_fornecedor(src):
         return "Sem fornecedor homologado (compra em andamento)"
     return "Não informado"
@@ -712,7 +718,7 @@ def _lookup_brasilapi_cadastro_cached(
     *,
     fetches_remaining: Optional[List[int]] = None,
 ) -> Dict[str, Any]:
-    """BrasilAPI por CNPJ com cache na requisição (nome + contato)."""
+    """BrasilAPI/cnpj.ws por CNPJ com cache na requisição (só sucesso com nome)."""
     d = re.sub(r"\D", "", str(cnpj_fornecedor or ""))
     if len(d) != 14:
         return {}
@@ -720,11 +726,12 @@ def _lookup_brasilapi_cadastro_cached(
         return cache[d]
     if fetches_remaining is not None and fetches_remaining[0] <= 0:
         return {}
-    _, cad = fetch_brasilapi_fornecedor_por_cnpj(d)
-    cache[d] = cad if isinstance(cad, dict) else {}
+    _, cad = fetch_fornecedor_cadastro_por_cnpj(d)
+    if _pick_supplier_name_from_brasilapi_cad(cad):
+        cache[d] = cad
     if fetches_remaining is not None:
         fetches_remaining[0] -= 1
-    return cache[d]
+    return cache.get(d, {})
 
 
 def _completar_contato_brasilapi_se_faltar(
@@ -819,6 +826,7 @@ def fonte_dict_de_item(
         fornecedor=fornecedor,
         cnpj_fornecedor=cnpj_fornecedor,
         supplier_name_by_cnpj=supplier_name_by_cnpj,
+        brasilapi_cache=brasilapi_cache,
     )
     cnpj = _cnpj_exibicao_relatorio(src, cnpj_fornecedor)
 
@@ -949,14 +957,14 @@ def _prefetch_fornecedor_nomes_brasilapi_para_linhas(
     *,
     max_lookups: Optional[int] = None,
 ) -> None:
-    """Pré-carrega razão social (BrasilAPI) para CNPJs sem nome nas linhas do PDF."""
+    """Pré-carrega razão social (BrasilAPI/cnpj.ws) para CNPJs sem nome nas linhas do PDF."""
     if max_lookups is None:
-        max_lookups = int(getattr(settings, "PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS", 64))
-    if max_lookups <= 0:
-        return
-    budget = [max_lookups]
+        max_lookups = int(getattr(settings, "PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS", 0))
+    budget: Optional[List[int]] = None
+    if max_lookups > 0:
+        budget = [max_lookups]
     for d in _cnpjs_sem_nome_das_linhas(members):
-        if budget[0] <= 0:
+        if budget is not None and budget[0] <= 0:
             break
         _lookup_brasilapi_cadastro_cached(d, cache, fetches_remaining=budget)
 

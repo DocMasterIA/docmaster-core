@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 
 from backend.app.services.pncp_relatorio_itens import (
     _fonte_pncp_em_andamento_sem_fornecedor,
     _fornecedor_exibicao_relatorio,
+    _lookup_brasilapi_cadastro_cached,
     _pick_supplier_email_from_source,
     _pick_supplier_name_from_brasilapi_cad,
     _pick_supplier_name_from_source,
@@ -29,6 +31,7 @@ from backend.app.services.pncp_supplier_enrichment import (
     _should_attempt_pncp_supplier_lookup,
     flatten_supplier_fields_in_payload,
     fornecedor_tem_cnpj_para_cotacao,
+    fetch_fornecedor_cadastro_por_cnpj,
 )
 
 
@@ -337,6 +340,19 @@ class BrasilApiNomePdfTests(unittest.TestCase):
         cad = {"razao_social": "EMPRESA BRASIL API LTDA", "nome_fantasia": "FANTASIA"}
         self.assertEqual(_pick_supplier_name_from_brasilapi_cad(cad), "EMPRESA BRASIL API LTDA")
 
+    def test_lookup_nao_cacheia_falha_brasilapi(self):
+        cache: dict = {}
+        with mock.patch(
+            "backend.app.services.pncp_relatorio_itens.fetch_fornecedor_cadastro_por_cnpj",
+            return_value=("", {}),
+        ) as mocked:
+            out = _lookup_brasilapi_cadastro_cached("18.269.125/0001-87", cache)
+            self.assertEqual(out, {})
+            self.assertNotIn("18269125000187", cache)
+            out2 = _lookup_brasilapi_cadastro_cached("18.269.125/0001-87", cache)
+            self.assertEqual(out2, {})
+            self.assertEqual(mocked.call_count, 2)
+
     def test_fonte_dict_preenche_nome_via_brasilapi_cache(self):
         class _It:
             modalidade = "PNCP"
@@ -379,6 +395,18 @@ class BrasilApiNomePdfTests(unittest.TestCase):
         }
         row = fonte_dict_de_item(_It(), tz=None, brasilapi_cache=cache)
         self.assertEqual(row["fornecedor"], "EMPRESA BRASIL API LTDA")
+
+    def test_fetch_fornecedor_cadastro_fallback_cnpj_ws(self):
+        with mock.patch(
+            "backend.app.services.pncp_supplier_enrichment.fetch_brasilapi_fornecedor_por_cnpj",
+            return_value=("", {}),
+        ), mock.patch(
+            "backend.app.services.pncp_supplier_enrichment._fetch_cnpj_ws_cadastro_http",
+            return_value=("BIOHOSP PRODUTOS HOSPITALARES LTDA", {"razao_social": "BIOHOSP PRODUTOS HOSPITALARES LTDA"}),
+        ):
+            nome, cad = fetch_fornecedor_cadastro_por_cnpj("18.269.125/0001-87")
+        self.assertEqual(nome, "BIOHOSP PRODUTOS HOSPITALARES LTDA")
+        self.assertEqual(cad.get("razao_social"), "BIOHOSP PRODUTOS HOSPITALARES LTDA")
 
     def test_supplier_index_com_brasilapi(self):
         class _It:

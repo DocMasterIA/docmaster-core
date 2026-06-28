@@ -636,6 +636,103 @@ def fetch_brasilapi_fornecedor_por_cnpj(cnpj_formatted: str) -> tuple[str, Dict[
     return nome, {k: v for k, v in cadastro.items() if v}
 
 
+def _nome_cadastro_util(nome: Any) -> bool:
+    v = coerce_supplier_name_text(nome)
+    if len(v) < 3:
+        return False
+    return v.lower() not in GENERIC_SUPPLIER_NAMES
+
+
+def _cadastro_tem_nome_util(cad: Dict[str, Any]) -> bool:
+    if not isinstance(cad, dict) or not cad:
+        return False
+    for k in ("razao_social", "nome_fantasia", "razaoSocial", "nomeFantasia"):
+        if _nome_cadastro_util(cad.get(k)):
+            return True
+    return False
+
+
+def brasilapi_lookup_under_limit(fetches: int, lim: int) -> bool:
+    """lim <= 0 = sem teto (PDF com muitos CNPJs únicos)."""
+    if lim <= 0:
+        return True
+    return fetches < lim
+
+
+def _fetch_cnpj_ws_cadastro_http(cnpj_digits: str) -> tuple[str, Dict[str, Any]]:
+    """Fallback quando BrasilAPI falha ou rate-limit (razão social + contato)."""
+    if len(cnpj_digits) != 14:
+        return "", {}
+    url = CNPJ_WS_URL.format(cnpj_digits=cnpj_digits)
+    try:
+        r = requests.get(url, timeout=_RECEITAWS_TIMEOUT, headers={"User-Agent": _HTTP_UA})
+    except Exception:
+        return "", {}
+    if r.status_code >= 400:
+        return "", {}
+    try:
+        payload = r.json()
+    except Exception:
+        return "", {}
+    if not isinstance(payload, dict):
+        return "", {}
+    razao = str(payload.get("razao_social") or "").strip()
+    est = payload.get("estabelecimento")
+    fantasia = ""
+    email = ""
+    telefone = ""
+    municipio = ""
+    uf = ""
+    if isinstance(est, dict):
+        fantasia = str(est.get("nome_fantasia") or "").strip()
+        email = str(est.get("email") or "").strip()
+        ddd = str(est.get("ddd1") or est.get("ddd") or "").strip()
+        tel = str(est.get("telefone1") or est.get("telefone") or "").strip()
+        if ddd and tel:
+            telefone = f"({ddd}) {tel}"
+        elif tel:
+            telefone = tel
+        cidade = est.get("cidade")
+        if isinstance(cidade, dict):
+            municipio = str(cidade.get("nome") or "").strip()
+            estado = cidade.get("estado")
+            if isinstance(estado, dict):
+                uf = str(estado.get("sigla") or "").strip()
+            elif estado:
+                uf = str(estado).strip()[:2]
+    nome = razao if _nome_cadastro_util(razao) else (fantasia if _nome_cadastro_util(fantasia) else "")
+    if not nome:
+        return "", {}
+    cadastro: Dict[str, Any] = {
+        "cnpj": _normalize_cnpj(cnpj_digits),
+        "razao_social": razao,
+        "nome_fantasia": fantasia,
+        "email": email,
+        "telefone": telefone,
+        "municipio": municipio,
+        "uf": uf,
+        "fornecedor_fonte_nome": "cnpj.ws",
+    }
+    return nome, {k: v for k, v in cadastro.items() if v}
+
+
+def fetch_fornecedor_cadastro_por_cnpj(cnpj_formatted: str) -> tuple[str, Dict[str, Any]]:
+    """
+    Razão social por CNPJ: BrasilAPI → cnpj.ws.
+    Só retorna cadastro com nome útil (nunca cacheia «Não informado»).
+    """
+    nome, cad = fetch_brasilapi_fornecedor_por_cnpj(cnpj_formatted)
+    if _nome_cadastro_util(nome) or _cadastro_tem_nome_util(cad):
+        if not nome and _cadastro_tem_nome_util(cad):
+            nome = str(cad.get("razao_social") or cad.get("nome_fantasia") or "").strip()
+        return nome, cad
+    d = _cnpj_digits(cnpj_formatted)
+    nome_ws, cad_ws = _fetch_cnpj_ws_cadastro_http(d)
+    if _nome_cadastro_util(nome_ws) or _cadastro_tem_nome_util(cad_ws):
+        return nome_ws, cad_ws
+    return "", {}
+
+
 def receitaws_email_fallback_enabled() -> bool:
     return bool(getattr(settings, "PNCP_RELATORIO_PDF_RECEITAWS_EMAIL", True))
 
@@ -1524,22 +1621,33 @@ def _apply_brasilapi_enrichment_to_payload(
         return False, brasil_fetches
     if ck in brasil_cache:
         nome_br, cad_br = brasil_cache[ck]
-    elif brasil_fetches < lim_br:
-        nome_br, cad_br = fetch_brasilapi_fornecedor_por_cnpj(str(it.get("cnpj_fornecedor") or ""))
-        brasil_cache[ck] = (nome_br, cad_br)
+        if _nome_cadastro_util(nome_br) or _cadastro_tem_nome_util(cad_br):
+            pass
+        else:
+            brasil_cache.pop(ck, None)
+            nome_br, cad_br = "", {}
+    if ck not in brasil_cache:
+        if not brasilapi_lookup_under_limit(brasil_fetches, lim_br):
+            return False, brasil_fetches
+        nome_br, cad_br = fetch_fornecedor_cadastro_por_cnpj(str(it.get("cnpj_fornecedor") or ""))
         brasil_fetches += 1
+        if _nome_cadastro_util(nome_br) or _cadastro_tem_nome_util(cad_br):
+            brasil_cache[ck] = (nome_br, cad_br)
     else:
-        return False, brasil_fetches
+        nome_br, cad_br = brasil_cache[ck]
     if not nome_br and not cad_br:
         return False, brasil_fetches
+    nome_exibir = nome_br
+    if not _nome_cadastro_util(nome_exibir) and _cadastro_tem_nome_util(cad_br):
+        nome_exibir = str(cad_br.get("razao_social") or cad_br.get("nome_fantasia") or "").strip()
     snap_br: Dict[str, Any] = {
         "cnpj_fornecedor": it.get("cnpj_fornecedor"),
         "fornecedor_cadastro": cad_br,
     }
-    if nome_br and not _fornecedor_tem_nome_util(it):
-        snap_br["fornecedor"] = nome_br
-    if nome_br and not str(it.get("fornecedor_fonte_nome") or "").strip():
-        snap_br["fornecedor_fonte_nome"] = "brasilapi_cnpj"
+    if _nome_cadastro_util(nome_exibir) and not _fornecedor_tem_nome_util(it):
+        snap_br["fornecedor"] = nome_exibir
+    if _nome_cadastro_util(nome_exibir) and not str(it.get("fornecedor_fonte_nome") or "").strip():
+        snap_br["fornecedor_fonte_nome"] = str(cad_br.get("fornecedor_fonte_nome") or "brasilapi_cnpj")
     elif cad_br and not str(it.get("fornecedor_contato_fonte") or "").strip():
         snap_br["fornecedor_contato_fonte"] = "brasilapi_cnpj"
     changed = _merge_supplier_snap_into_payload(it, snap_br)

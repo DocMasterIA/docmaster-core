@@ -21,6 +21,7 @@ from .docx_typography import (
     apply_standard_body_font_to_document,
     clamp_docx_paragraph_indents,
 )
+from .deprecated_cargo_slots import clear_deprecated_cargo_fields
 from .tr_deixis import adapt_text_for_dfd_or_oficio
 from .tr_template import (
     TRTemplateSlots,
@@ -227,6 +228,20 @@ def _remove_processo_visual_block_when_empty(doc: Document) -> None:
             parent.remove(tbl_el)
 
 
+def _remove_dfd_cargo_assinatura_when_empty(doc: Document) -> None:
+    """Remove linha(s) vazias após o nome na assinatura (ex.: ex-(DFD_CARGO_ASSINATURA))."""
+    paras = list(doc.paragraphs)
+    last_text_idx = -1
+    for i, p in enumerate(paras):
+        if (p.text or "").replace("\u00a0", " ").strip():
+            last_text_idx = i
+    if last_text_idx < 0:
+        return
+    for i in range(len(paras) - 1, last_text_idx, -1):
+        if not (paras[i].text or "").replace("\u00a0", " ").strip():
+            _remove_paragraph_element(paras[i])
+
+
 def render_dfd_from_tr_slots(
     slots: TRTemplateSlots,
     template_path: Optional[Path | str] = None,
@@ -254,6 +269,8 @@ def render_dfd_from_tr_slots(
     tpl_path = Path(template_path) if template_path else TEMPLATE_DFD_PATH_DEFAULT
     if not tpl_path.exists():
         raise FileNotFoundError(f"Template DFD não encontrado: {tpl_path}")
+
+    slots = clear_deprecated_cargo_fields(slots)
 
     doc = Document(str(tpl_path))
 
@@ -327,6 +344,7 @@ def render_dfd_from_tr_slots(
     split_paragraphs_on_double_newline(doc)
     if not num_proc:
         _remove_processo_visual_block_when_empty(doc)
+    _remove_dfd_cargo_assinatura_when_empty(doc)
 
     clamp_docx_paragraph_indents(doc)
 

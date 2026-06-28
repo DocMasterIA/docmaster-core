@@ -451,7 +451,8 @@ def _merge_user_context_into_tr_slots(
 
     secretaria = (usuario.get("secretaria") or "").strip()
     if secretaria:
-        slots.setdefault("secretaria_usuario", secretaria)
+        # Cargo/função removido do produto — não preencher secretaria_usuario no TR/DFD.
+        pass
 
     cidade = (usuario.get("prefeitura") or "").strip()
     estado_nome = (usuario.get("estado_nome") or usuario.get("estado_uf") or "").strip()
@@ -465,7 +466,9 @@ def _merge_user_context_into_tr_slots(
     if estado_uf:
         slots.setdefault("codigo_uf", estado_uf)
 
-    return slots
+    from .deprecated_cargo_slots import strip_deprecated_cargo_override
+
+    return strip_deprecated_cargo_override(slots)
 
 
 def _file_response_with_llm_token_usage(

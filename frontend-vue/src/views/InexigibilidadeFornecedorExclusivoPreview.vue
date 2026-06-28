@@ -381,6 +381,10 @@ import {
   formatMoedaBRLInput,
   sanitizeQuantidadeInput,
 } from '@/utils/itemValorCampos.js';
+import {
+  clearDeprecatedCargoPresetFields,
+  stripDeprecatedCargoSlotsOverride,
+} from '@/components/dispensa-art-75-ii/dispensaArt75iiShared.js';
 
 const tituloNomePt = capitalizeNomeTituloPt;
 const tituloNomeMultilinePt = capitalizeNomeTituloMultilinePt;
@@ -528,24 +532,20 @@ function removerItem(index) {
   valorGlobal.value = calcularValorGlobal();
 }
 function collectGlobalFormStatePayload() {
-  return {
+  return clearDeprecatedCargoPresetFields({
     processo_ativo: false,
     processo_numero: '',
     orgao: orgao.value,
     solicitacao_destinatario_nome: nome.value,
-    solicitacao_destinatario_cargo: cargo.value,
     solicitacao_responsavel_nome: fixoResponsavel.value,
-    solicitacao_responsavel_cargo: fixoResponsavelCargo.value,
     dfd_setor_requisitante: fixoSetor.value,
     dfd_responsavel_demanda: fixoDemanda.value,
     dfd_email: fixoEmail.value,
     dfd_gestor_contratos: fixoGestor.value,
     dfd_fiscal_contratos: fixoFiscal.value,
     dfd_assinatura_nome: fixoAssinatura.value,
-    dfd_assinatura_cargo: fixoAssinaturaCargo.value,
     ao_senhor_genero: tratNome.value,
-    senhor_senhora_genero: tratCargo.value,
-  };
+  });
 }
 async function saveUserGlobalPreset() {
   try {
@@ -906,19 +906,14 @@ function buildSlotsOverride(iaDeepen = null) {
     cnpj_fornecedor: String(cnpj.value || '').trim(),
     valor_total: String(valorGlobal.value || '').trim(),
     ao_senhor_genero: String(tratNome.value || '').trim(),
-    senhor_senhora_genero: String(tratCargo.value || '').trim(),
     sol_oficio_destinatario_nome: String(nome.value || '').trim(),
-    sol_oficio_destinatario_cargo: String(cargo.value || '').trim(),
     sol_oficio_responsavel_nome: String(fixoResponsavel.value || '').trim(),
-    sol_oficio_responsavel_cargo: String(fixoResponsavelCargo.value || '').trim(),
-    secretaria_usuario: String((responsavel.value || '').trim()),
     dfd_setor_requisitante: String((fixoSetor.value || orgao.value || '').trim()),
     dfd_responsavel_demanda: String(fixoDemanda.value || '').trim(),
     dfd_email: String(fixoEmail.value || '').trim(),
     dfd_gestor_contratos: String(fixoGestor.value || '').trim(),
     dfd_fiscal_contratos: String((fixoFiscal.value || fiscal.value || '').trim()),
     dfd_assinatura_nome: String(fixoAssinatura.value || '').trim(),
-    dfd_assinatura_cargo: String(fixoAssinaturaCargo.value || '').trim(),
     sol_oficio_artigo_inciso: 'Art. 74, Inciso I, da Lei no 14.133/2021',
   };
   if (dotacaoAtiva.value && String(dotacao.value || '').trim()) {
@@ -977,7 +972,7 @@ function buildSlotsOverride(iaDeepen = null) {
     }
   }
 
-  return o;
+  return stripDeprecatedCargoSlotsOverride(o);
 }
 function buildUserPrompt() {
   return [

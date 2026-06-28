@@ -5,6 +5,7 @@ Geração de Solicitação/Ofício a partir do modelo fixo
 `template_packages/tr_base/OFICIO_modelo_base.docx`, preenchendo apenas os slots.
 """
 
+import re
 import uuid
 from copy import deepcopy
 from pathlib import Path
@@ -12,6 +13,7 @@ from typing import Optional
 
 from docx import Document
 
+from .deprecated_cargo_slots import clear_deprecated_cargo_fields
 from .docx_typography import apply_default_justify_to_document, apply_standard_body_font_to_document
 from .tr_deixis import adapt_text_for_dfd_or_oficio
 from .tr_template import (
@@ -154,6 +156,41 @@ def _replace_placeholders(doc: Document, mapping: dict[str, str]) -> None:
                     _replace_placeholders_in_paragraph(p, mapping)
 
 
+def _remove_paragraph_element(paragraph) -> None:
+    el = paragraph._element
+    parent = el.getparent()
+    if parent is not None:
+        parent.remove(el)
+
+
+def _para_visible_text(paragraph) -> str:
+    return (paragraph.text or "").replace("\u00a0", " ").strip()
+
+
+def _is_punctuation_only_paragraph(text: str) -> bool:
+    t = (text or "").strip()
+    return bool(t) and not re.search(r"\w", t, re.UNICODE)
+
+
+def _remove_oficio_deprecated_cargo_artifacts(doc: Document) -> None:
+    """Remove linhas fantasma de cargo/função e vírgulas órfãs após placeholders vazios."""
+    for p in list(doc.paragraphs):
+        t = _para_visible_text(p)
+        if not t or _is_punctuation_only_paragraph(t):
+            _remove_paragraph_element(p)
+
+    paras = list(doc.paragraphs)
+    last_text_idx = -1
+    for i, p in enumerate(paras):
+        if _para_visible_text(p):
+            last_text_idx = i
+    if last_text_idx < 0:
+        return
+    for i in range(len(paras) - 1, last_text_idx, -1):
+        if not _para_visible_text(paras[i]):
+            _remove_paragraph_element(paras[i])
+
+
 def render_oficio_from_slots(
     slots: TRTemplateSlots,
     template_path: Optional[Path | str] = None,
@@ -162,6 +199,8 @@ def render_oficio_from_slots(
     tpl_path = Path(template_path) if template_path else TEMPLATE_OFICIO_PATH_DEFAULT
     if not tpl_path.exists():
         raise FileNotFoundError(f"Template OFICIO não encontrado: {tpl_path}")
+
+    slots = clear_deprecated_cargo_fields(slots)
 
     doc = Document(str(tpl_path))
 
@@ -193,13 +232,14 @@ def render_oficio_from_slots(
         "(SOL_OFICIO_PRAZO_RESPOSTA)": slots.sol_oficio_prazo_resposta or "",
         "(SOL_OFICIO_RESPONSAVEL_NOME)": _normalize_slot_block(slots.sol_oficio_responsavel_nome or ""),
         "(SOL_OFICIO_RESPONSAVEL_CARGO)": slots.sol_oficio_responsavel_cargo or "",
-        "(SOL_OFICIO_RESPONSAVEL_SETOR)": slots.sol_oficio_responsavel_setor or slots.secretaria_usuario or "",
+        "(SOL_OFICIO_RESPONSAVEL_SETOR)": slots.sol_oficio_responsavel_setor or "",
         "(SOL_OFICIO_CIDADE)": slots.cidade or "",
         "(SOL_OFICIO_DATA)": data_oficio_extenso,
     }
 
     _replace_placeholders(doc, mapping)
     split_paragraphs_on_double_newline(doc)
+    _remove_oficio_deprecated_cargo_artifacts(doc)
 
     apply_standard_body_font_to_document(doc)
     apply_default_justify_to_document(doc)

@@ -23,6 +23,7 @@ from .config import (
     LLM_ORCHESTRATION_GENERATE_PATH,
     RAG_HTTP_TIMEOUT,
 )
+from .deprecated_cargo_slots import clear_deprecated_cargo_fields, strip_deprecated_cargo_override
 from .objeto_clause_sanitize import sanitize_objeto_clause_pura as _sanitize_objeto_clause_pura
 from .justificativa_clause_sanitize import (
     finalize_rapida_secao4_tres_blocos,
@@ -1476,8 +1477,9 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
     Mescla slots vindos da IA com override enviado pelo usuário.
     O override tem prioridade: se uma chave estiver presente e não vazia, usa ela.
     """
+    override = strip_deprecated_cargo_override(override)
     if not override:
-        return llm_slots
+        return clear_deprecated_cargo_fields(llm_slots)
 
     objeto = (override.get("objeto") or llm_slots.objeto) if override.get("objeto") is not None else llm_slots.objeto
     objeto_escopo = (
@@ -1843,7 +1845,7 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
             )
     itens = llm_slots.itens
 
-    return TRTemplateSlots(
+    merged = TRTemplateSlots(
         objeto=objeto,
         objeto_escopo=objeto_escopo,
         objeto_entregas=objeto_entregas,
@@ -1903,6 +1905,7 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         slot_package_key=slot_package_key,
         dispensa_fluxo_ui=dispensa_fluxo_ui,
     )
+    return clear_deprecated_cargo_fields(merged)
 
 
 _ART75_INCISOS_ROMAN = frozenset(
@@ -1996,6 +1999,11 @@ def _strip_clause_draft_from_override(override: Dict[str, Any]) -> Dict[str, Any
         "cidade",
         "cidade_estado",
         "codigo_uf",
+        "dfd_assinatura_cargo",
+        "sol_oficio_destinatario_cargo",
+        "sol_oficio_responsavel_cargo",
+        "cargo_assinante_termo",
+        "senhor_senhora_genero",
     ):
         o.pop(key, None)
     return o

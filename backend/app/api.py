@@ -6,6 +6,7 @@ from backend.app.services.services import (
     merge_docx_with_template_body,
 )
 from backend.app.services.llm_context import build_llm_context_from_request
+from backend.app.services.deprecated_cargo_slots import strip_deprecated_cargo_override
 from backend.app.services.render import render_docx_by_index, render_docx_with_tokens
 from backend.app.services.preview import generate_docx_preview, generate_docx_preview_pdf
 from django.contrib.auth.decorators import login_required
@@ -614,7 +615,7 @@ def gerar_tr_modelo_api(request):
             return JsonResponse({"ok": False, "error": "Acesso negado ao template desta prefeitura."}, status=403)
 
     user_prompt = (payload.get("user_prompt") or "").strip()
-    slots_override = payload.get("slots_override")  # opcional
+    slots_override = strip_deprecated_cargo_override(payload.get("slots_override"))
     template_id = _resolve_merge_template_id(request, payload)
     slot_package_key = _resolve_slot_package_key(payload, request)
     set_request_metrics(request, package=slot_package_key, output="docx")
@@ -631,7 +632,7 @@ def gerar_tr_modelo_api(request):
 
     body = {
         "user_prompt": user_prompt,
-        "slots_override": slots_override or None,
+        "slots_override": slots_override,
         "context": context if context else None,
     }
 
@@ -762,7 +763,7 @@ def gerar_tr_e_dfd_api(request):
             return JsonResponse({"ok": False, "error": "Acesso negado ao template desta prefeitura."}, status=403)
 
     user_prompt = (payload.get("user_prompt") or "").strip()
-    slots_override = payload.get("slots_override")  # opcional
+    slots_override = strip_deprecated_cargo_override(payload.get("slots_override"))
     template_id = _resolve_merge_template_id(request, payload)
 
     if not user_prompt:
@@ -790,7 +791,7 @@ def gerar_tr_e_dfd_api(request):
 
     body = {
         "user_prompt": user_prompt,
-        "slots_override": slots_override or None,
+        "slots_override": slots_override,
         "context": context if context else None,
         "skip_context_in_prompt": True,
     }
@@ -974,7 +975,7 @@ def fill_tr_slots_api(request):
     set_request_metrics(request, package=slot_package_key, output="json")
 
     user_prompt = (payload.get("user_prompt") or "").strip()
-    slots_override = payload.get("slots_override")
+    slots_override = strip_deprecated_cargo_override(payload.get("slots_override"))
 
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)
@@ -987,7 +988,7 @@ def fill_tr_slots_api(request):
     url = f"{rag_url}/api/rag/fill-tr-slots"
     body = {
         "user_prompt": user_prompt,
-        "slots_override": slots_override or None,
+        "slots_override": slots_override,
         "context": context if context else None,
         "skip_context_in_prompt": True,
     }

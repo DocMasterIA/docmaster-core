@@ -494,8 +494,10 @@ import {
   normNomeTituloMultiline,
   sanitizeQuantidadeInput,
 } from '@/utils/itemValorCampos.js';
-
-/** Rótulos com cada palavra iniciando em maiúscula (pt-BR), p.ex. «Do Veículo», «Pelo Equipamento». */
+import {
+  clearDeprecatedCargoPresetFields,
+  stripDeprecatedCargoSlotsOverride,
+} from '@/components/dispensa-art-75-ii/dispensaArt75iiShared.js';
 const LABEL_ORGAO_UNIDADE = capitalizeEachWordLeadingPt('Órgão / unidade');
 /** Título de campo: partículas em minúscula («do»), evita «Unidade Do Veículo». */
 const LABEL_ORGAO_UNIDADE_VEICULO = tituloNomePt('órgão / unidade do veículo');
@@ -719,7 +721,7 @@ const CATALOG_KEYS = [
 ];
 
 function collectGlobalFormStatePayload() {
-  const payload = {
+  return clearDeprecatedCargoPresetFields({
     cabecalho_documento: cabecalhoDocumento.value,
     processo_ativo: false,
     processo_numero: '',
@@ -727,27 +729,21 @@ function collectGlobalFormStatePayload() {
     orgao_unidade_veiculo: orgaoUnidadeVeiculo.value,
     orgao_responsavel_equipamento: orgaoResponsavelEquipamento.value,
     solicitacao_destinatario_nome: fixoNome.value,
-    solicitacao_destinatario_cargo: fixoCargo.value,
     solicitacao_responsavel_nome: fixoResponsavel.value,
-    solicitacao_responsavel_cargo: fixoResponsavelCargo.value,
     dfd_setor_requisitante: fixoSetor.value,
     dfd_responsavel_demanda: fixoDemanda.value,
     dfd_email: fixoEmail.value,
     dfd_gestor_contratos: fixoGestor.value,
     dfd_fiscal_contratos: fixoFiscal.value,
     dfd_assinatura_nome: fixoAssinatura.value,
-    dfd_assinatura_cargo: fixoAssinaturaCargo.value,
     tr_nome_assinante: responsavel.value,
-    tr_cargo_assinante: responsavelCargo.value,
     clausula_contratado: clausulaContratado.value,
     clausula_setor: clausulaSetor.value,
     clausula_caracteristicas: clausulaCaracteristicas.value,
     clausula_objeto: clausulaObjeto.value,
     clausula_justificativa: clausulaJustificativa.value,
     ao_senhor_genero: fixoTratNome.value,
-    senhor_senhora_genero: fixoTratCargo.value,
-  };
-  return payload;
+  });
 }
 
 function applyGlobalFormStatePayload(data) {
@@ -863,7 +859,6 @@ function buildCatalogEntries() {
     ['dfd_gestor_contratos', fixoGestor.value],
     ['dfd_fiscal_contratos', fixoFiscal.value],
     ['dfd_assinatura_nome', fixoAssinatura.value],
-    ['dfd_assinatura_cargo', fixoAssinaturaCargo.value],
     ['clausula_contratado', clausulaContratado.value],
     ['clausula_setor', clausulaSetor.value],
     ['clausula_caracteristicas', clausulaCaracteristicas.value],
@@ -1347,13 +1342,9 @@ function buildInexigFornecedorExclusivoObjetoTrResumo(opts = {}) {
 function buildSlotsOverride(iaDeepen = null) {
   const o = {};
   const solDestNome = fixoNome.value.trim();
-  const solDestCargo = fixoCargo.value.trim();
   const solRespNome = fixoResponsavel.value.trim();
-  const solRespCargo = fixoResponsavelCargo.value.trim();
   if (solDestNome) o.sol_oficio_destinatario_nome = solDestNome;
-  if (solDestCargo) o.sol_oficio_destinatario_cargo = solDestCargo;
   if (solRespNome) o.sol_oficio_responsavel_nome = solRespNome;
-  if (solRespCargo) o.sol_oficio_responsavel_cargo = solRespCargo;
 
   const setorOrgFallback = isInexigibilidadeManutencaoRoute.value ? orgaoUnidadeVeiculo.value : orgao.value;
   const setor = (fixoSetor.value || setorOrgFallback).trim();
@@ -1373,7 +1364,6 @@ function buildSlotsOverride(iaDeepen = null) {
     o.dfd_fiscal_contratos = fiscalNome;
   }
   if (fixoAssinatura.value.trim()) o.dfd_assinatura_nome = fixoAssinatura.value.trim();
-  if (fixoAssinaturaCargo.value.trim()) o.dfd_assinatura_cargo = fixoAssinaturaCargo.value.trim();
 
   const dataManualFmt = toBrDate(dataManual.value);
   let dataTermo = '';
@@ -1395,7 +1385,6 @@ function buildSlotsOverride(iaDeepen = null) {
 
   if (responsavel.value.trim()) {
     o.nome_assinante_termo = responsavel.value.trim();
-    o.secretaria_usuario = responsavel.value.trim();
   }
 
   // Tipo/revisão só na dispensa art. 75, I — na inexigibilidade 74, I não usar isto como objeto do ofício/TR.
@@ -1466,7 +1455,6 @@ function buildSlotsOverride(iaDeepen = null) {
   if (cnpj.value.trim()) o.cnpj_fornecedor = cnpj.value.trim();
   if (valorGlobal.value.trim()) o.valor_total = valorGlobal.value.trim();
   if (fixoTratNome.value.trim()) o.ao_senhor_genero = fixoTratNome.value.trim();
-  if (fixoTratCargo.value.trim()) o.senhor_senhora_genero = fixoTratCargo.value.trim();
 
   if (isInexigibilidadeManutencaoRoute.value) {
     if (iaDeepen) {
@@ -1534,7 +1522,7 @@ function buildSlotsOverride(iaDeepen = null) {
     }));
   if (itensPayload.length) o.itens = itensPayload;
 
-  return Object.keys(o).length ? o : null;
+  return stripDeprecatedCargoSlotsOverride(o);
 }
 async function onGenerateClauses() {
   isGeneratingClauses.value = true;

@@ -193,10 +193,10 @@ export function buildInexigibilidadeManutencaoPrompt(fields) {
 }
 
 export function buildInexigibilidadeFornecedorExclusivoPrompt(fields) {
+  const orgResp = String(fields.orgaoResponsavel || fields.orgao || '').trim();
   const lines = [
     'Modalidade: inexigibilidade art. 74, inciso I — fornecedor exclusivo.',
-    fields.orgao ? `Órgão: ${fields.orgao}` : '',
-    fields.orgaoResponsavel ? `Unidade responsável pelo equipamento: ${fields.orgaoResponsavel}` : '',
+    orgResp ? `Órgão/unidade responsável pelo equipamento: ${orgResp}` : '',
     fields.objetoEspecifico ? `Objeto específico: ${fields.objetoEspecifico}` : '',
     fields.equipamento ? `Equipamento: ${fields.equipamento}` : '',
     fields.marca ? `Marca: ${fields.marca}` : '',

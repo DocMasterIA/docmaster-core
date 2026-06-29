@@ -72,7 +72,7 @@ Definidas em `qwen_llm_service/app/config.py`:
 | `PORT` | `8015` | |
 | `QWEN_API_KEY` | — | **Obrigatória** em produção |
 | `QWEN_API_BASE_URL` | `https://dashscope.aliyuncs.com/compatible-mode/v1` | |
-| `QWEN_MODEL` | `qwen3.6-plus` | Deve existir na conta |
+| `QWEN_MODEL` | `qwen3.7-plus` | Deve existir na conta |
 | `QWEN_TIMEOUT` | `120` | Segundos |
 | `QWEN_MAX_OUTPUT_TOKENS` | `4096` | |
 | `QWEN_MAX_PROMPT_CHARS` | `120000` | |

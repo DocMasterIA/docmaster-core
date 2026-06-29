@@ -154,7 +154,7 @@ Checklist antes de considerar Qwen «ligado» em produção:
 ### 4.1 Conta e chave API
 
 - [ ] Criar conta / projeto no [Alibaba Cloud DashScope](https://dashscope.aliyun.com/) (ou provedor compatível).
-- [ ] Gerar **API Key** com permissão para modelos chat (ex.: `qwen-plus`, `qwen3.6-plus`).
+- [ ] Gerar **API Key** com permissão para modelos chat (ex.: `qwen-plus`, `qwen3.7-plus`).
 - [ ] Confirmar **modelo disponível** na região da conta (`QWEN_MODEL` no compose).
 - [ ] Verificar **billing / quota** (requests por minuto, tokens/dia).
 
@@ -165,8 +165,8 @@ Checklist antes de considerar Qwen «ligado» em produção:
 ```env
 QWEN_API_KEY=sk-xxxxxxxxxxxxxxxx
 QWEN_API_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-QWEN_MODEL=qwen-plus
-# ou qwen3.6-plus — deve existir na conta
+QWEN_MODEL=qwen3.7-plus
+# ou qwen-plus — deve existir na conta
 QWEN_DAILY_TOKEN_BUDGET=500000
 ```
 
@@ -236,7 +236,7 @@ Se falhar → subir Qwen com profile `qwen` **depois** de `docker network create
 |----------|-------------|---------|-----------|
 | `QWEN_API_KEY` | **Sim** | vazio | Chave DashScope |
 | `QWEN_API_BASE_URL` | Não | `https://dashscope.aliyuncs.com/compatible-mode/v1` | Base OpenAI-compatible |
-| `QWEN_MODEL` | Não | `qwen3.6-plus` | Modelo default das chamadas |
+| `QWEN_MODEL` | Não | `qwen3.7-plus` | Modelo default das chamadas |
 | `QWEN_TIMEOUT` | Não | `120` | Timeout HTTP para a API cloud |
 | `QWEN_MAX_OUTPUT_TOKENS` | Não | `4096` | Teto de tokens de saída |
 | `QWEN_MAX_PROMPT_CHARS` | Não | `120000` | Teto de caracteres no prompt |
@@ -443,6 +443,6 @@ Recomendação inicial: `QWEN_DAILY_TOKEN_BUDGET` entre 200k–1M tokens/dia par
 3. Validar health + generate local.
 4. Recriar `rag_service`, `backend`, `pncp_researcher_service`.
 5. Testar os três fluxos (§8).
-6. Ajustar `QWEN_MODEL` (ex.: `qwen-plus` vs `qwen3.6-plus`) conforme qualidade/custo.
+6. Ajustar `QWEN_MODEL` (ex.: `qwen-plus` vs `qwen3.7-plus`) conforme qualidade/custo.
 
 Até a chave estar válida, os compose **já apontam** para `:8015` — o sistema tentará Qwen e falhará com mensagem clara no gateway ou timeout nos consumidores.

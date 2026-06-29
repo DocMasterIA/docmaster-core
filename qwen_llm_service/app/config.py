@@ -60,7 +60,7 @@ def load_settings() -> Settings:
             "https://dashscope.aliyuncs.com/compatible-mode/v1",
         ).rstrip("/"),
         qwen_api_key=_env_str("QWEN_API_KEY"),
-        qwen_model_default=_env_str("QWEN_MODEL", "qwen3.6-plus"),
+        qwen_model_default=_env_str("QWEN_MODEL", "qwen3.7-plus"),
         qwen_timeout_seconds=_env_float("QWEN_TIMEOUT", 120.0),
         qwen_max_output_tokens=_env_int("QWEN_MAX_OUTPUT_TOKENS", 4096),
         qwen_max_prompt_chars=_env_int("QWEN_MAX_PROMPT_CHARS", 120_000),

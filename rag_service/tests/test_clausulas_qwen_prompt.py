@@ -33,7 +33,7 @@ class ClausulasQwenPromptTests(unittest.TestCase):
             fluxo_ui="normal",
         )
         self.assertIn("Dispensa normal", full)
-        self.assertIn("setor/secretaria", full.lower())
+        self.assertIn("português claro", full.lower())
 
     def test_system_asks_json_only(self):
         self.assertIn('{"objeto"', CLAUSULAS_QWEN_SYSTEM_PROMPT)
@@ -42,6 +42,12 @@ class ClausulasQwenPromptTests(unittest.TestCase):
         self.assertIn("exatamente 3 parágrafos", CLAUSULAS_QWEN_SYSTEM_PROMPT.lower())
         self.assertIn("proibido texto genérico", CLAUSULAS_QWEN_SYSTEM_PROMPT.lower())
         self.assertNotIn("8 a 12 frases", CLAUSULAS_QWEN_SYSTEM_PROMPT)
+
+    def test_system_objeto_portugues_claro(self):
+        low = CLAUSULAS_QWEN_SYSTEM_PROMPT.lower()
+        self.assertIn("português claro", low)
+        self.assertIn("cocção", low)
+        self.assertIn("plena operacionalidade", low)
 
 
 if __name__ == "__main__":

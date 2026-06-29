@@ -237,8 +237,9 @@ REGRAS:
 - Redação densa e técnica, sem verborragia nem repetição de ideias.
 
 objeto:
-- Uma cláusula formal declarativa (preferir 1 período completo; até 2 se necessário).
+- Uma cláusula declarativa em português claro (preferir 1 período; até 2 curtos se necessário).
 - Descreva SOMENTE o que será contratado/adquirido e a finalidade administrativa (setor/destino quando informado).
+- Use termos do uso comum; evite vocabulário rebuscado, nominalizações longas, "visando", "plena operacionalidade" e "ativo" como sinônimo de equipamento.
 - PROIBIDO no objeto: fechamentos normativos do TR ("conforme especificações técnicas/quantidades do Termo de Referência", "a execução obedecerá rigorosamente…"), riscos da não contratação, necessidade jurídica ou argumentação de justificativa.
 - NÃO liste itens, quantidades, marcas, modelos, bullets ou "Inclui:" — detalhes ficam na tabela do TR.
 - Em dispensa normal com características informadas: texto genérico institucional, sem nomear produto, dosagem ou marca.
@@ -2524,8 +2525,8 @@ async def _fill_tr_slots_with_llm_work(
             )
             if _fluxo_ui == "normal":
                 user_prompt_text += (
-                    "\nDispensa normal: objeto em 1 período genérico; "
-                    "mencione obrigatoriamente o setor/secretaria do campo «Setor/secretaria atendido» no objeto e na justificativa; "
+                    "\nDispensa normal: objeto em 1 período, português claro e direto; "
+                    "mencione obrigatoriamente o setor/secretaria do campo «Setor/secretaria atendido» no objeto; "
                     "justificativa em exatamente 3 parágrafos (\\n\\n entre eles); "
                     "não cite itens, quantidades ou valores de tabela."
                 )

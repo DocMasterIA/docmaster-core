@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import { getApiBase } from '@/utils/apiBase.js';
+import { clearLegacyOrgaoProfilesLocalStorage } from '@/constants/orgaoProfiles.js';
 
 const SESSION_USER_KEY = 'docmaster.session_user_v1';
 
@@ -140,6 +141,7 @@ export function useSessionUser() {
     user.value = null;
     lastFetchedAt = 0;
     writeStoredUser(null);
+    clearLegacyOrgaoProfilesLocalStorage();
   }
 
   return { user, userLoading, fetchMe, clearUser, hasCachedUser };

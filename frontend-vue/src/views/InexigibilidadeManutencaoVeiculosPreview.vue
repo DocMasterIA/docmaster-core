@@ -489,6 +489,10 @@ import {
   clearDeprecatedCargoPresetFields,
   stripDeprecatedCargoSlotsOverride,
 } from '@/components/dispensa-art-75-ii/dispensaArt75iiShared.js';
+import {
+  emptyInexigDrawerDadosFixosPreset,
+} from '@/utils/dadosFixosReset.js';
+import { useOrgaoProfiles } from '@/composables/useOrgaoProfiles.js';
 const LABEL_ORGAO_UNIDADE = capitalizeEachWordLeadingPt('Órgão / unidade');
 /** Título de campo: partículas em minúscula («do»), evita «Unidade Do Veículo». */
 const LABEL_ORGAO_UNIDADE_VEICULO = tituloNomePt('órgão / unidade do veículo');
@@ -506,7 +510,6 @@ const API_BASE = getApiBase();
 const route = useRoute();
 const dataOptions = ['Data automática', 'Datado e assinado digitalmente', 'Data manual'];
 const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
-const ORGAO_PROFILES_STORAGE_KEY = 'orgao_profiles_v1';
 const cabecalhoOptions = ref([]);
 const tratamentoNome = ['Ao senhor', 'A senhora'];
 const tratamentoCargo = ['Senhor', 'Senhora'];
@@ -678,16 +681,17 @@ const pageSubtitle = computed(() => {
   return 'Documentos de inexigibilidade ou dispensa';
 });
 const slotFieldOptions = reactive({});
-const orgaoProfiles = ref([]);
-const selectedOrgaoProfileId = ref('');
-const orgaoProfileName = ref('');
-const orgaoOptionsFromProfiles = computed(() => {
-  const values = orgaoProfiles.value
-    .map((p) => String(p?.name || '').trim())
-    .filter(Boolean);
-  return [...new Set(values)];
-});
-const mergedOrgaoOptions = computed(() => orgaoOptionsFromProfiles.value);
+const {
+  orgaoProfiles,
+  selectedOrgaoProfileId,
+  orgaoProfileName,
+  mergedOrgaoOptions,
+  loadOrgaoProfiles,
+  loadOrgaoProfile: loadOrgaoProfileFromServer,
+  newOrgaoProfile: resetOrgaoProfileForm,
+  saveOrgaoProfile: persistOrgaoProfileOnServer,
+  deleteOrgaoProfile: removeOrgaoProfileOnServer,
+} = useOrgaoProfiles(() => API_BASE);
 const CATALOG_KEYS = [
   'cabecalho_documento',
   'orgao',
@@ -915,76 +919,41 @@ async function removeFieldHistory(fieldKey, rawValue) {
   await removeCatalogEntry(fieldKey, value);
 }
 
-function loadOrgaoProfiles() {
-  try {
-    const raw = localStorage.getItem(ORGAO_PROFILES_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    const list = Array.isArray(parsed) ? parsed : [];
-    let dirty = false;
-    orgaoProfiles.value = list.map((p) => {
-      const trimmed = String(p?.name ?? '').trim();
-      const n = trimmed ? tituloNomePt(trimmed) : '';
-      if (n !== trimmed) dirty = true;
-      return { ...p, name: n };
-    });
-    if (dirty) persistOrgaoProfiles();
-  } catch {
-    orgaoProfiles.value = [];
-  }
-}
-
-function persistOrgaoProfiles() {
-  try {
-    localStorage.setItem(ORGAO_PROFILES_STORAGE_KEY, JSON.stringify(orgaoProfiles.value));
-  } catch {
-    // silencioso
-  }
-}
-
 function loadOrgaoProfile(profileId) {
-  const id = String(profileId || '');
-  selectedOrgaoProfileId.value = id;
-  const hit = orgaoProfiles.value.find((p) => String(p.id) === id);
-  if (!hit) return;
-  const trimmed = String(hit.name || '').trim();
-  orgaoProfileName.value = trimmed ? tituloNomePt(trimmed) : '';
-  applyGlobalFormStatePayload(hit.data || {});
+  loadOrgaoProfileFromServer(profileId, (data) => {
+    applyGlobalFormStatePayload(data || {});
+  });
 }
 
 function newOrgaoProfile() {
-  selectedOrgaoProfileId.value = '';
-  orgaoProfileName.value = '';
+  resetOrgaoProfileForm(() => {
+    applyGlobalFormStatePayload(emptyInexigDrawerDadosFixosPreset());
+    orgao.value = '';
+    orgaoUnidadeVeiculo.value = '';
+    orgaoResponsavelEquipamento.value = '';
+  });
 }
 
-function saveOrgaoProfile() {
+async function saveOrgaoProfile() {
   const nameRaw = String(orgaoProfileName.value || '').trim();
-  const name = nameRaw ? tituloNomePt(nameRaw) : '';
-  if (!name) return false;
-  orgaoProfileName.value = name;
+  if (!nameRaw) return false;
   const data = collectGlobalFormStatePayload();
   if (isInexigibilidadeManutencaoRoute.value) {
-    data.orgao_unidade_veiculo = name;
+    data.orgao_unidade_veiculo = nameRaw;
     data.orgao = '';
   } else if (isFornecedorExclusivoRoute.value) {
-    data.orgao_responsavel_equipamento = name;
+    data.orgao_responsavel_equipamento = nameRaw;
     data.orgao = '';
   } else {
-    data.orgao = name;
+    data.orgao = nameRaw;
   }
   const orgaoValue = isInexigibilidadeManutencaoRoute.value
     ? String(data?.orgao_unidade_veiculo || '').trim()
     : isFornecedorExclusivoRoute.value
       ? String(data?.orgao_responsavel_equipamento || '').trim()
       : String(data?.orgao || '').trim();
-  const idx = orgaoProfiles.value.findIndex((p) => String(p.id) === String(selectedOrgaoProfileId.value || ''));
-  if (idx >= 0) {
-    orgaoProfiles.value[idx] = { ...orgaoProfiles.value[idx], name, data };
-  } else {
-    const id = String(Date.now());
-    orgaoProfiles.value.push({ id, name, data });
-    selectedOrgaoProfileId.value = id;
-  }
-  persistOrgaoProfiles();
+  const ok = await persistOrgaoProfileOnServer(nameRaw, data);
+  if (!ok) return false;
   if (orgaoValue) {
     const current = Array.isArray(slotFieldOptions.orgao) ? slotFieldOptions.orgao : [];
     if (!current.includes(orgaoValue)) slotFieldOptions.orgao = [...current, orgaoValue];
@@ -993,13 +962,8 @@ function saveOrgaoProfile() {
   return true;
 }
 
-function deleteOrgaoProfile() {
-  const id = String(selectedOrgaoProfileId.value || '');
-  if (!id) return;
-  orgaoProfiles.value = orgaoProfiles.value.filter((p) => String(p.id) !== id);
-  persistOrgaoProfiles();
-  selectedOrgaoProfileId.value = '';
-  orgaoProfileName.value = '';
+async function deleteOrgaoProfile() {
+  await removeOrgaoProfileOnServer();
 }
 
 async function loadSlotCatalogSuggestions() {
@@ -1788,7 +1752,7 @@ async function resetFormStateForNewRoute() {
   Object.keys(slotFieldOptions).forEach((k) => {
     delete slotFieldOptions[k];
   });
-  loadOrgaoProfiles();
+  await loadOrgaoProfiles();
   await loadUserGlobalPreset();
   await loadCabecalhoOptions();
   await loadSlotCatalogSuggestions();

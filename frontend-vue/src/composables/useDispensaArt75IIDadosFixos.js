@@ -1,17 +1,18 @@
-import { computed, reactive, ref } from 'vue';
+import { reactive, ref } from 'vue';
 import {
   clearDeprecatedCargoPresetFields,
   TEXTO_PADRAO_ENDERECO_PROPOSTAS,
   TRATAMENTO_NOME,
 } from '@/components/dispensa-art-75-ii/dispensaArt75iiShared.js';
-import { capitalizeNomeTituloPt, normNomeTituloMultiline } from '@/utils/itemValorCampos.js';
+import { normNomeTituloMultiline } from '@/utils/itemValorCampos.js';
+import { emptyDa75DadosFixosPreset } from '@/utils/dadosFixosReset.js';
+import { useOrgaoProfiles } from '@/composables/useOrgaoProfiles.js';
 
 function normNomeTitulo(raw) {
   return normNomeTituloMultiline(raw);
 }
 
 export const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
-const ORGAO_PROFILES_STORAGE_KEY = 'orgao_profiles_v1';
 
 function catalogItemToString(x) {
   if (x == null) return '';
@@ -49,16 +50,7 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
   const { cabecalho, processoAtivo, processo, orgao } = parentRefs;
 
   const slotFieldOptions = reactive({});
-  const orgaoProfiles = ref([]);
-  const selectedOrgaoProfileId = ref('');
-  const orgaoProfileName = ref('');
-  const orgaoOptionsFromProfiles = computed(() => {
-    const values = orgaoProfiles.value
-      .map((p) => String(p?.name || '').trim())
-      .filter(Boolean);
-    return [...new Set(values)];
-  });
-  const mergedOrgaoOptions = computed(() => orgaoOptionsFromProfiles.value);
+  const orgaoProfilesApi = useOrgaoProfiles(() => apiBase);
 
   const fixoTratNome = ref('');
   const fixoNome = ref('');
@@ -78,7 +70,6 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
   function collectPresetPayload() {
     return clearDeprecatedCargoPresetFields({
       cabecalho_documento: cabecalho.value,
-      // Processo (opcional) não entra no preset/perfil — só limpa merge antigo no servidor.
       processo_ativo: false,
       processo_numero: '',
       orgao: orgao.value,
@@ -238,72 +229,28 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     }
   }
 
-  function loadOrgaoProfiles() {
-    try {
-      const raw = localStorage.getItem(ORGAO_PROFILES_STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      const list = Array.isArray(parsed) ? parsed : [];
-      let dirty = false;
-      orgaoProfiles.value = list.map((p) => {
-        const trimmed = String(p?.name ?? '').trim();
-        const n = trimmed ? capitalizeNomeTituloPt(trimmed) : '';
-        if (n !== trimmed) dirty = true;
-        return { ...p, name: n };
-      });
-      if (dirty) persistOrgaoProfiles();
-    } catch {
-      orgaoProfiles.value = [];
-    }
-  }
-
-  function persistOrgaoProfiles() {
-    try {
-      localStorage.setItem(ORGAO_PROFILES_STORAGE_KEY, JSON.stringify(orgaoProfiles.value));
-    } catch {
-      // silencioso
-    }
-  }
-
-  function createOrgaoProfilePayload() {
-    return collectPresetPayload();
+  function clearDadosFixosFields() {
+    applyPresetPayload(emptyDa75DadosFixosPreset({ cabecalho: cabecalho.value, orgao: '' }));
   }
 
   function loadOrgaoProfile(profileId) {
-    const id = String(profileId || '');
-    selectedOrgaoProfileId.value = id;
-    const hit = orgaoProfiles.value.find((p) => String(p.id) === id);
-    if (!hit) return;
-    const trimmed = String(hit.name || '').trim();
-    orgaoProfileName.value = trimmed ? capitalizeNomeTituloPt(trimmed) : '';
-    applyPresetPayload(clearDeprecatedCargoPresetFields(hit.data || {}));
+    orgaoProfilesApi.loadOrgaoProfile(profileId, (data) => {
+      applyPresetPayload(clearDeprecatedCargoPresetFields(data || {}));
+    });
   }
 
   function newOrgaoProfile() {
-    selectedOrgaoProfileId.value = '';
-    orgaoProfileName.value = '';
+    orgaoProfilesApi.newOrgaoProfile(clearDadosFixosFields);
   }
 
-  function saveOrgaoProfile() {
-    const nameRaw = String(orgaoProfileName.value || '').trim();
-    const name = nameRaw ? capitalizeNomeTituloPt(nameRaw) : '';
-    if (!name) return false;
-    orgaoProfileName.value = name;
-    const data = createOrgaoProfilePayload();
-    data.orgao = name;
-    const orgaoValue = String(data?.orgao || '').trim();
-    const existingIdx = orgaoProfiles.value.findIndex((p) => String(p.id) === String(selectedOrgaoProfileId.value || ''));
-    if (existingIdx >= 0) {
-      orgaoProfiles.value[existingIdx] = {
-        ...orgaoProfiles.value[existingIdx],
-        name,
-        data,
-      };
-    } else {
-      const id = String(Date.now());
-      orgaoProfiles.value.push({ id, name, data });
-      selectedOrgaoProfileId.value = id;
-    }
-    persistOrgaoProfiles();
+  async function saveOrgaoProfile() {
+    const nameRaw = String(orgaoProfilesApi.orgaoProfileName.value || '').trim();
+    if (!nameRaw) return false;
+    const data = collectPresetPayload();
+    data.orgao = nameRaw;
+    const ok = await orgaoProfilesApi.saveOrgaoProfile(nameRaw, data);
+    if (!ok) return false;
+    const orgaoValue = String(data.orgao || '').trim();
     if (orgaoValue) {
       const current = Array.isArray(slotFieldOptions.orgao) ? slotFieldOptions.orgao : [];
       if (!current.includes(orgaoValue)) slotFieldOptions.orgao = [...current, orgaoValue];
@@ -312,26 +259,17 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     return true;
   }
 
-  function deleteOrgaoProfile() {
-    const id = String(selectedOrgaoProfileId.value || '');
-    if (!id) return;
-    orgaoProfiles.value = orgaoProfiles.value.filter((p) => String(p.id) !== id);
-    persistOrgaoProfiles();
-    selectedOrgaoProfileId.value = '';
-    orgaoProfileName.value = '';
+  async function deleteOrgaoProfile() {
+    await orgaoProfilesApi.deleteOrgaoProfile();
   }
 
-  loadOrgaoProfiles();
-
-  // `reactive` para refs aninhadas serem desempacotadas em templates (ex.: drawer com `:ctx="dadosFixos"`).
-  // Sem isso, `v-model="ctx.fixoNome"` recebe o objeto Ref e o input mostra "[object Object]".
   return reactive({
     processo,
     orgao,
-    orgaoProfiles,
-    selectedOrgaoProfileId,
-    orgaoProfileName,
-    mergedOrgaoOptions,
+    orgaoProfiles: orgaoProfilesApi.orgaoProfiles,
+    selectedOrgaoProfileId: orgaoProfilesApi.selectedOrgaoProfileId,
+    orgaoProfileName: orgaoProfilesApi.orgaoProfileName,
+    mergedOrgaoOptions: orgaoProfilesApi.mergedOrgaoOptions,
     slotFieldOptions,
     tratamentoNome,
     fixoTratNome,
@@ -348,12 +286,14 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     fixoTrResponsavelNome,
     loadSlotCatalogSuggestions,
     loadUserGlobalPreset,
+    loadOrgaoProfiles: orgaoProfilesApi.loadOrgaoProfiles,
     saveUserGlobalPreset,
     addFieldHistory,
     removeFieldHistory,
     canDeleteFieldHistory,
     loadOrgaoProfile,
     newOrgaoProfile,
+    clearDadosFixosFields,
     saveOrgaoProfile,
     deleteOrgaoProfile,
   });

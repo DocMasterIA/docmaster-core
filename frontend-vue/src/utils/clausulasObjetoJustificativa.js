@@ -1,4 +1,5 @@
 import { getApiBase } from './apiBase.js';
+import { ensureTrObjetoFechamento } from './trObjetoFechamento.js';
 
 /**
  * Geração rápida de cláusulas de objeto/justificativa (dispensa normal, inexigibilidade).
@@ -79,7 +80,7 @@ export function parseClausulasResponseText(text) {
     try {
       const parsed = JSON.parse(cleaned);
       return {
-        objeto: sanitizeObjetoClausePura(parsed.objeto || ''),
+        objeto: ensureTrObjetoFechamento(sanitizeObjetoClausePura(parsed.objeto || '')),
         justificativa: String(parsed.justificativa || '').trim(),
         dfd_objeto_referencia: String(parsed.dfd_objeto_referencia || parsed.dfdObjetoReferencia || '').trim(),
       };
@@ -89,7 +90,7 @@ export function parseClausulasResponseText(text) {
   }
   const sections = parseClauseSections(raw);
   return {
-    objeto: sanitizeObjetoClausePura(sections.objeto || ''),
+    objeto: ensureTrObjetoFechamento(sanitizeObjetoClausePura(sections.objeto || '')),
     justificativa: sections.justificativa || '',
     dfd_objeto_referencia: '',
   };
@@ -104,7 +105,7 @@ export function extractClausesFromSectionTexts(sectionTexts) {
     return '';
   };
   return {
-    objeto: sanitizeObjetoClausePura(get('objeto', 'objeto_licitacao', 'do_objeto')),
+    objeto: ensureTrObjetoFechamento(sanitizeObjetoClausePura(get('objeto', 'objeto_licitacao', 'do_objeto'))),
     justificativa: get('justificativa', 'necessidade', 'fundamentacao', 'da_necessidade'),
     escopo: get('escopo', 'objeto_escopo'),
     entregas: get('entregas', 'objeto_entregas'),
@@ -161,8 +162,8 @@ export function applyInexigibilidadeDeepenedClauses(slots, ia) {
   const justificativa = String(ia.justificativa || '').trim();
   const dfdObjRef = String(ia.dfd_objeto_referencia || '').trim();
   if (objeto) {
-    slots.objeto = objeto;
-    slots.sol_oficio_objeto = objeto;
+    slots.objeto = ensureTrObjetoFechamento(objeto);
+    slots.sol_oficio_objeto = ensureTrObjetoFechamento(objeto);
   }
   if (justificativa) {
     slots.justificativa = justificativa;

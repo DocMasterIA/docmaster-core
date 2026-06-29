@@ -56,13 +56,24 @@
             <section class="da75-block">
               <h3>O que será contratado?</h3>
               <div class="da75-block__body">
-                <div class="da75-field">
-                  <textarea
-                    class="da75-textarea"
-                    :value="objetoContratado"
-                    :placeholder="rapidaObjPlaceholder"
-                    @input="objetoContratado = primeiraMaiuscula(($event.target).value)"
-                  />
+                <div class="da75-stack">
+                  <div class="da75-field">
+                    <textarea
+                      class="da75-textarea"
+                      :value="objetoContratado"
+                      :placeholder="rapidaObjPlaceholder"
+                      @input="objetoContratado = primeiraMaiuscula(($event.target).value)"
+                    />
+                  </div>
+                  <div class="da75-field">
+                    <label class="da75-label">Qual setor/secretaria será atendido?</label>
+                    <input
+                      class="da75-input"
+                      :value="objetoSetor"
+                      placeholder="Ex: Secretaria de Administração"
+                      @input="objetoSetor = primeiraMaiuscula(($event.target).value)"
+                    />
+                  </div>
                 </div>
               </div>
             </section>
@@ -183,11 +194,9 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   DATA_OPTIONS,
-  TEXTO_PADRAO_ENDERECO_PROPOSTAS,
   campoPreenchido,
   formatarData,
   gerarJustificativaTexto,
-  gerarObjetoTexto,
   primeiraMaiuscula,
   stripDeprecatedCargoSlotsOverride,
 } from './dispensaArt75iiShared.js';
@@ -203,6 +212,7 @@ import {
   fetchFillTrSlotsWithRetry,
   formatJustificativaDisplayFromSlots,
 } from '@/utils/fetchFillTrSlots.js';
+import { buildClausulasObjetoJustificativaPrompt } from '@/utils/clausulasObjetoJustificativa.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import {
   applyUsuarioLocalidadeToSlots,
@@ -222,6 +232,7 @@ const processo = ref('');
 const orgao = ref('');
 const dadosFixos = useDispensaArt75IIDadosFixos(API_BASE, { cabecalho, processoAtivo, processo, orgao });
 const objetoContratado = ref('');
+const objetoSetor = ref('');
 const objetoGerado = ref('');
 const justificativa = ref('');
 /** Slots de cláusulas da última IA (3 blocos na rápida: justificativa + problema + benefício). */
@@ -286,6 +297,7 @@ function sanitizeOrgaoValue() {
 }
 
 async function reloadPresetCabecalhosOrgao() {
+  await dadosFixos.loadOrgaoProfiles();
   await dadosFixos.loadUserGlobalPreset();
   await dadosFixos.loadSlotCatalogSuggestions();
   usuarioLocalidade.value = await fetchUsuarioLocalidadeParaTr(API_BASE);
@@ -325,18 +337,7 @@ async function resetFormStateForNewRoute() {
   documentZipFilename.value = 'tr_dfd_oficio.zip';
   dadosFixos.selectedOrgaoProfileId = '';
   dadosFixos.orgaoProfileName = '';
-  dadosFixos.fixoTratNome = '';
-  dadosFixos.fixoNome = '';
-  dadosFixos.fixoResponsavel = '';
-  dadosFixos.fixoSetor = '';
-  dadosFixos.fixoDemanda = '';
-  dadosFixos.fixoEmail = '';
-  dadosFixos.fixoGestor = '';
-  dadosFixos.fixoFiscal = '';
-  dadosFixos.fixoAssinatura = '';
-  dadosFixos.fixoEnderecoEntrega = TEXTO_PADRAO_ENDERECO_PROPOSTAS;
-  dadosFixos.fixoEmailPropostas = '';
-  dadosFixos.fixoTrResponsavelNome = '';
+  dadosFixos.clearDadosFixosFields();
   await reloadPresetCabecalhosOrgao();
 }
 
@@ -407,9 +408,10 @@ const secoes = computed(() => {
     },
     {
       titulo: 'Objeto da contratação',
-      completo: campoPreenchido(objetoContratado.value),
+      completo: campoPreenchido(objetoContratado.value) && campoPreenchido(objetoSetor.value),
       linhas: [
         ['Resumo do objeto', objetoContratado.value || 'Não informado', campoPreenchido(objetoContratado.value)],
+        ['Setor/secretaria', objetoSetor.value || 'Não informado', campoPreenchido(objetoSetor.value)],
       ],
     },
     {
@@ -517,7 +519,12 @@ function buildSlotsOverride() {
   if (destNome) o.sol_oficio_destinatario_nome = destNome;
   if (respNome) o.sol_oficio_responsavel_nome = respNome;
   if (tratNome) o.ao_senhor_genero = tratNome;
-  if (String(dadosFixos.fixoSetor || '').trim()) o.dfd_setor_requisitante = String(dadosFixos.fixoSetor).trim();
+  const setorFormulario = String(objetoSetor.value || '').trim();
+  if (setorFormulario) {
+    o.dfd_setor_requisitante = setorFormulario;
+  } else if (String(dadosFixos.fixoSetor || '').trim()) {
+    o.dfd_setor_requisitante = String(dadosFixos.fixoSetor).trim();
+  }
   if (String(dadosFixos.fixoDemanda || '').trim()) o.dfd_responsavel_demanda = String(dadosFixos.fixoDemanda).trim();
   if (String(dadosFixos.fixoEmail || '').trim()) o.dfd_email = String(dadosFixos.fixoEmail).trim();
   if (String(dadosFixos.fixoGestor || '').trim()) o.dfd_gestor_contratos = String(dadosFixos.fixoGestor).trim();
@@ -585,27 +592,17 @@ function buildSlotsOverride() {
   return stripDeprecatedCargoSlotsOverride(o);
 }
 
-/** Só para fill-tr-slots (objeto/justificativa) — alinhado ao prompt da dispensa normal. */
+/** Só para fill-tr-slots (objeto/justificativa) — sem órgão/unidade dos dados básicos. */
 function buildUserPromptFillTrSlots() {
-  const contratado = String(objetoContratado.value || '').trim();
-  const setor = String(dadosFixos.fixoSetor || '').trim();
-  return [
-    contratado ? `O que será contratado: ${contratado}` : '',
-    setor ? `Setor/secretaria atendido: ${setor}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
+  return buildClausulasObjetoJustificativaPrompt({
+    contratado: objetoContratado.value,
+    setor: objetoSetor.value,
+  });
 }
 
-/** Metadados no payload de gerar-tr-e-dfd; com cláusulas no override a 2ª LLM é pulada. */
+/** Contexto mínimo para enrich no gerar-tr-e-dfd (sem órgão/cabeçalho/process). */
 function buildUserPrompt() {
-  return [
-    `Gerar documento com base nos dados preenchidos para ${String(route.meta?.title || 'dispensa rapida')}.`,
-    `Cabeçalho do documento: ${cabecalho.value || 'Não informado'}`,
-    `Órgão: ${orgao.value || 'Não informado'}`,
-    `Processo: ${processoAtivo.value ? (processo.value || 'Não informado') : 'Não se aplica'}`,
-    `Objeto (o que será contratado): ${objetoContratado.value || 'Não informado'}`,
-  ].join('\n');
+  return buildUserPromptFillTrSlots();
 }
 
 async function onSubmit() {

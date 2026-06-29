@@ -385,6 +385,10 @@ import {
   clearDeprecatedCargoPresetFields,
   stripDeprecatedCargoSlotsOverride,
 } from '@/components/dispensa-art-75-ii/dispensaArt75iiShared.js';
+import {
+  emptyFornecedorExclusivoDrawerDadosFixosPreset,
+} from '@/utils/dadosFixosReset.js';
+import { useOrgaoProfiles } from '@/composables/useOrgaoProfiles.js';
 
 const tituloNomePt = capitalizeNomeTituloPt;
 const tituloNomeMultilinePt = capitalizeNomeTituloMultilinePt;
@@ -394,7 +398,6 @@ const PLACEHOLDER_ORGAO_UNIDADE = capitalizeEachWordLeadingPt('Digite o órgão'
 
 const API_BASE = getApiBase();
 const dataOptions = ['Data automática', 'Datado e assinado digitalmente', 'Data manual'];
-const ORGAO_PROFILES_STORAGE_KEY = 'orgao_profiles_v1';
 const tratamentoNome = ['Ao senhor', 'A senhora'];
 const tratamentoCargo = ['Senhor', 'Senhora'];
 const objetoOptions = [
@@ -456,16 +459,17 @@ const fixoFiscal = ref('');
 const fixoAssinatura = ref('');
 const fixoAssinaturaCargo = ref('');
 const slotFieldOptions = reactive({});
-const orgaoProfiles = ref([]);
-const selectedOrgaoProfileId = ref('');
-const orgaoProfileName = ref('');
-const orgaoOptionsFromProfiles = computed(() => {
-  const values = orgaoProfiles.value
-    .map((p) => String(p?.name || '').trim())
-    .filter(Boolean);
-  return [...new Set(values)];
-});
-const mergedOrgaoOptions = computed(() => orgaoOptionsFromProfiles.value);
+const {
+  orgaoProfiles,
+  selectedOrgaoProfileId,
+  orgaoProfileName,
+  mergedOrgaoOptions,
+  loadOrgaoProfiles,
+  loadOrgaoProfile: loadOrgaoProfileFromServer,
+  newOrgaoProfile: resetOrgaoProfileForm,
+  saveOrgaoProfile: persistOrgaoProfileOnServer,
+  deleteOrgaoProfile: removeOrgaoProfileOnServer,
+} = useOrgaoProfiles(() => API_BASE);
 const GLOBAL_SLOT_FORM_PRESET_KEY = 'global_slots_preset_v1';
 const SLOT_PACKAGE_KEY = 'inexigibilidade_74_i_fornecedor_exclusivo';
 const CATALOG_KEYS = [
@@ -684,64 +688,27 @@ async function removeFieldHistory(fieldKey, rawValue) {
   await removeCatalogEntry(fieldKey, value);
 }
 
-function loadOrgaoProfiles() {
-  try {
-    const raw = localStorage.getItem(ORGAO_PROFILES_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    const list = Array.isArray(parsed) ? parsed : [];
-    let dirty = false;
-    orgaoProfiles.value = list.map((p) => {
-      const trimmed = String(p?.name ?? '').trim();
-      const n = trimmed ? tituloNomePt(trimmed) : '';
-      if (n !== trimmed) dirty = true;
-      return { ...p, name: n };
-    });
-    if (dirty) persistOrgaoProfiles();
-  } catch {
-    orgaoProfiles.value = [];
-  }
-}
-
-function persistOrgaoProfiles() {
-  try {
-    localStorage.setItem(ORGAO_PROFILES_STORAGE_KEY, JSON.stringify(orgaoProfiles.value));
-  } catch {
-    // silencioso
-  }
-}
-
 function loadOrgaoProfile(profileId) {
-  const id = String(profileId || '');
-  selectedOrgaoProfileId.value = id;
-  const hit = orgaoProfiles.value.find((p) => String(p.id) === id);
-  if (!hit) return;
-  const trimmed = String(hit.name || '').trim();
-  orgaoProfileName.value = trimmed ? tituloNomePt(trimmed) : '';
-  applyGlobalFormStatePayload(hit.data || {});
+  loadOrgaoProfileFromServer(profileId, (data) => {
+    applyGlobalFormStatePayload(data || {});
+  });
 }
 
 function newOrgaoProfile() {
-  selectedOrgaoProfileId.value = '';
-  orgaoProfileName.value = '';
+  resetOrgaoProfileForm(() => {
+    applyGlobalFormStatePayload(emptyFornecedorExclusivoDrawerDadosFixosPreset());
+    orgao.value = '';
+  });
 }
 
-function saveOrgaoProfile() {
+async function saveOrgaoProfile() {
   const nameRaw = String(orgaoProfileName.value || '').trim();
-  const name = nameRaw ? tituloNomePt(nameRaw) : '';
-  if (!name) return false;
-  orgaoProfileName.value = name;
+  if (!nameRaw) return false;
   const data = collectGlobalFormStatePayload();
-  data.orgao = name;
+  data.orgao = nameRaw;
   const orgaoValue = String(data?.orgao || '').trim();
-  const idx = orgaoProfiles.value.findIndex((p) => String(p.id) === String(selectedOrgaoProfileId.value || ''));
-  if (idx >= 0) {
-    orgaoProfiles.value[idx] = { ...orgaoProfiles.value[idx], name, data };
-  } else {
-    const id = String(Date.now());
-    orgaoProfiles.value.push({ id, name, data });
-    selectedOrgaoProfileId.value = id;
-  }
-  persistOrgaoProfiles();
+  const ok = await persistOrgaoProfileOnServer(nameRaw, data);
+  if (!ok) return false;
   if (orgaoValue) {
     const current = Array.isArray(slotFieldOptions.orgao) ? slotFieldOptions.orgao : [];
     if (!current.includes(orgaoValue)) slotFieldOptions.orgao = [...current, orgaoValue];
@@ -750,13 +717,8 @@ function saveOrgaoProfile() {
   return true;
 }
 
-function deleteOrgaoProfile() {
-  const id = String(selectedOrgaoProfileId.value || '');
-  if (!id) return;
-  orgaoProfiles.value = orgaoProfiles.value.filter((p) => String(p.id) !== id);
-  persistOrgaoProfiles();
-  selectedOrgaoProfileId.value = '';
-  orgaoProfileName.value = '';
+async function deleteOrgaoProfile() {
+  await removeOrgaoProfileOnServer();
 }
 function toBlobUrl(base64, mimeType) {
   if (!base64) return '';
@@ -1071,7 +1033,7 @@ async function onApplyFixedData() {
   drawerOpen.value = false;
 }
 onMounted(async () => {
-  loadOrgaoProfiles();
+  await loadOrgaoProfiles();
   await loadUserGlobalPreset();
   await loadSlotCatalogSuggestions();
 });

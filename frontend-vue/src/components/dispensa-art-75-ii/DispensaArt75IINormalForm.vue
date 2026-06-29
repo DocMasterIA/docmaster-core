@@ -250,7 +250,6 @@ import { useRoute } from 'vue-router';
 import {
   DATA_OPTIONS,
   EMPTY_ITEM,
-  TEXTO_PADRAO_ENDERECO_PROPOSTAS,
   calcularValorTotalEstimado,
   campoPreenchido,
   formatarData,
@@ -394,6 +393,7 @@ function sanitizeOrgaoValue() {
 }
 
 async function reloadPresetCabecalhosOrgao() {
+  await dadosFixos.loadOrgaoProfiles();
   await dadosFixos.loadUserGlobalPreset();
   await dadosFixos.loadSlotCatalogSuggestions();
   usuarioLocalidade.value = await fetchUsuarioLocalidadeParaTr(API_BASE);
@@ -437,18 +437,7 @@ async function resetFormStateForNewRoute() {
   documentZipFilename.value = 'tr_dfd_oficio.zip';
   dadosFixos.selectedOrgaoProfileId = '';
   dadosFixos.orgaoProfileName = '';
-  dadosFixos.fixoTratNome = '';
-  dadosFixos.fixoNome = '';
-  dadosFixos.fixoResponsavel = '';
-  dadosFixos.fixoSetor = '';
-  dadosFixos.fixoDemanda = '';
-  dadosFixos.fixoEmail = '';
-  dadosFixos.fixoGestor = '';
-  dadosFixos.fixoFiscal = '';
-  dadosFixos.fixoAssinatura = '';
-  dadosFixos.fixoEnderecoEntrega = TEXTO_PADRAO_ENDERECO_PROPOSTAS;
-  dadosFixos.fixoEmailPropostas = '';
-  dadosFixos.fixoTrResponsavelNome = '';
+  dadosFixos.clearDadosFixosFields();
   await reloadPresetCabecalhosOrgao();
 }
 
@@ -739,16 +728,7 @@ function buildSlotsOverride() {
 }
 
 function buildUserPrompt() {
-  return [
-    `Gerar documento com base nos dados preenchidos para ${String(route.meta?.title || 'dispensa normal')}.`,
-    `Cabeçalho do documento: ${cabecalho.value || 'Não informado'}`,
-    `Órgão: ${orgao.value || 'Não informado'}`,
-    `Processo: ${processoAtivo.value ? (processo.value || 'Não informado') : 'Não se aplica'}`,
-    `Objeto base: ${objetoContratado.value || 'Não informado'}`,
-    `Setor/secretaria atendido (usar nas cláusulas de objeto e justificativa): ${objetoSetor.value || 'Não informado'}`,
-    `Características mínimas: ${objetoCaracteristicas.value || 'Não informado'}`,
-    'Em objeto e justificativa não liste nem discuta itens da tabela (descrições, quantidades, valores); mantenha texto genérico.',
-  ].join('\n');
+  return buildUserPromptGerarClausulas();
 }
 
 function sanitizeJsonBody(obj) {

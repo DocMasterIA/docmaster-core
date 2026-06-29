@@ -240,7 +240,8 @@ objeto:
 - Uma cláusula declarativa completa (preferir 1 período bem articulado; até 2 se necessário).
 - Inclua natureza da contratação, tipo/modalidade quando couber, bem/equipamento ou público atendido, setor/unidade de destino e finalidade operacional — sem frase telegráfica.
 - Português claro: mesmo nível de detalhe de cláusula madura, mas sem termos raros (ex.: "fogão a gás" em vez de "equipamento de cocção"; "pleno funcionamento do equipamento" em vez de "plena operacionalidade do ativo").
-- PROIBIDO no objeto: fechamentos normativos do TR, riscos da não contratação ou argumentação de justificativa; objeto pobre de uma linha sem finalidade.
+- OBRIGATÓRIO: feche o objeto com «conforme quantidades e demais condições estabelecidas neste Termo de Referência» (aquisição) ou «conforme requisitos técnicos e demais condições estabelecidas neste Termo de Referência» (contratação/serviços), sempre com «neste Termo de Referência».
+- PROIBIDO no objeto: riscos da não contratação ou argumentação de justificativa; objeto pobre de uma linha sem finalidade.
 - NÃO liste itens, quantidades, marcas, modelos, bullets ou "Inclui:" — detalhes ficam na tabela do TR.
 - Em dispensa normal com características informadas: texto genérico institucional, sem nomear produto, dosagem ou marca.
 - Se o pedido trouxer «Setor/secretaria atendido», inclua esse destino no objeto (finalidade/vinculação ao setor).
@@ -297,6 +298,12 @@ CRITÉRIO DE ACEITAÇÃO:
   "o que", "em que extensão mínima", "para qual finalidade administrativa" e "sob quais balizas técnicas".
 - Se houver lista extensa de itens de aquisição, o núcleo material deve ter no máximo 3 a 5 macrogrupos (ex.: pneus, peças, insumos e acessórios automotivos), sem listar cada insumo nominalmente, deixando o detalhe na tabela. Porém a cláusula NÃO pode ser telegráfica: inclua obrigatoriamente uma oração clara de finalidade administrativa (ex.: atendimento à manutenção da frota, continuidade operacional, suporte ao funcionamento dos veículos da Administração), antes do fechamento normativo. Proibido: "incluindo ... 300 unidades ...", enumeração de modelos, blocos "Inclui:" com traços e fechamento que re-lista quantitativos.
 """
+
+
+from .clausulas_qwen_prompt import (
+    build_clausulas_qwen_full_prompt,
+    dispensa_clausulas_pedido_from_user_prompt,
+)
 
 
 def _format_user_context_for_tr_prompt(user_context: Optional[Dict[str, Any]]) -> str:
@@ -1454,19 +1461,25 @@ def _fix_o_manutencao_para_a_manutencao(text: str) -> str:
 def _apply_o_manutencao_fix_to_tr_slots(slots: TRTemplateSlots) -> TRTemplateSlots:
     """Normaliza concordância «é o manutenção» → «é a manutenção» nos campos de texto dos slots."""
     from .tr_deixis import adapt_text_for_tr
+    from .tr_objeto_fechamento import ensure_tr_objeto_fechamento
 
     mf = _fix_o_manutencao_para_a_manutencao
     tr_deixis = adapt_text_for_tr
+    objeto_final = tr_deixis(ensure_tr_objeto_fechamento(mf(slots.objeto or "")))
+    sol_oficio_raw = (slots.sol_oficio_objeto or "").strip()
+    sol_oficio_final = (
+        ensure_tr_objeto_fechamento(mf(sol_oficio_raw)) if sol_oficio_raw else ""
+    )
     return replace(
         slots,
-        objeto=tr_deixis(mf(slots.objeto or "")),
+        objeto=objeto_final,
         objeto_escopo=mf(slots.objeto_escopo or ""),
         objeto_entregas=mf(slots.objeto_entregas or ""),
         objeto_resultados=mf(slots.objeto_resultados or ""),
         justificativa=tr_deixis(mf(slots.justificativa or "")),
         problema_administrativo=mf(slots.problema_administrativo or ""),
         beneficio_esperado=mf(slots.beneficio_esperado or ""),
-        sol_oficio_objeto=mf(slots.sol_oficio_objeto or ""),
+        sol_oficio_objeto=sol_oficio_final or mf(slots.sol_oficio_objeto or ""),
         sol_oficio_justificativa=mf(slots.sol_oficio_justificativa or ""),
         dfd_objeto_referencia=mf(slots.dfd_objeto_referencia or ""),
         dfd_justificativa=mf(slots.dfd_justificativa or ""),
@@ -2194,7 +2207,7 @@ async def _enrich_dispensa_normal_tr_secao4(
         f"Objeto: {slots.objeto or ''}",
         f"Justificativa (não reescrever): {jus}",
     ]
-    up = (user_prompt or "").strip()
+    up = dispensa_clausulas_pedido_from_user_prompt(user_prompt or "")
     if up:
         user_bits.append(f"Contexto do pedido:\n{up[:3500]}")
     full_prompt = (
@@ -2332,7 +2345,7 @@ async def _enrich_tr_itens_from_prompt(
     jus = (slots.justificativa or "").strip()
     if jus:
         user_bits.append(f"Justificativa (contexto, não reescrever): {jus[:1200]}")
-    up = (user_prompt or "").strip()
+    up = dispensa_clausulas_pedido_from_user_prompt(user_prompt or "")
     if up:
         user_bits.append(f"Contexto do pedido:\n{up[:3500]}")
     full_prompt = (
@@ -2495,8 +2508,8 @@ async def _fill_tr_slots_with_llm_work(
     _fluxo_ui = str(override.get("dispensa_fluxo_ui") or "").strip().lower()
     rich_clausulas = False
     cloud_max_tokens: Optional[int] = None
+    clausulas_pedido = dispensa_clausulas_pedido_from_user_prompt(user_prompt)
     if lite_fill:
-        from .clausulas_qwen_prompt import build_clausulas_qwen_full_prompt
         from .config import (
             LLM_CLAUSULAS_CLOUD_MAX_TOKENS,
             clausulas_use_rich_prompt,
@@ -2513,10 +2526,10 @@ async def _fill_tr_slots_with_llm_work(
             base_tokens = max(400, int(LLM_CLAUSULAS_CLOUD_MAX_TOKENS))
             # Só a rápida tendia a ecoar após o 3º parágrafo; normal mantém teto configurável.
             cloud_max_tokens = min(768, base_tokens) if _fluxo_ui == "rapida" else base_tokens
-            full_prompt = build_clausulas_qwen_full_prompt(user_prompt, fluxo_ui=_fluxo_ui)
+            full_prompt = build_clausulas_qwen_full_prompt(clausulas_pedido, fluxo_ui=_fluxo_ui)
         else:
             user_prompt_text = _build_objeto_justificativa_user_prompt(
-                user_prompt, None, skip_context_in_prompt=True
+                clausulas_pedido, None, skip_context_in_prompt=True
             )
             user_prompt_text += (
                 "\nUse somente o texto em «Pedido do usuário». "
@@ -2592,7 +2605,7 @@ async def _fill_tr_slots_with_llm_work(
             override=override,
             slots_override=slots_override,
             user_context=user_context,
-            user_prompt=user_prompt,
+            user_prompt=clausulas_pedido,
             rich_output=rich_clausulas,
         )
 

@@ -34,6 +34,7 @@ class ClausulasQwenPromptTests(unittest.TestCase):
         )
         self.assertIn("Dispensa normal", full)
         self.assertIn("cláusula completa", full.lower())
+        self.assertIn("órgão/unidade", full.lower())
 
     def test_system_asks_json_only(self):
         self.assertIn('{"objeto"', CLAUSULAS_QWEN_SYSTEM_PROMPT)

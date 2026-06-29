@@ -189,8 +189,7 @@ REGRAS:
   - Regras de conteúdo:
     * Se houver quantidade e unidade explícitas, incorpore obrigatoriamente no objeto.
     * Sempre que natural, use "número + (extenso)" para reforçar precisão formal.
-    * Em aquisição, prefira fechamento com "conforme quantidades e demais condições estabelecidas neste Termo de Referência".
-    * Em contratação (qualquer natureza), prefira fechamento com "conforme requisitos técnicos e demais condições estabelecidas neste Termo de Referência".
+    * Em aquisição ou contratação, feche sempre com "conforme quantidades e demais condições estabelecidas neste Termo de Referência".
     * Quando houver muitos itens de aquisição (lista extensa), NÃO enumerar item por item no objeto; resumir em poucos MACROGRUPOS (idealmente 3 a 5 termos), p.ex. "Aquisição de pneus, peças, insumos e acessórios automotivos", e manter o detalhamento no array "itens" (tabela). NÃO liste nominalmente cada tipo (válvulas, pastilhas, óleo 5W30 etc.). NÃO use "incluindo" seguido de quantidades/modelos; NÃO recoloque algarismos ou medidas (kg, litros, unidades) no objeto — isso fica na tabela.
     * Não mencionar preço/valor unitário/estimado, salvo se o usuário tiver informado explicitamente.
     * Não remeter a "itens abaixo", "tabela", "anexo" ou equivalentes.
@@ -240,7 +239,7 @@ objeto:
 - Uma cláusula declarativa completa (preferir 1 período bem articulado; até 2 se necessário).
 - Inclua natureza da contratação, tipo/modalidade quando couber, bem/equipamento ou público atendido, setor/unidade de destino e finalidade operacional — sem frase telegráfica.
 - Português claro: mesmo nível de detalhe de cláusula madura, mas sem termos raros (ex.: "fogão a gás" em vez de "equipamento de cocção"; "pleno funcionamento do equipamento" em vez de "plena operacionalidade do ativo").
-- OBRIGATÓRIO: feche o objeto com «conforme quantidades e demais condições estabelecidas neste Termo de Referência» (aquisição) ou «conforme requisitos técnicos e demais condições estabelecidas neste Termo de Referência» (contratação/serviços), sempre com «neste Termo de Referência».
+- OBRIGATÓRIO: feche o objeto com «conforme quantidades e demais condições estabelecidas neste Termo de Referência» (sempre «neste Termo de Referência»; proibido «requisitos técnicos» no fechamento).
 - PROIBIDO no objeto: riscos da não contratação ou argumentação de justificativa; objeto pobre de uma linha sem finalidade.
 - NÃO liste itens, quantidades, marcas, modelos, bullets ou "Inclui:" — detalhes ficam na tabela do TR.
 - Em dispensa normal com características informadas: texto genérico institucional, sem nomear produto, dosagem ou marca.
@@ -1234,24 +1233,17 @@ def _enforce_objeto_semantic_consistency(text: str, *, add_tr_fechamento: bool =
 
     # Fechamento normativo do TR — só no pipeline integral do TR, não em cláusulas dispensa.
     if add_tr_fechamento:
-        is_aquisicao = bool(re.search(r"(?i)\b(aquisi(?:ç|c)[aã]o|fornecimento)\b", t)) and not has_service_nature
-        if is_aquisicao:
-            t = re.sub(
-                r"(?i),?\s*(visando|com\s+o\s+intuito\s+de)\s+atender\s+aos?\s+requisitos?\s+t[ée]cnicos?,?\s+quantitativos?\s+e\s+(demais\s+)?condi[çc][õo]es?\s+(delineadas|estabelecidas)\s+neste\s+termo\s+de\s+refer[êe]ncia\.?",
-                ", conforme quantidades e demais condições estabelecidas neste Termo de Referência",
-                t,
-            )
-            t = re.sub(
-                r"(?i),?\s*conforme\s+especifica(?:ç|c)[õo]es?\s+t[ée]cnicas?,?\s+quantitativos?\s+e\s+condi[çc][õo]es?\s+estabelecidas\s+neste\s+termo\s+de\s+refer[êe]ncia\.?",
-                ", conforme quantidades e demais condições estabelecidas neste Termo de Referência",
-                t,
-            )
-        else:
-            t = re.sub(
-                r"(?i),?\s*conforme\s+quantidades?\s+e\s+demais\s+condi[çc][õo]es?\s+estabelecidas\s+neste\s+termo\s+de\s+refer[êe]ncia\.?",
-                ", conforme requisitos técnicos e demais condições estabelecidas neste Termo de Referência",
-                t,
-            )
+        _fechamento_qtd = ", conforme quantidades e demais condições estabelecidas neste Termo de Referência"
+        t = re.sub(
+            r"(?i),?\s*(visando|com\s+o\s+intuito\s+de)\s+atender\s+aos?\s+requisitos?\s+t[ée]cnicos?,?\s+quantitativos?\s+e\s+(demais\s+)?condi[çc][õo]es?\s+(delineadas|estabelecidas)\s+neste\s+termo\s+de\s+refer[êe]ncia\.?",
+            _fechamento_qtd,
+            t,
+        )
+        t = re.sub(
+            r"(?i),?\s*conforme\s+(?:especifica(?:ç|c)[õo]es?\s+t[ée]cnicas?,?\s+quantitativos?\s+e\s+condi[çc][õo]es?|requisitos?\s+t[ée]cnicos?)\s+e\s+demais\s+condi[çc][õo]es?\s+estabelecidas\s+(?:neste|no)\s+termo\s+de\s+refer[êe]ncia\.?",
+            _fechamento_qtd,
+            t,
+        )
 
     # Mantém liberdade de redação da IA: aqui só sanidade mínima.
     t = re.sub(r"\s{2,}", " ", t).strip()

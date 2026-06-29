@@ -26,10 +26,14 @@ class TrObjetoFechamentoTests(unittest.TestCase):
         self.assertIn("neste Termo de Referência", out)
         self.assertNotIn("no Termo de Referência", out)
 
-    def test_contratacao_uses_requisitos_tecnicos(self):
-        raw = "Contratação de serviços de manutenção preventiva do fogão da cozinha."
+    def test_contratacao_usa_fechamento_quantidades(self):
+        raw = (
+            "Contratação de serviço especializado de limpeza predial, destinado à "
+            "conservação dos prédios públicos municipais."
+        )
         out = ensure_tr_objeto_fechamento(raw)
-        self.assertIn("conforme requisitos técnicos", out.lower())
+        self.assertIn("conforme quantidades", out.lower())
+        self.assertNotIn("requisitos técnicos", out.lower())
         self.assertIn("neste Termo de Referência", out)
 
     def test_dfd_converts_neste_to_no(self):

@@ -16,7 +16,7 @@ OBJETO (1 período completo e bem articulado; até 2 se indispensável):
 - Modelo de profundidade (adaptar ao pedido; não copiar literalmente): "Contratação de serviço especializado de manutenção corretiva do fogão a gás da cozinha, destinado ao uso da Secretaria de Administração, visando restabelecer o pleno funcionamento do equipamento."
 - Anti-modelo (proibido — objeto pobre): "Contratação de serviço de conserto do fogão da cozinha da Secretaria de Administração." ou "Aquisição de medicamentos para a UBS Leontino." sem tipo de assistência, destino administrativo ou finalidade.
 - Em dispensa normal: redação genérica institucional sobre o tema, sem nominalizar cada item da tabela.
-- OBRIGATÓRIO no objeto: feche com vírgula + «conforme quantidades e demais condições estabelecidas neste Termo de Referência» (aquisição/fornecimento) ou «conforme requisitos técnicos e demais condições estabelecidas neste Termo de Referência» (contratação de serviços/obras/manutenção). Use sempre «neste Termo de Referência» no objeto do TR.
+- OBRIGATÓRIO no objeto: feche com vírgula + «conforme quantidades e demais condições estabelecidas neste Termo de Referência». Use sempre «neste Termo de Referência»; proibido «requisitos técnicos» no fechamento.
 - PROIBIDO no objeto: «a execução obedecerá…», riscos da não contratação ou argumentação de justificativa.
 - PROIBIDO usar nos textos: órgão/unidade do cabeçalho administrativo, prefeitura, município, processo, cabeçalho do documento ou qualquer metadado que não esteja explicitamente em «O que será contratado» ou «Setor/secretaria atendido».
 

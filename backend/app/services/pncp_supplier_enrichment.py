@@ -23,7 +23,12 @@ from backend.app.services.pncp_cnpj_nome_cache import (
     set_cached_cnpj_nome,
 )
 from backend.app.models import PncpCotacaoItemCotacao
-from backend.app.services.pncp_supplier_placeholders import GENERIC_SUPPLIER_NAMES, coerce_supplier_name_text
+from backend.app.services.pncp_supplier_placeholders import (
+    GENERIC_SUPPLIER_NAMES,
+    coerce_supplier_name_text,
+    is_supplier_fonte_identifier,
+    supplier_name_metadata_key,
+)
 from backend.app.services.pncp_source_normalize import normalize_pncp_geo_in_payload
 
 logger = logging.getLogger(__name__)
@@ -288,18 +293,20 @@ def _walk_supplier_candidates(obj: Any, *, path: str = "", acc: Optional[List[Di
         cnpj = ""
         for k, v in obj.items():
             kk = str(k or "").strip().lower()
-            vv = str(v or "").strip()
-            if vv:
-                if any(x in kk for x in name_keys) and len(vv) > 2:
-                    nome = vv
-                if any(x in kk for x in cnpj_keys):
-                    m = _CNPJ_RE.search(vv)
-                    if m:
-                        cnpj = m.group()
-                    else:
-                        d = re.sub(r"\D", "", vv)
-                        if len(d) == 14:
-                            cnpj = d
+            if supplier_name_metadata_key(kk):
+                continue
+            raw_v = str(v or "").strip()
+            vv = coerce_supplier_name_text(v)
+            if vv and any(x in kk for x in name_keys) and len(vv) > 2:
+                nome = vv
+            if raw_v and any(x in kk for x in cnpj_keys):
+                m = _CNPJ_RE.search(raw_v)
+                if m:
+                    cnpj = m.group()
+                else:
+                    d = re.sub(r"\D", "", raw_v)
+                    if len(d) == 14:
+                        cnpj = d
         if nome or cnpj:
             acc.append({"path": path, "fornecedor": nome, "cnpj": cnpj})
         for k, v in obj.items():
@@ -325,6 +332,7 @@ def _extract_supplier_snapshot(payload: Any) -> Dict[str, str]:
             nome
             and nome_norm not in generic_names
             and not nome_norm.startswith("pncp_")
+            and not is_supplier_fonte_identifier(nome)
             and not _nome_e_somente_cnpj_formatado(nome)
         )
         if cnpj and nome_ok:

@@ -107,6 +107,30 @@ class SupplierNameDisplayTests(unittest.TestCase):
         }
         self.assertEqual(_pick_supplier_name_from_source(src), "")
 
+    def test_pick_name_ignora_fornecedor_contato_fonte_receitaws(self):
+        src = {
+            "cnpj_fornecedor": "27.105.456/0001-72",
+            "fornecedor": "",
+            "fornecedor_contato_fonte": "receitaws_cnpj",
+            "fornecedor_cadastro": {"razao_social": "EMPRESA RECEITAWS LTDA"},
+        }
+        self.assertEqual(_pick_supplier_name_from_source(src), "EMPRESA RECEITAWS LTDA")
+
+    def test_rejeita_receitaws_cnpj_como_nome(self):
+        self.assertFalse(nome_fornecedor_e_util_para_exibicao("receitaws_cnpj"))
+
+    def test_flatten_remove_receitaws_cnpj_do_topo(self):
+        it = {
+            "cnpj_fornecedor": "27.105.456/0001-72",
+            "fornecedor": "receitaws_cnpj",
+            "fornecedor_contato_fonte": "receitaws_cnpj",
+            "source": {
+                "fornecedor_cadastro": {"razao_social": "EMPRESA REAL LTDA"},
+            },
+        }
+        flatten_supplier_fields_in_payload(it)
+        self.assertEqual(it.get("fornecedor"), "EMPRESA REAL LTDA")
+
     def test_pick_name_from_fornecedor_cadastro(self):
         src = {
             "cnpj_fornecedor": "27.105.456/0001-72",

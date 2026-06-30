@@ -17,7 +17,12 @@ from typing import Any, Dict, List, Optional, Tuple
 from django.conf import settings
 from django.utils import timezone
 
-from backend.app.services.pncp_supplier_placeholders import GENERIC_SUPPLIER_NAMES, coerce_supplier_name_text
+from backend.app.services.pncp_supplier_placeholders import (
+    GENERIC_SUPPLIER_NAMES,
+    coerce_supplier_name_text,
+    is_supplier_fonte_identifier,
+    supplier_name_metadata_key,
+)
 from backend.app.services.pncp_supplier_enrichment import (
     _nome_e_somente_cnpj_formatado,
     _promote_supplier_from_deep_walk,
@@ -322,25 +327,8 @@ _SUPPLIER_NAME_TOP_KEYS = (
     "fornecedor_nome",
 )
 
-_SUPPLIER_NAME_META_KEYS = frozenset(
-    {
-        "fornecedor_fonte",
-        "fornecedor_fonte_nome",
-        "fornecedor_elegivel",
-        "fornecedor_origem_indice",
-        "fornecedor_enriquecido_ao_adicionar",
-        "fornecedor_cadastro",
-        "fornecedor_hibrido_live",
-        "fornecedor_busca_pncp",
-    }
-)
-
-
 def _supplier_name_key_is_metadata(key: str) -> bool:
-    k = str(key or "").strip().lower()
-    if k in _SUPPLIER_NAME_META_KEYS:
-        return True
-    return k.startswith("fornecedor_fonte")
+    return supplier_name_metadata_key(key)
 
 
 def nome_fornecedor_e_util_para_exibicao(nome: str) -> bool:
@@ -352,6 +340,8 @@ def nome_fornecedor_e_util_para_exibicao(nome: str) -> bool:
     if low in GENERIC_SUPPLIER_NAMES:
         return False
     if low.startswith("pncp_"):
+        return False
+    if is_supplier_fonte_identifier(n):
         return False
     if _nome_e_somente_cnpj_formatado(n):
         return False

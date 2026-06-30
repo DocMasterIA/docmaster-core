@@ -68,6 +68,48 @@ CNPJ_KEYS = (
     "niFornecedor",
 )
 
+SUPPLIER_FONTE_IDENTIFIERS = frozenset(
+    {
+        "receitaws_cnpj",
+        "receitaws",
+        "brasilapi_cnpj",
+        "brasilapi",
+        "cnpj.ws",
+        "cnpj_ws",
+        "sem_email",
+    }
+)
+
+
+def _supplier_name_metadata_key(key: str) -> bool:
+    k = str(key or "").strip().lower()
+    if k in {
+        "fornecedor_fonte",
+        "fornecedor_fonte_nome",
+        "fornecedor_contato_fonte",
+        "fornecedor_elegivel",
+        "fornecedor_origem_indice",
+        "fornecedor_enriquecido_ao_adicionar",
+        "fornecedor_cadastro",
+        "fornecedor_hibrido_live",
+        "fornecedor_busca_pncp",
+    }:
+        return True
+    return k.startswith(("fornecedor_fonte", "fornecedor_contato"))
+
+
+def _is_supplier_fonte_identifier(text: str) -> bool:
+    low = re.sub(r"\s+", " ", str(text or "").strip()).lower()
+    if not low:
+        return False
+    if low in SUPPLIER_FONTE_IDENTIFIERS:
+        return True
+    if low.startswith("pncp_"):
+        return True
+    if " " not in low and low.endswith("_cnpj") and low.replace("_", "").replace(".", "").isalnum():
+        return True
+    return False
+
 
 @dataclass
 class SupplierResolution:
@@ -106,6 +148,8 @@ def nome_fornecedor_e_util(nome: str) -> bool:
     if s in GENERIC_SUPPLIER_NAMES:
         return False
     if s.startswith("pncp_"):
+        return False
+    if _is_supplier_fonte_identifier(s):
         return False
     if _CNPJ_RE.fullmatch(s.replace(" ", "")) or len(cnpj_digits(s)) == 14:
         return False
@@ -283,19 +327,20 @@ def walk_supplier_candidates(
         cnpj = ""
         for k, v in obj.items():
             kk = str(k or "").strip().lower()
+            if _supplier_name_metadata_key(kk):
+                continue
             if isinstance(v, bool):
                 continue
+            raw_v = str(v or "").strip()
             vv = sanitize_fornecedor_nome(v)
-            if not vv:
-                continue
-            if any(x in kk for x in SUPPLIER_NAME_KEYS):
+            if vv and any(x in kk for x in SUPPLIER_NAME_KEYS):
                 nome = vv
-            if any(x in kk for x in CNPJ_KEYS):
-                m = _CNPJ_RE.search(vv)
+            if raw_v and any(x in kk for x in CNPJ_KEYS):
+                m = _CNPJ_RE.search(raw_v)
                 if m:
                     cnpj = m.group()
                 else:
-                    d = cnpj_digits(vv)
+                    d = cnpj_digits(raw_v)
                     if len(d) == 14:
                         cnpj = d
         if nome or cnpj:

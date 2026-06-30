@@ -717,6 +717,64 @@ def split_paragraphs_on_double_newline(doc: Document, *, space_after_pt: float =
         process_para(p)
 
 
+def _set_paragraph_left_aligned(paragraph: Paragraph) -> None:
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    try:
+        pf = paragraph.paragraph_format
+        pf.space_before = Pt(0)
+        pf.space_after = Pt(0)
+        pf.line_spacing = 1.0
+    except Exception:
+        pass
+
+
+def _left_align_tr_user_dotacao_paragraphs(doc: Document, dotacao: str) -> None:
+    """
+    Dotação opcional inserida pelo usuário (§20/21 do TR): sempre à esquerda.
+    Só atua quando há texto em slots.dotacao — não altera o modelo sem dotação informada.
+    """
+    dot = _normalize_slot_block(dotacao)
+    if not dot:
+        return
+
+    needle_lines = [ln.strip() for ln in dot.split("\n") if ln.strip()]
+    if not needle_lines:
+        return
+
+    paras = list(_iter_all_document_paragraphs(doc))
+    matched_indices: list[int] = []
+
+    for i, p in enumerate(paras):
+        raw = (p.text or "").replace("\xa0", " ")
+        if not raw.strip():
+            continue
+        if needle_lines[0] in raw or raw.strip() in needle_lines:
+            matched_indices.append(i)
+        elif matched_indices and any(ln in raw for ln in needle_lines[1:]):
+            matched_indices.append(i)
+
+    if not matched_indices:
+        for i, p in enumerate(paras):
+            tl = (p.text or "").lower()
+            if "seguinte dotação orçamentária" not in tl and "seguinte dotacao orcamentaria" not in tl:
+                continue
+            j = i + 1
+            while j < len(paras):
+                tj = (paras[j].text or "").strip()
+                if not tj:
+                    matched_indices.append(j)
+                    j += 1
+                    continue
+                if re.match(r"^\d+\.\s", tj) and "dotação" not in tj.lower() and "dotacao" not in tj.lower():
+                    break
+                matched_indices.append(j)
+                j += 1
+            break
+
+    for i in matched_indices:
+        _set_paragraph_left_aligned(paras[i])
+
+
 def _fill_items_table(doc: Document, itens: List[ItemSlot]) -> None:
     """
     Preenche a tabela de Quantitativo e Descritivo com base em slots.itens.
@@ -1390,6 +1448,8 @@ def render_tr_from_slots(
 
     _replace_placeholders_in_paragraphs(doc, mapping)
     split_paragraphs_on_double_newline(doc)
+    if str(slots.dotacao or "").strip():
+        _left_align_tr_user_dotacao_paragraphs(doc, slots.dotacao)
     _remove_tr_assinatura_cargo_line(doc)
     _fix_respetiva_typo_in_document(doc)
     _apply_art74_i_dotacao_paragraph_branch(doc, tpl_path, slots.dotacao, slots)

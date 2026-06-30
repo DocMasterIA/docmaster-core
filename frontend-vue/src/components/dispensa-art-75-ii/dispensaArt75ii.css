@@ -254,6 +254,7 @@
 .da75-textarea {
   resize: vertical;
   min-height: 4.5rem;
+  white-space: pre-wrap;
 }
 
 .da75-field {

@@ -530,6 +530,7 @@ import {
   capitalizeNomeTituloMultilinePt,
   capitalizeNomeTituloPt,
   SLOT_NOME_MULTILINE_IDS,
+  trimMultilinePreserve,
   formatMoedaBRLInput,
   sanitizeQuantidadeInput,
 } from '@/utils/itemValorCampos.js';
@@ -1234,7 +1235,7 @@ function buildTrSlotsOverride() {
 
   const solDestNome = (f.solicitacao_destinatario_nome || '').trim();
   const solDestTratNome = (f.solicitacao_destinatario_tratamento_nome || '').trim();
-  const solRespNome = (f.solicitacao_responsavel_nome || '').trim();
+  const solRespNome = trimMultilinePreserve(f.solicitacao_responsavel_nome || '');
   if (solDestNome) o.sol_oficio_destinatario_nome = solDestNome;
   if (solDestTratNome) o.ao_senhor_genero = solDestTratNome;
   if (solRespNome) o.sol_oficio_responsavel_nome = solRespNome;
@@ -1267,7 +1268,7 @@ function buildTrSlotsOverride() {
   const dfdGestor = (f.dfd_gestor_contratos || '').trim();
   if (dfdGestor) o.dfd_gestor_contratos = dfdGestor;
 
-  const dfdAssNome = (f.dfd_assinatura_nome || '').trim();
+  const dfdAssNome = trimMultilinePreserve(f.dfd_assinatura_nome || '');
   if (dfdAssNome) o.dfd_assinatura_nome = dfdAssNome;
 
   const end = (f.tr_endereco_propostas || '').trim();
@@ -1290,12 +1291,12 @@ function buildTrSlotsOverride() {
     o.data_termo = dataTermo;
   }
 
-  const nomeAss = (
+  const nomeAss = trimMultilinePreserve(
     f.tr_nome_assinante
     || f.tr_termo_responsavel_nome
     || f.responsavel_tr_nome
-    || ''
-  ).trim();
+    || '',
+  );
   if (nomeAss) {
     o.nome_assinante_termo = nomeAss;
   }

@@ -318,6 +318,8 @@ DFD_INCLUSIVE_ROLE_LABEL_REPLACEMENTS: tuple[tuple[str, str], ...] = (
 
 def _replace_substring_in_paragraph_runs(paragraph, needle: str, replacement: str) -> bool:
     """Substitui `needle` em um parágrafo mesmo quando o texto está dividido em vários runs."""
+    from .tr_template import _append_multiline_to_run
+
     runs = paragraph.runs
     if not runs or not needle:
         return False
@@ -346,11 +348,27 @@ def _replace_substring_in_paragraph_runs(paragraph, needle: str, replacement: st
 
     if start_idx == end_idx:
         txt = runs[start_idx].text or ""
-        runs[start_idx].text = txt[:start_off] + replacement + txt[end_off:]
+        before = txt[:start_off]
+        after = txt[end_off:]
+        run = runs[start_idx]
+        run.text = before
+        if "\n" in replacement:
+            _append_multiline_to_run(run, replacement)
+            if after:
+                run.add_text(after)
+        else:
+            run.text = before + replacement + after
     else:
         prefix = (runs[start_idx].text or "")[:start_off]
         suffix = (runs[end_idx].text or "")[end_off:]
-        runs[start_idx].text = prefix + replacement + suffix
+        run = runs[start_idx]
+        run.text = prefix
+        if "\n" in replacement:
+            _append_multiline_to_run(run, replacement)
+            if suffix:
+                run.add_text(suffix)
+        else:
+            run.text = prefix + replacement + suffix
         for idx in range(start_idx + 1, end_idx + 1):
             runs[idx].text = ""
     return True

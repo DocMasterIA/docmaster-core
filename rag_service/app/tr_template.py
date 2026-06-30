@@ -488,6 +488,16 @@ def _append_multiline_to_run(run, text: str) -> None:
         run.add_text(part)
 
 
+def set_paragraph_multiline_text(paragraph: Paragraph, text: str) -> None:
+    """Substitui o conteúdo do parágrafo preservando \\n como quebras Word (w:br)."""
+    normalized = str(text or "").replace("\r\n", "\n").replace("\r", "\n")
+    paragraph.clear()
+    if not normalized:
+        return
+    run = paragraph.add_run()
+    _append_multiline_to_run(run, normalized)
+
+
 def _replace_placeholders_in_paragraphs(doc: Document, mapping: Dict[str, str]) -> None:
     def _replace_placeholder_in_paragraph_runs(paragraph, placeholder: str, replacement: str) -> bool:
         runs = paragraph.runs
@@ -576,7 +586,7 @@ def split_paragraphs_on_double_newline(doc: Document, *, space_after_pt: float =
         parts = [p.strip() for p in t.split("\n\n") if p.strip()]
         if len(parts) <= 1:
             return
-        para.text = parts[0]
+        set_paragraph_multiline_text(para, parts[0])
         n = len(parts)
         parent_align = para.alignment
         if n >= 2:
@@ -586,7 +596,7 @@ def split_paragraphs_on_double_newline(doc: Document, *, space_after_pt: float =
             new_p = OxmlElement("w:p")
             ref_el.addnext(new_p)
             new_para = Paragraph(new_p, para._parent)
-            new_para.text = chunk
+            set_paragraph_multiline_text(new_para, chunk)
             if parent_align is not None:
                 new_para.alignment = parent_align
             if idx < n - 2:

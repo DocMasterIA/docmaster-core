@@ -116,7 +116,6 @@ export function extractClausesFromSectionTexts(sectionTexts) {
 /**
  * @param {{
  *   contratado: string,
- *   setor: string,
  *   caracteristicas?: string,
  *   tipoManutencao?: string,
  *   revisaoKm?: string,
@@ -125,14 +124,12 @@ export function extractClausesFromSectionTexts(sectionTexts) {
  */
 export function buildClausulasObjetoJustificativaPrompt(fields) {
   const contratado = String(fields.contratado || '').trim();
-  const setor = String(fields.setor || '').trim();
   const caracteristicas = String(fields.caracteristicas || '').trim();
   const tipoManutencao = String(fields.tipoManutencao || '').trim();
   const revisaoKm = String(fields.revisaoKm || '').trim();
 
   return [
     `O que será contratado: ${contratado}`,
-    `Setor/secretaria atendido: ${setor}`,
     caracteristicas ? `Características mínimas: ${caracteristicas}` : '',
     tipoManutencao ? `Tipo de manutenção: ${tipoManutencao}` : '',
     revisaoKm ? `Revisão/KM: ${revisaoKm}` : '',
@@ -306,7 +303,6 @@ export async function requestClausulasObjetoJustificativaFast(apiBase, options =
   const url = base ? `${base}/api/llm/generate` : '/api/llm/generate';
   const prompt = buildClausulasObjetoJustificativaPrompt({
     contratado: options.contratado,
-    setor: options.setor,
     caracteristicas: options.caracteristicas,
     tipoManutencao: options.tipoManutencao,
     revisaoKm: options.revisaoKm,

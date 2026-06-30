@@ -67,11 +67,27 @@ export const SLOT_NOME_MULTILINE_IDS = new Set([
 ]);
 
 /**
+ * Normaliza quebras vindas de textarea, Word ou clipboard (\\r\\n, \\u2028, etc.).
+ * @param {string} value
+ */
+export function normalizeMultilineInput(value) {
+  return String(value ?? '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/\u2028|\u2029|\u0085/g, '\n');
+}
+
+/** Trim só nas bordas; preserva linhas vazias e quebras internas. */
+export function trimMultilinePreserve(value) {
+  return normalizeMultilineInput(value).trim();
+}
+
+/**
  * Formata cada linha como nome/título; preserva quebras de linha digitadas pelo usuário.
  * @param {string} value
  */
 export function capitalizeNomeTituloMultilinePt(value) {
-  const raw = String(value ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const raw = normalizeMultilineInput(value);
   if (!raw.trim()) return raw;
   return raw
     .split('\n')
@@ -84,7 +100,7 @@ export function capitalizeNomeTituloMultilinePt(value) {
  * @param {string} raw
  */
 export function normNomeTituloMultiline(raw) {
-  const text = String(raw ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+  const text = trimMultilinePreserve(raw);
   if (!text) return '';
   return text
     .split('\n')

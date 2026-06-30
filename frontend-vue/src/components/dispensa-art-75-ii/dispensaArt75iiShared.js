@@ -64,7 +64,7 @@ export function campoPreenchido(valor) {
 }
 
 /**
- * Setor requisitante do DFD (2.1) — somente «Dados fixos», nunca o setor do prompt de cláusulas IA.
+ * Setor requisitante do DFD (2.1) — somente «Dados fixos» na geração DOCX; não entra no prompt de cláusulas IA.
  * @param {{ fixoSetor?: string }} dadosFixos
  */
 export function dfdSetorRequisitanteFromDadosFixos(dadosFixos) {

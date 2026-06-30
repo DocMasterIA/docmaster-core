@@ -160,8 +160,12 @@ def api_login_required(view_func):
 
 
 def _normalize_slot_value(v: str) -> str:
-    s = re.sub(r"\s+", " ", (v or "").strip())
-    return s.casefold()
+    """Chave de deduplicação do catálogo — preserva linhas, colapsa só espaços na mesma linha."""
+    lines = [
+        re.sub(r"[ \t\f\v]+", " ", ln.strip())
+        for ln in str(v or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    ]
+    return "\n".join(lines).strip().casefold()
 
 
 def _resolve_slot_package_key(payload: dict, request) -> str:

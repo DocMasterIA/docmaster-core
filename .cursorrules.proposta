@@ -1,0 +1,194 @@
+# DocMaster Core — regras propostas para o Cursor
+# ============================================================
+# ESTE ARQUIVO NÃO ESTÁ ATIVO. Renomeie para `.cursorrules` na raiz
+# do repositório somente após revisão.
+# Proposta gerada em jun/2026 — alinhada a docs/SISTEMA-DOCMASTER-VISAO-COMPLETA.md
+# ============================================================
+
+## Contexto do projeto
+
+Você trabalha no **docmaster-core**: sistema de documentos de licitação pública brasileira (Lei 14.133/2021).
+
+Stack principal:
+- **backend/** — Django 5.2, multi-tenant por prefeitura, APIs REST
+- **frontend-vue/** — Vue 3 + Vite + TypeScript/JavaScript
+- **rag_service/** — FastAPI: RAG, geração TR/DFD/Ofício, análise, DOCX
+- **llm_api/** — orquestração Ollama (retry, auditoria)
+- **llm_agent/** — estrutura de documento e cláusulas
+- **pncp_researcher_service/** — índice PNCP SQLite (stack Docker **isolado**)
+- **template_packages/** — modelos DOCX por `slot_package_key`
+- **text_corrector_service/** — correção gramatical
+
+Antes de mudanças amplas, consulte:
+- `docs/SISTEMA-DOCMASTER-VISAO-COMPLETA.md` — mapa mestre
+- `docs/geracao-documentos/` — slots, tipografia, changelog jun/2026
+- `docs/servicos/DOC_*.md` — contratos por serviço
+- `docs/deploy/README.md` — produção (dois stacks Compose, volumes PNCP)
+
+O produto é **assistivo** — nunca afirmar validade jurídica automática.
+
+---
+
+## Princípios de código
+
+1. **Escopo mínimo** — corrija só o que foi pedido; não refatore áreas adjacentes.
+2. **Separação de camadas** — Django não chama Ollama diretamente; lógica de IA fica em rag_service / llm_api / llm_agent.
+3. **Convenções existentes** — leia o arquivo e a pasta antes de inventar padrão novo.
+4. **Sem over-engineering** — evite abstrações para um único uso; sem helpers de uma linha.
+5. **Comentários** — só para lógica de negócio não óbvia (Lei 14.133, DOCX, slots).
+6. **Testes** — adicione quando o bug for sutil ou regressível (tipografia DOCX, sanitize slots, PNCP); não teste o trivial.
+
+---
+
+## Onde mexer (roteamento de tarefas)
+
+| Tarefa | Onde |
+|--------|------|
+| Formulário dispensa / dados fixos / slots_override | `frontend-vue/src/components/dispensa-art-75-ii/` |
+| Placeholders, render DOCX, tipografia, assinatura | `rag_service/app/tr_template.py`, `dfd_template.py`, `oficio_template.py`, `docx_typography.py` |
+| Merge slots IA + override | `rag_service/app/tr_slots_llm.py` |
+| Sanitização slots DFD | `rag_service/app/dfd_slot_sanitize.py` |
+| API gerar documento, proxy RAG, merge biblioteca | `backend/app/api.py`, `backend/app/services/` |
+| Modelos DOCX base | `template_packages/lei_14133/<pacote>/` |
+| PNCP ingest / busca / worker | `pncp_researcher_service/` (não misturar com rag_service) |
+| Variáveis de ambiente | `docker-compose.yml`, `docs/servicos/DOC_CONFIG_AMBIENTE.md` |
+
+---
+
+## Geração TR / DFD / Ofício — regras de domínio
+
+### Slots e placeholders
+- Convenção: `(TR_OBJETO)`, `(DFD_SETOR_REQUISITANTE)`, `(SOL_OFICIO_RESPONSAVEL_NOME)` — prefixo por documento, caixa alta, parênteses no DOCX.
+- `slots_override` vem do frontend; merge final em `tr_slots_llm.py`.
+- **`dfd_setor_requisitante`** vem **somente** de `dadosFixos.fixoSetor` na geração DOCX — **não** entra no prompt de cláusulas IA (nem campo «setor atendido» no formulário normal).
+- Ao alterar slots no Vue, verificar **normal** e **rápida** + `dispensaArt75iiShared.js`.
+
+### Pipeline de render DOCX (ordem importa)
+1. Substituir placeholders / inserir tabelas e cláusulas
+2. `apply_standard_body_font_to_document()`
+3. `apply_default_justify_to_document()` — não sobrescrever alinhamento explícito no modelo
+4. `ensure_signature_nome_blank_lines()` — **último passo**; 3 linhas vazias entre cidade/data e nome
+
+### Tipografia
+- Parágrafos já justificados no `.docx` devem permanecer justificados.
+- §15.1 e itens romanos curtos (`I – …`) ficam à esquerda.
+- Detecção cidade/data deve incluir «datado e assinado digitalmente» (sem exigir ano de 4 dígitos).
+
+### Templates
+- Alteração em `template_packages/` exige **rebuild** da imagem `rag_service` em produção — `git pull` + `recreate` sem `build` **não** atualiza DOCX.
+
+---
+
+## Frontend (Vue 3)
+
+- Componentes dispensa: `DispensaArt75IINormalForm.vue`, `DispensaArt75IIRapidaForm.vue`, `DispensaArt75IIDadosFixosDrawer.vue`.
+- Helpers compartilhados: `dispensaArt75iiShared.js` — preferir centralizar aqui em vez de duplicar.
+- Presets/dados fixos: `useDispensaArt75IIDadosFixos.js`.
+- Não commitar `frontend-vue/dist/` salvo se o fluxo de deploy do projeto exigir explicitamente.
+- Após mudança em formulários/slots: rebuild `frontend-vue` na VPS.
+
+---
+
+## Backend Django
+
+- Rotas tenant: `/<prefeitura_slug>/...` — respeitar multi-tenant.
+- APIs de documento exigem autenticação (`@api_login_required`).
+- Timeouts RAG configuráveis (`RAG_HTTP_TIMEOUT`, `RAG_HTTP_TIMEOUT_TR_DFD_MAX`) — não adicionar retry em cascata no POST ao RAG.
+- Merge biblioteca: `merge_docx_with_template_body()` — corpo vem do RAG; não reformatar assinatura no merge sem necessidade.
+
+---
+
+## PNCP — cuidados obrigatórios
+
+- Stack **separado**: `docker-compose.pncp.yml`, projeto Compose `docmaster-pncp`.
+- **Nunca** sugerir `docker compose -f docker-compose.pncp.yml down -v` (apaga SQLite).
+- Volume crítico: `docmaster-pncp_pncp_researcher_data`.
+- `docker compose up` do stack principal não deve recriar PNCP.
+- Documentação: `docs/pncp/00-INDICE.md`, `docs/deploy/PNCP-*.md`.
+
+---
+
+## LLM e RAG
+
+- Roteamento de modelos por env: `LLM_ORCHESTRATION_BASE_URL`, `LLM_CLAUSULAS_GENERATION_BASE_URL`, `LLM_ETP_GENERATION_BASE_URL`, `PNCP_IA_BASE_URL`.
+- Qwen: profile `qwen` no compose — `docker compose --profile qwen up -d qwen_llm_service`.
+- ChromaDB: filtrar retrieval por `document_type` (gerador vs analisador usam filtros diferentes na mesma coleção).
+- Logs de auditoria LLM em `llm_audit/` — não logar dados sensíveis a mais do que o padrão existente.
+
+---
+
+## Testes
+
+```bash
+# RAG — tipografia, assinatura, sanitize DFD
+cd rag_service && pytest tests/test_docx_typography.py tests/test_signature_nome_spacing.py tests/test_dfd_slot_sanitize.py -v
+
+# Django
+cd backend && python manage.py test <app>.<TestClass>
+
+# PNCP
+cd pncp_researcher_service && pytest
+```
+
+Após mudança em `docx_typography.py`, rodar testes de assinatura **e** justificação.
+
+---
+
+## Deploy (produção)
+
+Ambiente típico: WSL + Docker, compose em `~/`, repo em `~/docmaster-core`.
+
+```bash
+cd ~/docmaster-core && git pull
+cd ~
+docker compose build rag_service frontend-vue   # só os serviços alterados
+docker compose up -d --force-recreate rag_service frontend-vue
+```
+
+- Cloudflare Tunnel: timeout ~100s na borda — gerações longas podem precisar de estratégia assíncrona ou nginx com timeout maior.
+- Métricas: Grafana `127.0.0.1:3000` (túnel SSH na VPS).
+- Ver `docs/geracao-documentos/04-deploy-templates-docx.md`.
+
+---
+
+## Git e entregas
+
+- **Não commitar** sem pedido explícito do usuário.
+- **Não commitar** `.env`, credenciais, tokens Cloudflare.
+- Não rodar `git push --force` em main/master.
+- Não criar `.md` de documentação não solicitados (exceto quando o usuário pedir docs).
+
+---
+
+## Comunicação com o usuário
+
+- Respostas em português quando o usuário escreve em português.
+- Citar código existente com formato `startLine:endLine:filepath`.
+- Explicar o «porquê» em correções de domínio (slots, DOCX, PNCP).
+- Não prometer deploy na VPS sem o usuário pedir — dar comandos prontos para copiar.
+
+---
+
+## Anti-padrões (evitar)
+
+- Colocar lógica de render DOCX no Django ou no Vue.
+- Duplicar `dfd_setor_requisitante` em múltiplos builders de override sem passar por `dispensaArt75iiShared.js`.
+- Chamar `ensure_signature_nome_blank_lines` antes da justificação.
+- Alterar heurística de `paragraph_should_remain_left_aligned` sem teste com TR compras real (§15.1 + justificativa longa).
+- Adicionar PNCP ao `docker-compose.yml` principal.
+- Assumir que `force-recreate` atualiza código Python ou templates DOCX sem `build`.
+
+---
+
+## Documentação — quando atualizar
+
+Atualize docs **somente se o usuário pedir**, ou se a mudança alterar contrato público (API, slot, deploy). Referências preferenciais:
+
+| Tema | Arquivo |
+|------|---------|
+| Visão geral | `docs/SISTEMA-DOCMASTER-VISAO-COMPLETA.md` |
+| Changelog geração | `docs/geracao-documentos/CHANGELOG-2026-06.md` |
+| Slots | `docs/geracao-documentos/01-slots-tr-dfd-oficio.md` |
+| Novo endpoint RAG | `docs/servicos/DOC_RAG_SERVICE.md` |
+| Novo endpoint Django | `docs/servicos/DOC_BACKEND.md` |
+| Ops PNCP | `docs/deploy/` ou `docs/pncp/planejamento/` |

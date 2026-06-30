@@ -206,6 +206,7 @@ import {
 } from '@/utils/fetchFillTrSlots.js';
 import { buildClausulasObjetoJustificativaPrompt } from '@/utils/clausulasObjetoJustificativa.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
+import { trimMultilinePreserve } from '@/utils/itemValorCampos.js';
 import {
   applyUsuarioLocalidadeToSlots,
   fetchUsuarioLocalidadeParaTr,
@@ -515,7 +516,7 @@ function buildSlotsOverride() {
   applyUsuarioLocalidadeToSlots(o, usuarioLocalidade.value);
   o.dispensa_fluxo_ui = 'rapida';
   const destNome = String(dadosFixos.fixoNome || '').trim();
-  const respNome = String(dadosFixos.fixoResponsavel || '').trim();
+  const respNome = trimMultilinePreserve(dadosFixos.fixoResponsavel || '');
   const tratNome = String(dadosFixos.fixoTratNome || '').trim();
   if (destNome) o.sol_oficio_destinatario_nome = destNome;
   if (respNome) o.sol_oficio_responsavel_nome = respNome;
@@ -529,7 +530,9 @@ function buildSlotsOverride() {
     o.dfd_fiscal_contratos = fn;
     o.fiscal = { nome: fn };
   }
-  if (String(dadosFixos.fixoAssinatura || '').trim()) o.dfd_assinatura_nome = String(dadosFixos.fixoAssinatura).trim();
+  if (trimMultilinePreserve(dadosFixos.fixoAssinatura || '')) {
+    o.dfd_assinatura_nome = trimMultilinePreserve(dadosFixos.fixoAssinatura);
+  }
   if (processoAtivo.value && String(processo.value || '').trim()) {
     const np = String(processo.value).trim();
     o.numero_processo = np;
@@ -537,9 +540,8 @@ function buildSlotsOverride() {
   }
   if (String(dadosFixos.fixoEnderecoEntrega || '').trim()) o.endereco_entrega = String(dadosFixos.fixoEnderecoEntrega).trim();
   if (String(dadosFixos.fixoEmailPropostas || '').trim()) o.email_envio_propostas = String(dadosFixos.fixoEmailPropostas).trim();
-  if (String(dadosFixos.fixoTrResponsavelNome || '').trim()) {
-    o.nome_assinante_termo = String(dadosFixos.fixoTrResponsavelNome).trim();
-  }
+  const trRespNome = trimMultilinePreserve(dadosFixos.fixoTrResponsavelNome || '');
+  if (trRespNome) o.nome_assinante_termo = trRespNome;
   const modoNormalizado = String(modoData.value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -592,7 +594,7 @@ function buildSlotsOverride() {
 function buildUserPromptFillTrSlots() {
   return buildClausulasObjetoJustificativaPrompt({
     contratado: objetoContratado.value,
-    setor: dfdSetorRequisitanteFromDadosFixos(dadosFixos),
+    caracteristicas: objetoCaracteristicas.value,
   });
 }
 

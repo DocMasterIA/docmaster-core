@@ -68,15 +68,6 @@
                       />
                     </div>
                     <div class="da75-field">
-                      <label class="da75-label">Qual setor/secretaria será atendido?</label>
-                      <input
-                        class="da75-input"
-                        :value="objetoSetor"
-                        :placeholder="normalPhSetor"
-                        @input="objetoSetor = primeiraMaiuscula(($event.target).value)"
-                      />
-                    </div>
-                    <div class="da75-field">
                       <label class="da75-label">Características mínimas obrigatórias (opcional)</label>
                       <textarea
                         class="da75-textarea"
@@ -272,6 +263,7 @@ import {
   fetchFillTrSlotsWithRetry,
 } from '@/utils/fetchFillTrSlots.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
+import { trimMultilinePreserve } from '@/utils/itemValorCampos.js';
 import {
   applyUsuarioLocalidadeToSlots,
   fetchUsuarioLocalidadeParaTr,
@@ -290,7 +282,6 @@ const processo = ref('');
 const orgao = ref('');
 const dadosFixos = useDispensaArt75IIDadosFixos(API_BASE, { cabecalho, processoAtivo, processo, orgao });
 const objetoContratado = ref('');
-const objetoSetor = ref('');
 const objetoCaracteristicas = ref('');
 const objetoGerado = ref('');
 const justificativa = ref('');
@@ -327,31 +318,26 @@ const SLOT_PACKAGE_BY_ROUTE = {
 const DISPENSA_ART75_II_NORMAL_SHARED_ROUTES = new Set(Object.keys(SLOT_PACKAGE_BY_ROUTE));
 const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[String(route.name || '')] || 'tr_dfd_generico');
 
-/** Exemplos por modalidade (dispensa normal — objeto / setor / características). */
+/** Exemplos por modalidade (dispensa normal — objeto / características). */
 const NORMAL_OBJ_EXAMPLES = {
   DispensaArt75IObrasEngenharia: {
     objeto: 'Ex: Reforma do prédio da prefeitura, incluindo fornecimento de materiais e mão de obra',
-    setor: 'Ex: Secretaria Municipal de Obras e Urbanismo',
     caracteristicas: 'Ex: Cronograma físico-financeiro em anexo ao processo (opcional)',
   },
   DispensaArt75IManutencaoVeiculos: {
     objeto: 'Ex: Prestação de serviços com reparo no módulo de injeção eletrônica',
-    setor: 'Ex: Frota oficial da Prefeitura',
     caracteristicas: 'Ex: Peças com garantia mínima de 90 dias (opcional)',
   },
   DispensaArt75IICompras: {
     objeto: 'Ex: Aquisição de medicamentos',
-    setor: 'Ex: UBS Leontino',
     caracteristicas: 'Ex: Para doação à população carente',
   },
   DispensaArt75IIServicos: {
     objeto: 'Ex: Prestação de serviços de limpeza e conservação predial',
-    setor: 'Ex: Prédios públicos municipais',
     caracteristicas: 'Ex: Com fornecimento de materiais de limpeza',
   },
   DispensaArt75IIComprasServicosInclusos: {
     objeto: 'Ex: Aquisição de playground infantil com instalação',
-    setor: 'Ex: Secretaria Municipal de Assistência Social',
     caracteristicas: 'Ex: Para recreação das crianças',
   },
 };
@@ -361,14 +347,12 @@ const normalPhTrio = computed(() => {
   return (
     NORMAL_OBJ_EXAMPLES[n] || {
       objeto: 'Ex: Descreva o objeto da contratação',
-      setor: 'Ex: Setor ou secretaria atendida',
       caracteristicas: 'Ex: Requisitos ou observações (opcional)',
     }
   );
 });
 
 const normalPhObjeto = computed(() => normalPhTrio.value.objeto);
-const normalPhSetor = computed(() => normalPhTrio.value.setor);
 const normalPhCaracteristicas = computed(() => normalPhTrio.value.caracteristicas);
 
 function resolveSolOficioFundamentoLegal(routeName) {
@@ -417,7 +401,6 @@ async function resetFormStateForNewRoute() {
   processo.value = '';
   orgao.value = '';
   objetoContratado.value = '';
-  objetoSetor.value = '';
   objetoCaracteristicas.value = '';
   objetoGerado.value = '';
   justificativa.value = '';
@@ -469,7 +452,7 @@ function onApplyDadosFixos() {
 }
 
 const objetoPrompt = computed(() =>
-  [objetoContratado.value, objetoSetor.value, objetoCaracteristicas.value].filter(campoPreenchido).join(' | '),
+  [objetoContratado.value, objetoCaracteristicas.value].filter(campoPreenchido).join(' | '),
 );
 
 const dataResumo = computed(() => (modoData.value === 'Data manual' ? dataManual.value : modoData.value));
@@ -559,7 +542,6 @@ function buildUserPromptGerarClausulas() {
   const car = String(objetoCaracteristicas.value || '').trim();
   return [
     `O que será contratado: ${objetoContratado.value}`,
-    `Setor/secretaria atendido: ${objetoSetor.value}`,
     car ? `Características mínimas: ${car}` : '',
   ]
     .filter(Boolean)
@@ -569,9 +551,8 @@ function buildUserPromptGerarClausulas() {
 async function gerar() {
   erroGeracaoClausulas.value = '';
   const contratado = String(objetoContratado.value || '').trim();
-  const setor = String(objetoSetor.value || '').trim();
-  if (!contratado || !setor) {
-    erroGeracaoClausulas.value = 'Preencha "O que será contratado?" e "Qual setor/secretaria será atendido?".';
+  if (!contratado) {
+    erroGeracaoClausulas.value = 'Preencha "O que será contratado?".';
     return;
   }
 
@@ -650,8 +631,8 @@ function buildSlotsOverride() {
   const o = {};
   applyUsuarioLocalidadeToSlots(o, usuarioLocalidade.value);
   o.dispensa_fluxo_ui = 'normal';
-  const destNome = String(dadosFixos.fixoNome || '').trim();
-  const respNome = String(dadosFixos.fixoResponsavel || '').trim();
+  const destNome = trimMultilinePreserve(dadosFixos.fixoNome || '');
+  const respNome = trimMultilinePreserve(dadosFixos.fixoResponsavel || '');
   const tratNome = String(dadosFixos.fixoTratNome || '').trim();
   if (destNome) o.sol_oficio_destinatario_nome = destNome;
   if (respNome) o.sol_oficio_responsavel_nome = respNome;
@@ -665,7 +646,9 @@ function buildSlotsOverride() {
     o.dfd_fiscal_contratos = fn;
     o.fiscal = { nome: fn };
   }
-  if (String(dadosFixos.fixoAssinatura || '').trim()) o.dfd_assinatura_nome = String(dadosFixos.fixoAssinatura).trim();
+  if (trimMultilinePreserve(dadosFixos.fixoAssinatura || '')) {
+    o.dfd_assinatura_nome = trimMultilinePreserve(dadosFixos.fixoAssinatura);
+  }
   if (processoAtivo.value && String(processo.value || '').trim()) {
     const np = String(processo.value).trim();
     o.numero_processo = np;
@@ -673,9 +656,8 @@ function buildSlotsOverride() {
   }
   if (String(dadosFixos.fixoEnderecoEntrega || '').trim()) o.endereco_entrega = String(dadosFixos.fixoEnderecoEntrega).trim();
   if (String(dadosFixos.fixoEmailPropostas || '').trim()) o.email_envio_propostas = String(dadosFixos.fixoEmailPropostas).trim();
-  if (String(dadosFixos.fixoTrResponsavelNome || '').trim()) {
-    o.nome_assinante_termo = String(dadosFixos.fixoTrResponsavelNome).trim();
-  }
+  const trRespNome = trimMultilinePreserve(dadosFixos.fixoTrResponsavelNome || '');
+  if (trRespNome) o.nome_assinante_termo = trRespNome;
   if (dotacaoAtiva.value && String(dotacao.value || '').trim()) {
     const dotacaoTexto = String(dotacao.value).trim();
     o.dotacao = dotacaoTexto;

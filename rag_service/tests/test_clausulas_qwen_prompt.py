@@ -27,14 +27,14 @@ class ClausulasQwenPromptTests(unittest.TestCase):
         self.assertIn("3 parágrafos", full.lower())
         self.assertNotIn("problema_administrativo", CLAUSULAS_QWEN_SYSTEM_PROMPT)
 
-    def test_normal_fluxo_adds_setor_hint(self):
+    def test_normal_fluxo_adds_hint(self):
         full = build_clausulas_qwen_full_prompt(
-            "O que será contratado: papel A4\nSetor/secretaria atendido: Administração",
+            "O que será contratado: papel A4",
             fluxo_ui="normal",
         )
         self.assertIn("Dispensa normal", full)
         self.assertIn("cláusula completa", full.lower())
-        self.assertIn("órgão/unidade", full.lower())
+        self.assertIn("setor requisitante do dfd", full.lower())
 
     def test_system_asks_json_only(self):
         self.assertIn('{"objeto"', CLAUSULAS_QWEN_SYSTEM_PROMPT)

@@ -244,15 +244,13 @@ objeto:
 - PROIBIDO no objeto: riscos da não contratação ou argumentação de justificativa; objeto pobre de uma linha sem finalidade.
 - NÃO liste itens, quantidades, marcas, modelos, bullets ou "Inclui:" — detalhes ficam na tabela do TR.
 - Em dispensa normal com características informadas: texto genérico institucional, sem nomear produto, dosagem ou marca.
-- Se o pedido trouxer «Setor/secretaria atendido», inclua esse destino no objeto (finalidade/vinculação ao setor).
 
 justificativa:
 - Exatamente 3 parágrafos separados (use \\n\\n na string JSON). Pare após o 3º — proibido 4º parágrafo, resumo, eco, repetir o mesmo eixo (necessidade/riscos/benefícios) ou listas com marcadores.
-- 1º parágrafo: necessidade concreta para a Administração e para o setor/destino informados no pedido (3 a 4 frases técnicas).
+- 1º parágrafo: necessidade concreta para a Administração com base no contratado informado (3 a 4 frases técnicas).
 - 2º parágrafo: riscos técnicos e operacionais se a contratação não for realizada (continuidade, eficiência, segurança ou desempenho institucional).
 - 3º parágrafo: adequação da medida ao interesse público e continuidade administrativa; características mínimas somente se informadas.
 - Linguagem formal; profundidade técnica proporcional ao objeto, sem frases genéricas de enchimento nem eco entre parágrafos.
-- Se o pedido trouxer «Setor/secretaria atendido», cite esse setor/secretaria explicitamente no objeto e na justificativa.
 - Use SOMENTE nomes de órgão, município ou entidade que apareçam literalmente no pedido do usuário.
 - Concordância correta (ex.: "a manutenção", não "o manutenção").
 - Não invente valores, prazos, órgãos ou localidades além do pedido.
@@ -2531,16 +2529,17 @@ async def _fill_tr_slots_with_llm_work(
             )
             if _fluxo_ui == "normal":
                 user_prompt_text += (
-                    "\nDispensa normal: objeto em cláusula completa (natureza, destino/setor e finalidade), "
+                    "\nDispensa normal: objeto em cláusula completa (natureza e finalidade), "
                     "português claro sem termos difíceis; "
-                    "mencione o setor/secretaria do campo «Setor/secretaria atendido» no objeto; "
                     "justificativa em exatamente 3 parágrafos (\\n\\n entre eles); "
-                    "não cite itens, quantidades ou valores de tabela."
+                    "não cite itens, quantidades ou valores de tabela; "
+                    "não use setor requisitante do DFD nem metadados administrativos."
                 )
             elif _fluxo_ui == "rapida":
                 user_prompt_text += (
                     "\nDispensa rápida: mesmo padrão da normal — justificativa em exatamente 3 parágrafos "
-                    "(\\n\\n entre eles); mencione o setor/secretaria do pedido; JSON só com objeto e justificativa."
+                    "(\\n\\n entre eles); JSON só com objeto e justificativa; "
+                    "não use setor requisitante do DFD."
                 )
             system_prompt = TR_SLOTS_OBJETO_JUSTIFICATIVA_SYSTEM_PROMPT
             full_prompt = f"<<SYSTEM>>\n{system_prompt.strip()}\n\n<<USER>>\n{user_prompt_text}"

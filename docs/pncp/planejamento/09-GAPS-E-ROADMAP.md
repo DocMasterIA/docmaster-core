@@ -105,7 +105,7 @@ Usar como baseline para medir melhoria pós-deploy throughput + starve.
 
 Ao implementar mudanças, atualizar:
 
-1. Este diretório `docs/PNCP-PLANEJAMENTO/`
-2. `docs/PNCP-DECLARATIVO.md`
+1. Este diretório `docs/pncp/planejamento/`
+2. `docs/pncp/PNCP-DECLARATIVO.md`
 3. `docs/deploy/PNCP-COMANDOS-OPERACAO.txt`
 4. Defaults em `docker-compose.pncp.yml` e `config.py`

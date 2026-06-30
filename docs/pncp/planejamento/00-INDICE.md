@@ -28,8 +28,8 @@
 |----------|-----|
 | [../PNCP-DECLARATIVO.md](../PNCP-DECLARATIVO.md) | Estado declarativo do repositório |
 | [../PNCP-CONTEXTO-IA.md](../PNCP-CONTEXTO-IA.md) | Contexto compacto para IA |
-| [../deploy/PNCP-INGESTAO-INDEX-24-7.md](../deploy/PNCP-INGESTAO-INDEX-24-7.md) | Guia operacional DESKTOP |
-| [../deploy/PNCP-COMANDOS-OPERACAO.txt](../deploy/PNCP-COMANDOS-OPERACAO.txt) | Comandos copy-paste |
+| [../../deploy/PNCP-INGESTAO-INDEX-24-7.md](../../deploy/PNCP-INGESTAO-INDEX-24-7.md) | Guia operacional DESKTOP |
+| [../../deploy/PNCP-COMANDOS-OPERACAO.txt](../../deploy/PNCP-COMANDOS-OPERACAO.txt) | Comandos copy-paste |
 | [../PLANO-MODULO-COBERTURA-FORNECEDOR-PNCP.md](../PLANO-MODULO-COBERTURA-FORNECEDOR-PNCP.md) | Plano fornecedor |
 | [../PLANO-FONTES-PRECOS-MULTIPLAS-PLATAFORMAS.md](../PLANO-FONTES-PRECOS-MULTIPLAS-PLATAFORMAS.md) | TCE, BNC, BLL e outras fontes de preço |
 | [../PNCP-IMPLEMENTACAO-PARIDADE-LOTE.md](../PNCP-IMPLEMENTACAO-PARIDADE-LOTE.md) | Runbook implementação + checkpoints |

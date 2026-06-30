@@ -4,7 +4,7 @@ Documento para conferência do que está **implementado no repositório** versus
 
 **Data de referência:** maio/2026 · repositório `docmaster-core`
 
-**Próximo módulo (planejado):** [Cobertura de fornecedor PNCP](../PLANO-MODULO-COBERTURA-FORNECEDOR-PNCP.md) — persistir vencedor no índice SQLite; meta 70–90% nos itens elegíveis.
+**Próximo módulo (planejado):** [Cobertura de fornecedor PNCP](../pncp/PLANO-MODULO-COBERTURA-FORNECEDOR-PNCP.md) — persistir vencedor no índice SQLite; meta 70–90% nos itens elegíveis.
 
 ---
 

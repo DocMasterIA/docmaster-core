@@ -1,5 +1,7 @@
 # Guia de Slots TR/DFD
 
+> Parte da pasta [geracao-documentos/](./). Changelog recente: [CHANGELOG-2026-06.md](./CHANGELOG-2026-06.md).
+
 Este documento centraliza o mapeamento entre:
 
 - campos do card `Dados do assistente (slots)` no frontend;

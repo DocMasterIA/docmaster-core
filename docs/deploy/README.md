@@ -9,14 +9,14 @@ Guias operacionais para produção (servidor DESKTOP / `/home/docmaster`, WSL + 
 | Site + API no ar, túnel Cloudflare, erro 502/1033 | [STACK-E-CLOUDFLARE-502.md](./STACK-E-CLOUDFLARE-502.md) |
 | Boot após reboot (systemd + WSL Windows) | [BOOT-AUTOMATICO.md](./BOOT-AUTOMATICO.md), [WSL-BOOT-WINDOWS.md](./WSL-BOOT-WINDOWS.md) |
 | PNCP API 24/7 (contentor isolado) | [PNCP-RESEARCHER-24-7.md](./PNCP-RESEARCHER-24-7.md) |
-| **Contexto IA PNCP** (ingest + fornecedor + ops) | [PNCP-CONTEXTO-IA.md](../PNCP-CONTEXTO-IA.md) |
-| **Estado declarativo PNCP** | [PNCP-DECLARATIVO.md](../PNCP-DECLARATIVO.md) |
+| **Contexto IA PNCP** (ingest + fornecedor + ops) | [PNCP-CONTEXTO-IA.md](../pncp/PNCP-CONTEXTO-IA.md) |
+| **Estado declarativo PNCP** | [PNCP-DECLARATIVO.md](../pncp/PNCP-DECLARATIVO.md) |
 | **Alimentar índice PNCP** (loop, watermarks, paralelo) | [PNCP-INGESTAO-INDEX-24-7.md](./PNCP-INGESTAO-INDEX-24-7.md) |
 | Scripts PNCP (referência) | [PNCP-SCRIPTS-REFERENCIA.md](./PNCP-SCRIPTS-REFERENCIA.md) |
 | **Comandos operação PNCP** (monitorar, backup, deploy) | [PNCP-COMANDOS-OPERACAO.txt](./PNCP-COMANDOS-OPERACAO.txt) |
 | API índice local + FTS + busca V2 | [PNCP-API-INDICE-LOCAL.md](./PNCP-API-INDICE-LOCAL.md), [PNCP-V2-DEPLOY.md](./PNCP-V2-DEPLOY.md) |
-| **Busca inteligente qualidade + Qwen** | [PNCP-BUSCA-INTELIGENTE-QUALIDADE.md](../PNCP-BUSCA-INTELIGENTE-QUALIDADE.md) |
-| Integração Qwen (DocMaster) | [QWEN-INTEGRACAO-DOCMASTER.md](../QWEN-INTEGRACAO-DOCMASTER.md) |
+| **Busca inteligente qualidade + Qwen** | [PNCP-BUSCA-INTELIGENTE-QUALIDADE.md](../pncp/PNCP-BUSCA-INTELIGENTE-QUALIDADE.md) |
+| Integração Qwen (DocMaster) | [QWEN-INTEGRACAO-DOCMASTER.md](../integracao/QWEN-INTEGRACAO-DOCMASTER.md) |
 | Grafana / Prometheus | [OBSERVABILIDADE-VPS.md](./OBSERVABILIDADE-VPS.md) |
 | Estabilidade geral / WSL idle | [ESTABILIDADE-E-CLOUDFLARE.md](./ESTABILIDADE-E-CLOUDFLARE.md) |
 | Entrega de módulos (checklist) | [ENTREGA-MODULOS.md](./ENTREGA-MODULOS.md) |

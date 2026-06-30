@@ -151,4 +151,4 @@ Frontend usa Django para persistência; researcher para busca.
 5. Índice vazio para termo → hybrid fallback ativa
 6. PDF gerado → capa/listagem fornecedor OK
 
-Ver também: `docs/PNCP-TESTES-FORNECEDOR.md`
+Ver também: `docs/pncp/PNCP-TESTES-FORNECEDOR.md`

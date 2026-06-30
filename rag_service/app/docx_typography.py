@@ -445,50 +445,65 @@ def _paragraph_looks_like_cidade_data_line(paragraph: Paragraph) -> bool:
     t = _paragraph_visible_text(paragraph)
     if not t:
         return False
-    if any(marker in (paragraph.text or "") for marker in _CIDADE_DATA_MARKERS):
+    raw = paragraph.text or ""
+    if any(marker in raw for marker in _CIDADE_DATA_MARKERS):
         return True
-    # Pós-substituição: «Cidade - UF, 22 de junho de 2026» ou «Cidade, 22/06/2026»
+    tl = t.lower()
+    if "datado e assinado digitalmente" in tl:
+        return True
+    # «Cidade - UF, 22 de junho de 2026» ou «Cidade, 22/06/2026»
     if "," in t and re.search(r"\b(19|20)\d{2}\b", t) and len(t) <= 160:
         return True
+    # «Cidade - UF, datado e assinado digitalmente»
+    if re.search(r"\s-\s*[A-Z]{2}\s*,", t) and "," in t and len(t) <= 160:
+        return True
     return False
+
+
+def _find_signature_anchor_structural(paragraphs: list[Paragraph]) -> Paragraph | None:
+    """Linha cidade/data no final do documento (varre só o rodapé)."""
+    for i in range(len(paragraphs) - 1, max(-1, len(paragraphs) - 28), -1):
+        if _paragraph_looks_like_cidade_data_line(paragraphs[i]):
+            return paragraphs[i]
+    return None
 
 
 def _find_signature_nome_paragraph(paragraphs: list[Paragraph]) -> Paragraph | None:
     for p in paragraphs:
         if _paragraph_has_signature_nome_marker(p):
             return p
-    for i in range(len(paragraphs) - 1, max(-1, len(paragraphs) - 24), -1):
-        if not _paragraph_looks_like_cidade_data_line(paragraphs[i]):
-            continue
-        j = i + 1
-        while j < len(paragraphs) and _is_removable_gap_paragraph(paragraphs[j]):
-            j += 1
-        if j < len(paragraphs) and _paragraph_visible_text(paragraphs[j]):
-            return paragraphs[j]
+    anchor = _find_signature_anchor_structural(paragraphs)
+    if anchor is None:
         return None
+    try:
+        anchor_idx = paragraphs.index(anchor)
+    except ValueError:
+        return None
+    j = anchor_idx + 1
+    while j < len(paragraphs) and _is_removable_gap_paragraph(paragraphs[j]):
+        j += 1
+    if j < len(paragraphs) and _paragraph_visible_text(paragraphs[j]):
+        return paragraphs[j]
     return None
 
 
 def _find_signature_anchor_paragraph(paragraphs: list[Paragraph], nome_para: Paragraph) -> Paragraph | None:
     """
-    Âncora do espaçamento: linha cidade/data imediatamente acima da assinatura.
-    Se não houver, usa o último parágrafo com texto antes do nome.
+    Âncora = parágrafo com texto imediatamente antes do bloco de linhas vazias
+  que precede o nome (em geral cidade/data).
     """
     try:
         nome_idx = paragraphs.index(nome_para)
     except ValueError:
         return None
 
-    for i in range(nome_idx - 1, max(-1, nome_idx - 32), -1):
-        if _paragraph_looks_like_cidade_data_line(paragraphs[i]):
-            return paragraphs[i]
-
     prev_idx = nome_idx - 1
     while prev_idx >= 0 and _is_removable_gap_paragraph(paragraphs[prev_idx]):
         prev_idx -= 1
     if prev_idx >= 0:
         return paragraphs[prev_idx]
-    return None
+
+    return _find_signature_anchor_structural(paragraphs)
 
 
 def _remove_gap_paragraphs_between(anchor_para: Paragraph, nome_para: Paragraph) -> int:

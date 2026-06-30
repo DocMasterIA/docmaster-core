@@ -69,6 +69,29 @@ class SignatureNomeSpacingTests(unittest.TestCase):
         nome_idx = next(i for i, p in enumerate(paras) if "Maria da Silva" in (p.text or ""))
         self.assertEqual(_blank_lines_before_paragraph_index(doc, nome_idx), 3)
 
+    def test_digital_date_tr_has_three_blank_lines_after_cidade(self):
+        from app.tr_template import TRTemplateSlots, render_tr_from_slots
+
+        path = TEMPLATE_ROOT / "dispensa_75_ii_compras" / "TR_modelo_base.docx"
+        slots = TRTemplateSlots(
+            cidade="São Paulo",
+            codigo_uf="SP",
+            data_termo="datado e assinado digitalmente",
+            nome_assinante_termo="João Silva",
+            objeto="Objeto teste",
+            justificativa="Justificativa teste",
+        )
+        out = render_tr_from_slots(slots, template_path=path)
+        doc = Document(out)
+        paras = list(doc.paragraphs)
+        cidade_idx = next(
+            i
+            for i, p in enumerate(paras)
+            if "datado e assinado digitalmente" in (p.text or "").lower()
+        )
+        nome_idx = next(i for i, p in enumerate(paras) if "João Silva" in (p.text or ""))
+        self.assertEqual(nome_idx - cidade_idx - 1, 3)
+
 
 if __name__ == "__main__":
     unittest.main()

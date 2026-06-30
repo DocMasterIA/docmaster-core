@@ -65,15 +65,6 @@
                       @input="objetoContratado = primeiraMaiuscula(($event.target).value)"
                     />
                   </div>
-                  <div class="da75-field">
-                    <label class="da75-label">Qual setor/secretaria será atendido?</label>
-                    <input
-                      class="da75-input"
-                      :value="objetoSetor"
-                      placeholder="Ex: Secretaria de Administração"
-                      @input="objetoSetor = primeiraMaiuscula(($event.target).value)"
-                    />
-                  </div>
                 </div>
               </div>
             </section>
@@ -196,10 +187,10 @@ import {
   DATA_OPTIONS,
   campoPreenchido,
   formatarData,
-  gerarJustificativaTexto,
   primeiraMaiuscula,
   stripDeprecatedCargoSlotsOverride,
   applyDfdSetorRequisitanteToSlotsOverride,
+  dfdSetorRequisitanteFromDadosFixos,
 } from './dispensaArt75iiShared.js';
 import './dispensaArt75ii.css';
 import DispensaArt75IIDadosFixosDrawer from './DispensaArt75IIDadosFixosDrawer.vue';
@@ -233,7 +224,6 @@ const processo = ref('');
 const orgao = ref('');
 const dadosFixos = useDispensaArt75IIDadosFixos(API_BASE, { cabecalho, processoAtivo, processo, orgao });
 const objetoContratado = ref('');
-const objetoSetor = ref('');
 const objetoGerado = ref('');
 const justificativa = ref('');
 /** Slots de cláusulas da última IA (3 blocos na rápida: justificativa + problema + benefício). */
@@ -409,10 +399,20 @@ const secoes = computed(() => {
     },
     {
       titulo: 'Objeto da contratação',
-      completo: campoPreenchido(objetoContratado.value) && campoPreenchido(objetoSetor.value),
+      completo: campoPreenchido(objetoContratado.value),
       linhas: [
         ['Resumo do objeto', objetoContratado.value || 'Não informado', campoPreenchido(objetoContratado.value)],
-        ['Setor/secretaria', objetoSetor.value || 'Não informado', campoPreenchido(objetoSetor.value)],
+      ],
+    },
+    {
+      titulo: 'Dados fixos',
+      completo: campoPreenchido(dfdSetorRequisitanteFromDadosFixos(dadosFixos)),
+      linhas: [
+        [
+          'Setor requisitante (DFD 2.1)',
+          dfdSetorRequisitanteFromDadosFixos(dadosFixos) || 'Não informado — abra Dados fixos',
+          campoPreenchido(dfdSetorRequisitanteFromDadosFixos(dadosFixos)),
+        ],
       ],
     },
     {
@@ -592,7 +592,7 @@ function buildSlotsOverride() {
 function buildUserPromptFillTrSlots() {
   return buildClausulasObjetoJustificativaPrompt({
     contratado: objetoContratado.value,
-    setor: objetoSetor.value,
+    setor: dfdSetorRequisitanteFromDadosFixos(dadosFixos),
   });
 }
 

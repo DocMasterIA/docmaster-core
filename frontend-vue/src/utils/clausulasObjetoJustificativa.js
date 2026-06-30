@@ -117,6 +117,7 @@ export function extractClausesFromSectionTexts(sectionTexts) {
  * @param {{
  *   contratado: string,
  *   caracteristicas?: string,
+ *   setor?: string,
  *   tipoManutencao?: string,
  *   revisaoKm?: string,
  *   variant?: 'dispensa_normal'|'generic'
@@ -124,12 +125,14 @@ export function extractClausesFromSectionTexts(sectionTexts) {
  */
 export function buildClausulasObjetoJustificativaPrompt(fields) {
   const contratado = String(fields.contratado || '').trim();
+  const setor = String(fields.setor || '').trim();
   const caracteristicas = String(fields.caracteristicas || '').trim();
   const tipoManutencao = String(fields.tipoManutencao || '').trim();
   const revisaoKm = String(fields.revisaoKm || '').trim();
 
   return [
     `O que será contratado: ${contratado}`,
+    setor ? `Setor/secretaria atendido: ${setor}` : '',
     caracteristicas ? `Características mínimas: ${caracteristicas}` : '',
     tipoManutencao ? `Tipo de manutenção: ${tipoManutencao}` : '',
     revisaoKm ? `Revisão/KM: ${revisaoKm}` : '',

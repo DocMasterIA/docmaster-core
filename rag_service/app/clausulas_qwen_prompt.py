@@ -2,7 +2,7 @@
 Prompt para objeto/justificativa via gateway cloud (Qwen).
 
 Dispensa normal e rápida (art. 75): redação técnica densa, sem verborragia.
-O setor requisitante do DFD (2.1) NÃO entra no pedido de cláusulas — só em dados fixos na geração DOCX.
+O setor requisitante do DFD (2.1) NÃO entra no pedido — mas «Setor/secretaria atendido» do bloco Objeto da contratação SIM.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ OBJETO (1 período completo e bem articulado; até 2 se indispensável):
 - Em dispensa normal: redação genérica institucional sobre o tema, sem nominalizar cada item da tabela.
 - OBRIGATÓRIO no objeto: feche com vírgula + «conforme quantidades e demais condições estabelecidas neste Termo de Referência». Use sempre «neste Termo de Referência»; proibido «requisitos técnicos» no fechamento.
 - PROIBIDO no objeto: «a execução obedecerá…», riscos da não contratação ou argumentação de justificativa.
-- PROIBIDO usar nos textos: órgão/unidade do cabeçalho administrativo, prefeitura, município, processo, cabeçalho do documento, setor requisitante do DFD ou qualquer metadado que não esteja em «O que será contratado» ou «Características mínimas».
+- PROIBIDO usar nos textos: órgão/unidade do cabeçalho administrativo, prefeitura, município, processo, cabeçalho do documento, setor requisitante do DFD (2.1) ou metadado fora de «O que será contratado», «Setor/secretaria atendido» e «Características mínimas».
 
 JUSTIFICATIVA (exatamente 3 parágrafos em prosa corrida, separados por linha em branco — pare após o 3º):
 - Proibido listas com marcadores (-, *, números), bullets, tópicos ou continuação após o 3º parágrafo.
@@ -47,6 +47,8 @@ _DISPRESA_CLAUSULAS_PEDIDO_KEEP_PREFIXES = (
     "tipo de manutencao:",
     "revisão/km:",
     "revisao/km:",
+    "setor/secretaria atendido:",
+    "setor/secretaria atendido",
 )
 
 _DISPRESA_CLAUSULAS_PEDIDO_DROP_PREFIXES = (
@@ -62,8 +64,6 @@ _DISPRESA_CLAUSULAS_PEDIDO_DROP_PREFIXES = (
     "objeto (o que será contratado):",
     "em objeto e justificativa não liste",
     "em objeto e justificativa nao liste",
-    "setor/secretaria atendido:",
-    "setor/secretaria atendido",
     "setor requisitante",
     "2. dfd",
     "2.1 setor requisitante",
@@ -76,7 +76,8 @@ _DISPRESA_CLAUSULAS_PEDIDO_DROP_PREFIXES = (
 def dispensa_clausulas_pedido_from_user_prompt(user_prompt: str) -> str:
     """
     Extrai só o pedido permitido para objeto/justificativa (dispensa normal/rápida).
-    Remove órgão/unidade, cabeçalho, processo, setor DFD e outros metadados administrativos.
+    Remove órgão/unidade, cabeçalho, processo e setor requisitante do DFD (2.1).
+    Mantém «Setor/secretaria atendido» do bloco Objeto da contratação.
     """
     text = (user_prompt or "").strip()
     if not text:
@@ -127,7 +128,8 @@ def build_clausulas_qwen_full_prompt(user_prompt: str, *, fluxo_ui: str = "") ->
     user_block = build_clausulas_qwen_user_block(user_prompt)
     fluxo = str(fluxo_ui or "").strip().lower()
     anti_orgao = (
-        "\nUse somente «O que será contratado» e «Características mínimas» (se houver). "
+        "\nUse somente «O que será contratado», «Setor/secretaria atendido» (se houver) e "
+        "«Características mínimas» (se houver). "
         "Não use órgão/unidade do formulário administrativo, prefeitura, município, cabeçalho, "
         "processo nem setor requisitante do DFD (2.1)."
     )

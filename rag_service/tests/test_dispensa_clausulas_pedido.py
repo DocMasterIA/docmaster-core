@@ -16,7 +16,7 @@ class DispensaClausulasPedidoTests(unittest.TestCase):
         self.assertIn("Conserto de fogão", out)
         self.assertIn("Garantia de 90 dias", out)
 
-    def test_drops_orgao_cabecalho_processo_and_setor(self):
+    def test_drops_orgao_cabecalho_processo_and_dfd_setor(self):
         raw = "\n".join(
             [
                 "Gerar documento com base nos dados preenchidos para dispensa rapida.",
@@ -33,17 +33,17 @@ class DispensaClausulasPedidoTests(unittest.TestCase):
         self.assertNotIn("Prefeitura", out)
         self.assertNotIn("Modelo X", out)
         self.assertNotIn("123/2026", out)
-        self.assertNotIn("Finanças", out)
+        self.assertIn("Finanças", out)
         self.assertNotIn("Saúde", out)
         self.assertIn("Papel A4", out)
 
-    def test_drops_setor_line_with_hint(self):
+    def test_keeps_setor_objeto_contratacao_with_hint(self):
         raw = (
             "Setor/secretaria atendido (usar nas cláusulas de objeto e justificativa): "
             "Secretaria de Saúde"
         )
         out = dispensa_clausulas_pedido_from_user_prompt(raw)
-        self.assertEqual(out, "")
+        self.assertIn("Secretaria de Saúde", out)
 
     def test_keeps_multiline_itens_after_contratado(self):
         raw = (

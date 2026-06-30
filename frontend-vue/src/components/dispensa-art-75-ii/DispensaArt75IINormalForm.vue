@@ -557,14 +557,12 @@ function buildSlotsOverrideForGerarClausulas() {
 }
 
 function buildUserPromptGerarClausulas() {
-  const car = String(objetoCaracteristicas.value || '').trim();
-  return [
-    `O que será contratado: ${objetoContratado.value}`,
-    `Setor/secretaria atendido: ${objetoSetor.value}`,
-    car ? `Características mínimas: ${car}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
+  return buildClausulasObjetoJustificativaPrompt({
+    contratado: objetoContratado.value,
+    setor: objetoSetor.value,
+    caracteristicas: objetoCaracteristicas.value,
+    variant: 'dispensa_normal',
+  });
 }
 
 async function gerar() {
@@ -732,13 +730,13 @@ function buildSlotsOverride() {
 function buildUserPrompt() {
   const contratadoBlock = buildClausulasObjetoJustificativaPrompt({
     contratado: objetoContratado.value,
+    setor: objetoSetor.value,
     caracteristicas: objetoCaracteristicas.value,
     variant: 'dispensa_normal',
   });
   return [
     `Gerar documento com base nos dados preenchidos para ${String(route.meta?.title || 'dispensa normal')}.`,
     contratadoBlock,
-    objetoSetor.value.trim() ? `Setor/secretaria atendido: ${objetoSetor.value.trim()}` : '',
     'Em objeto e justificativa não liste nem discuta itens da tabela (descrições, quantidades, valores); mantenha texto genérico.',
   ]
     .filter(Boolean)

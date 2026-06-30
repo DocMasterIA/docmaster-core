@@ -27,7 +27,7 @@ from .tr_template import (
     replace_placeholder_in_paragraph,
     slots_numero_processo_display,
     split_paragraphs_on_double_newline,
-    _normalize_slot_block,
+    _normalize_multiline_signature_text,
 )
 
 
@@ -204,7 +204,9 @@ def render_oficio_from_slots(
             (slots.sol_oficio_justificativa or slots.justificativa or "").strip()
         ),
         "(SOL_OFICIO_PRAZO_RESPOSTA)": slots.sol_oficio_prazo_resposta or "",
-        "(SOL_OFICIO_RESPONSAVEL_NOME)": _normalize_slot_block(slots.sol_oficio_responsavel_nome or ""),
+        "(SOL_OFICIO_RESPONSAVEL_NOME)": _normalize_multiline_signature_text(
+            slots.sol_oficio_responsavel_nome or ""
+        ),
         "(SOL_OFICIO_RESPONSAVEL_CARGO)": slots.sol_oficio_responsavel_cargo or "",
         "(SOL_OFICIO_RESPONSAVEL_SETOR)": slots.sol_oficio_responsavel_setor or "",
         "(SOL_OFICIO_CIDADE)": slots.cidade or "",

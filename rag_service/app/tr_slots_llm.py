@@ -1325,6 +1325,12 @@ def _str_multiline_slot(value: Any) -> str:
     return str(value or "").replace("\r\n", "\n").replace("\r", "\n").strip()
 
 
+def _coalesce_numero_processo_pair(dfd_numero_processo: str, numero_processo: str) -> tuple[str, str]:
+    """Espelha o valor em ambos os slots após merge (TR usa qualquer um; DFD idem)."""
+    value = str(dfd_numero_processo or "").strip() or str(numero_processo or "").strip()
+    return value, value
+
+
 def _dict_to_tr_slots(data: Dict[str, Any], *, preserve_objeto_normalize: bool = False) -> TRTemplateSlots:
     """Converte o dicionário retornado pela LLM em TRTemplateSlots."""
     disp = data.get("dispensa") or {}
@@ -1917,6 +1923,16 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         slot_package_key=slot_package_key,
         dispensa_fluxo_ui=dispensa_fluxo_ui,
     )
+    dfd_np_sync, num_np_sync = _coalesce_numero_processo_pair(
+        merged.dfd_numero_processo,
+        merged.numero_processo,
+    )
+    if dfd_np_sync or num_np_sync:
+        merged = replace(
+            merged,
+            dfd_numero_processo=dfd_np_sync,
+            numero_processo=num_np_sync,
+        )
     return clear_deprecated_cargo_fields(merged)
 
 

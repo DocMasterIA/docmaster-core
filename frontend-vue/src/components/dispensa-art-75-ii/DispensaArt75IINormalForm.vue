@@ -274,6 +274,7 @@ import {
 } from '@/utils/fetchFillTrSlots.js';
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { trimMultilinePreserve } from '@/utils/itemValorCampos.js';
+import { applyProcessoAtivoToSlotsOverride } from '@/utils/numeroProcessoSlots.js';
 import {
   applyUsuarioLocalidadeToSlots,
   fetchUsuarioLocalidadeParaTr,
@@ -672,11 +673,7 @@ function buildSlotsOverride() {
   if (trimMultilinePreserve(dadosFixos.fixoAssinatura || '')) {
     o.dfd_assinatura_nome = trimMultilinePreserve(dadosFixos.fixoAssinatura);
   }
-  if (processoAtivo.value && String(processo.value || '').trim()) {
-    const np = String(processo.value).trim();
-    o.numero_processo = np;
-    o.dfd_numero_processo = np;
-  }
+  applyProcessoAtivoToSlotsOverride(o, processoAtivo.value, processo.value);
   if (String(dadosFixos.fixoEnderecoEntrega || '').trim()) o.endereco_entrega = String(dadosFixos.fixoEnderecoEntrega).trim();
   if (String(dadosFixos.fixoEmailPropostas || '').trim()) o.email_envio_propostas = String(dadosFixos.fixoEmailPropostas).trim();
   const trRespNome = trimMultilinePreserve(dadosFixos.fixoTrResponsavelNome || '');

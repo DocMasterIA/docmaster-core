@@ -25,6 +25,39 @@ MULTILINE_NOME = (
     "Secretaria da Educação"
 )
 
+MULTILINE_NOME_DOUBLE_BLANK = (
+    "Fabrizia de Oliveira Borges\n"
+    "Secretaria da Saúde\n"
+    "\n\n"
+    "João Carlos\n"
+    "Secretaria da Educação"
+)
+
+
+def _count_empty_paragraphs_between(doc: Document, start_text: str, end_text: str) -> int:
+    start_idx = next(i for i, p in enumerate(doc.paragraphs) if start_text in (p.text or ""))
+    end_idx = next(i for i, p in enumerate(doc.paragraphs) if end_text in (p.text or ""))
+    return sum(
+        1
+        for i in range(start_idx + 1, end_idx)
+        if not (doc.paragraphs[i].text or "").strip()
+    )
+
+
+def test_oficio_responsavel_preserves_double_blank_between_blocks():
+    slots = TRTemplateSlots(
+        sol_oficio_responsavel_nome=MULTILINE_NOME_DOUBLE_BLANK,
+        objeto="Objeto de teste para ofício.",
+        justificativa="Justificativa de teste para ofício.",
+        cidade="Cidade Teste",
+    )
+    out = render_oficio_from_slots(slots, template_path=TEMPLATE_PKG / "OFICIO_modelo_base.docx")
+    doc = Document(out)
+    empty_count = _count_empty_paragraphs_between(doc, "Secretaria da Saúde", "João Carlos")
+    assert empty_count >= 2, f"Esperadas ≥2 linhas vazias entre blocos, obteve {empty_count}"
+    joao_para = next(p for p in doc.paragraphs if "João Carlos" in (p.text or ""))
+    assert "Secretaria da Educação" not in (joao_para.text or "")
+
 
 def _line_break_count(paragraph) -> int:
     ns = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"

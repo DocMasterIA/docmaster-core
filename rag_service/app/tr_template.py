@@ -470,8 +470,13 @@ def _configure_items_table_columns(table, doc: Document, use_price_layout: bool 
                 row.cells[idx].width = width
 
 
+def _normalize_multiline_signature_text(text: str) -> str:
+    """Preserva todas as quebras digitadas (incl. linhas em branco duplas entre blocos)."""
+    return str(text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+
+
 def _normalize_slot_block(text: str) -> str:
-    t = str(text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    t = _normalize_multiline_signature_text(text)
     # Preserva um par de quebras (parágrafo lógico); só colapsa 3+ linhas vazias a \n\n.
     t = re.sub(r"\n{3,}", "\n\n", t)
     return t
@@ -591,7 +596,11 @@ def replace_placeholder_in_paragraph(
     """
     if multiline_as_paragraphs is None:
         multiline_as_paragraphs = placeholder in SIGNATURE_MULTILINE_PLACEHOLDERS
-    normalized = _normalize_slot_block(replacement) if multiline_as_paragraphs else str(replacement or "")
+    normalized = (
+        _normalize_multiline_signature_text(replacement)
+        if multiline_as_paragraphs
+        else str(replacement or "")
+    )
     if multiline_as_paragraphs and "\n" in normalized:
         lines = normalized.split("\n")
         font_ref = _font_reference_run(paragraph)
@@ -1355,7 +1364,7 @@ def render_tr_from_slots(
 
     # Cargo/função abaixo do nome na assinatura foi descontinuado no produto.
     cargo_assinatura_tr = ""
-    nome_assinante_tr = _normalize_slot_block(slots.nome_assinante_termo or "")
+    nome_assinante_tr = _normalize_multiline_signature_text(slots.nome_assinante_termo or "")
 
     data_termo_extenso = format_date_pt_br_extenso(slots.data_termo)
 

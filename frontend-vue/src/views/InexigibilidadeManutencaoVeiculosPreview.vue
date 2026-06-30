@@ -483,8 +483,10 @@ import {
   capitalizeNomeTituloPt as tituloNomePt,
   formatMoedaBRLInput,
   normNomeTituloMultiline,
+  trimMultilinePreserve,
   sanitizeQuantidadeInput,
 } from '@/utils/itemValorCampos.js';
+import { applyProcessoAtivoToSlotsOverride } from '@/utils/numeroProcessoSlots.js';
 import {
   clearDeprecatedCargoPresetFields,
   stripDeprecatedCargoSlotsOverride,
@@ -1313,7 +1315,7 @@ function buildInexigFornecedorExclusivoObjetoTrResumo(opts = {}) {
 function buildSlotsOverride(iaDeepen = null) {
   const o = {};
   const solDestNome = fixoNome.value.trim();
-  const solRespNome = fixoResponsavel.value.trim();
+  const solRespNome = trimMultilinePreserve(fixoResponsavel.value || '');
   if (solDestNome) o.sol_oficio_destinatario_nome = solDestNome;
   if (solRespNome) o.sol_oficio_responsavel_nome = solRespNome;
 
@@ -1338,7 +1340,9 @@ function buildSlotsOverride(iaDeepen = null) {
     o.fiscal = { nome: fiscalNome };
     o.dfd_fiscal_contratos = fiscalNome;
   }
-  if (fixoAssinatura.value.trim()) o.dfd_assinatura_nome = fixoAssinatura.value.trim();
+  if (trimMultilinePreserve(fixoAssinatura.value || '')) {
+    o.dfd_assinatura_nome = trimMultilinePreserve(fixoAssinatura.value);
+  }
 
   const dataManualFmt = toBrDate(dataManual.value);
   let dataTermo = '';
@@ -1403,11 +1407,7 @@ function buildSlotsOverride(iaDeepen = null) {
   if (objetoFinal.trim()) o.sol_oficio_objeto = objetoFinal.trim();
   if (justificativaFinal.trim()) o.sol_oficio_justificativa = justificativaFinal.trim();
 
-  const numeroProcesso = processoAtivo.value ? processo.value.trim() : '';
-  if (numeroProcesso) {
-    o.numero_processo = numeroProcesso;
-    o.dfd_numero_processo = numeroProcesso;
-  }
+  applyProcessoAtivoToSlotsOverride(o, processoAtivo.value, processo.value);
   if (isInexigibilidadeManutencaoRoute.value) {
     if (orgaoUnidadeVeiculo.value.trim()) o.orgao = orgaoUnidadeVeiculo.value.trim();
   } else if (isFornecedorExclusivoRoute.value) {

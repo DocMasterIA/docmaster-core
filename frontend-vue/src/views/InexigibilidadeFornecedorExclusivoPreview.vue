@@ -378,9 +378,11 @@ import {
   capitalizeNomeTituloMultilinePt,
   capitalizeNomeTituloPt,
   normNomeTituloMultiline,
+  trimMultilinePreserve,
   formatMoedaBRLInput,
   sanitizeQuantidadeInput,
 } from '@/utils/itemValorCampos.js';
+import { applyProcessoAtivoToSlotsOverride } from '@/utils/numeroProcessoSlots.js';
 import {
   clearDeprecatedCargoPresetFields,
   stripDeprecatedCargoSlotsOverride,
@@ -858,7 +860,6 @@ function buildFornecedorExclusivo74ObjetoTrResumo(opts = {}) {
 
 function buildSlotsOverride(iaDeepen = null) {
   const o = {
-    numero_processo: processoAtivo.value ? String(processo.value || '').trim() : '',
     orgao: String(orgao.value || '').trim(),
     objeto_especifico: objetoEspecifico.value === 'Outro' ? String(outroObjetoEspecifico.value || '').trim() : String(objetoEspecifico.value || '').trim(),
     equipamento: String(equipamento.value || '').trim(),
@@ -869,13 +870,13 @@ function buildSlotsOverride(iaDeepen = null) {
     valor_total: String(valorGlobal.value || '').trim(),
     ao_senhor_genero: String(tratNome.value || '').trim(),
     sol_oficio_destinatario_nome: String(nome.value || '').trim(),
-    sol_oficio_responsavel_nome: String(fixoResponsavel.value || '').trim(),
+    sol_oficio_responsavel_nome: trimMultilinePreserve(fixoResponsavel.value || ''),
     dfd_setor_requisitante: String((fixoSetor.value || orgao.value || '').trim()),
     dfd_responsavel_demanda: String(fixoDemanda.value || '').trim(),
     dfd_email: String(fixoEmail.value || '').trim(),
     dfd_gestor_contratos: String(fixoGestor.value || '').trim(),
     dfd_fiscal_contratos: String((fixoFiscal.value || fiscal.value || '').trim()),
-    dfd_assinatura_nome: String(fixoAssinatura.value || '').trim(),
+    dfd_assinatura_nome: trimMultilinePreserve(fixoAssinatura.value || ''),
     sol_oficio_artigo_inciso: 'Art. 74, Inciso I, da Lei no 14.133/2021',
   };
   if (dotacaoAtiva.value && String(dotacao.value || '').trim()) {
@@ -934,9 +935,10 @@ function buildSlotsOverride(iaDeepen = null) {
     }
   }
 
+  applyProcessoAtivoToSlotsOverride(o, processoAtivo.value, processo.value);
+
   return stripDeprecatedCargoSlotsOverride(o);
 }
-function buildUserPrompt() {
   return [
     'Inexigibilidade Art. 74 I - Fornecedor Exclusivo.',
     `Objeto específico: ${objetoEspecifico.value || 'não informado'}`,

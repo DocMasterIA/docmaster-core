@@ -534,6 +534,7 @@ import {
   formatMoedaBRLInput,
   sanitizeQuantidadeInput,
 } from '@/utils/itemValorCampos.js';
+import { applyNumeroProcessoToSlotsOverride } from '@/utils/numeroProcessoSlots.js';
 import '@/components/dispensa-art-75-ii/dispensaArt75ii.css';
 import {
   clearDeprecatedCargoPresetFields,
@@ -1321,6 +1322,8 @@ function buildTrSlotsOverride() {
 
   const fundamentoLegal = resolveSolOficioFundamentoLegal(dispensaLogicalRouteName.value);
   if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;
+
+  applyNumeroProcessoToSlotsOverride(o, f.numero_processo || '');
 
   return stripDeprecatedCargoSlotsOverride(o);
 }

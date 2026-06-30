@@ -32,7 +32,7 @@ from .tr_template import (
     replace_placeholder_in_paragraph,
     slots_numero_processo_display,
     split_paragraphs_on_double_newline,
-    _normalize_slot_block,
+    _normalize_multiline_signature_text,
 )
 
 
@@ -251,7 +251,7 @@ def render_dfd_from_tr_slots(
         "(DFD_GESTOR_CONTRATOS)": slots.dfd_gestor_contratos or "",
         "(DFD_FISCAL_CONTRATOS)": slots.dfd_fiscal_contratos or "",
         "(DFD_CARGO_ASSINATURA)": slots.dfd_assinatura_cargo or "",
-        "(DFD_NOME_ASSINATURA)": _normalize_slot_block(slots.dfd_assinatura_nome or ""),
+        "(DFD_NOME_ASSINATURA)": _normalize_multiline_signature_text(slots.dfd_assinatura_nome or ""),
         "(DFD_DATA)": dfd_data_text,
         # Placeholders legados (mesmo conteúdo que DFD_OBJETO_REFERENCIA / DFD_JUSTIFICATIVA)
         "(Descrever objeto do termo de referencia)": dfd_obj,
@@ -264,7 +264,7 @@ def render_dfd_from_tr_slots(
         "(GESTORA CONTRATOS)": slots.dfd_gestor_contratos or "",
         "(FISCAL CONTRATOS)": slots.dfd_fiscal_contratos or "",
         "(CARGO ASSINATURA DFD)": slots.dfd_assinatura_cargo or "",
-        "(NOME ASSINATURA DFD)": _normalize_slot_block(slots.dfd_assinatura_nome or ""),
+        "(NOME ASSINATURA DFD)": _normalize_multiline_signature_text(slots.dfd_assinatura_nome or ""),
         "(DATA DFD)": dfd_data_text,
     }
 

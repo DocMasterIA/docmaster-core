@@ -1,6 +1,7 @@
 """Substituição de ( NUMERO_PROCESSO ) no TR — placeholder manual no .docx."""
 from __future__ import annotations
 
+import re
 import unittest
 from pathlib import Path
 
@@ -10,12 +11,16 @@ from app.tr_template import (
     TRTemplateSlots,
     numero_processo_valor_placeholder_tr,
     render_tr_from_slots,
+    slots_numero_processo_display,
 )
+
+TEMPLATE_PACKAGES_ROOT = Path(__file__).resolve().parents[2] / "template_packages"
+
+ALL_TR_TEMPLATES = sorted(TEMPLATE_PACKAGES_ROOT.rglob("TR_modelo_base.docx"))
 
 # Modelo com placeholder manual (como o usuário coloca no Word)
 TEMPLATE_COM_PLACEHOLDER = (
-    Path(__file__).resolve().parents[2]
-    / "template_packages"
+    TEMPLATE_PACKAGES_ROOT
     / "lei_14133"
     / "inexigibilidade_74_i_manutencao_de_veiculos"
     / "TR_modelo_base.docx"
@@ -23,6 +28,63 @@ TEMPLATE_COM_PLACEHOLDER = (
 
 
 class TrNumeroProcessoPlaceholderTests(unittest.TestCase):
+    def test_all_tr_templates_have_numero_processo_placeholder(self):
+        self.assertTrue(ALL_TR_TEMPLATES, "Nenhum TR_modelo_base.docx encontrado")
+        missing: list[str] = []
+        for path in ALL_TR_TEMPLATES:
+            doc = Document(str(path))
+            full = "\n".join(p.text or "" for p in doc.paragraphs)
+            if not re.search(r"\(\s*NUMERO_PROCESSO\s*\)", full, re.I):
+                missing.append(str(path.relative_to(TEMPLATE_PACKAGES_ROOT)))
+        self.assertEqual(
+            missing,
+            [],
+            f"TR(s) sem ( NUMERO_PROCESSO ): {missing}",
+        )
+
+    def test_numero_processo_replaced_in_every_tr_template(self):
+        slots = TRTemplateSlots(
+            numero_processo="1231/2026",
+            objeto="Objeto teste",
+            justificativa="Justificativa teste.",
+            cidade="Cidade Teste",
+            codigo_uf="GO",
+        )
+        failures: list[str] = []
+        for path in ALL_TR_TEMPLATES:
+            out = render_tr_from_slots(slots, template_path=path)
+            doc = Document(out)
+            head = doc.paragraphs[:12]
+            if not any("PROCESSO: 1231/2026" in (p.text or "") for p in head):
+                failures.append(f"{path.relative_to(TEMPLATE_PACKAGES_ROOT)}: PROCESSO não substituído")
+            if any("( NUMERO_PROCESSO )" in (p.text or "") for p in head):
+                failures.append(f"{path.relative_to(TEMPLATE_PACKAGES_ROOT)}: placeholder bruto permaneceu")
+        self.assertEqual(failures, [], "\n".join(failures))
+
+    def test_numero_processo_only_on_slots_still_renders_tr(self):
+        """Override só com numero_processo (sem dfd_numero_processo) preenche o TR."""
+        slots = TRTemplateSlots(
+            numero_processo="4567/2026",
+            objeto="Objeto teste",
+            justificativa="Justificativa teste.",
+            cidade="Cidade Teste",
+            codigo_uf="GO",
+        )
+        self.assertEqual(slots_numero_processo_display(slots), "4567/2026")
+        out = render_tr_from_slots(slots, template_path=TEMPLATE_COM_PLACEHOLDER)
+        doc = Document(out)
+        self.assertTrue(
+            any("PROCESSO: 4567/2026" in (p.text or "") for p in doc.paragraphs[:8]),
+        )
+
+    def test_merge_coalesces_numero_processo_pair(self):
+        from app.tr_slots_llm import _merge_slots
+
+        llm_slots = TRTemplateSlots(objeto="Obj", justificativa="Just.")
+        merged = _merge_slots(llm_slots, {"numero_processo": "7890/2026"})
+        self.assertEqual(merged.numero_processo, "7890/2026")
+        self.assertEqual(merged.dfd_numero_processo, "7890/2026")
+
     def test_mapping_formats_processo_prefix(self):
         self.assertEqual(numero_processo_valor_placeholder_tr("1231/2026"), "PROCESSO: 1231/2026")
         self.assertEqual(numero_processo_valor_placeholder_tr(""), "")

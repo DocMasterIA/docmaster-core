@@ -22,6 +22,7 @@ from .docx_typography import (
     clamp_docx_paragraph_indents,
 )
 from .deprecated_cargo_slots import clear_deprecated_cargo_fields
+from .dfd_slot_sanitize import sanitize_dfd_setor_requisitante
 from .tr_deixis import adapt_text_for_dfd_or_oficio
 from .tr_template import (
     TRTemplateSlots,
@@ -289,7 +290,7 @@ def render_dfd_from_tr_slots(
         "(DFD_OBJETO_REFERENCIA)": dfd_obj,
         "(DFD_JUSTIFICATIVA)": dfd_just,
         "(DFD_CIDADE)": slots.cidade or "",
-        "(DFD_SETOR_REQUISITANTE)": slots.dfd_setor_requisitante or "",
+        "(DFD_SETOR_REQUISITANTE)": sanitize_dfd_setor_requisitante(slots.dfd_setor_requisitante or ""),
         "(DFD_NUMERO_PROCESSO)": num_proc,
         "(NUMERO_PROCESSO)": num_proc_tr_style,
         "( NUMERO_PROCESSO )": num_proc_tr_style,
@@ -307,7 +308,7 @@ def render_dfd_from_tr_slots(
         "(descrever a justificativa usada no termo de referencias)": dfd_just,
         "(CIDADE)": slots.cidade or "",
         # Placeholders novos de identificação/assinatura do DFD
-        "(SETOR REQUISITANTE)": slots.dfd_setor_requisitante or "",
+        "(SETOR REQUISITANTE)": sanitize_dfd_setor_requisitante(slots.dfd_setor_requisitante or ""),
         "(RESPONSAVEL DEMANDA)": slots.dfd_responsavel_demanda or "",
         "(EMAIL DFD)": slots.dfd_email or "",
         "(GESTORA CONTRATOS)": slots.dfd_gestor_contratos or "",

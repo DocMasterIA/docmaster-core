@@ -63,6 +63,21 @@ export function campoPreenchido(valor) {
   return String(valor || '').trim().length > 0;
 }
 
+/**
+ * Setor requisitante do DFD (2.1) — somente «Dados fixos», nunca o setor do prompt de cláusulas IA.
+ * @param {{ fixoSetor?: string }} dadosFixos
+ */
+export function dfdSetorRequisitanteFromDadosFixos(dadosFixos) {
+  return String(dadosFixos?.fixoSetor || '').trim();
+}
+
+/** Preenche dfd_setor_requisitante no override de geração TR/DFD/Ofício. */
+export function applyDfdSetorRequisitanteToSlotsOverride(slotsOverride, dadosFixos) {
+  const setor = dfdSetorRequisitanteFromDadosFixos(dadosFixos);
+  if (setor) slotsOverride.dfd_setor_requisitante = setor;
+  return slotsOverride;
+}
+
 export function primeiraMaiuscula(valor) {
   return capitalizeFirstSignificantLetter(valor);
 }

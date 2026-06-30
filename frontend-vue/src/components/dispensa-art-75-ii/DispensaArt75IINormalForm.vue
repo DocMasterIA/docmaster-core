@@ -257,6 +257,7 @@ import {
   quantidadeParaNumero,
   primeiraMaiuscula,
   stripDeprecatedCargoSlotsOverride,
+  applyDfdSetorRequisitanteToSlotsOverride,
 } from './dispensaArt75iiShared.js';
 import './dispensaArt75ii.css';
 import DispensaArt75IIDadosFixosDrawer from './DispensaArt75IIDadosFixosDrawer.vue';
@@ -551,10 +552,7 @@ function slotsOverrideWithoutClauseDraft(raw) {
 
 /** Só os campos do bloco «Objeto da contratação» — sem Dados básicos, dados fixos ou tabela de itens. */
 function buildSlotsOverrideForGerarClausulas() {
-  const setor = String(objetoSetor.value || '').trim();
-  const o = { dispensa_fluxo_ui: 'normal' };
-  if (setor) o.dfd_setor_requisitante = setor;
-  return o;
+  return { dispensa_fluxo_ui: 'normal' };
 }
 
 function buildUserPromptGerarClausulas() {
@@ -658,12 +656,7 @@ function buildSlotsOverride() {
   if (destNome) o.sol_oficio_destinatario_nome = destNome;
   if (respNome) o.sol_oficio_responsavel_nome = respNome;
   if (tratNome) o.ao_senhor_genero = tratNome;
-  const setorFormulario = String(objetoSetor.value || '').trim();
-  if (setorFormulario) {
-    o.dfd_setor_requisitante = setorFormulario;
-  } else if (String(dadosFixos.fixoSetor || '').trim()) {
-    o.dfd_setor_requisitante = String(dadosFixos.fixoSetor).trim();
-  }
+  applyDfdSetorRequisitanteToSlotsOverride(o, dadosFixos);
   if (String(dadosFixos.fixoDemanda || '').trim()) o.dfd_responsavel_demanda = String(dadosFixos.fixoDemanda).trim();
   if (String(dadosFixos.fixoEmail || '').trim()) o.dfd_email = String(dadosFixos.fixoEmail).trim();
   if (String(dadosFixos.fixoGestor || '').trim()) o.dfd_gestor_contratos = String(dadosFixos.fixoGestor).trim();

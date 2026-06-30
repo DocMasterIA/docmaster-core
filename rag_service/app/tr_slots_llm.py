@@ -24,6 +24,7 @@ from .config import (
     RAG_HTTP_TIMEOUT,
 )
 from .deprecated_cargo_slots import clear_deprecated_cargo_fields, strip_deprecated_cargo_override
+from .dfd_slot_sanitize import sanitize_dfd_setor_requisitante
 from .objeto_clause_sanitize import sanitize_objeto_clause_pura as _sanitize_objeto_clause_pura
 from .justificativa_clause_sanitize import (
     finalize_rapida_secao4_tres_blocos,
@@ -1642,7 +1643,7 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         if override.get("sol_oficio_responsavel_setor") is not None
         else llm_slots.sol_oficio_responsavel_setor
     )
-    dfd_setor_requisitante = (
+    dfd_setor_requisitante = sanitize_dfd_setor_requisitante(
         (override.get("dfd_setor_requisitante") or llm_slots.dfd_setor_requisitante)
         if override.get("dfd_setor_requisitante") is not None
         else llm_slots.dfd_setor_requisitante

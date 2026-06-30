@@ -281,19 +281,11 @@ watch(dotacaoAtiva, (v) => {
   if (!v) dotacao.value = '';
 });
 
-function sanitizeOrgaoValue() {
-  const current = String(orgao.value || '').trim();
-  if (!current) return;
-  const allowed = new Set((dadosFixos.mergedOrgaoOptions || []).map((x) => String(x || '').trim()).filter(Boolean));
-  if (!allowed.has(current)) orgao.value = '';
-}
-
 async function reloadPresetCabecalhosOrgao() {
   await dadosFixos.loadOrgaoProfiles();
   await dadosFixos.loadUserGlobalPreset();
   await dadosFixos.loadSlotCatalogSuggestions();
   usuarioLocalidade.value = await fetchUsuarioLocalidadeParaTr(API_BASE);
-  sanitizeOrgaoValue();
   cabecalhosLoading.value = true;
   try {
     const opts = await fetchCabecalhosPrefeitura(API_BASE);
@@ -349,16 +341,14 @@ watch(
   },
 );
 
-function onApplyDadosFixos() {
-  void dadosFixos.saveUserGlobalPreset();
-  {
-    const current = String(orgao.value || '').trim();
-    if (current) {
-      const allowed = new Set((dadosFixos.mergedOrgaoOptions || []).map((x) => String(x || '').trim()).filter(Boolean));
-      if (!allowed.has(current)) orgao.value = '';
-    }
-  }
+async function onApplyDadosFixos() {
   drawerAberto.value = false;
+  isSubmitting.value = false;
+  try {
+    await dadosFixos.saveUserGlobalPreset();
+  } catch {
+    // silencioso
+  }
 }
 
 const dataResumo = computed(() => (modoData.value === 'Data manual' ? dataManual.value : modoData.value));
@@ -603,6 +593,7 @@ function buildUserPrompt() {
 }
 
 async function onSubmit() {
+  if (isSubmitting.value) return;
   generateError.value = '';
   successMessage.value = '';
   documentReady.value = false;
@@ -613,6 +604,7 @@ async function onSubmit() {
     return;
   }
   isSubmitting.value = true;
+  let presetSaveAfterSuccess = false;
   try {
     try {
       await preencherObjetoEJustificativaInterno();
@@ -660,12 +652,13 @@ async function onSubmit() {
     documentZipFilename.value = data.zip?.filename || 'tr_dfd_oficio.zip';
     documentReady.value = true;
     successMessage.value = 'Documentos gerados com sucesso.';
-    await dadosFixos.saveUserGlobalPreset();
+    presetSaveAfterSuccess = true;
   } catch (e) {
     generateError.value = e?.message || 'Erro ao gerar documento';
   } finally {
     isSubmitting.value = false;
   }
+  if (presetSaveAfterSuccess) void dadosFixos.saveUserGlobalPreset();
 }
 
 onBeforeUnmount(() => {

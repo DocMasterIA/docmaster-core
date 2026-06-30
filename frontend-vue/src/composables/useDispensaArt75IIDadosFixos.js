@@ -1,4 +1,4 @@
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import {
   clearDeprecatedCargoPresetFields,
   TEXTO_PADRAO_ENDERECO_PROPOSTAS,
@@ -66,6 +66,18 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
   const fixoTrResponsavelNome = ref('');
 
   const tratamentoNome = TRATAMENTO_NOME;
+
+  /** Perfis salvos + histórico do catálogo + valor atual (texto livre no campo principal). */
+  const mergedOrgaoOptions = computed(() => {
+    const profiles = orgaoProfilesApi.orgaoOptionsFromProfiles.value || [];
+    const catalog = Array.isArray(slotFieldOptions.orgao) ? slotFieldOptions.orgao : [];
+    const current = String(orgao.value || '').trim();
+    return [...new Set(
+      [...profiles, ...catalog, current]
+        .map((x) => String(x || '').trim())
+        .filter(Boolean),
+    )];
+  });
 
   function collectPresetPayload() {
     return clearDeprecatedCargoPresetFields({
@@ -269,7 +281,7 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     orgaoProfiles: orgaoProfilesApi.orgaoProfiles,
     selectedOrgaoProfileId: orgaoProfilesApi.selectedOrgaoProfileId,
     orgaoProfileName: orgaoProfilesApi.orgaoProfileName,
-    mergedOrgaoOptions: orgaoProfilesApi.mergedOrgaoOptions,
+    mergedOrgaoOptions,
     slotFieldOptions,
     tratamentoNome,
     fixoTratNome,

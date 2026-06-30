@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from copy import deepcopy
 from datetime import date, datetime
 
 """
@@ -523,6 +524,36 @@ def _copy_paragraph_layout(source: Paragraph, target: Paragraph) -> None:
         pass
 
 
+def _font_reference_run(paragraph: Paragraph):
+    """Run com tamanho de fonte explícito (ex. placeholder 12 pt no modelo)."""
+    for run in paragraph.runs:
+        if run.font.size is not None:
+            return run
+    for run in paragraph.runs:
+        if (run.text or "").strip():
+            return run
+    return paragraph.runs[0] if paragraph.runs else None
+
+
+def _copy_run_font(source, target) -> None:
+    if source is None or target is None:
+        return
+    try:
+        if source.font.size is not None:
+            target.font.size = source.font.size
+        if source.font.name:
+            target.font.name = source.font.name
+        src_rpr = source._element.rPr
+        if src_rpr is not None:
+            tgt_el = target._element
+            old_rpr = tgt_el.rPr
+            if old_rpr is not None:
+                tgt_el.remove(old_rpr)
+            tgt_el.insert(0, deepcopy(src_rpr))
+    except Exception:
+        pass
+
+
 def _locate_placeholder_span(runs, placeholder: str) -> tuple[int, int, int, int] | None:
     full_text = "".join(run.text or "" for run in runs)
     start = full_text.find(placeholder)
@@ -563,14 +594,18 @@ def replace_placeholder_in_paragraph(
     normalized = _normalize_slot_block(replacement) if multiline_as_paragraphs else str(replacement or "")
     if multiline_as_paragraphs and "\n" in normalized:
         lines = normalized.split("\n")
+        font_ref = _font_reference_run(paragraph)
         if not _replace_placeholder_in_paragraph_inline(paragraph, placeholder, lines[0]):
             return False
+        if font_ref is None:
+            font_ref = _font_reference_run(paragraph)
         current = paragraph
         for line in lines[1:]:
             new_p = _insert_paragraph_after(current)
             _copy_paragraph_layout(current, new_p)
             if line.strip():
-                new_p.add_run(line.strip())
+                run = new_p.add_run(line.strip())
+                _copy_run_font(font_ref, run)
             current = new_p
         return True
     return _replace_placeholder_in_paragraph_inline(paragraph, placeholder, replacement)

@@ -577,6 +577,7 @@ def split_paragraphs_on_double_newline(doc: Document, *, space_after_pt: float =
             return
         para.text = parts[0]
         n = len(parts)
+        parent_align = para.alignment
         if n >= 2:
             para.paragraph_format.space_after = gap
         ref_el = para._p
@@ -585,6 +586,8 @@ def split_paragraphs_on_double_newline(doc: Document, *, space_after_pt: float =
             ref_el.addnext(new_p)
             new_para = Paragraph(new_p, para._parent)
             new_para.text = chunk
+            if parent_align is not None:
+                new_para.alignment = parent_align
             if idx < n - 2:
                 new_para.paragraph_format.space_after = gap
             ref_el = new_p

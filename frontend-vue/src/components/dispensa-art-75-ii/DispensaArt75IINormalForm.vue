@@ -68,6 +68,15 @@
                       />
                     </div>
                     <div class="da75-field">
+                      <label class="da75-label">Qual setor/secretaria será atendido?</label>
+                      <input
+                        class="da75-input"
+                        :value="objetoSetor"
+                        :placeholder="normalPhSetor"
+                        @input="objetoSetor = primeiraMaiuscula(($event.target).value)"
+                      />
+                    </div>
+                    <div class="da75-field">
                       <label class="da75-label">Características mínimas obrigatórias (opcional)</label>
                       <textarea
                         class="da75-textarea"
@@ -282,6 +291,7 @@ const processo = ref('');
 const orgao = ref('');
 const dadosFixos = useDispensaArt75IIDadosFixos(API_BASE, { cabecalho, processoAtivo, processo, orgao });
 const objetoContratado = ref('');
+const objetoSetor = ref('');
 const objetoCaracteristicas = ref('');
 const objetoGerado = ref('');
 const justificativa = ref('');
@@ -318,26 +328,31 @@ const SLOT_PACKAGE_BY_ROUTE = {
 const DISPENSA_ART75_II_NORMAL_SHARED_ROUTES = new Set(Object.keys(SLOT_PACKAGE_BY_ROUTE));
 const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[String(route.name || '')] || 'tr_dfd_generico');
 
-/** Exemplos por modalidade (dispensa normal — objeto / características). */
+/** Exemplos por modalidade (dispensa normal — objeto / setor / características). */
 const NORMAL_OBJ_EXAMPLES = {
   DispensaArt75IObrasEngenharia: {
     objeto: 'Ex: Reforma do prédio da prefeitura, incluindo fornecimento de materiais e mão de obra',
+    setor: 'Ex: Secretaria Municipal de Obras e Urbanismo',
     caracteristicas: 'Ex: Cronograma físico-financeiro em anexo ao processo (opcional)',
   },
   DispensaArt75IManutencaoVeiculos: {
     objeto: 'Ex: Prestação de serviços com reparo no módulo de injeção eletrônica',
+    setor: 'Ex: Frota oficial da Prefeitura',
     caracteristicas: 'Ex: Peças com garantia mínima de 90 dias (opcional)',
   },
   DispensaArt75IICompras: {
     objeto: 'Ex: Aquisição de medicamentos',
+    setor: 'Ex: UBS Leontino',
     caracteristicas: 'Ex: Para doação à população carente',
   },
   DispensaArt75IIServicos: {
     objeto: 'Ex: Prestação de serviços de limpeza e conservação predial',
+    setor: 'Ex: Prédios públicos municipais',
     caracteristicas: 'Ex: Com fornecimento de materiais de limpeza',
   },
   DispensaArt75IIComprasServicosInclusos: {
     objeto: 'Ex: Aquisição de playground infantil com instalação',
+    setor: 'Ex: Secretaria Municipal de Assistência Social',
     caracteristicas: 'Ex: Para recreação das crianças',
   },
 };
@@ -347,12 +362,14 @@ const normalPhTrio = computed(() => {
   return (
     NORMAL_OBJ_EXAMPLES[n] || {
       objeto: 'Ex: Descreva o objeto da contratação',
+      setor: 'Ex: Setor ou secretaria atendida',
       caracteristicas: 'Ex: Requisitos ou observações (opcional)',
     }
   );
 });
 
 const normalPhObjeto = computed(() => normalPhTrio.value.objeto);
+const normalPhSetor = computed(() => normalPhTrio.value.setor);
 const normalPhCaracteristicas = computed(() => normalPhTrio.value.caracteristicas);
 
 function resolveSolOficioFundamentoLegal(routeName) {
@@ -393,6 +410,7 @@ async function resetFormStateForNewRoute() {
   processo.value = '';
   orgao.value = '';
   objetoContratado.value = '';
+  objetoSetor.value = '';
   objetoCaracteristicas.value = '';
   objetoGerado.value = '';
   justificativa.value = '';
@@ -448,7 +466,7 @@ async function onApplyDadosFixos() {
 }
 
 const objetoPrompt = computed(() =>
-  [objetoContratado.value, objetoCaracteristicas.value].filter(campoPreenchido).join(' | '),
+  [objetoContratado.value, objetoSetor.value, objetoCaracteristicas.value].filter(campoPreenchido).join(' | '),
 );
 
 const dataResumo = computed(() => (modoData.value === 'Data manual' ? dataManual.value : modoData.value));
@@ -531,13 +549,17 @@ function slotsOverrideWithoutClauseDraft(raw) {
 
 /** Só os campos do bloco «Objeto da contratação» — sem Dados básicos, dados fixos ou tabela de itens. */
 function buildSlotsOverrideForGerarClausulas() {
-  return { dispensa_fluxo_ui: 'normal' };
+  const setor = String(objetoSetor.value || '').trim();
+  const o = { dispensa_fluxo_ui: 'normal' };
+  if (setor) o.dfd_setor_requisitante = setor;
+  return o;
 }
 
 function buildUserPromptGerarClausulas() {
   const car = String(objetoCaracteristicas.value || '').trim();
   return [
     `O que será contratado: ${objetoContratado.value}`,
+    `Setor/secretaria atendido: ${objetoSetor.value}`,
     car ? `Características mínimas: ${car}` : '',
   ]
     .filter(Boolean)
@@ -547,8 +569,9 @@ function buildUserPromptGerarClausulas() {
 async function gerar() {
   erroGeracaoClausulas.value = '';
   const contratado = String(objetoContratado.value || '').trim();
-  if (!contratado) {
-    erroGeracaoClausulas.value = 'Preencha "O que será contratado?".';
+  const setor = String(objetoSetor.value || '').trim();
+  if (!contratado || !setor) {
+    erroGeracaoClausulas.value = 'Preencha "O que será contratado?" e "Qual setor/secretaria será atendido?".';
     return;
   }
 
@@ -633,7 +656,12 @@ function buildSlotsOverride() {
   if (destNome) o.sol_oficio_destinatario_nome = destNome;
   if (respNome) o.sol_oficio_responsavel_nome = respNome;
   if (tratNome) o.ao_senhor_genero = tratNome;
-  applyDfdSetorRequisitanteToSlotsOverride(o, dadosFixos);
+  const setorFormulario = String(objetoSetor.value || '').trim();
+  if (setorFormulario) {
+    o.dfd_setor_requisitante = setorFormulario;
+  } else {
+    applyDfdSetorRequisitanteToSlotsOverride(o, dadosFixos);
+  }
   if (String(dadosFixos.fixoDemanda || '').trim()) o.dfd_responsavel_demanda = String(dadosFixos.fixoDemanda).trim();
   if (String(dadosFixos.fixoEmail || '').trim()) o.dfd_email = String(dadosFixos.fixoEmail).trim();
   if (String(dadosFixos.fixoGestor || '').trim()) o.dfd_gestor_contratos = String(dadosFixos.fixoGestor).trim();
@@ -699,7 +727,16 @@ function buildSlotsOverride() {
 }
 
 function buildUserPrompt() {
-  return buildUserPromptGerarClausulas();
+  return [
+    `Gerar documento com base nos dados preenchidos para ${String(route.meta?.title || 'dispensa normal')}.`,
+    `Cabeçalho do documento: ${cabecalho.value || 'Não informado'}`,
+    `Órgão: ${orgao.value || 'Não informado'}`,
+    `Processo: ${processoAtivo.value ? (processo.value || 'Não informado') : 'Não se aplica'}`,
+    `Objeto base: ${objetoContratado.value || 'Não informado'}`,
+    `Setor/secretaria atendido (usar nas cláusulas de objeto e justificativa): ${objetoSetor.value || 'Não informado'}`,
+    `Características mínimas: ${objetoCaracteristicas.value || 'Não informado'}`,
+    'Em objeto e justificativa não liste nem discuta itens da tabela (descrições, quantidades, valores); mantenha texto genérico.',
+  ].join('\n');
 }
 
 function sanitizeJsonBody(obj) {

@@ -112,6 +112,19 @@ export function useDotacaoOrcamentariaProfiles(apiBase) {
     }
   }
 
+  function findProfile(profileId) {
+    const id = String(profileId || '').trim();
+    if (!id) return null;
+    return profiles.value.find((p) => String(p.id) === id) || null;
+  }
+
+  /** @returns {{ name: string, texto: string } | null} */
+  function profilePayload(profileId) {
+    const hit = findProfile(profileId);
+    if (!hit) return null;
+    return { name: hit.name, texto: hit.texto };
+  }
+
   function loadProfile(profileId) {
     const id = String(profileId || '').trim();
     selectedProfileId.value = id;
@@ -119,13 +132,13 @@ export function useDotacaoOrcamentariaProfiles(apiBase) {
       profileName.value = '';
       return null;
     }
-    const hit = profiles.value.find((p) => String(p.id) === id);
-    if (!hit) {
+    const payload = profilePayload(id);
+    if (!payload) {
       profileName.value = '';
       return null;
     }
-    profileName.value = hit.name;
-    return hit.texto;
+    profileName.value = payload.name;
+    return payload.texto;
   }
 
   function newProfile() {
@@ -197,6 +210,7 @@ export function useDotacaoOrcamentariaProfiles(apiBase) {
     loading,
     loadProfiles,
     loadProfile,
+    profilePayload,
     newProfile,
     saveProfile,
     deleteProfile,

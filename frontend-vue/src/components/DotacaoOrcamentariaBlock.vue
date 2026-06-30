@@ -90,7 +90,7 @@ const {
   selectedProfileId,
   profileName,
   loadProfiles,
-  loadProfile,
+  profilePayload,
   newProfile,
   saveProfile,
   deleteProfile,
@@ -213,11 +213,29 @@ function syncDotacaoFromDom() {
   return texto;
 }
 
-function onSelectProfile(id) {
-  const texto = loadProfile(id);
-  if (texto != null) {
-    dotacaoAtiva.value = true;
+function applyProfileToFields(profileId, { forceText = false } = {}) {
+  const payload = profilePayload(profileId);
+  if (!payload) return false;
+  selectedProfileId.value = String(profileId || '').trim();
+  profileName.value = payload.name;
+  const texto = String(payload.texto || '').trim();
+  if (texto && (forceText || !String(dotacao.value || '').trim())) {
     dotacao.value = texto;
+  }
+  return Boolean(texto);
+}
+
+function syncSelectedProfileToDotacao({ forceText = false } = {}) {
+  const id = String(selectedProfileId.value || '').trim();
+  if (!id || !dotacaoAtiva.value) return;
+  applyProfileToFields(id, { forceText });
+}
+
+async function onSelectProfile(id) {
+  await loadProfiles();
+  const applied = applyProfileToFields(id, { forceText: true });
+  if (applied) {
+    dotacaoAtiva.value = true;
     saveMessage.value = '';
   }
 }
@@ -241,8 +259,23 @@ async function onDeleteProfile() {
   saveMessage.value = '';
 }
 
-onMounted(() => {
-  loadProfiles();
+watch(dotacaoAtiva, async (active) => {
+  if (!active) return;
+  await loadProfiles();
+  syncSelectedProfileToDotacao({ forceText: true });
+});
+
+watch(
+  () => profiles.value,
+  () => {
+    syncSelectedProfileToDotacao();
+  },
+  { deep: true },
+);
+
+onMounted(async () => {
+  await loadProfiles();
+  syncSelectedProfileToDotacao({ forceText: true });
 });
 </script>
 

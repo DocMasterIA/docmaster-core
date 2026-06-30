@@ -29,8 +29,22 @@ class SignatureNomeSpacingTests(unittest.TestCase):
     def test_tr_template_gets_three_blank_lines(self):
         path = TEMPLATE_ROOT / "dispensa_75_ii_compras" / "TR_modelo_base.docx"
         doc = Document(str(path))
+        self.assertEqual(_blank_lines_before_nome(doc, "(TR_NOME_ASSINANTE_TERMO)"), 5)
         ensure_signature_nome_blank_lines(doc)
         self.assertEqual(_blank_lines_before_nome(doc, "(TR_NOME_ASSINANTE_TERMO)"), 3)
+        ensure_signature_nome_blank_lines(doc)
+        self.assertEqual(_blank_lines_before_nome(doc, "(TR_NOME_ASSINANTE_TERMO)"), 3)
+
+    def test_two_existing_blanks_becomes_three_not_five(self):
+        doc = Document()
+        doc.add_paragraph("Cidade - UF, 22 de junho de 2026")
+        doc.add_paragraph("")
+        doc.add_paragraph("")
+        doc.add_paragraph("Maria da Silva")
+        ensure_signature_nome_blank_lines(doc)
+        paras = list(doc.paragraphs)
+        nome_idx = next(i for i, p in enumerate(paras) if "Maria da Silva" in (p.text or ""))
+        self.assertEqual(_blank_lines_before_paragraph_index(doc, nome_idx), 3)
 
     def test_dfd_template_gets_three_blank_lines(self):
         path = TEMPLATE_ROOT / "dispensa_75_ii_compras" / "DFD_modelo_base.docx"

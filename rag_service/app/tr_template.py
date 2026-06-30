@@ -1279,10 +1279,10 @@ def render_tr_from_slots(
         _normalize_art74_sec15_1_15_2_spacing(doc)
     _fill_items_table(doc, slots.itens)
 
-    ensure_signature_nome_blank_lines(doc)
-
     apply_standard_body_font_to_document(doc)
     apply_default_justify_to_document(doc)
+
+    ensure_signature_nome_blank_lines(doc)
 
     out_path = Path(output_path) if output_path else None
     if out_path is None:

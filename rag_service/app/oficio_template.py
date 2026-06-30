@@ -245,10 +245,10 @@ def render_oficio_from_slots(
     split_paragraphs_on_double_newline(doc)
     _remove_oficio_deprecated_cargo_artifacts(doc)
 
-    ensure_signature_nome_blank_lines(doc)
-
     apply_standard_body_font_to_document(doc)
     apply_default_justify_to_document(doc)
+
+    ensure_signature_nome_blank_lines(doc)
 
     out_path = Path(output_path) if output_path else None
     if out_path is None:

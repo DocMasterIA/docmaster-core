@@ -420,6 +420,22 @@ def _insert_empty_paragraph_after(ref_para: Paragraph) -> Paragraph:
     return Paragraph(new_p, ref_para._parent)
 
 
+def _insert_empty_paragraph_before(ref_para: Paragraph) -> Paragraph:
+    from docx.oxml import OxmlElement
+
+    new_p = OxmlElement("w:p")
+    ref_para._p.addprevious(new_p)
+    return Paragraph(new_p, ref_para._parent)
+
+
+def _is_removable_gap_paragraph(paragraph: Paragraph) -> bool:
+    """Parágrafo vazio (ou só pontuação) entre cidade/data e nome — não é conteúdo."""
+    if _is_empty_paragraph(paragraph):
+        return True
+    t = _paragraph_visible_text(paragraph)
+    return bool(t) and not re.search(r"\w", t, re.UNICODE)
+
+
 def _paragraph_has_signature_nome_marker(paragraph: Paragraph) -> bool:
     t = (paragraph.text or "").replace("\u00a0", " ")
     return any(marker in t for marker in SIGNATURE_NOME_MARKERS)
@@ -437,52 +453,101 @@ def _paragraph_looks_like_cidade_data_line(paragraph: Paragraph) -> bool:
     return False
 
 
-def _find_signature_nome_paragraph_index(paragraphs: list[Paragraph]) -> int | None:
-    for i, p in enumerate(paragraphs):
+def _find_signature_nome_paragraph(paragraphs: list[Paragraph]) -> Paragraph | None:
+    for p in paragraphs:
         if _paragraph_has_signature_nome_marker(p):
-            return i
-    # Fallback estrutural (placeholders já substituídos): 1.º parágrafo com texto após cidade/data.
+            return p
     for i in range(len(paragraphs) - 1, max(-1, len(paragraphs) - 24), -1):
         if not _paragraph_looks_like_cidade_data_line(paragraphs[i]):
             continue
         j = i + 1
-        while j < len(paragraphs) and _is_empty_paragraph(paragraphs[j]):
+        while j < len(paragraphs) and _is_removable_gap_paragraph(paragraphs[j]):
             j += 1
         if j < len(paragraphs) and _paragraph_visible_text(paragraphs[j]):
-            return j
+            return paragraphs[j]
         return None
     return None
 
 
-def _normalize_blank_gap_before_index(
-    paragraphs: list[Paragraph],
-    nome_idx: int,
+def _find_signature_anchor_paragraph(paragraphs: list[Paragraph], nome_para: Paragraph) -> Paragraph | None:
+    """
+    Âncora do espaçamento: linha cidade/data imediatamente acima da assinatura.
+    Se não houver, usa o último parágrafo com texto antes do nome.
+    """
+    try:
+        nome_idx = paragraphs.index(nome_para)
+    except ValueError:
+        return None
+
+    for i in range(nome_idx - 1, max(-1, nome_idx - 32), -1):
+        if _paragraph_looks_like_cidade_data_line(paragraphs[i]):
+            return paragraphs[i]
+
+    prev_idx = nome_idx - 1
+    while prev_idx >= 0 and _is_removable_gap_paragraph(paragraphs[prev_idx]):
+        prev_idx -= 1
+    if prev_idx >= 0:
+        return paragraphs[prev_idx]
+    return None
+
+
+def _remove_gap_paragraphs_between(anchor_para: Paragraph, nome_para: Paragraph) -> int:
+    """Remove todos os parágrafos entre a âncora (cidade/data) e o nome — retorna quantos removeu."""
+    removed = 0
+    anchor_el = anchor_para._p
+    nome_el = nome_para._p
+    if anchor_el.getparent() is not nome_el.getparent():
+        return 0
+
+    el = anchor_el.getnext()
+    while el is not None and el is not nome_el:
+        nxt = el.getnext()
+        if el.tag == qn("w:p"):
+            gap_p = Paragraph(el, anchor_para._parent)
+            if _is_removable_gap_paragraph(gap_p):
+                parent = el.getparent()
+                if parent is not None:
+                    parent.remove(el)
+                    removed += 1
+            else:
+                break
+        el = nxt
+    return removed
+
+
+def _set_signature_gap_paragraph_spacing(paragraph: Paragraph) -> None:
+    """Evita «linhas fantasma» via space_before/space_after no Word."""
+    pf = paragraph.paragraph_format
+    pf.space_before = Pt(0)
+    pf.space_after = Pt(0)
+    pf.line_spacing = 1.0
+
+
+def _normalize_signature_blank_gap(
+    anchor_para: Paragraph,
+    nome_para: Paragraph,
     *,
     blank_lines: int,
 ) -> bool:
-    """Garante exatamente `blank_lines` parágrafos vazios antes do nome da assinatura."""
-    prev_idx = nome_idx - 1
-    while prev_idx >= 0 and _is_empty_paragraph(paragraphs[prev_idx]):
-        prev_idx -= 1
-    if prev_idx < 0:
+    """
+    Zera o intervalo entre cidade/data e nome e recria com exatamente N parágrafos vazios.
+    Não soma em cima dos vazios já existentes no .docx.
+    """
+    if blank_lines < 0:
+        return False
+    if anchor_para._p is nome_para._p:
         return False
 
-    gap_start = prev_idx + 1
-    empty_paras = [paragraphs[j] for j in range(gap_start, nome_idx) if _is_empty_paragraph(paragraphs[j])]
-    n_empty = len(empty_paras)
+    changed = _remove_gap_paragraphs_between(anchor_para, nome_para) > 0
 
-    if n_empty > blank_lines:
-        for ep in empty_paras[blank_lines:]:
-            _remove_paragraph_element(ep)
-        return True
+    for _ in range(blank_lines):
+        inserted = _insert_empty_paragraph_before(nome_para)
+        _set_signature_gap_paragraph_spacing(inserted)
+        changed = True
 
-    if n_empty < blank_lines:
-        ref = paragraphs[prev_idx]
-        for _ in range(blank_lines - n_empty):
-            ref = _insert_empty_paragraph_after(ref)
-        return True
-
-    return False
+    _set_signature_gap_paragraph_spacing(anchor_para)
+    _set_signature_gap_paragraph_spacing(nome_para)
+    return changed
 
 
 def ensure_signature_nome_blank_lines(
@@ -491,22 +556,18 @@ def ensure_signature_nome_blank_lines(
     blank_lines: int = _SIGNATURE_NOME_BLANK_LINES_DEFAULT,
 ) -> None:
     """
-    Mantém exatamente N linhas em branco entre o último texto antes da assinatura
-    (em geral cidade/data) e o parágrafo do nome do signatário.
+    Exatamente N parágrafos vazios entre a linha cidade/data e o nome do signatário.
 
-    Aplica a (TR_NOME_ASSINANTE_TERMO), (DFD_NOME_ASSINATURA) e (SOL_OFICIO_RESPONSAVEL_NOME)
-    em qualquer pacote — evita ajustar cada .docx manualmente quando o corpo cresce.
+    Remove qualquer vazio já existente nesse intervalo antes de inserir os N — evita
+    2 no modelo + 3 do código = 5 linhas.
     """
     if blank_lines < 0:
         return
-    changed = True
-    guard = 0
-    while changed and guard < 8:
-        guard += 1
-        changed = False
-        paras = list(doc.paragraphs)
-        nome_idx = _find_signature_nome_paragraph_index(paras)
-        if nome_idx is None:
-            break
-        if _normalize_blank_gap_before_index(paras, nome_idx, blank_lines=blank_lines):
-            changed = True
+    paras = list(doc.paragraphs)
+    nome_para = _find_signature_nome_paragraph(paras)
+    if nome_para is None:
+        return
+    anchor_para = _find_signature_anchor_paragraph(paras, nome_para)
+    if anchor_para is None:
+        return
+    _normalize_signature_blank_gap(anchor_para, nome_para, blank_lines=blank_lines)

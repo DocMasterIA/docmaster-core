@@ -348,12 +348,12 @@ def render_dfd_from_tr_slots(
         _remove_processo_visual_block_when_empty(doc)
     _remove_dfd_cargo_assinatura_when_empty(doc)
 
-    ensure_signature_nome_blank_lines(doc)
-
     clamp_docx_paragraph_indents(doc)
 
     apply_standard_body_font_to_document(doc)
     apply_default_justify_to_document(doc)
+
+    ensure_signature_nome_blank_lines(doc)
 
     out_path = Path(output_path) if output_path else None
     if out_path is None:

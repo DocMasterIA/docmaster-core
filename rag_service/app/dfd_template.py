@@ -20,6 +20,7 @@ from .docx_typography import (
     apply_dfd_inclusive_role_labels,
     apply_standard_body_font_to_document,
     clamp_docx_paragraph_indents,
+    ensure_signature_nome_blank_lines,
 )
 from .deprecated_cargo_slots import clear_deprecated_cargo_fields
 from .dfd_slot_sanitize import sanitize_dfd_setor_requisitante
@@ -346,6 +347,8 @@ def render_dfd_from_tr_slots(
     if not num_proc:
         _remove_processo_visual_block_when_empty(doc)
     _remove_dfd_cargo_assinatura_when_empty(doc)
+
+    ensure_signature_nome_blank_lines(doc)
 
     clamp_docx_paragraph_indents(doc)
 

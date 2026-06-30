@@ -14,7 +14,11 @@ from typing import Optional
 from docx import Document
 
 from .deprecated_cargo_slots import clear_deprecated_cargo_fields
-from .docx_typography import apply_default_justify_to_document, apply_standard_body_font_to_document
+from .docx_typography import (
+    apply_default_justify_to_document,
+    apply_standard_body_font_to_document,
+    ensure_signature_nome_blank_lines,
+)
 from .tr_deixis import adapt_text_for_dfd_or_oficio
 from .tr_template import (
     TRTemplateSlots,
@@ -240,6 +244,8 @@ def render_oficio_from_slots(
     _replace_placeholders(doc, mapping)
     split_paragraphs_on_double_newline(doc)
     _remove_oficio_deprecated_cargo_artifacts(doc)
+
+    ensure_signature_nome_blank_lines(doc)
 
     apply_standard_body_font_to_document(doc)
     apply_default_justify_to_document(doc)

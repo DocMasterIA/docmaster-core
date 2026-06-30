@@ -28,6 +28,7 @@ from docx.text.paragraph import Paragraph
 from .docx_typography import (
     apply_default_justify_to_document,
     apply_standard_body_font_to_document,
+    ensure_signature_nome_blank_lines,
     paragraph_is_roman_enumerated_list,
 )
 
@@ -1277,6 +1278,8 @@ def render_tr_from_slots(
     if _tr_is_lei14133_art74_i_inexigibilidade_pack(tpl_path, slots):
         _normalize_art74_sec15_1_15_2_spacing(doc)
     _fill_items_table(doc, slots.itens)
+
+    ensure_signature_nome_blank_lines(doc)
 
     apply_standard_body_font_to_document(doc)
     apply_default_justify_to_document(doc)

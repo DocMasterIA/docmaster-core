@@ -373,3 +373,140 @@ def apply_literal_text_replacements_in_document(
 def apply_dfd_inclusive_role_labels(doc: Document) -> None:
     """Normaliza rótulos de cargo no DFD (ex.: Gestor de Contratos → Gestor(a) de Contratos)."""
     apply_literal_text_replacements_in_document(doc, DFD_INCLUSIVE_ROLE_LABEL_REPLACEMENTS)
+
+
+# --- Espaçamento da assinatura (TR / DFD / Ofício) ---------------------------------
+
+SIGNATURE_NOME_MARKERS: tuple[str, ...] = (
+    "(TR_NOME_ASSINANTE_TERMO)",
+    "(NOME DO ASSINANTE DO TERMO)",
+    "(DFD_NOME_ASSINATURA)",
+    "(NOME ASSINATURA DFD)",
+    "(SOL_OFICIO_RESPONSAVEL_NOME)",
+)
+
+_CIDADE_DATA_MARKERS: tuple[str, ...] = (
+    "(TR_CIDADE)",
+    "(DFD_CIDADE)",
+    "(SOL_OFICIO_CIDADE)",
+    "(TR_DATA_TERMO)",
+    "(DFD_DATA)",
+    "(SOL_OFICIO_DATA)",
+)
+
+_SIGNATURE_NOME_BLANK_LINES_DEFAULT = 3
+
+
+def _paragraph_visible_text(paragraph: Paragraph) -> str:
+    return (paragraph.text or "").replace("\u00a0", " ").strip()
+
+
+def _is_empty_paragraph(paragraph: Paragraph) -> bool:
+    return not _paragraph_visible_text(paragraph)
+
+
+def _remove_paragraph_element(paragraph: Paragraph) -> None:
+    el = paragraph._element
+    parent = el.getparent()
+    if parent is not None:
+        parent.remove(el)
+
+
+def _insert_empty_paragraph_after(ref_para: Paragraph) -> Paragraph:
+    from docx.oxml import OxmlElement
+
+    new_p = OxmlElement("w:p")
+    ref_para._p.addnext(new_p)
+    return Paragraph(new_p, ref_para._parent)
+
+
+def _paragraph_has_signature_nome_marker(paragraph: Paragraph) -> bool:
+    t = (paragraph.text or "").replace("\u00a0", " ")
+    return any(marker in t for marker in SIGNATURE_NOME_MARKERS)
+
+
+def _paragraph_looks_like_cidade_data_line(paragraph: Paragraph) -> bool:
+    t = _paragraph_visible_text(paragraph)
+    if not t:
+        return False
+    if any(marker in (paragraph.text or "") for marker in _CIDADE_DATA_MARKERS):
+        return True
+    # Pós-substituição: «Cidade - UF, 22 de junho de 2026» ou «Cidade, 22/06/2026»
+    if "," in t and re.search(r"\b(19|20)\d{2}\b", t) and len(t) <= 160:
+        return True
+    return False
+
+
+def _find_signature_nome_paragraph_index(paragraphs: list[Paragraph]) -> int | None:
+    for i, p in enumerate(paragraphs):
+        if _paragraph_has_signature_nome_marker(p):
+            return i
+    # Fallback estrutural (placeholders já substituídos): 1.º parágrafo com texto após cidade/data.
+    for i in range(len(paragraphs) - 1, max(-1, len(paragraphs) - 24), -1):
+        if not _paragraph_looks_like_cidade_data_line(paragraphs[i]):
+            continue
+        j = i + 1
+        while j < len(paragraphs) and _is_empty_paragraph(paragraphs[j]):
+            j += 1
+        if j < len(paragraphs) and _paragraph_visible_text(paragraphs[j]):
+            return j
+        return None
+    return None
+
+
+def _normalize_blank_gap_before_index(
+    paragraphs: list[Paragraph],
+    nome_idx: int,
+    *,
+    blank_lines: int,
+) -> bool:
+    """Garante exatamente `blank_lines` parágrafos vazios antes do nome da assinatura."""
+    prev_idx = nome_idx - 1
+    while prev_idx >= 0 and _is_empty_paragraph(paragraphs[prev_idx]):
+        prev_idx -= 1
+    if prev_idx < 0:
+        return False
+
+    gap_start = prev_idx + 1
+    empty_paras = [paragraphs[j] for j in range(gap_start, nome_idx) if _is_empty_paragraph(paragraphs[j])]
+    n_empty = len(empty_paras)
+
+    if n_empty > blank_lines:
+        for ep in empty_paras[blank_lines:]:
+            _remove_paragraph_element(ep)
+        return True
+
+    if n_empty < blank_lines:
+        ref = paragraphs[prev_idx]
+        for _ in range(blank_lines - n_empty):
+            ref = _insert_empty_paragraph_after(ref)
+        return True
+
+    return False
+
+
+def ensure_signature_nome_blank_lines(
+    doc: Document,
+    *,
+    blank_lines: int = _SIGNATURE_NOME_BLANK_LINES_DEFAULT,
+) -> None:
+    """
+    Mantém exatamente N linhas em branco entre o último texto antes da assinatura
+    (em geral cidade/data) e o parágrafo do nome do signatário.
+
+    Aplica a (TR_NOME_ASSINANTE_TERMO), (DFD_NOME_ASSINATURA) e (SOL_OFICIO_RESPONSAVEL_NOME)
+    em qualquer pacote — evita ajustar cada .docx manualmente quando o corpo cresce.
+    """
+    if blank_lines < 0:
+        return
+    changed = True
+    guard = 0
+    while changed and guard < 8:
+        guard += 1
+        changed = False
+        paras = list(doc.paragraphs)
+        nome_idx = _find_signature_nome_paragraph_index(paras)
+        if nome_idx is None:
+            break
+        if _normalize_blank_gap_before_index(paras, nome_idx, blank_lines=blank_lines):
+            changed = True

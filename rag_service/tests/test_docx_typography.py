@@ -10,6 +10,7 @@ from app.docx_typography import (
     paragraph_is_roman_enumerated_list,
     paragraph_is_roman_item_line,
     paragraph_is_short_roman_item_line,
+    paragraph_is_tr_numbered_subsection_prose,
     paragraph_should_remain_left_aligned,
 )
 
@@ -94,6 +95,50 @@ class DocxTypographyTests(unittest.TestCase):
         text = "I – " + ("texto dissertativo " * 40)
         self.assertFalse(paragraph_is_short_roman_item_line(text))
         self.assertFalse(paragraph_should_remain_left_aligned(text))
+
+    def test_tr_secao_6_subsection_prose_is_justified_even_if_template_left(self):
+        text = (
+            "6.1. A formalização da contratação decorrente deste procedimento poderá ocorrer mediante "
+            "CONTRATO, ATA DE REGISTRO DE PREÇOS ou INSTRUMENTO EQUIVALENTE, conforme o caso e a "
+            "natureza da contratação, nos termos do art. 95 da Lei nº 14.133/2021."
+        )
+        self.assertTrue(paragraph_is_tr_numbered_subsection_prose(text))
+        doc = Document()
+        p = doc.add_paragraph(text)
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        apply_default_justify_to_document(doc)
+        self.assertEqual(p.alignment, WD_ALIGN_PARAGRAPH.JUSTIFY)
+
+    def test_manutencao_veiculos_sec61_sec62_justified_after_render(self):
+        from pathlib import Path
+
+        from app.tr_template import TRTemplateSlots, render_tr_from_slots
+
+        tpl = (
+            Path(__file__).resolve().parents[2]
+            / "template_packages/lei_14133/dispensa_75_i_manutencao_veiculos/TR_modelo_base.docx"
+        )
+        slots = TRTemplateSlots(
+            objeto="Prestação de serviços de manutenção veicular.",
+            justificativa="Justificativa de teste com texto suficiente para o termo de referência.",
+            cidade="Goiânia",
+            codigo_uf="GO",
+            slot_package_key="dispensa_75_i_manutencao_veiculos",
+        )
+        out = render_tr_from_slots(slots, template_path=tpl)
+        doc = Document(out)
+        sec6 = [
+            p
+            for p in doc.paragraphs
+            if (p.text or "").strip().startswith(("6.1.", "6.2."))
+        ]
+        assert len(sec6) >= 2, "§6.1/6.2 não encontrados no TR manutenção veículos"
+        for p in sec6[:2]:
+            self.assertEqual(
+                p.alignment,
+                WD_ALIGN_PARAGRAPH.JUSTIFY,
+                msg=(p.text or "")[:80],
+            )
 
 
 if __name__ == "__main__":

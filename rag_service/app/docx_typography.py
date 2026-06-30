@@ -86,6 +86,25 @@ def paragraph_is_contract_instrument_substitution_block(text: str) -> bool:
     return False
 
 
+def paragraph_is_tr_numbered_subsection_prose(text: str) -> bool:
+    """
+    Subitens dissertativos do TR (ex.: «6.1. A formalização…», «6.2. Quando formalizada…»).
+    Devem ficar justificados mesmo que o .docx traga w:jc left por engano no modelo.
+    """
+    t = (text or "").replace("\r\n", "\n").strip()
+    if not t or len(t) < 80:
+        return False
+    if not re.match(r"^\d+\.\d+\.\s+\S", t):
+        return False
+    if paragraph_is_contract_instrument_substitution_block(text):
+        return False
+    if paragraph_is_short_roman_item_line(t):
+        return False
+    if paragraph_is_roman_enumerated_list(text):
+        return False
+    return True
+
+
 def paragraph_should_remain_left_aligned(text: str) -> bool:
     """Parágrafos de lista/inciso curtos que não devem receber justificação automática."""
     t = (text or "").replace("\r\n", "\n").strip()
@@ -227,6 +246,9 @@ def _justify_paragraphs_in_container(container, *, justify_heading_styles: bool)
         return
     try:
         for p in _iter_paragraphs_deep(container):
+            if paragraph_is_tr_numbered_subsection_prose(p.text or ""):
+                p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                continue
             if paragraph_should_remain_left_aligned(p.text or ""):
                 p.alignment = WD_ALIGN_PARAGRAPH.LEFT
                 pf = p.paragraph_format

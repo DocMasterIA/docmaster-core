@@ -4,8 +4,34 @@ import {
   DOTACAO_PROFILES_FORM_KEY,
 } from '@/constants/dotacaoOrcamentaria.js';
 
-/** Perfis por API (partilhados entre módulos no mesmo backend). */
-const profilesByApiBase = ref({});
+const SESSION_USER_KEY = 'docmaster.session_user_v1';
+
+/** Perfis em memória — chave `${apiBase}::${userId}` (nunca só apiBase). */
+const profilesByCacheKey = ref({});
+
+function readSessionUserId() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_USER_KEY);
+    if (!raw) return '';
+    const parsed = JSON.parse(raw);
+    return String(parsed?.data?.id ?? '').trim();
+  } catch {
+    return '';
+  }
+}
+
+function profilesCacheKey(apiBase, userId = '') {
+  const base = String(apiBase || '').trim();
+  if (!base) return '';
+  const uid = String(userId || readSessionUserId() || '').trim() || 'anonymous';
+  return `${base}::${uid}`;
+}
+
+/** Limpa cache ao trocar de usuário (logout / login). */
+export function clearDotacaoOrcamentariaProfilesCache() {
+  profilesByCacheKey.value = {};
+  loadedCacheKeys.clear();
+}
 
 function normalizeProfile(p) {
   const name = String(p?.name ?? '').trim();
@@ -15,19 +41,19 @@ function normalizeProfile(p) {
   return { id, name: name || 'Sem nome', texto };
 }
 
-function profilesForBase(apiBase) {
-  const base = String(apiBase || '').trim();
-  if (!base) return [];
-  const bucket = profilesByApiBase.value[base];
+function profilesForCacheKey(cacheKey) {
+  const key = String(cacheKey || '').trim();
+  if (!key) return [];
+  const bucket = profilesByCacheKey.value[key];
   return Array.isArray(bucket) ? bucket : [];
 }
 
-function setProfilesForBase(apiBase, list) {
-  const base = String(apiBase || '').trim();
-  if (!base) return;
-  profilesByApiBase.value = {
-    ...profilesByApiBase.value,
-    [base]: list,
+function setProfilesForCacheKey(cacheKey, list) {
+  const key = String(cacheKey || '').trim();
+  if (!key) return;
+  profilesByCacheKey.value = {
+    ...profilesByCacheKey.value,
+    [key]: list,
   };
 }
 
@@ -73,7 +99,7 @@ async function upsertCatalogValue(apiBase, texto) {
   }
 }
 
-const loadedForApiBase = new Set();
+const loadedCacheKeys = new Set();
 
 /**
  * Perfis de dotação orçamentária (servidor + catálogo), reutilizáveis em todos os módulos TR/DFD.
@@ -86,15 +112,18 @@ export function useDotacaoOrcamentariaProfiles(apiBase) {
     return String(raw?.value ?? raw ?? '').trim();
   });
 
-  const profiles = computed(() => profilesForBase(baseRef.value));
+  const cacheKeyRef = computed(() => profilesCacheKey(baseRef.value));
+
+  const profiles = computed(() => profilesForCacheKey(cacheKeyRef.value));
   const selectedProfileId = ref('');
   const profileName = ref('');
   const loading = ref(false);
 
   async function loadProfiles(force = false) {
     const base = baseRef.value;
-    if (!base) return;
-    if (!force && loadedForApiBase.has(base)) return;
+    const cacheKey = cacheKeyRef.value;
+    if (!base || !cacheKey) return;
+    if (!force && loadedCacheKeys.has(cacheKey)) return;
     loading.value = true;
     try {
       const url = `${base}/api/slots/form-state?slot_package_key=${encodeURIComponent(DOTACAO_PROFILES_FORM_KEY)}`;
@@ -102,11 +131,11 @@ export function useDotacaoOrcamentariaProfiles(apiBase) {
       if (res.ok) {
         const payload = await res.json().catch(() => ({}));
         const list = Array.isArray(payload?.data?.profiles) ? payload.data.profiles : [];
-        setProfilesForBase(base, list.map(normalizeProfile).filter(Boolean));
-        loadedForApiBase.add(base);
+        setProfilesForCacheKey(cacheKey, list.map(normalizeProfile).filter(Boolean));
+        loadedCacheKeys.add(cacheKey);
       }
     } catch {
-      setProfilesForBase(base, []);
+      setProfilesForCacheKey(cacheKey, []);
     } finally {
       loading.value = false;
     }
@@ -169,7 +198,8 @@ export function useDotacaoOrcamentariaProfiles(apiBase) {
 
     profileName.value = name;
     const data = { name, texto: body };
-    const list = [...profilesForBase(base)];
+    const cacheKey = cacheKeyRef.value;
+    const list = [...profilesForCacheKey(cacheKey)];
     const idx = list.findIndex((p) => String(p.id) === String(selectedProfileId.value || ''));
     if (idx >= 0) {
       list[idx] = { ...list[idx], ...data };
@@ -178,7 +208,7 @@ export function useDotacaoOrcamentariaProfiles(apiBase) {
       list.push({ id, ...data });
       selectedProfileId.value = id;
     }
-    setProfilesForBase(base, list);
+    setProfilesForCacheKey(cacheKey, list);
 
     const persisted = await persistProfiles(base, list);
     if (!persisted.ok) {
@@ -192,8 +222,9 @@ export function useDotacaoOrcamentariaProfiles(apiBase) {
     const base = baseRef.value;
     const id = String(selectedProfileId.value || '').trim();
     if (!id) return { ok: false, error: 'Nenhum cadastro selecionado.' };
-    const list = profilesForBase(base).filter((p) => String(p.id) !== id);
-    setProfilesForBase(base, list);
+    const cacheKey = cacheKeyRef.value;
+    const list = profilesForCacheKey(cacheKey).filter((p) => String(p.id) !== id);
+    setProfilesForCacheKey(cacheKey, list);
     selectedProfileId.value = '';
     profileName.value = '';
     const persisted = await persistProfiles(base, list);

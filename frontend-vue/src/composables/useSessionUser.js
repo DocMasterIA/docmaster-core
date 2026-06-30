@@ -1,6 +1,7 @@
 import { ref } from 'vue';
 import { getApiBase } from '@/utils/apiBase.js';
 import { clearLegacyOrgaoProfilesLocalStorage } from '@/constants/orgaoProfiles.js';
+import { clearDotacaoOrcamentariaProfilesCache } from '@/composables/useDotacaoOrcamentariaProfiles.js';
 
 const SESSION_USER_KEY = 'docmaster.session_user_v1';
 
@@ -106,6 +107,11 @@ export function useSessionUser() {
         }
         const data = await res.json();
         if (data && typeof data === 'object') {
+          const prevId = String(user.value?.id ?? readStoredUser()?.id ?? '').trim();
+          const nextId = String(data.id ?? '').trim();
+          if (prevId && nextId && prevId !== nextId) {
+            clearDotacaoOrcamentariaProfilesCache();
+          }
           user.value = data;
           lastFetchedAt = Date.now();
           writeStoredUser(data);
@@ -142,6 +148,7 @@ export function useSessionUser() {
     lastFetchedAt = 0;
     writeStoredUser(null);
     clearLegacyOrgaoProfilesLocalStorage();
+    clearDotacaoOrcamentariaProfilesCache();
   }
 
   return { user, userLoading, fetchMe, clearUser, hasCachedUser };

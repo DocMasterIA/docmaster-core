@@ -32,6 +32,7 @@ from .docx_typography import (
     ensure_signature_nome_blank_lines,
     paragraph_is_roman_enumerated_list,
 )
+from .justificativa_clause_sanitize import finalize_rapida_secao4_tres_blocos
 
 TR_ITEMS_TABLE_ANCHOR = "(TR_TABELA_ITENS)"
 
@@ -1349,6 +1350,19 @@ def render_tr_from_slots(
             problema_text = ""
         if beneficio_text.strip() == jus_cmp:
             beneficio_text = ""
+
+    if fluxo_ui == "normal" and "\n\n" in justificativa_text.strip():
+        problema_text = ""
+        beneficio_text = ""
+    elif fluxo_ui == "rapida" and "\n\n" in justificativa_text.strip():
+        p1, p2, p3 = finalize_rapida_secao4_tres_blocos(
+            justificativa_text,
+            problema_text,
+            beneficio_text,
+        )
+        justificativa_text = p1
+        problema_text = p2
+        beneficio_text = p3
 
     valor_total_placeholder = _valor_total_sem_rs(slots.valor_total or "")
 

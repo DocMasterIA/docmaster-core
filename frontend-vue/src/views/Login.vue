@@ -84,10 +84,12 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+import { useSessionUser } from '@/composables/useSessionUser.js';
 
 const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 const router = useRouter();
 const route = useRoute();
+const { clearUser, fetchMe } = useSessionUser();
 
 const emailOrUsername = ref('');
 const password = ref('');
@@ -120,6 +122,8 @@ async function onSubmit() {
       return;
     }
     if (data.ok) {
+      clearUser();
+      await fetchMe({ force: true });
       const r = route.query.redirect && String(route.query.redirect);
       router.replace(r && r.startsWith('/') ? r : '/');
     } else {

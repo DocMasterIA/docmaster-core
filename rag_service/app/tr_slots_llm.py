@@ -2180,6 +2180,57 @@ def _build_tr_slots_from_override_prefilled(
         ctx_pk = str(user_context.get("slot_package_key") or "").strip()
         if ctx_pk and not (slots.slot_package_key or "").strip():
             slots = replace(slots, slot_package_key=ctx_pk)
+    return _apply_dispensa_secao4_from_prefilled_override(slots, override, user_context)
+
+
+def _resolve_dispensa_fluxo_ui_from_override(
+    override: Dict[str, Any],
+    slots: TRTemplateSlots,
+    user_context: Optional[Dict[str, Any]] = None,
+) -> str:
+    fluxo = str(override.get("dispensa_fluxo_ui") or slots.dispensa_fluxo_ui or "").strip().lower()
+    if fluxo:
+        return fluxo
+    pkg = _package_key_from_override_or_context(override, user_context)
+    if pkg.startswith("dispensa_rapida_"):
+        return "rapida"
+    if pkg.startswith("dispensa_"):
+        return "normal"
+    return ""
+
+
+def _apply_dispensa_secao4_from_prefilled_override(
+    slots: TRTemplateSlots,
+    override: Dict[str, Any],
+    user_context: Optional[Dict[str, Any]] = None,
+) -> TRTemplateSlots:
+    """
+    Dispensa normal: 3 parágrafos em justificativa (problema/benefício vazios).
+    Dispensa rápida: reparte nos 3 placeholders do TR — evita 5 parágrafos no Word
+    quando justificativa já traz \\n\\n e enrich/formulário também preenche p2/p3.
+    """
+    fluxo = _resolve_dispensa_fluxo_ui_from_override(override, slots, user_context)
+    if fluxo == "rapida":
+        p1, p2, p3 = finalize_rapida_secao4_tres_blocos(
+            slots.justificativa or "",
+            slots.problema_administrativo or "",
+            slots.beneficio_esperado or "",
+        )
+        return replace(
+            slots,
+            justificativa=p1,
+            problema_administrativo=p2,
+            beneficio_esperado=p3,
+            dispensa_fluxo_ui="rapida",
+        )
+    if fluxo == "normal":
+        return replace(
+            slots,
+            justificativa=normalize_justificativa_tres_paragrafos(slots.justificativa or ""),
+            problema_administrativo="",
+            beneficio_esperado="",
+            dispensa_fluxo_ui="normal",
+        )
     return slots
 
 
@@ -2214,6 +2265,15 @@ async def _enrich_dispensa_normal_tr_secao4(
     if not jus:
         return slots
     if (slots.problema_administrativo or "").strip() and (slots.beneficio_esperado or "").strip():
+        return slots
+
+    fluxo = _resolve_dispensa_fluxo_ui_from_override(override, slots, user_context)
+    paras_jus = [p.strip() for p in jus.split("\n\n") if p.strip()]
+    # Normal: justificativa já traz 3 parágrafos — enrich duplicaria p2/p3 no Word.
+    if fluxo == "normal" and len(paras_jus) >= 3:
+        return slots
+    # Rápida: texto multilinha será repartido em prefilled/render; não gerar mais 2 blocos.
+    if fluxo == "rapida" and len(paras_jus) >= 2:
         return slots
 
     user_bits = [

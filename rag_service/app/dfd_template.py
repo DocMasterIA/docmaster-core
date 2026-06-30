@@ -29,9 +29,9 @@ from .tr_template import (
     TRTemplateSlots,
     format_date_pt_br_extenso,
     numero_processo_valor_placeholder_tr,
+    replace_placeholder_in_paragraph,
     slots_numero_processo_display,
     split_paragraphs_on_double_newline,
-    _append_multiline_to_run,
     _normalize_slot_block,
 )
 
@@ -68,58 +68,7 @@ def _element_xml_lower(el) -> str:
 
 
 def _replace_placeholder_in_paragraph_runs(paragraph, placeholder: str, replacement: str) -> bool:
-    runs = paragraph.runs
-    if not runs:
-        return False
-    full_text = "".join(run.text or "" for run in runs)
-    start = full_text.find(placeholder)
-    if start < 0:
-        return False
-    end = start + len(placeholder)
-
-    cursor = 0
-    start_idx = start_off = end_idx = end_off = None
-    for idx, run in enumerate(runs):
-        txt = run.text or ""
-        next_cursor = cursor + len(txt)
-        if start_idx is None and start < next_cursor:
-            start_idx = idx
-            start_off = start - cursor
-        if end_idx is None and end <= next_cursor:
-            end_idx = idx
-            end_off = end - cursor
-            break
-        cursor = next_cursor
-
-    if start_idx is None or end_idx is None or start_off is None or end_off is None:
-        return False
-
-    if start_idx == end_idx:
-        txt = runs[start_idx].text or ""
-        before = txt[:start_off]
-        after = txt[end_off:]
-        run = runs[start_idx]
-        run.text = before
-        if "\n" in replacement:
-            _append_multiline_to_run(run, replacement)
-            if after:
-                run.add_text(after)
-        else:
-            run.text = before + replacement + after
-    else:
-        prefix = (runs[start_idx].text or "")[:start_off]
-        suffix = (runs[end_idx].text or "")[end_off:]
-        run = runs[start_idx]
-        run.text = prefix
-        if "\n" in replacement:
-            _append_multiline_to_run(run, replacement)
-            if suffix:
-                run.add_text(suffix)
-        else:
-            run.text = prefix + replacement + suffix
-        for idx in range(start_idx + 1, end_idx + 1):
-            runs[idx].text = ""
-    return True
+    return replace_placeholder_in_paragraph(paragraph, placeholder, replacement)
 
 
 def _replace_placeholders_in_paragraph(paragraph, mapping: dict[str, str]) -> bool:

@@ -488,6 +488,135 @@ def _append_multiline_to_run(run, text: str) -> None:
         run.add_text(part)
 
 
+# Campos de assinatura: cada \\n vira parágrafo Word (mais legível que só w:br).
+SIGNATURE_MULTILINE_PLACEHOLDERS: frozenset[str] = frozenset(
+    {
+        "(TR_NOME_ASSINANTE_TERMO)",
+        "(NOME DO ASSINANTE DO TERMO)",
+        "(DFD_NOME_ASSINATURA)",
+        "(NOME ASSINATURA DFD)",
+        "(SOL_OFICIO_RESPONSAVEL_NOME)",
+    }
+)
+
+
+def _insert_paragraph_after(paragraph: Paragraph) -> Paragraph:
+    new_el = OxmlElement("w:p")
+    paragraph._p.addnext(new_el)
+    new_para = Paragraph(new_el, paragraph._parent)
+    try:
+        if paragraph.style:
+            new_para.style = paragraph.style
+    except Exception:
+        pass
+    return new_para
+
+
+def _copy_paragraph_layout(source: Paragraph, target: Paragraph) -> None:
+    try:
+        target.alignment = source.alignment
+        spf, tpf = source.paragraph_format, target.paragraph_format
+        tpf.space_before = spf.space_before
+        tpf.space_after = spf.space_after
+        tpf.line_spacing = spf.line_spacing
+    except Exception:
+        pass
+
+
+def _locate_placeholder_span(runs, placeholder: str) -> tuple[int, int, int, int] | None:
+    full_text = "".join(run.text or "" for run in runs)
+    start = full_text.find(placeholder)
+    if start < 0:
+        return None
+    end = start + len(placeholder)
+    cursor = 0
+    start_idx = start_off = end_idx = end_off = None
+    for idx, run in enumerate(runs):
+        txt = run.text or ""
+        next_cursor = cursor + len(txt)
+        if start_idx is None and start < next_cursor:
+            start_idx = idx
+            start_off = start - cursor
+        if end_idx is None and end <= next_cursor:
+            end_idx = idx
+            end_off = end - cursor
+            break
+        cursor = next_cursor
+    if start_idx is None or end_idx is None or start_off is None or end_off is None:
+        return None
+    return start_idx, start_off, end_idx, end_off
+
+
+def replace_placeholder_in_paragraph(
+    paragraph: Paragraph,
+    placeholder: str,
+    replacement: str,
+    *,
+    multiline_as_paragraphs: bool | None = None,
+) -> bool:
+    """
+    Substitui placeholder no parágrafo (texto pode estar dividido em vários runs).
+    Campos de assinatura multilinha viram um parágrafo Word por linha digitada.
+    """
+    if multiline_as_paragraphs is None:
+        multiline_as_paragraphs = placeholder in SIGNATURE_MULTILINE_PLACEHOLDERS
+    normalized = _normalize_slot_block(replacement) if multiline_as_paragraphs else str(replacement or "")
+    if multiline_as_paragraphs and "\n" in normalized:
+        lines = normalized.split("\n")
+        if not _replace_placeholder_in_paragraph_inline(paragraph, placeholder, lines[0]):
+            return False
+        current = paragraph
+        for line in lines[1:]:
+            new_p = _insert_paragraph_after(current)
+            _copy_paragraph_layout(current, new_p)
+            if line.strip():
+                new_p.add_run(line.strip())
+            current = new_p
+        return True
+    return _replace_placeholder_in_paragraph_inline(paragraph, placeholder, replacement)
+
+
+def _replace_placeholder_in_paragraph_inline(
+    paragraph: Paragraph, placeholder: str, replacement: str
+) -> bool:
+    runs = paragraph.runs
+    if not runs:
+        return False
+    span = _locate_placeholder_span(runs, placeholder)
+    if span is None:
+        return False
+    start_idx, start_off, end_idx, end_off = span
+
+    if start_idx == end_idx:
+        txt = runs[start_idx].text or ""
+        before = txt[:start_off]
+        after = txt[end_off:]
+        run = runs[start_idx]
+        run.text = before
+        repl = "" if replacement is None else str(replacement)
+        if "\n" in repl:
+            _append_multiline_to_run(run, repl)
+            if after:
+                run.add_text(after)
+        else:
+            run.text = before + repl + after
+    else:
+        prefix = (runs[start_idx].text or "")[:start_off]
+        suffix = (runs[end_idx].text or "")[end_off:]
+        run = runs[start_idx]
+        run.text = prefix
+        repl = "" if replacement is None else str(replacement)
+        if "\n" in repl:
+            _append_multiline_to_run(run, repl)
+            if suffix:
+                run.add_text(suffix)
+        else:
+            run.text = prefix + repl + suffix
+        for idx in range(start_idx + 1, end_idx + 1):
+            runs[idx].text = ""
+    return True
+
+
 def set_paragraph_multiline_text(paragraph: Paragraph, text: str) -> None:
     """Substitui o conteúdo do parágrafo preservando \\n como quebras Word (w:br)."""
     normalized = str(text or "").replace("\r\n", "\n").replace("\r", "\n")
@@ -499,60 +628,6 @@ def set_paragraph_multiline_text(paragraph: Paragraph, text: str) -> None:
 
 
 def _replace_placeholders_in_paragraphs(doc: Document, mapping: Dict[str, str]) -> None:
-    def _replace_placeholder_in_paragraph_runs(paragraph, placeholder: str, replacement: str) -> bool:
-        runs = paragraph.runs
-        if not runs:
-            return False
-        full_text = "".join(run.text or "" for run in runs)
-        start = full_text.find(placeholder)
-        if start < 0:
-            return False
-        end = start + len(placeholder)
-
-        cursor = 0
-        start_idx = start_off = end_idx = end_off = None
-        for idx, run in enumerate(runs):
-            txt = run.text or ""
-            next_cursor = cursor + len(txt)
-            if start_idx is None and start < next_cursor:
-                start_idx = idx
-                start_off = start - cursor
-            if end_idx is None and end <= next_cursor:
-                end_idx = idx
-                end_off = end - cursor
-                break
-            cursor = next_cursor
-
-        if start_idx is None or end_idx is None or start_off is None or end_off is None:
-            return False
-
-        if start_idx == end_idx:
-            txt = runs[start_idx].text or ""
-            before = txt[:start_off]
-            after = txt[end_off:]
-            run = runs[start_idx]
-            run.text = before
-            if "\n" in replacement:
-                _append_multiline_to_run(run, replacement)
-                if after:
-                    run.add_text(after)
-            else:
-                run.text = before + replacement + after
-        else:
-            prefix = (runs[start_idx].text or "")[:start_off]
-            suffix = (runs[end_idx].text or "")[end_off:]
-            run = runs[start_idx]
-            run.text = prefix
-            if "\n" in replacement:
-                _append_multiline_to_run(run, replacement)
-                if suffix:
-                    run.add_text(suffix)
-            else:
-                run.text = prefix + replacement + suffix
-            for idx in range(start_idx + 1, end_idx + 1):
-                runs[idx].text = ""
-        return True
-
     def _replace_in_paragraph(paragraph) -> None:
         for ph, val in mapping.items():
             if not ph:
@@ -560,7 +635,7 @@ def _replace_placeholders_in_paragraphs(doc: Document, mapping: Dict[str, str]) 
             replacement = "" if val is None else str(val)
             max_iters = 100
             iters = 0
-            while iters < max_iters and _replace_placeholder_in_paragraph_runs(paragraph, ph, replacement):
+            while iters < max_iters and replace_placeholder_in_paragraph(paragraph, ph, replacement):
                 iters += 1
                 if ph and ph in replacement:
                     break

@@ -1318,6 +1318,11 @@ def _enrich_objeto_with_quantidade(text: str, itens: List[ItemSlot]) -> str:
     return t
 
 
+def _str_multiline_slot(value: Any) -> str:
+    """Preserva quebras internas; normaliza só finais de linha e bordas."""
+    return str(value or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+
+
 def _dict_to_tr_slots(data: Dict[str, Any], *, preserve_objeto_normalize: bool = False) -> TRTemplateSlots:
     """Converte o dicionário retornado pela LLM em TRTemplateSlots."""
     disp = data.get("dispensa") or {}
@@ -1390,7 +1395,7 @@ def _dict_to_tr_slots(data: Dict[str, Any], *, preserve_objeto_normalize: bool =
         endereco_entrega=str(data.get("endereco_entrega", "")).strip(),
         email_envio_propostas=str(data.get("email_envio_propostas", "")).strip(),
         data_termo=str(data.get("data_termo", "")).strip(),
-        nome_assinante_termo=str(data.get("nome_assinante_termo", "")).strip(),
+        nome_assinante_termo=_str_multiline_slot(data.get("nome_assinante_termo", "")),
         cargo_assinante_termo=str(data.get("cargo_assinante_termo", "")).strip(),
         sol_oficio_artigo_inciso=str(data.get("sol_oficio_artigo_inciso", "")).strip(),
         sol_oficio_destinatario_nome=str(data.get("sol_oficio_destinatario_nome", "")).strip(),
@@ -1400,7 +1405,7 @@ def _dict_to_tr_slots(data: Dict[str, Any], *, preserve_objeto_normalize: bool =
         sol_oficio_objeto=str(data.get("sol_oficio_objeto", "")).strip(),
         sol_oficio_justificativa=str(data.get("sol_oficio_justificativa", "")).strip(),
         sol_oficio_prazo_resposta=str(data.get("sol_oficio_prazo_resposta", "")).strip(),
-        sol_oficio_responsavel_nome=str(data.get("sol_oficio_responsavel_nome", "")).strip(),
+        sol_oficio_responsavel_nome=_str_multiline_slot(data.get("sol_oficio_responsavel_nome", "")),
         sol_oficio_responsavel_cargo=str(data.get("sol_oficio_responsavel_cargo", "")).strip(),
         sol_oficio_responsavel_setor=str(data.get("sol_oficio_responsavel_setor", "")).strip(),
         dfd_setor_requisitante=str(data.get("dfd_setor_requisitante", "")).strip(),
@@ -1410,7 +1415,7 @@ def _dict_to_tr_slots(data: Dict[str, Any], *, preserve_objeto_normalize: bool =
         dfd_gestor_contratos=str(data.get("dfd_gestor_contratos", "")).strip(),
         dfd_fiscal_contratos=str(data.get("dfd_fiscal_contratos", "")).strip(),
         dfd_assinatura_cargo=str(data.get("dfd_assinatura_cargo", "")).strip(),
-        dfd_assinatura_nome=str(data.get("dfd_assinatura_nome", "")).strip(),
+        dfd_assinatura_nome=_str_multiline_slot(data.get("dfd_assinatura_nome", "")),
         dfd_data=str(data.get("dfd_data", "")).strip(),
         dfd_objeto_referencia=str(data.get("dfd_objeto_referencia", "")).strip(),
         dfd_justificativa=str(data.get("dfd_justificativa", "")).strip(),

@@ -475,6 +475,9 @@ def _paragraph_looks_like_cidade_data_line(paragraph: Paragraph) -> bool:
     # «Cidade - UF, datado e assinado digitalmente»
     if re.search(r"\s-\s*[A-Z]{2}\s*,", t) and "," in t and len(t) <= 160:
         return True
+    # «Cidade, » ou «Cidade - UF, » após preenchimento (data opcional / vazia).
+    if t.rstrip().endswith(",") and len(t) <= 100 and re.search(r"[A-Za-zÀ-ú]", t):
+        return True
     return False
 
 

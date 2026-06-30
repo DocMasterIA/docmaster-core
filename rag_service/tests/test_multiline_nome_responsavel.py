@@ -51,10 +51,27 @@ def test_oficio_responsavel_multiline_not_collapsed_to_single_line():
     assert "Secretaria da Saúde" in full
     assert "João Carlos" in full
     assert "Secretaria da Educação" in full
-    # Pelo menos uma quebra Word (w:br) ou blocos separados (linha em branco dupla).
-    has_breaks = any(_line_break_count(p) >= 1 for p in paras)
-    has_blocks = len(paras) >= 2
-    assert has_breaks or has_blocks
+    # Cada linha digitada vira parágrafo Word (ou bloco separado por linha em branco).
+    fabrizia_paras = [p for p in doc.paragraphs if "Fabrizia" in (p.text or "")]
+    assert len(fabrizia_paras) == 1
+    assert "Secretaria da Saúde" not in (fabrizia_paras[0].text or "")
+    assert any("Secretaria da Saúde" in (p.text or "") for p in doc.paragraphs)
+    # Linha em branco entre blocos: parágrafo vazio entre Fabrizia/Secretaria e João.
+    fab_idx = next(i for i, p in enumerate(doc.paragraphs) if "Fabrizia" in (p.text or ""))
+    joao_idx = next(i for i, p in enumerate(doc.paragraphs) if "João Carlos" in (p.text or ""))
+    assert joao_idx > fab_idx + 1
+
+
+def _assert_multiline_signature_block(doc: Document) -> None:
+    fabrizia_paras = [p for p in doc.paragraphs if "Fabrizia" in (p.text or "")]
+    assert fabrizia_paras, "Nome Fabrizia não encontrado"
+    assert len(fabrizia_paras) == 1
+    assert any("Secretaria da Saúde" in (p.text or "") for p in doc.paragraphs)
+    assert any("João Carlos" in (p.text or "") for p in doc.paragraphs)
+    assert any("Secretaria da Educação" in (p.text or "") for p in doc.paragraphs)
+    fab_idx = next(i for i, p in enumerate(doc.paragraphs) if "Fabrizia" in (p.text or ""))
+    joao_idx = next(i for i, p in enumerate(doc.paragraphs) if "João Carlos" in (p.text or ""))
+    assert joao_idx > fab_idx
 
 
 def test_dfd_assinatura_multiline_preserved():
@@ -66,9 +83,7 @@ def test_dfd_assinatura_multiline_preserved():
     )
     out = render_dfd_from_tr_slots(slots, template_path=TEMPLATE_PKG / "DFD_modelo_base_v2.docx")
     doc = Document(out)
-    paras = _paragraphs_with("Fabrizia", doc)
-    assert paras
-    assert any(_line_break_count(p) >= 1 for p in paras) or len(paras) >= 2
+    _assert_multiline_signature_block(doc)
 
 
 def test_tr_nome_assinante_multiline_preserved():
@@ -81,6 +96,4 @@ def test_tr_nome_assinante_multiline_preserved():
     )
     out = render_tr_from_slots(slots, template_path=TEMPLATE_PKG / "TR_modelo_base.docx")
     doc = Document(out)
-    paras = _paragraphs_with("Fabrizia", doc)
-    assert paras
-    assert any(_line_break_count(p) >= 1 for p in paras) or len(paras) >= 2
+    _assert_multiline_signature_block(doc)

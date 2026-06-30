@@ -24,9 +24,9 @@ from .tr_template import (
     TRTemplateSlots,
     format_date_pt_br_extenso,
     numero_processo_valor_placeholder_tr,
+    replace_placeholder_in_paragraph,
     slots_numero_processo_display,
     split_paragraphs_on_double_newline,
-    _append_multiline_to_run,
     _normalize_slot_block,
 )
 
@@ -37,63 +37,13 @@ TEMPLATE_OFICIO_PATH_DEFAULT = (
 
 
 def _replace_placeholder_in_paragraph_runs(paragraph, placeholder: str, replacement: str) -> bool:
-    runs = paragraph.runs
-    if not runs:
-        return False
-    full_text = "".join(run.text or "" for run in runs)
-    start = full_text.find(placeholder)
-    if start < 0:
-        return False
-    end = start + len(placeholder)
-
-    cursor = 0
-    start_idx = start_off = end_idx = end_off = None
-    for idx, run in enumerate(runs):
-        txt = run.text or ""
-        next_cursor = cursor + len(txt)
-        if start_idx is None and start < next_cursor:
-            start_idx = idx
-            start_off = start - cursor
-        if end_idx is None and end <= next_cursor:
-            end_idx = idx
-            end_off = end - cursor
-            break
-        cursor = next_cursor
-
-    if start_idx is None or end_idx is None or start_off is None or end_off is None:
-        return False
-
-    if start_idx == end_idx:
-        txt = runs[start_idx].text or ""
-        before = txt[:start_off]
-        after = txt[end_off:]
-        run = runs[start_idx]
-        run.text = before
-        if "\n" in replacement:
-            _append_multiline_to_run(run, replacement)
-            if after:
-                run.add_text(after)
-        else:
-            run.text = before + replacement + after
-        target_idx = start_idx
-    else:
-        prefix = (runs[start_idx].text or "")[:start_off]
-        suffix = (runs[end_idx].text or "")[end_off:]
-        run = runs[start_idx]
-        run.text = prefix
-        if "\n" in replacement:
-            _append_multiline_to_run(run, replacement)
-            if suffix:
-                run.add_text(suffix)
-        else:
-            run.text = prefix + replacement + suffix
-        for idx in range(start_idx + 1, end_idx + 1):
-            runs[idx].text = ""
-        target_idx = start_idx
-
-    if placeholder == "(SOL_OFICIO_DESTINATARIO_NOME)" and replacement.strip():
-        _inherit_neighbor_run_style(paragraph, target_idx)
-    return True
+    changed = replace_placeholder_in_paragraph(paragraph, placeholder, replacement)
+    if changed and placeholder == "(SOL_OFICIO_DESTINATARIO_NOME)" and str(replacement or "").strip():
+        for idx, run in enumerate(paragraph.runs):
+            if (run.text or "").strip():
+                _inherit_neighbor_run_style(paragraph, idx)
+                break
+    return changed
 
 
 def _inherit_neighbor_run_style(paragraph, target_idx: int) -> None:
@@ -178,10 +128,30 @@ def _is_punctuation_only_paragraph(text: str) -> bool:
 
 def _remove_oficio_deprecated_cargo_artifacts(doc: Document) -> None:
     """Remove linhas fantasma de cargo/função e vírgulas órfãs após placeholders vazios."""
-    for p in list(doc.paragraphs):
-        t = _para_visible_text(p)
-        if not t or _is_punctuation_only_paragraph(t):
-            _remove_paragraph_element(p)
+    from .docx_typography import _find_signature_nome_paragraph
+
+    paras = list(doc.paragraphs)
+    nome_para = _find_signature_nome_paragraph(paras)
+    nome_idx = None
+    if nome_para is not None:
+        try:
+            nome_idx = paras.index(nome_para)
+        except ValueError:
+            nome_idx = None
+
+    if nome_idx is None:
+        # Sem âncora detectada: não apagar parágrafos vazios (podem ser espaçamento multilinha).
+        for p in list(doc.paragraphs):
+            t = _para_visible_text(p)
+            if _is_punctuation_only_paragraph(t):
+                _remove_paragraph_element(p)
+    else:
+        for i, p in enumerate(list(doc.paragraphs)):
+            if i >= nome_idx:
+                break
+            t = _para_visible_text(p)
+            if not t or _is_punctuation_only_paragraph(t):
+                _remove_paragraph_element(p)
 
     paras = list(doc.paragraphs)
     last_text_idx = -1

@@ -8,6 +8,7 @@ from app.tr_slots_llm import (
     _is_objeto_justificativa_fill_mode,
     _override_has_prefilled_itens,
     _override_has_prefilled_clauses,
+    _parse_itens_linhas_quantitativas,
     _parse_itens_llm_payload,
     _parse_secao4_normal_llm_payload,
     _should_enrich_itens_llm,
@@ -187,6 +188,21 @@ class TrSlotsSkipLlmTests(unittest.TestCase):
         self.assertEqual(items[0].descricao, "Manutenção preventiva de veículos")
         self.assertEqual(items[0].unidade, "Sv")
         self.assertEqual(items[0].quantidade, 1)
+
+    def test_parse_itens_linhas_quantitativas_lista_produtos(self):
+        bruto = (
+            "Aquisição de produtos\n"
+            "10 pacotes café 500g\n"
+            "5 pacotes de açucar 1kg\n"
+            "3 pacotes de arroz 1kg"
+        )
+        items = _parse_itens_linhas_quantitativas(bruto)
+        self.assertEqual(len(items), 3)
+        self.assertEqual(items[0].quantidade, 10)
+        self.assertIn("café", items[0].descricao.lower())
+        self.assertEqual(items[1].quantidade, 5)
+        self.assertEqual(items[2].quantidade, 3)
+        self.assertEqual(items[0].unidade, "Pct")
 
 
 if __name__ == "__main__":

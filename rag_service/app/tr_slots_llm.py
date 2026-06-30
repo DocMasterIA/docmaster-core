@@ -88,9 +88,11 @@ Responda APENAS JSON válido:
 {"itens": [{"descricao": "...", "unidade": "un", "quantidade": 1, "valor_unitario": "", "valor_total": ""}]}
 
 Regras:
+- Priorize o «Texto original do formulário» quando listar produtos com quantidades (cada linha = um item).
 - Cada produto ou serviço distinto = um item (descrição técnica mínima, não uma palavra solta).
-- Se o pedido mencionar quantidades, preserve-as; se não, quantidade=1 e unidade coerente (un, sv, m², etc.).
+- Se o pedido mencionar quantidades, preserve-as; se não, quantidade=1 e unidade coerente (un, pct, kg, sv, m², etc.).
 - valor_unitario e valor_total: deixe "" se não houver preço no pedido.
+- NÃO colapse vários produtos em um único item genérico («produtos diversos», «materiais de consumo», etc.).
 - Serviço único (manutenção, obra, reforma): 1 item descrevendo o serviço.
 - Não invente itens fora do pedido. Pt-BR formal."""
 
@@ -2293,6 +2295,64 @@ def _is_dispensa_tr_flow(
     return pkg.startswith("dispensa_")
 
 
+_RE_LINHA_ITEM_QTD = re.compile(r"^\s*(\d+(?:[.,]\d+)?)\s+(.+)$")
+
+
+def _objeto_contratado_bruto_text(override: Dict[str, Any], user_prompt: str) -> str:
+    """Texto bruto do formulário (lista de produtos), antes do objeto genérico da IA."""
+    raw = str(override.get("objeto_contratado_bruto") or "").strip()
+    if raw:
+        return raw
+    return dispensa_clausulas_pedido_from_user_prompt(user_prompt or "").strip()
+
+
+def _infer_item_unidade_from_descricao(desc: str) -> str:
+    low = str(desc or "").lower()
+    if re.search(r"\bpacotes?\b", low):
+        return "Pct"
+    if re.search(r"\bkg\b|\bquilos?\b", low):
+        return "Kg"
+    if re.search(r"\blitros?\b", low):
+        return "L"
+    if re.search(r"\bmetros?\b|\bm²\b", low):
+        return "M"
+    return "Un"
+
+
+def _parse_itens_linhas_quantitativas(texto: str) -> List[ItemSlot]:
+    """
+    Converte linhas «10 pacotes café 500g» em linhas da tabela TR.
+    Ignora título sem quantidade inicial (ex.: «Aquisição de produtos»).
+    """
+    itens: List[ItemSlot] = []
+    for line in str(texto or "").splitlines():
+        s = line.strip()
+        if not s:
+            continue
+        m = _RE_LINHA_ITEM_QTD.match(s)
+        if not m:
+            continue
+        qty_s = m.group(1).replace(",", ".")
+        try:
+            qf = float(qty_s)
+            qty: Any = int(qf) if qf.is_integer() else qf
+        except ValueError:
+            continue
+        desc = m.group(2).strip()
+        if not desc:
+            continue
+        itens.append(
+            ItemSlot(
+                descricao=desc,
+                unidade=_infer_item_unidade_from_descricao(desc),
+                quantidade=qty,
+                valor_unitario="",
+                valor_total="",
+            )
+        )
+    return itens
+
+
 def _should_enrich_itens_llm(
     override: Dict[str, Any],
     user_context: Optional[Dict[str, Any]],
@@ -2334,16 +2394,28 @@ async def _enrich_tr_itens_from_prompt(
     if not _should_enrich_itens_llm(override, user_context, slots):
         return slots
 
+    bruto = _objeto_contratado_bruto_text(override, user_prompt)
+    parsed = _parse_itens_linhas_quantitativas(bruto)
+    if parsed:
+        return replace(slots, itens=parsed)
+
     user_bits = [
-        "Use somente o texto abaixo (objeto já aprovado no formulário).",
-        f"Objeto: {slots.objeto or ''}",
+        "Monte a tabela quantitativa a partir do texto original do formulário quando houver lista de produtos.",
     ]
+    if bruto:
+        user_bits.append(f"Texto original do formulário (prioridade para itens):\n{bruto[:4000]}")
+    obj = (slots.objeto or "").strip()
+    if obj:
+        user_bits.append(
+            f"Objeto genérico (contexto; não substituir linhas com quantidades do texto original):\n{obj[:1200]}"
+        )
     jus = (slots.justificativa or "").strip()
     if jus:
         user_bits.append(f"Justificativa (contexto, não reescrever): {jus[:1200]}")
-    up = dispensa_clausulas_pedido_from_user_prompt(user_prompt or "")
-    if up:
-        user_bits.append(f"Contexto do pedido:\n{up[:3500]}")
+    if not bruto:
+        up = dispensa_clausulas_pedido_from_user_prompt(user_prompt or "")
+        if up:
+            user_bits.append(f"Contexto do pedido:\n{up[:3500]}")
     full_prompt = (
         f"<<SYSTEM>>\n{TR_SLOTS_ITENS_SYSTEM_PROMPT.strip()}\n\n"
         f"<<USER>>\n" + "\n".join(user_bits)

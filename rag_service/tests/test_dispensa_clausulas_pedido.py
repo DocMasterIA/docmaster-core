@@ -45,6 +45,18 @@ class DispensaClausulasPedidoTests(unittest.TestCase):
         out = dispensa_clausulas_pedido_from_user_prompt(raw)
         self.assertEqual(out, "")
 
+    def test_keeps_multiline_itens_after_contratado(self):
+        raw = (
+            "O que será contratado: Aquisição de produtos\n"
+            "10 pacotes café 500g\n"
+            "5 pacotes de açucar 1kg\n"
+            "3 pacotes de arroz 1kg"
+        )
+        out = dispensa_clausulas_pedido_from_user_prompt(raw)
+        self.assertIn("10 pacotes café 500g", out)
+        self.assertIn("5 pacotes de açucar 1kg", out)
+        self.assertIn("3 pacotes de arroz 1kg", out)
+
 
 if __name__ == "__main__":
     unittest.main()

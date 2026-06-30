@@ -550,6 +550,8 @@ function buildSlotsOverride() {
   if (dataTermo) o.data_termo = dataTermo;
   const objetoFinal = String(objetoGerado.value || objetoContratado.value || '').trim();
   if (objetoFinal) o.objeto = objetoFinal;
+  const brutoContratado = String(objetoContratado.value || '').trim();
+  if (brutoContratado) o.objeto_contratado_bruto = brutoContratado;
   const ia = slotsClausulasIA.value;
   if (ia && typeof ia === 'object') {
     const p1 = String(ia.justificativa || '').trim();

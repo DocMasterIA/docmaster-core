@@ -82,17 +82,25 @@ def dispensa_clausulas_pedido_from_user_prompt(user_prompt: str) -> str:
     if not text:
         return ""
     kept: list[str] = []
+    capture = False
     for line in text.splitlines():
         stripped = line.strip()
         if not stripped:
+            if capture:
+                kept.append("")
             continue
         low = stripped.lower()
         if any(low.startswith(p) for p in _DISPRESA_CLAUSULAS_PEDIDO_DROP_PREFIXES):
+            capture = False
             continue
         if any(low.startswith(p) for p in _DISPRESA_CLAUSULAS_PEDIDO_KEEP_PREFIXES):
             kept.append(stripped)
+            capture = True
+            continue
+        if capture:
+            kept.append(stripped)
     if kept:
-        return "\n".join(kept)
+        return "\n".join(kept).strip()
     if not any(
         line.strip().lower().startswith(_DISPRESA_CLAUSULAS_PEDIDO_DROP_PREFIXES)
         for line in text.splitlines()

@@ -266,6 +266,7 @@ import DispensaArt75IIItensValores from './DispensaArt75IIItensValores.vue';
 import DotacaoOrcamentariaBlock from '@/components/DotacaoOrcamentariaBlock.vue';
 import { fetchCabecalhosPrefeitura } from '@/utils/fetchCabecalhosPrefeitura.js';
 import { buildGerarTrEDfdUrl, getApiBase } from '@/utils/apiBase.js';
+import { buildClausulasObjetoJustificativaPrompt } from '@/utils/clausulasObjetoJustificativa.js';
 import {
   buildFillTrSlotsUrl,
   describeFillTrSlotsNetworkFailure,
@@ -702,6 +703,8 @@ function buildSlotsOverride() {
   if (dataTermo) o.data_termo = dataTermo;
   const objetoFinal = String(objetoGerado.value || objetoContratado.value || '').trim();
   if (objetoFinal) o.objeto = objetoFinal;
+  const brutoContratado = String(objetoContratado.value || '').trim();
+  if (brutoContratado) o.objeto_contratado_bruto = brutoContratado;
   if (String(justificativa.value || '').trim()) o.justificativa = String(justificativa.value).trim();
   const itensOverride = itens.value
     .filter((item) => Object.values(item).some((v) => campoPreenchido(v)))
@@ -727,16 +730,19 @@ function buildSlotsOverride() {
 }
 
 function buildUserPrompt() {
+  const contratadoBlock = buildClausulasObjetoJustificativaPrompt({
+    contratado: objetoContratado.value,
+    caracteristicas: objetoCaracteristicas.value,
+    variant: 'dispensa_normal',
+  });
   return [
     `Gerar documento com base nos dados preenchidos para ${String(route.meta?.title || 'dispensa normal')}.`,
-    `Cabeçalho do documento: ${cabecalho.value || 'Não informado'}`,
-    `Órgão: ${orgao.value || 'Não informado'}`,
-    `Processo: ${processoAtivo.value ? (processo.value || 'Não informado') : 'Não se aplica'}`,
-    `Objeto base: ${objetoContratado.value || 'Não informado'}`,
-    `Setor/secretaria atendido (usar nas cláusulas de objeto e justificativa): ${objetoSetor.value || 'Não informado'}`,
-    `Características mínimas: ${objetoCaracteristicas.value || 'Não informado'}`,
+    contratadoBlock,
+    objetoSetor.value.trim() ? `Setor/secretaria atendido: ${objetoSetor.value.trim()}` : '',
     'Em objeto e justificativa não liste nem discuta itens da tabela (descrições, quantidades, valores); mantenha texto genérico.',
-  ].join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 function sanitizeJsonBody(obj) {

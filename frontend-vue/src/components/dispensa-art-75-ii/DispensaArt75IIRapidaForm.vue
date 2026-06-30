@@ -594,7 +594,6 @@ function buildSlotsOverride() {
 function buildUserPromptFillTrSlots() {
   return buildClausulasObjetoJustificativaPrompt({
     contratado: objetoContratado.value,
-    caracteristicas: objetoCaracteristicas.value,
   });
 }
 

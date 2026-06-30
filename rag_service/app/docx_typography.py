@@ -89,6 +89,11 @@ def paragraph_is_contract_instrument_substitution_block(text: str) -> bool:
 def paragraph_should_remain_left_aligned(text: str) -> bool:
     """Parágrafos de lista/inciso curtos que não devem receber justificação automática."""
     t = (text or "").replace("\r\n", "\n").strip()
+    # Cabeçalho do TR: «PROCESSO: 123/2026» (estilo Heading 1 no modelo — não centralizar).
+    if t.upper().startswith("PROCESSO:"):
+        return True
+    if re.search(r"\(\s*NUMERO[\s_]*PROCESSO\s*\)", t, re.I):
+        return True
     # §15.1 (instrumento de contrato) — sempre exceção, mesmo em parágrafo longo do modelo.
     if paragraph_is_contract_instrument_substitution_block(text):
         return True
@@ -222,6 +227,13 @@ def _justify_paragraphs_in_container(container, *, justify_heading_styles: bool)
         return
     try:
         for p in _iter_paragraphs_deep(container):
+            if paragraph_should_remain_left_aligned(p.text or ""):
+                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                pf = p.paragraph_format
+                pf.space_before = Pt(0)
+                pf.space_after = Pt(0)
+                pf.line_spacing = 1.0
+                continue
             if not justify_heading_styles:
                 try:
                     sn = (p.style and p.style.name) or ""
@@ -229,14 +241,6 @@ def _justify_paragraphs_in_container(container, *, justify_heading_styles: bool)
                         continue
                 except Exception:
                     pass
-            if paragraph_should_remain_left_aligned(p.text or ""):
-                if p.alignment is None:
-                    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-                    pf = p.paragraph_format
-                    pf.space_before = Pt(0)
-                    pf.space_after = Pt(0)
-                    pf.line_spacing = 1.0
-                continue
             al = p.alignment
             if al is None:
                 p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY

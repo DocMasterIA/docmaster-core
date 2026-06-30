@@ -7,6 +7,8 @@ from pathlib import Path
 
 from docx import Document
 
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+
 from app.tr_template import (
     TRTemplateSlots,
     numero_processo_valor_placeholder_tr,
@@ -59,6 +61,13 @@ class TrNumeroProcessoPlaceholderTests(unittest.TestCase):
                 failures.append(f"{path.relative_to(TEMPLATE_PACKAGES_ROOT)}: PROCESSO não substituído")
             if any("( NUMERO_PROCESSO )" in (p.text or "") for p in head):
                 failures.append(f"{path.relative_to(TEMPLATE_PACKAGES_ROOT)}: placeholder bruto permaneceu")
+            proc_paras = [p for p in head if (p.text or "").strip().upper().startswith("PROCESSO:")]
+            for proc_para in proc_paras:
+                if proc_para.alignment != WD_ALIGN_PARAGRAPH.LEFT:
+                    failures.append(
+                        f"{path.relative_to(TEMPLATE_PACKAGES_ROOT)}: PROCESSO não está à esquerda "
+                        f"(align={proc_para.alignment})"
+                    )
         self.assertEqual(failures, [], "\n".join(failures))
 
     def test_numero_processo_only_on_slots_still_renders_tr(self):

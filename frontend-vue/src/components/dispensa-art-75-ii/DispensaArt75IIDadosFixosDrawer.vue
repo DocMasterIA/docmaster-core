@@ -71,6 +71,25 @@
                 />
               </div>
             </div>
+            <div class="ixp-grid-3">
+              <div class="ixp-field">
+                <label>Tratamento</label>
+                <select v-model="ctx.fixoTratCargo" class="da75-select da75-select--sm">
+                  <option value="">Selecione</option>
+                  <option v-for="op in ctx.tratamentoCargo" :key="op" :value="op">{{ op }}</option>
+                </select>
+              </div>
+              <div class="ixp-field ixp-col-2">
+                <label>1.2 A quem é direcionada a solicitação — Cargo</label>
+                <input
+                  :value="ctx.fixoCargo"
+                  class="da75-input da75-input--sm"
+                  list="da75-dl-solicitacao-destinatario-cargo"
+                  placeholder="Digite o cargo"
+                  @input="ctx.fixoCargo = capNome(String(($event.target).value || ''))"
+                />
+              </div>
+            </div>
             <h4 class="ixp-subsection-title">1.3 Responsável pela solicitação</h4>
             <div class="ixp-grid-1">
               <div class="ixp-field">
@@ -190,6 +209,9 @@
 
       <datalist id="da75-dl-solicitacao-destinatario-nome">
         <option v-for="v in (ctx.slotFieldOptions.solicitacao_destinatario_nome || [])" :key="`sdn-${v}`" :value="v" />
+      </datalist>
+      <datalist id="da75-dl-solicitacao-destinatario-cargo">
+        <option v-for="v in (ctx.slotFieldOptions.solicitacao_destinatario_cargo || [])" :key="`sdc-${v}`" :value="v" />
       </datalist>
       <datalist id="da75-dl-solicitacao-responsavel-nome">
         <option v-for="v in (ctx.slotFieldOptions.solicitacao_responsavel_nome || [])" :key="`srn-${v}`" :value="v" />

@@ -8,13 +8,10 @@ from typing import Any, Dict, Optional
 from .tr_template import TRTemplateSlots
 
 DEPRECATED_CARGO_OVERRIDE_KEYS = (
-    "sol_oficio_destinatario_cargo",
     "sol_oficio_responsavel_cargo",
     "dfd_assinatura_cargo",
-    "senhor_senhora_genero",
     "cargo_assinante_termo",
     "secretaria_usuario",
-    "solicitacao_destinatario_cargo",
     "solicitacao_responsavel_cargo",
     "solicitacao_tratamento_cargo",
     "tr_cargo_assinante",
@@ -24,9 +21,7 @@ DEPRECATED_CARGO_OVERRIDE_KEYS = (
 CARGO_SLOT_FIELDS_ON_TR_TEMPLATE = (
     "secretaria_usuario",
     "cargo_assinante_termo",
-    "sol_oficio_destinatario_cargo",
     "sol_oficio_responsavel_cargo",
-    "senhor_senhora_genero",
     "dfd_assinatura_cargo",
 )
 

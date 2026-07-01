@@ -275,6 +275,24 @@
                 />
               </div>
             </div>
+            <div class="fe-grid-3">
+              <div class="fe-field">
+                <label>Tratamento</label>
+                <select v-model="tratCargo" class="da75-select da75-select--sm">
+                  <option value="">Selecione</option>
+                  <option v-for="o in tratamentoCargo" :key="o" :value="o">{{ o }}</option>
+                </select>
+              </div>
+              <div class="fe-field fe-col-2">
+                <label>1.2 A quem é direcionada a solicitação — Cargo</label>
+                <input
+                  :value="cargo"
+                  list="dl-solicitacao-destinatario-cargo"
+                  placeholder="Digite o cargo"
+                  @input="cargo = tituloNomePt(String(($event.target).value || ''))"
+                />
+              </div>
+            </div>
             <h4 class="fe-subsection-title">1.3 Responsável pela solicitação</h4>
             <div class="fe-grid-1">
               <div class="fe-field">
@@ -353,6 +371,7 @@
     <datalist id="dl-processo-numero"><option v-for="v in (slotFieldOptions.processo_numero || [])" :key="`pn-${v}`" :value="v" /></datalist>
     <datalist id="dl-orgao"><option v-for="v in mergedOrgaoOptions" :key="`org-${v}`" :value="v" /></datalist>
     <datalist id="dl-solicitacao-destinatario-nome"><option v-for="v in (slotFieldOptions.solicitacao_destinatario_nome || [])" :key="`sdn-${v}`" :value="v" /></datalist>
+    <datalist id="dl-solicitacao-destinatario-cargo"><option v-for="v in (slotFieldOptions.solicitacao_destinatario_cargo || [])" :key="`sdc-${v}`" :value="v" /></datalist>
     <datalist id="dl-solicitacao-responsavel-nome"><option v-for="v in (slotFieldOptions.solicitacao_responsavel_nome || [])" :key="`srn-${v}`" :value="v" /></datalist>
     <datalist id="dl-dfd-setor-requisitante"><option v-for="v in (slotFieldOptions.dfd_setor_requisitante || [])" :key="`dsr-${v}`" :value="v" /></datalist>
     <datalist id="dl-dfd-responsavel-demanda"><option v-for="v in (slotFieldOptions.dfd_responsavel_demanda || [])" :key="`drd-${v}`" :value="v" /></datalist>
@@ -543,6 +562,7 @@ function collectGlobalFormStatePayload() {
     processo_numero: '',
     orgao: orgao.value,
     solicitacao_destinatario_nome: nome.value,
+    solicitacao_destinatario_cargo: cargo.value,
     solicitacao_responsavel_nome: fixoResponsavel.value,
     dfd_setor_requisitante: fixoSetor.value,
     dfd_responsavel_demanda: fixoDemanda.value,
@@ -551,6 +571,7 @@ function collectGlobalFormStatePayload() {
     dfd_fiscal_contratos: fixoFiscal.value,
     dfd_assinatura_nome: fixoAssinatura.value,
     ao_senhor_genero: tratNome.value,
+    senhor_senhora_genero: tratCargo.value,
   });
 }
 async function saveUserGlobalPreset() {
@@ -869,7 +890,9 @@ function buildSlotsOverride(iaDeepen = null) {
     cnpj_fornecedor: String(cnpj.value || '').trim(),
     valor_total: String(valorGlobal.value || '').trim(),
     ao_senhor_genero: String(tratNome.value || '').trim(),
+    senhor_senhora_genero: String(tratCargo.value || '').trim(),
     sol_oficio_destinatario_nome: String(nome.value || '').trim(),
+    sol_oficio_destinatario_cargo: String(cargo.value || '').trim(),
     sol_oficio_responsavel_nome: trimMultilinePreserve(fixoResponsavel.value || ''),
     dfd_setor_requisitante: String((fixoSetor.value || orgao.value || '').trim()),
     dfd_responsavel_demanda: String(fixoDemanda.value || '').trim(),

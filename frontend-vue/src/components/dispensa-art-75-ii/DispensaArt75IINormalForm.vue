@@ -651,11 +651,15 @@ function buildSlotsOverride() {
   applyUsuarioLocalidadeToSlots(o, usuarioLocalidade.value);
   o.dispensa_fluxo_ui = 'normal';
   const destNome = trimMultilinePreserve(dadosFixos.fixoNome || '');
+  const destCargo = String(dadosFixos.fixoCargo || '').trim();
   const respNome = trimMultilinePreserve(dadosFixos.fixoResponsavel || '');
   const tratNome = String(dadosFixos.fixoTratNome || '').trim();
+  const tratCargo = String(dadosFixos.fixoTratCargo || '').trim();
   if (destNome) o.sol_oficio_destinatario_nome = destNome;
+  if (destCargo) o.sol_oficio_destinatario_cargo = destCargo;
   if (respNome) o.sol_oficio_responsavel_nome = respNome;
   if (tratNome) o.ao_senhor_genero = tratNome;
+  if (tratCargo) o.senhor_senhora_genero = tratCargo;
   const setorFormulario = String(objetoSetor.value || '').trim();
   if (setorFormulario) {
     o.dfd_setor_requisitante = setorFormulario;

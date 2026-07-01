@@ -667,6 +667,13 @@ const FLOW_CONFIG = {
             options: ['Ao senhor', 'A senhora'],
           },
           { id: 'solicitacao_destinatario_nome', label: '1.1 A quem é direcionada a solicitação — Nome', input: 'text' },
+          {
+            id: 'solicitacao_destinatario_tratamento_cargo',
+            label: 'Tratamento',
+            input: 'select',
+            options: ['Senhor', 'Senhora'],
+          },
+          { id: 'solicitacao_destinatario_cargo', label: '1.2 A quem é direcionada a solicitação — Cargo', input: 'text' },
           { id: '_h_solicitacao_responsavel', label: '1.3 Responsável pela solicitação', input: 'heading', fullWidth: true },
           { id: 'solicitacao_responsavel_nome', label: 'Nome do responsável', input: 'textarea', fullWidth: true },
         ],
@@ -925,6 +932,7 @@ const ITEM_VALOR_SLOT_IDS = new Set(['item_descricao', 'item_quantidade', 'item_
 /** Campos de nome próprio / cargo / setor nos fluxos TR+DFD+Ofício (drawer Dados fixos). */
 const SLOT_NOME_TITULO_IDS = new Set([
   'solicitacao_destinatario_nome',
+  'solicitacao_destinatario_cargo',
   'solicitacao_responsavel_nome',
   'dfd_setor_requisitante',
   'dfd_responsavel_demanda',
@@ -1236,9 +1244,13 @@ function buildTrSlotsOverride() {
 
   const solDestNome = (f.solicitacao_destinatario_nome || '').trim();
   const solDestTratNome = (f.solicitacao_destinatario_tratamento_nome || '').trim();
+  const solDestTratCargo = (f.solicitacao_destinatario_tratamento_cargo || '').trim();
+  const solDestCargo = (f.solicitacao_destinatario_cargo || '').trim();
   const solRespNome = trimMultilinePreserve(f.solicitacao_responsavel_nome || '');
   if (solDestNome) o.sol_oficio_destinatario_nome = solDestNome;
   if (solDestTratNome) o.ao_senhor_genero = solDestTratNome;
+  if (solDestTratCargo) o.senhor_senhora_genero = solDestTratCargo;
+  if (solDestCargo) o.sol_oficio_destinatario_cargo = solDestCargo;
   if (solRespNome) o.sol_oficio_responsavel_nome = solRespNome;
 
   const itemDescricao = (f.item_descricao || '').trim();

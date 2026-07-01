@@ -4,20 +4,16 @@ export const DATA_OPTIONS = ['Data automática', 'Datado e assinado digitalmente
 export const TRATAMENTO_NOME = ['Ao senhor', 'A senhora'];
 export const TRATAMENTO_CARGO = ['Senhor', 'Senhora'];
 
-/** IDs de campos no assistente DocumentGenerator (preset global). */
+/** IDs de campos no assistente DocumentGenerator (preset global) — cargos ainda descontinuados. */
 export const LEGACY_CARGO_SLOT_FORM_IDS = [
-  'solicitacao_destinatario_cargo',
-  'solicitacao_destinatario_tratamento_cargo',
   'solicitacao_responsavel_cargo',
   'dfd_assinatura_cargo',
   'tr_cargo_assinante',
   'tr_termo_responsavel_cargo',
 ];
 
-/** Preset/dados fixos — removidos do drawer; limpar no save para não ressurgir no merge do backend. */
+/** Preset/dados fixos — cargos descontinuados; limpar no save para não ressurgir no merge do backend. */
 export const DA75_DEPRECATED_CARGO_PRESET_KEYS = [
-  'solicitacao_tratamento_cargo',
-  'solicitacao_destinatario_cargo',
   'solicitacao_responsavel_cargo',
   'dfd_assinatura_cargo',
   'tr_termo_responsavel_cargo',
@@ -25,10 +21,8 @@ export const DA75_DEPRECATED_CARGO_PRESET_KEYS = [
 
 /** slots_override — não enviar à geração TR/DFD/Ofício (fantasmas de presets antigos). */
 export const DA75_DEPRECATED_CARGO_OVERRIDE_KEYS = [
-  'sol_oficio_destinatario_cargo',
   'sol_oficio_responsavel_cargo',
   'dfd_assinatura_cargo',
-  'senhor_senhora_genero',
   'cargo_assinante_termo',
   'secretaria_usuario',
   'tr_cargo_assinante',

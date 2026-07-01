@@ -5,13 +5,10 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 DEPRECATED_CARGO_OVERRIDE_KEYS = (
-    "sol_oficio_destinatario_cargo",
     "sol_oficio_responsavel_cargo",
     "dfd_assinatura_cargo",
-    "senhor_senhora_genero",
     "cargo_assinante_termo",
     "secretaria_usuario",
-    "solicitacao_destinatario_cargo",
     "solicitacao_responsavel_cargo",
     "solicitacao_tratamento_cargo",
     "tr_cargo_assinante",

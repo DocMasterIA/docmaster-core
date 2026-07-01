@@ -372,6 +372,25 @@
                 />
               </div>
             </div>
+            <div class="ixp-grid-3">
+              <div class="ixp-field">
+                <label>Tratamento</label>
+                <select v-model="fixoTratCargo" class="da75-select da75-select--sm">
+                  <option value="">Selecione</option>
+                  <option v-for="op in tratamentoCargo" :key="op" :value="op">{{ op }}</option>
+                </select>
+              </div>
+              <div class="ixp-field ixp-col-2">
+                <label>1.2 A quem é direcionada a solicitação — Cargo</label>
+                <input
+                  :value="fixoCargo"
+                  class="da75-input da75-input--sm"
+                  list="dl-solicitacao-destinatario-cargo"
+                  placeholder="Digite o cargo"
+                  @input="fixoCargo = tituloNomePt(String(($event.target).value || ''))"
+                />
+              </div>
+            </div>
             <h4 class="ixp-subsection-title">1.3 Responsável pela solicitação</h4>
             <div class="ixp-grid-1">
               <div class="ixp-field">
@@ -458,6 +477,7 @@
     <datalist id="dl-tr-nome-assinante"><option v-for="v in (slotFieldOptions.tr_nome_assinante || [])" :key="`na-${v}`" :value="v" /></datalist>
     <datalist id="dl-clausula-setor"><option v-for="v in (slotFieldOptions.clausula_setor || [])" :key="`cs-${v}`" :value="v" /></datalist>
     <datalist id="dl-solicitacao-destinatario-nome"><option v-for="v in (slotFieldOptions.solicitacao_destinatario_nome || [])" :key="`sdn-${v}`" :value="v" /></datalist>
+    <datalist id="dl-solicitacao-destinatario-cargo"><option v-for="v in (slotFieldOptions.solicitacao_destinatario_cargo || [])" :key="`sdc-${v}`" :value="v" /></datalist>
     <datalist id="dl-solicitacao-responsavel-nome"><option v-for="v in (slotFieldOptions.solicitacao_responsavel_nome || [])" :key="`srn-${v}`" :value="v" /></datalist>
     <datalist id="dl-dfd-setor-requisitante"><option v-for="v in (slotFieldOptions.dfd_setor_requisitante || [])" :key="`dsr-${v}`" :value="v" /></datalist>
     <datalist id="dl-dfd-responsavel-demanda"><option v-for="v in (slotFieldOptions.dfd_responsavel_demanda || [])" :key="`drd-${v}`" :value="v" /></datalist>
@@ -726,6 +746,7 @@ function collectGlobalFormStatePayload() {
     orgao_unidade_veiculo: orgaoUnidadeVeiculo.value,
     orgao_responsavel_equipamento: orgaoResponsavelEquipamento.value,
     solicitacao_destinatario_nome: fixoNome.value,
+    solicitacao_destinatario_cargo: fixoCargo.value,
     solicitacao_responsavel_nome: fixoResponsavel.value,
     dfd_setor_requisitante: fixoSetor.value,
     dfd_responsavel_demanda: fixoDemanda.value,
@@ -740,6 +761,7 @@ function collectGlobalFormStatePayload() {
     clausula_objeto: clausulaObjeto.value,
     clausula_justificativa: clausulaJustificativa.value,
     ao_senhor_genero: fixoTratNome.value,
+    senhor_senhora_genero: fixoTratCargo.value,
   });
 }
 
@@ -1315,8 +1337,10 @@ function buildInexigFornecedorExclusivoObjetoTrResumo(opts = {}) {
 function buildSlotsOverride(iaDeepen = null) {
   const o = {};
   const solDestNome = fixoNome.value.trim();
+  const solDestCargo = fixoCargo.value.trim();
   const solRespNome = trimMultilinePreserve(fixoResponsavel.value || '');
   if (solDestNome) o.sol_oficio_destinatario_nome = solDestNome;
+  if (solDestCargo) o.sol_oficio_destinatario_cargo = solDestCargo;
   if (solRespNome) o.sol_oficio_responsavel_nome = solRespNome;
 
   const setorOrgFallback = isInexigibilidadeManutencaoRoute.value
@@ -1429,6 +1453,7 @@ function buildSlotsOverride(iaDeepen = null) {
   if (cnpj.value.trim()) o.cnpj_fornecedor = cnpj.value.trim();
   if (valorGlobal.value.trim()) o.valor_total = valorGlobal.value.trim();
   if (fixoTratNome.value.trim()) o.ao_senhor_genero = fixoTratNome.value.trim();
+  if (fixoTratCargo.value.trim()) o.senhor_senhora_genero = fixoTratCargo.value.trim();
 
   if (isInexigibilidadeManutencaoRoute.value) {
     if (iaDeepen) {

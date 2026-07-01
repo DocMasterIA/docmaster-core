@@ -2,6 +2,7 @@ import { computed, reactive, ref } from 'vue';
 import {
   clearDeprecatedCargoPresetFields,
   TEXTO_PADRAO_ENDERECO_PROPOSTAS,
+  TRATAMENTO_CARGO,
   TRATAMENTO_NOME,
 } from '@/components/dispensa-art-75-ii/dispensaArt75iiShared.js';
 import { normNomeTituloMultiline } from '@/utils/itemValorCampos.js';
@@ -30,6 +31,8 @@ export const DA75_FIXOS_CATALOG_KEYS = [
   'cabecalho_documento',
   'orgao',
   'solicitacao_destinatario_nome',
+  'solicitacao_destinatario_cargo',
+  'solicitacao_destinatario_tratamento_cargo',
   'solicitacao_responsavel_nome',
   'dfd_setor_requisitante',
   'dfd_responsavel_demanda',
@@ -54,6 +57,8 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
 
   const fixoTratNome = ref('');
   const fixoNome = ref('');
+  const fixoTratCargo = ref('');
+  const fixoCargo = ref('');
   const fixoResponsavel = ref('');
   const fixoSetor = ref('');
   const fixoDemanda = ref('');
@@ -66,6 +71,7 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
   const fixoTrResponsavelNome = ref('');
 
   const tratamentoNome = TRATAMENTO_NOME;
+  const tratamentoCargo = TRATAMENTO_CARGO;
 
   /** Perfis salvos + histórico do catálogo + valor atual (texto livre no campo principal). */
   const mergedOrgaoOptions = computed(() => {
@@ -86,7 +92,9 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
       processo_numero: '',
       orgao: orgao.value,
       solicitacao_tratamento_nome: fixoTratNome.value,
+      solicitacao_destinatario_tratamento_cargo: fixoTratCargo.value,
       solicitacao_destinatario_nome: fixoNome.value,
+      solicitacao_destinatario_cargo: fixoCargo.value,
       solicitacao_responsavel_nome: fixoResponsavel.value,
       dfd_setor_requisitante: fixoSetor.value,
       dfd_responsavel_demanda: fixoDemanda.value,
@@ -105,7 +113,15 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     if ('cabecalho_documento' in data) cabecalho.value = String(data.cabecalho_documento || '');
     if ('orgao' in data) orgao.value = normNomeTitulo(data.orgao);
     if ('solicitacao_tratamento_nome' in data) fixoTratNome.value = String(data.solicitacao_tratamento_nome || '');
+    if ('solicitacao_destinatario_tratamento_cargo' in data) {
+      fixoTratCargo.value = String(data.solicitacao_destinatario_tratamento_cargo || '');
+    } else if ('solicitacao_tratamento_cargo' in data) {
+      fixoTratCargo.value = String(data.solicitacao_tratamento_cargo || '');
+    } else if ('senhor_senhora_genero' in data) {
+      fixoTratCargo.value = String(data.senhor_senhora_genero || '');
+    }
     if ('solicitacao_destinatario_nome' in data) fixoNome.value = normNomeTitulo(data.solicitacao_destinatario_nome);
+    if ('solicitacao_destinatario_cargo' in data) fixoCargo.value = normNomeTitulo(data.solicitacao_destinatario_cargo);
     if ('solicitacao_responsavel_nome' in data) fixoResponsavel.value = normNomeTitulo(data.solicitacao_responsavel_nome);
     if ('dfd_setor_requisitante' in data) fixoSetor.value = normNomeTitulo(data.dfd_setor_requisitante);
     if ('dfd_responsavel_demanda' in data) fixoDemanda.value = normNomeTitulo(data.dfd_responsavel_demanda);
@@ -128,6 +144,8 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
       ['cabecalho_documento', cabecalho.value],
       ['orgao', orgao.value],
       ['solicitacao_destinatario_nome', fixoNome.value],
+      ['solicitacao_destinatario_cargo', fixoCargo.value],
+      ['solicitacao_destinatario_tratamento_cargo', fixoTratCargo.value],
       ['solicitacao_responsavel_nome', fixoResponsavel.value],
       ['dfd_setor_requisitante', fixoSetor.value],
       ['dfd_responsavel_demanda', fixoDemanda.value],
@@ -284,8 +302,11 @@ export function useDispensaArt75IIDadosFixos(apiBase, parentRefs) {
     mergedOrgaoOptions,
     slotFieldOptions,
     tratamentoNome,
+    tratamentoCargo,
     fixoTratNome,
     fixoNome,
+    fixoTratCargo,
+    fixoCargo,
     fixoResponsavel,
     fixoSetor,
     fixoDemanda,

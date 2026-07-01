@@ -495,7 +495,65 @@ def _append_multiline_to_run(run, text: str) -> None:
         run.add_text(part)
 
 
-# Campos de assinatura: cada \\n vira parágrafo Word (mais legível que só w:br).
+def _split_multiline_signature_blocks(text: str) -> list[tuple[list[str], int]]:
+    """
+    Agrupa linhas não vazias em blocos (ex.: nome + secretaria).
+    Linhas em branco separam blocos; retorna (linhas, parágrafos_vazios_após).
+    """
+    normalized = str(text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not normalized:
+        return []
+    blocks: list[tuple[list[str], int]] = []
+    current: list[str] = []
+    blank_run = 0
+    for line in normalized.split("\n"):
+        if line.strip():
+            if blank_run > 0 and current:
+                blocks.append((current, blank_run))
+                current = []
+                blank_run = 0
+            elif blank_run > 0:
+                blank_run = 0
+            current.append(line.strip())
+        else:
+            blank_run += 1
+    if current:
+        blocks.append((current, 0))
+    return blocks
+
+
+def _set_tight_paragraph_spacing(paragraph: Paragraph) -> None:
+    """Evita espaço extra entre linhas do mesmo bloco (nome + cargo/setor)."""
+    try:
+        pf = paragraph.paragraph_format
+        pf.space_before = Pt(0)
+        pf.space_after = Pt(0)
+        pf.line_spacing = 1.0
+    except Exception:
+        pass
+
+
+def _append_block_lines_to_run(run, lines: list[str], font_ref) -> None:
+    for line in lines:
+        run.add_break()
+        run.add_text(line)
+    if font_ref is not None:
+        _copy_run_font(font_ref, run)
+
+
+def _fill_signature_block_paragraph(
+    paragraph: Paragraph, lines: list[str], font_ref
+) -> None:
+    """Preenche parágrafo com a primeira linha já inserida + demais via w:br."""
+    if len(lines) <= 1:
+        _set_tight_paragraph_spacing(paragraph)
+        return
+    run = paragraph.runs[-1] if paragraph.runs else paragraph.add_run()
+    _append_block_lines_to_run(run, lines[1:], font_ref)
+    _set_tight_paragraph_spacing(paragraph)
+
+
+# Campos de assinatura: blocos (nome + setor) com w:br; linha vazia = novo bloco.
 SIGNATURE_MULTILINE_PLACEHOLDERS: frozenset[str] = frozenset(
     {
         "(TR_NOME_ASSINANTE_TERMO)",
@@ -593,7 +651,8 @@ def replace_placeholder_in_paragraph(
 ) -> bool:
     """
     Substitui placeholder no parágrafo (texto pode estar dividido em vários runs).
-    Campos de assinatura multilinha viram um parágrafo Word por linha digitada.
+    Campos de assinatura multilinha: blocos (nome + cargo/setor) com w:br;
+    linhas em branco separam blocos em parágrafos distintos.
     """
     if multiline_as_paragraphs is None:
         multiline_as_paragraphs = placeholder in SIGNATURE_MULTILINE_PLACEHOLDERS
@@ -603,19 +662,30 @@ def replace_placeholder_in_paragraph(
         else str(replacement or "")
     )
     if multiline_as_paragraphs and "\n" in normalized:
-        lines = normalized.split("\n")
+        blocks = _split_multiline_signature_blocks(normalized)
+        if not blocks:
+            return _replace_placeholder_in_paragraph_inline(paragraph, placeholder, "")
         font_ref = _font_reference_run(paragraph)
-        if not _replace_placeholder_in_paragraph_inline(paragraph, placeholder, lines[0]):
+        first_lines, _ = blocks[0]
+        if not _replace_placeholder_in_paragraph_inline(paragraph, placeholder, first_lines[0]):
             return False
         if font_ref is None:
             font_ref = _font_reference_run(paragraph)
+        _fill_signature_block_paragraph(paragraph, first_lines, font_ref)
         current = paragraph
-        for line in lines[1:]:
+        for i in range(1, len(blocks)):
+            block_lines, _ = blocks[i]
+            gap = blocks[i - 1][1]
+            for _ in range(gap):
+                spacer = _insert_paragraph_after(current)
+                _copy_paragraph_layout(current, spacer)
+                _set_tight_paragraph_spacing(spacer)
+                current = spacer
             new_p = _insert_paragraph_after(current)
             _copy_paragraph_layout(current, new_p)
-            if line.strip():
-                run = new_p.add_run(line.strip())
-                _copy_run_font(font_ref, run)
+            run = new_p.add_run(block_lines[0])
+            _copy_run_font(font_ref, run)
+            _fill_signature_block_paragraph(new_p, block_lines, font_ref)
             current = new_p
         return True
     return _replace_placeholder_in_paragraph_inline(paragraph, placeholder, replacement)

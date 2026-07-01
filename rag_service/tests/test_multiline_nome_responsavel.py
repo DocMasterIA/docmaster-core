@@ -56,7 +56,8 @@ def test_oficio_responsavel_preserves_double_blank_between_blocks():
     empty_count = _count_empty_paragraphs_between(doc, "Secretaria da Saúde", "João Carlos")
     assert empty_count >= 2, f"Esperadas ≥2 linhas vazias entre blocos, obteve {empty_count}"
     joao_para = next(p for p in doc.paragraphs if "João Carlos" in (p.text or ""))
-    assert "Secretaria da Educação" not in (joao_para.text or "")
+    assert "Secretaria da Educação" in (joao_para.text or "")
+    assert _line_break_count(joao_para) >= 1
 
 
 def _line_break_count(paragraph) -> int:
@@ -84,11 +85,17 @@ def test_oficio_responsavel_multiline_not_collapsed_to_single_line():
     assert "Secretaria da Saúde" in full
     assert "João Carlos" in full
     assert "Secretaria da Educação" in full
-    # Cada linha digitada vira parágrafo Word (ou bloco separado por linha em branco).
+    # Nome + secretaria no mesmo parágrafo (w:br); blocos separados por linha em branco.
     fabrizia_paras = [p for p in doc.paragraphs if "Fabrizia" in (p.text or "")]
     assert len(fabrizia_paras) == 1
-    assert "Secretaria da Saúde" not in (fabrizia_paras[0].text or "")
-    assert any("Secretaria da Saúde" in (p.text or "") for p in doc.paragraphs)
+    fabrizia_para = fabrizia_paras[0]
+    assert "Secretaria da Saúde" in (fabrizia_para.text or "")
+    assert _line_break_count(fabrizia_para) >= 1
+    joao_paras = [p for p in doc.paragraphs if "João Carlos" in (p.text or "")]
+    assert len(joao_paras) == 1
+    joao_para = joao_paras[0]
+    assert "Secretaria da Educação" in (joao_para.text or "")
+    assert _line_break_count(joao_para) >= 1
     # Linha em branco entre blocos: parágrafo vazio entre Fabrizia/Secretaria e João.
     fab_idx = next(i for i, p in enumerate(doc.paragraphs) if "Fabrizia" in (p.text or ""))
     joao_idx = next(i for i, p in enumerate(doc.paragraphs) if "João Carlos" in (p.text or ""))
@@ -99,9 +106,14 @@ def _assert_multiline_signature_block(doc: Document) -> None:
     fabrizia_paras = [p for p in doc.paragraphs if "Fabrizia" in (p.text or "")]
     assert fabrizia_paras, "Nome Fabrizia não encontrado"
     assert len(fabrizia_paras) == 1
-    assert any("Secretaria da Saúde" in (p.text or "") for p in doc.paragraphs)
-    assert any("João Carlos" in (p.text or "") for p in doc.paragraphs)
-    assert any("Secretaria da Educação" in (p.text or "") for p in doc.paragraphs)
+    fabrizia_para = fabrizia_paras[0]
+    assert "Secretaria da Saúde" in (fabrizia_para.text or "")
+    assert _line_break_count(fabrizia_para) >= 1
+    joao_paras = [p for p in doc.paragraphs if "João Carlos" in (p.text or "")]
+    assert len(joao_paras) == 1
+    joao_para = joao_paras[0]
+    assert "Secretaria da Educação" in (joao_para.text or "")
+    assert _line_break_count(joao_para) >= 1
     fab_idx = next(i for i, p in enumerate(doc.paragraphs) if "Fabrizia" in (p.text or ""))
     joao_idx = next(i for i, p in enumerate(doc.paragraphs) if "João Carlos" in (p.text or ""))
     assert joao_idx > fab_idx

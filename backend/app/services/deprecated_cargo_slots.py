@@ -16,7 +16,11 @@ DEPRECATED_CARGO_OVERRIDE_KEYS = (
 )
 
 
+from backend.app.services.oficio_slots import normalize_oficio_slots_override
+
+
 def strip_deprecated_cargo_override(override: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    override = normalize_oficio_slots_override(override if isinstance(override, dict) else None)
     if not isinstance(override, dict):
         return override
     out = dict(override)

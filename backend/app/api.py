@@ -7,6 +7,7 @@ from backend.app.services.services import (
 )
 from backend.app.services.llm_context import build_llm_context_from_request
 from backend.app.services.deprecated_cargo_slots import strip_deprecated_cargo_override
+from backend.app.services.oficio_slots import normalize_oficio_slots_override
 from backend.app.services.render import render_docx_by_index, render_docx_with_tokens
 from backend.app.services.preview import generate_docx_preview, generate_docx_preview_pdf
 from django.contrib.auth.decorators import login_required
@@ -204,6 +205,50 @@ def _templates_queryset_for_user(user):
         else:
             qs = qs.filter(prefeitura_id=user_pref_id) | qs.filter(prefeitura__isnull=True)
     return qs.distinct()
+
+
+def _merge_oficio_slots_from_user_preset(request, slots_override: dict | None) -> dict:
+    """Completa slots do Ofício a partir do preset global salvo (dados fixos)."""
+    o = normalize_oficio_slots_override(slots_override if isinstance(slots_override, dict) else {})
+    if not getattr(request.user, "is_authenticated", False):
+        return o
+    try:
+        obj = SlotFormState.objects.filter(
+            owner=request.user,
+            slot_package_key=GLOBAL_SLOT_PRESET_KEY,
+        ).first()
+        if not obj or not isinstance(obj.data, dict):
+            return o
+        preset = obj.data
+        pairs = (
+            ("ao_senhor_genero", ("solicitacao_tratamento_nome", "ao_senhor_genero")),
+            (
+                "senhor_senhora_genero",
+                (
+                    "senhor_senhora_genero",
+                    "solicitacao_destinatario_tratamento_cargo",
+                    "solicitacao_tratamento_cargo",
+                ),
+            ),
+            ("sol_oficio_destinatario_nome", ("solicitacao_destinatario_nome",)),
+            ("sol_oficio_destinatario_cargo", ("solicitacao_destinatario_cargo",)),
+        )
+        for target, sources in pairs:
+            if str(o.get(target) or "").strip():
+                continue
+            for src in sources:
+                v = str(preset.get(src) or "").strip()
+                if v:
+                    o[target] = v
+                    break
+    except Exception:
+        pass
+    return o
+
+
+def _slots_override_for_generation(request, payload) -> dict | None:
+    raw = payload.get("slots_override") if isinstance(payload, dict) else None
+    return strip_deprecated_cargo_override(_merge_oficio_slots_from_user_preset(request, raw))
 
 
 def _resolve_merge_template_id(request, payload):
@@ -619,7 +664,7 @@ def gerar_tr_modelo_api(request):
             return JsonResponse({"ok": False, "error": "Acesso negado ao template desta prefeitura."}, status=403)
 
     user_prompt = (payload.get("user_prompt") or "").strip()
-    slots_override = strip_deprecated_cargo_override(payload.get("slots_override"))
+    slots_override = _slots_override_for_generation(request, payload)
     template_id = _resolve_merge_template_id(request, payload)
     slot_package_key = _resolve_slot_package_key(payload, request)
     set_request_metrics(request, package=slot_package_key, output="docx")
@@ -767,7 +812,7 @@ def gerar_tr_e_dfd_api(request):
             return JsonResponse({"ok": False, "error": "Acesso negado ao template desta prefeitura."}, status=403)
 
     user_prompt = (payload.get("user_prompt") or "").strip()
-    slots_override = strip_deprecated_cargo_override(payload.get("slots_override"))
+    slots_override = _slots_override_for_generation(request, payload)
     template_id = _resolve_merge_template_id(request, payload)
 
     if not user_prompt:
@@ -979,7 +1024,7 @@ def fill_tr_slots_api(request):
     set_request_metrics(request, package=slot_package_key, output="json")
 
     user_prompt = (payload.get("user_prompt") or "").strip()
-    slots_override = strip_deprecated_cargo_override(payload.get("slots_override"))
+    slots_override = _slots_override_for_generation(request, payload)
 
     if not user_prompt:
         return JsonResponse({"ok": False, "error": "user_prompt é obrigatório"}, status=400)

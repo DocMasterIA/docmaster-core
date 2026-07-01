@@ -36,9 +36,40 @@ export function clearDeprecatedCargoPresetFields(data) {
   return out;
 }
 
-export function stripDeprecatedCargoSlotsOverride(raw) {
-  if (!raw || typeof raw !== 'object') return raw;
+export function normalizeOficioSlotsOverride(raw) {
+  if (!raw || typeof raw !== 'object') return {};
   const o = { ...raw };
+  if (!String(o.ao_senhor_genero || '').trim()) {
+    const v = String(o.solicitacao_tratamento_nome || '').trim();
+    if (v) o.ao_senhor_genero = v;
+  }
+  if (!String(o.senhor_senhora_genero || '').trim()) {
+    for (const key of [
+      'senhor_senhora_genero',
+      'solicitacao_destinatario_tratamento_cargo',
+      'solicitacao_tratamento_cargo',
+    ]) {
+      const v = String(o[key] || '').trim();
+      if (v) {
+        o.senhor_senhora_genero = v;
+        break;
+      }
+    }
+  }
+  if (!String(o.sol_oficio_destinatario_nome || '').trim()) {
+    const v = String(o.solicitacao_destinatario_nome || '').trim();
+    if (v) o.sol_oficio_destinatario_nome = v;
+  }
+  if (!String(o.sol_oficio_destinatario_cargo || '').trim()) {
+    const v = String(o.solicitacao_destinatario_cargo || '').trim();
+    if (v) o.sol_oficio_destinatario_cargo = v;
+  }
+  return o;
+}
+
+export function stripDeprecatedCargoSlotsOverride(raw) {
+  const o = normalizeOficioSlotsOverride(raw);
+  if (!o || typeof o !== 'object') return o;
   for (const key of DA75_DEPRECATED_CARGO_OVERRIDE_KEYS) delete o[key];
   return Object.keys(o).length ? o : null;
 }

@@ -18,6 +18,7 @@ backend/data/
 # Virtualenv
 env/
 venv/
+.venv/
 
 # IDEs
 .vscode/

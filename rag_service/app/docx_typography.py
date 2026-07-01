@@ -20,9 +20,7 @@ from docx.shared import Pt, RGBColor
 _ROMAN_ITEM_LINE = re.compile(r"^[IVXLC]+\s*[–—\-]\s*.+", re.MULTILINE)
 _ROMAN_ITEM_LINE_START = re.compile(r"^\s*[IVXLC]+\s*[–—\-]\s*.+")
 
-# Parágrafos dissertativos (justificativa, objeto) — não aplicar heurísticas de lista.
-_BODY_PROSE_MIN_CHARS = 420
-# Inciso I – … em linha curta (§15.1 / listas do TR).
+# Inciso I – … em linha curta (heurística auxiliar).
 _SHORT_ROMAN_LINE_MAX_CHARS = 280
 
 
@@ -44,9 +42,8 @@ def paragraph_is_short_roman_item_line(text: str) -> bool:
 
 def paragraph_is_roman_enumerated_list(text: str) -> bool:
     """
-    Lista I – …; II – …; III – … no TR (§2.1 manutenção, §15.1 incisos).
-    Linhas curtas; não justificar. Não usar menções soltas a «manutenção preventiva/corretiva»
-    em texto dissertativo da justificativa.
+    Lista I – …; II – …; III – … em um único parágrafo (ex.: §2.1 manutenção).
+    Usado para não dividir blocos em split_paragraphs_on_double_newline — não força alinhamento.
     """
     t = (text or "").replace("\r\n", "\n").strip()
     if not t:
@@ -106,19 +103,17 @@ def paragraph_is_tr_numbered_subsection_prose(text: str) -> bool:
 
 
 def paragraph_should_remain_left_aligned(text: str) -> bool:
-    """Parágrafos de lista/inciso curtos que não devem receber justificação automática."""
+    """Parágrafos que devem permanecer à esquerda (cabeçalho processo, bloco §15.1 intro)."""
     t = (text or "").replace("\r\n", "\n").strip()
     # Cabeçalho do TR: «PROCESSO: 123/2026» (estilo Heading 1 no modelo — não centralizar).
     if t.upper().startswith("PROCESSO:"):
         return True
     if re.search(r"\(\s*NUMERO[\s_]*PROCESSO\s*\)", t, re.I):
         return True
-    # §15.1 (instrumento de contrato) — sempre exceção, mesmo em parágrafo longo do modelo.
+    # §15.1 (instrumento de contrato) — intro «nos casos de:», não os incisos I/II/III.
     if paragraph_is_contract_instrument_substitution_block(text):
         return True
-    if len(t) >= _BODY_PROSE_MIN_CHARS:
-        return False
-    return paragraph_is_roman_enumerated_list(text)
+    return False
 
 STANDARD_BODY_FONT = "Times New Roman"
 STANDARD_FONT_COLOR = RGBColor(0, 0, 0)
@@ -239,8 +234,8 @@ def _apply_font_to_header_footer_part(part) -> None:
 def _justify_paragraphs_in_container(container, *, justify_heading_styles: bool) -> None:
     """
     Justifica parágrafos sem alinhamento explícito (None).
-    Preserva centro/direita/justificado já definidos no .docx; listas romanas curtas e §15.1
-    só recebem esquerda quando ainda não tinham alinhamento explícito.
+    Preserva centro/direita/justificado já definidos no .docx.
+    §15.1 intro e cabeçalho PROCESSO permanecem à esquerda; incisos romanos (I –, II –) seguem o modelo.
     """
     if container is None:
         return
@@ -274,7 +269,7 @@ def apply_default_justify_to_document(doc: Document, *, justify_heading_styles: 
     """
     Alinha em justificado o texto corrido sem alinhamento explícito no parágrafo.
     Não sobrescreve justificado/centro/direita já definidos no modelo .docx.
-    Listas romanas curtas e o bloco §15.1 só recebem esquerda se ainda não tinham alinhamento.
+    Listas romanas (I –, II –) e §15.1 intro: não forçar esquerda nos incisos; justificar quando o modelo não define alinhamento.
     Por omissão não altera estilos «Heading N» (títulos gerados por add_heading no JSON→DOCX).
     """
     _justify_paragraphs_in_container(doc, justify_heading_styles=justify_heading_styles)

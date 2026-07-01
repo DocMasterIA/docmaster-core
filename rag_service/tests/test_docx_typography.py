@@ -46,19 +46,26 @@ class DocxTypographyTests(unittest.TestCase):
         self.assertEqual(p_left.alignment, WD_ALIGN_PARAGRAPH.LEFT)
         self.assertEqual(p_none.alignment, WD_ALIGN_PARAGRAPH.JUSTIFY)
 
-    def test_apply_justify_keeps_15_1_and_roman_items_left(self):
+    def test_apply_justify_keeps_15_1_intro_left_roman_items_justified(self):
         doc = Document()
         intro = doc.add_paragraph(
             "15.1. O instrumento de contrato poderá ser substituído por instrumento equivalente, "
             "tais como carta-contrato, nota de empenho, nos casos de:"
         )
-        item_i = doc.add_paragraph("I – dispensa de licitação em razão do valor;")
-        item_ii = doc.add_paragraph("II – compras com entrega imediata e integral dos bens.")
+        item_i = doc.add_paragraph(
+            "I – Nota Fiscal devidamente emitida em nome da Contratante, contendo a descrição precisa dos serviços."
+        )
+        item_i.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        item_ii = doc.add_paragraph(
+            "II – Certidões Negativas ou Positivas com efeito de Negativa de Débitos Relativos aos Tributos."
+        )
+        item_ii.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         apply_default_justify_to_document(doc)
         self.assertEqual(intro.alignment, WD_ALIGN_PARAGRAPH.LEFT)
-        self.assertEqual(item_i.alignment, WD_ALIGN_PARAGRAPH.LEFT)
-        self.assertEqual(item_ii.alignment, WD_ALIGN_PARAGRAPH.LEFT)
+        self.assertEqual(item_i.alignment, WD_ALIGN_PARAGRAPH.JUSTIFY)
+        self.assertEqual(item_ii.alignment, WD_ALIGN_PARAGRAPH.JUSTIFY)
         self.assertTrue(paragraph_should_remain_left_aligned(intro.text))
+        self.assertFalse(paragraph_should_remain_left_aligned(item_i.text))
 
     def test_contract_15_1_long_block_still_left_aligned(self):
         # Bloco real do TR compras (425+ chars no modelo) — não pode cair na regra de corpo longo.
@@ -72,7 +79,7 @@ class DocxTypographyTests(unittest.TestCase):
         self.assertTrue(paragraph_is_contract_instrument_substitution_block(text))
         self.assertTrue(paragraph_should_remain_left_aligned(text))
 
-    def test_manutencao_sec21_roman_block_still_left_aligned(self):
+    def test_manutencao_sec21_roman_block_not_forced_left(self):
         text = (
             "I – Manutenção preventiva;\n"
             "II – Manutenção corretiva;\n"
@@ -80,7 +87,7 @@ class DocxTypographyTests(unittest.TestCase):
             "IV – Substituição de peças, componentes e acessórios;"
         )
         self.assertTrue(paragraph_is_roman_enumerated_list(text))
-        self.assertTrue(paragraph_should_remain_left_aligned(text))
+        self.assertFalse(paragraph_should_remain_left_aligned(text))
 
     def test_manutencao_terms_in_long_justificativa_not_treated_as_list(self):
         text = (
@@ -95,6 +102,28 @@ class DocxTypographyTests(unittest.TestCase):
         text = "I – " + ("texto dissertativo " * 40)
         self.assertFalse(paragraph_is_short_roman_item_line(text))
         self.assertFalse(paragraph_should_remain_left_aligned(text))
+
+    def test_roman_nf_lines_justified_after_tr_render(self):
+        from pathlib import Path
+
+        from app.tr_template import TRTemplateSlots, render_tr_from_slots
+
+        tpl = (
+            Path(__file__).resolve().parents[2]
+            / "template_packages/lei_14133/dispensa_75_ii_compras/TR_modelo_base.docx"
+        )
+        slots = TRTemplateSlots(
+            objeto="Aquisição de material de expediente.",
+            justificativa="Justificativa de teste com texto suficiente para o termo de referência.",
+            cidade="Goiânia",
+            codigo_uf="GO",
+        )
+        out = render_tr_from_slots(slots, template_path=tpl)
+        doc = Document(out)
+        nf = next(p for p in doc.paragraphs if "Nota Fiscal devidamente" in (p.text or ""))
+        cert = next(p for p in doc.paragraphs if "Certidões Negativas" in (p.text or ""))
+        self.assertEqual(nf.alignment, WD_ALIGN_PARAGRAPH.JUSTIFY)
+        self.assertEqual(cert.alignment, WD_ALIGN_PARAGRAPH.JUSTIFY)
 
     def test_tr_secao_6_subsection_prose_is_justified_even_if_template_left(self):
         text = (

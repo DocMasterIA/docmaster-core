@@ -551,9 +551,7 @@ function slotsOverrideWithoutClauseDraft(raw) {
 
 /** Só os campos do bloco «Objeto da contratação» — sem Dados básicos, dados fixos ou tabela de itens. */
 function buildSlotsOverrideForGerarClausulas() {
-  const setor = String(objetoSetor.value || '').trim();
   const o = { dispensa_fluxo_ui: 'normal' };
-  if (setor) o.dfd_setor_requisitante = setor;
   return o;
 }
 
@@ -660,12 +658,7 @@ function buildSlotsOverride() {
   if (respNome) o.sol_oficio_responsavel_nome = respNome;
   if (tratNome) o.ao_senhor_genero = tratNome;
   if (tratCargo) o.senhor_senhora_genero = tratCargo;
-  const setorFormulario = String(objetoSetor.value || '').trim();
-  if (setorFormulario) {
-    o.dfd_setor_requisitante = setorFormulario;
-  } else {
-    applyDfdSetorRequisitanteToSlotsOverride(o, dadosFixos);
-  }
+  applyDfdSetorRequisitanteToSlotsOverride(o, dadosFixos);
   if (String(dadosFixos.fixoDemanda || '').trim()) o.dfd_responsavel_demanda = String(dadosFixos.fixoDemanda).trim();
   if (String(dadosFixos.fixoEmail || '').trim()) o.dfd_email = String(dadosFixos.fixoEmail).trim();
   if (String(dadosFixos.fixoGestor || '').trim()) o.dfd_gestor_contratos = String(dadosFixos.fixoGestor).trim();

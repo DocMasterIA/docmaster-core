@@ -1117,11 +1117,11 @@ def upsert_contract_items(
                 )
                 updated = int(cur.rowcount or 0) > 0
             if not updated:
-            c.execute(
-                """
-                INSERT INTO pncp_itens (
-                    numero_pncp, ano_compra, sequencial_compra, numero_item, descricao, material_servico,
-                    quantidade, unidade_medida, valor_unitario, valor_total, orgao, municipio, uf,
+                c.execute(
+                    """
+                    INSERT INTO pncp_itens (
+                        numero_pncp, ano_compra, sequencial_compra, numero_item, descricao, material_servico,
+                        quantidade, unidade_medida, valor_unitario, valor_total, orgao, municipio, uf,
                         modalidade_nome, data_publicacao, item_fingerprint, updated_at, raw_json_zlib,
                         situacao_item, situacao_compra, fornecedor_elegivel,
                         cnpj_fornecedor, fornecedor, fornecedor_fonte,
@@ -1129,22 +1129,22 @@ def upsert_contract_items(
                         valor_unitario_homologado, valor_total_homologado, quantidade_homologada,
                         resultado_resolvido_at, fornecedor_resolvido_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(numero_pncp, item_fingerprint) DO UPDATE SET
-                    ano_compra=excluded.ano_compra,
-                    sequencial_compra=excluded.sequencial_compra,
-                    numero_item=excluded.numero_item,
-                    descricao=excluded.descricao,
-                    material_servico=excluded.material_servico,
-                    quantidade=excluded.quantidade,
-                    unidade_medida=excluded.unidade_medida,
-                    valor_unitario=excluded.valor_unitario,
-                    valor_total=excluded.valor_total,
-                    orgao=excluded.orgao,
-                    municipio=excluded.municipio,
-                    uf=excluded.uf,
-                    modalidade_nome=excluded.modalidade_nome,
-                    data_publicacao=excluded.data_publicacao,
-                    updated_at=excluded.updated_at,
+                    ON CONFLICT(numero_pncp, item_fingerprint) DO UPDATE SET
+                        ano_compra=excluded.ano_compra,
+                        sequencial_compra=excluded.sequencial_compra,
+                        numero_item=excluded.numero_item,
+                        descricao=excluded.descricao,
+                        material_servico=excluded.material_servico,
+                        quantidade=excluded.quantidade,
+                        unidade_medida=excluded.unidade_medida,
+                        valor_unitario=excluded.valor_unitario,
+                        valor_total=excluded.valor_total,
+                        orgao=excluded.orgao,
+                        municipio=excluded.municipio,
+                        uf=excluded.uf,
+                        modalidade_nome=excluded.modalidade_nome,
+                        data_publicacao=excluded.data_publicacao,
+                        updated_at=excluded.updated_at,
                         raw_json_zlib=excluded.raw_json_zlib,
                         situacao_item=excluded.situacao_item,
                         situacao_compra=excluded.situacao_compra,
@@ -2472,34 +2472,34 @@ def _row_to_local_item(
     cleanup_for_display: bool,
     origem: str = "base_local_itens",
 ) -> Dict[str, Any]:
-        esfera_id, esfera_adm, poder_id = _extract_esfera_from_raw_blob(r["raw_json_zlib"])
-        if not esfera_id:
-            esfera_id, esfera_adm, poder_id = _extract_esfera_from_contract_raw_json(r["contrato_raw_json"])
-        entry: Dict[str, Any] = {
-            "numero_pncp": r["numero_pncp"],
-            "ano_compra": r["ano_compra"],
-            "sequencial_compra": r["sequencial_compra"],
-            "numero_item": r["numero_item"],
-            "descricao_item": r["descricao"],
-            "material_servico": r["material_servico"],
-            "quantidade": r["quantidade"],
-            "unidade_medida": r["unidade_medida"],
-            "valor_unitario": r["valor_unitario"],
-            "valor_total": r["valor_total"],
+    esfera_id, esfera_adm, poder_id = _extract_esfera_from_raw_blob(r["raw_json_zlib"])
+    if not esfera_id:
+        esfera_id, esfera_adm, poder_id = _extract_esfera_from_contract_raw_json(r["contrato_raw_json"])
+    entry: Dict[str, Any] = {
+        "numero_pncp": r["numero_pncp"],
+        "ano_compra": r["ano_compra"],
+        "sequencial_compra": r["sequencial_compra"],
+        "numero_item": r["numero_item"],
+        "descricao_item": r["descricao"],
+        "material_servico": r["material_servico"],
+        "quantidade": r["quantidade"],
+        "unidade_medida": r["unidade_medida"],
+        "valor_unitario": r["valor_unitario"],
+        "valor_total": r["valor_total"],
         "valor_unitario_estimado": _row_get(r, "valor_unitario_estimado"),
         "valor_total_estimado": _row_get(r, "valor_total_estimado"),
         "quantidade_estimada": _row_get(r, "quantidade_estimada"),
         "valor_unitario_homologado": _row_get(r, "valor_unitario_homologado"),
         "valor_total_homologado": _row_get(r, "valor_total_homologado"),
         "quantidade_homologada": _row_get(r, "quantidade_homologada"),
-            "orgao": r["orgao"],
-            "municipio": r["municipio"],
-            "uf": r["uf"],
-            "modalidade": r["modalidade_nome"],
-            "data_publicacao": r["data_publicacao"],
-            "esfera_id": esfera_id,
-            "esfera_administrativa": esfera_adm,
-            "poder_id": poder_id,
+        "orgao": r["orgao"],
+        "municipio": r["municipio"],
+        "uf": r["uf"],
+        "modalidade": r["modalidade_nome"],
+        "data_publicacao": r["data_publicacao"],
+        "esfera_id": esfera_id,
+        "esfera_administrativa": esfera_adm,
+        "poder_id": poder_id,
         "origem": origem,
     }
     situacao_compra = str(_row_get(r, "situacao_compra", "") or "").strip()
@@ -2514,8 +2514,8 @@ def _row_to_local_item(
         if sit_item:
             entry["situacaoCompraItemNome"] = sit_item
     entry.update(_supplier_fields_from_local_row(r))
-        if cleanup_for_display:
-            apply_item_display_cleanup(entry)
+    if cleanup_for_display:
+        apply_item_display_cleanup(entry)
     return entry
 
 

@@ -1635,6 +1635,7 @@ def _build_manual_parity_top3(
     *,
     faixa_min: Optional[float] = None,
     faixa_max: Optional[float] = None,
+    faixa_sentido: Optional[str] = None,
     target: int = 3,
 ) -> List[Dict[str, Any]]:
     """
@@ -1648,7 +1649,7 @@ def _build_manual_parity_top3(
         if _row_price_for_faixa(it) <= 0.0:
             continue
         if faixa_min is not None and faixa_max is not None:
-            if not _preco_dentro_faixa(it, faixa_min, faixa_max):
+            if not _preco_dentro_faixa(it, faixa_min, faixa_max, sentido=faixa_sentido):
                 continue
         tier = str(it.get("search_tier") or "").lower()
         lit = round(_literal_match_score(termo_busca, it), 3)
@@ -1686,6 +1687,7 @@ def _build_bulk_manual_recall_pool(
     termo_busca_raw: str,
     faixa_min: Optional[float],
     faixa_max: Optional[float],
+    faixa_sentido: Optional[str] = None,
     min_ok: int,
 ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
@@ -1700,7 +1702,7 @@ def _build_bulk_manual_recall_pool(
             skipped_sem_preco += 1
             continue
         if faixa_min is not None and faixa_max is not None:
-            if not _preco_dentro_faixa(it, faixa_min, faixa_max):
+            if not _preco_dentro_faixa(it, faixa_min, faixa_max, sentido=faixa_sentido):
                 skipped_faixa += 1
                 continue
         tier = str(it.get("search_tier") or "").lower()
@@ -1762,13 +1764,15 @@ async def _finalize_busca_lote_top3_response(
     """
     Autostart cotação: até 3 preços por item, escolhidos do mesmo pool da busca manual (faixa + índice).
     """
-    _set_faixa_sentido_ctx(ref_sentido if funil.get("faixa_ativa") else None)
+    faixa_sentido = ref_sentido if funil.get("faixa_ativa") else None
+    _set_faixa_sentido_ctx(faixa_sentido)
     candidate_pool, pool_funil = _build_bulk_manual_recall_pool(
         itens,
         termo_busca=termo_efetivo,
         termo_busca_raw=termo_busca_raw,
         faixa_min=faixa_min,
         faixa_max=faixa_max,
+        faixa_sentido=faixa_sentido,
         min_ok=min_ok,
     )
     funil.update(pool_funil)
@@ -1796,6 +1800,7 @@ async def _finalize_busca_lote_top3_response(
         termo_busca=termo_efetivo,
         faixa_min=faixa_min,
         faixa_max=faixa_max,
+        faixa_sentido=faixa_sentido,
     )
     funil["top3_final"] = len(top3)
     funil["modo_resposta"] = "busca_lote_top3_parity"
@@ -1891,6 +1896,7 @@ def _ensure_top3_from_pool(
     termo_busca: str = "",
     faixa_min: Optional[float] = None,
     faixa_max: Optional[float] = None,
+    faixa_sentido: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Garante até ``target`` preços distintos quando o pool tiver candidatos elegíveis.
@@ -1904,7 +1910,7 @@ def _ensure_top3_from_pool(
         if _row_price_for_faixa(it) <= 0.0:
             return False
         if faixa_min is not None and faixa_max is not None:
-            return _preco_dentro_faixa(it, faixa_min, faixa_max)
+            return _preco_dentro_faixa(it, faixa_min, faixa_max, sentido=faixa_sentido)
         return True
 
     def rank_key(it: Dict[str, Any]) -> tuple[float, float]:
@@ -1946,6 +1952,7 @@ def _enforce_faixa_no_top3(
     lo: float,
     hi: float,
     termo_busca: str,
+    faixa_sentido: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Substitui escolhas fora da faixa regional (valor base ± %) por candidatos dentro da faixa,
@@ -1953,7 +1960,7 @@ def _enforce_faixa_no_top3(
     """
     if not top3 or not pool:
         return top3
-    in_band = [dict(x) for x in pool if _preco_dentro_faixa(x, lo, hi)]
+    in_band = [dict(x) for x in pool if _preco_dentro_faixa(x, lo, hi, sentido=faixa_sentido)]
     in_band.sort(
         key=lambda it: (
             float(it.get("literal_match") or _literal_match_score(termo_busca, it)),
@@ -1965,7 +1972,7 @@ def _enforce_faixa_no_top3(
     out: List[Dict[str, Any]] = []
     for it in top3:
         row = dict(it)
-        if _preco_dentro_faixa(row, lo, hi):
+        if _preco_dentro_faixa(row, lo, hi, sentido=faixa_sentido):
             k = _ia_item_key(row) or f"id:{id(row)}"
             used.add(k)
             out.append(row)
@@ -2982,7 +2989,9 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         rerank_timeout = PNCP_IA_BULK_TIMEOUT_SECONDS if busca_lote else PNCP_IA_TIMEOUT_SECONDS
         pool_ia = list(pool_ia_source)
         if faixa_min is not None and faixa_max is not None:
-            in_band_ia = [x for x in pool_ia if _preco_dentro_faixa(x, faixa_min, faixa_max)]
+            in_band_ia = [
+                x for x in pool_ia if _preco_dentro_faixa(x, faixa_min, faixa_max, sentido=ref_sentido)
+            ]
             if len(in_band_ia) >= 3:
                 pool_ia = in_band_ia
         candidatos_ia: List[Dict[str, Any]] = []
@@ -3010,7 +3019,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
                 if not row:
                     continue
                 if faixa_min is not None and faixa_max is not None:
-                    if not _preco_dentro_faixa(row, faixa_min, faixa_max):
+                    if not _preco_dentro_faixa(row, faixa_min, faixa_max, sentido=ref_sentido):
                         continue
                 out = dict(row)
                 out.pop("_ia_id", None)
@@ -3059,6 +3068,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             )
 
     funil["top3_antes_completar"] = len(top3)
+    faixa_sentido_manual = ref_sentido if funil.get("faixa_ativa") else None
     top3 = _ensure_top3_from_pool(
         top3,
         scored,
@@ -3066,6 +3076,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         termo_busca=termo_efetivo,
         faixa_min=faixa_min,
         faixa_max=faixa_max,
+        faixa_sentido=faixa_sentido_manual,
     )
     if not top3 and itens:
         top3 = _build_manual_parity_top3(
@@ -3073,6 +3084,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             termo_efetivo,
             faixa_min=faixa_min,
             faixa_max=faixa_max,
+            faixa_sentido=faixa_sentido_manual,
         )
         funil["manual_parity_fallback"] = len(top3)
     elif len(top3) < 3 and itens:
@@ -3081,6 +3093,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             termo_efetivo,
             faixa_min=faixa_min,
             faixa_max=faixa_max,
+            faixa_sentido=faixa_sentido_manual,
             target=3,
         )
         top3 = _merge_unique_items(top3, extra)[:3]

@@ -1053,14 +1053,10 @@ function buildContextFromItem(it) {
   ) {
     variacaoRef = Number(variacaoPercentualGlobal.value);
   }
-  // Variação % e direção são globais da sessão; item.source não deve sobrepor o salvo em CotacaoDetalhe.
+  // Variação % e direção são globais da sessão; item.source não deve sobrepor CotacaoDetalhe.
   const sentidoRef = parseSentidoRef(
     it?.variacao_sentido_global,
     variacaoSentidoGlobal.value,
-    src?.variacao_sentido,
-    src?.variacaoSentido,
-    faixa?.variacao_sentido,
-    faixa?.sentido,
   ) || 'ambos';
   const faixaCalc = (
     valorBaseRef != null

@@ -67,7 +67,41 @@ class MarketSearchFaixaIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(r["filtros"]["variacao_sentido_referencia"], "baixo")
         for it in r.get("itens") or []:
             p = _row_price_for_faixa(it)
-            self.assertTrue(_preco_dentro_faixa(it, lo, hi), f"R$ {p} fora de [{lo}, {hi}]")
+            self.assertTrue(
+                _preco_dentro_faixa(it, lo, hi, sentido="baixo"),
+                f"R$ {p} fora de [{lo}, {hi}] com sentido baixo",
+            )
+
+    def test_bulk_recall_pool_respeita_sentido_cima(self):
+        from app.service import _build_bulk_manual_recall_pool
+
+        base = 100.0
+        lo, hi = compute_faixa_regional(base, 20.0, sentido="cima")
+        itens = [
+            {
+                "valor_unitario": 90.0,
+                "valor_unitario_estimado": 115.0,
+                "descricao_item": "abaixo base mas estimado na faixa",
+                "search_tier": "strict",
+            },
+            {
+                "valor_unitario": 110.0,
+                "descricao_item": "dentro faixa cima",
+                "search_tier": "strict",
+            },
+        ]
+        pool, funil = _build_bulk_manual_recall_pool(
+            itens,
+            termo_busca="teste",
+            termo_busca_raw="teste",
+            faixa_min=lo,
+            faixa_max=hi,
+            faixa_sentido="cima",
+            min_ok=70,
+        )
+        self.assertEqual(funil["eliminados_faixa_preco_recall"], 1)
+        self.assertEqual(len(pool), 1)
+        self.assertAlmostEqual(_row_price_for_faixa(pool[0]), 110.0)
 
     async def test_faixa_estreita_nao_relaxa(self):
         payload = MarketSearchRequest(

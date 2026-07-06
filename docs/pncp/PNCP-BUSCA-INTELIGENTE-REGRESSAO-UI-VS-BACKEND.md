@@ -2,6 +2,8 @@
 
 Documento para retomar depois. Consolida investigação, **baseline confirmado**, janela da regressão e comandos de rollback na VPS.
 
+> **Handoff operacional completo (jul/2026):** deploy VPS, performance do lote, flags enrich, item lento no autostart → [PNCP-PERFIL-OPERACIONAL-JUL2026.md](./PNCP-PERFIL-OPERACIONAL-JUL2026.md)
+
 ---
 
 ## Conclusão confirmada (jul/2026)
@@ -16,7 +18,9 @@ Documento para retomar depois. Consolida investigação, **baseline confirmado**
 
 **Baseline bom para operar/testar:** `94711975a10591bfdefc6ff11640bdf5b406c923`
 
-**HEAD atual (main):** `e5648bc9` (2026-07-03) — contém regressão de busca em relação a `94711975`.
+**HEAD histórico da investigação:** `e5648bc9` (2026-07-03) — continha regressão em relação a `94711975`.
+
+**Correção aplicada em main:** `e0427a0b` + `c83af16c` (jul/2026) — ver [PNCP-PERFIL-OPERACIONAL-JUL2026.md](./PNCP-PERFIL-OPERACIONAL-JUL2026.md).
 
 ---
 

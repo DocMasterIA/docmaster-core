@@ -169,19 +169,30 @@ class PricingDisplayTests(unittest.TestCase):
         self.assertTrue(item_matches_faixa_band(it_ok, lo, hi, sentido="cima"))
 
     def test_cima_rejeita_apos_enrich_homolog_abaixo_base(self):
-        """Catálogo na faixa, homologado real abaixo do base — deve falhar após enrich."""
+        """Homologado abaixo do base com sentido cima — rejeitado."""
         from app.pricing_faixa import compute_faixa_regional
 
         base = 19.16
         lo, hi = compute_faixa_regional(base, 20.0, sentido="cima")
-        pre = {"valor_unitario": 20.0, "item_homologado": True}
-        self.assertTrue(item_matches_faixa_band(pre, lo, hi, sentido="cima"))
         pos = {
             "valor_unitario_homologado": 17.59,
             "valor_unitario": 17.59,
             "item_homologado": True,
         }
         self.assertFalse(item_matches_faixa_band(pos, lo, hi, sentido="cima"))
+
+    def test_cima_rejeita_homologado_sem_preco_com_catalogo_na_faixa(self):
+        """Homologado sem preço vencedor: não usar catálogo inflado no gate cima."""
+        from app.pricing_display import row_unit_price_for_faixa_gate
+        from app.pricing_faixa import compute_faixa_regional
+
+        base = 19.0
+        lo, hi = compute_faixa_regional(base, 50.0, sentido="cima")
+        it = {"valor_unitario": 22.0, "item_homologado": True}
+        self.assertEqual(row_unit_price_for_faixa_gate(it, sentido="cima"), 0.0)
+        self.assertFalse(item_matches_faixa_band(it, lo, hi, sentido="cima"))
+        it_ok = {"valor_unitario_homologado": 21.0, "valor_unitario": 21.0, "item_homologado": True}
+        self.assertTrue(item_matches_faixa_band(it_ok, lo, hi, sentido="cima"))
 
 
 if __name__ == "__main__":

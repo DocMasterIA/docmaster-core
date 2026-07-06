@@ -1139,12 +1139,12 @@ async function runSearchWithContext({
     const valorBaseCtx = context?.valor_base_referencia ?? null;
     const variacaoCtx = context?.variacao_percentual_referencia ?? null;
     const sentidoCtx = context?.variacao_sentido_referencia ?? 'ambos';
-    const faixaMinCtx = context?.valor_min_referencia;
-    const faixaMaxCtx = context?.valor_max_referencia;
-    const faixaAtiva = faixaMinCtx != null
-      && faixaMaxCtx != null
-      && Number.isFinite(Number(faixaMinCtx))
-      && Number.isFinite(Number(faixaMaxCtx));
+    const faixaAtiva = valorBaseCtx != null
+      && Number.isFinite(Number(valorBaseCtx))
+      && Number(valorBaseCtx) > 0
+      && variacaoCtx != null
+      && Number.isFinite(Number(variacaoCtx))
+      && Number(variacaoCtx) >= 0;
 
     const globalVariacaoDefinida = Number.isFinite(Number(variacaoPercentualGlobal.value))
       && Number(variacaoPercentualGlobal.value) >= 0;

@@ -79,6 +79,7 @@ from .search_text_clean import apply_item_display_cleanup, normalize_for_search,
 from .pricing_display import (
     filter_items_for_search_display,
     item_matches_faixa_band,
+    item_needs_homolog_pricing_lookup,
     row_display_unit_price,
 )
 from .pricing_faixa import (
@@ -1680,6 +1681,23 @@ def _bulk_recall_enrich_cap(pool_len: int) -> int:
     return min(pool_len, max(0, cap))
 
 
+async def _enrich_homolog_for_directional_faixa(
+    rows: List[Dict[str, Any]],
+    *,
+    sentido: Optional[str],
+    max_n: int,
+) -> int:
+    """Busca preço vencedor antes do gate cima/baixo (catálogo ≠ homologado)."""
+    if max_n <= 0 or not rows:
+        return 0
+    if normalize_variacao_sentido(sentido) == "ambos":
+        return 0
+    pool = [x for x in rows if item_needs_homolog_pricing_lookup(x)]
+    if not pool:
+        return 0
+    return await enrich_homolog_items_from_pncp(pool, max_n=min(max_n, len(pool)))
+
+
 def _build_bulk_manual_recall_pool(
     itens: List[Dict[str, Any]],
     *,
@@ -1766,6 +1784,16 @@ async def _finalize_busca_lote_top3_response(
     """
     faixa_sentido = ref_sentido if funil.get("faixa_ativa") else None
     _set_faixa_sentido_ctx(faixa_sentido)
+
+    pre_enrich_n = 0
+    if faixa_sentido and faixa_min is not None and faixa_max is not None:
+        pre_cap = _bulk_recall_enrich_cap(len(itens))
+        if pre_cap:
+            pre_enrich_n = await _enrich_homolog_for_directional_faixa(
+                itens, sentido=faixa_sentido, max_n=pre_cap
+            )
+    funil["pre_enrich_direcional"] = pre_enrich_n
+
     candidate_pool, pool_funil = _build_bulk_manual_recall_pool(
         itens,
         termo_busca=termo_efetivo,
@@ -1784,7 +1812,7 @@ async def _finalize_busca_lote_top3_response(
     if candidate_pool and enrich_cap:
         enrich_n = await enrich_homolog_items_from_pncp(candidate_pool, max_n=enrich_cap)
 
-    if faixa_min is not None and faixa_max is not None and faixa_sentido:
+    if faixa_min is not None and faixa_max is not None:
         antes = len(candidate_pool)
         candidate_pool = _filter_rows_in_faixa(
             candidate_pool, faixa_min, faixa_max, sentido=faixa_sentido
@@ -1809,6 +1837,8 @@ async def _finalize_busca_lote_top3_response(
         faixa_max=faixa_max,
         faixa_sentido=faixa_sentido,
     )
+    if faixa_min is not None and faixa_max is not None and top3:
+        top3 = _filter_rows_in_faixa(top3, faixa_min, faixa_max, sentido=faixa_sentido)
     funil["top3_final"] = len(top3)
     funil["modo_resposta"] = "busca_lote_top3_parity"
 
@@ -2661,6 +2691,15 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             hybrid_live_count=hybrid_live_count,
             min_ok=min_ok,
         )
+
+    pre_enrich_manual = 0
+    if funil.get("faixa_ativa") and faixa_min is not None and ref_sentido in ("cima", "baixo"):
+        pre_enrich_manual = await _enrich_homolog_for_directional_faixa(
+            itens,
+            sentido=ref_sentido,
+            max_n=max(0, int(PNCP_SEARCH_ENRICH_HOMOLOG_MAX)),
+        )
+        funil["pre_enrich_direcional"] = pre_enrich_manual
 
     def _score_candidates(candidates: List[Dict[str, Any]], *, mode: str) -> List[Dict[str, Any]]:
         out_rows: List[Dict[str, Any]] = []

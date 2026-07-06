@@ -83,6 +83,26 @@ def merge_homologated_pricing_from_snap(it: Dict[str, Any], snap: Dict[str, Any]
     return changed
 
 
+def row_unit_price_for_faixa_gate(
+    it: Dict[str, Any],
+    *,
+    sentido: Optional[str] = None,
+) -> float:
+    """
+    Preço para gate de faixa.
+
+  - ``cima`` / ``baixo``: homologado sem preço vencedor não usa catálogo/estimado
+    (evita passar com valor inflado antes do enrich PNCP).
+    """
+    sent = normalize_variacao_sentido(sentido) if sentido is not None else "ambos"
+    hom = _optional_positive(it.get("valor_unitario_homologado"))
+    if hom is not None:
+        return hom
+    if sent != "ambos" and it.get("item_homologado"):
+        return 0.0
+    return row_display_unit_price(it)
+
+
 def item_matches_faixa_band(
     it: Dict[str, Any],
     lo: float,
@@ -96,7 +116,7 @@ def item_matches_faixa_band(
     - ``ambos`` (±): aceita se homologado **ou** estimado estiver na banda (recall).
     - ``cima`` / ``baixo``: usa só o preço canônico de exibição — direção respeitada.
     """
-    p = row_display_unit_price(it)
+    p = row_unit_price_for_faixa_gate(it, sentido=sentido)
     if p > 0.0 and lo <= p <= hi:
         return True
     # Recall homologado/estimado só com sentido explícito «ambos» (±).

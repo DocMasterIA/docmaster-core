@@ -1784,6 +1784,13 @@ async def _finalize_busca_lote_top3_response(
     if candidate_pool and enrich_cap:
         enrich_n = await enrich_homolog_items_from_pncp(candidate_pool, max_n=enrich_cap)
 
+    if faixa_min is not None and faixa_max is not None and faixa_sentido:
+        antes = len(candidate_pool)
+        candidate_pool = _filter_rows_in_faixa(
+            candidate_pool, faixa_min, faixa_max, sentido=faixa_sentido
+        )
+        funil["eliminados_faixa_pos_enrich"] = antes - len(candidate_pool)
+
     for row in candidate_pool:
         apply_item_display_cleanup(row)
 
@@ -1886,6 +1893,18 @@ def _preco_dentro_faixa(
 ) -> bool:
     eff = sentido if sentido is not None else _faixa_sentido_ctx.get()
     return item_matches_faixa_band(it, lo, hi, sentido=eff)
+
+
+def _filter_rows_in_faixa(
+    rows: List[Dict[str, Any]],
+    lo: Optional[float],
+    hi: Optional[float],
+    *,
+    sentido: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    if lo is None or hi is None or not rows:
+        return rows
+    return [x for x in rows if _preco_dentro_faixa(x, lo, hi, sentido=sentido)]
 
 
 def _ensure_top3_from_pool(
@@ -3099,8 +3118,6 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         top3 = _merge_unique_items(top3, extra)[:3]
         if extra:
             funil["manual_parity_topup"] = len(extra)
-    if faixa_min is not None and faixa_max is not None and top3:
-        top3 = [x for x in top3 if _preco_dentro_faixa(x, faixa_min, faixa_max, sentido=ref_sentido)]
     funil["top3_final"] = len(top3)
     if len(top3) < 3 and funil.get("scored_final_pool", 0) >= 3:
         funil["provavel_gargalo_top3"] = "selecao_top3_incompleta"
@@ -3123,6 +3140,13 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
 
     for row in top3:
         apply_item_display_cleanup(row)
+
+    if faixa_min is not None and faixa_max is not None and top3:
+        antes_faixa = len(top3)
+        top3 = _filter_rows_in_faixa(top3, faixa_min, faixa_max, sentido=ref_sentido)
+        if antes_faixa > len(top3):
+            funil["eliminados_faixa_pos_enrich"] = antes_faixa - len(top3)
+        funil["top3_final"] = len(top3)
 
     top3 = filter_items_for_search_display(top3)
     funil["top3_antes_filtro_fornecedor"] = top3_antes_filtro_fornecedor

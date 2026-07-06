@@ -5,7 +5,7 @@ import unittest
 
 from app.pricing_faixa import compute_faixa_regional, normalize_variacao_sentido
 from app.schemas import MarketSearchRequest
-from app.service import _build_manual_parity_top3, _preco_dentro_faixa, _row_price_for_faixa, market_search_intelligent
+from app.service import _build_manual_parity_top3, _filter_rows_in_faixa, _preco_dentro_faixa, _row_price_for_faixa, market_search_intelligent
 
 
 class PricingFaixaTests(unittest.TestCase):
@@ -102,6 +102,25 @@ class MarketSearchFaixaIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(funil["eliminados_faixa_preco_recall"], 1)
         self.assertEqual(len(pool), 1)
         self.assertAlmostEqual(_row_price_for_faixa(pool[0]), 110.0)
+
+    def test_filter_rows_in_faixa_pos_enrich_cima(self):
+        base = 19.16
+        lo, hi = compute_faixa_regional(base, 20.0, sentido="cima")
+        rows = [
+            {
+                "valor_unitario_homologado": 17.59,
+                "valor_unitario": 17.59,
+                "descricao_item": "homolog abaixo base",
+            },
+            {
+                "valor_unitario_homologado": 20.50,
+                "valor_unitario": 20.50,
+                "descricao_item": "dentro faixa",
+            },
+        ]
+        out = _filter_rows_in_faixa(rows, lo, hi, sentido="cima")
+        self.assertEqual(len(out), 1)
+        self.assertAlmostEqual(_row_price_for_faixa(out[0]), 20.50)
 
     async def test_faixa_estreita_nao_relaxa(self):
         payload = MarketSearchRequest(

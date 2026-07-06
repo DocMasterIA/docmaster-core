@@ -12,6 +12,7 @@ Documentação do módulo **Pesquisador PNCP** (`pncp_researcher_service`), inge
 | [PNCP-CONTEXTO-IA.md](./PNCP-CONTEXTO-IA.md) | Contexto IA (ingest + fornecedor + ops) |
 | [PESQUISADOR_PNCP_FUNCIONAMENTO_ATUAL.md](./PESQUISADOR_PNCP_FUNCIONAMENTO_ATUAL.md) | Funcionamento atual da busca/cotação |
 | [PNCP-NOTAS-PENDENCIAS.md](./PNCP-NOTAS-PENDENCIAS.md) | Pendências conhecidas |
+| [PNCP-BUSCA-INTELIGENTE-REGRESSAO-UI-VS-BACKEND.md](./PNCP-BUSCA-INTELIGENTE-REGRESSAO-UI-VS-BACKEND.md) | Regressão UI vs backend (handoff jul/2026) |
 
 ---
 

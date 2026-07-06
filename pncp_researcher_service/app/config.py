@@ -366,8 +366,9 @@ PNCP_BULK_SEARCH_MAX_SECONDS: float = float(os.getenv("PNCP_BULK_SEARCH_MAX_SECO
 PNCP_BULK_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_BULK_ENRICH_HOMOLOG_MAX", 3)
 # Enrich síncrono por tentativa de termo em busca_lote (menor que PNCP_SEARCH_ENRICH_HOMOLOG_MAX).
 PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX", 6)
-# Lote: usa o mesmo pipeline de scoring/top3 que busca_lote=false (paridade ?itemId=).
-PNCP_BULK_USE_INTELLIGENT_PIPELINE: bool = _env_bool("PNCP_BULK_USE_INTELLIGENT_PIPELINE", True)
+# Lote: por padrão mantém o fluxo legado estável; habilite via env para testar
+# a paridade com busca por item isolado.
+PNCP_BULK_USE_INTELLIGENT_PIPELINE: bool = _env_bool("PNCP_BULK_USE_INTELLIGENT_PIPELINE", False)
 # SQL cap quando PNCP_BULK_USE_INTELLIGENT_PIPELINE=1 (recall maior que legado 200).
 PNCP_BULK_INTELLIGENT_SQL_LIMIT: int = _env_int("PNCP_BULK_INTELLIGENT_SQL_LIMIT", 2000)
 # Máximo de termos alternativos por item no lote inteligente (evita N× SQL em edital longo).

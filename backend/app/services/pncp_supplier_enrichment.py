@@ -298,15 +298,15 @@ def _walk_supplier_candidates(obj: Any, *, path: str = "", acc: Optional[List[Di
             raw_v = str(v or "").strip()
             vv = coerce_supplier_name_text(v)
             if vv and any(x in kk for x in name_keys) and len(vv) > 2:
-                    nome = vv
+                nome = vv
             if raw_v and any(x in kk for x in cnpj_keys):
                 m = _CNPJ_RE.search(raw_v)
-                    if m:
-                        cnpj = m.group()
-                    else:
+                if m:
+                    cnpj = m.group()
+                else:
                     d = re.sub(r"\D", "", raw_v)
-                        if len(d) == 14:
-                            cnpj = d
+                    if len(d) == 14:
+                        cnpj = d
         if nome or cnpj:
             acc.append({"path": path, "fornecedor": nome, "cnpj": cnpj})
         for k, v in obj.items():
@@ -474,22 +474,22 @@ def _fornecedor_display_name_from_source(src: Dict[str, Any]) -> str:
                     continue
                 return v
         for k in (
-        "fornecedor",
-        "fornecedor_nome",
-        "nome_fornecedor",
-        "nomeRazaoSocialFornecedor",
-        "razaoSocialFornecedor",
-        "razao_social",
+            "fornecedor",
+            "fornecedor_nome",
+            "nome_fornecedor",
+            "nomeRazaoSocialFornecedor",
+            "razaoSocialFornecedor",
+            "razao_social",
         ):
             v = coerce_supplier_name_text(layer.get(k))
-        if not v:
-            continue
-        low = re.sub(r"\s+", " ", v).strip().lower()
+            if not v:
+                continue
+            low = re.sub(r"\s+", " ", v).strip().lower()
             if low in generic or low.startswith("pncp_"):
-            continue
-        if _nome_e_somente_cnpj_formatado(v):
-            continue
-        return v
+                continue
+            if _nome_e_somente_cnpj_formatado(v):
+                continue
+            return v
     return ""
 
 
@@ -1381,8 +1381,8 @@ def get_contract_supplier_snapshot_sync(
             if snap.get("cnpj_fornecedor") or snap.get("fornecedor"):
                 return _finalize_supplier_snapshot_sync(snap)
 
-    data = _get_json(f"{base}/resultados")
-    if data is not None:
+        data = _get_json(f"{base}/resultados")
+        if data is not None:
             homolog_acc.update(_homolog_pricing_from_resultados(data, numero_item=n_item))
             snap = _supplier_snap_from_resultados_payload(
                 data, numero_item=n_item, situacao_compra=sit
@@ -1833,11 +1833,11 @@ def enrich_supplier_fields_in_payloads(
 
         _ensure_pncp_compra_keys(it)
         has_cnpj = bool(str(it.get("cnpj_fornecedor") or "").strip())
-                if not has_cnpj:
+        if not has_cnpj:
             display = _fornecedor_display_name_from_source(it)
             if _nome_e_somente_cnpj_formatado(display):
                 fmt = _normalize_cnpj(_cnpj_digits(display))
-                    if fmt:
+                if fmt:
                     it["cnpj_fornecedor"] = fmt
 
         np = str(it.get("numero_pncp") or it.get("numeroControlePNCP") or "").strip()

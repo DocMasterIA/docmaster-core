@@ -317,7 +317,7 @@ class BulkSearchSupplierFilterTests(unittest.IsolatedAsyncioTestCase):
             await market_search_intelligent(payload)
         self.assertTrue(enrich_mock.called)
         cap = enrich_mock.call_args.kwargs.get("max_n")
-        expected_cap = min(len(pool), max(int(PNCP_SEARCH_ENRICH_HOMOLOG_MAX), int(PNCP_BULK_ENRICH_HOMOLOG_MAX)))
+        expected_cap = min(len(pool), int(PNCP_BULK_ENRICH_HOMOLOG_MAX))
         self.assertLessEqual(cap, expected_cap)
         self.assertGreaterEqual(cap, 1)
 

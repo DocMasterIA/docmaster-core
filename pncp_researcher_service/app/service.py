@@ -1672,10 +1672,10 @@ def _build_manual_parity_top3(
 
 
 def _bulk_recall_enrich_cap(pool_len: int) -> int:
-    """Teto de enrich PNCP em busca_lote (recall manual): prioriza cobertura de CNPJ."""
+    """Teto de enrich PNCP em busca_lote — só PNCP_BULK_ENRICH (não herda 16 da busca manual)."""
     if pool_len <= 0:
         return 0
-    cap = max(int(PNCP_SEARCH_ENRICH_HOMOLOG_MAX), int(PNCP_BULK_ENRICH_HOMOLOG_MAX))
+    cap = int(PNCP_BULK_ENRICH_HOMOLOG_MAX)
     return min(pool_len, max(0, cap))
 
 

@@ -1262,7 +1262,8 @@ async function runSearchWithContext({
       backendItensTotal += n;
     } else {
       const ufItem = context?.uf_padrao ? String(context.uf_padrao).trim().toUpperCase() : null;
-      const ufsToRun = ufItem ? [ufItem] : [null];
+      // Lote autostart: 1 chamada nacional (evita UF vazio + retry BR ≈ 2×90s por item).
+      const ufsToRun = bulkMode ? [null] : (ufItem ? [ufItem] : [null]);
       for (const ufCode of ufsToRun) {
         const n = await runGeoSearch(
           {
@@ -1278,7 +1279,7 @@ async function runSearchWithContext({
         backendItensTotal += n;
       }
       // Item com UF mas sem match local: ampliar para nacional (comum em cotações hospitalares).
-      if (aggregated.length === 0 && ufItem) {
+      if (!bulkMode && aggregated.length === 0 && ufItem) {
         const n = await runGeoSearch(
           {
             ...basePayload,

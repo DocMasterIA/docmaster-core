@@ -365,7 +365,7 @@ PNCP_BULK_SEARCH_MAX_SECONDS: float = float(os.getenv("PNCP_BULK_SEARCH_MAX_SECO
 # Enrich PNCP ao vivo no top3 em lote (homologados sem CNPJ antes do filtro de fornecedor).
 PNCP_BULK_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_BULK_ENRICH_HOMOLOG_MAX", 3)
 # Enrich síncrono por tentativa de termo em busca_lote (menor que PNCP_SEARCH_ENRICH_HOMOLOG_MAX).
-PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX", 6)
+PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX: int = _env_int("PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX", 0)
 # Lote: por padrão mantém o fluxo legado estável; habilite via env para testar
 # a paridade com busca por item isolado.
 PNCP_BULK_USE_INTELLIGENT_PIPELINE: bool = _env_bool("PNCP_BULK_USE_INTELLIGENT_PIPELINE", False)

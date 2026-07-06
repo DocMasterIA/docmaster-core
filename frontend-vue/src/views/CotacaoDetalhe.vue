@@ -685,7 +685,7 @@ const manualItem = ref({
   unidade_medida: '',
   valor_base: '',
 });
-const variacaoGlobalPercentual = ref('20');
+const variacaoGlobalPercentual = ref('0');
 const variacaoGlobalSentido = ref('ambos');
 const isSavingVariacaoGlobal = ref(false);
 /** Rascunho local do campo moeda por item_id (valor base da faixa). */
@@ -1270,7 +1270,7 @@ async function loadSessionFromBackend() {
       const variacaoGlobal = Number(filtrosSessao.variacao_percentual_global);
       variacaoGlobalPercentual.value = Number.isFinite(variacaoGlobal) && variacaoGlobal >= 0
         ? String(Math.round(variacaoGlobal))
-        : '20';
+        : '0';
       const sentidoRaw = String(filtrosSessao.variacao_sentido_global || '').trim().toLowerCase();
       variacaoGlobalSentido.value = ['cima', 'baixo', 'ambos'].includes(sentidoRaw) ? sentidoRaw : 'ambos';
     }
@@ -1353,7 +1353,7 @@ async function loadSessionFromBackend() {
     totalItensSessao.value = 0;
     formulaCalculoId.value = 'media_aritmetica_precos_obtidos';
     formulaCalculoLabel.value = 'Média aritmética dos preços obtidos';
-    variacaoGlobalPercentual.value = '20';
+    variacaoGlobalPercentual.value = '0';
     variacaoGlobalSentido.value = 'ambos';
   } finally {
     isLoading.value = false;

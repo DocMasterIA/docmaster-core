@@ -30,6 +30,7 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn gevent
 
 # Código da aplicação
 COPY backend/ backend/
+COPY template_packages/ template_packages/
 COPY manage.py .
 
 # Coleta dos arquivos estáticos (admin, unfold, app) para produção

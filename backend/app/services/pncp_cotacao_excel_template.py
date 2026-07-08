@@ -37,21 +37,32 @@ SLOT_ALIASES: Dict[str, str] = {
 _SLOT_PATTERN = re.compile(r"\{([^{}]+)\}")
 
 
+def _resolve_repo_roots() -> List[Path]:
+    base = Path(getattr(settings, "BASE_DIR", Path(__file__).resolve().parents[2]))
+    roots: List[Path] = []
+    for candidate in (base, base.parent, Path("/app")):
+        if candidate not in roots:
+            roots.append(candidate)
+    return roots
+
+
 def default_cotacao_excel_template_path() -> Path:
     env = (getattr(settings, "PNCP_COTACAO_EXCEL_TEMPLATE", None) or "").strip()
     if env:
         return Path(env)
-    base = Path(getattr(settings, "BASE_DIR", Path(__file__).resolve().parents[2]))
-    for name in (
-        "cotacao_pesquisa_precos.xlsm",
-        "cotacao_pesquisa_precos.xlsx",
-        "cotacao_export.xlsm",
-        "cotacao_export.xlsx",
-    ):
-        candidate = base / "template_packages" / "pncp" / name
-        if candidate.is_file():
-            return candidate
-    return base / "template_packages" / "pncp" / "cotacao_pesquisa_precos.xlsm"
+
+    relative_paths = (
+        "template_packages/excell_base/relatorio_saida_excell.xlsx",
+        "template_packages/pncp/cotacao_pesquisa_precos.xlsm",
+        "template_packages/pncp/cotacao_pesquisa_precos.xlsx",
+    )
+    for rel in relative_paths:
+        for root in _resolve_repo_roots():
+            candidate = root / rel
+            if candidate.is_file():
+                return candidate
+
+    return _resolve_repo_roots()[0] / relative_paths[0]
 
 
 def _canonical_slot(raw: str) -> str:
@@ -110,19 +121,20 @@ def build_global_slot_context(
     prefeitura_estado = texto_orgao_capa_prefeitura_cotacao(cotacao, usuario)
     if not prefeitura_estado:
         prefeitura_estado = "—"
+    prefeitura_estado_fmt = prefeitura_estado.upper()
 
-    prefeitura_e_data = prefeitura_estado
+    prefeitura_e_data = prefeitura_estado_fmt
     data_pesquisa_txt = _format_date_br(data_pesquisa)
     if data_pesquisa_txt:
-        prefeitura_e_data = f"{prefeitura_estado}, {data_pesquisa_txt}"
+        prefeitura_e_data = f"{prefeitura_estado_fmt}, {data_pesquisa_txt}"
 
     total = somar_valor_total_estimado_itens(itens, refletidos)
-    valor_extenso = valor_monetario_por_extenso(total) if total is not None else ""
+    valor_extenso = valor_monetario_por_extenso(total).upper() if total is not None else ""
 
     return {
         "DATA_HORARIO_GERACAO": _format_dt_br(agora),
         "PREFEITURA_E_DATA": prefeitura_e_data,
-        "PREFEITURA_ESTADO": prefeitura_estado,
+        "PREFEITURA_ESTADO": prefeitura_estado_fmt,
         "RESPONSAVEL_PESQUISA_PREÇOS": _responsavel_pesquisa(cotacao),
         "VALOR_EXTENSO": valor_extenso,
     }

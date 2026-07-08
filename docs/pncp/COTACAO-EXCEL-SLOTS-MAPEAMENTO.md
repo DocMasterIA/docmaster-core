@@ -18,15 +18,31 @@ O modelo pode ser `.xlsm`, mas o arquivo gerado é **sempre `.xlsx`** (sem macro
 Caminho padrão (primeiro que existir):
 
 ```
-backend/template_packages/pncp/cotacao_pesquisa_precos.xlsm
-backend/template_packages/pncp/cotacao_pesquisa_precos.xlsx
+template_packages/excell_base/relatorio_saida_excell.xlsx   ← modelo oficial (Mapa de Apuração)
+template_packages/pncp/cotacao_pesquisa_precos.xlsx         ← fallback dev
 ```
+
+No container Docker: `/app/template_packages/excell_base/relatorio_saida_excell.xlsx`
 
 Override por variável de ambiente / settings:
 
 ```
-PNCP_COTACAO_EXCEL_TEMPLATE=/caminho/absoluto/modelo.xlsm
+PNCP_COTACAO_EXCEL_TEMPLATE=/caminho/absoluto/modelo.xlsx
 ```
+
+## Mapa de células no modelo oficial
+
+| Célula | Slot |
+|--------|------|
+| `B2` | `{PREFEITURA_ESTADO}` |
+| `A9` | `Relatório gerado em {DATA_HORARIO_GERACAO}` |
+| `A15` | `{ID_ITEM}` |
+| `B15` | `{NOME_ITEM}` |
+| `B21` | `{VALOR_EXTENSO}` |
+| `A23` | `{PREFEITURA_E_DATA}` |
+| `A26` | `{RESPONSAVEL_PESQUISA_PREÇOS}` |
+
+Linha 15 é replicada para cada item da cotação. Colunas de cestas de preço (E em diante) ficam para integração futura.
 
 ## Slots globais (uma vez na planilha)
 

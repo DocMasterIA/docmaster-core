@@ -2,7 +2,20 @@
 
 Documento para retomar depois. Consolida investigação, **baseline confirmado**, janela da regressão e comandos de rollback na VPS.
 
-> **Handoff operacional completo (jul/2026):** deploy VPS, performance do lote, flags enrich, item lento no autostart → [PNCP-PERFIL-OPERACIONAL-JUL2026.md](./PNCP-PERFIL-OPERACIONAL-JUL2026.md)
+> **Handoff operacional completo (jul/2026):** deploy VPS, performance do lote, flags enrich, faixa direcional → [PNCP-PERFIL-OPERACIONAL-JUL2026.md](./PNCP-PERFIL-OPERACIONAL-JUL2026.md)  
+> **Faixa `cima`/`baixo` (validado):** [PNCP-FAIXA-DIRECIONAL-JUL2026.md](./PNCP-FAIXA-DIRECIONAL-JUL2026.md)
+
+---
+
+## Estado final (jul/2026 — validado em produção)
+
+| Item | Status |
+|------|--------|
+| Qualidade busca (Penrose, Acebrofilina) | OK em `e0427a0b`+ |
+| Performance autostart 696 itens | OK com flags `c83af16c` |
+| Faixa direcional `cima` / `baixo` | OK em `c3c1aa86`+ |
+| Variação global UI default 0% | OK em `ad4dced9`+ |
+| **HEAD recomendado** | `c3c1aa86` ou posterior |
 
 ---
 
@@ -20,7 +33,7 @@ Documento para retomar depois. Consolida investigação, **baseline confirmado**
 
 **HEAD histórico da investigação:** `e5648bc9` (2026-07-03) — continha regressão em relação a `94711975`.
 
-**Correção aplicada em main:** `e0427a0b` + `c83af16c` (jul/2026) — ver [PNCP-PERFIL-OPERACIONAL-JUL2026.md](./PNCP-PERFIL-OPERACIONAL-JUL2026.md).
+**Correção aplicada em main:** `e0427a0b` → `c83af16c` → `b41e7a94` → `26e33b3f` → `c3c1aa86` — ver [PNCP-PERFIL-OPERACIONAL-JUL2026.md](./PNCP-PERFIL-OPERACIONAL-JUL2026.md).
 
 ---
 

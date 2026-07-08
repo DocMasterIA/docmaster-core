@@ -336,6 +336,26 @@ export async function uploadSupplierPdfToResearchSession(sessaoId, files, signal
   return payload;
 }
 
+export async function downloadResearchSessionExcel(sessaoId, signal) {
+  const res = await fetch(
+    `${API_BASE}/api/pncp/cotacoes/research/sessions/${encodeURIComponent(sessaoId)}/export/xlsx`,
+    {
+      method: 'GET',
+      credentials: 'include',
+      signal,
+    },
+  );
+  const ctype = (res.headers.get('content-type') || '').toLowerCase();
+  if (!res.ok) {
+    const payload = ctype.includes('application/json') ? await res.json() : await res.text();
+    throw new Error(extractErrorMessage(payload, res.status));
+  }
+  const blob = await res.blob();
+  const cd = res.headers.get('content-disposition') || '';
+  const filename = parseFilenameFromContentDisposition(cd) || '';
+  return { blob, filename };
+}
+
 export function searchLocalItems(payload, signal) {
   return researchRequest('local-index/search-items', { method: 'POST', body: payload, signal });
 }

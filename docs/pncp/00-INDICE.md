@@ -12,8 +12,9 @@ Documentação do módulo **Pesquisador PNCP** (`pncp_researcher_service`), inge
 | [PNCP-CONTEXTO-IA.md](./PNCP-CONTEXTO-IA.md) | Contexto IA (ingest + fornecedor + ops) |
 | [PESQUISADOR_PNCP_FUNCIONAMENTO_ATUAL.md](./PESQUISADOR_PNCP_FUNCIONAMENTO_ATUAL.md) | Funcionamento atual da busca/cotação |
 | [PNCP-NOTAS-PENDENCIAS.md](./PNCP-NOTAS-PENDENCIAS.md) | Pendências conhecidas |
-| [PNCP-BUSCA-INTELIGENTE-REGRESSAO-UI-VS-BACKEND.md](./PNCP-BUSCA-INTELIGENTE-REGRESSAO-UI-VS-BACKEND.md) | Regressão UI vs backend (handoff jul/2026) |
-| [PNCP-PERFIL-OPERACIONAL-JUL2026.md](./PNCP-PERFIL-OPERACIONAL-JUL2026.md) | **Handoff completo** — qualidade, lote, deploy VPS, flags, troubleshooting |
+| [PNCP-BUSCA-INTELIGENTE-REGRESSAO-UI-VS-BACKEND.md](./PNCP-BUSCA-INTELIGENTE-REGRESSAO-UI-VS-BACKEND.md) | Regressão UI vs backend (bisect jun/2026) |
+| [PNCP-PERFIL-OPERACIONAL-JUL2026.md](./PNCP-PERFIL-OPERACIONAL-JUL2026.md) | **Handoff completo** — qualidade, lote, deploy VPS, flags |
+| [PNCP-FAIXA-DIRECIONAL-JUL2026.md](./PNCP-FAIXA-DIRECIONAL-JUL2026.md) | **Faixa `cima`/`baixo`** — causa, fix, testes (validado jul/2026) |
 
 ---
 
@@ -58,7 +59,11 @@ Pasta [planejamento/](./planejamento/) — documentos numerados `00` a `10`:
 
 | Documento | Conteúdo |
 |-----------|----------|
-| [PLANO-FONTES-PRECOS-MULTIPLAS-PLATAFORMAS.md](./PLANO-FONTES-PRECOS-MULTIPLAS-PLATAFORMAS.md) | Fontes de preços multi-plataforma |
+| [PLANO-FONTES-PRECOS-MULTIPLAS-PLATAFORMAS.md](./PLANO-FONTES-PRECOS-MULTIPLAS-PLATAFORMAS.md) | Plano original multi-plataforma (jun/2026) |
+| [MODULO-FONTES-PRECOS-00-PREPARACAO.md](./MODULO-FONTES-PRECOS-00-PREPARACAO.md) | **Preparação** — síntese + decisões |
+| [MODULO-FONTES-PRECOS-01-CATALOGO-COMERCIAL.md](./MODULO-FONTES-PRECOS-01-CATALOGO-COMERCIAL.md) | Catálogo comercial (complexidade + faixas — opcional) |
+| [MODULO-FONTES-PRECOS-02-PARTICIONAMENTO.md](./MODULO-FONTES-PRECOS-02-PARTICIONAMENTO.md) | **Particionamento** — camadas, épicos, o que conectar |
+| [MODULO-FONTES-PRECOS-03-PORTAL-COMPRAS-PUBLICAS.md](./MODULO-FONTES-PRECOS-03-PORTAL-COMPRAS-PUBLICAS.md) | **PCP (Ecustomize)** — API, fluxo, mapeamento, legal, dedup PNCP |
 
 ---
 

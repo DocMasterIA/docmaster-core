@@ -277,6 +277,21 @@ def _iso_z(dt) -> Optional[str]:
     return dt.astimezone(dt_timezone.utc).replace(tzinfo=None).isoformat(timespec="seconds") + "Z"
 
 
+def _slugify_filename_part(value: Any, fallback: str = "cotacao") -> str:
+    text = str(value or "").strip()
+    if not text:
+        return fallback
+    text = "".join(ch for ch in unicodedata.normalize("NFD", text) if unicodedata.category(ch) != "Mn")
+    text = re.sub(r"[^a-zA-Z0-9]+", "-", text).strip("-").lower()
+    return text[:64] or fallback
+
+
+def _excel_sheet_title(value: str, fallback: str) -> str:
+    title = re.sub(r'[:\\/?*\[\]]+', " ", str(value or "")).strip()
+    title = re.sub(r"\s+", " ", title)
+    return (title[:31] or fallback)
+
+
 def _parse_json_body(request: HttpRequest) -> Tuple[Optional[Dict[str, Any]], Optional[JsonResponse]]:
     raw = request.body or b""
     if len(raw) > MAX_JSON_BODY_BYTES:
@@ -1049,6 +1064,265 @@ def _item_from_payload(it: Dict[str, Any], cotacao: PncpCotacao) -> PncpCotacaoI
         or payload.get("objetoCompra")
         or ""
     )
+
+
+def _source_first_text(src: Dict[str, Any], *keys: str) -> str:
+    if not isinstance(src, dict):
+        return ""
+    for key in keys:
+        value = src.get(key)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return ""
+
+
+def _item_status_from_fontes(fontes: Dict[str, Any]) -> str:
+    return "Completo" if _total_cotacoes_from_fontes(fontes) >= 3 else "Incompleto"
+
+
+def _autosize_openpyxl_columns(ws, *, min_width: int = 10, max_width: int = 52) -> None:
+    try:
+        from openpyxl.utils import get_column_letter
+    except Exception:
+        return
+    widths: Dict[int, int] = {}
+    for row in ws.iter_rows(values_only=True):
+        for idx, value in enumerate(row, start=1):
+            text = "" if value is None else str(value)
+            widths[idx] = max(widths.get(idx, 0), len(text))
+    for idx, width in widths.items():
+        ws.column_dimensions[get_column_letter(idx)].width = max(min_width, min(max_width, width + 2))
+
+
+def _build_cotacao_export_xlsx(cotacao: PncpCotacao) -> tuple[io.BytesIO, str]:
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font
+    except Exception as exc:
+        raise RuntimeError("Exportação XLSX indisponível. Dependência 'openpyxl' não encontrada.") from exc
+
+    itens_asc = list(cotacao.itens.all().order_by("id"))
+    cotacoes_rows = list(
+        PncpCotacaoItemCotacao.objects.filter(cotacao_id=cotacao.id).select_related("item").order_by("item_id", "id")
+    )
+    fontes_counts = _fontes_counts_for_session(cotacao.id)
+    formula_id = _resolve_formula_calculo_id(cotacao.filtros or {})
+    refletidos = _itens_refletidos_for_session(cotacao.id, formula_id)
+    filtros = cotacao.filtros if isinstance(cotacao.filtros, dict) else {}
+    variacao_global = _safe_float(filtros.get("variacao_percentual_global"))
+    variacao_sentido = str(filtros.get("variacao_sentido_global") or "ambos").strip().lower()
+    if variacao_sentido not in {"cima", "baixo", "ambos"}:
+        variacao_sentido = "ambos"
+
+    wb = Workbook()
+    ws_resumo = wb.active
+    ws_resumo.title = _excel_sheet_title("Resumo", "Resumo")
+    ws_itens = wb.create_sheet(_excel_sheet_title("Itens", "Itens"))
+    ws_cotacoes = wb.create_sheet(_excel_sheet_title("Cotacoes", "Cotacoes"))
+
+    bold = Font(bold=True)
+
+    resumo_rows = [
+        ("Cotação ID", cotacao.id),
+        ("Título", cotacao.titulo or ""),
+        ("Termo de busca", cotacao.termo_busca or ""),
+        ("Status", cotacao.status or ""),
+        ("Criado em", _iso_z(cotacao.created_at) or ""),
+        ("Atualizado em", _iso_z(cotacao.updated_at) or ""),
+        ("Fórmula de cálculo", FORMULA_LABELS.get(formula_id, FORMULA_LABELS[DEFAULT_FORMULA_CALCULO])),
+        ("Variação global (%)", variacao_global if variacao_global is not None else ""),
+        ("Direção da variação global", variacao_sentido),
+        ("Total de itens", len(itens_asc)),
+        ("Total de cotações", len(cotacoes_rows)),
+    ]
+    for label, value in resumo_rows:
+        ws_resumo.append([label, value])
+    for cell in ws_resumo[1]:
+        cell.font = bold
+    for row in ws_resumo.iter_rows(min_row=1, max_row=len(resumo_rows), min_col=1, max_col=1):
+        row[0].font = bold
+
+    item_headers = [
+        "item_id",
+        "numero_item",
+        "descricao_item",
+        "quantidade",
+        "unidade_medida",
+        "valor_unitario_refletido",
+        "valor_total_refletido",
+        "valor_unitario_original",
+        "valor_total_original",
+        "governamentais",
+        "entes_publicos",
+        "dominio_amplo",
+        "cotacao_direta",
+        "notas_fiscais",
+        "similaridade_encontrada",
+        "status",
+        "numero_pncp",
+        "orgao",
+        "municipio",
+        "uf",
+        "modalidade",
+        "faixa_valor_base",
+        "variacao_global_percentual",
+        "variacao_global_sentido",
+    ]
+    ws_itens.append(item_headers)
+    for cell in ws_itens[1]:
+        cell.font = bold
+    for item in itens_asc:
+        fontes = fontes_counts.get(int(item.id), {
+            "governamentais": 0,
+            "entesPublicos": 0,
+            "dominioAmplo": 0,
+            "cotacaoDireta": 0,
+            "notasFiscais": 0,
+            "similaridadeEncontrada": 0,
+        })
+        refletido = refletidos.get(int(item.id), {})
+        item_src = item.source if isinstance(item.source, dict) else {}
+        faixa = item_src.get("faixa_regional") if isinstance(item_src.get("faixa_regional"), dict) else {}
+        faixa_valor_base = _safe_float(
+            faixa.get("valor_base")
+            or item_src.get("valor_base")
+            or item_src.get("valorBase")
+            or item_src.get("preco_base")
+            or item_src.get("precoBase")
+        )
+        ws_itens.append([
+            item.id,
+            item.numero_item or "",
+            item.descricao_item or "",
+            item.quantidade,
+            item.unidade_medida or "",
+            refletido.get("valor_unitario_refletido"),
+            refletido.get("valor_total_refletido"),
+            item.valor_unitario,
+            item.valor_total,
+            int(fontes.get("governamentais") or 0),
+            int(fontes.get("entesPublicos") or 0),
+            int(fontes.get("dominioAmplo") or 0),
+            int(fontes.get("cotacaoDireta") or 0),
+            int(fontes.get("notasFiscais") or 0),
+            int(fontes.get("similaridadeEncontrada") or 0),
+            _item_status_from_fontes(fontes),
+            item.numero_pncp or "",
+            item.orgao or "",
+            item.municipio or "",
+            item.uf or "",
+            item.modalidade or "",
+            faixa_valor_base,
+            variacao_global if variacao_global is not None else "",
+            variacao_sentido,
+        ])
+
+    cotacao_headers = [
+        "cotacao_id",
+        "item_id",
+        "numero_item_sessao",
+        "descricao_item_sessao",
+        "fonte_resolvida",
+        "inciso_resolvido",
+        "plataforma",
+        "numero_pncp",
+        "ano_compra",
+        "sequencial_compra",
+        "numero_item_fonte",
+        "descricao_item_fonte",
+        "quantidade",
+        "unidade_medida",
+        "valor_unitario",
+        "valor_total",
+        "valor_unitario_homologado",
+        "valor_total_homologado",
+        "valor_unitario_estimado",
+        "valor_total_estimado",
+        "orgao",
+        "municipio",
+        "uf",
+        "modalidade",
+        "data_publicacao",
+        "fornecedor_nome",
+        "fornecedor_cnpj",
+        "score_aprovacao",
+        "confiabilidade",
+        "risco",
+        "status",
+        "source_json",
+    ]
+    ws_cotacoes.append(cotacao_headers)
+    for cell in ws_cotacoes[1]:
+        cell.font = bold
+    for row in cotacoes_rows:
+        src = row.source if isinstance(row.source, dict) else {}
+        fonte_resolvida = _resolve_fonte_bucket(src, row.numero_pncp) or ""
+        inciso_resolvido = "inciso_i" if fonte_resolvida == "governamentais" else ("inciso_ii" if fonte_resolvida == "entesPublicos" else "")
+        fornecedor_nome = _source_first_text(
+            src,
+            "fornecedor_nome",
+            "nome_fornecedor",
+            "fornecedor",
+            "razaoSocialFornecedor",
+            "nomeRazaoSocialFornecedor",
+        )
+        fornecedor_cnpj = _source_first_text(
+            src,
+            "cnpj_fornecedor",
+            "cnpjFornecedor",
+            "cnpjCpfFornecedor",
+            "niFornecedor",
+            "cnpj",
+        )
+        ws_cotacoes.append([
+            row.id,
+            row.item_id,
+            row.item.numero_item or "",
+            row.item.descricao_item or "",
+            fonte_resolvida,
+            inciso_resolvido,
+            _source_first_text(src, "plataforma", "fonte", "tipo_fonte", "categoria_fonte"),
+            row.numero_pncp or "",
+            row.ano_compra,
+            row.sequencial_compra,
+            row.numero_item or "",
+            row.descricao_item or "",
+            row.quantidade,
+            row.unidade_medida or "",
+            row.valor_unitario,
+            row.valor_total,
+            _safe_float(src.get("valor_unitario_homologado") or src.get("valorUnitarioHomologado")),
+            _safe_float(src.get("valor_total_homologado") or src.get("valorTotalHomologado")),
+            _safe_float(src.get("valor_unitario_estimado") or src.get("valorUnitarioEstimado")),
+            _safe_float(src.get("valor_total_estimado") or src.get("valorTotalEstimado")),
+            row.orgao or "",
+            row.municipio or "",
+            row.uf or "",
+            row.modalidade or "",
+            row.data_publicacao or "",
+            fornecedor_nome,
+            fornecedor_cnpj,
+            row.score_aprovacao,
+            row.confiabilidade or "",
+            row.risco or "",
+            row.status or "",
+            json.dumps(src, ensure_ascii=False, default=str),
+        ])
+
+    _autosize_openpyxl_columns(ws_resumo)
+    _autosize_openpyxl_columns(ws_itens)
+    _autosize_openpyxl_columns(ws_cotacoes)
+
+    stream = io.BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    stamp = timezone.localtime(timezone.now()).strftime("%Y%m%d-%H%M")
+    slug = _slugify_filename_part(cotacao.titulo, fallback=f"cotacao-{cotacao.id}")
+    filename = f"cotacao-{cotacao.id}_{slug}_{stamp}.xlsx"
+    return stream, filename
     vt = _safe_float(payload.get("valor_total")) or _safe_float(payload.get("valor_global"))
     np = str(payload.get("numero_pncp") or payload.get("numeroControlePNCP") or "")[:256]
     return PncpCotacaoItem(
@@ -1372,6 +1646,42 @@ def pncp_research_sessions_detail(request, sessao_id: int):
             "stats": {"total_itens": len(itens_asc), "total_grupos": len(grupos_relatorio)},
         }
     )
+
+
+@api_login_required
+@csrf_exempt
+@require_http_methods(["GET", "OPTIONS"])
+@_pncp_json_errors
+def pncp_research_sessions_export_xlsx(request, sessao_id: int):
+    if request.method == "OPTIONS":
+        return JsonResponse({}, status=204)
+
+    cotacao = (
+        _cotacao_qs_for_user(request.user)
+        .select_related("usuario", "prefeitura", "usuario__prefeitura")
+        .filter(pk=sessao_id)
+        .first()
+    )
+    if not cotacao:
+        return JsonResponse({"ok": False, "error": "Sessão não encontrada.", "sessao_id": sessao_id}, status=404)
+    if not cotacao.itens.exists():
+        return JsonResponse(
+            {"detail": "Esta cotação ainda não possui itens. Adicione ao menos 1 item para exportar Excel."},
+            status=422,
+        )
+
+    stream, filename = _build_cotacao_export_xlsx(cotacao)
+    resp = FileResponse(
+        stream,
+        as_attachment=True,
+        filename=filename,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    resp["Access-Control-Expose-Headers"] = "Content-Disposition"
+    resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp["Pragma"] = "no-cache"
+    resp["Expires"] = "0"
+    return resp
 
 
 @api_login_required

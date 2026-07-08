@@ -141,4 +141,4 @@ Prioridade de código correta quando `valor_unitario_homologado` existe. Gap: í
 
 **Ideia:** conectar fontes além do PNCP para completar cotações (Art. 5º) quando o índice federal não cobre item/região.
 
-**Status:** planejamento — ver [`PLANO-FONTES-PRECOS-MULTIPLAS-PLATAFORMAS.md`](PLANO-FONTES-PRECOS-MULTIPLAS-PLATAFORMAS.md).
+**Status:** planejamento — ver [`PLANO-FONTES-PRECOS-MULTIPLAS-PLATAFORMAS.md`](PLANO-FONTES-PRECOS-MULTIPLAS-PLATAFORMAS.md) e preparação [`MODULO-FONTES-PRECOS-00-PREPARACAO.md`](MODULO-FONTES-PRECOS-00-PREPARACAO.md). PNCP estável jul/2026 — Fase 0/1 desbloqueada.

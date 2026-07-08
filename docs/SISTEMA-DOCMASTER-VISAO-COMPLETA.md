@@ -425,6 +425,7 @@ flowchart LR
 | Paridade lote vs item | [pncp/PNCP-IMPLEMENTACAO-PARIDADE-LOTE.md](./pncp/PNCP-IMPLEMENTACAO-PARIDADE-LOTE.md) |
 | Cobertura fornecedor (roadmap) | [pncp/PLANO-MODULO-COBERTURA-FORNECEDOR-PNCP.md](./pncp/PLANO-MODULO-COBERTURA-FORNECEDOR-PNCP.md) |
 | Fontes múltiplas de preço | [pncp/PLANO-FONTES-PRECOS-MULTIPLAS-PLATAFORMAS.md](./pncp/PLANO-FONTES-PRECOS-MULTIPLAS-PLATAFORMAS.md) |
+| Esquematização multi-fonte | [pncp/MODULO-FONTES-PRECOS-00-PREPARACAO.md](./pncp/MODULO-FONTES-PRECOS-00-PREPARACAO.md) |
 
 ### 9.4 Fatores críticos PNCP
 

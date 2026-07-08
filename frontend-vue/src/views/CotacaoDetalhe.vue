@@ -150,6 +150,15 @@
               : (hasSupplierPdfAttachment ? 'Adicionar mais PDFs do Fornecedor' : 'Anexar Cotação do Fornecedor')
           }}
         </button>
+        <button
+          type="button"
+          class="cot-btn"
+          :disabled="excelLoading || totalItensSessao === 0"
+          @click="downloadResultadoExcel"
+        >
+          <i class="fa-solid fa-file-excel" aria-hidden="true"></i>
+          {{ excelLoading ? 'Gerando Excel...' : 'Baixar resultado Excel (em teste)' }}
+        </button>
         <button type="button" class="cot-btn cot-btn--primary" @click="openRelatorioModal">
           <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
           Gerar relatório PDF
@@ -618,6 +627,7 @@ import {
   addItemsToResearchSession,
   deleteItemsFromResearchSession,
   downloadCotacaoRelatorioPdf,
+  downloadResearchSessionExcel,
   getResearchSession,
   importItemsSpreadsheetToResearchSession,
   uploadSupplierPdfToResearchSession,
@@ -656,6 +666,7 @@ const relatorioModalOpen = ref(false);
 const relatorioTitulo = ref('');
 const relatorioError = ref('');
 const relatorioLoading = ref(false);
+const excelLoading = ref(false);
 const totalItensSessao = ref(0);
 const formulaCalculoLabel = ref('Média aritmética dos preços obtidos');
 const formulaCalculoId = ref('media_aritmetica_precos_obtidos');
@@ -1198,6 +1209,30 @@ async function submitRelatorioPdf() {
     relatorioError.value = e?.message || 'Falha ao gerar o PDF.';
   } finally {
     relatorioLoading.value = false;
+  }
+}
+
+async function downloadResultadoExcel() {
+  const sessionId = Number(cotacaoId.value);
+  if (Number.isNaN(sessionId)) {
+    loadError.value = 'Cotação inválida para exportar Excel.';
+    return;
+  }
+  if (totalItensSessao.value === 0 || excelLoading.value) return;
+  loadError.value = '';
+  excelLoading.value = true;
+  try {
+    const { blob, filename } = await downloadResearchSessionExcel(sessionId);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (filename || '').trim() || `cotacao-${sessionId}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    loadError.value = `Falha ao exportar Excel (${err?.message || 'erro desconhecido'}).`;
+  } finally {
+    excelLoading.value = false;
   }
 }
 

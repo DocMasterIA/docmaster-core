@@ -16,9 +16,12 @@
 3. Filtro serviços (PNCP_BLOCK_SERVICE_ITEMS)
 4. Scoring multi-estágio (literal, preço ref, unidade, recência)
 5. Top 3 + regra federal-first
-6. enrich_homolog_items_from_pncp (async, top 3)
-7. Opcional: LLM rerank + resumo item
-8. Retorna exatamente 3 itens
+6. Faixa regional (se valor base + variação): gate com `row_unit_price_for_faixa_gate`; sentido `cima`/`baixo`/`ambos`
+7. enrich_homolog_items_from_pncp (pre-enrich direcional + enrich top3/pool + **refiltro faixa**)
+8. Opcional: LLM rerank + resumo item
+9. Retorna até 3 itens
+
+**Lote (`busca_lote=true`):** fluxo `busca_lote_top3_parity` — ver [PNCP-FAIXA-DIRECIONAL-JUL2026.md](../PNCP-FAIXA-DIRECIONAL-JUL2026.md) e [PNCP-PERFIL-OPERACIONAL-JUL2026.md](../PNCP-PERFIL-OPERACIONAL-JUL2026.md).
 ```
 
 ### 1.2 Busca manual / ao vivo

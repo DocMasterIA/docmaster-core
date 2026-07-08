@@ -157,7 +157,8 @@
           @click="downloadResultadoExcel"
         >
           <i class="fa-solid fa-file-excel" aria-hidden="true"></i>
-          {{ excelLoading ? 'Gerando Excel...' : 'Baixar resultado Excel (em teste)' }}
+          {{ excelLoading ? 'Gerando Excel...' : 'Baixar resultado Excel' }}
+          <span v-if="!excelLoading" class="cot-beta-tag">Em teste</span>
         </button>
         <button type="button" class="cot-btn cot-btn--primary" @click="openRelatorioModal">
           <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
@@ -2209,7 +2210,8 @@ async function saveTituloNoBackend() {
   flex-wrap: wrap;
 }
 
-.cot-similaridade-tag {
+.cot-similaridade-tag,
+.cot-beta-tag {
   display: inline-flex;
   align-items: center;
   border: 1px solid #f2dfb7;
@@ -2498,7 +2500,8 @@ a.pncp-modal__link-btn {
   color: #e2e8f0 !important;
 }
 
-:deep(.dm-dark) .cot-similaridade-tag {
+:deep(.dm-dark) .cot-similaridade-tag,
+:deep(.dm-dark) .cot-beta-tag {
   background: rgba(161, 98, 7, 0.22) !important;
   color: #fcd34d !important;
   border-color: #a16207 !important;

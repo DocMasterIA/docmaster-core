@@ -50,7 +50,7 @@ from .pncp_relatorio_api import (
     pncp_cotacao_relatorio_verificacao_download,
     pncp_cotacao_relatorio_verificar,
 )
-from .ajax import area_do_usuario_ajax
+from .valor_extenso_api import api_valor_monetario_extenso
 from django.conf import settings
 from django.conf.urls.static import static
 from .admin import SecretariaAutocomplete
@@ -75,6 +75,7 @@ urlpatterns = [
     path('api/me/documents/', api_me_documents, name='api_me_documents'),
     path('api/auth/login/', api_auth_login, name='api_auth_login'),
     path('api/auth/logout/', api_auth_logout, name='api_auth_logout'),
+    path('api/utils/valor-extenso/', api_valor_monetario_extenso, name='api_valor_monetario_extenso'),
     path("api/slots/catalog/batch", slot_catalog_batch_api, name="slots_catalog_batch_api"),
     path("api/slots/catalog/upsert", slot_catalog_upsert_api, name="slots_catalog_upsert_api"),
     path("api/slots/catalog/delete", slot_catalog_delete_api, name="slots_catalog_delete_api"),

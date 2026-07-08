@@ -548,10 +548,40 @@ def _slug_part(value: str, max_len: int = 40) -> str:
     return raw[:max_len]
 
 
-def nome_arquivo_relatorio(cotacao_id: int, titulo_relatorio: str, *, sistema_nome: str = "", usuario_nome: str = "", dt=None) -> str:
+def nome_arquivo_relatorio(
+    cotacao_id: int,
+    titulo_relatorio: str,
+    *,
+    sistema_nome: str = "",
+    usuario_nome: str = "",
+    dt=None,
+    ext: str = "pdf",
+) -> str:
     now = dt or timezone.now()
     stamp = timezone.localtime(now).strftime("%Y%m%d-%H%M")
     sistema = _slug_part(sistema_nome, max_len=26) or "docmaster-pesquisador-pncp"
     usuario = _slug_part(usuario_nome, max_len=26) or "usuario"
     titulo = _slug_part(titulo_relatorio, max_len=42) or "relatorio"
-    return f"{sistema}_{usuario}_{stamp}_cotacao-{int(cotacao_id)}_{titulo}.pdf"
+    suffix = str(ext or "pdf").lstrip(".").lower() or "pdf"
+    return f"{sistema}_{usuario}_{stamp}_cotacao-{int(cotacao_id)}_{titulo}.{suffix}"
+
+
+def usuario_nome_export_cotacao(cotacao) -> str:
+    """Nome do responsável para nomenclatura de arquivos exportados (PDF/Excel)."""
+    snap = (getattr(cotacao, "criado_por_nome", None) or "").strip()
+    if snap:
+        return snap
+    u = getattr(cotacao, "usuario", None)
+    if u is None:
+        return "usuario"
+    full = ""
+    if callable(getattr(u, "get_full_name", None)):
+        try:
+            full = (u.get_full_name() or "").strip()
+        except Exception:
+            full = ""
+    if not full:
+        first = (getattr(u, "first_name", None) or "").strip()
+        last = (getattr(u, "last_name", None) or "").strip()
+        full = f"{first} {last}".strip()
+    return full or (getattr(u, "email", None) or "").strip() or str(getattr(u, "pk", "usuario"))

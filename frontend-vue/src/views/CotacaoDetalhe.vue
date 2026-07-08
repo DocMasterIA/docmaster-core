@@ -58,6 +58,10 @@
             <strong>{{ sessaoStatusLabel }}</strong>
           </div>
         </div>
+        <div v-if="valorTotalItensExtenso" class="cot-valor-extenso">
+          <span class="cot-valor-extenso__label">Valor total por extenso</span>
+          <p class="cot-valor-extenso__text">{{ valorTotalItensExtenso }}</p>
+        </div>
       </section>
 
       <section class="cot-formula">
@@ -152,7 +156,7 @@
         </button>
         <button
           type="button"
-          class="cot-btn"
+          class="cot-btn cot-btn--primary"
           :disabled="excelLoading || totalItensSessao === 0"
           @click="downloadResultadoExcel"
         >
@@ -640,6 +644,7 @@ import {
   formatMoedaBRLInput,
   sanitizeQuantidadeInput,
 } from '../utils/itemValorCampos';
+import { valorMonetarioPorExtenso } from '../utils/valorExtensoPt';
 
 const route = useRoute();
 const router = useRouter();
@@ -660,6 +665,7 @@ const sessaoCreatedAt = ref('—');
 const sessaoCriadoPor = ref('—');
 const sessaoCriadoPorEmail = ref('');
 const valorTotalItensFmt = ref('R$ —');
+const valorTotalItensExtenso = ref('');
 const tituloSalvo = ref(false);
 const isLoading = ref(false);
 const loadError = ref('');
@@ -1165,7 +1171,7 @@ function closeRelatorioModal() {
   relatorioModalOpen.value = false;
 }
 
-function fallbackRelatorioFilename(sessionId, titulo) {
+function fallbackExportFilename(sessionId, titulo, ext = 'pdf', usuario = '') {
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
@@ -1177,7 +1183,20 @@ function fallbackRelatorioFilename(sessionId, titulo) {
     .trim()
     .replace(/[-\s]+/g, '-')
     .slice(0, 42) || 'relatorio';
-  return `docmaster-pesquisador-pncp_usuario_${stamp}_cotacao-${sessionId}_${slug}.pdf`;
+  const usuarioSlug = String(usuario || 'usuario')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/[-\s]+/g, '-')
+    .slice(0, 26) || 'usuario';
+  const suffix = String(ext || 'pdf').replace(/^\./, '').toLowerCase() || 'pdf';
+  return `docmaster-pesquisador-pncp_${usuarioSlug}_${stamp}_cotacao-${sessionId}_${slug}.${suffix}`;
+}
+
+function fallbackRelatorioFilename(sessionId, titulo) {
+  return fallbackExportFilename(sessionId, titulo, 'pdf');
 }
 
 async function submitRelatorioPdf() {
@@ -1227,7 +1246,12 @@ async function downloadResultadoExcel() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = (filename || '').trim() || `cotacao-${sessionId}.xlsx`;
+    a.download = (filename || '').trim() || fallbackExportFilename(
+      sessionId,
+      tituloCotacao.value,
+      'xlsx',
+      sessaoCriadoPor.value,
+    );
     a.click();
     URL.revokeObjectURL(url);
   } catch (err) {
@@ -1273,6 +1297,17 @@ onUnmounted(() => {
 onMounted(() => {
   loadSessionFromBackend();
 });
+
+function resolveValorTotalExtenso(sessao, soma, temValor) {
+  const fromApi = String(sessao?.valor_total_estimado_extenso || '').trim();
+  if (fromApi) return fromApi;
+  if (!temValor) return '';
+  try {
+    return valorMonetarioPorExtenso(soma);
+  } catch {
+    return '';
+  }
+}
 
 async function loadSessionFromBackend() {
   const sessionId = Number(cotacaoId.value);
@@ -1372,15 +1407,18 @@ async function loadSessionFromBackend() {
         };
       });
       valorTotalItensFmt.value = temValor ? formatCurrency(soma) : 'R$ —';
+      valorTotalItensExtenso.value = resolveValorTotalExtenso(data?.sessao, soma, temValor);
     } else if (data?.ok) {
       linhasMock.value = [];
       valorTotalItensFmt.value = 'R$ —';
+      valorTotalItensExtenso.value = '';
       totalItensSessao.value = 0;
     }
   } catch (err) {
     loadError.value = `Não foi possível carregar a sessão no backend (${err.message || 'erro desconhecido'}).`;
     linhasMock.value = [];
     valorTotalItensFmt.value = 'R$ —';
+    valorTotalItensExtenso.value = '';
     sessaoCriadoPor.value = '—';
     sessaoCriadoPorEmail.value = '';
     sessaoStatus.value = 'aberta';
@@ -1581,6 +1619,31 @@ async function saveTituloNoBackend() {
 .cot-head__summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
 .cot-card { border: 1px solid #d6dde8; border-radius: 10px; background: #fff; padding: 10px; display: flex; flex-direction: column; gap: 2px; }
 .cot-card--highlight strong { color: #1f4e79; }
+
+.cot-valor-extenso {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid #c9d9ea;
+  border-radius: 12px;
+  background: #f4f8fc;
+}
+
+.cot-valor-extenso__label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.cot-valor-extenso__text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #1f2937;
+  font-style: italic;
+}
 .cot-card__label { font-size: 11px; text-transform: uppercase; color: var(--color-text-soft); }
 .cot-card__email {
   display: block;
@@ -2497,6 +2560,19 @@ a.pncp-modal__link-btn {
 
 :deep(.dm-dark) .cot-faixa-block__value,
 :deep(.dm-dark) .cot-faixa-block__dot {
+  color: #e2e8f0 !important;
+}
+
+:deep(.dm-dark) .cot-valor-extenso {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+:deep(.dm-dark) .cot-valor-extenso__label {
+  color: #94a3b8 !important;
+}
+
+:deep(.dm-dark) .cot-valor-extenso__text {
   color: #e2e8f0 !important;
 }
 

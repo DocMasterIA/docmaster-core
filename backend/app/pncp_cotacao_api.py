@@ -53,7 +53,19 @@ from backend.app.services.pncp_relatorio_itens import (
     texto_orgao_exibicao_relatorio_pesquisa_precos,
     total_item_de_media_unitaria_exibida,
 )
-from backend.app.services.pncp_relatorio_pdf import extrair_cnpjs_dos_itens
+from backend.app.services.pncp_relatorio_pdf import (
+    extrair_cnpjs_dos_itens,
+    nome_arquivo_relatorio,
+    nome_sistema_relatorio,
+    usuario_nome_export_cotacao,
+)
+from backend.app.services.pncp_cotacao_excel_template import (
+    default_cotacao_excel_template_path,
+    render_cotacao_excel_from_template,
+    template_available,
+)
+from backend.app.utils.cotacao_valor_total import somar_valor_total_estimado_itens
+from backend.app.utils.valor_extenso_pt import valor_monetario_extenso_payload
 
 logger = logging.getLogger(__name__)
 
@@ -1064,6 +1076,25 @@ def _item_from_payload(it: Dict[str, Any], cotacao: PncpCotacao) -> PncpCotacaoI
         or payload.get("objetoCompra")
         or ""
     )
+    vt = _safe_float(payload.get("valor_total")) or _safe_float(payload.get("valor_global"))
+    np = str(payload.get("numero_pncp") or payload.get("numeroControlePNCP") or "")[:256]
+    return PncpCotacaoItem(
+        cotacao=cotacao,
+        numero_pncp=np,
+        ano_compra=_safe_int_field(payload.get("ano_compra"), min_v=1990, max_v=2100),
+        sequencial_compra=_safe_int_field(payload.get("sequencial_compra"), min_v=1, max_v=2_147_483_647),
+        numero_item=str(payload.get("numero_item") or payload.get("numeroItem") or "")[:64],
+        descricao_item=str(desc)[:10000] if desc else "",
+        quantidade=_safe_float(payload.get("quantidade")),
+        unidade_medida=str(payload.get("unidade_medida") or payload.get("unidadeMedida") or "")[:64],
+        valor_unitario=_safe_float(payload.get("valor_unitario")) or _safe_float(payload.get("valorUnitario")),
+        valor_total=vt,
+        orgao=str(payload.get("orgao") or "")[:512],
+        municipio=str(payload.get("municipio") or "")[:256],
+        uf=_normalize_uf(payload.get("uf")),
+        modalidade=str(payload.get("modalidade") or "")[:256],
+        source=_compact_item_source(payload),
+    )
 
 
 def _source_first_text(src: Dict[str, Any], *keys: str) -> str:
@@ -1097,20 +1128,64 @@ def _autosize_openpyxl_columns(ws, *, min_width: int = 10, max_width: int = 52) 
         ws.column_dimensions[get_column_letter(idx)].width = max(min_width, min(max_width, width + 2))
 
 
+def _build_cotacao_export_filename(cotacao: PncpCotacao) -> str:
+    titulo = (cotacao.titulo or cotacao.termo_busca or "").strip() or "relatorio"
+    return nome_arquivo_relatorio(
+        int(cotacao.id),
+        titulo,
+        sistema_nome=nome_sistema_relatorio(),
+        usuario_nome=usuario_nome_export_cotacao(cotacao),
+        dt=timezone.now(),
+        ext="xlsx",
+    )
+
+
 def _build_cotacao_export_xlsx(cotacao: PncpCotacao) -> tuple[io.BytesIO, str]:
+    itens_asc = list(cotacao.itens.all().order_by("id"))
+    formula_id = _resolve_formula_calculo_id(cotacao.filtros or {})
+    refletidos = _itens_refletidos_for_session(cotacao.id, formula_id)
+    template_path = default_cotacao_excel_template_path()
+    filename = _build_cotacao_export_filename(cotacao)
+
+    if template_available(template_path):
+        stream = render_cotacao_excel_from_template(
+            cotacao,
+            template_path,
+            refletidos=refletidos,
+            itens=itens_asc,
+        )
+        return stream, filename
+
+    return _build_cotacao_export_xlsx_legacy(
+        cotacao,
+        itens_asc=itens_asc,
+        refletidos=refletidos,
+        filename=filename,
+    )
+
+
+def _build_cotacao_export_xlsx_legacy(
+    cotacao: PncpCotacao,
+    *,
+    itens_asc: Optional[List[Any]] = None,
+    refletidos: Optional[Dict[int, Dict[str, Any]]] = None,
+    filename: Optional[str] = None,
+) -> tuple[io.BytesIO, str]:
     try:
         from openpyxl import Workbook
         from openpyxl.styles import Font
     except Exception as exc:
         raise RuntimeError("Exportação XLSX indisponível. Dependência 'openpyxl' não encontrada.") from exc
 
-    itens_asc = list(cotacao.itens.all().order_by("id"))
+    itens_asc = list(itens_asc if itens_asc is not None else cotacao.itens.all().order_by("id"))
+    if refletidos is None:
+        formula_id = _resolve_formula_calculo_id(cotacao.filtros or {})
+        refletidos = _itens_refletidos_for_session(cotacao.id, formula_id)
     cotacoes_rows = list(
         PncpCotacaoItemCotacao.objects.filter(cotacao_id=cotacao.id).select_related("item").order_by("item_id", "id")
     )
     fontes_counts = _fontes_counts_for_session(cotacao.id)
     formula_id = _resolve_formula_calculo_id(cotacao.filtros or {})
-    refletidos = _itens_refletidos_for_session(cotacao.id, formula_id)
     filtros = cotacao.filtros if isinstance(cotacao.filtros, dict) else {}
     variacao_global = _safe_float(filtros.get("variacao_percentual_global"))
     variacao_sentido = str(filtros.get("variacao_sentido_global") or "ambos").strip().lower()
@@ -1319,29 +1394,8 @@ def _build_cotacao_export_xlsx(cotacao: PncpCotacao) -> tuple[io.BytesIO, str]:
     stream = io.BytesIO()
     wb.save(stream)
     stream.seek(0)
-    stamp = timezone.localtime(timezone.now()).strftime("%Y%m%d-%H%M")
-    slug = _slugify_filename_part(cotacao.titulo, fallback=f"cotacao-{cotacao.id}")
-    filename = f"cotacao-{cotacao.id}_{slug}_{stamp}.xlsx"
+    filename = filename or _build_cotacao_export_filename(cotacao)
     return stream, filename
-    vt = _safe_float(payload.get("valor_total")) or _safe_float(payload.get("valor_global"))
-    np = str(payload.get("numero_pncp") or payload.get("numeroControlePNCP") or "")[:256]
-    return PncpCotacaoItem(
-        cotacao=cotacao,
-        numero_pncp=np,
-        ano_compra=_safe_int_field(payload.get("ano_compra"), min_v=1990, max_v=2100),
-        sequencial_compra=_safe_int_field(payload.get("sequencial_compra"), min_v=1, max_v=2_147_483_647),
-        numero_item=str(payload.get("numero_item") or payload.get("numeroItem") or "")[:64],
-        descricao_item=str(desc)[:10000] if desc else "",
-        quantidade=_safe_float(payload.get("quantidade")),
-        unidade_medida=str(payload.get("unidade_medida") or payload.get("unidadeMedida") or "")[:64],
-        valor_unitario=_safe_float(payload.get("valor_unitario")) or _safe_float(payload.get("valorUnitario")),
-        valor_total=vt,
-        orgao=str(payload.get("orgao") or "")[:512],
-        municipio=str(payload.get("municipio") or "")[:256],
-        uf=_normalize_uf(payload.get("uf")),
-        modalidade=str(payload.get("modalidade") or "")[:256],
-        source=_compact_item_source(payload),
-    )
 
 
 @api_login_required
@@ -1580,6 +1634,10 @@ def pncp_research_sessions_detail(request, sessao_id: int):
         )
     orgao_exibicao = texto_orgao_exibicao_relatorio_pesquisa_precos(c, request.user, grupos_relatorio)
     formula_label = FORMULA_LABELS.get(formula_id, FORMULA_LABELS[DEFAULT_FORMULA_CALCULO])
+    valor_total_estimado = somar_valor_total_estimado_itens(itens_asc, refletidos)
+    valor_total_extenso_payload = (
+        valor_monetario_extenso_payload(valor_total_estimado) if valor_total_estimado is not None else None
+    )
     anexos = list(
         PncpCotacaoAnexoArquivo.objects.filter(cotacao_id=c.id)
         .only("id", "nome_original", "tamanho_bytes", "content_type", "created_at")
@@ -1617,6 +1675,11 @@ def pncp_research_sessions_detail(request, sessao_id: int):
                 "orgao_exibicao": orgao_exibicao,
                 "formula_calculo": formula_label,
                 "formula_calculo_id": formula_id,
+                "valor_total_estimado": valor_total_estimado,
+                "valor_total_estimado_extenso": (
+                    valor_total_extenso_payload.get("extenso") if valor_total_extenso_payload else None
+                ),
+                "valor_total_estimado_extenso_payload": valor_total_extenso_payload,
                 "anexo_fornecedor_pdf": bool(anexos_payload),
                 "anexo_fornecedor_nome": (anexos_payload[0]["nome"] if anexos_payload else ""),
                 "anexos_fornecedor": anexos_payload,

@@ -3,8 +3,9 @@ Exportação de cotação PNCP a partir de planilha-modelo (.xlsx / .xlsm) com s
 
 Slots suportados (ver docs/pncp/COTACAO-EXCEL-SLOTS-MAPEAMENTO.md):
   globais: DATA_HORARIO_GERACAO, PREFEITURA_E_DATA, RESPONSAVEL_PESQUISA_PREÇOS,
-           VALOR_EXTENSO, PREFEITURA_ESTADO
-  por item (linha-modelo): ID_ITEM, NOME_ITEM
+           VALOR_EXTENSO, PREFEITURA_ESTADO, CNPJ, TELEFONE, DEPARTAMENTO, OBSERVACOES
+  por item (linha-modelo): ID_ITEM, NOME_ITEM, UNIDADE, QUANTIDADE, COTACOES_VALIDAS,
+                           VALOR_MEDIO, VALOR_TOTAL_HOMOLOGADO
 """
 from __future__ import annotations
 
@@ -18,12 +19,24 @@ from django.conf import settings
 from django.utils import timezone
 
 from backend.app.models import PncpCotacao
-from backend.app.services.pncp_relatorio_itens import texto_orgao_capa_prefeitura_cotacao
+from backend.app.services.pncp_relatorio_itens import (
+    _formatar_moeda_br,
+    _fmt_quantidade,
+    texto_orgao_capa_prefeitura_cotacao,
+)
 from backend.app.utils.cotacao_valor_total import somar_valor_total_estimado_itens
 from backend.app.utils.valor_extenso_pt import valor_monetario_por_extenso
 
 # Slots repetidos por linha de item na planilha-modelo.
-ITEM_SLOT_NAMES = frozenset({"ID_ITEM", "NOME_ITEM"})
+ITEM_SLOT_NAMES = frozenset({
+    "ID_ITEM",
+    "NOME_ITEM",
+    "UNIDADE",
+    "QUANTIDADE",
+    "COTACOES_VALIDAS",
+    "VALOR_MEDIO",
+    "VALOR_TOTAL_HOMOLOGADO",
+})
 
 # Slots preenchidos pelo usuário no modal de exportação.
 USER_PREF_SLOT_NAMES = ("CNPJ", "TELEFONE")
@@ -150,20 +163,93 @@ def build_global_slot_context(
     return ctx
 
 
-def build_item_slot_context(item: Any) -> Dict[str, str]:
-    numero = getattr(item, "numero_item", None)
-    if numero is None and isinstance(item, dict):
-        numero = item.get("numero_item")
-    descricao = getattr(item, "descricao_item", None)
-    if descricao is None and isinstance(item, dict):
-        descricao = item.get("descricao_item")
-    item_id = getattr(item, "id", None)
-    if item_id is None and isinstance(item, dict):
-        item_id = item.get("id")
+def _item_get(item: Any, key: str, default: Any = None) -> Any:
+    if isinstance(item, dict):
+        return item.get(key, default)
+    return getattr(item, key, default)
+
+
+def _safe_float(v: Any) -> Optional[float]:
+    if v is None:
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    if f != f or f in (float("inf"), float("-inf")):
+        return None
+    return f
+
+
+def _fmt_moeda_ui(v: Any) -> str:
+    n = _safe_float(v)
+    if n is None:
+        return "R$ —"
+    return f"R$ {_formatar_moeda_br(n)}"
+
+
+def _total_cotacoes_validas(fontes: Mapping[str, Any]) -> int:
+    return (
+        int(fontes.get("governamentais") or 0)
+        + int(fontes.get("entesPublicos") or 0)
+        + int(fontes.get("dominioAmplo") or 0)
+        + int(fontes.get("cotacaoDireta") or 0)
+        + int(fontes.get("notasFiscais") or 0)
+    )
+
+
+def _resolve_valor_medio_item(item: Any, refletido: Mapping[str, Any]) -> float:
+    """Mesma prioridade da coluna «Média de preço» em CotacaoDetalhe.vue."""
+    vu = _safe_float(refletido.get("valor_unitario_refletido"))
+    if vu is None:
+        vu = _safe_float(_item_get(item, "valor_unitario"))
+    if vu is None:
+        qtd = _safe_float(_item_get(item, "quantidade")) or _safe_float(refletido.get("quantidade_refletida"))
+        vt = _safe_float(_item_get(item, "valor_total"))
+        if qtd and qtd > 0 and vt is not None:
+            vu = vt / qtd
+    return float(vu) if vu is not None else 0.0
+
+
+def _resolve_valor_total_homologado_item(item: Any, refletido: Mapping[str, Any]) -> Optional[float]:
+    vt = _safe_float(refletido.get("valor_total_refletido"))
+    if vt is None:
+        vt = _safe_float(_item_get(item, "valor_total"))
+    if vt is None:
+        vt = _safe_float(_item_get(item, "valor_unitario"))
+    return vt
+
+
+def build_item_slot_context(
+    item: Any,
+    *,
+    refletido: Optional[Mapping[str, Any]] = None,
+    fontes: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, str]:
+    refletido = refletido or {}
+    fontes = fontes or {}
+
+    numero = _item_get(item, "numero_item")
+    descricao = _item_get(item, "descricao_item")
+    item_id = _item_get(item, "id")
     id_exibicao = str(numero or item_id or "").strip()
+
+    unidade = str(refletido.get("unidade_medida_refletida") or _item_get(item, "unidade_medida") or "").strip() or "-"
+    quantidade = _item_get(item, "quantidade")
+    if quantidade is None:
+        quantidade = refletido.get("quantidade_refletida")
+
+    valor_medio = _resolve_valor_medio_item(item, refletido)
+    valor_total = _resolve_valor_total_homologado_item(item, refletido)
+
     return {
         "ID_ITEM": id_exibicao,
         "NOME_ITEM": str(descricao or "").strip(),
+        "UNIDADE": unidade,
+        "QUANTIDADE": _fmt_quantidade(quantidade),
+        "COTACOES_VALIDAS": str(_total_cotacoes_validas(fontes)),
+        "VALOR_MEDIO": _fmt_moeda_ui(valor_medio),
+        "VALOR_TOTAL_HOMOLOGADO": _fmt_moeda_ui(valor_total),
     }
 
 
@@ -219,9 +305,14 @@ def _apply_item_row_templates(
     ws,
     items: Sequence[Any],
     global_ctx: Mapping[str, str],
+    *,
+    refletidos: Optional[Mapping[int, Mapping[str, Any]]] = None,
+    fontes_counts: Optional[Mapping[int, Mapping[str, Any]]] = None,
 ) -> None:
     if not items:
         return
+    refletidos = refletidos or {}
+    fontes_counts = fontes_counts or {}
     template_rows = [r for r in range(1, ws.max_row + 1) if _row_has_item_slot(ws, r)]
     for row_idx in reversed(template_rows):
         template_values = [cell.value for cell in ws[row_idx]]
@@ -236,7 +327,12 @@ def _apply_item_row_templates(
                 _copy_row_style(ws, row_idx, target)
 
         for target_row, item in zip(target_rows, items):
-            item_ctx = build_item_slot_context(item)
+            item_id = int(_item_get(item, "id") or 0)
+            item_ctx = build_item_slot_context(
+                item,
+                refletido=refletidos.get(item_id, {}),
+                fontes=fontes_counts.get(item_id, {}),
+            )
             merged = {**global_ctx, **item_ctx}
             for col_idx, raw in enumerate(template_values, start=1):
                 if raw is None:
@@ -248,10 +344,23 @@ def _apply_item_row_templates(
                 ws.cell(row=target_row, column=col_idx, value=_substitute_slots(text, merged))
 
 
-def apply_slots_to_workbook(wb, global_ctx: Mapping[str, str], items: Sequence[Any]) -> None:
+def apply_slots_to_workbook(
+    wb,
+    global_ctx: Mapping[str, str],
+    items: Sequence[Any],
+    *,
+    refletidos: Optional[Mapping[int, Mapping[str, Any]]] = None,
+    fontes_counts: Optional[Mapping[int, Mapping[str, Any]]] = None,
+) -> None:
     """Substitui slots globais e expande linhas-modelo de itens em todas as abas."""
     for ws in wb.worksheets:
-        _apply_item_row_templates(ws, items, global_ctx)
+        _apply_item_row_templates(
+            ws,
+            items,
+            global_ctx,
+            refletidos=refletidos,
+            fontes_counts=fontes_counts,
+        )
         for row in ws.iter_rows():
             for cell in row:
                 val = cell.value
@@ -266,6 +375,7 @@ def render_cotacao_excel_from_template(
     template_path: Path,
     *,
     refletidos: Optional[Mapping[int, Mapping[str, Any]]] = None,
+    fontes_counts: Optional[Mapping[int, Mapping[str, Any]]] = None,
     itens: Optional[Sequence[Any]] = None,
     extra: Optional[Mapping[str, Any]] = None,
 ) -> io.BytesIO:
@@ -279,7 +389,13 @@ def render_cotacao_excel_from_template(
     keep_vba = suffix == ".xlsm"
     wb = load_workbook(template_path, keep_vba=keep_vba)
     global_ctx = build_global_slot_context(cotacao, refletidos=refletidos, itens=itens, extra=extra)
-    apply_slots_to_workbook(wb, global_ctx, itens)
+    apply_slots_to_workbook(
+        wb,
+        global_ctx,
+        itens,
+        refletidos=refletidos,
+        fontes_counts=fontes_counts,
+    )
 
     stream = io.BytesIO()
     # Saída sempre .xlsx (sem macros), mesmo quando o modelo base é .xlsm.

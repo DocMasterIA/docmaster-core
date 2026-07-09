@@ -35,9 +35,18 @@ PNCP_COTACAO_EXCEL_TEMPLATE=/caminho/absoluto/modelo.xlsx
 | Célula | Slot |
 |--------|------|
 | `B2` | `{PREFEITURA_ESTADO}` |
+| `B3` | `CNPJ: {CNPJ}` |
+| `B4` | `Telefone: {TELEFONE}` |
+| `B5` | `Departamento: {DEPARTAMENTO}` |
 | `A9` | `Relatório gerado em {DATA_HORARIO_GERACAO}` |
 | `A15` | `{ID_ITEM}` |
 | `B15` | `{NOME_ITEM}` |
+| `C15` | `{UNIDADE}` |
+| `D15` | `{QUANTIDADE}` |
+| `E15` | `{COTACOES_VALIDAS}` |
+| `F15` | `{VALOR_MEDIO}` |
+| `G15` | `{VALOR_TOTAL_HOMOLOGADO}` |
+| `B18` | `{OBSERVACOES}` |
 | `B21` | `{VALOR_EXTENSO}` |
 | `A23` | `{PREFEITURA_E_DATA}` |
 | `A26` | `{RESPONSAVEL_PESQUISA_PREÇOS}` |
@@ -53,6 +62,10 @@ Linha 15 é replicada para cada item da cotação. Colunas de cestas de preço (
 | `{PREFEITURA_ESTADO}` | Só prefeitura + UF (sem data) | `Prefeitura Municipal de Campinas (SP)` |
 | `{RESPONSAVEL_PESQUISA_PREÇOS}` | Nome de quem criou a cotação (`criado_por_nome` ou usuário) | `Maria Silva` |
 | `{VALOR_EXTENSO}` | Soma estimada dos itens, por extenso | `mil duzentos reais e cinquenta centavos` |
+| `{CNPJ}` | Preenchido no modal de exportação; fixo por usuário | `01.067.271/0001-27` |
+| `{TELEFONE}` | Preenchido no modal de exportação; fixo por usuário | `(64) 99298-5174` |
+| `{DEPARTAMENTO}` | Preenchido no modal; fixo só nesta cotação | `Compras` |
+| `{OBSERVACOES}` | Preenchido no modal; fixo só nesta cotação | `Prazo de entrega 15 dias` |
 
 ### Regras de origem
 
@@ -75,6 +88,11 @@ Coloque **uma linha** na planilha com estes placeholders; o sistema **replica a 
 |------|--------|---------|
 | `{ID_ITEM}` | `numero_item` da sessão; se vazio, `id` interno | `22` |
 | `{NOME_ITEM}` | `descricao_item` | `Álcool gel 500 ml` |
+| `{UNIDADE}` | `unidade_medida_refletida` → `unidade_medida` | `UN` |
+| `{QUANTIDADE}` | `quantidade` do item | `100` |
+| `{COTACOES_VALIDAS}` | Soma das cotações nas 5 fontes (Art. 5º) | `3` |
+| `{VALOR_MEDIO}` | Mesma regra da coluna **Média de preço** na tela (`valor_unitario_refletido` → fallbacks) | `R$ 6,34` |
+| `{VALOR_TOTAL_HOMOLOGADO}` | `valor_total_refletido` → `valor_total` → `valor_unitario` | `R$ 634,00` |
 
 A linha-modelo pode misturar slots de item com texto fixo e slots globais (globais são re-substituídos em cada linha).
 

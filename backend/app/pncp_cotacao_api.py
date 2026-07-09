@@ -1161,6 +1161,7 @@ def _build_cotacao_export_xlsx(cotacao: PncpCotacao, extra: Optional[Dict[str, A
     itens_asc = list(cotacao.itens.all().order_by("id"))
     formula_id = _resolve_formula_calculo_id(cotacao.filtros or {})
     refletidos = _itens_refletidos_for_session(cotacao.id, formula_id)
+    fontes_counts = _fontes_counts_for_session(cotacao.id)
     template_path = default_cotacao_excel_template_path()
     filename = _build_cotacao_export_filename(cotacao)
 
@@ -1169,6 +1170,7 @@ def _build_cotacao_export_xlsx(cotacao: PncpCotacao, extra: Optional[Dict[str, A
             cotacao,
             template_path,
             refletidos=refletidos,
+            fontes_counts=fontes_counts,
             itens=itens_asc,
             extra=extra,
         )

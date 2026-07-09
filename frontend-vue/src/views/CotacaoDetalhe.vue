@@ -1211,11 +1211,6 @@ async function onImportSpreadsheetSelected(event) {
       numero_item: 'numero_item',
     });
     await loadSessionFromBackend();
-    const invalid = Number(res?.linhas_invalidas || 0);
-    loadError.value =
-      invalid > 0
-        ? `Planilha importada com sucesso: ${res?.itens_inseridos || 0} itens. ${invalid} linha(s) inválida(s).`
-        : '';
   } catch (err) {
     loadError.value = `Falha ao importar planilha: ${err?.message || 'erro desconhecido'}. Coluna obrigatória: descricao_item. Recomendada: valor_base.`;
   } finally {

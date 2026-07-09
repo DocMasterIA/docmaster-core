@@ -663,11 +663,26 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** União por id — evita perder linhas quando o snapshot do lote sobrescreve append recente. */
+function mergeBulkSearchRows(localRows, registryRows) {
+  const map = new Map();
+  const ingest = (list) => {
+    for (const row of list || []) {
+      const id = String(row?.id || '').trim();
+      if (!id) continue;
+      map.set(id, row);
+    }
+  };
+  ingest(registryRows);
+  ingest(localRows);
+  return Array.from(map.values());
+}
+
 function persistBulkUiSnapshot(sessionId) {
   if (!Number.isFinite(Number(sessionId))) return;
   bulkAutostartRegistry.sessionId = Number(sessionId);
   bulkAutostartRegistry.progress = { ...autoSearchProgress.value };
-  bulkAutostartRegistry.rows = [...rows.value];
+  bulkAutostartRegistry.rows = mergeBulkSearchRows(rows.value, bulkAutostartRegistry.rows);
   bulkAutostartRegistry.lastFailure = String(lastBulkFailure.value || '');
 }
 
@@ -677,7 +692,7 @@ function applyBulkUiSnapshot(sessionId) {
     autoSearchProgress.value = { ...bulkAutostartRegistry.progress };
   }
   if (Array.isArray(bulkAutostartRegistry.rows)) {
-    rows.value = [...bulkAutostartRegistry.rows];
+    rows.value = mergeBulkSearchRows(rows.value, bulkAutostartRegistry.rows);
   }
   lastBulkFailure.value = bulkAutostartRegistry.lastFailure || '';
   isAutoSearchingAll.value = Boolean(bulkAutostartRegistry.isRunning);
@@ -850,6 +865,7 @@ async function runBulkItemSearches(pendentes, {
   if (clearRows) {
     rows.value = [];
     clearRowSelections();
+    bulkAutostartRegistry.rows = [];
   }
   isAutoSearchingAll.value = true;
   autoSearchProgress.value = {
@@ -1034,7 +1050,12 @@ const groupedRows = computed(() => {
   for (const g of groups) {
     g.allSelected = g.rows.length > 0 && g.rows.every((x) => selectedRowIds.value.has(x.id));
   }
-  groups.sort((a, b) => String(a.label).localeCompare(String(b.label), 'pt-BR'));
+  groups.sort((a, b) => {
+    const ai = Number(a.itemId);
+    const bi = Number(b.itemId);
+    if (Number.isFinite(ai) && Number.isFinite(bi) && ai !== bi) return ai - bi;
+    return String(a.label).localeCompare(String(b.label), 'pt-BR');
+  });
   return groups;
 });
 
@@ -1387,6 +1408,10 @@ async function runSearchWithContext({
         return (Number.isFinite(va) ? va : Infinity) - (Number.isFinite(vb) ? vb : Infinity);
       });
       rows.value = append ? [...rows.value, ...picks] : picks;
+      if (bulkMode) {
+        const sid = Number(cotacaoId.value);
+        if (Number.isFinite(sid) && sid > 0) persistBulkUiSnapshot(sid);
+      }
       exibidos = picks.length;
       const apiN = Number(lastBackend?.itens?.length ?? backendItensTotal ?? picks.length);
       const filtrosResp = lastBackend?.filtros || {};

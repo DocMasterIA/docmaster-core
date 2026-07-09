@@ -52,7 +52,7 @@ PNCP_COTACAO_EXCEL_TEMPLATE=/caminho/absoluto/modelo.xlsx
 | `A20` | `{PREFEITURA_E_DATA}` |
 | `A23` | `{RESPONSAVEL_PESQUISA_PREÇOS}` |
 
-Linha 14 é replicada para cada item da cotação.
+Linha 14 é replicada para cada item da cotação. As linhas de rodapé (observações, valor extenso, data, assinatura) **permanecem abaixo dos itens**, com merges e alturas preservados.
 
 ## Slots globais (uma vez na planilha)
 

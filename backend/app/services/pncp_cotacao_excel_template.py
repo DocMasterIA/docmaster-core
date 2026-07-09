@@ -286,6 +286,50 @@ def _row_has_item_slot(ws, row_idx: int) -> bool:
     return False
 
 
+def _find_footer_start_row(ws, item_template_row: int) -> int:
+    """Primeira linha do rodapé (observações, assinatura…) após a linha-modelo de itens."""
+    for r in range(item_template_row + 1, ws.max_row + 1):
+        if _row_has_item_slot(ws, r):
+            continue
+        has_content = any(
+            cell.value is not None and str(cell.value).strip()
+            for cell in ws[r]
+        )
+        if has_content:
+            return r
+    return item_template_row + 1
+
+
+def _read_merge_specs(ws) -> List[Tuple[int, int, int, int]]:
+    return [(m.min_row, m.min_col, m.max_row, m.max_col) for m in ws.merged_cells.ranges]
+
+
+def _shift_merge_specs(
+    specs: Sequence[Tuple[int, int, int, int]],
+    insert_at: int,
+    amount: int,
+) -> List[Tuple[int, int, int, int]]:
+    if amount <= 0:
+        return list(specs)
+    shifted: List[Tuple[int, int, int, int]] = []
+    for min_r, min_c, max_r, max_c in specs:
+        if min_r >= insert_at:
+            min_r += amount
+            max_r += amount
+        elif max_r >= insert_at:
+            max_r += amount
+        shifted.append((min_r, min_c, max_r, max_c))
+    return shifted
+
+
+def _apply_merge_specs(ws, specs: Sequence[Tuple[int, int, int, int]]) -> None:
+    from openpyxl.worksheet.cell_range import MultiCellRange
+
+    ws.merged_cells = MultiCellRange()
+    for min_r, min_c, max_r, max_c in specs:
+        ws.merge_cells(start_row=min_r, start_column=min_c, end_row=max_r, end_column=max_c)
+
+
 def _copy_row_style(ws, src_row: int, dst_row: int) -> None:
     if src_row == dst_row:
         return
@@ -317,15 +361,21 @@ def _apply_item_row_templates(
     template_rows = [r for r in range(1, ws.max_row + 1) if _row_has_item_slot(ws, r)]
     for row_idx in reversed(template_rows):
         template_values = [cell.value for cell in ws[row_idx]]
-        if len(items) == 1:
-            target_rows = [row_idx]
-        else:
-            ws.insert_rows(row_idx + 1, amount=len(items) - 1)
-            target_rows = list(range(row_idx, row_idx + len(items)))
-            for offset, target in enumerate(target_rows):
-                if offset == 0:
-                    continue
-                _copy_row_style(ws, row_idx, target)
+        footer_row = _find_footer_start_row(ws, row_idx)
+        n_items = len(items)
+        merge_specs = _read_merge_specs(ws)
+
+        if n_items > 1:
+            # Insere linhas de itens *antes* do rodapé (observações, assinatura…),
+            # preservando merges e alturas das linhas fixas abaixo.
+            ws.insert_rows(footer_row, n_items - 1)
+            _apply_merge_specs(ws, _shift_merge_specs(merge_specs, footer_row, n_items - 1))
+
+        target_rows = list(range(row_idx, row_idx + n_items))
+        for offset, target in enumerate(target_rows):
+            if offset == 0:
+                continue
+            _copy_row_style(ws, row_idx, target)
 
         for target_row, item in zip(target_rows, items):
             item_id = int(_item_get(item, "id") or 0)

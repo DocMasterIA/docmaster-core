@@ -62,8 +62,10 @@ from backend.app.services.pncp_relatorio_pdf import (
 )
 from backend.app.services.pncp_cotacao_excel_template import (
     default_cotacao_excel_template_path,
+    excel_content_type_for_ext,
     render_cotacao_excel_from_template,
     template_available,
+    template_output_ext,
 )
 from backend.app.utils.cotacao_valor_total import somar_valor_total_estimado_itens
 from backend.app.utils.valor_extenso_pt import valor_monetario_extenso_payload
@@ -1145,7 +1147,7 @@ def _autosize_openpyxl_columns(ws, *, min_width: int = 10, max_width: int = 52) 
         ws.column_dimensions[get_column_letter(idx)].width = max(min_width, min(max_width, width + 2))
 
 
-def _build_cotacao_export_filename(cotacao: PncpCotacao) -> str:
+def _build_cotacao_export_filename(cotacao: PncpCotacao, ext: str = "xlsx") -> str:
     titulo = (cotacao.titulo or cotacao.termo_busca or "").strip() or "relatorio"
     return nome_arquivo_relatorio(
         int(cotacao.id),
@@ -1153,7 +1155,7 @@ def _build_cotacao_export_filename(cotacao: PncpCotacao) -> str:
         sistema_nome=nome_sistema_relatorio(),
         usuario_nome=usuario_nome_export_cotacao(cotacao),
         dt=timezone.now(),
-        ext="xlsx",
+        ext=ext,
     )
 
 
@@ -1163,9 +1165,10 @@ def _build_cotacao_export_xlsx(cotacao: PncpCotacao, extra: Optional[Dict[str, A
     refletidos = _itens_refletidos_for_session(cotacao.id, formula_id)
     fontes_counts = _fontes_counts_for_session(cotacao.id)
     template_path = default_cotacao_excel_template_path()
-    filename = _build_cotacao_export_filename(cotacao)
 
     if template_available(template_path):
+        # Modelo .xlsm sai como .xlsm (keep_vba); salvar como .xlsx corromperia o arquivo.
+        filename = _build_cotacao_export_filename(cotacao, ext=template_output_ext(template_path))
         stream = render_cotacao_excel_from_template(
             cotacao,
             template_path,
@@ -1180,7 +1183,7 @@ def _build_cotacao_export_xlsx(cotacao: PncpCotacao, extra: Optional[Dict[str, A
         cotacao,
         itens_asc=itens_asc,
         refletidos=refletidos,
-        filename=filename,
+        filename=_build_cotacao_export_filename(cotacao),
     )
 
 
@@ -1806,7 +1809,7 @@ def pncp_research_sessions_export_xlsx(request, sessao_id: int):
         stream,
         as_attachment=True,
         filename=filename,
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        content_type=excel_content_type_for_ext(filename.rsplit(".", 1)[-1]),
     )
     resp["Access-Control-Expose-Headers"] = "Content-Disposition"
     resp["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"

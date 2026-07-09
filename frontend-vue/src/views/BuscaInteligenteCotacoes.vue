@@ -199,7 +199,10 @@
           <article v-for="group in groupedRows" :key="group.key" class="bia-group-card">
             <header class="bia-group-head">
               <div>
-                <h3 class="bia-group-title">{{ group.label }}</h3>
+                <h3 class="bia-group-title">
+                  {{ group.label }}
+                  <span class="bia-group-media">· Média escolhida: <strong>{{ mediaEscolhidaGrupo(group) }}</strong></span>
+                </h3>
                 <p class="bia-meta">
                   {{ group.rows.length }} cotações sugeridas para este item
                   <span v-if="group.backendItensCount != null && group.backendItensCount !== group.rows.length">
@@ -238,7 +241,11 @@
                 <tbody>
                   <tr v-for="row in group.rows" :key="row.id">
                     <td class="bia-cell-center">
-                      <input type="checkbox" :checked="row.selecionado" @change="toggleSelecionado(row.id)" />
+                      <input
+                        type="checkbox"
+                        :checked="isRowSelected(row.id)"
+                        @change="setRowSelected(row.id, $event.target.checked)"
+                      />
                     </td>
                     <td>
                       <div class="bia-main">{{ row.titulo }}</div>
@@ -495,6 +502,8 @@ function ufBandeiraUrl(code) {
 }
 
 const rows = ref([]);
+/** Seleções persistem mesmo quando a lista de linhas é atualizada (bulk/autostart). */
+const selectedRowIds = ref(new Set());
 const isSearching = ref(false);
 /** Conta chamadas HTTP de busca em voo (várias sequenciais ou reinício). */
 const activeSearchOps = ref(0);
@@ -675,6 +684,30 @@ function applyBulkUiSnapshot(sessionId) {
   return true;
 }
 
+function isRowSelected(id) {
+  return selectedRowIds.value.has(id);
+}
+
+function setRowSelected(id, checked) {
+  const next = new Set(selectedRowIds.value);
+  if (checked) next.add(id);
+  else next.delete(id);
+  selectedRowIds.value = next;
+}
+
+function clearRowSelections() {
+  selectedRowIds.value = new Set();
+}
+
+function mediaEscolhidaGrupo(group) {
+  const nums = (group?.rows || [])
+    .filter((r) => selectedRowIds.value.has(r.id))
+    .map((r) => Number(r.valorUnitario ?? parseMoeda(r.valor)))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (!nums.length) return 'R$ -';
+  return formatCurrency(nums.reduce((a, b) => a + b, 0) / nums.length);
+}
+
 async function awaitBulkAutostartRegistry(sessionId) {
   applyBulkUiSnapshot(sessionId);
   const pollMs = 400;
@@ -814,7 +847,10 @@ async function runBulkItemSearches(pendentes, {
   const myBulkRunId = bulkRunId;
   const sid = Number(sessionId);
   const stopOpts = { mountRunId, myBulkRunId, generation, autostartBulk };
-  if (clearRows) rows.value = [];
+  if (clearRows) {
+    rows.value = [];
+    clearRowSelections();
+  }
   isAutoSearchingAll.value = true;
   autoSearchProgress.value = {
     done: 0,
@@ -899,12 +935,12 @@ async function runBulkItemSearches(pendentes, {
       `Falha de rede em ${p.fail} item(ns). Verifique o serviço PNCP e clique «Pesquisar UF» para tentar de novo.`;
   }
 }
-const totalSelecionados = computed(() => displayedRows.value.filter((x) => x.selecionado).length);
+const totalSelecionados = computed(() => displayedRows.value.filter((x) => selectedRowIds.value.has(x.id)).length);
 const totalSalvaveis = computed(
   () => displayedRows.value.filter((r) => canSalvarCotacaoPnCp(r)).length,
 );
 const allDisplayedSelecionados = computed(
-  () => displayedRows.value.length > 0 && displayedRows.value.every((x) => x.selecionado),
+  () => displayedRows.value.length > 0 && displayedRows.value.every((x) => selectedRowIds.value.has(x.id)),
 );
 const bulkSelectLabel = computed(() => {
   const n = displayedRows.value.length;
@@ -996,7 +1032,7 @@ const groupedRows = computed(() => {
   }
   const groups = [...map.values()];
   for (const g of groups) {
-    g.allSelected = g.rows.length > 0 && g.rows.every((x) => x.selecionado);
+    g.allSelected = g.rows.length > 0 && g.rows.every((x) => selectedRowIds.value.has(x.id));
   }
   groups.sort((a, b) => String(a.label).localeCompare(String(b.label), 'pt-BR'));
   return groups;
@@ -1013,6 +1049,7 @@ async function applyFilters() {
       return;
     }
     rows.value = [];
+    clearRowSelections();
     return runSearchWithContext({
       descricao: itemContext.value?.descricao_item || '',
       context: itemContext.value,
@@ -1337,6 +1374,9 @@ async function runSearchWithContext({
       }
     }
     if (aggregated.length > 0) {
+      if (generationStale() || bulkSuperseded()) {
+        return bulkSearchFailResult(null, { superseded: bulkSuperseded() || generationStale() });
+      }
       // Confia no top3 do backend; sem dedupe agressivo (descrições PNCP iguais colapsavam 3→1).
       const picks = [...aggregated].sort((a, b) => {
         const sa = Number(a.score ?? 0);
@@ -1406,21 +1446,27 @@ function formatCurrency(v) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function toggleSelecionado(id) {
-  rows.value = rows.value.map((r) => (r.id === id ? { ...r, selecionado: !r.selecionado } : r));
-}
-
 function toggleSelecionarTop3() {
   if (!displayedRows.value.length) return;
-  const ids = new Set(displayedRows.value.map((r) => r.id));
+  const ids = displayedRows.value.map((r) => r.id);
   const mark = !allDisplayedSelecionados.value;
-  rows.value = rows.value.map((r) => (ids.has(r.id) ? { ...r, selecionado: mark } : r));
+  const next = new Set(selectedRowIds.value);
+  for (const id of ids) {
+    if (mark) next.add(id);
+    else next.delete(id);
+  }
+  selectedRowIds.value = next;
 }
 
 function toggleSelecionarGrupo(group) {
-  const ids = new Set(group.rows.map((r) => r.id));
+  const ids = group.rows.map((r) => r.id);
   const mark = !group.allSelected;
-  rows.value = rows.value.map((r) => (ids.has(r.id) ? { ...r, selecionado: mark } : r));
+  const next = new Set(selectedRowIds.value);
+  for (const id of ids) {
+    if (mark) next.add(id);
+    else next.delete(id);
+  }
+  selectedRowIds.value = next;
 }
 
 async function adicionarSelecionadosNaCotacao() {
@@ -1430,7 +1476,7 @@ async function adicionarSelecionadosNaCotacao() {
     saveMessage.value = 'Cotação inválida para salvar no backend.';
     return;
   }
-  const brutos = displayedRows.value.filter((r) => r.selecionado);
+  const brutos = displayedRows.value.filter((r) => selectedRowIds.value.has(r.id));
   const semFornecedor = brutos.filter((r) => !canSalvarCotacaoPnCp(r)).length;
   const selecionados = brutos
     .filter((r) => canSalvarCotacaoPnCp(r))
@@ -1535,8 +1581,11 @@ async function adicionarSelecionadosNaCotacao() {
       semFornecedorUi: semFornecedor,
     });
     if (shouldClearSavedSelection(stats, enviar.length)) {
-      const selectedIds = new Set(displayedRows.value.filter((r) => r.selecionado).map((r) => r.id));
-      rows.value = rows.value.filter((r) => !selectedIds.has(r.id));
+      const savedIds = new Set(displayedRows.value.filter((r) => selectedRowIds.value.has(r.id)).map((r) => r.id));
+      rows.value = rows.value.filter((r) => !savedIds.has(r.id));
+      const next = new Set(selectedRowIds.value);
+      for (const id of savedIds) next.delete(id);
+      selectedRowIds.value = next;
     }
     if (stats.inseridas > 0 || stats.itensNovos > 0) {
       if (itemId.value) {
@@ -2203,6 +2252,12 @@ function onVariacaoInput(event) {
   background: #fff;
 }
 .bia-group-title { margin: 0; font-size: 14px; color: #0f172a; }
+.bia-group-media {
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+}
+.bia-group-media strong { color: #0f4c81; font-weight: 700; }
 .bia-table { width: 100%; min-width: 1300px; border-collapse: collapse; table-layout: fixed; }
 .bia-table th, .bia-table td { border-bottom: 1px solid #e5eaf3; padding: 10px 8px; font-size: 12px; vertical-align: top; }
 .bia-table th { text-align: left; font-size: 11px; text-transform: uppercase; color: #64748b; background: #fff; }

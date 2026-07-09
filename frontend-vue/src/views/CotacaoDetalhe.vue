@@ -58,10 +58,6 @@
             <strong>{{ sessaoStatusLabel }}</strong>
           </div>
         </div>
-        <div v-if="valorTotalItensExtenso" class="cot-valor-extenso">
-          <span class="cot-valor-extenso__label">Valor total por extenso</span>
-          <p class="cot-valor-extenso__text">{{ valorTotalItensExtenso }}</p>
-        </div>
       </section>
 
       <section class="cot-formula">
@@ -720,8 +716,6 @@ import {
   formatMoedaBRLInput,
   sanitizeQuantidadeInput,
 } from '../utils/itemValorCampos';
-import { valorMonetarioPorExtenso } from '../utils/valorExtensoPt';
-
 const route = useRoute();
 const router = useRouter();
 const cotacaoId = computed(() => route.params.cotacaoId || 'CT-2026-00421');
@@ -741,7 +735,6 @@ const sessaoCreatedAt = ref('—');
 const sessaoCriadoPor = ref('—');
 const sessaoCriadoPorEmail = ref('');
 const valorTotalItensFmt = ref('R$ —');
-const valorTotalItensExtenso = ref('');
 const tituloSalvo = ref(false);
 const isLoading = ref(false);
 const loadError = ref('');
@@ -1414,17 +1407,6 @@ onMounted(() => {
   loadSessionFromBackend();
 });
 
-function resolveValorTotalExtenso(sessao, soma, temValor) {
-  const fromApi = String(sessao?.valor_total_estimado_extenso || '').trim();
-  if (fromApi) return fromApi;
-  if (!temValor) return '';
-  try {
-    return valorMonetarioPorExtenso(soma);
-  } catch {
-    return '';
-  }
-}
-
 async function loadSessionFromBackend() {
   const sessionId = Number(cotacaoId.value);
   if (Number.isNaN(sessionId)) {
@@ -1532,18 +1514,15 @@ async function loadSessionFromBackend() {
         };
       });
       valorTotalItensFmt.value = temValor ? formatCurrency(soma) : 'R$ —';
-      valorTotalItensExtenso.value = resolveValorTotalExtenso(data?.sessao, soma, temValor);
     } else if (data?.ok) {
       linhasMock.value = [];
       valorTotalItensFmt.value = 'R$ —';
-      valorTotalItensExtenso.value = '';
       totalItensSessao.value = 0;
     }
   } catch (err) {
     loadError.value = `Não foi possível carregar a sessão no backend (${err.message || 'erro desconhecido'}).`;
     linhasMock.value = [];
     valorTotalItensFmt.value = 'R$ —';
-    valorTotalItensExtenso.value = '';
     sessaoCriadoPor.value = '—';
     sessaoCriadoPorEmail.value = '';
     sessaoStatus.value = 'aberta';
@@ -1745,30 +1724,6 @@ async function saveTituloNoBackend() {
 .cot-card { border: 1px solid #d6dde8; border-radius: 10px; background: #fff; padding: 10px; display: flex; flex-direction: column; gap: 2px; }
 .cot-card--highlight strong { color: #1f4e79; }
 
-.cot-valor-extenso {
-  margin-top: 10px;
-  padding: 12px 14px;
-  border: 1px solid #c9d9ea;
-  border-radius: 12px;
-  background: #f4f8fc;
-}
-
-.cot-valor-extenso__label {
-  display: block;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #64748b;
-  margin-bottom: 6px;
-}
-
-.cot-valor-extenso__text {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
-  color: #1f2937;
-  font-style: italic;
-}
 .cot-card__label { font-size: 11px; text-transform: uppercase; color: var(--color-text-soft); }
 .cot-card__email {
   display: block;
@@ -2685,19 +2640,6 @@ a.pncp-modal__link-btn {
 
 :deep(.dm-dark) .cot-faixa-block__value,
 :deep(.dm-dark) .cot-faixa-block__dot {
-  color: #e2e8f0 !important;
-}
-
-:deep(.dm-dark) .cot-valor-extenso {
-  background: #0f172a !important;
-  border-color: #334155 !important;
-}
-
-:deep(.dm-dark) .cot-valor-extenso__label {
-  color: #94a3b8 !important;
-}
-
-:deep(.dm-dark) .cot-valor-extenso__text {
   color: #e2e8f0 !important;
 }
 

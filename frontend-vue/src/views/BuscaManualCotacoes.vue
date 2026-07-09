@@ -180,7 +180,7 @@
       <section class="manual-summary">
         <div class="manual-summary-card"><span>Resultados</span><strong>{{ resultadosFiltradosOrdenados.length }}</strong></div>
         <div class="manual-summary-card"><span>Selecionados</span><strong>{{ totalSelecionados }}</strong></div>
-        <div class="manual-summary-card"><span>Valor médio</span><strong>{{ mediaValor }}</strong></div>
+        <div class="manual-summary-card"><span>Valor médio (selecionados)</span><strong>{{ mediaValor }}</strong></div>
         <div class="manual-summary-card"><span>UFs distintas</span><strong>{{ totalUfs }}</strong></div>
       </section>
       <p v-if="faixaValorAtiva" class="manual-meta">
@@ -216,6 +216,7 @@
                 <th>UF</th>
                 <th>Data</th>
                 <th>Valor Unit.</th>
+                <th>Faixa Regional do Item</th>
                 <th>Confiabilidade IA</th>
                 <th>Observação</th>
               </tr>
@@ -253,6 +254,20 @@
                 </td>
                 <td class="manual-cell-center">{{ item.data }}</td>
                 <td class="manual-cell-money">{{ item.valor }}</td>
+                <td class="manual-faixa-cell">
+                  <template v-if="faixaRegionalItemDisplay">
+                    <div class="manual-faixa-cell__row">
+                      <span class="manual-faixa-cell__label">BASE</span>
+                      <strong>{{ faixaRegionalItemDisplay.baseFmt }}</strong>
+                    </div>
+                    <div class="manual-faixa-cell__row">
+                      <span class="manual-faixa-cell__label">VAR</span>
+                      <strong>{{ faixaRegionalItemDisplay.variacaoFmt }}</strong>
+                    </div>
+                    <div class="manual-faixa-cell__range">{{ faixaRegionalItemDisplay.rangeFmt }}</div>
+                  </template>
+                  <span v-else class="manual-meta">—</span>
+                </td>
                 <td class="manual-cell-center">
                   <span class="manual-status" :class="statusClass(item.statusIa)">{{ item.statusIa }}</span>
                 </td>
@@ -283,7 +298,7 @@ import {
 } from '../utils/pncpSaveCotacoes';
 import { MUNICIPIOS_POR_UF } from '../data/brasilMunicipiosPorUf';
 import { buildRecortesGeograficosPayload, itemMatchesRecortesGeograficos } from '../utils/recortesGeograficos';
-import { canSalvarCotacaoPnCp, displayPnCpUnitario, extractCnpjFornecedorSalvar, formatFaixaResumo, passesPnCpSearchDisplayGate, computeFaixaRegional, pickFornecedorDisplayName } from '../utils/pncpPricing';
+import { canSalvarCotacaoPnCp, displayPnCpUnitario, extractCnpjFornecedorSalvar, formatFaixaResumo, passesPnCpSearchDisplayGate, computeFaixaRegional, pickFornecedorDisplayName, buildFaixaRegionalItemDisplay } from '../utils/pncpPricing';
 
 const route = useRoute();
 const router = useRouter();
@@ -467,7 +482,10 @@ const addButtonLabel = computed(() => (
 const totalSelecionados = computed(() => resultados.value.filter((x) => x.selecionado).length);
 const totalUfs = computed(() => new Set(resultadosFiltradosOrdenados.value.map((x) => x.uf).filter(Boolean)).size);
 const mediaValor = computed(() => {
-  const nums = resultadosFiltradosOrdenados.value.map((x) => parseMoeda(x.valor)).filter((x) => typeof x === 'number');
+  const nums = resultados.value
+    .filter((x) => x.selecionado)
+    .map((x) => parseMoeda(x.valor))
+    .filter((x) => typeof x === 'number');
   if (!nums.length) return 'R$ -';
   return formatCurrency(nums.reduce((a, b) => a + b, 0) / nums.length);
 });
@@ -479,6 +497,14 @@ const faixaValorAtiva = computed(() => {
   const perc = Number.isFinite(p) ? Math.max(0, p) : 0;
   const sentido = ['baixo', 'cima', 'ambos'].includes(filtros.variacaoSentido) ? filtros.variacaoSentido : 'ambos';
   return formatFaixaResumo(base, perc, sentido);
+});
+const faixaRegionalItemDisplay = computed(() => {
+  const base = parseMoeda(filtros.valorBase);
+  if (base == null || base <= 0) return null;
+  const p = Number.parseFloat(String(filtros.variacao || '0'));
+  const perc = Number.isFinite(p) ? Math.max(0, p) : 0;
+  const sentido = ['baixo', 'cima', 'ambos'].includes(filtros.variacaoSentido) ? filtros.variacaoSentido : 'ambos';
+  return buildFaixaRegionalItemDisplay(base, perc, sentido);
 });
 const resultadosFiltradosOrdenados = computed(() => {
   const base = [...resultados.value];
@@ -985,8 +1011,16 @@ function parseMoeda(v) {
 function applyFaixaDefaultsFromItem(it) {
   if (!it) return;
   const src = it?.source || {};
+  const faixa = src?.faixa_regional || src?.faixaRegional || {};
   const base = Number(
-    src?.valor_base ?? src?.valorBase ?? src?.preco_base ?? src?.precoBase ?? it?.valor_base ?? null,
+    faixa?.valor_base
+    ?? faixa?.valorBase
+    ?? src?.valor_base
+    ?? src?.valorBase
+    ?? src?.preco_base
+    ?? src?.precoBase
+    ?? it?.valor_base
+    ?? null,
   );
   const variacao = Number(
     src?.variacao_percentual ?? src?.variacaoPercentual ?? src?.variacao ?? it?.variacao_percentual ?? null,
@@ -1292,6 +1326,31 @@ onMounted(async () => {
 .manual-field span { font-size: 10px; text-transform: uppercase; color: #64748b; }
 .manual-meta { margin: 0; font-size: 12px; color: #64748b; }
 .manual-meta--error { color: #b91c1c; }
+
+.manual-faixa-cell {
+  min-width: 118px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #334155;
+}
+.manual-faixa-cell__row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+.manual-faixa-cell__label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+.manual-faixa-cell__range {
+  margin-top: 2px;
+  font-size: 10px;
+  color: #0f4c81;
+  font-weight: 600;
+}
 .manual-field input,
 .manual-field select { border: 1px solid #cfd8e3; border-radius: 8px; background: #fff; font-size: 13px; padding: 7px 9px; outline: none; }
 

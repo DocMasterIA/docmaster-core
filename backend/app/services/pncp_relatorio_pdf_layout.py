@@ -22,7 +22,7 @@ PDF_FONTE_TEXTO_MAX: Dict[str, int] = {
     "endereco": 180,
     "email": 72,
     "telefone": 36,
-    "processo": 72,
+    "link_pncp": 512,
     "ajuste": 72,
     "municipio_uf": 44,
     "tipo": 72,

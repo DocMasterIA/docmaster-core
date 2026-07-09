@@ -228,6 +228,7 @@
                     <th>UF</th>
                     <th>Data</th>
                     <th>Valor Unit.</th>
+                    <th>Faixa Regional do Item</th>
                     <th>Confiabilidade IA</th>
                     <th>Risco</th>
                     <th>Score</th>
@@ -276,6 +277,20 @@
                     </td>
                     <td class="bia-cell-center">{{ row.data }}</td>
                     <td class="bia-bold">{{ row.valor }}</td>
+                    <td class="bia-faixa-cell">
+                      <template v-if="faixaRegionalItemForRow(row)">
+                        <div class="bia-faixa-cell__row">
+                          <span class="bia-faixa-cell__label">BASE</span>
+                          <strong>{{ faixaRegionalItemForRow(row).baseFmt }}</strong>
+                        </div>
+                        <div class="bia-faixa-cell__row">
+                          <span class="bia-faixa-cell__label">VAR</span>
+                          <strong>{{ faixaRegionalItemForRow(row).variacaoFmt }}</strong>
+                        </div>
+                        <div class="bia-faixa-cell__range">{{ faixaRegionalItemForRow(row).rangeFmt }}</div>
+                      </template>
+                      <span v-else class="bia-meta">—</span>
+                    </td>
                     <td class="bia-cell-center">
                       <span class="bia-badge" :class="confiabilidadeClass(row.confiabilidade)">
                         {{ row.confiabilidade }}
@@ -329,6 +344,7 @@ import {
   displayPnCpTotal,
   displayPnCpUnitario,
   canSalvarCotacaoPnCp,
+  buildFaixaRegionalItemDisplay,
   computeFaixaRegional,
   extractCnpjFornecedorSalvar,
   extractPnCpHomologadoTotal,
@@ -932,6 +948,33 @@ const displayedRows = computed(() => {
   return filtrados;
 });
 
+const itemFaixaRegionalById = computed(() => {
+  const map = new Map();
+  const contexts = [];
+  if (itemContext.value) contexts.push(itemContext.value);
+  for (const ctx of allItemContexts.value) {
+    if (ctx && !contexts.some((c) => c?.id === ctx?.id)) contexts.push(ctx);
+  }
+  for (const ctx of contexts) {
+    const id = Number(ctx?.id);
+    if (!Number.isFinite(id) || id <= 0) continue;
+    const display = buildFaixaRegionalItemDisplay(
+      ctx.valor_base_referencia,
+      ctx.variacao_percentual_referencia,
+      ctx.variacao_sentido_referencia,
+    );
+    if (display) map.set(id, display);
+  }
+  return map;
+});
+
+function faixaRegionalItemForRow(row) {
+  if (row?.faixaRegionalItem) return row.faixaRegionalItem;
+  const id = Number(row?.itemId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  return itemFaixaRegionalById.value.get(id) || null;
+}
+
 const groupedRows = computed(() => {
   const map = new Map();
   for (const row of displayedRows.value) {
@@ -1222,6 +1265,9 @@ async function runSearchWithContext({
         similaridadeEncontrada: Boolean(it.similaridade_encontrada),
         fornecedor: pickFornecedorDisplayName({ sourceRaw: it }),
         cnpjFornecedor: extractCnpjFornecedorSalvar({ sourceRaw: it }),
+        faixaRegionalItem: faixaAtiva
+          ? buildFaixaRegionalItemDisplay(valorBaseCtx, variacaoCtx, sentidoCtx)
+          : null,
         selecionado: false,
         backendItensCount: backend.itens.length,
       }));
@@ -1815,6 +1861,31 @@ function onVariacaoInput(event) {
   margin-top: 4px;
   font-size: 11px;
   color: #64748b;
+}
+
+.bia-faixa-cell {
+  min-width: 118px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #334155;
+}
+.bia-faixa-cell__row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+.bia-faixa-cell__label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+.bia-faixa-cell__range {
+  margin-top: 2px;
+  font-size: 10px;
+  color: #0f4c81;
+  font-weight: 600;
 }
 
 .bia-filters { display: block; }

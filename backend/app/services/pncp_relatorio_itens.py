@@ -24,6 +24,8 @@ from backend.app.services.pncp_supplier_placeholders import (
     supplier_name_metadata_key,
 )
 from backend.app.services.pncp_supplier_enrichment import (
+    _ano_seq_for_enrichment,
+    _extract_cnpj_orgao,
     _nome_e_somente_cnpj_formatado,
     _promote_supplier_from_deep_walk,
     _supplier_payload_layers,
@@ -34,6 +36,8 @@ from backend.app.services.pncp_supplier_enrichment import (
     prefetch_cnpj_emails,
     receitaws_email_fallback_enabled,
 )
+
+_PNCP_PORTAL_BASE = "https://pncp.gov.br/app/editais"
 
 # Mínimo de cotações (fontes) por item para marcar situação como válida (IN 65 / prática comum).
 MIN_FONTES_SITUACAO_VALIDA = 3
@@ -769,6 +773,49 @@ def _source_efetivo_linha_cotacao(it: Any) -> Dict[str, Any]:
     return src
 
 
+def _pick_http_url(*candidates: Any) -> str:
+    for v in candidates:
+        u = str(v or "").strip()
+        if u.lower().startswith(("http://", "https://")):
+            return u
+    return ""
+
+
+def build_pncp_portal_processo_url(it: Any, *, src: Optional[Dict[str, Any]] = None) -> str:
+    """Mesma regra do botão «Ver no PNCP» na página do item de cotação (frontend pncpPortal.js)."""
+    src = src if isinstance(src, dict) else _source_efetivo_linha_cotacao(it)
+    from_source = _pick_http_url(
+        src.get("linkSistemaOrigem"),
+        src.get("linkProcessoEletronico"),
+        src.get("url_pncp"),
+        src.get("link_pncp"),
+        src.get("linkPncp"),
+        src.get("link_portal_pncp"),
+    )
+    if from_source:
+        return from_source
+
+    numero_pncp = str(
+        getattr(it, "numero_pncp", None)
+        or src.get("numero_pncp")
+        or src.get("numeroControlePNCP")
+        or ""
+    ).strip()
+    cnpj = _extract_cnpj_orgao(numero_pncp)
+    if not cnpj:
+        return ""
+
+    ano, seq = _ano_seq_for_enrichment(
+        numero_pncp=numero_pncp,
+        ano_compra=getattr(it, "ano_compra", None),
+        sequencial_compra=getattr(it, "sequencial_compra", None),
+        source=src,
+    )
+    if ano is None or seq is None:
+        return ""
+    return f"{_PNCP_PORTAL_BASE}/{cnpj}/{ano}/{seq}"
+
+
 def fonte_dict_de_item(
     it: Any,
     *,
@@ -841,9 +888,7 @@ def fonte_dict_de_item(
     municipio_uf = _format_municipio_uf(mun, uf) or "—"
     orgao = _format_orgao_com_local(getattr(it, "orgao", None), mun, uf)[:200]
 
-    processo = _pick_source(src, "processo", "numeroControlePNCP")
-    if processo == "—":
-        processo = (getattr(it, "numero_pncp", None) or "").strip() or "—"
+    link_pncp = build_pncp_portal_processo_url(it, src=src)
 
     ajuste = _pick_source(src, "ajuste", "observacao_frete", "frete", default="Sem frete")
 
@@ -869,7 +914,7 @@ def fonte_dict_de_item(
         "quantidade": _fmt_quantidade(getattr(it, "quantidade", None)),
         "orgao": orgao,
         "municipio_uf": municipio_uf[:120],
-        "processo": str(processo)[:120],
+        "link_pncp": link_pncp[:512],
         "ajuste": ajuste[:120],
         "telefone": telefone[:64],
         "email": email[:255],

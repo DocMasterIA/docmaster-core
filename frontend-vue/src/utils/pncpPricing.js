@@ -324,6 +324,21 @@ export function formatFaixaResumo(valorBase, variacaoPct, sentido = 'ambos') {
   return `base ${baseFmt}, ±${pct}% (${minFmt} – ${maxFmt})`;
 }
 
+/** Célula read-only da coluna «Faixa Regional do Item» (pesquisa de preços). */
+export function buildFaixaRegionalItemDisplay(valorBase, variacaoPct, sentido = 'ambos') {
+  const base = Number(valorBase);
+  const pct = Number(variacaoPct);
+  if (!Number.isFinite(base) || base <= 0 || !Number.isFinite(pct) || pct < 0) return null;
+  const { min, max } = computeFaixaRegional(base, pct, sentido);
+  if (min == null || max == null) return null;
+  const fmt = (n) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  return {
+    baseFmt: fmt(base),
+    variacaoFmt: `${Math.round(pct).toLocaleString('pt-BR')}%`,
+    rangeFmt: `${fmt(min)} – ${fmt(max)}`,
+  };
+}
+
 export function displayPnCpTotal(row) {
   const hom = extractPnCpHomologadoTotal(row);
   if (hom != null) return hom;

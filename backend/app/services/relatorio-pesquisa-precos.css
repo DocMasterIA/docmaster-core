@@ -676,6 +676,12 @@
   color: #1e293b;
 }
 
+.rpp-processo-link {
+  color: #1d4ed8;
+  text-decoration: underline;
+  font-weight: 600;
+}
+
 .rpp-mini-compact {
   border: 1px solid #e2e8f0;
   border-radius: 5px;

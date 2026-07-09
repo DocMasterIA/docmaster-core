@@ -180,7 +180,7 @@
       <section class="manual-summary">
         <div class="manual-summary-card"><span>Resultados</span><strong>{{ resultadosFiltradosOrdenados.length }}</strong></div>
         <div class="manual-summary-card"><span>Selecionados</span><strong>{{ totalSelecionados }}</strong></div>
-        <div class="manual-summary-card"><span>Valor médio (selecionados)</span><strong>{{ mediaValor }}</strong></div>
+        <div class="manual-summary-card"><span>Valor médio</span><strong>{{ mediaValor }}</strong></div>
         <div class="manual-summary-card"><span>UFs distintas</span><strong>{{ totalUfs }}</strong></div>
       </section>
       <p v-if="faixaValorAtiva" class="manual-meta">

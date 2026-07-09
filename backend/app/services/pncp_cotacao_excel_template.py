@@ -69,6 +69,7 @@ def default_cotacao_excel_template_path() -> Path:
         return Path(env)
 
     relative_paths = (
+        "template_packages/excell_base/relatorio_base_excell.xlsm",
         "template_packages/excell_base/relatorio_saida_excell.xlsx",
         "template_packages/pncp/cotacao_pesquisa_precos.xlsm",
         "template_packages/pncp/cotacao_pesquisa_precos.xlsx",

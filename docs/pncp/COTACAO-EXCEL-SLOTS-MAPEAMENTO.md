@@ -18,11 +18,12 @@ O modelo pode ser `.xlsm`, mas o arquivo gerado é **sempre `.xlsx`** (sem macro
 Caminho padrão (primeiro que existir):
 
 ```
-template_packages/excell_base/relatorio_saida_excell.xlsx   ← modelo oficial (Mapa de Apuração)
-template_packages/pncp/cotacao_pesquisa_precos.xlsx         ← fallback dev
+template_packages/excell_base/relatorio_base_excell.xlsm   ← modelo oficial (Mapa de Apuração)
+template_packages/excell_base/relatorio_saida_excell.xlsx  ← legado
+template_packages/pncp/cotacao_pesquisa_precos.xlsx        ← fallback dev
 ```
 
-No container Docker: `/app/template_packages/excell_base/relatorio_saida_excell.xlsx`
+No container Docker: `/app/template_packages/excell_base/relatorio_base_excell.xlsm`
 
 Override por variável de ambiente / settings:
 
@@ -34,24 +35,24 @@ PNCP_COTACAO_EXCEL_TEMPLATE=/caminho/absoluto/modelo.xlsx
 
 | Célula | Slot |
 |--------|------|
-| `B2` | `{PREFEITURA_ESTADO}` |
-| `B3` | `CNPJ: {CNPJ}` |
-| `B4` | `Telefone: {TELEFONE}` |
-| `B5` | `Departamento: {DEPARTAMENTO}` |
+| `A2` | `{PREFEITURA_ESTADO}` |
+| `A3` | `{CNPJ}` |
+| `A4` | `{TELEFONE}` |
+| `A5` | `Departamento: {DEPARTAMENTO}` |
 | `A9` | `Relatório gerado em {DATA_HORARIO_GERACAO}` |
-| `A15` | `{ID_ITEM}` |
-| `B15` | `{NOME_ITEM}` |
-| `C15` | `{UNIDADE}` |
-| `D15` | `{QUANTIDADE}` |
-| `E15` | `{COTACOES_VALIDAS}` |
-| `F15` | `{VALOR_MEDIO}` |
-| `G15` | `{VALOR_TOTAL_HOMOLOGADO}` |
-| `B18` | `{OBSERVACOES}` |
-| `B21` | `{VALOR_EXTENSO}` |
-| `A23` | `{PREFEITURA_E_DATA}` |
-| `A26` | `{RESPONSAVEL_PESQUISA_PREÇOS}` |
+| `A14` | `{ID_ITEM}` |
+| `B14` | `{NOME_ITEM}` |
+| `C14` | `{UNIDADE}` |
+| `D14` | `{QUANTIDADE}` |
+| `E14` | `{COTACOES_VALIDAS}` |
+| `F14` | `{VALOR_MEDIO}` |
+| `G14` | `{VALOR_TOTAL_HOMOLOGADO}` |
+| `B16` | `{OBSERVACOES}` |
+| `B18` | `{VALOR_EXTENSO}` |
+| `A20` | `{PREFEITURA_E_DATA}` |
+| `A23` | `{RESPONSAVEL_PESQUISA_PREÇOS}` |
 
-Linha 15 é replicada para cada item da cotação. Colunas de cestas de preço (E em diante) ficam para integração futura.
+Linha 14 é replicada para cada item da cotação.
 
 ## Slots globais (uma vez na planilha)
 

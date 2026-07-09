@@ -1140,7 +1140,7 @@ def _build_cotacao_export_filename(cotacao: PncpCotacao) -> str:
     )
 
 
-def _build_cotacao_export_xlsx(cotacao: PncpCotacao) -> tuple[io.BytesIO, str]:
+def _build_cotacao_export_xlsx(cotacao: PncpCotacao, extra: Optional[Dict[str, Any]] = None) -> tuple[io.BytesIO, str]:
     itens_asc = list(cotacao.itens.all().order_by("id"))
     formula_id = _resolve_formula_calculo_id(cotacao.filtros or {})
     refletidos = _itens_refletidos_for_session(cotacao.id, formula_id)
@@ -1153,6 +1153,7 @@ def _build_cotacao_export_xlsx(cotacao: PncpCotacao) -> tuple[io.BytesIO, str]:
             template_path,
             refletidos=refletidos,
             itens=itens_asc,
+            extra=extra,
         )
         return stream, filename
 
@@ -1683,6 +1684,12 @@ def pncp_research_sessions_detail(request, sessao_id: int):
                 "anexo_fornecedor_pdf": bool(anexos_payload),
                 "anexo_fornecedor_nome": (anexos_payload[0]["nome"] if anexos_payload else ""),
                 "anexos_fornecedor": anexos_payload,
+                "export_excel_prefs": {
+                    "cnpj": str((getattr(request.user, "pncp_export_prefs", None) or {}).get("cnpj", "") or ""),
+                    "telefone": str((getattr(request.user, "pncp_export_prefs", None) or {}).get("telefone", "") or ""),
+                    "departamento": str(((c.filtros or {}).get("export_excel") or {}).get("departamento", "") or ""),
+                    "observacoes": str(((c.filtros or {}).get("export_excel") or {}).get("observacoes", "") or ""),
+                },
             },
             "itens": [
                 {
@@ -1711,9 +1718,50 @@ def pncp_research_sessions_detail(request, sessao_id: int):
     )
 
 
+def _resolve_export_extra_fields(request, cotacao: PncpCotacao) -> Dict[str, str]:
+    """Resolve CNPJ/Telefone (prefs do usuário) e Departamento/Observações (da cotação).
+
+    Em POST, os valores enviados são persistidos: CNPJ/Telefone ficam fixos no
+    usuário (reaproveitados em outras cotações) e Departamento/Observações ficam
+    fixos apenas nesta cotação. Em GET, usa o que já estiver guardado.
+    """
+    user = request.user
+    prefs = dict(getattr(user, "pncp_export_prefs", None) or {})
+    filtros = dict(cotacao.filtros or {})
+    export_meta = dict(filtros.get("export_excel") or {})
+
+    if request.method == "POST":
+        body, err = _parse_json_body(request)
+        if err is None and body:
+            def _clean(v: Any, limit: int) -> str:
+                return str(v or "").strip()[:limit]
+
+            if "cnpj" in body:
+                prefs["cnpj"] = _clean(body.get("cnpj"), 32)
+            if "telefone" in body:
+                prefs["telefone"] = _clean(body.get("telefone"), 40)
+            if "departamento" in body:
+                export_meta["departamento"] = _clean(body.get("departamento"), 160)
+            if "observacoes" in body:
+                export_meta["observacoes"] = _clean(body.get("observacoes"), 2000)
+
+            user.pncp_export_prefs = prefs
+            user.save(update_fields=["pncp_export_prefs"])
+            filtros["export_excel"] = export_meta
+            cotacao.filtros = filtros
+            cotacao.save(update_fields=["filtros"])
+
+    return {
+        "CNPJ": str(prefs.get("cnpj", "") or ""),
+        "TELEFONE": str(prefs.get("telefone", "") or ""),
+        "DEPARTAMENTO": str(export_meta.get("departamento", "") or ""),
+        "OBSERVACOES": str(export_meta.get("observacoes", "") or ""),
+    }
+
+
 @api_login_required
 @csrf_exempt
-@require_http_methods(["GET", "OPTIONS"])
+@require_http_methods(["GET", "POST", "OPTIONS"])
 @_pncp_json_errors
 def pncp_research_sessions_export_xlsx(request, sessao_id: int):
     if request.method == "OPTIONS":
@@ -1733,7 +1781,8 @@ def pncp_research_sessions_export_xlsx(request, sessao_id: int):
             status=422,
         )
 
-    stream, filename = _build_cotacao_export_xlsx(cotacao)
+    extra = _resolve_export_extra_fields(request, cotacao)
+    stream, filename = _build_cotacao_export_xlsx(cotacao, extra=extra)
     resp = FileResponse(
         stream,
         as_attachment=True,

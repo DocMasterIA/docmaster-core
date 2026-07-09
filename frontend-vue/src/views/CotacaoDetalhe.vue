@@ -158,7 +158,7 @@
           type="button"
           class="cot-btn cot-btn--primary"
           :disabled="excelLoading || totalItensSessao === 0"
-          @click="downloadResultadoExcel"
+          @click="openExcelModal"
         >
           <i class="fa-solid fa-file-excel" aria-hidden="true"></i>
           {{ excelLoading ? 'Gerando Excel...' : 'Baixar resultado Excel' }}
@@ -621,6 +621,82 @@
           </div>
         </div>
       </div>
+
+      <div
+        v-if="excelModalOpen"
+        class="pncp-modal-backdrop"
+        role="presentation"
+        @click.self="closeExcelModal"
+      >
+        <div
+          class="pncp-modal pncp-modal--relatorio"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cot-excel-title"
+          @click.stop
+        >
+          <h2 id="cot-excel-title" class="pncp-modal__title">Dados para o Excel desta cotação</h2>
+          <p class="pncp-modal__text">
+            Preencha os dados que aparecerão no relatório Excel. O <strong>CNPJ</strong> e o
+            <strong>Telefone</strong> ficam <strong>salvos para você</strong> e são reaproveitados nas próximas
+            cotações. O <strong>Departamento</strong> e as <strong>Observações</strong> ficam guardados
+            <strong>apenas nesta cotação</strong>.
+          </p>
+          <label class="cot-relatorio-field">
+            <span>CNPJ</span>
+            <input
+              v-model.trim="excelForm.cnpj"
+              type="text"
+              class="gov-input"
+              placeholder="Ex.: 01.067.271/0001-27"
+              autocomplete="off"
+            />
+          </label>
+          <label class="cot-relatorio-field">
+            <span>Telefone</span>
+            <input
+              v-model.trim="excelForm.telefone"
+              type="text"
+              class="gov-input"
+              placeholder="Ex.: (64) 99298-5174"
+              autocomplete="off"
+            />
+          </label>
+          <label class="cot-relatorio-field">
+            <span>Departamento</span>
+            <input
+              v-model.trim="excelForm.departamento"
+              type="text"
+              class="gov-input"
+              placeholder="Ex.: Compras"
+              autocomplete="off"
+            />
+          </label>
+          <label class="cot-relatorio-field">
+            <span>Observações</span>
+            <textarea
+              v-model.trim="excelForm.observacoes"
+              class="gov-input"
+              rows="3"
+              placeholder="Observações que aparecerão no relatório"
+            ></textarea>
+          </label>
+          <p v-if="excelError" class="pncp-modal__error">{{ excelError }}</p>
+          <div class="pncp-modal__actions">
+            <button type="button" class="pncp-modal__btn pncp-modal__btn--ghost" @click="closeExcelModal">
+              Cancelar
+            </button>
+            <button
+              type="button"
+              class="pncp-modal__btn pncp-modal__btn--primary"
+              :disabled="excelLoading || totalItensSessao === 0"
+              @click="submitExcelDownload"
+            >
+              {{ excelLoading ? 'Gerando Excel…' : 'Gerar e baixar Excel' }}
+            </button>
+          </div>
+        </div>
+      </div>
     </Teleport>
   </section>
 </template>
@@ -674,6 +750,9 @@ const relatorioTitulo = ref('');
 const relatorioError = ref('');
 const relatorioLoading = ref(false);
 const excelLoading = ref(false);
+const excelModalOpen = ref(false);
+const excelError = ref('');
+const excelForm = ref({ cnpj: '', telefone: '', departamento: '', observacoes: '' });
 const totalItensSessao = ref(0);
 const formulaCalculoLabel = ref('Média aritmética dos preços obtidos');
 const formulaCalculoId = ref('media_aritmetica_precos_obtidos');
@@ -1235,14 +1314,20 @@ async function submitRelatorioPdf() {
 async function downloadResultadoExcel() {
   const sessionId = Number(cotacaoId.value);
   if (Number.isNaN(sessionId)) {
-    loadError.value = 'Cotação inválida para exportar Excel.';
+    excelError.value = 'Cotação inválida para exportar Excel.';
     return;
   }
   if (totalItensSessao.value === 0 || excelLoading.value) return;
-  loadError.value = '';
+  excelError.value = '';
   excelLoading.value = true;
   try {
-    const { blob, filename } = await downloadResearchSessionExcel(sessionId);
+    const fields = {
+      cnpj: excelForm.value.cnpj || '',
+      telefone: excelForm.value.telefone || '',
+      departamento: excelForm.value.departamento || '',
+      observacoes: excelForm.value.observacoes || '',
+    };
+    const { blob, filename } = await downloadResearchSessionExcel(sessionId, fields);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1254,11 +1339,27 @@ async function downloadResultadoExcel() {
     );
     a.click();
     URL.revokeObjectURL(url);
+    excelModalOpen.value = false;
   } catch (err) {
-    loadError.value = `Falha ao exportar Excel (${err?.message || 'erro desconhecido'}).`;
+    excelError.value = `Falha ao exportar Excel (${err?.message || 'erro desconhecido'}).`;
   } finally {
     excelLoading.value = false;
   }
+}
+
+function openExcelModal() {
+  if (totalItensSessao.value === 0) return;
+  excelError.value = '';
+  excelModalOpen.value = true;
+}
+
+function closeExcelModal() {
+  if (excelLoading.value) return;
+  excelModalOpen.value = false;
+}
+
+function submitExcelDownload() {
+  downloadResultadoExcel();
 }
 
 let escHandler = null;
@@ -1289,9 +1390,24 @@ watch(relatorioModalOpen, (open) => {
   }
 });
 
+let escExcel = null;
+watch(excelModalOpen, (open) => {
+  if (escExcel) {
+    window.removeEventListener('keydown', escExcel);
+    escExcel = null;
+  }
+  if (open) {
+    escExcel = (e) => {
+      if (e.key === 'Escape') closeExcelModal();
+    };
+    window.addEventListener('keydown', escExcel);
+  }
+});
+
 onUnmounted(() => {
   if (escHandler) window.removeEventListener('keydown', escHandler);
   if (escRelatorio) window.removeEventListener('keydown', escRelatorio);
+  if (escExcel) window.removeEventListener('keydown', escExcel);
 });
 
 onMounted(() => {
@@ -1344,6 +1460,15 @@ async function loadSessionFromBackend() {
         : '0';
       const sentidoRaw = String(filtrosSessao.variacao_sentido_global || '').trim().toLowerCase();
       variacaoGlobalSentido.value = ['cima', 'baixo', 'ambos'].includes(sentidoRaw) ? sentidoRaw : 'ambos';
+      const prefs = (s.export_excel_prefs && typeof s.export_excel_prefs === 'object')
+        ? s.export_excel_prefs
+        : {};
+      excelForm.value = {
+        cnpj: String(prefs.cnpj || '').trim(),
+        telefone: String(prefs.telefone || '').trim(),
+        departamento: String(prefs.departamento || '').trim(),
+        observacoes: String(prefs.observacoes || '').trim(),
+      };
     }
     if (data?.ok && Array.isArray(data.itens)) {
       let soma = 0;

@@ -119,6 +119,8 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     profile_photo = models.ImageField(_("Foto de Perfil"), upload_to="profile_photos/", null=True, blank=True, default='defaults/default_photo.png')
     allowed_modules = models.JSONField(_("Módulos permitidos"), default=default_allowed_modules, blank=True)
+    # Preferências reutilizáveis do usuário (ex.: CNPJ/Telefone p/ relatórios de cotação PNCP)
+    pncp_export_prefs = models.JSONField(_("Preferências de exportação PNCP"), default=dict, blank=True)
     objects = UserManager()
 
     USERNAME_FIELD = "email"

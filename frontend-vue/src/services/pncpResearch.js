@@ -336,12 +336,15 @@ export async function uploadSupplierPdfToResearchSession(sessaoId, files, signal
   return payload;
 }
 
-export async function downloadResearchSessionExcel(sessaoId, signal) {
+export async function downloadResearchSessionExcel(sessaoId, fields = null, signal) {
+  const hasBody = fields && typeof fields === 'object';
   const res = await fetch(
     `${API_BASE}/api/pncp/cotacoes/research/sessions/${encodeURIComponent(sessaoId)}/export/xlsx`,
     {
-      method: 'GET',
+      method: hasBody ? 'POST' : 'GET',
       credentials: 'include',
+      headers: hasBody ? { 'Content-Type': 'application/json' } : undefined,
+      body: hasBody ? JSON.stringify(fields) : undefined,
       signal,
     },
   );

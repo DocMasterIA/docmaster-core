@@ -25,6 +25,10 @@ from backend.app.utils.valor_extenso_pt import valor_monetario_por_extenso
 # Slots repetidos por linha de item na planilha-modelo.
 ITEM_SLOT_NAMES = frozenset({"ID_ITEM", "NOME_ITEM"})
 
+# Slots preenchidos pelo usuário no modal de exportação.
+USER_PREF_SLOT_NAMES = ("CNPJ", "TELEFONE")
+COTACAO_SLOT_NAMES = ("DEPARTAMENTO", "OBSERVACOES")
+
 # Aliases (sem acento / grafia alternativa) → slot canônico.
 SLOT_ALIASES: Dict[str, str] = {
     "RESPONSAVEL_PESQUISA_PRECOS": "RESPONSAVEL_PESQUISA_PREÇOS",
@@ -111,6 +115,7 @@ def build_global_slot_context(
     *,
     refletidos: Optional[Mapping[int, Mapping[str, Any]]] = None,
     itens: Optional[Sequence[Any]] = None,
+    extra: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, str]:
     """Monta valores dos slots globais da planilha."""
     itens = list(itens or cotacao.itens.all().order_by("id"))
@@ -131,13 +136,18 @@ def build_global_slot_context(
     total = somar_valor_total_estimado_itens(itens, refletidos)
     valor_extenso = valor_monetario_por_extenso(total).upper() if total is not None else ""
 
-    return {
+    ctx = {
         "DATA_HORARIO_GERACAO": _format_dt_br(agora),
         "PREFEITURA_E_DATA": prefeitura_e_data,
         "PREFEITURA_ESTADO": prefeitura_estado_fmt,
         "RESPONSAVEL_PESQUISA_PREÇOS": _responsavel_pesquisa(cotacao),
         "VALOR_EXTENSO": valor_extenso,
     }
+
+    extra = extra or {}
+    for slot in (*USER_PREF_SLOT_NAMES, *COTACAO_SLOT_NAMES):
+        ctx[slot] = str(extra.get(slot, "") or "")
+    return ctx
 
 
 def build_item_slot_context(item: Any) -> Dict[str, str]:
@@ -257,6 +267,7 @@ def render_cotacao_excel_from_template(
     *,
     refletidos: Optional[Mapping[int, Mapping[str, Any]]] = None,
     itens: Optional[Sequence[Any]] = None,
+    extra: Optional[Mapping[str, Any]] = None,
 ) -> io.BytesIO:
     try:
         from openpyxl import load_workbook
@@ -267,7 +278,7 @@ def render_cotacao_excel_from_template(
     suffix = template_path.suffix.lower()
     keep_vba = suffix == ".xlsm"
     wb = load_workbook(template_path, keep_vba=keep_vba)
-    global_ctx = build_global_slot_context(cotacao, refletidos=refletidos, itens=itens)
+    global_ctx = build_global_slot_context(cotacao, refletidos=refletidos, itens=itens, extra=extra)
     apply_slots_to_workbook(wb, global_ctx, itens)
 
     stream = io.BytesIO()

@@ -48,6 +48,7 @@ from backend.app.services.pncp_supplier_enrichment import (
 from backend.app.services.pncp_relatorio_itens import (
     agrupar_cotacoes_por_item_relatorio_pesquisa_precos,
     agrupar_itens_relatorio_pesquisa_precos,
+    formatar_telefone_br,
     preco_unitario_cotacao_fonte,
     resumo_calculo_precos,
     texto_orgao_exibicao_relatorio_pesquisa_precos,
@@ -324,6 +325,22 @@ def _parse_json_body(request: HttpRequest) -> Tuple[Optional[Dict[str, Any]], Op
 
 def _normalize_cnpj_digits(v: Any) -> str:
     return re.sub(r"\D", "", str(v or ""))
+
+
+def _format_cnpj_br(v: Any) -> str:
+    """Máscara brasileira: 00.000.000/0000-00 (até 14 dígitos)."""
+    n = _normalize_cnpj_digits(v)[:14]
+    if not n:
+        return ""
+    if len(n) <= 2:
+        return n
+    if len(n) <= 5:
+        return f"{n[:2]}.{n[2:]}"
+    if len(n) <= 8:
+        return f"{n[:2]}.{n[2:5]}.{n[5:]}"
+    if len(n) <= 12:
+        return f"{n[:2]}.{n[2:5]}.{n[5:8]}/{n[8:]}"
+    return f"{n[:2]}.{n[2:5]}.{n[5:8]}/{n[8:12]}-{n[12:14]}"
 
 
 def _fornecedor_dict(row: PncpFornecedorCadastro) -> Dict[str, Any]:
@@ -1685,8 +1702,8 @@ def pncp_research_sessions_detail(request, sessao_id: int):
                 "anexo_fornecedor_nome": (anexos_payload[0]["nome"] if anexos_payload else ""),
                 "anexos_fornecedor": anexos_payload,
                 "export_excel_prefs": {
-                    "cnpj": str((getattr(request.user, "pncp_export_prefs", None) or {}).get("cnpj", "") or ""),
-                    "telefone": str((getattr(request.user, "pncp_export_prefs", None) or {}).get("telefone", "") or ""),
+                    "cnpj": _format_cnpj_br((getattr(request.user, "pncp_export_prefs", None) or {}).get("cnpj", "") or ""),
+                    "telefone": formatar_telefone_br((getattr(request.user, "pncp_export_prefs", None) or {}).get("telefone", "") or ""),
                     "departamento": str(((c.filtros or {}).get("export_excel") or {}).get("departamento", "") or ""),
                     "observacoes": str(((c.filtros or {}).get("export_excel") or {}).get("observacoes", "") or ""),
                 },
@@ -1737,9 +1754,9 @@ def _resolve_export_extra_fields(request, cotacao: PncpCotacao) -> Dict[str, str
                 return str(v or "").strip()[:limit]
 
             if "cnpj" in body:
-                prefs["cnpj"] = _clean(body.get("cnpj"), 32)
+                prefs["cnpj"] = _format_cnpj_br(_clean(body.get("cnpj"), 32))
             if "telefone" in body:
-                prefs["telefone"] = _clean(body.get("telefone"), 40)
+                prefs["telefone"] = formatar_telefone_br(_clean(body.get("telefone"), 40))
             if "departamento" in body:
                 export_meta["departamento"] = _clean(body.get("departamento"), 160)
             if "observacoes" in body:
@@ -1752,8 +1769,8 @@ def _resolve_export_extra_fields(request, cotacao: PncpCotacao) -> Dict[str, str
             cotacao.save(update_fields=["filtros"])
 
     return {
-        "CNPJ": str(prefs.get("cnpj", "") or ""),
-        "TELEFONE": str(prefs.get("telefone", "") or ""),
+        "CNPJ": _format_cnpj_br(prefs.get("cnpj", "") or ""),
+        "TELEFONE": formatar_telefone_br(prefs.get("telefone", "") or ""),
         "DEPARTAMENTO": str(export_meta.get("departamento", "") or ""),
         "OBSERVACOES": str(export_meta.get("observacoes", "") or ""),
     }

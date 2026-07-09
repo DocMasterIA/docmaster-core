@@ -641,21 +641,29 @@
           <label class="cot-relatorio-field">
             <span>CNPJ</span>
             <input
-              v-model.trim="excelForm.cnpj"
+              :value="excelForm.cnpj"
               type="text"
               class="gov-input"
-              placeholder="Ex.: 01.067.271/0001-27"
+              placeholder="00.000.000/0000-00"
+              inputmode="numeric"
               autocomplete="off"
+              maxlength="18"
+              @keydown="onCnpjInputKeydown"
+              @input="onExcelCnpjInput"
             />
           </label>
           <label class="cot-relatorio-field">
             <span>Telefone</span>
             <input
-              v-model.trim="excelForm.telefone"
+              :value="excelForm.telefone"
               type="text"
               class="gov-input"
-              placeholder="Ex.: (64) 99298-5174"
+              placeholder="(00) 00000-0000"
+              inputmode="numeric"
               autocomplete="off"
+              maxlength="15"
+              @keydown="onTelefoneInputKeydown"
+              @input="onExcelTelefoneInput"
             />
           </label>
           <label class="cot-relatorio-field">
@@ -716,6 +724,9 @@ import {
   formatMoedaBRLInput,
   sanitizeQuantidadeInput,
 } from '../utils/itemValorCampos';
+import { formatCnpjBr, onCnpjInputKeydown } from '../utils/cnpjFormat';
+import { formatTelefoneBr, onTelefoneInputKeydown } from '../utils/telefoneFormat';
+
 const route = useRoute();
 const router = useRouter();
 const cotacaoId = computed(() => route.params.cotacaoId || 'CT-2026-00421');
@@ -1304,6 +1315,14 @@ async function submitRelatorioPdf() {
   }
 }
 
+function onExcelCnpjInput(event) {
+  excelForm.value.cnpj = formatCnpjBr(String(event?.target?.value || ''));
+}
+
+function onExcelTelefoneInput(event) {
+  excelForm.value.telefone = formatTelefoneBr(String(event?.target?.value || ''));
+}
+
 async function downloadResultadoExcel() {
   const sessionId = Number(cotacaoId.value);
   if (Number.isNaN(sessionId)) {
@@ -1315,8 +1334,8 @@ async function downloadResultadoExcel() {
   excelLoading.value = true;
   try {
     const fields = {
-      cnpj: excelForm.value.cnpj || '',
-      telefone: excelForm.value.telefone || '',
+      cnpj: formatCnpjBr(excelForm.value.cnpj),
+      telefone: formatTelefoneBr(excelForm.value.telefone),
       departamento: excelForm.value.departamento || '',
       observacoes: excelForm.value.observacoes || '',
     };
@@ -1446,8 +1465,8 @@ async function loadSessionFromBackend() {
         ? s.export_excel_prefs
         : {};
       excelForm.value = {
-        cnpj: String(prefs.cnpj || '').trim(),
-        telefone: String(prefs.telefone || '').trim(),
+        cnpj: formatCnpjBr(prefs.cnpj),
+        telefone: formatTelefoneBr(prefs.telefone),
         departamento: String(prefs.departamento || '').trim(),
         observacoes: String(prefs.observacoes || '').trim(),
       };

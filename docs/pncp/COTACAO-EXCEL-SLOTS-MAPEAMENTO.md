@@ -11,7 +11,7 @@ Mesmo padrão do PDF de relatório:
 
 Exemplo: `docmaster-pesquisador-pncp_marcelo-faria_20260706-1251_cotacao-73_medicamentos.xlsx`
 
-O modelo pode ser `.xlsm`, mas o arquivo gerado é **sempre `.xlsx`** (sem macros).
+O modelo base pode ser `.xlsm`, mas o arquivo gerado é **sempre `.xlsx`** (sem macros, compatível com Google Sheets).
 
 ## Onde colocar o arquivo
 

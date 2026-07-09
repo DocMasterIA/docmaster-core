@@ -386,9 +386,10 @@ def render_cotacao_excel_from_template(
         raise RuntimeError("Exportação XLSX indisponível. Dependência 'openpyxl' não encontrada.") from exc
 
     itens = list(itens or cotacao.itens.all().order_by("id"))
-    suffix = template_path.suffix.lower()
-    keep_vba = suffix == ".xlsm"
-    wb = load_workbook(template_path, keep_vba=keep_vba)
+    # keep_vba=False: remove content-types macroEnabled do modelo .xlsm.
+    # Saída sempre .xlsx — compatível com Google Sheets, Excel e LibreOffice.
+    # (keep_vba=True + extensão .xlsx corrompe; .xlsm o Google Sheets não abre.)
+    wb = load_workbook(template_path, keep_vba=False)
     global_ctx = build_global_slot_context(cotacao, refletidos=refletidos, itens=itens, extra=extra)
     apply_slots_to_workbook(
         wb,
@@ -399,8 +400,6 @@ def render_cotacao_excel_from_template(
     )
 
     stream = io.BytesIO()
-    # Modelo .xlsm → saída .xlsm (com macros preservadas); modelo .xlsx → saída .xlsx.
-    # Salvar workbook com keep_vba=True em extensão .xlsx corrompe o arquivo.
     wb.save(stream)
     stream.seek(0)
     return stream
@@ -412,9 +411,8 @@ def template_available(path: Optional[Path] = None) -> bool:
 
 
 def template_output_ext(path: Optional[Path] = None) -> str:
-    """Extensão do arquivo exportado: .xlsm mantém macros; .xlsx caso contrário."""
-    p = path or default_cotacao_excel_template_path()
-    return "xlsm" if p.suffix.lower() == ".xlsm" else "xlsx"
+    """Extensão do arquivo exportado (sempre .xlsx para compatibilidade com Google Sheets)."""
+    return "xlsx"
 
 
 def excel_content_type_for_ext(ext: str) -> str:

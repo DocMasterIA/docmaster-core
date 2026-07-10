@@ -35,6 +35,8 @@ from .schemas import (
 )
 from .service import market_search, market_search_intelligent, market_search_stream
 from .search_diagnose import diagnose_intelligent_search
+from .adapters.contracts import FederatedSearchQuery
+from .adapters.federated import federated_search
 from .config import PNCP_LOCAL_DB_PATH
 from .local_index import (
     add_items_to_research_session,
@@ -143,6 +145,49 @@ async def market_search_intelligent_endpoint(body: MarketSearchRequest) -> Marke
         raise HTTPException(status_code=502, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/market-search/federated", response_model=MarketSearchResponse)
+async def market_search_federated_endpoint(body: MarketSearchRequest) -> MarketSearchResponse:
+    """
+    Busca federada multi-fonte. Com fontes_habilitadas=['pncp'], equivalente à busca inteligente.
+    """
+    try:
+        from .config import PNCP_BULK_SEARCH_MAX_SECONDS, PNCP_BULK_USE_INTELLIGENT_PIPELINE
+        from .service import _bulk_search_timeout_response
+
+        query = FederatedSearchQuery.from_market_request(
+            body,
+            fontes_habilitadas=body.fontes_habilitadas,
+        )
+        if body.busca_lote and float(PNCP_BULK_SEARCH_MAX_SECONDS or 0) > 0:
+            tmo = max(8.0, float(PNCP_BULK_SEARCH_MAX_SECONDS))
+            if PNCP_BULK_USE_INTELLIGENT_PIPELINE:
+                tmo = max(tmo, 120.0)
+            try:
+                data = await asyncio.wait_for(federated_search(query), timeout=tmo)
+            except asyncio.TimeoutError:
+                data = _bulk_search_timeout_response(body)
+        else:
+            data = await federated_search(query)
+        return MarketSearchResponse(**data)
+    except PNCPClientError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/price-sources")
+async def list_price_sources_endpoint():
+    """Lista conectores de fonte de preço disponíveis."""
+    from .adapters.registry import get_adapters, list_adapter_ids
+
+    ids = list_adapter_ids()
+    adapters = get_adapters(ids)
+    return {
+        "ok": True,
+        "fontes": [a.capabilities() for a in adapters],
+    }
 
 
 @router.post("/market-search/stream")

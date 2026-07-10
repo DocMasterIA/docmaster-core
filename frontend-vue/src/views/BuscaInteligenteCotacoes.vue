@@ -111,6 +111,24 @@
           </div>
         </div>
       </section>
+
+      <section class="bia-fontes-panel">
+        <p class="bia-geo-panel__kicker">Fontes de preço</p>
+        <h2 class="bia-geo-panel__title">Plataformas consultadas</h2>
+        <p class="bia-geo-panel__hint">
+          Selecione as fontes para a busca federada. Hoje apenas PNCP está disponível; novas plataformas
+          serão adicionadas sem alterar o fluxo de salvamento.
+        </p>
+        <label class="bia-fontes-item">
+          <input
+            v-model="fontesHabilitadas"
+            type="checkbox"
+            value="pncp"
+          />
+          <span>PNCP (Portal Nacional de Contratações Públicas)</span>
+        </label>
+      </section>
+
       <p v-if="isLoadingSessionItems" class="bia-meta">
         Carregando itens da cotação{{ sessionItemsLoadHint ? ` (${sessionItemsLoadHint})` : '' }}...
       </p>
@@ -326,8 +344,8 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   fetchAllItemsForBulkSearch,
+  federatedMarketSearch,
   getResearchSession,
-  intelligentMarketSearch,
 } from '../services/pncpResearch';
 import {
   formatCotacaoSaveFeedback,
@@ -376,6 +394,9 @@ const filtros = reactive({
   /** @type {Array<{ _id: string, uf: string, municipios: string[], filtroMun: string }>} */
   cidades: [],
 });
+
+/** IDs das fontes de preço habilitadas na busca federada. */
+const fontesHabilitadas = ref(['pncp']);
 
 function newLinhaCidade() {
   return {
@@ -1267,6 +1288,7 @@ async function runSearchWithContext({
       valor_base_referencia: faixaAtiva ? Number(valorBaseCtx) : null,
       variacao_percentual_referencia: faixaAtiva ? Number(variacaoCtx) : null,
       variacao_sentido_referencia: faixaAtiva ? sentidoCtx : null,
+      fontes_habilitadas: (fontesHabilitadas.value?.length ? fontesHabilitadas.value : ['pncp']),
     };
 
     const aggregated = [];
@@ -1342,7 +1364,7 @@ async function runSearchWithContext({
       if (generationStale() || bulkSuperseded()) {
         return null;
       }
-      const backend = await intelligentMarketSearch(geoPayload, fetchSignal, bulkSearchOpts);
+      const backend = await federatedMarketSearch(geoPayload, fetchSignal, bulkSearchOpts);
       return mapBackendToRows(backend, geoKeyPart) || 0;
     }
 
@@ -1564,9 +1586,11 @@ async function adicionarSelecionadosNaCotacao() {
       sequencial_compra: r.sequencialCompra ?? r.sourceRaw?.sequencial_compra ?? null,
       source: {
         ...raw,
+        plataforma: raw.plataforma || 'pncp',
         fornecedor: pickFornecedorDisplayName(r),
         cnpj_fornecedor: extractCnpjFornecedorSalvar(r) || r.cnpjFornecedor || null,
       },
+      plataforma: raw.plataforma || 'pncp',
     };
     });
   if (!selecionados.length) {
@@ -1975,6 +1999,23 @@ function onVariacaoInput(event) {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+.bia-fontes-panel {
+  border: 1px solid #dbe4f0;
+  border-radius: 12px;
+  background: #fbfdff;
+  padding: 12px 14px;
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bia-fontes-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-top: 4px;
 }
 .bia-geo-panel__top {
   display: flex;

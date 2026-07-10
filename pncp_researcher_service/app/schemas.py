@@ -104,6 +104,23 @@ class MarketSearchRequest(BaseModel):
             "PNCP_IA_RERANK_BULK_ENABLED (menos candidatos/timeout que busca manual)."
         ),
     )
+    fontes_habilitadas: Optional[List[str]] = Field(
+        None,
+        description="IDs das fontes de preço (ex.: pncp). Usado em /market-search/federated.",
+    )
+
+    @field_validator("fontes_habilitadas", mode="before")
+    @classmethod
+    def normalize_fontes(cls, v: Any) -> Any:
+        if v is None:
+            return None
+        if isinstance(v, str):
+            parts = [p.strip().lower() for p in v.split(",") if p.strip()]
+            return parts or None
+        if isinstance(v, list):
+            out = [str(x).strip().lower() for x in v if str(x).strip()]
+            return out or None
+        return None
 
     @field_validator("variacao_sentido_referencia", mode="before")
     @classmethod

@@ -409,6 +409,33 @@ export function intelligentMarketSearch(payload, signal, options = {}) {
   })();
 }
 
+/** Busca federada multi-fonte (Parte 0). Fallback para intelligent se endpoint indisponível. */
+export function federatedMarketSearch(payload, signal, options = {}) {
+  const timeoutMs = options.timeoutMs ?? 120000;
+  const body = {
+    ...payload,
+    fontes_habilitadas: payload.fontes_habilitadas?.length
+      ? payload.fontes_habilitadas
+      : ['pncp'],
+  };
+  return researchRequest('market-search/federated', {
+    method: 'POST',
+    body,
+    signal,
+    timeoutMs,
+  }).catch((err) => {
+    const status = Number(err?.status);
+    if (status === 404 || status === 503 || status === 501) {
+      return intelligentMarketSearch(payload, signal, options);
+    }
+    throw err;
+  });
+}
+
+export function listPriceSources() {
+  return researchRequest('price-sources', { method: 'GET' });
+}
+
 export function getLocalIndexStats(signal) {
   return researchRequest('local-index/stats', { signal });
 }

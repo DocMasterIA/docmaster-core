@@ -385,6 +385,12 @@ PNCP_SEARCH_ANCHOR_TIER_ENABLED: bool = _env_bool("PNCP_SEARCH_ANCHOR_TIER_ENABL
 PNCP_IA_RERANK_MIXED_POOL: bool = _env_bool("PNCP_IA_RERANK_MIXED_POOL", True)
 # Marcador visável no /health para confirmar deploy do código de busca (manual-parity, tiers, etc.).
 PNCP_SEARCH_CODE_REV: str = os.getenv("PNCP_SEARCH_CODE_REV", "2026-06-19-quality-qwen").strip()
+
+# Busca federada multi-fonte (Parte 0)
+PNCP_FEDERATED_SEARCH_ENABLED: bool = _env_bool("PNCP_FEDERATED_SEARCH_ENABLED", True)
+PNCP_FEDERATED_SOURCE_TIMEOUT_SECONDS: float = float(
+    os.getenv("PNCP_FEDERATED_SOURCE_TIMEOUT_SECONDS", "20") or "20"
+)
 # Descrições de cotação: até N tokens usam busca completa; acima disso cap de âncoras (recall).
 PNCP_SEARCH_ANCHOR_FULL_TERM_MAX: int = _env_int("PNCP_SEARCH_ANCHOR_FULL_TERM_MAX", 5)
 PNCP_SEARCH_ANCHOR_MAX_GROUPS: int = _env_int("PNCP_SEARCH_ANCHOR_MAX_GROUPS", 8)

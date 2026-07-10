@@ -191,6 +191,9 @@ _SOURCE_KEEP_KEYS = frozenset(
         "faixa_regional",
         "faixaRegional",
         "similaridade_encontrada",
+        "plataforma",
+        "plataforma_item_id",
+        "url_origem",
         # Campos de fornecedor (para relatório sem confundir com órgão).
         "fornecedor",
         "fornecedor_nome",
@@ -615,9 +618,24 @@ def _resolve_formula_calculo_id(filtros: Any) -> str:
     return _coerce_formula_id(raw)
 
 
+def _ensure_plataforma_in_payload(it: Dict[str, Any]) -> None:
+    """Garante source.plataforma explícito antes de persistir cotação."""
+    if not isinstance(it, dict):
+        return
+    plat = str(it.get("plataforma") or "").strip().lower()
+    if plat:
+        it["plataforma"] = plat
+        return
+    if it.get("numero_pncp") or it.get("numeroControlePNCP"):
+        it["plataforma"] = "pncp"
+        return
+    it["plataforma"] = "pncp"
+
+
 def _compact_item_source(it: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(it, dict):
         return {}
+    _ensure_plataforma_in_payload(it)
     try:
         raw = json.dumps(it, ensure_ascii=False, default=str)
     except Exception:
@@ -2202,6 +2220,7 @@ def pncp_research_sessions_item_cotacoes(request, sessao_id: int, item_id: int):
 
     dict_rows = [dict(r) for r in raw_cotacoes if isinstance(r, dict)]
     for row in dict_rows:
+        _ensure_plataforma_in_payload(row)
         normalize_pncp_geo_in_payload(row)
     enrich_supplier_fields_in_payloads(dict_rows, only_homologated=False)
 

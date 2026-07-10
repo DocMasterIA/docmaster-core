@@ -23,6 +23,22 @@ from backend.app.models.usuario import MODULE_ACCESS_CHOICES
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
+
+def _prefeitura_user_limit_message(prefeitura, *, exclude_user_id=None):
+    """Retorna mensagem de erro se a prefeitura já atingiu o limite de usuários."""
+    if not prefeitura or not prefeitura.pk:
+        return None
+    qs = User.objects.filter(prefeitura_id=prefeitura.pk)
+    if exclude_user_id:
+        qs = qs.exclude(pk=exclude_user_id)
+    if qs.count() >= prefeitura.numero_usuarios_permitidos:
+        return (
+            f"Limite de usuários atingido para {prefeitura.nome_municipio} "
+            f"({prefeitura.numero_usuarios_permitidos})."
+        )
+    return None
+
+
 class UserAdminForm(forms.ModelForm):
     allowed_modules = forms.MultipleChoiceField(
         label="Módulos permitidos",
@@ -47,12 +63,47 @@ class UserAdminForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if hasattr(self.instance, "get_allowed_modules"):
             self.fields["allowed_modules"].initial = self.instance.get_allowed_modules()
-        # se já existe uma prefeitura selecionada no form (edit)
-        if self.instance and self.instance.prefeitura:
-            self.fields["secretaria"].queryset = Secretaria.objects.filter(prefeitura=self.instance.prefeitura)
+
+        prefeitura = None
+        prefeitura_raw = self.data.get("prefeitura") if self.data else None
+        if prefeitura_raw:
+            prefeitura = Prefeitura.objects.filter(pk=prefeitura_raw).first()
+        elif self.instance and self.instance.prefeitura_id:
+            prefeitura = self.instance.prefeitura
+
+        if prefeitura:
+            self.fields["secretaria"].queryset = Secretaria.objects.filter(prefeitura=prefeitura)
         else:
-            # se não, nenhum disponível
             self.fields["secretaria"].queryset = Secretaria.objects.none()
+
+        if self.instance.pk and "password" in self.fields:
+            self.fields["password"].required = False
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.errors:
+            return cleaned_data
+
+        prefeitura = cleaned_data.get("prefeitura")
+        secretaria = cleaned_data.get("secretaria")
+
+        if secretaria and prefeitura and secretaria.prefeitura_id != prefeitura.pk:
+            raise ValidationError({
+                "secretaria": "A secretaria selecionada não pertence à prefeitura escolhida.",
+            })
+
+        if not prefeitura:
+            return cleaned_data
+
+        assigning_prefeitura = (
+            self.instance.pk is None or self.instance.prefeitura_id != prefeitura.pk
+        )
+        if assigning_prefeitura:
+            msg = _prefeitura_user_limit_message(prefeitura)
+            if msg:
+                raise ValidationError({"prefeitura": msg})
+
+        return cleaned_data
 
     def clean_allowed_modules(self):
         vals = self.cleaned_data.get("allowed_modules") or []
@@ -82,17 +133,6 @@ class UserAdmin(BaseUserAdmin):
         }),
     )
 
-    def save_model(self, request, obj, form, change):
-        try:
-            super().save_model(request, obj, form, change)
-        except ValidationError as exc:
-            if hasattr(exc, "message_dict"):
-                for field, errors in exc.message_dict.items():
-                    for err in errors:
-                        form.add_error(field if field != "__all__" else None, err)
-            else:
-                form.add_error(None, exc.messages[0] if getattr(exc, "messages", None) else str(exc))
-            return
 from django.contrib import admin, messages
 from django.utils.html import format_html, mark_safe
 from django.core.files import File

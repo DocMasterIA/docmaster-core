@@ -4,6 +4,7 @@ from django.test import TestCase
 
 from backend.app.admin import (
     PrefeituraAdmin,
+    UserAdminForm,
     _resolve_prefeitura_from_inline_parent,
 )
 from backend.app.models import Prefeitura, Secretaria
@@ -77,3 +78,72 @@ class PrefeituraUserLimitHelpersTest(TestCase):
 
         source = inspect.getsource(PrefeituraAdmin.save_formset)
         self.assertNotIn("from app.models import", source)
+
+
+class UserAdminFormPrefeituraTest(TestCase):
+    def setUp(self):
+        self.pref_a = Prefeitura.objects.create(
+            nome_municipio="Municipio A",
+            estado="SC",
+            numero_usuarios_permitidos=5,
+        )
+        self.pref_b = Prefeitura.objects.create(
+            nome_municipio="Municipio B",
+            estado="SC",
+            numero_usuarios_permitidos=2,
+        )
+        self.sec_a = Secretaria.objects.create(prefeitura=self.pref_a, nome="Sec A")
+        self.sec_b = Secretaria.objects.create(prefeitura=self.pref_b, nome="Sec B")
+        self.user = User.objects.create_user(
+            email="moveme@test.com",
+            prefeitura=self.pref_a,
+            secretaria=self.sec_a,
+        )
+        User.objects.create_user(
+            email="b1@test.com",
+            prefeitura=self.pref_b,
+            secretaria=self.sec_b,
+        )
+        User.objects.create_user(
+            email="b2@test.com",
+            prefeitura=self.pref_b,
+            secretaria=self.sec_b,
+        )
+
+    def _form_data(self, **overrides):
+        data = {
+            "email": self.user.email,
+            "first_name": self.user.first_name,
+            "last_name": self.user.last_name,
+            "prefeitura": str(self.pref_b.pk),
+            "secretaria": str(self.sec_b.pk),
+            "role": self.user.role,
+            "allowed_modules": list(self.user.get_allowed_modules()),
+            "is_active": "on",
+            "is_staff": "",
+            "is_superuser": "",
+            "date_joined": self.user.date_joined.strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        data.update(overrides)
+        return data
+
+    def test_form_rejects_move_to_prefeitura_at_limit(self):
+        form = UserAdminForm(data=self._form_data(), instance=self.user)
+        self.assertFalse(form.is_valid())
+        self.assertIn("prefeitura", form.errors)
+
+    def test_form_allows_move_when_target_has_capacity(self):
+        self.pref_b.numero_usuarios_permitidos = 3
+        self.pref_b.save()
+        form = UserAdminForm(data=self._form_data(), instance=self.user)
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_form_rejects_secretaria_from_other_prefeitura(self):
+        self.pref_b.numero_usuarios_permitidos = 5
+        self.pref_b.save()
+        form = UserAdminForm(
+            data=self._form_data(secretaria=str(self.sec_a.pk)),
+            instance=self.user,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("secretaria", form.errors)

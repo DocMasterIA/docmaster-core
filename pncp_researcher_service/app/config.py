@@ -391,6 +391,20 @@ PNCP_FEDERATED_SEARCH_ENABLED: bool = _env_bool("PNCP_FEDERATED_SEARCH_ENABLED",
 PNCP_FEDERATED_SOURCE_TIMEOUT_SECONDS: float = float(
     os.getenv("PNCP_FEDERATED_SOURCE_TIMEOUT_SECONDS", "20") or "20"
 )
+
+# Índices SQLite por plataforma (multi-fonte) — arquivos separados, cruzamento central.
+PRICE_PLATFORM_DATA_ROOT: str = os.getenv(
+    "PRICE_PLATFORM_DATA_ROOT",
+    "/data/platforms",
+).strip()
+PRICE_CROSSLINK_DB_PATH: str = os.getenv(
+    "PRICE_CROSSLINK_DB_PATH",
+    "/data/crosslink/price_cross_refs.db",
+).strip()
+TCE_RS_LOCAL_DB_PATH: str = os.getenv(
+    "TCE_RS_LOCAL_DB_PATH",
+    os.path.join(PRICE_PLATFORM_DATA_ROOT, "tce_rs_local.db"),
+).strip()
 # Descrições de cotação: até N tokens usam busca completa; acima disso cap de âncoras (recall).
 PNCP_SEARCH_ANCHOR_FULL_TERM_MAX: int = _env_int("PNCP_SEARCH_ANCHOR_FULL_TERM_MAX", 5)
 PNCP_SEARCH_ANCHOR_MAX_GROUPS: int = _env_int("PNCP_SEARCH_ANCHOR_MAX_GROUPS", 8)

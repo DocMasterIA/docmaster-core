@@ -71,6 +71,8 @@ def pncp_row_to_hit(row: Dict[str, Any]) -> MarketPriceHit:
         esfera=esfera,
         url_origem=str(raw.get("url_origem") or raw.get("link_pncp") or "").strip() or None,
         raw=raw,
+        canonical_key=str(raw.get("canonical_key") or "").strip() or None,
+        cross_refs=dict(raw.get("cross_refs") or {}) if isinstance(raw.get("cross_refs"), dict) else {},
     )
 
 
@@ -107,7 +109,46 @@ def hit_to_pncp_row(hit: MarketPriceHit) -> Dict[str, Any]:
         row["esfera_administrativa"] = hit.esfera
     if hit.url_origem:
         row["url_origem"] = hit.url_origem
+    if hit.canonical_key:
+        row["canonical_key"] = hit.canonical_key
+    if hit.cross_refs:
+        row["cross_refs"] = dict(hit.cross_refs)
     return row
+
+
+def platform_row_to_hit(row: Dict[str, Any], *, plataforma: str, spec_defaults: Dict[str, Any]) -> MarketPriceHit:
+    """Converte linha do índice platform_index em MarketPriceHit."""
+    raw = dict(row) if isinstance(row, dict) else {}
+    hom = _safe_float(raw.get("valor_unitario_homologado"))
+    unit = hom
+    if unit is None:
+        unit = _safe_float(raw.get("valor_unitario")) or 0.0
+    ext_id = str(raw.get("plataforma_item_id") or "").strip()
+    if not ext_id:
+        proc = str(raw.get("processo_id") or raw.get("numero_processo") or "")
+        ni = str(raw.get("numero_item") or "")
+        ext_id = f"{proc}:{ni}" if proc else ni or str(raw.get("id") or "")
+    return MarketPriceHit(
+        plataforma=plataforma,
+        plataforma_item_id=ext_id,
+        descricao_item=str(raw.get("descricao_item") or raw.get("descricao") or "").strip(),
+        valor_unitario=float(unit or 0.0),
+        valor_unitario_homologado=hom,
+        unidade_medida=str(raw.get("unidade_medida") or "").strip() or None,
+        quantidade=_safe_float(raw.get("quantidade")),
+        orgao=str(raw.get("orgao") or "").strip() or None,
+        municipio=str(raw.get("municipio") or "").strip() or None,
+        uf=str(raw.get("uf") or "").strip() or None,
+        fornecedor_nome=str(raw.get("fornecedor_nome") or raw.get("fornecedor") or "").strip() or None,
+        fornecedor_cnpj=_cnpj_digits(raw.get("cnpj_fornecedor")) or None,
+        data_referencia=str(raw.get("data_referencia") or raw.get("data_publicacao") or "").strip() or None,
+        inciso_classificacao=str(
+            raw.get("inciso_classificacao") or spec_defaults.get("inciso_default") or ""
+        ).strip() or None,
+        esfera=str(raw.get("esfera") or spec_defaults.get("esfera_default") or "").strip() or None,
+        url_origem=str(raw.get("url_origem") or "").strip() or None,
+        raw=raw,
+    )
 
 
 def hits_to_pncp_rows(hits: List[MarketPriceHit]) -> List[Dict[str, Any]]:

@@ -190,6 +190,53 @@ async def list_price_sources_endpoint():
     }
 
 
+@router.get("/price-platform-indexes")
+async def list_price_platform_indexes_endpoint():
+    """
+    Catálogo de plataformas cadastradas: .db separado por fonte + status de índice/cruzamento.
+    """
+    from .adapters.registry import list_platform_index_catalog
+    from .platform_index.crosslink_db import crosslink_stats
+
+    return {
+        "ok": True,
+        "plataformas": list_platform_index_catalog(),
+        "crosslink": crosslink_stats(),
+    }
+
+
+@router.post("/price-platform-indexes/{platform_id}/ensure")
+async def ensure_price_platform_index_endpoint(platform_id: str):
+    """
+    Inicializa schema SQLite de uma plataforma batch (ex.: tce_rs).
+    PNCP usa /local-index/* — não chamar aqui para pncp.
+    """
+    from .platform_index.registry import get_platform_spec
+    from .platform_index.schema import ensure_platform_index, platform_spec_with_stats
+
+    spec = get_platform_spec(platform_id)
+    if spec is None:
+        raise HTTPException(status_code=404, detail=f"plataforma desconhecida: {platform_id}")
+    if spec.schema_kind == "legacy_pncp":
+        raise HTTPException(
+            status_code=400,
+            detail="PNCP usa índice legacy em PNCP_LOCAL_DB_PATH (/local-index/*)",
+        )
+    if spec.schema_kind == "api_only":
+        raise HTTPException(status_code=400, detail=f"plataforma {platform_id} não possui índice SQLite")
+    try:
+        path = ensure_platform_index(platform_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    updated = get_platform_spec(platform_id)
+    return {
+        "ok": True,
+        "platform_id": platform_id,
+        "db_path": path,
+        "plataforma": platform_spec_with_stats(updated) if updated else None,
+    }
+
+
 @router.post("/market-search/stream")
 async def market_search_stream_endpoint(body: MarketSearchRequest):
     """

@@ -14,6 +14,9 @@ def _norm_text(v: str) -> str:
 
 
 def _dedupe_key(hit: MarketPriceHit, *, price_epsilon: float = 0.01) -> str:
+    canon = str(hit.canonical_key or "").strip()
+    if canon:
+        return f"canon|{canon}"
     cnpj = re.sub(r"\D", "", str(hit.fornecedor_cnpj or ""))
     orgao = _norm_text(hit.orgao or "")
     desc = _norm_text(hit.descricao_item or "")[:120]

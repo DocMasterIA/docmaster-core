@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from ..config import PNCP_FEDERATED_SEARCH_ENABLED, PNCP_FEDERATED_SOURCE_TIMEOUT_SECONDS
 from .contracts import FederatedSearchQuery, MarketPriceHit
+from .crosslink import assign_canonical_keys
 from .dedup import dedupe_hits
 from .mapping import hit_to_pncp_row
 from .pncp_adapter import PncpAdapter
@@ -80,7 +81,8 @@ async def federated_search(query: FederatedSearchQuery) -> Dict[str, Any]:
         }
         merged.extend(hits)
 
-    deduped = dedupe_hits(merged)
+    linked = assign_canonical_keys(merged, persist=True)
+    deduped = dedupe_hits(linked)
     deduped.sort(
         key=lambda h: float(h.valor_unitario_homologado or h.valor_unitario or 0),
         reverse=True,
@@ -99,6 +101,7 @@ async def federated_search(query: FederatedSearchQuery) -> Dict[str, Any]:
             "fontes": source_stats,
             "total_hits": len(merged),
             "total_apos_dedup": len(deduped),
+            "crosslink_aplicado": True,
         },
         "itens": rows,
     }

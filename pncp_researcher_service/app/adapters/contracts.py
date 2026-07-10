@@ -27,6 +27,9 @@ class MarketPriceHit:
     esfera: Optional[str] = None
     url_origem: Optional[str] = None
     raw: Optional[Dict[str, Any]] = field(default_factory=dict)
+    # Identidade unificada para cruzamento entre plataformas (dedup federado).
+    canonical_key: Optional[str] = None
+    cross_refs: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass

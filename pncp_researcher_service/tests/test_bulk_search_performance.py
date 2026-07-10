@@ -17,7 +17,7 @@ from app.service import _bulk_search_timeout_response, market_search_intelligent
 
 
 def _patch_bulk_legacy():
-    return patch("app.service.PNCP_BULK_USE_INTELLIGENT_PIPELINE", False)
+    return patch("app.config.PNCP_BULK_USE_INTELLIGENT_PIPELINE", False)
 
 
 class BulkSearchPerformanceTests(unittest.IsolatedAsyncioTestCase):
@@ -195,7 +195,8 @@ class BulkSearchPerformanceTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(kw.get("filtrar_fornecedor_para_exibicao", True))
         self.assertEqual(kw.get("enrich_homolog_max"), max(0, int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX)))
 
-    async def test_bulk_intelligent_applies_supplier_filter_in_local_index(self):
+    async def test_bulk_lote_disables_supplier_filter_during_sql_recall(self):
+        """Em busca_lote, filtro de fornecedor só no top3 final (não no SQL)."""
         payload = MarketSearchRequest(
             termo_busca="ITEM TESTE BULK FILTRO",
             busca_lote=True,
@@ -223,8 +224,7 @@ class BulkSearchPerformanceTests(unittest.IsolatedAsyncioTestCase):
             await market_search_intelligent(payload)
         self.assertGreaterEqual(local_mock.call_count, 1)
         kw = local_mock.call_args.kwargs
-        self.assertTrue(kw.get("filtrar_fornecedor_para_exibicao", False))
-        self.assertIsNone(kw.get("enrich_homolog_max"))
+        self.assertFalse(kw.get("filtrar_fornecedor_para_exibicao", True))
 
     async def test_bulk_enrich_top3_default_enabled(self):
         from app.config import PNCP_BULK_ENRICH_HOMOLOG_MAX

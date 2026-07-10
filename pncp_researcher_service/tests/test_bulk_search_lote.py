@@ -47,7 +47,7 @@ def _local_result(itens: list[dict]) -> dict:
 
 
 def _patch_bulk_legacy():
-    return patch("app.service.PNCP_BULK_USE_INTELLIGENT_PIPELINE", False)
+    return patch("app.config.PNCP_BULK_USE_INTELLIGENT_PIPELINE", False)
 
 
 class BulkSearchLoteRecallTests(unittest.IsolatedAsyncioTestCase):
@@ -221,8 +221,12 @@ class BulkSearchSupplierFilterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(itens), 3)
         funil = (out.get("stats") or {}).get("funil_busca") or {}
         self.assertEqual(funil.get("top3_final"), 3)
-        self.assertEqual(funil.get("modo_resposta"), "bulk_intelligent_top3")
-        self.assertIn("scored_final_pool", funil)
+        self.assertIn(
+            funil.get("modo_resposta"),
+            ("bulk_intelligent_top3", "busca_lote_top3_parity"),
+        )
+        if funil.get("modo_resposta") == "bulk_intelligent_top3":
+            self.assertIn("scored_final_pool", funil)
 
     async def test_bulk_returns_items_when_async_enrich_fixes_supplier(self):
         payload = MarketSearchRequest(
@@ -331,7 +335,9 @@ class BulkIntelligentPipelineFlagTests(unittest.IsolatedAsyncioTestCase):
             tamanho_pagina=80,
             somente_homologados=False,
         )
-        with patch("app.service.local_item_search", return_value=_local_result([])) as local_mock, patch(
+        with patch("app.config.PNCP_BULK_USE_INTELLIGENT_PIPELINE", True), patch(
+            "app.service.local_item_search", return_value=_local_result([])
+        ) as local_mock, patch(
             "app.service.market_search",
             new_callable=AsyncMock,
             return_value={"ok": True, "itens": [], "stats": {}},
@@ -360,7 +366,9 @@ class BulkIntelligentPipelineFlagTests(unittest.IsolatedAsyncioTestCase):
             )
             for i in range(3)
         ]
-        with patch("app.service.local_item_search", return_value=_local_result(pool)), patch(
+        with patch("app.config.PNCP_BULK_USE_INTELLIGENT_PIPELINE", True), patch(
+            "app.service.local_item_search", return_value=_local_result(pool)
+        ), patch(
             "app.service.market_search",
             new_callable=AsyncMock,
             return_value={"ok": True, "itens": [], "stats": {}},

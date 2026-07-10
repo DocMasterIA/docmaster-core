@@ -1,6 +1,7 @@
 import nested_admin
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django.utils.html import format_html
 from django.urls import reverse
@@ -80,6 +81,18 @@ class UserAdmin(BaseUserAdmin):
             "fields": ("first_name", "last_name", "email", "profile_photo","password1", "password2", "role", "prefeitura", "secretaria", "allowed_modules", "is_staff", "is_active"),
         }),
     )
+
+    def save_model(self, request, obj, form, change):
+        try:
+            super().save_model(request, obj, form, change)
+        except ValidationError as exc:
+            if hasattr(exc, "message_dict"):
+                for field, errors in exc.message_dict.items():
+                    for err in errors:
+                        form.add_error(field if field != "__all__" else None, err)
+            else:
+                form.add_error(None, exc.messages[0] if getattr(exc, "messages", None) else str(exc))
+            return
 from django.contrib import admin, messages
 from django.utils.html import format_html, mark_safe
 from django.core.files import File
@@ -352,46 +365,58 @@ def dashboard_view(request):
     return TemplateResponse(request, "admin/index.html", context)
 
 from django.forms.models import BaseInlineFormSet
-from django.core.exceptions import ValidationError
 from django.db import transaction
+
+
+def _resolve_prefeitura_from_inline_parent(parent):
+    """Resolve a prefeitura a partir do objeto pai de um inline (Prefeitura ou Secretaria)."""
+    if parent is None:
+        return None
+    if isinstance(parent, Prefeitura):
+        return parent
+    prefeitura_id = getattr(parent, "prefeitura_id", None)
+    if prefeitura_id:
+        return Prefeitura.objects.filter(pk=prefeitura_id).first()
+    return None
+
+
+def _count_new_users_in_formset(formset):
+    novos = 0
+    for form in formset.forms:
+        if not getattr(form, "cleaned_data", None):
+            continue
+        if form.cleaned_data and not form.cleaned_data.get("DELETE", False):
+            if form.instance.pk is None:
+                novos += 1
+    return novos
+
 
 # Formset inline para validar limites de usuários por prefeitura.
 class UsuarioInlineFormSet(BaseInlineFormSet):
     def clean(self):
         super().clean()
-        prefeitura = self.instance
-        if not prefeitura.pk:
-            return
+        # Limite é validado em PrefeituraAdmin.save_formset após salvar o novo
+        # numero_usuarios_permitidos; aqui só garantimos e-mail único por formulário.
 
-        usuarios_existentes = prefeitura.user_set.count()
-        novos = 0
-        for form in self.forms:
-            # formulário pode ser invalido / vazio: pule
-            if not getattr(form, "cleaned_data", None):
-                continue
-            if form.cleaned_data and not form.cleaned_data.get("DELETE", False):
-                # novo se não tem PK (vai ser criado)
-                if form.instance.pk is None:
-                    novos += 1
-        total = usuarios_existentes + novos
-        if total > prefeitura.numero_usuarios_permitidos:
-            raise ValidationError(
-                f"Limite excedido! Esta prefeitura permite no máximo {prefeitura.numero_usuarios_permitidos} usuários."
-            )
-        
-# Inline (somente leitura) de usuários dentro de Secretarias.
+    def save_new(self, form, commit=True):
+        obj = form.save(commit=False)
+        if obj.secretaria_id and not obj.prefeitura_id:
+            obj.prefeitura = obj.secretaria.prefeitura
+        if commit:
+            obj.save()
+            form.save_m2m()
+        return obj
+
+
+# Inline de usuários dentro de Secretarias (nested).
 class UsuarioInline(nested_admin.NestedTabularInline):
     model = User
-    fk_name = "secretaria"   # ajuste se o FK no User tiver outro nome
-    fields = ("first_name", "last_name","email", "is_active")  # escolha os campos que quer ver
-    readonly_fields = ("first_name", "last_name", "email", "is_active")  
-    extra = 0                # não mostrar formulários vazios extras
-    show_change_link = False  # link para editar o usuário
+    formset = UsuarioInlineFormSet
+    fk_name = "secretaria"
+    fields = ("first_name", "last_name", "email", "is_active")
+    extra = 0
+    show_change_link = False
     can_delete = True
-
-    def has_add_permission(self, request, obj=None):
-        # desativa a adição via inline
-        return False
 
 from dal import autocomplete
 
@@ -462,38 +487,40 @@ class PrefeituraAdmin(nested_admin.NestedModelAdmin):
         return True  # ou False se quiser bloquear exclusões
     
     def save_formset(self, request, form, formset, change):
-        # aplicar apenas para o inline de usuários (use comparação robusta)
         if formset.model != User:
             return super().save_formset(request, form, formset, change)
 
-        prefeitura = form.instance
-        if not prefeitura.pk:
+        prefeitura = _resolve_prefeitura_from_inline_parent(form.instance)
+        if not prefeitura or not prefeitura.pk:
             return super().save_formset(request, form, formset, change)
 
-        # Conta quantos novos serão criados no formset
-        novos = 0
-        for f in formset.forms:
-            if not getattr(f, "cleaned_data", None):
-                continue
-            if f.cleaned_data and not f.cleaned_data.get("DELETE", False):
-                if f.instance.pk is None:
-                    novos += 1
-
+        novos = _count_new_users_in_formset(formset)
         if novos == 0:
             return super().save_formset(request, form, formset, change)
 
-        # checagem atômica com lock na prefeitura
-        from app.models import Prefeitura as PrefModel  # ajuste se necessário
         with transaction.atomic():
-            pref_locked = PrefModel.objects.select_for_update().get(pk=prefeitura.pk)
+            pref_locked = Prefeitura.objects.select_for_update().get(pk=prefeitura.pk)
             existentes = User.objects.filter(prefeitura=pref_locked).count()
-            logger.debug("Admin save_formset: pref=%s existentes=%s novos=%s limite=%s",
-                         pref_locked.pk, existentes, novos, pref_locked.numero_usuarios_permitidos)
+            logger.debug(
+                "Admin save_formset: pref=%s existentes=%s novos=%s limite=%s",
+                pref_locked.pk,
+                existentes,
+                novos,
+                pref_locked.numero_usuarios_permitidos,
+            )
             if existentes + novos > pref_locked.numero_usuarios_permitidos:
-                msg = (f"Não foi possível adicionar os {novos} usuário(s): limite de "
-                       f"{pref_locked.numero_usuarios_permitidos} atingido (existem {existentes}).")
+                msg = (
+                    f"Não foi possível adicionar {novos} usuário(s): limite de "
+                    f"{pref_locked.numero_usuarios_permitidos} atingido "
+                    f"(existem {existentes})."
+                )
                 self.message_user(request, msg, level=messages.ERROR)
-                # interrompe salvamento do formset lançando ValidationError que o admin exibe
-                raise ValidationError(msg)
-            # tudo ok — salva o formset dentro da mesma transação
+                return
+
+            for f in formset.forms:
+                if not getattr(f, "cleaned_data", None) or f.cleaned_data.get("DELETE"):
+                    continue
+                if f.instance.pk is None:
+                    f.instance.prefeitura = pref_locked
+
             return super().save_formset(request, form, formset, change)

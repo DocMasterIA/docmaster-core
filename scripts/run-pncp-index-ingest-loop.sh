@@ -27,18 +27,29 @@ if ! flock -n 9; then
   exit 1
 fi
 
-BASE_URL="${PNCP_BASE_URL:-http://127.0.0.1:8012}"
+BASE_URL="${PNCP_FEED_BASE_URL:-http://127.0.0.1:8013}"
+FEED_CONTAINER="${PNCP_FEED_CONTAINER:-price_index_feed_pncp}"
+FEED_PORT="${PNCP_FEED_PORT:-8013}"
 # Com docker-compose.pncp.noports.yml não há 8012 no host — curl no host trava/falha o backfill.
 # Preferir docker exec quando o contentor existe (mesmo se DEPLOY=docmaster-core/ sem noports.yml).
 PNCP_INGEST_VIA_DOCKER="${PNCP_INGEST_VIA_DOCKER:-}"
 _pncp_compose_home="${DOCMASTER_DEPLOY_DIR:-${HOME}}"
 if [[ -z "${PNCP_INGEST_VIA_DOCKER}" ]]; then
-  if docker inspect pncp_researcher_service >/dev/null 2>&1; then
+  if docker inspect "${FEED_CONTAINER}" >/dev/null 2>&1; then
     PNCP_INGEST_VIA_DOCKER=1
+  elif docker inspect price_index_feed_service >/dev/null 2>&1; then
+    PNCP_INGEST_VIA_DOCKER=1
+    FEED_CONTAINER=price_index_feed_service
+    FEED_PORT=8013
+  elif docker inspect pncp_researcher_service >/dev/null 2>&1; then
+    PNCP_INGEST_VIA_DOCKER=1
+    FEED_CONTAINER=pncp_researcher_service
+    FEED_PORT=8012
   elif [[ -f "${DEPLOY}/docker-compose.pncp.noports.yml" ]] \
     || [[ -f "${_pncp_compose_home}/docker-compose.pncp.noports.yml" ]]; then
     PNCP_INGEST_VIA_DOCKER=1
-  elif ! curl -sf --max-time 5 "${BASE_URL}/api/pncp-research/health" >/dev/null 2>&1; then
+  elif ! curl -sf --max-time 5 "${BASE_URL}/api/pncp-feed/health" >/dev/null 2>&1 \
+    && ! curl -sf --max-time 5 "http://127.0.0.1:8012/api/pncp-research/health" >/dev/null 2>&1; then
     PNCP_INGEST_VIA_DOCKER=1
   else
     PNCP_INGEST_VIA_DOCKER=0
@@ -67,17 +78,17 @@ pncp_http() {
   local body="${3:-}"
   local timeout_sec="${4:-30}"
   if [[ "${PNCP_INGEST_VIA_DOCKER}" == "1" ]]; then
-    docker exec pncp_researcher_service python -c "
+    docker exec "${FEED_CONTAINER}" python -c "
 import json, sys, urllib.request
-method, path, body, timeout = sys.argv[1], sys.argv[2], sys.argv[3] or '', int(sys.argv[4])
-url = 'http://127.0.0.1:8012' + path
+method, path, body, timeout, port = sys.argv[1], sys.argv[2], sys.argv[3] or '', int(sys.argv[4]), sys.argv[5]
+url = 'http://127.0.0.1:' + port + path
 data = body.encode('utf-8') if body else None
 req = urllib.request.Request(url, data=data, method=method)
 if body:
     req.add_header('Content-Type', 'application/json')
 with urllib.request.urlopen(req, timeout=timeout) as resp:
     sys.stdout.write(resp.read().decode('utf-8', errors='replace'))
-" "$method" "$path" "$body" "$timeout_sec"
+" "$method" "$path" "$body" "$timeout_sec" "$FEED_PORT"
   elif [[ "$method" == "GET" ]]; then
     curl -sf --max-time "${timeout_sec}" "${BASE_URL}${path}"
   else
@@ -131,9 +142,9 @@ PY
 }
 
 if [[ "${PNCP_INGEST_VIA_DOCKER}" == "1" ]]; then
-  log "PNCP ingest loop — via docker exec pncp_researcher_service (sem 8012 no host)"
+  log "PNCP ingest loop — via docker exec ${FEED_CONTAINER}:${FEED_PORT}"
 else
-  log "PNCP ingest loop — ${BASE_URL}"
+  log "PNCP ingest loop — feed ${BASE_URL}"
 fi
 read -r c0 i0 <<<"$(stats_snapshot)"
 log "STATS início: contratos=${c0} itens=${i0}"

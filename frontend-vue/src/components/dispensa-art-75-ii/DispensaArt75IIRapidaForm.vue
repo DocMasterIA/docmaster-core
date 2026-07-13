@@ -208,6 +208,7 @@ import { buildClausulasObjetoJustificativaPrompt } from '@/utils/clausulasObjeto
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { trimMultilinePreserve } from '@/utils/itemValorCampos.js';
 import { applyProcessoAtivoToSlotsOverride } from '@/utils/numeroProcessoSlots.js';
+import { resolveSolOficioArtigoInciso } from '@/utils/solOficioArtigoInciso.js';
 import {
   applyUsuarioLocalidadeToSlots,
   fetchUsuarioLocalidadeParaTr,
@@ -354,14 +355,6 @@ async function onApplyDadosFixos() {
 
 const dataResumo = computed(() => (modoData.value === 'Data manual' ? dataManual.value : modoData.value));
 const slotPackageKey = computed(() => SLOT_PACKAGE_BY_ROUTE[String(route.name || '')] || 'tr_dfd_generico');
-
-function resolveSolOficioFundamentoLegal(routeName) {
-  const name = String(routeName || '').trim();
-  if (!name) return '';
-  if (name.includes('Art75II')) return 'Art. 75, Inciso II, da Lei no 14.133/2021';
-  if (name.includes('Art75I')) return 'Art. 75, Inciso I, da Lei no 14.133/2021';
-  return '';
-}
 
 const cabecalhoMergeTemplateId = computed(() => {
   const n = String(cabecalho.value || '').trim();
@@ -578,7 +571,7 @@ function buildSlotsOverride() {
     o.dotacao = dotacaoTexto;
     o.objeto_resultados = `Dotação orçamentária: ${dotacaoTexto}`;
   }
-  const fundamentoLegal = resolveSolOficioFundamentoLegal(String(route.name || ''));
+  const fundamentoLegal = resolveSolOficioArtigoInciso(String(route.name || ''));
   if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;
   return stripDeprecatedCargoSlotsOverride(o);
 }

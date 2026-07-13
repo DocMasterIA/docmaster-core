@@ -113,7 +113,12 @@ if ! docker network inspect docmaster_net >/dev/null 2>&1; then
 fi
 
 UP_FLAGS=(-d)
-PNCP_SERVICE="${PNCP_SERVICE:-pncp_researcher_service}"
+PNCP_SERVICE="${PNCP_SERVICE:-}"
+if [[ -z "$PNCP_SERVICE" ]]; then
+  PNCP_SERVICES=(price_index_feed_pncp price_index_feed_tce_rs pncp_researcher_service)
+else
+  PNCP_SERVICES=("$PNCP_SERVICE")
+fi
 if [[ "${PNCP_FORCE_RECREATE:-0}" == "1" ]] || [[ "${PNCP_BUILD:-0}" == "1" ]]; then
   UP_FLAGS+=(--force-recreate)
   if [[ "${PNCP_BUILD:-0}" == "1" ]]; then
@@ -132,16 +137,16 @@ echo "==> PNCP Researcher 24/7 (projeto docmaster-pncp)"
 if [[ "${PNCP_BUILD:-0}" == "1" ]] || [[ "${PNCP_FORCE_RECREATE:-0}" == "1" ]]; then
   echo "==> A remover contentor antigo antes do recreate (volume preservado)..."
   docker compose "${COMPOSE_ARGS[@]}" down --remove-orphans 2>/dev/null || true
-  docker rm -f pncp_researcher_service 2>/dev/null || true
+  docker rm -f pncp_researcher_service price_index_feed_pncp price_index_feed_tce_rs price_index_feed_service 2>/dev/null || true
   while IFS= read -r cid; do
     [[ -z "$cid" ]] && continue
     docker rm -f "$cid" 2>/dev/null || true
   done < <(docker ps -aq --filter "name=pncp_researcher" 2>/dev/null || true)
 fi
-docker compose "${COMPOSE_ARGS[@]}" up "${UP_FLAGS[@]}" "$PNCP_SERVICE"
+docker compose "${COMPOSE_ARGS[@]}" up "${UP_FLAGS[@]}" "${PNCP_SERVICES[@]}"
 
 echo ""
-docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E '^(NAMES|pncp_researcher)' || true
+docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E '^(NAMES|pncp_researcher|price_index_feed)' || true
 
 echo ""
 echo "==> /health"
@@ -161,10 +166,10 @@ if [[ "$ok" -eq 1 ]]; then
   pncp_print_stats_summary || true
   echo ""
   if [[ "${PNCP_USE_DOCKER_HEALTH:-0}" == "1" ]]; then
-    stats_json="$(docker exec "$PNCP_SERVICE" python -c \
+    stats_json="$(docker exec pncp_researcher_service python -c \
       "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8012/api/pncp-research/local-index/stats', timeout=120).read().decode())" \
       2>/dev/null || true)"
-    health_json="$(docker exec "$PNCP_SERVICE" python -c \
+    health_json="$(docker exec pncp_researcher_service python -c \
       "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8012/api/pncp-research/health', timeout=30).read().decode())" \
       2>/dev/null || true)"
     items_n="$(echo "$stats_json" | python3 -c "import json,sys; d=json.load(sys.stdin); print(int(d.get('total_itens') or 0))" 2>/dev/null || echo 0)"
@@ -186,9 +191,9 @@ if [[ "$ok" -eq 1 ]]; then
   fi
   echo ""
   echo "==> contentor (confirme «Up … seconds» — não «Up 30+ hours» após deploy com BUILD=1)"
-  docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' | grep -E "^(NAMES|${PNCP_SERVICE})" || true
+  docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}' | grep -E '^(NAMES|pncp_researcher_service|price_index_feed_service)' || true
   if [[ "${PNCP_USE_DOCKER_HEALTH:-0}" == "1" ]]; then
-    code_rev="$(docker exec "$PNCP_SERVICE" python -c \
+    code_rev="$(docker exec pncp_researcher_service python -c \
       "from pncp_researcher_service.app.config import PNCP_SEARCH_CODE_REV; print(PNCP_SEARCH_CODE_REV)" \
       2>/dev/null || true)"
     if [[ -n "${code_rev:-}" ]]; then
@@ -217,4 +222,7 @@ echo "Ou manualmente após reboot: ./scripts/ensure-docmaster-stack.sh"
 echo "NÃO use: docker compose -f docker-compose.pncp.yml down -v"
 echo "Backend/outros: docker compose up -d --no-recreate backend  (não recria o PNCP)"
 echo "Para total_itens SUBIR (ingestão): nohup ./scripts/run-pncp-index-ingest-loop.sh >> ~/pncp-ingest.log 2>&1 &"
-echo "Doc: docs/deploy/PNCP-RESEARCHER-24-7.md"
+echo "Feed PNCP (ingest): http://127.0.0.1:8013/api/pncp-feed/health"
+echo "Feed TCE-RS:        http://127.0.0.1:8014/api/pncp-feed/health"
+echo "Researcher (busca): http://127.0.0.1:8012/api/pncp-research/health"
+echo "Doc: docs/pncp/ARQUITETURA-FEEDS-INDEPENDENTES.md"

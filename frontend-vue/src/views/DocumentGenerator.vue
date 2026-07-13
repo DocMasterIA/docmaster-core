@@ -542,6 +542,7 @@ import {
   stripDeprecatedCargoSlotsOverride,
 } from '@/components/dispensa-art-75-ii/dispensaArt75iiShared.js';
 import { useSessionUser } from '@/composables/useSessionUser.js';
+import { resolveSolOficioArtigoInciso } from '@/utils/solOficioArtigoInciso.js';
 
 // Em dev: '' → proxy Vite `/api`
 const API_BASE = getApiBase();
@@ -859,32 +860,6 @@ const SLOT_PACKAGE_BY_ROUTE = {
   InexigibilidadeArt74IFornecedorExclusivoPreview: 'inexigibilidade_74_i_fornecedor_exclusivo',
   InexigibilidadeArt74IManutencaoVeiculosPreview: 'inexigibilidade_74_i_manutencao_veiculos',
 };
-
-const SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE = {
-  DispensaArt75I: 'Art. 75, Inciso I, da Lei nº 14.133/2021',
-  DispensaArt75IManutencaoVeiculos: 'Art. 75, Inciso I, da Lei nº 14.133/2021',
-  DispensaArt75IObrasEngenharia: 'Art. 75, Inciso I, da Lei nº 14.133/2021',
-  DispensaArt75II: 'Art. 75, Inciso II, da Lei nº 14.133/2021',
-  DispensaArt75IICompras: 'Art. 75, Inciso II, da Lei nº 14.133/2021',
-  DispensaArt75IIServicos: 'Art. 75, Inciso II, da Lei nº 14.133/2021',
-  DispensaArt75IIComprasServicosInclusos: 'Art. 75, Inciso II, da Lei nº 14.133/2021',
-  InexigibilidadeArt74I: 'Art. 74, Inciso I, da Lei nº 14.133/2021',
-  InexigibilidadeArt74IManutencaoVeiculos: 'Art. 74, Inciso I, da Lei nº 14.133/2021',
-  InexigibilidadeArt74IManutencaoVeiculosPreview: 'Art. 74, Inciso I, da Lei nº 14.133/2021',
-  InexigibilidadeArt74IFornecedorExclusivo: 'Art. 74, Inciso I, da Lei nº 14.133/2021',
-  InexigibilidadeArt74IFornecedorExclusivoPreview: 'Art. 74, Inciso I, da Lei nº 14.133/2021',
-};
-
-function resolveSolOficioFundamentoLegal(routeName) {
-  const name = String(routeName || '').trim();
-  if (!name) return '';
-  if (SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE[name]) return SOL_OFICIO_FUNDAMENTO_LEGAL_BY_ROUTE[name];
-  if (name.startsWith('InexigibilidadeArt74I')) return 'Art. 74, Inciso I, da Lei nº 14.133/2021';
-  if (name.startsWith('DispensaArt75I')) return 'Art. 75, Inciso I, da Lei nº 14.133/2021';
-  if (name.startsWith('DispensaArt75II')) return 'Art. 75, Inciso II, da Lei nº 14.133/2021';
-  return '';
-}
-
 const slotPackageKey = computed(() => {
   if (isEtpLivreRoute.value) return 'etp_livre';
   return SLOT_PACKAGE_BY_ROUTE[dispensaLogicalRouteName.value] || 'tr_dfd_generico';
@@ -1332,7 +1307,7 @@ function buildTrSlotsOverride() {
   const justificativa = (f.justificativa || f.justificativa_inviabilidade || '').trim();
   if (justificativa) o.justificativa = justificativa;
 
-  const fundamentoLegal = resolveSolOficioFundamentoLegal(dispensaLogicalRouteName.value);
+  const fundamentoLegal = resolveSolOficioArtigoInciso(dispensaLogicalRouteName.value);
   if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;
 
   applyNumeroProcessoToSlotsOverride(o, f.numero_processo || '');

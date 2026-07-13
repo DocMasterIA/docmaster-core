@@ -25,6 +25,7 @@ from .config import (
 )
 from .deprecated_cargo_slots import clear_deprecated_cargo_fields, strip_deprecated_cargo_override
 from .dfd_slot_sanitize import sanitize_dfd_setor_requisitante
+from .oficio_slots import normalize_sol_oficio_artigo_inciso
 from .objeto_clause_sanitize import sanitize_objeto_clause_pura as _sanitize_objeto_clause_pura
 from .justificativa_clause_sanitize import (
     finalize_rapida_secao4_tres_blocos,
@@ -1599,7 +1600,7 @@ def _merge_slots(llm_slots: TRTemplateSlots, override: Dict[str, Any]) -> TRTemp
         if override.get("cargo_assinante_termo") is not None
         else llm_slots.cargo_assinante_termo
     )
-    sol_oficio_artigo_inciso = (
+    sol_oficio_artigo_inciso = normalize_sol_oficio_artigo_inciso(
         (override.get("sol_oficio_artigo_inciso") or llm_slots.sol_oficio_artigo_inciso)
         if override.get("sol_oficio_artigo_inciso") is not None
         else llm_slots.sol_oficio_artigo_inciso

@@ -91,6 +91,7 @@ def assign_canonical_keys(
     hits: Iterable[MarketPriceHit],
     *,
     persist: bool = True,
+    db_path: Optional[str] = None,
 ) -> List[MarketPriceHit]:
     """
     Atribui canonical_key e cross_refs a cada hit.
@@ -105,6 +106,7 @@ def assign_canonical_keys(
             numero_pncp=ids.get("numero_pncp"),
             numero_item=ids.get("numero_item"),
             numero_processo=ids.get("numero_processo"),
+            db_path=db_path,
         )
         canonical = stored or build_canonical_key(hit, ids)
         cross_refs = dict(hit.cross_refs or {})
@@ -147,5 +149,6 @@ def assign_canonical_keys(
                 valor_bucket=int(ids.get("valor_bucket") or "0"),
                 desc_norm=ids.get("desc_norm"),
                 metodo="federated_search",
+                db_path=db_path,
             )
     return out

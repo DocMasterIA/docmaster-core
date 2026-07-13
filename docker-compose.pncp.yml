@@ -1,126 +1,154 @@
-# PNCP Researcher — stack isolada (24/7, alimentação do índice local).
+# Stack isolada: feeds por plataforma (independentes) + researcher de preços.
 # Projeto Compose separado (name) → não mistura com grafana/backend no mesmo «up».
-#
-# DEPLOY = docmaster-core:  PNCP_BUILD_CONTEXT=. (default)
-# DEPLOY = ~ com repo em docmaster-core/:  PNCP_BUILD_CONTEXT=docmaster-core
 #
 #   docker compose -f docker-compose.pncp.yml up -d
 #   ./scripts/ensure-pncp-researcher.sh
 #
-# Produção (DESKTOP): após git pull, recrie o contentor para aplicar envs deste ficheiro:
-#   cp docmaster-core/docker-compose.pncp.yml ~/docker-compose.pncp.yml
-#   docker compose -f ~/docker-compose.pncp.yml up -d --force-recreate pncp_researcher_service
+# Arquitetura:
+#   price_index_feed_pncp      :8013  — só PNCP (worker 24/7)
+#   price_index_feed_tce_rs    :8014  — só TCE-RS / LicitaCon → platform_index
+#   pncp_researcher_service    :8012  — busca federada (Django proxy); só lê .db
+#
+# Docs: docs/pncp/ARQUITETURA-FEEDS-INDEPENDENTES.md
 
 name: docmaster-pncp
 
+x-pncp-image: &pncp-image
+  build:
+    context: ${PNCP_BUILD_CONTEXT:-.}
+    dockerfile: pncp_researcher_service/Dockerfile
+  image: docmaster-pncp_researcher_service
+
+x-pncp-volumes: &pncp-volumes
+  - pncp_researcher_data:/data/pncp
+  - price_platform_data:/data/platforms
+  - price_crosslink_data:/data/crosslink
+
+x-pncp-db-env: &pncp-db-env
+  PNCP_LOCAL_DB_PATH: /data/pncp/pncp_researcher_local.db
+  PRICE_PLATFORM_DATA_ROOT: /data/platforms
+  PRICE_CROSSLINK_DB_PATH: /data/crosslink/price_cross_refs.db
+  TCE_RS_LOCAL_DB_PATH: /data/platforms/tce_rs_local.db
+
 services:
+  # ── Feed PNCP (escrita exclusiva do índice legacy) ─────────────────────
+  price_index_feed_pncp:
+    <<: *pncp-image
+    container_name: price_index_feed_pncp
+    ports:
+      - "127.0.0.1:8013:8013"
+    environment:
+      <<: *pncp-db-env
+      PORT: "8013"
+      SERVICE_MODE: feed
+      FEED_PLATFORM: pncp
+      PNCP_BASE_URL: https://pncp.gov.br/api/consulta
+      PNCP_TIMEOUT: "60"
+      PNCP_FTS5_ENABLED: ${PNCP_FTS5_ENABLED:-1}
+      PNCP_INGEST_QUEUE_ENABLED: ${PNCP_INGEST_QUEUE_ENABLED:-1}
+      PNCP_INGEST_WORKER_ENABLED: ${PNCP_INGEST_WORKER_ENABLED:-1}
+      PNCP_INGEST_AUTOPAUSE_ENABLED: ${PNCP_INGEST_AUTOPAUSE_ENABLED:-1}
+      PNCP_INGEST_WATERMARK_RESUME: ${PNCP_INGEST_WATERMARK_RESUME:-1}
+      PNCP_INGEST_FETCH_ITEM_RESULTADOS: ${PNCP_INGEST_FETCH_ITEM_RESULTADOS:-1}
+      PNCP_INGEST_BACKFILL_MODE: ${PNCP_INGEST_BACKFILL_MODE:-1}
+      PNCP_LOCAL_BACKFILL_DAYS: ${PNCP_LOCAL_BACKFILL_DAYS:-365}
+      PNCP_INGEST_ITEMS_REFRESH_DAYS: ${PNCP_INGEST_ITEMS_REFRESH_DAYS:-3}
+    volumes: *pncp-volumes
+    networks:
+      - docmaster_net
+    restart: always
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8013/api/pncp-feed/health', timeout=5)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── Feed TCE-RS (escrita exclusiva de tce_rs_local.db; independente do PNCP) ──
+  price_index_feed_tce_rs:
+    <<: *pncp-image
+    container_name: price_index_feed_tce_rs
+    ports:
+      - "127.0.0.1:8014:8014"
+    environment:
+      <<: *pncp-db-env
+      PORT: "8014"
+      SERVICE_MODE: feed
+      FEED_PLATFORM: tce_rs
+      PNCP_INGEST_WORKER_ENABLED: "0"
+      TCE_RS_INGEST_DATA_DIR: ${TCE_RS_INGEST_DATA_DIR:-/data/tce_rs/raw}
+    volumes:
+      - price_platform_data:/data/platforms
+      - price_crosslink_data:/data/crosslink
+      - ${TCE_RS_RAW_HOST_DIR:-./pncp_researcher_service/data/tce_rs/raw}:/data/tce_rs/raw:ro
+    networks:
+      - docmaster_net
+    restart: always
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8014/api/pncp-feed/health', timeout=5)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── Researcher (só leitura + Camada B; alimentado pelos feeds via volumes) ──
   pncp_researcher_service:
-    build:
-      context: ${PNCP_BUILD_CONTEXT:-.}
-      dockerfile: pncp_researcher_service/Dockerfile
-    image: docmaster-pncp_researcher_service
+    <<: *pncp-image
     container_name: pncp_researcher_service
     ports:
       - "127.0.0.1:8012:8012"
     environment:
-      - PORT=8012
-      - PNCP_BASE_URL=https://pncp.gov.br/api/consulta
-      - PNCP_TIMEOUT=60
-      - PNCP_DEFAULT_LOOKBACK_DAYS=180
-      - PNCP_MAX_PAGINAS_PER_REQUEST=${PNCP_MAX_PAGINAS_PER_REQUEST:-120}
-      - PNCP_INGEST_AUTOPAUSE_ENABLED=${PNCP_INGEST_AUTOPAUSE_ENABLED:-1}
-      - PNCP_INGEST_AUTOPAUSE_BASE_SECONDS=${PNCP_INGEST_AUTOPAUSE_BASE_SECONDS:-180}
-      - PNCP_INGEST_AUTOPAUSE_MAX_SECONDS=${PNCP_INGEST_AUTOPAUSE_MAX_SECONDS:-1800}
-      - PNCP_INGEST_AUTOPAUSE_JSON_INVALID_SECONDS=${PNCP_INGEST_AUTOPAUSE_JSON_INVALID_SECONDS:-120}
-      - PNCP_INGEST_WATERMARK_RESUME=${PNCP_INGEST_WATERMARK_RESUME:-1}
-      - PNCP_BACKFILL_ITEM_CONCURRENCY=${PNCP_BACKFILL_ITEM_CONCURRENCY:-12}
-      - PNCP_FTS5_ENABLED=${PNCP_FTS5_ENABLED:-1}
-      - PNCP_HYBRID_FALLBACK_ENABLED=${PNCP_HYBRID_FALLBACK_ENABLED:-1}
-      - PNCP_HYBRID_BULK_ENABLED=${PNCP_HYBRID_BULK_ENABLED:-1}
-      - PNCP_HYBRID_MIN_LOCAL_RESULTS=${PNCP_HYBRID_MIN_LOCAL_RESULTS:-8}
-      - PNCP_HYBRID_MAX_LIVE_PAGES=${PNCP_HYBRID_MAX_LIVE_PAGES:-6}
-      - PNCP_BULK_MAX_TERM_FALLBACKS=${PNCP_BULK_MAX_TERM_FALLBACKS:-6}
-      - PNCP_BULK_SEARCH_MAX_SECONDS=${PNCP_BULK_SEARCH_MAX_SECONDS:-90}
-      - PNCP_BULK_ENRICH_HOMOLOG_MAX=${PNCP_BULK_ENRICH_HOMOLOG_MAX:-2}
-      - PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX=${PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX:-0}
-      - PNCP_BULK_USE_INTELLIGENT_PIPELINE=${PNCP_BULK_USE_INTELLIGENT_PIPELINE:-0}
-      - PNCP_BULK_INTELLIGENT_SQL_LIMIT=${PNCP_BULK_INTELLIGENT_SQL_LIMIT:-2000}
-      - PNCP_BULK_INTELLIGENT_MAX_TERM_FALLBACKS=${PNCP_BULK_INTELLIGENT_MAX_TERM_FALLBACKS:-6}
-      - PNCP_LOCAL_DB_PATH=/data/pncp/pncp_researcher_local.db
-      - PRICE_PLATFORM_DATA_ROOT=/data/platforms
-      - PRICE_CROSSLINK_DB_PATH=/data/crosslink/price_cross_refs.db
-      - TCE_RS_LOCAL_DB_PATH=/data/platforms/tce_rs_local.db
-      - PNCP_LOCAL_BACKFILL_DAYS=${PNCP_LOCAL_BACKFILL_DAYS:-365}
-      - PNCP_INGEST_QUEUE_ENABLED=${PNCP_INGEST_QUEUE_ENABLED:-1}
-      - PNCP_INGEST_WORKER_ENABLED=${PNCP_INGEST_WORKER_ENABLED:-1}
-      - PNCP_INGEST_JSON_INVALID_RETRIES=${PNCP_INGEST_JSON_INVALID_RETRIES:-3}
-      - PNCP_INGEST_JSON_INVALID_RETRY_SECONDS=${PNCP_INGEST_JSON_INVALID_RETRY_SECONDS:-2}
-      # Modo backfill: pipeline cheio, 365d × UFs × modalidades (recreate contentor p/ envs).
-      - PNCP_INGEST_FETCH_ITEM_RESULTADOS=${PNCP_INGEST_FETCH_ITEM_RESULTADOS:-1}
-      - PNCP_INGEST_RESULTADOS_TOPUP_ENABLED=${PNCP_INGEST_RESULTADOS_TOPUP_ENABLED:-1}
-      - PNCP_INGEST_RESULTADOS_TOPUP_LIMIT=${PNCP_INGEST_RESULTADOS_TOPUP_LIMIT:-400}
-      - PNCP_INGEST_SYNC_CATALOG_BATCH=${PNCP_INGEST_SYNC_CATALOG_BATCH:-25000}
-      - PNCP_INGEST_BACKFILL_MODE=${PNCP_INGEST_BACKFILL_MODE:-1}
-      - PNCP_INGEST_BACKFILL_TARGET_BACKLOG=${PNCP_INGEST_BACKFILL_TARGET_BACKLOG:-10000}
-      - PNCP_INGEST_BACKFILL_TOPUP_CHUNK=${PNCP_INGEST_BACKFILL_TOPUP_CHUNK:-5000}
-      - PNCP_INGEST_BACKFILL_ITEMS_FIRST_BACKLOG=${PNCP_INGEST_BACKFILL_ITEMS_FIRST_BACKLOG:-1000}
-      - PNCP_INGEST_BACKFILL_LOW_ROWS_1H_ALERT=${PNCP_INGEST_BACKFILL_LOW_ROWS_1H_ALERT:-2000}
-      - PNCP_INGEST_BACKFILL_LOW_ROWS_ALERT_SECONDS=${PNCP_INGEST_BACKFILL_LOW_ROWS_ALERT_SECONDS:-7200}
-      - PNCP_INGEST_WORKER_CATALOG_BATCH=${PNCP_INGEST_WORKER_CATALOG_BATCH:-6}
-      - PNCP_INGEST_WORKER_ITEMS_BATCH=${PNCP_INGEST_WORKER_ITEMS_BATCH:-32}
-      - PNCP_INGEST_WORKER_ITEMS_CONCURRENCY=${PNCP_INGEST_WORKER_ITEMS_CONCURRENCY:-16}
-      - PNCP_INGEST_TASK_TIMEOUT_SECONDS=${PNCP_INGEST_TASK_TIMEOUT_SECONDS:-180}
-      - PNCP_INGEST_BATCH_MAX_SECONDS=${PNCP_INGEST_BATCH_MAX_SECONDS:-480}
-      - PNCP_INGEST_WORKER_POLL_SECONDS=${PNCP_INGEST_WORKER_POLL_SECONDS:-2}
-      - PNCP_INGEST_PLANNER_INTERVAL_SECONDS=${PNCP_INGEST_PLANNER_INTERVAL_SECONDS:-300}
-      - PNCP_INGEST_PLANNER_PAGES_PER_SCOPE=${PNCP_INGEST_PLANNER_PAGES_PER_SCOPE:-32}
-      - PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS=${PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS:-600}
-      - PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS_MAX=${PNCP_INGEST_PLANNER_CONTRACTS_WITHOUT_ITEMS_MAX:-5000}
-      - PNCP_INGEST_ITEMS_STARVE_BACKLOG=${PNCP_INGEST_ITEMS_STARVE_BACKLOG:-10000}
-      - PNCP_INGEST_CATALOG_HEAVY_PENDING=${PNCP_INGEST_CATALOG_HEAVY_PENDING:-300}
-      - PNCP_INGEST_CATALOG_PAUSE_MIN_GAP=${PNCP_INGEST_CATALOG_PAUSE_MIN_GAP:-50}
-      - PNCP_INGEST_ITEMS_STALL_SECONDS=${PNCP_INGEST_ITEMS_STALL_SECONDS:-600}
-      - PNCP_INGEST_QUEUE_MAX_PENDING=${PNCP_INGEST_QUEUE_MAX_PENDING:-12000}
-      - PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG=${PNCP_INGEST_ITEMS_BACKLOG_PAUSE_CATALOG:-15000}
-      - PNCP_INGEST_WORKER_ITEMS_BATCH_MAX=${PNCP_INGEST_WORKER_ITEMS_BATCH_MAX:-64}
-      # Busca: só homologados + enrich on-demand de CNPJ na pesquisa local.
-      - PNCP_SEARCH_ONLY_HOMOLOGATED=${PNCP_SEARCH_ONLY_HOMOLOGATED:-1}
-      - PNCP_SEARCH_ENRICH_HOMOLOG_MAX=${PNCP_SEARCH_ENRICH_HOMOLOG_MAX:-16}
-      - PNCP_SEARCH_MIN_SCORE_APROVACAO=${PNCP_SEARCH_MIN_SCORE_APROVACAO:-50}
-      # Busca inteligente — rerank top-3 + resumo de item (mesmo contrato /api/llm/generate que llm_api).
-      # Requer qwen_llm_service Up (docker compose --profile qwen) na rede docmaster_net.
-      - PNCP_IA_BASE_URL=${PNCP_IA_BASE_URL:-http://qwen_llm_service:8015}
-      - PNCP_IA_MODEL=${PNCP_IA_MODEL:-}
-      - PNCP_IA_TIMEOUT_SECONDS=${PNCP_IA_TIMEOUT_SECONDS:-22}
-      - PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS=${PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS:-18}
-      - PNCP_IA_RERANK_ENABLED=${PNCP_IA_RERANK_ENABLED:-1}
-      - PNCP_IA_ITEM_RESUMO_ENABLED=${PNCP_IA_ITEM_RESUMO_ENABLED:-1}
-      # Rerank local (rápido, sem Qwen) — default no lote e busca manual.
-      - PNCP_LOCAL_RERANK_ENABLED=${PNCP_LOCAL_RERANK_ENABLED:-1}
-      - PNCP_LOCAL_RERANK_MAX_CANDIDATES=${PNCP_LOCAL_RERANK_MAX_CANDIDATES:-24}
-      - PNCP_LOCAL_RERANK_ONLY_AMBIGUOUS=${PNCP_LOCAL_RERANK_ONLY_AMBIGUOUS:-1}
-      - PNCP_IA_RERANK_PREFER_LOCAL=${PNCP_IA_RERANK_PREFER_LOCAL:-1}
-      # Qwen no lote: off por default (lento); manual usa local primeiro.
-      - PNCP_IA_RERANK_BULK_ENABLED=${PNCP_IA_RERANK_BULK_ENABLED:-0}
-      - PNCP_IA_BULK_MAX_CANDIDATES=${PNCP_IA_BULK_MAX_CANDIDATES:-12}
-      - PNCP_IA_BULK_TIMEOUT_SECONDS=${PNCP_IA_BULK_TIMEOUT_SECONDS:-12}
-      - PNCP_IA_RERANK_BULK_ONLY_AMBIGUOUS=${PNCP_IA_RERANK_BULK_ONLY_AMBIGUOUS:-1}
-      - PNCP_IA_MAX_CANDIDATES=${PNCP_IA_MAX_CANDIDATES:-36}
-      # Busca inteligente — qualidade primeiro (pareado com Qwen rerank):
-      - PNCP_SEARCH_QUALITY_FIRST=${PNCP_SEARCH_QUALITY_FIRST:-1}
-      - PNCP_SEARCH_TIER_FLEX_RATIO=${PNCP_SEARCH_TIER_FLEX_RATIO:-0.78}
-      - PNCP_SEARCH_ANCHOR_TIER_ENABLED=${PNCP_SEARCH_ANCHOR_TIER_ENABLED:-0}
-      - PNCP_SEARCH_MAX_SIMILAR_IN_TOP3=${PNCP_SEARCH_MAX_SIMILAR_IN_TOP3:-1}
-      - PNCP_IA_RERANK_MIXED_POOL=${PNCP_IA_RERANK_MIXED_POOL:-1}
-      # Em backfill mode efetivo REFRESH=0; valor aqui aplica-se com BACKFILL_MODE=0.
-      - PNCP_INGEST_ITEMS_REFRESH_DAYS=${PNCP_INGEST_ITEMS_REFRESH_DAYS:-3}
-    volumes:
-      - pncp_researcher_data:/data/pncp
-      - price_platform_data:/data/platforms
-      - price_crosslink_data:/data/crosslink
+      <<: *pncp-db-env
+      PORT: "8012"
+      SERVICE_MODE: researcher
+      PNCP_BASE_URL: https://pncp.gov.br/api/consulta
+      PNCP_TIMEOUT: "60"
+      PNCP_DEFAULT_LOOKBACK_DAYS: "180"
+      PNCP_MAX_PAGINAS_PER_REQUEST: ${PNCP_MAX_PAGINAS_PER_REQUEST:-120}
+      PNCP_FTS5_ENABLED: ${PNCP_FTS5_ENABLED:-1}
+      PNCP_INGEST_WORKER_ENABLED: "0"
+      PNCP_LOCAL_AUTO_INGEST: "0"
+      PNCP_HYBRID_FALLBACK_ENABLED: ${PNCP_HYBRID_FALLBACK_ENABLED:-1}
+      PNCP_HYBRID_BULK_ENABLED: ${PNCP_HYBRID_BULK_ENABLED:-1}
+      PNCP_HYBRID_MIN_LOCAL_RESULTS: ${PNCP_HYBRID_MIN_LOCAL_RESULTS:-8}
+      PNCP_HYBRID_MAX_LIVE_PAGES: ${PNCP_HYBRID_MAX_LIVE_PAGES:-6}
+      PNCP_BULK_MAX_TERM_FALLBACKS: ${PNCP_BULK_MAX_TERM_FALLBACKS:-6}
+      PNCP_BULK_SEARCH_MAX_SECONDS: ${PNCP_BULK_SEARCH_MAX_SECONDS:-90}
+      PNCP_BULK_ENRICH_HOMOLOG_MAX: ${PNCP_BULK_ENRICH_HOMOLOG_MAX:-2}
+      PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX: ${PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX:-0}
+      PNCP_BULK_USE_INTELLIGENT_PIPELINE: ${PNCP_BULK_USE_INTELLIGENT_PIPELINE:-0}
+      PNCP_BULK_INTELLIGENT_SQL_LIMIT: ${PNCP_BULK_INTELLIGENT_SQL_LIMIT:-2000}
+      PNCP_BULK_INTELLIGENT_MAX_TERM_FALLBACKS: ${PNCP_BULK_INTELLIGENT_MAX_TERM_FALLBACKS:-6}
+      PNCP_SEARCH_ONLY_HOMOLOGATED: ${PNCP_SEARCH_ONLY_HOMOLOGATED:-1}
+      PNCP_SEARCH_ENRICH_HOMOLOG_MAX: ${PNCP_SEARCH_ENRICH_HOMOLOG_MAX:-16}
+      PNCP_SEARCH_MIN_SCORE_APROVACAO: ${PNCP_SEARCH_MIN_SCORE_APROVACAO:-50}
+      PNCP_IA_BASE_URL: ${PNCP_IA_BASE_URL:-http://qwen_llm_service:8015}
+      PNCP_IA_MODEL: ${PNCP_IA_MODEL:-}
+      PNCP_IA_TIMEOUT_SECONDS: ${PNCP_IA_TIMEOUT_SECONDS:-22}
+      PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS: ${PNCP_IA_ITEM_RESUMO_TIMEOUT_SECONDS:-18}
+      PNCP_IA_RERANK_ENABLED: ${PNCP_IA_RERANK_ENABLED:-1}
+      PNCP_IA_ITEM_RESUMO_ENABLED: ${PNCP_IA_ITEM_RESUMO_ENABLED:-1}
+      PNCP_LOCAL_RERANK_ENABLED: ${PNCP_LOCAL_RERANK_ENABLED:-1}
+      PNCP_LOCAL_RERANK_MAX_CANDIDATES: ${PNCP_LOCAL_RERANK_MAX_CANDIDATES:-24}
+      PNCP_LOCAL_RERANK_ONLY_AMBIGUOUS: ${PNCP_LOCAL_RERANK_ONLY_AMBIGUOUS:-1}
+      PNCP_IA_RERANK_PREFER_LOCAL: ${PNCP_IA_RERANK_PREFER_LOCAL:-1}
+      PNCP_IA_RERANK_BULK_ENABLED: ${PNCP_IA_RERANK_BULK_ENABLED:-0}
+      PNCP_IA_BULK_MAX_CANDIDATES: ${PNCP_IA_BULK_MAX_CANDIDATES:-12}
+      PNCP_IA_BULK_TIMEOUT_SECONDS: ${PNCP_IA_BULK_TIMEOUT_SECONDS:-12}
+      PNCP_IA_RERANK_BULK_ONLY_AMBIGUOUS: ${PNCP_IA_RERANK_BULK_ONLY_AMBIGUOUS:-1}
+      PNCP_IA_MAX_CANDIDATES: ${PNCP_IA_MAX_CANDIDATES:-36}
+      PNCP_SEARCH_QUALITY_FIRST: ${PNCP_SEARCH_QUALITY_FIRST:-1}
+      PNCP_SEARCH_TIER_FLEX_RATIO: ${PNCP_SEARCH_TIER_FLEX_RATIO:-0.78}
+      PNCP_SEARCH_ANCHOR_TIER_ENABLED: ${PNCP_SEARCH_ANCHOR_TIER_ENABLED:-0}
+      PNCP_SEARCH_MAX_SIMILAR_IN_TOP3: ${PNCP_SEARCH_MAX_SIMILAR_IN_TOP3:-1}
+      PNCP_IA_RERANK_MIXED_POOL: ${PNCP_IA_RERANK_MIXED_POOL:-1}
+      PNCP_FEDERATED_SEARCH_ENABLED: ${PNCP_FEDERATED_SEARCH_ENABLED:-1}
+      PNCP_FEDERATED_SOURCE_TIMEOUT_SECONDS: ${PNCP_FEDERATED_SOURCE_TIMEOUT_SECONDS:-20}
+    volumes: *pncp-volumes
     networks:
       - docmaster_net
-    # 24/7: reinicia após reboot do Docker ou crash do processo (não depende do compose principal).
     restart: always
     stop_grace_period: 30s
     healthcheck:
@@ -131,9 +159,6 @@ services:
       start_period: 30s
 
 volumes:
-  # Volume nomeado do projeto docmaster-pncp. Para reutilizar índice antigo após down/up:
-  #   PNCP_DATA_VOLUME=nome_do_volume_grande ./scripts/attach-pncp-volume.sh
-  # (gera docker-compose.pncp.override.yml com volume external).
   pncp_researcher_data:
   price_platform_data:
   price_crosslink_data:

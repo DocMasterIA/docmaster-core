@@ -27,6 +27,8 @@ class PlatformIndexSpec:
     uf_scope: Optional[str] = None
     enabled: bool = True
     search_ready: bool = False
+    # feed = alimentação/ingest; researcher = leitura na busca; both = PNCP legacy monolito
+    index_writer: Literal["feed", "researcher", "both"] = "feed"
 
     def db_exists(self) -> bool:
         if not self.db_path:
@@ -44,6 +46,7 @@ class PlatformIndexSpec:
             "uf_scope": self.uf_scope,
             "enabled": self.enabled,
             "search_ready": self.search_ready,
+            "index_writer": self.index_writer,
             "db_exists": self.db_exists(),
         }
 
@@ -62,6 +65,7 @@ _PLATFORM_SPECS: Dict[str, PlatformIndexSpec] = {
         inciso_default="inciso_i",
         esfera_default="federal",
         search_ready=True,
+        index_writer="feed",
     ),
     "tce_rs": PlatformIndexSpec(
         id="tce_rs",

@@ -402,6 +402,7 @@ import {
   sanitizeQuantidadeInput,
 } from '@/utils/itemValorCampos.js';
 import { applyProcessoAtivoToSlotsOverride } from '@/utils/numeroProcessoSlots.js';
+import { resolveSolOficioArtigoInciso } from '@/utils/solOficioArtigoInciso.js';
 import {
   clearDeprecatedCargoPresetFields,
   stripDeprecatedCargoSlotsOverride,
@@ -900,7 +901,7 @@ function buildSlotsOverride(iaDeepen = null) {
     dfd_gestor_contratos: String(fixoGestor.value || '').trim(),
     dfd_fiscal_contratos: String((fixoFiscal.value || fiscal.value || '').trim()),
     dfd_assinatura_nome: trimMultilinePreserve(fixoAssinatura.value || ''),
-    sol_oficio_artigo_inciso: 'Art. 74, Inciso I, da Lei no 14.133/2021',
+    sol_oficio_artigo_inciso: resolveSolOficioArtigoInciso('InexigibilidadeArt74IFornecedorExclusivoPreview'),
   };
   if (dotacaoAtiva.value && String(dotacao.value || '').trim()) {
     const dotacaoTexto = String(dotacao.value || '').trim();

@@ -7,7 +7,7 @@ from ..config import PNCP_FEDERATED_SEARCH_ENABLED, PNCP_FEDERATED_SOURCE_TIMEOU
 from .contracts import FederatedSearchQuery, MarketPriceHit
 from .crosslink import assign_canonical_keys
 from .dedup import dedupe_hits
-from .mapping import hit_to_pncp_row
+from .orchestrator import orchestrate_federated_hits
 from .pncp_adapter import PncpAdapter
 from .registry import get_adapters
 
@@ -83,25 +83,11 @@ async def federated_search(query: FederatedSearchQuery) -> Dict[str, Any]:
 
     linked = assign_canonical_keys(merged, persist=True)
     deduped = dedupe_hits(linked)
-    deduped.sort(
-        key=lambda h: float(h.valor_unitario_homologado or h.valor_unitario or 0),
-        reverse=True,
-    )
-    top = deduped[:3]
-    rows = [hit_to_pncp_row(h) for h in top]
 
-    return {
-        "ok": True,
-        "filtros": {
-            "termo_busca": query.termo_busca,
-            "fontes_habilitadas": sources,
-        },
-        "stats": {
-            "fontes_consultadas": sources,
-            "fontes": source_stats,
-            "total_hits": len(merged),
-            "total_apos_dedup": len(deduped),
-            "crosslink_aplicado": True,
-        },
-        "itens": rows,
-    }
+    return await orchestrate_federated_hits(
+        query,
+        deduped,
+        source_stats=source_stats,
+        total_hits=len(merged),
+        total_after_dedup=len(deduped),
+    )

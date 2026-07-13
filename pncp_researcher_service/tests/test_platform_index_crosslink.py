@@ -113,7 +113,7 @@ def test_assign_canonical_keys_persists(crosslink_db, monkeypatch):
             raw={"numero_pncp": "NP", "numero_item": "2"},
         )
     ]
-    linked = assign_canonical_keys(hits, persist=True)
+    linked = assign_canonical_keys(hits, persist=True, db_path=crosslink_db)
     assert linked[0].canonical_key == "pncp|NP|2"
     stored = resolve_canonical_key(
         plataforma="pncp",

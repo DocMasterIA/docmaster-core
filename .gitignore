@@ -47,4 +47,7 @@ docker-compose.pncp.override.yml
 # LLM API – logs de auditoria (volume Docker)
 /llm_audit/
 
+# TCE-RS LicitaCon raw exports (centenas de MB / GB)
+pncp_researcher_service/data/tce_rs/raw/
+
 /staticfiles/

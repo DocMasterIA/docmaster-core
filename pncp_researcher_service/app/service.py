@@ -2436,205 +2436,83 @@ def _bulk_search_timeout_response(payload: MarketSearchRequest) -> Dict[str, Any
     }
 
 
-async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, Any]:
+async def orchestrate_merged_candidate_pool(
+    payload: MarketSearchRequest,
+    itens: List[Dict[str, Any]],
+    *,
+    base_stats: Optional[Dict[str, Any]] = None,
+    funil: Optional[Dict[str, Any]] = None,
+    hybrid_used: bool = False,
+    hybrid_live_count: int = 0,
+    service_blocked_count: int = 0,
+    source_label: str = "local_item_search",
+    federated_source_stats: Optional[Dict[str, Any]] = None,
+    fontes_habilitadas: Optional[List[str]] = None,
+) -> Dict[str, Any]:
     """
-    Versão inteligente da busca manual:
-    - usa o mesmo índice local de itens PNCP (local_item_search);
-    - aplica score 0-100 por item;
-    - retorna exatamente 3 cotações com diversidade de órgão.
-    - em busca_lote (autostart): até 3 preços por item, pool = busca manual + faixa.
+    Camada B — pipeline unificado: faixa regional, scoring, rerank e top 3.
+    Recebe candidatos normalizados (dict rows) de uma ou mais plataformas.
     """
-    # Reutiliza a mesma fonte da busca manual (itens PNCP normalizados)
-    busca_lote = bool(getattr(payload, "busca_lote", False))
-    search_payload = payload
-    ia_rerank_on = _ia_rerank_on_for_request(busca_lote)
-    ia_resumo_on = _ia_resumo_on_for_request(busca_lote)
-    limit = max(50, search_payload.max_paginas * search_payload.tamanho_pagina)
-    if busca_lote:
-        limit = min(limit, max(80, int(PNCP_BULK_SEARCH_SQL_LIMIT)))
-    termo_busca_raw = search_payload.termo_busca
-    termo_efetivo, term_meta = derive_anchor_search_term(termo_busca_raw)
     from .product_spec_match import product_spec_has_constraints
 
+    search_payload = payload
+    busca_lote = bool(getattr(payload, "busca_lote", False))
+    ia_rerank_on = _ia_rerank_on_for_request(busca_lote)
+    ia_resumo_on = _ia_resumo_on_for_request(busca_lote)
+    termo_busca_raw = search_payload.termo_busca
+    termo_efetivo, term_meta = derive_anchor_search_term(termo_busca_raw)
     if product_spec_has_constraints(termo_busca_raw):
         termo_spec = termo_busca_raw
     elif term_meta.get("termo_truncado"):
         termo_spec = termo_efetivo
     else:
         termo_spec = termo_busca_raw
-    itens: List[Dict[str, Any]] = []
-    base_stats: Dict[str, Any] = {}
-    terms_tried: List[str] = []
-    bulk_term_cap = max(2, int(PNCP_BULK_MAX_TERM_FALLBACKS)) if busca_lote else 0
-    for i, term_try in enumerate(_iter_search_term_fallbacks(termo_busca_raw)):
-        if busca_lote and i >= bulk_term_cap:
-            break
-        terms_tried.append(term_try)
-        batch_result = local_item_search(
-            term_try,
-            uf=search_payload.uf,
-            municipio=search_payload.municipio,
-            recortes_geograficos=search_payload.recortes_geograficos,
-            codigo_modalidade=search_payload.codigo_modalidade,
-            limit=limit,
-            cleanup_for_display=False,
-            somente_homologados=search_payload.somente_homologados,
-            filtrar_fornecedor_para_exibicao=not busca_lote,
-            enrich_homolog_max=(
-                max(0, int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX)) if busca_lote else None
-            ),
-            termo_product_spec=termo_spec,
-        )
-        if not base_stats:
-            base_stats = dict(batch_result.get("stats") or {})
-        batch = list(batch_result.get("itens") or [])
-        itens = _merge_local_item_batches(itens, batch)
-        if busca_lote and batch and int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX) > 0:
-            from .supplier_resolver import item_fornecedor_tem_cnpj_para_salvar
 
-            local_cap = max(0, int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX))
-            enrich_pool = [
-                x
-                for x in itens
-                if x.get("item_homologado") and not item_fornecedor_tem_cnpj_para_salvar(x)
-            ]
-            if enrich_pool:
-                local_enriched = await enrich_homolog_items_from_pncp(
-                    enrich_pool,
-                    max_n=min(local_cap, len(enrich_pool)),
-                )
-                funil_local_enrich = int(base_stats.get("enriquecidos_pncp_local_lote") or 0)
-                base_stats["enriquecidos_pncp_local_lote"] = funil_local_enrich + int(local_enriched or 0)
-        priced_n = sum(1 for x in itens if _row_price_for_faixa(x) > 0.0)
-        if priced_n >= 3:
-            break
-        # Lote: se o índice já tem preço, não varre 6 termos (top3 + enrich PNCP fecha o resto).
-        if busca_lote and priced_n >= 1:
-            break
-        # Lote sem preço: no máximo 3 termos antes do híbrido (evita ~6× SQL/item vazio).
-        if busca_lote and priced_n == 0 and i >= 2:
-            break
-        if len(itens) >= limit:
-            break
-    base_items = {"ok": True, "itens": itens, "stats": base_stats}
-    base_stats = dict(base_items.get("stats") or {})
-    funil: Dict[str, Any] = {
-        "termo_busca": term_meta,
-        "local_homologados": len(itens),
-        "local_com_preco": sum(1 for x in itens if _row_price_for_faixa(x) > 0.0),
-        "sql_rows_fetched": int(base_stats.get("sql_rows_fetched") or 0),
-        "filtrados_token_match": int(base_stats.get("filtrados_token_match") or 0),
-        "filtrados_nao_homologados": int(base_stats.get("filtrados_nao_homologados") or 0),
-        "busca_lote_relaxada": bool(busca_lote),
-        "busca_lote_fornecedor_filter_final_only": bool(busca_lote),
-        "hybrid_bulk_disabled": bool(busca_lote and not PNCP_HYBRID_BULK_ENABLED),
-        "bulk_max_term_fallbacks": int(PNCP_BULK_MAX_TERM_FALLBACKS) if busca_lote else None,
-        "bulk_local_enrich_max": int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX) if busca_lote else None,
-        "termo_truncado": bool(term_meta.get("termo_truncado")),
-        "search_terms_tried": terms_tried,
-    }
-    hybrid_used = False
-    hybrid_live_count = 0
-    hybrid_min = max(1, int(PNCP_HYBRID_MIN_LOCAL_RESULTS))
-    local_priced = sum(1 for x in itens if _row_price_for_faixa(x) > 0.0)
-    hybrid_allowed = PNCP_HYBRID_FALLBACK_ENABLED and (not busca_lote or PNCP_HYBRID_BULK_ENABLED)
-    if busca_lote:
-        # Lote: só PNCP ao vivo se o índice local não trouxe nada com preço (evita 6 páginas/item).
-        need_hybrid = local_priced == 0
-    else:
-        need_hybrid = len(itens) < hybrid_min or local_priced < hybrid_min
-    if hybrid_allowed and need_hybrid:
-        live_pages = max(1, min(int(PNCP_HYBRID_MAX_LIVE_PAGES), int(search_payload.max_paginas or 1)))
-        if busca_lote:
-            live_pages = min(live_pages, 2)
-        live_payload = search_payload.model_copy(update={"max_paginas": live_pages})
-        try:
-            live_result = await market_search(live_payload)
-            live_itens = list(live_result.get("itens") or [])
-            hybrid_used = True
-            hybrid_live_count = len(live_itens)
-            seen = {
-                (
-                    str(it.get("numero_pncp") or ""),
-                    str(it.get("numero_item") or ""),
-                    str(it.get("descricao_item") or "")[:120],
-                )
-                for it in itens
-            }
-            for lit in live_itens:
-                key = (
-                    str(lit.get("numero_pncp") or ""),
-                    str(lit.get("numero_item") or ""),
-                    str(lit.get("descricao_item") or "")[:120],
-                )
-                if key in seen:
-                    live_cnpj = str(lit.get("cnpj_fornecedor") or "").strip()
-                    if live_cnpj:
-                        for loc in itens:
-                            loc_key = (
-                                str(loc.get("numero_pncp") or ""),
-                                str(loc.get("numero_item") or ""),
-                                str(loc.get("descricao_item") or "")[:120],
-                            )
-                            if loc_key != key:
-                                continue
-                            if str(loc.get("cnpj_fornecedor") or "").strip():
-                                break
-                            loc["cnpj_fornecedor"] = live_cnpj
-                            if str(lit.get("fornecedor") or "").strip():
-                                loc["fornecedor"] = lit.get("fornecedor")
-                            if lit.get("fornecedor_cadastro"):
-                                loc["fornecedor_cadastro"] = lit.get("fornecedor_cadastro")
-                            if lit.get("fornecedor_fonte_nome"):
-                                loc["fornecedor_fonte_nome"] = lit.get("fornecedor_fonte_nome")
-                            loc["fornecedor_hibrido_live"] = True
-                            break
-                    continue
-                seen.add(key)
-                lit = dict(lit)
-                lit["origem"] = lit.get("origem") or "pncp_live_fallback"
-                itens.append(lit)
-        except PNCPClientError:
-            pass
-    service_blocked_count = 0
-    if PNCP_BLOCK_SERVICE_ITEMS and itens:
-        filtered_items: List[Dict[str, Any]] = []
-        for it in itens:
-            if _is_service_like_item(it):
-                service_blocked_count += 1
-                continue
-            filtered_items.append(it)
-        itens = filtered_items
+    base_items = {"ok": True, "stats": dict(base_stats or {})}
+    funil = dict(funil or {})
+    funil.setdefault("termo_busca", term_meta)
+    funil.setdefault("local_homologados", len(itens))
+    funil.setdefault(
+        "local_com_preco",
+        sum(1 for x in itens if _row_price_for_faixa(x) > 0.0),
+    )
+    if federated_source_stats is not None:
+        funil["federated"] = True
+        funil["fontes"] = dict(federated_source_stats)
+    if fontes_habilitadas:
+        funil["fontes_habilitadas"] = list(fontes_habilitadas)
+
     if not itens:
-        return {
-            "ok": True,
-            "filtros": {
-                "termo_busca": payload.termo_busca,
-                "uf": payload.uf,
-                "municipio": payload.municipio,
-                "recortes_geograficos": (
-                    [r.model_dump() for r in payload.recortes_geograficos]
-                    if payload.recortes_geograficos
-                    else None
-                ),
-                "codigo_municipio_ibge": payload.codigo_municipio_ibge,
-                "codigo_modalidade": payload.codigo_modalidade,
-                "pagina_inicial": payload.pagina,
-                "max_paginas": payload.max_paginas,
-                "tamanho_pagina": payload.tamanho_pagina,
-                "fonte": "local_item_search",
-            },
-            "stats": {
-                **base_stats,
+        empty_stats = dict(base_stats or {})
+        empty_stats.update(
+            {
                 "servico_bloqueio_ativo": bool(PNCP_BLOCK_SERVICE_ITEMS),
                 "servico_bloqueados": int(service_blocked_count),
                 "hybrid_fallback_used": hybrid_used,
                 "hybrid_live_count": hybrid_live_count,
                 "funil_busca": {**funil, "top3_final": 0},
                 "provavel_gargalo": _infer_search_bottleneck(funil, 0),
-            },
-            "itens": [],
+            }
+        )
+        filtros = {
+            "termo_busca": payload.termo_busca,
+            "uf": payload.uf,
+            "municipio": payload.municipio,
+            "recortes_geograficos": (
+                [r.model_dump() for r in payload.recortes_geograficos]
+                if payload.recortes_geograficos
+                else None
+            ),
+            "codigo_municipio_ibge": payload.codigo_municipio_ibge,
+            "codigo_modalidade": payload.codigo_modalidade,
+            "pagina_inicial": payload.pagina,
+            "max_paginas": payload.max_paginas,
+            "tamanho_pagina": payload.tamanho_pagina,
+            "fonte": source_label,
         }
+        if fontes_habilitadas:
+            filtros["fontes_habilitadas"] = list(fontes_habilitadas)
+        return {"ok": True, "filtros": filtros, "stats": empty_stats, "itens": []}
 
     termo_tokens = preprocess_cotacao_search_term(termo_busca_raw) or termo_busca_raw
     query_groups = _build_search_tokens(termo_tokens)
@@ -2712,7 +2590,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             aggressive = mode == "aggressive"
             partial_anchor = _has_partial_anchor_match(it, query_groups)
             origem = str(it.get("origem") or "")
-            from_local_index = origem in ("base_local_itens", "") or origem.startswith("base_local")
+            from_local_index = origem in ("base_local_itens", "") or origem.startswith("base_local") or origem.startswith("federated_")
             if not relaxed and not _is_strict_candidate_match(it, query_groups):
                 # Índice local já exigiu match AND nos mesmos token groups — não refiltrar por proximidade.
                 if not from_local_index:
@@ -3234,7 +3112,8 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
     )
     out_stats["min_score_aprovacao"] = min_ok
 
-    return {
+
+    result = {
         "ok": bool(base_items.get("ok", True)),
         "filtros": {
             "termo_busca": payload.termo_busca,
@@ -3250,7 +3129,7 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
             "pagina_inicial": payload.pagina,
             "max_paginas": payload.max_paginas,
             "tamanho_pagina": payload.tamanho_pagina,
-            "fonte": "local_item_search",
+            "fonte": source_label,
             "quantidade_referencia": payload.quantidade_referencia,
             "unidade_medida_referencia": payload.unidade_medida_referencia,
             "valor_base_referencia": payload.valor_base_referencia,
@@ -3264,3 +3143,224 @@ async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, A
         "stats": out_stats,
         "itens": top3,
     }
+    if fontes_habilitadas:
+        result["filtros"]["fontes_habilitadas"] = list(fontes_habilitadas)
+        out_stats["fontes_habilitadas"] = list(fontes_habilitadas)
+        out_stats["fontes_consultadas"] = list(fontes_habilitadas)
+    if federated_source_stats is not None:
+        out_stats["fontes"] = dict(federated_source_stats)
+        out_stats["crosslink_aplicado"] = True
+        out_stats["regra_selecao"] = "federated_unified_pipeline"
+    return result
+
+
+async def market_search_intelligent(payload: MarketSearchRequest) -> Dict[str, Any]:
+    """
+    Versão inteligente da busca manual:
+    - usa o mesmo índice local de itens PNCP (local_item_search);
+    - aplica score 0-100 por item;
+    - retorna exatamente 3 cotações com diversidade de órgão.
+    - em busca_lote (autostart): até 3 preços por item, pool = busca manual + faixa.
+    """
+    # Reutiliza a mesma fonte da busca manual (itens PNCP normalizados)
+    busca_lote = bool(getattr(payload, "busca_lote", False))
+    search_payload = payload
+    ia_rerank_on = _ia_rerank_on_for_request(busca_lote)
+    ia_resumo_on = _ia_resumo_on_for_request(busca_lote)
+    limit = max(50, search_payload.max_paginas * search_payload.tamanho_pagina)
+    if busca_lote:
+        limit = min(limit, max(80, int(PNCP_BULK_SEARCH_SQL_LIMIT)))
+    termo_busca_raw = search_payload.termo_busca
+    termo_efetivo, term_meta = derive_anchor_search_term(termo_busca_raw)
+    from .product_spec_match import product_spec_has_constraints
+
+    if product_spec_has_constraints(termo_busca_raw):
+        termo_spec = termo_busca_raw
+    elif term_meta.get("termo_truncado"):
+        termo_spec = termo_efetivo
+    else:
+        termo_spec = termo_busca_raw
+    itens: List[Dict[str, Any]] = []
+    base_stats: Dict[str, Any] = {}
+    terms_tried: List[str] = []
+    bulk_term_cap = max(2, int(PNCP_BULK_MAX_TERM_FALLBACKS)) if busca_lote else 0
+    for i, term_try in enumerate(_iter_search_term_fallbacks(termo_busca_raw)):
+        if busca_lote and i >= bulk_term_cap:
+            break
+        terms_tried.append(term_try)
+        batch_result = local_item_search(
+            term_try,
+            uf=search_payload.uf,
+            municipio=search_payload.municipio,
+            recortes_geograficos=search_payload.recortes_geograficos,
+            codigo_modalidade=search_payload.codigo_modalidade,
+            limit=limit,
+            cleanup_for_display=False,
+            somente_homologados=search_payload.somente_homologados,
+            filtrar_fornecedor_para_exibicao=not busca_lote,
+            enrich_homolog_max=(
+                max(0, int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX)) if busca_lote else None
+            ),
+            termo_product_spec=termo_spec,
+        )
+        if not base_stats:
+            base_stats = dict(batch_result.get("stats") or {})
+        batch = list(batch_result.get("itens") or [])
+        itens = _merge_local_item_batches(itens, batch)
+        if busca_lote and batch and int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX) > 0:
+            from .supplier_resolver import item_fornecedor_tem_cnpj_para_salvar
+
+            local_cap = max(0, int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX))
+            enrich_pool = [
+                x
+                for x in itens
+                if x.get("item_homologado") and not item_fornecedor_tem_cnpj_para_salvar(x)
+            ]
+            if enrich_pool:
+                local_enriched = await enrich_homolog_items_from_pncp(
+                    enrich_pool,
+                    max_n=min(local_cap, len(enrich_pool)),
+                )
+                funil_local_enrich = int(base_stats.get("enriquecidos_pncp_local_lote") or 0)
+                base_stats["enriquecidos_pncp_local_lote"] = funil_local_enrich + int(local_enriched or 0)
+        priced_n = sum(1 for x in itens if _row_price_for_faixa(x) > 0.0)
+        if priced_n >= 3:
+            break
+        # Lote: se o índice já tem preço, não varre 6 termos (top3 + enrich PNCP fecha o resto).
+        if busca_lote and priced_n >= 1:
+            break
+        # Lote sem preço: no máximo 3 termos antes do híbrido (evita ~6× SQL/item vazio).
+        if busca_lote and priced_n == 0 and i >= 2:
+            break
+        if len(itens) >= limit:
+            break
+    base_items = {"ok": True, "itens": itens, "stats": base_stats}
+    base_stats = dict(base_items.get("stats") or {})
+    funil: Dict[str, Any] = {
+        "termo_busca": term_meta,
+        "local_homologados": len(itens),
+        "local_com_preco": sum(1 for x in itens if _row_price_for_faixa(x) > 0.0),
+        "sql_rows_fetched": int(base_stats.get("sql_rows_fetched") or 0),
+        "filtrados_token_match": int(base_stats.get("filtrados_token_match") or 0),
+        "filtrados_nao_homologados": int(base_stats.get("filtrados_nao_homologados") or 0),
+        "busca_lote_relaxada": bool(busca_lote),
+        "busca_lote_fornecedor_filter_final_only": bool(busca_lote),
+        "hybrid_bulk_disabled": bool(busca_lote and not PNCP_HYBRID_BULK_ENABLED),
+        "bulk_max_term_fallbacks": int(PNCP_BULK_MAX_TERM_FALLBACKS) if busca_lote else None,
+        "bulk_local_enrich_max": int(PNCP_BULK_LOCAL_ENRICH_HOMOLOG_MAX) if busca_lote else None,
+        "termo_truncado": bool(term_meta.get("termo_truncado")),
+        "search_terms_tried": terms_tried,
+    }
+    hybrid_used = False
+    hybrid_live_count = 0
+    hybrid_min = max(1, int(PNCP_HYBRID_MIN_LOCAL_RESULTS))
+    local_priced = sum(1 for x in itens if _row_price_for_faixa(x) > 0.0)
+    hybrid_allowed = PNCP_HYBRID_FALLBACK_ENABLED and (not busca_lote or PNCP_HYBRID_BULK_ENABLED)
+    if busca_lote:
+        # Lote: só PNCP ao vivo se o índice local não trouxe nada com preço (evita 6 páginas/item).
+        need_hybrid = local_priced == 0
+    else:
+        need_hybrid = len(itens) < hybrid_min or local_priced < hybrid_min
+    if hybrid_allowed and need_hybrid:
+        live_pages = max(1, min(int(PNCP_HYBRID_MAX_LIVE_PAGES), int(search_payload.max_paginas or 1)))
+        if busca_lote:
+            live_pages = min(live_pages, 2)
+        live_payload = search_payload.model_copy(update={"max_paginas": live_pages})
+        try:
+            live_result = await market_search(live_payload)
+            live_itens = list(live_result.get("itens") or [])
+            hybrid_used = True
+            hybrid_live_count = len(live_itens)
+            seen = {
+                (
+                    str(it.get("numero_pncp") or ""),
+                    str(it.get("numero_item") or ""),
+                    str(it.get("descricao_item") or "")[:120],
+                )
+                for it in itens
+            }
+            for lit in live_itens:
+                key = (
+                    str(lit.get("numero_pncp") or ""),
+                    str(lit.get("numero_item") or ""),
+                    str(lit.get("descricao_item") or "")[:120],
+                )
+                if key in seen:
+                    live_cnpj = str(lit.get("cnpj_fornecedor") or "").strip()
+                    if live_cnpj:
+                        for loc in itens:
+                            loc_key = (
+                                str(loc.get("numero_pncp") or ""),
+                                str(loc.get("numero_item") or ""),
+                                str(loc.get("descricao_item") or "")[:120],
+                            )
+                            if loc_key != key:
+                                continue
+                            if str(loc.get("cnpj_fornecedor") or "").strip():
+                                break
+                            loc["cnpj_fornecedor"] = live_cnpj
+                            if str(lit.get("fornecedor") or "").strip():
+                                loc["fornecedor"] = lit.get("fornecedor")
+                            if lit.get("fornecedor_cadastro"):
+                                loc["fornecedor_cadastro"] = lit.get("fornecedor_cadastro")
+                            if lit.get("fornecedor_fonte_nome"):
+                                loc["fornecedor_fonte_nome"] = lit.get("fornecedor_fonte_nome")
+                            loc["fornecedor_hibrido_live"] = True
+                            break
+                    continue
+                seen.add(key)
+                lit = dict(lit)
+                lit["origem"] = lit.get("origem") or "pncp_live_fallback"
+                itens.append(lit)
+        except PNCPClientError:
+            pass
+    service_blocked_count = 0
+    if PNCP_BLOCK_SERVICE_ITEMS and itens:
+        filtered_items: List[Dict[str, Any]] = []
+        for it in itens:
+            if _is_service_like_item(it):
+                service_blocked_count += 1
+                continue
+            filtered_items.append(it)
+        itens = filtered_items
+    if not itens:
+        return {
+            "ok": True,
+            "filtros": {
+                "termo_busca": payload.termo_busca,
+                "uf": payload.uf,
+                "municipio": payload.municipio,
+                "recortes_geograficos": (
+                    [r.model_dump() for r in payload.recortes_geograficos]
+                    if payload.recortes_geograficos
+                    else None
+                ),
+                "codigo_municipio_ibge": payload.codigo_municipio_ibge,
+                "codigo_modalidade": payload.codigo_modalidade,
+                "pagina_inicial": payload.pagina,
+                "max_paginas": payload.max_paginas,
+                "tamanho_pagina": payload.tamanho_pagina,
+                "fonte": "local_item_search",
+            },
+            "stats": {
+                **base_stats,
+                "servico_bloqueio_ativo": bool(PNCP_BLOCK_SERVICE_ITEMS),
+                "servico_bloqueados": int(service_blocked_count),
+                "hybrid_fallback_used": hybrid_used,
+                "hybrid_live_count": hybrid_live_count,
+                "funil_busca": {**funil, "top3_final": 0},
+                "provavel_gargalo": _infer_search_bottleneck(funil, 0),
+            },
+            "itens": [],
+        }
+
+    return await orchestrate_merged_candidate_pool(
+        payload,
+        itens,
+        base_stats=base_stats,
+        funil=funil,
+        hybrid_used=hybrid_used,
+        hybrid_live_count=hybrid_live_count,
+        service_blocked_count=service_blocked_count,
+        source_label="local_item_search",
+    )

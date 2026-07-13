@@ -405,6 +405,10 @@ TCE_RS_LOCAL_DB_PATH: str = os.getenv(
     "TCE_RS_LOCAL_DB_PATH",
     os.path.join(PRICE_PLATFORM_DATA_ROOT, "tce_rs_local.db"),
 ).strip()
+PRICE_INDEX_FEED_BASE_URL: str = os.getenv(
+    "PRICE_INDEX_FEED_BASE_URL",
+    "http://127.0.0.1:8013",
+).strip().rstrip("/")
 # Descrições de cotação: até N tokens usam busca completa; acima disso cap de âncoras (recall).
 PNCP_SEARCH_ANCHOR_FULL_TERM_MAX: int = _env_int("PNCP_SEARCH_ANCHOR_FULL_TERM_MAX", 5)
 PNCP_SEARCH_ANCHOR_MAX_GROUPS: int = _env_int("PNCP_SEARCH_ANCHOR_MAX_GROUPS", 8)

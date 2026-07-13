@@ -11,6 +11,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 from app.tr_template import (
     TRTemplateSlots,
+    is_numero_processo_placeholder,
     numero_processo_valor_placeholder_tr,
     render_tr_from_slots,
     slots_numero_processo_display,
@@ -30,6 +31,23 @@ TEMPLATE_COM_PLACEHOLDER = (
 
 
 class TrNumeroProcessoPlaceholderTests(unittest.TestCase):
+    def _processo_paragraphs_bold(self, doc: Document) -> list[str]:
+        failures: list[str] = []
+        for p in doc.paragraphs:
+            text = (p.text or "").strip().upper()
+            if not text.startswith("PROCESSO:"):
+                continue
+            for run in p.runs:
+                if (run.text or "").strip() and not run.bold:
+                    failures.append(f"run não negrito: {run.text!r} em {p.text!r}")
+        return failures
+
+    def test_numero_processo_placeholder_detection(self):
+        self.assertTrue(is_numero_processo_placeholder("( NUMERO_PROCESSO )"))
+        self.assertTrue(is_numero_processo_placeholder("(NUMERO PROCESSO)"))
+        self.assertTrue(is_numero_processo_placeholder("(DFD_NUMERO_PROCESSO)"))
+        self.assertFalse(is_numero_processo_placeholder("(TR_OBJETO)"))
+
     def test_all_tr_templates_have_numero_processo_placeholder(self):
         self.assertTrue(ALL_TR_TEMPLATES, "Nenhum TR_modelo_base.docx encontrado")
         missing: list[str] = []
@@ -68,6 +86,12 @@ class TrNumeroProcessoPlaceholderTests(unittest.TestCase):
                         f"{path.relative_to(TEMPLATE_PACKAGES_ROOT)}: PROCESSO não está à esquerda "
                         f"(align={proc_para.alignment})"
                     )
+                for run in proc_para.runs:
+                    if (run.text or "").strip() and not run.bold:
+                        failures.append(
+                            f"{path.relative_to(TEMPLATE_PACKAGES_ROOT)}: PROCESSO não está em negrito "
+                            f"(run={run.text!r})"
+                        )
         self.assertEqual(failures, [], "\n".join(failures))
 
     def test_numero_processo_only_on_slots_still_renders_tr(self):
@@ -110,6 +134,7 @@ class TrNumeroProcessoPlaceholderTests(unittest.TestCase):
             any("PROCESSO: 1231/2026" in (p.text or "") for p in doc.paragraphs[:8]),
             "Esperado PROCESSO: no parágrafo do placeholder",
         )
+        self.assertEqual(self._processo_paragraphs_bold(doc), [])
         self.assertFalse(
             any("( NUMERO_PROCESSO )" in (p.text or "") for p in doc.paragraphs[:8]),
             "Placeholder não deve permanecer no DOCX",

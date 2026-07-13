@@ -2,7 +2,25 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, Optional
+
+_LEI_14133_SUFFIX_RE = re.compile(
+    r",?\s*da\s+Lei\s+n[oº°.]?\s*\.?\s*14[\./]?133(?:/\d{4})?\s*$",
+    re.IGNORECASE,
+)
+
+
+def normalize_sol_oficio_artigo_inciso(value: Any) -> str:
+    """
+    Slot (SOL_OFICIO_ARTIGO_INCISO): só artigo + inciso.
+    Remove sufixo «, da Lei nº 14.133/2021» (o ofício já cita a lei no corpo).
+    """
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    text = _LEI_14133_SUFFIX_RE.sub("", text).strip()
+    return text.rstrip(",").strip()
 
 
 def normalize_oficio_slots_override(override: Optional[Dict[str, Any]]) -> Dict[str, Any]:
@@ -39,5 +57,10 @@ def normalize_oficio_slots_override(override: Optional[Dict[str, Any]]) -> Dict[
         v = str(o.get("solicitacao_destinatario_cargo") or "").strip()
         if v:
             o["sol_oficio_destinatario_cargo"] = v
+
+    if o.get("sol_oficio_artigo_inciso") is not None:
+        o["sol_oficio_artigo_inciso"] = normalize_sol_oficio_artigo_inciso(
+            o.get("sol_oficio_artigo_inciso")
+        )
 
     return o

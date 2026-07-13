@@ -255,10 +255,23 @@ class SchemaRegressionTests(unittest.TestCase):
 
 class ApiEndpointRegressionTests(unittest.IsolatedAsyncioTestCase):
     async def test_price_sources_lists_pncp(self):
-        from httpx import ASGITransport, AsyncClient
-        from app.main import app
+        import importlib
+        import os
 
-        transport = ASGITransport(app=app)
+        # Garante app em modo researcher (testes de FEED_PLATFORM podem ter sujado o módulo).
+        os.environ["SERVICE_MODE"] = "all"
+        os.environ.pop("FEED_PLATFORM", None)
+        import app.service_mode as sm
+        import app.api as api_mod
+        import app.main as main_mod
+
+        importlib.reload(sm)
+        importlib.reload(api_mod)
+        importlib.reload(main_mod)
+
+        from httpx import ASGITransport, AsyncClient
+
+        transport = ASGITransport(app=main_mod.app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.get("/api/pncp-research/price-sources")
         self.assertEqual(resp.status_code, 200)

@@ -14,6 +14,7 @@ from typing import Optional
 from docx import Document
 
 from .deprecated_cargo_slots import clear_deprecated_cargo_fields
+from .oficio_slots import normalize_sol_oficio_artigo_inciso
 from .docx_typography import (
     apply_default_justify_to_document,
     apply_standard_body_font_to_document,
@@ -192,7 +193,7 @@ def render_oficio_from_slots(
         "( AO_SENHOR_GENERO )": slots.ao_senhor_genero or "",
         "(SENHOR_SENHORA_GENERO)": slots.senhor_senhora_genero or "",
         "( SENHOR_SENHORA_GENERO )": slots.senhor_senhora_genero or "",
-        "(SOL_OFICIO_ARTIGO_INCISO)": slots.sol_oficio_artigo_inciso or "",
+        "(SOL_OFICIO_ARTIGO_INCISO)": normalize_sol_oficio_artigo_inciso(slots.sol_oficio_artigo_inciso),
         "(SOL_OFICIO_DESTINATARIO_NOME)": slots.sol_oficio_destinatario_nome or "",
         "(SOL_OFICIO_DESTINATARIO_CARGO)": slots.sol_oficio_destinatario_cargo or "",
         "(SOL_OFICIO_DESTINATARIO_ORGAO)": slots.sol_oficio_destinatario_orgao or "",

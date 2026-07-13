@@ -125,6 +125,104 @@ def numero_processo_valor_placeholder_tr(raw: str) -> str:
     return f"PROCESSO: {s}"
 
 
+_NUMERO_PROCESSO_PLACEHOLDER_RE = re.compile(
+    r"^\(\s*(?:DFD_)?NUMERO[\s_]PROCESSO\s*\)$",
+    re.IGNORECASE,
+)
+
+
+def is_numero_processo_placeholder(placeholder: str) -> bool:
+    """True para `(NUMERO_PROCESSO)`, `( NUMERO PROCESSO )`, `(DFD_NUMERO_PROCESSO)`, etc."""
+    return bool(_NUMERO_PROCESSO_PLACEHOLDER_RE.match(str(placeholder or "").strip()))
+
+
+def numero_processo_bold_targets(num_proc: str) -> list[str]:
+    """Textos a destacar em negrito no TR após substituir `(NUMERO_PROCESSO)`."""
+    s = str(num_proc or "").strip()
+    if not s:
+        return []
+    targets: list[str] = []
+    tr_style = numero_processo_valor_placeholder_tr(s)
+    if tr_style:
+        targets.append(tr_style)
+    if s not in targets:
+        targets.append(s)
+    return targets
+
+
+def _insert_run_after(reference_run, text: str):
+    from docx.text.run import Run
+
+    new_r = OxmlElement("w:r")
+    reference_run._element.addnext(new_r)
+    new_run = Run(new_r, reference_run._parent)
+    new_run.text = text
+    return new_run
+
+
+def _bold_char_range_in_paragraph(paragraph: Paragraph, start: int, end: int) -> None:
+    """Aplica negrito ao intervalo [start, end) em paragraph.text (índices UTF-16-like / Python str)."""
+    if start >= end:
+        return
+    cursor = 0
+    idx = 0
+    while idx < len(paragraph.runs):
+        run = paragraph.runs[idx]
+        txt = run.text or ""
+        run_start = cursor
+        run_end = cursor + len(txt)
+        cursor = run_end
+        if run_end <= start or run_start >= end:
+            idx += 1
+            continue
+        local_start = max(0, start - run_start)
+        local_end = min(len(txt), end - run_start)
+        if local_start == 0 and local_end == len(txt):
+            run.bold = True
+            idx += 1
+            continue
+        before = txt[:local_start]
+        middle = txt[local_start:local_end]
+        after = txt[local_end:]
+        font_ref = run
+        run.text = before
+        prev = run
+        if middle:
+            mid_run = _insert_run_after(prev, middle)
+            _copy_run_font(font_ref, mid_run)
+            mid_run.bold = True
+            prev = mid_run
+        if after:
+            aft_run = _insert_run_after(prev, after)
+            _copy_run_font(font_ref, aft_run)
+        idx += 1
+
+
+def _bold_substring_in_paragraph(paragraph: Paragraph, needle: str) -> bool:
+    if not needle:
+        return False
+    hay = paragraph.text or ""
+    pos = hay.find(needle)
+    if pos < 0:
+        return False
+    _bold_char_range_in_paragraph(paragraph, pos, pos + len(needle))
+    return True
+
+
+def _apply_numero_processo_bold_to_paragraph(paragraph: Paragraph, num_proc: str) -> None:
+    for needle in numero_processo_bold_targets(num_proc):
+        if _bold_substring_in_paragraph(paragraph, needle):
+            return
+
+
+def apply_numero_processo_bold_to_document(doc: Document, num_proc: str) -> None:
+    """Garante negrito no número de processo do TR mesmo quando o modelo .docx não formata o placeholder."""
+    if not str(num_proc or "").strip():
+        return
+    for p in _iter_all_document_paragraphs(doc):
+        _apply_numero_processo_bold_to_paragraph(p, num_proc)
+
+
 def _parse_br_money_to_float(value: Any) -> Optional[float]:
     """Interpreta valor monetário BR (R$, milhar com ponto, decimal com vírgula). None se vazio ou inválido."""
     raw = str(value or "").strip()
@@ -1553,6 +1651,7 @@ def render_tr_from_slots(
     _fill_items_table(doc, slots.itens)
 
     apply_standard_body_font_to_document(doc)
+    apply_numero_processo_bold_to_document(doc, num_proc_display)
     apply_default_justify_to_document(doc)
 
     ensure_signature_nome_blank_lines(doc)

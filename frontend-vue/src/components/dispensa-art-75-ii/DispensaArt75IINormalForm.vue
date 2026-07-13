@@ -275,6 +275,7 @@ import {
 import { describeGerarTrEDfdNetworkFailure, fetchGerarTrEDfdWithRetry } from '@/utils/fetchGerarTrEDfd.js';
 import { trimMultilinePreserve } from '@/utils/itemValorCampos.js';
 import { applyProcessoAtivoToSlotsOverride } from '@/utils/numeroProcessoSlots.js';
+import { resolveSolOficioArtigoInciso } from '@/utils/solOficioArtigoInciso.js';
 import {
   applyUsuarioLocalidadeToSlots,
   fetchUsuarioLocalidadeParaTr,
@@ -373,14 +374,6 @@ const normalPhTrio = computed(() => {
 const normalPhObjeto = computed(() => normalPhTrio.value.objeto);
 const normalPhSetor = computed(() => normalPhTrio.value.setor);
 const normalPhCaracteristicas = computed(() => normalPhTrio.value.caracteristicas);
-
-function resolveSolOficioFundamentoLegal(routeName) {
-  const name = String(routeName || '').trim();
-  if (!name) return '';
-  if (name.includes('Art75II')) return 'Art. 75, Inciso II, da Lei no 14.133/2021';
-  if (name.includes('Art75I')) return 'Art. 75, Inciso I, da Lei no 14.133/2021';
-  return '';
-}
 
 const cabecalhoMergeTemplateId = computed(() => {
   const n = String(cabecalho.value || '').trim();
@@ -716,7 +709,7 @@ function buildSlotsOverride() {
     const total = itensOverride.reduce((acc, item) => acc + moedaParaNumero(item.valor_total), 0);
     o.valor_total = formatCurrencyBr(total);
   }
-  const fundamentoLegal = resolveSolOficioFundamentoLegal(String(route.name || ''));
+  const fundamentoLegal = resolveSolOficioArtigoInciso(String(route.name || ''));
   if (fundamentoLegal) o.sol_oficio_artigo_inciso = fundamentoLegal;
   return stripDeprecatedCargoSlotsOverride(o);
 }

@@ -11,6 +11,8 @@ from .pricing_faixa import normalize_variacao_sentido
 class HealthResponse(BaseModel):
     ok: bool = True
     service: str = "pncp_researcher_service"
+    service_mode: str = "all"
+    feed_platform: str = ""
     search_code_rev: str = ""
     db_path: str = ""
     db_bytes: int = 0
@@ -226,6 +228,25 @@ class LocalSyncCatalogRequest(BaseModel):
         ge=1,
         le=200,
         description="Quantos lotes executar nesta chamada.",
+    )
+
+
+class TceRsIngestRequest(BaseModel):
+    """Ingest LicitaCon TCE-RS (layout CSV provisório — revisar em 1-TCE-DIS)."""
+
+    data_dir: Optional[str] = Field(
+        None,
+        description="Diretório com LICITACAO.csv, ITEM.csv, PROPOSTA.csv (ou nomes similares).",
+    )
+    use_sample: bool = Field(
+        False,
+        description="Carrega fixtures internas para dev/teste.",
+    )
+    max_rows: Optional[int] = Field(
+        None,
+        ge=1,
+        le=500000,
+        description="Limite de linhas por arquivo CSV (debug).",
     )
 
 

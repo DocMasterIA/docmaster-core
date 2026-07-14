@@ -9,17 +9,16 @@ Pasta local: `pncp_researcher_service/data/tce_rs/raw/{2025,2026}/`.
 
 ## 1. Existe serviço separado para TCE-RS?
 
-**Não.** Hoje TCE-RS **não** tem container/serviço próprio.
+**Operacionalmente sim** — container `price_index_feed_tce_rs` (:8014), isolado do feed PNCP.
+Código ainda na mesma imagem (`FEED_PLATFORM=tce_rs`).
 
 | Peça | Onde vive |
 |------|-----------|
 | Ingest / materialização | Container `price_index_feed_tce_rs` (`SERVICE_MODE=feed`, `FEED_PLATFORM=tce_rs`, :8014) |
-| Busca | `price_researcher` / `pncp_researcher_service` (:8012) via `TceRsAdapter` (só leitura) |
+| Busca | `pncp_researcher_service` (:8012) via `TceRsAdapter` (só leitura) |
 | SQLite | `/data/platforms/tce_rs_local.db` (escrito só pelo feed TCE-RS) |
 | Código ingest | `app/platform_index/ingest/tce_rs/` |
 | Arquitetura | [ARQUITETURA-FEEDS-INDEPENDENTES.md](../../../docs/pncp/ARQUITETURA-FEEDS-INDEPENDENTES.md) |
-
-Um microserviço `tce_rs_feed_service` só faria sentido depois, se o volume/cron do LicitaCon saturar o feed PNCP. Por ora: **mesmo feed, outro pipeline**.
 
 ---
 
@@ -168,37 +167,44 @@ Join `pessoas` por (`TP_DOCUMENTO`,`NR_DOCUMENTO`) → `NM_PESSOA` (confirmado e
 | `valor_unitario` | homologado \|\| proposta.VL_UNITARIO \|\| estimado |
 | `orgao` | `licitacao.NM_ORGAO` |
 | `uf` | `"RS"` |
-| `municipio` | TBD (pessoas/órgão) — nullable no MVP |
-| `fornecedor_nome` / `cnpj_fornecedor` | `pessoas` + `NR_DOCUMENTO` |
+| `municipio` | IBGE do **fornecedor** (`pessoas.CD_MUNICIPIO_IBGE`); órgão não tem coluna |
+| `fornecedor_nome` / `cnpj_fornecedor` | waterfall: `item_prop C` → `item` doc1/doc2 → `licitacao` vencedor/fornecedor → `pessoas` |
 | `data_referencia` | `DT_HOMOLOGACAO` item_prop \|\| licitação |
 | `numero_processo` | `NR_PROCESSO`/`ANO_PROCESSO` |
 | `url_origem` | `LINK_LICITACON_CIDADAO` |
 | `inciso_classificacao` | `"inciso_ii"` |
 | `esfera` | `"estadual"` |
-| `numero_pncp` | **não há** nestes CSVs → null (crosslink só por soft-key) |
+| `numero_pncp` | parcial: parse `evento_lic.DS_PUBLICACAO` (`pncp.gov.br/editais/...`) |
+
+Análise completa (fill rates + cobertura premium 2025): [`ANALISE-COLUNAS-PREMIUM.md`](./ANALISE-COLUNAS-PREMIUM.md).
 
 ---
 
 ## 6. O que precisa ser feito (backlog técnico)
 
 1. **Pasta dedicada (feito)** — `data/tce_rs/raw/{ano}/`; raw **fora do git**.  
-2. **Atualizar parser** — trocar aliases genéricos pelos nomes reais (`CD_ORGAO`, `DS_ITEM`, …); alias `itemw.csv` → item.  
-3. **Join real** — materialize por chave composta (não por `id_licitacao` fictício das fixtures).  
-4. **Regra de preço** — homologado → proposta vencedora → estimado + flag no `raw`.  
-5. **Ingest por ano** — `ingest(data_dir=.../2025)` e `.../2026` (ou merge). Volume grande: streaming / lote, não carregar CSV inteiro em RAM.  
-6. **Filtros de qualidade** — preferir itens com preço > 0; decidir se incluir só homologados na busca federada (flag).  
-7. **Município** — enrichment futuro (cadastro de órgãos TCE ou IBGE).  
-8. **CKAN/cron** — depois; por enquanto ingest a partir desta pasta local.  
+2. **Parser LicitaCon (feito)** — `CD_ORGAO`/`DS_ITEM`/`VL_UNITARIO_*`, chave composta, `itemw.csv`, `item_prop` + `pessoas`.  
+3. **Join + preço (parcial)** — homologado → proposta `C`; **ainda** inclui estimado e waterfall de CNPJ incompleto.  
+4. **Ingest amostral / multi-ano (feito)**.  
+5. **Premium interno (próximo)** — ver `ANALISE-COLUNAS-PREMIUM.md`:  
+   - headers duplicados de documento no `item`  
+   - waterfall fornecedor completo  
+   - `itens_leitura` só homologado/prop C + fornecedor  
+   - soft-PNCP via `evento_lic`  
+6. **Ingest full-year** — sem `max_rows` no feed `:8014`.  
+7. **Município do órgão** — só com cadastro externo de órgãos (não está nos CSVs).  
+8. **CKAN/cron** — depois.  
 9. **UI** — checkbox TCE-RS quando `search_ready`.  
 
 ---
 
 ## 7. Observações importantes
 
-- **Duplicação de headers** em alguns CSVs (`TP_DOCUMENTO` / `NR_DOCUMENTO` aparecem duas vezes em `item`, `lote`, `licitante`). O `csv.DictReader` do Python fica com a **última** ocorrência — o parser precisa lidar com isso (renomear na leitura ou usar índice de coluna).  
-- `pessoas.csv` é grande e se repete entre anos — considerar cache/dedup por documento.  
-- `documento_lic` (~300+ MB somados) **não** precisa no FTS de preço na fase 1.  
-- Código oficial de resultado (`TP_RESULTADO_ITEM`: A/D/F/N/R) ainda sem dicionário confirmado no portal; amostragem: `A` ~ homologado aceito, muitos vazios com preço preenchido.
+- **Duplicação de headers** em `item`/`lote`/`licitante`: os dois pares `TP_DOCUMENTO`/`NR_DOCUMENTO` são **mutuamente exclusivos** (0 linhas com ambos preenchidos em 2025). `DictReader` sem rename **apaga** o 1º par quando o 2º vem vazio (~532 k docs).  
+- `pessoas.csv` é grande e se repete entre anos — dedup por dígitos do documento.  
+- `documento_lic` **não** precisa no FTS de preço na fase premium.  
+- `TP_RESULTADO_ITEM`: `A` dominante; muitos homologados com resultado vazio — **não** filtrar só por `A`.  
+- Links PNCP em `evento_lic.DS_PUBLICACAO` existem (~52 k licitações/2025); usar antes de API externa.
 
 ---
 

@@ -57,14 +57,22 @@ def _tce_spec(db_path: str):
     )
 
 
-def test_fixtures_parse_three_files():
+def test_fixtures_parse_licitacon_files():
     parsed = parse_tce_rs_directory(FIXTURES_DIR)
     assert parsed["files"]["licitacao"]
     assert parsed["files"]["item"]
     assert parsed["files"]["proposta"]
+    assert parsed["files"]["pessoas"]
     assert len(parsed["licitacoes"]) >= 2
     assert len(parsed["itens"]) >= 3
     assert len(parsed["propostas"]) >= 3
+    # Chave composta LicitaCon (não id fictício).
+    assert any(str(l["licitacao_id"]).startswith("48100:2025:62:") for l in parsed["licitacoes"])
+    # Pessoas enriquecem proposta vencedora.
+    vencedoras = [p for p in parsed["propostas"] if str(p.get("tp_resultado_proposta") or "").upper() == "C"]
+    assert any(p.get("fornecedor_nome") for p in vencedoras)
+    # Preço no próprio item.
+    assert any((i.get("valor_unitario_homologado") or 0) > 0 for i in parsed["itens"])
 
 
 def test_ingest_sample_populates_index(tce_db):
@@ -72,9 +80,26 @@ def test_ingest_sample_populates_index(tce_db):
     assert out["ok"] is True
     assert out["search_ready"] is True
     assert out["materialize"]["itens_leitura_upserted"] >= 3
+    assert out["materialize"]["preco_origem"]["item_homologado"] >= 1
     stats = platform_index_stats(tce_db)
     assert stats["itens_leitura"] >= 3
     assert stats["search_ready"] is True
+
+
+def test_ingest_sample_keeps_supplier_and_url(tce_db):
+    from app.platform_index.connection import platform_conn
+
+    ingest_tce_rs_sample(db_path=tce_db)
+    with platform_conn(tce_db) as c:
+        row = c.execute(
+            "SELECT fornecedor_nome, url_origem, valor_unitario, orgao "
+            "FROM platform_itens_leitura WHERE descricao LIKE '%PAPEL A4%' LIMIT 1"
+        ).fetchone()
+    assert row is not None
+    assert "Papelaria" in (row["fornecedor_nome"] or "")
+    assert "portal.tce.rs.gov.br" in (row["url_origem"] or "")
+    assert float(row["valor_unitario"]) == 24.50
+    assert "FLORES" in (row["orgao"] or "").upper()
 
 
 def test_ingest_status_after_sample(tce_db):
@@ -156,3 +181,79 @@ class TceRsAdapterAsyncTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(out.get("ok"))
         itens = out.get("itens") or []
         self.assertTrue(any(str(i.get("plataforma") or "") == "tce_rs" for i in itens))
+
+
+RAW_2025 = _ROOT / "data" / "tce_rs" / "raw" / "2025"
+RAW_2026 = _ROOT / "data" / "tce_rs" / "raw" / "2026"
+RAW_ROOT = _ROOT / "data" / "tce_rs" / "raw"
+
+
+@pytest.mark.skipif(not RAW_2025.is_dir(), reason="CSVs LicitaCon 2025 ausentes")
+def test_raw_2025_join_smoke_builds_priced_items(tce_db):
+    """Amostra dos CSVs reais 2025: junção monta itens com preço e órgão."""
+    from app.platform_index.connection import platform_conn
+    from app.platform_index.ingest.tce_rs.ingest import ingest_tce_rs_from_directory
+
+    out = ingest_tce_rs_from_directory(RAW_2025, max_rows=80, db_path=tce_db)
+    assert out["ok"] is True
+    assert out["parsed"]["itens"] >= 1
+    assert out["materialize"]["itens_leitura_upserted"] >= 1
+    with platform_conn(tce_db) as c:
+        row = c.execute(
+            "SELECT descricao, valor_unitario, orgao, uf FROM platform_itens_leitura LIMIT 1"
+        ).fetchone()
+    assert row is not None
+    assert (row["descricao"] or "").strip()
+    assert float(row["valor_unitario"]) > 0
+    assert row["uf"] == "RS"
+    assert (row["orgao"] or "").strip()
+
+
+@pytest.mark.skipif(not RAW_2026.is_dir(), reason="CSVs LicitaCon 2026 ausentes")
+def test_raw_2026_itemw_join_smoke_builds_priced_items(tce_db):
+    """2026 usa itemw.csv — mesmo contrato de junção/preço."""
+    from app.platform_index.connection import platform_conn
+    from app.platform_index.ingest.tce_rs.ingest import ingest_tce_rs_from_directory
+    from app.platform_index.ingest.tce_rs.parser import find_item_csv
+
+    item_path = find_item_csv(RAW_2026)
+    assert item_path is not None
+    assert item_path.name.lower() == "itemw.csv"
+
+    out = ingest_tce_rs_from_directory(RAW_2026, max_rows=80, db_path=tce_db)
+    assert out["ok"] is True
+    assert "2026" in (out.get("years") or [])
+    assert out["parsed"]["itens"] >= 1
+    assert out["materialize"]["itens_leitura_upserted"] >= 1
+    with platform_conn(tce_db) as c:
+        row = c.execute(
+            "SELECT descricao, valor_unitario, orgao, uf FROM platform_itens_leitura LIMIT 1"
+        ).fetchone()
+    assert row is not None
+    assert float(row["valor_unitario"]) > 0
+    assert row["uf"] == "RS"
+
+
+@pytest.mark.skipif(
+    not (RAW_2025.is_dir() and RAW_2026.is_dir()),
+    reason="precisa raw/2025 e raw/2026",
+)
+def test_raw_root_discovers_both_years(tce_db):
+    from app.platform_index.ingest.tce_rs.ingest import (
+        discover_ingest_dirs,
+        ingest_tce_rs_from_directory,
+    )
+
+    dirs = discover_ingest_dirs(RAW_ROOT)
+    names = [p.name for p in dirs]
+    assert "2025" in names
+    assert "2026" in names
+
+    out = ingest_tce_rs_from_directory(RAW_ROOT, max_rows=40, db_path=tce_db)
+    assert out["ok"] is True
+    assert set(out.get("years") or []) >= {"2025", "2026"}
+    assert out["parsed"]["itens"] >= 2
+    by_year = {y["year"]: y for y in out["parsed"]["by_year"]}
+    assert by_year["2025"]["itens"] >= 1
+    assert by_year["2026"]["itens"] >= 1
+    assert "itemw" in (by_year["2026"]["files"].get("item") or "").lower()

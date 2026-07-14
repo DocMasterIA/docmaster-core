@@ -15,6 +15,8 @@ Documentação do módulo **Pesquisador PNCP** (`pncp_researcher_service`), inge
 | [PNCP-BUSCA-INTELIGENTE-REGRESSAO-UI-VS-BACKEND.md](./PNCP-BUSCA-INTELIGENTE-REGRESSAO-UI-VS-BACKEND.md) | Regressão UI vs backend (bisect jun/2026) |
 | [PNCP-PERFIL-OPERACIONAL-JUL2026.md](./PNCP-PERFIL-OPERACIONAL-JUL2026.md) | **Handoff completo** — qualidade, lote, deploy VPS, flags |
 | [PNCP-FAIXA-DIRECIONAL-JUL2026.md](./PNCP-FAIXA-DIRECIONAL-JUL2026.md) | **Faixa `cima`/`baixo`** — causa, fix, testes (validado jul/2026) |
+| [ARQUITETURA-FEEDS-INDEPENDENTES.md](./ARQUITETURA-FEEDS-INDEPENDENTES.md) | Feeds PNCP + TCE-RS independentes → researcher |
+| [ANALISE-COLUNAS-PREMIUM.md](../pncp_researcher_service/data/tce_rs/ANALISE-COLUNAS-PREMIUM.md) | TCE-RS: scan CSV × item premium (sem API externa) |
 
 ---
 

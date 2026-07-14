@@ -8,8 +8,8 @@ from typing import Any, Dict, List, Optional
 
 from ...connection import platform_conn
 from ...schema import ensure_platform_index
-from .config import PLATFORM_ID, TCE_RS_CKAN_BASE_URL
-from .parser import pick_best_propostas
+from .config import PLATFORM_ID
+from .parser import pick_best_propostas, resolve_item_price
 
 
 def _utc_now() -> str:
@@ -42,8 +42,8 @@ def materialize_tce_rs_parsed(
     db_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Grava LICITACAO + ITEM + PROPOSTA no schema platform_index.
-    Layout LicitaCon ainda sujeito a revisão (1-TCE-DIS).
+    Grava licitacao + item + item_prop (+ pessoas já enriquecidas) no platform_index.
+    Preço: item.homologado → proposta vencedora → item.estimado.
     """
     path = ensure_platform_index(PLATFORM_ID, db_path=db_path)
     licitacoes: List[Dict[str, Any]] = list(parsed.get("licitacoes") or [])
@@ -59,6 +59,12 @@ def materialize_tce_rs_parsed(
         "itens_leitura_upserted": 0,
         "itens_sem_licitacao": 0,
         "itens_sem_preco": 0,
+        "preco_origem": {
+            "item_homologado": 0,
+            "proposta_homologada": 0,
+            "proposta": 0,
+            "item_estimado": 0,
+        },
     }
 
     with platform_conn(path) as c:
@@ -108,9 +114,25 @@ def materialize_tce_rs_parsed(
             desc = str(item["descricao"])
             fp = _item_fingerprint(proc_id, num_item, desc)
             prop = proposta_by_key.get((item["licitacao_id"], num_item), {})
-            valor = prop.get("valor_unitario_homologado") or prop.get("valor_unitario")
-            homolog = prop.get("valor_unitario_homologado")
-            bruto_raw = {"item": item.get("raw"), "proposta": prop.get("raw")}
+            valor, homolog, origem = resolve_item_price(item, prop)
+            if origem in stats["preco_origem"]:
+                stats["preco_origem"][origem] += 1
+
+            data_ref = (
+                (prop or {}).get("data_homologacao")
+                or lic.get("data_publicacao")
+            )
+            url = lic.get("url_origem") or None
+            fornecedor = (prop or {}).get("fornecedor_nome")
+            cnpj = _cnpj_digits((prop or {}).get("cnpj_fornecedor"))
+            if not cnpj:
+                cnpj = _cnpj_digits(item.get("nr_documento"))
+
+            bruto_raw = {
+                "item": item.get("raw"),
+                "proposta": (prop or {}).get("raw"),
+                "preco_origem": origem,
+            }
             c.execute(
                 """
                 INSERT INTO platform_itens_bruto(
@@ -139,8 +161,8 @@ def materialize_tce_rs_parsed(
                     item.get("unidade_medida"),
                     valor,
                     homolog,
-                    prop.get("fornecedor_nome"),
-                    _cnpj_digits(prop.get("cnpj_fornecedor")),
+                    fornecedor,
+                    cnpj,
                     fp,
                     now,
                     _compress_json(bruto_raw),
@@ -153,7 +175,6 @@ def materialize_tce_rs_parsed(
                 continue
 
             plat_item_id = f"{proc_id}:{num_item}"
-            url = f"{TCE_RS_CKAN_BASE_URL}/"
             c.execute(
                 """
                 INSERT INTO platform_itens_leitura(
@@ -175,6 +196,7 @@ def materialize_tce_rs_parsed(
                     fornecedor_nome=excluded.fornecedor_nome,
                     cnpj_fornecedor=excluded.cnpj_fornecedor,
                     data_referencia=excluded.data_referencia,
+                    url_origem=excluded.url_origem,
                     numero_pncp=excluded.numero_pncp,
                     numero_processo=excluded.numero_processo,
                     updated_at=excluded.updated_at
@@ -193,9 +215,9 @@ def materialize_tce_rs_parsed(
                     lic.get("orgao"),
                     lic.get("municipio"),
                     "RS",
-                    prop.get("fornecedor_nome"),
-                    _cnpj_digits(prop.get("cnpj_fornecedor")),
-                    lic.get("data_publicacao"),
+                    fornecedor,
+                    cnpj,
+                    data_ref,
                     "inciso_ii",
                     "estadual",
                     url,

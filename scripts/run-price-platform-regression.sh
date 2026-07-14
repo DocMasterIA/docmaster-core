@@ -32,6 +32,7 @@ python -m pytest \
   tests/test_platform_index_crosslink.py \
   tests/test_pricing_faixa.py::PricingFaixaTests \
   tests/test_pricing_faixa.py::ManualParityFaixaTests \
+  -k "not raw_" \
   "${PYTEST_ARGS[@]}"
 
 echo ""

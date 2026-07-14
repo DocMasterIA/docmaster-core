@@ -232,11 +232,14 @@ class LocalSyncCatalogRequest(BaseModel):
 
 
 class TceRsIngestRequest(BaseModel):
-    """Ingest LicitaCon TCE-RS (layout CSV provisório — revisar em 1-TCE-DIS)."""
+    """Ingest LicitaCon TCE-RS (CSV por ano: 2025/, 2026/ com item ou itemw)."""
 
     data_dir: Optional[str] = Field(
         None,
-        description="Diretório com LICITACAO.csv, ITEM.csv, PROPOSTA.csv (ou nomes similares).",
+        description=(
+            "Pasta de um ano (…/2025) ou raiz raw/ (ingere 2025+2026). "
+            "Esperado: licitacao.csv + item.csv|itemw.csv + item_prop.csv + pessoas.csv."
+        ),
     )
     use_sample: bool = Field(
         False,
@@ -246,7 +249,7 @@ class TceRsIngestRequest(BaseModel):
         None,
         ge=1,
         le=500000,
-        description="Limite de linhas por arquivo CSV (debug).",
+        description="Limite de itens por pasta de ano (debug/amostra).",
     )
 
 

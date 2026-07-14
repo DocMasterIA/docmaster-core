@@ -140,6 +140,28 @@ LICITACAO_URL_ALIASES = (
     "link",
 )
 LICITACAO_PNCP_ALIASES = ("numero_pncp", "pncp", "numero_controle_pncp")
+LICITACAO_TP_DOC_VENCEDOR_ALIASES = (
+    "tp_documento_vencedor",
+    "tp_doc_vencedor",
+    "tipo_documento_vencedor",
+)
+LICITACAO_NR_DOC_VENCEDOR_ALIASES = (
+    "nr_documento_vencedor",
+    "documento_vencedor",
+    "cnpj_vencedor",
+    "cpf_cnpj_vencedor",
+)
+LICITACAO_TP_DOC_FORNECEDOR_ALIASES = (
+    "tp_documento_fornecedor",
+    "tp_doc_fornecedor",
+    "tipo_documento_fornecedor",
+)
+LICITACAO_NR_DOC_FORNECEDOR_ALIASES = (
+    "nr_documento_fornecedor",
+    "documento_fornecedor",
+    "cnpj_fornecedor",
+    "cpf_cnpj_fornecedor",
+)
 
 ITEM_DESC_ALIASES = (
     "ds_item",
@@ -152,6 +174,10 @@ ITEM_QTD_ALIASES = ("qt_itens", "quantidade", "qtd", "qtde")
 ITEM_UNIDADE_ALIASES = ("sg_unidade_medida", "unidade", "unidade_medida", "und")
 ITEM_ESTIMADO_ALIASES = ("vl_unitario_estimado", "valor_unitario_estimado")
 ITEM_HOMOLOG_ALIASES = ("vl_unitario_homologado", "valor_unitario_homologado")
+ITEM_TP_DOC_1_ALIASES = ("tp_documento", "tipo_documento")
+ITEM_NR_DOC_1_ALIASES = ("nr_documento", "documento", "cnpj", "cpf_cnpj")
+ITEM_TP_DOC_2_ALIASES = ("tp_documento__1", "tipo_documento__1")
+ITEM_NR_DOC_2_ALIASES = ("nr_documento__1", "documento__1", "cnpj__1", "cpf_cnpj__1")
 
 PROPOSTA_VALOR_ALIASES = (
     "vl_unitario",
@@ -203,6 +229,10 @@ def map_licitacao_row(raw: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         numero_processo = f"{nr_proc}/{ano_proc}"
     else:
         numero_processo = nr_proc
+    tp_vencedor = _pick(raw, LICITACAO_TP_DOC_VENCEDOR_ALIASES)
+    nr_vencedor = _pick(raw, LICITACAO_NR_DOC_VENCEDOR_ALIASES)
+    tp_fornecedor = _pick(raw, LICITACAO_TP_DOC_FORNECEDOR_ALIASES)
+    nr_fornecedor = _pick(raw, LICITACAO_NR_DOC_FORNECEDOR_ALIASES)
     return {
         "licitacao_id": lic_id,
         "numero_processo": numero_processo,
@@ -212,6 +242,12 @@ def map_licitacao_row(raw: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "data_publicacao": _pick(raw, LICITACAO_DATA_ALIASES),
         "numero_pncp": _pick(raw, LICITACAO_PNCP_ALIASES),
         "url_origem": _pick(raw, LICITACAO_URL_ALIASES),
+        "tp_documento_vencedor": tp_vencedor,
+        "nr_documento_vencedor": nr_vencedor,
+        "doc_key_vencedor": doc_key(tp_vencedor, nr_vencedor),
+        "tp_documento_fornecedor": tp_fornecedor,
+        "nr_documento_fornecedor": nr_fornecedor,
+        "doc_key_fornecedor": doc_key(tp_fornecedor, nr_fornecedor),
         "raw": dict(raw),
     }
 
@@ -222,6 +258,10 @@ def map_item_row(raw: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     desc = _pick(raw, ITEM_DESC_ALIASES)
     if not lic_id or not num_item or not desc:
         return None
+    tp_doc = _pick(raw, ITEM_TP_DOC_1_ALIASES)
+    nr_doc = _pick(raw, ITEM_NR_DOC_1_ALIASES)
+    tp_doc_2 = _pick(raw, ITEM_TP_DOC_2_ALIASES)
+    nr_doc_2 = _pick(raw, ITEM_NR_DOC_2_ALIASES)
     return {
         "licitacao_id": lic_id,
         "numero_item": num_item,
@@ -231,8 +271,12 @@ def map_item_row(raw: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "valor_unitario_estimado": _pick_float(raw, ITEM_ESTIMADO_ALIASES),
         "valor_unitario_homologado": _pick_float(raw, ITEM_HOMOLOG_ALIASES),
         "tp_resultado_item": _pick(raw, ("tp_resultado_item", "resultado_item")),
-        "tp_documento": _pick(raw, ("tp_documento",)),
-        "nr_documento": _pick(raw, ("nr_documento",)),
+        "tp_documento": tp_doc,
+        "nr_documento": nr_doc,
+        "doc_key": doc_key(tp_doc, nr_doc),
+        "tp_documento_2": tp_doc_2,
+        "nr_documento_2": nr_doc_2,
+        "doc_key_2": doc_key(tp_doc_2, nr_doc_2),
         "raw": dict(raw),
     }
 

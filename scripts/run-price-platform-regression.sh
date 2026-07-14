@@ -27,6 +27,7 @@ python -m pytest \
   tests/test_feed_platform_isolation.py \
   tests/test_orchestrator_camada_b.py \
   tests/test_tce_rs_ingest.py \
+  tests/test_federated_item_totals.py \
   tests/test_federated_adapters.py \
   tests/test_federated_regression.py \
   tests/test_platform_index_crosslink.py \

@@ -224,6 +224,30 @@ def resolve_item_price(
     return None, None, "sem_preco"
 
 
+def _add_doc_key(out: Set[str], value: Any) -> None:
+    if value:
+        out.add(str(value))
+
+
+def collect_supplier_doc_keys(
+    *,
+    licitacoes: List[Dict[str, Any]],
+    itens: List[Dict[str, Any]],
+    propostas: List[Dict[str, Any]],
+) -> Set[str]:
+    """Documentos candidatos do waterfall de fornecedor."""
+    needed: Set[str] = set()
+    for prop in propostas:
+        _add_doc_key(needed, prop.get("doc_key"))
+    for item in itens:
+        _add_doc_key(needed, item.get("doc_key"))
+        _add_doc_key(needed, item.get("doc_key_2"))
+    for lic in licitacoes:
+        _add_doc_key(needed, lic.get("doc_key_vencedor"))
+        _add_doc_key(needed, lic.get("doc_key_fornecedor"))
+    return needed
+
+
 def parse_tce_rs_directory(
     data_dir: Path,
     *,
@@ -235,7 +259,7 @@ def parse_tce_rs_directory(
     - licitacao: carrega completo (necessário ao join)
     - item: limitado por max_rows quando informado
     - item_prop: só chaves presentes nos itens carregados
-    - pessoas: só documentos referenciados nas propostas retidas
+    - pessoas: só documentos candidatos do waterfall de fornecedor
     """
     lic_path = find_csv_file(data_dir, TCE_RS_FILE_LICITACAO) or find_csv_file(data_dir, "LICITACAO")
     item_path = find_item_csv(data_dir)
@@ -278,7 +302,11 @@ def parse_tce_rs_directory(
                 break
 
     propostas = list(propostas_best.values())
-    needed_docs = {p["doc_key"] for p in propostas if p.get("doc_key")}
+    needed_docs = collect_supplier_doc_keys(
+        licitacoes=licitacoes,
+        itens=itens,
+        propostas=propostas,
+    )
 
     pessoas_by_doc: Dict[str, Dict[str, Any]] = {}
     if pessoas_path and pessoas_path.is_file() and needed_docs:
@@ -298,6 +326,8 @@ def parse_tce_rs_directory(
         person = pessoas_by_doc.get(prop.get("doc_key") or "")
         if person:
             prop["fornecedor_nome"] = person.get("fornecedor_nome")
+            prop["fornecedor_uf"] = person.get("uf")
+            prop["fornecedor_municipio_ibge"] = person.get("municipio_ibge")
 
     return {
         "data_dir": str(data_dir),
@@ -311,4 +341,5 @@ def parse_tce_rs_directory(
         "itens": itens,
         "propostas": propostas,
         "pessoas": list(pessoas_by_doc.values()),
+        "pessoas_by_doc": pessoas_by_doc,
     }

@@ -102,6 +102,100 @@ def test_ingest_sample_keeps_supplier_and_url(tce_db):
     assert "FLORES" in (row["orgao"] or "").upper()
 
 
+def _write_tce_csv(path: Path, header: list[str], rows: list[list[str]]) -> None:
+    lines = [",".join(header)]
+    lines.extend(",".join(row) for row in rows)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def test_waterfall_supplier_uses_second_item_document_pair(tmp_path, tce_db):
+    from app.platform_index.connection import platform_conn
+    from app.platform_index.ingest.tce_rs.ingest import ingest_tce_rs_from_directory
+
+    data_dir = tmp_path / "raw"
+    data_dir.mkdir()
+    key_cols = ["CD_ORGAO", "ANO_LICITACAO", "NR_LICITACAO", "CD_TIPO_MODALIDADE"]
+    _write_tce_csv(
+        data_dir / "licitacao.csv",
+        [*key_cols, "NM_ORGAO", "DS_OBJETO", "LINK_LICITACON_CIDADAO"],
+        [["1", "2026", "10", "PRD", "Prefeitura Teste", "Objeto", "https://tce.example/10"]],
+    )
+    _write_tce_csv(
+        data_dir / "item.csv",
+        [
+            *key_cols,
+            "NR_LOTE",
+            "NR_ITEM",
+            "DS_ITEM",
+            "VL_UNITARIO_HOMOLOGADO",
+            "TP_DOCUMENTO",
+            "NR_DOCUMENTO",
+            "TP_DOCUMENTO",
+            "NR_DOCUMENTO",
+        ],
+        [["1", "2026", "10", "PRD", "1", "1", "PAPEL A4", "12.34", "", "", "J", "12345678000190"]],
+    )
+    _write_tce_csv(
+        data_dir / "pessoas.csv",
+        ["TP_DOCUMENTO", "NR_DOCUMENTO", "NM_PESSOA", "SG_UF", "CD_MUNICIPIO_IBGE"],
+        [["J", "12345678000190", "Fornecedor Segundo Documento Ltda", "RS", "4305108"]],
+    )
+
+    out = ingest_tce_rs_from_directory(data_dir, db_path=tce_db)
+    assert out["materialize"]["fornecedor_origem"]["item_doc2"] == 1
+    with platform_conn(tce_db) as c:
+        row = c.execute(
+            "SELECT fornecedor_nome, cnpj_fornecedor, municipio "
+            "FROM platform_itens_leitura WHERE descricao='PAPEL A4'"
+        ).fetchone()
+    assert row is not None
+    assert row["fornecedor_nome"] == "Fornecedor Segundo Documento Ltda"
+    assert row["cnpj_fornecedor"] == "12345678000190"
+    assert row["municipio"] == "4305108"
+
+
+def test_waterfall_supplier_uses_licitacao_fornecedor(tmp_path, tce_db):
+    from app.platform_index.connection import platform_conn
+    from app.platform_index.ingest.tce_rs.ingest import ingest_tce_rs_from_directory
+
+    data_dir = tmp_path / "raw"
+    data_dir.mkdir()
+    key_cols = ["CD_ORGAO", "ANO_LICITACAO", "NR_LICITACAO", "CD_TIPO_MODALIDADE"]
+    _write_tce_csv(
+        data_dir / "licitacao.csv",
+        [
+            *key_cols,
+            "NM_ORGAO",
+            "DS_OBJETO",
+            "LINK_LICITACON_CIDADAO",
+            "NR_DOCUMENTO_FORNECEDOR",
+        ],
+        [["2", "2026", "20", "PRD", "Prefeitura Teste", "Objeto", "https://tce.example/20", "98765432000110"]],
+    )
+    _write_tce_csv(
+        data_dir / "item.csv",
+        [*key_cols, "NR_LOTE", "NR_ITEM", "DS_ITEM", "VL_UNITARIO_HOMOLOGADO"],
+        [["2", "2026", "20", "PRD", "1", "1", "ALCOOL ETILICO", "8.90"]],
+    )
+    _write_tce_csv(
+        data_dir / "pessoas.csv",
+        ["TP_DOCUMENTO", "NR_DOCUMENTO", "NM_PESSOA", "SG_UF", "CD_MUNICIPIO_IBGE"],
+        [["J", "98765432000110", "Fornecedor da Licitacao Ltda", "RS", "4314902"]],
+    )
+
+    out = ingest_tce_rs_from_directory(data_dir, db_path=tce_db)
+    assert out["materialize"]["fornecedor_origem"]["licitacao_fornecedor"] == 1
+    with platform_conn(tce_db) as c:
+        row = c.execute(
+            "SELECT fornecedor_nome, cnpj_fornecedor, municipio "
+            "FROM platform_itens_leitura WHERE descricao='ALCOOL ETILICO'"
+        ).fetchone()
+    assert row is not None
+    assert row["fornecedor_nome"] == "Fornecedor da Licitacao Ltda"
+    assert row["cnpj_fornecedor"] == "98765432000110"
+    assert row["municipio"] == "4314902"
+
+
 def test_ingest_status_after_sample(tce_db):
     ingest_tce_rs_sample(db_path=tce_db)
     status = tce_rs_ingest_status(db_path=tce_db)

@@ -116,7 +116,9 @@
         </div>
         <div class="manual-local-db-row">
           <p class="manual-meta">
-            Base local PNCP (`pncp_researcher_service`): <strong>{{ totalItensBaseLocal }}</strong> itens indexados.
+            Base local (`pncp_researcher_service`):
+            <strong>{{ totalItensBaseLocalFmt }}</strong> itens indexados
+            <span v-if="detalheBaseLocalPorFonte"> ({{ detalheBaseLocalPorFonte }})</span>.
           </p>
           <button type="button" class="manual-btn-backfill" :disabled="isBackfilling" @click="atualizarBaseLocalAgora">
             {{ isBackfilling ? 'Atualizando base...' : 'Atualizar base local (.db)' }}
@@ -489,7 +491,31 @@ const mediaValor = computed(() => {
   if (!nums.length) return 'R$ -';
   return formatCurrency(nums.reduce((a, b) => a + b, 0) / nums.length);
 });
-const totalItensBaseLocal = computed(() => Number(localStats.value?.total_itens || 0));
+/** Volume bruto indexado (PNCP + TCE-RS + …), não só o subconjunto homologado na busca. */
+const totalItensBaseLocal = computed(() => {
+  const s = localStats.value;
+  if (!s) return 0;
+  const todas = Number(s.total_itens_todas_fontes);
+  if (Number.isFinite(todas) && todas > 0) return todas;
+  return Number(s.total_itens || 0);
+});
+const totalItensBaseLocalFmt = computed(() =>
+  totalItensBaseLocal.value.toLocaleString('pt-BR'),
+);
+const detalheBaseLocalPorFonte = computed(() => {
+  const rows = Array.isArray(localStats.value?.por_plataforma)
+    ? localStats.value.por_plataforma
+    : [];
+  const parts = rows
+    .map((r) => {
+      const n = Number(r?.total_itens || 0);
+      if (!Number.isFinite(n) || n <= 0) return null;
+      const label = String(r?.label || r?.id || '').trim() || 'fonte';
+      return `${label} ${n.toLocaleString('pt-BR')}`;
+    })
+    .filter(Boolean);
+  return parts.length > 1 ? parts.join(' · ') : '';
+});
 const faixaValorAtiva = computed(() => {
   const base = parseMoeda(filtros.valorBase);
   if (base == null || base <= 0) return '';
@@ -805,7 +831,8 @@ async function atualizarBaseLocalAgora() {
       include_items: true,
     });
     localStats.value = res;
-    saveMessage.value = `Base local atualizada. Itens no índice: ${Number(res?.total_itens || 0)}.`;
+    saveMessage.value = `Base PNCP atualizada. Itens PNCP no índice: ${Number(res?.total_itens || 0).toLocaleString('pt-BR')}.`;
+    await carregarStatusBaseLocal();
     await buscarNoBackend();
   } catch (err) {
     searchError.value = `Falha ao atualizar a base local (${err.message || 'erro desconhecido'}).`;

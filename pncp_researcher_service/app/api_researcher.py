@@ -197,9 +197,16 @@ async def list_price_platform_indexes_endpoint():
 
 @researcher_router.get("/local-index/stats")
 async def local_index_stats_read_endpoint():
-    """Leitura do índice PNCP (escrita no feed service)."""
+    """
+    Leitura do índice PNCP + totais das demais plataformas (ex.: TCE-RS).
+
+    `total_itens` permanece PNCP-only (compat). O front usa
+    `total_itens_todas_fontes` para o volume agregado indexado.
+    """
     try:
-        return local_index_stats()
+        from .platform_index.aggregate_stats import attach_federated_item_totals
+
+        return attach_federated_item_totals(local_index_stats())
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 

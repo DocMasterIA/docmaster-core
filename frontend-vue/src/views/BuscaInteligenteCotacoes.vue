@@ -1566,14 +1566,16 @@ async function adicionarSelecionadosNaCotacao() {
       const unitSave = homUnit ?? r.valorUnitario ?? parseMoeda(r.valor);
       const totalSave = homTotal ?? r.valorTotal ?? (unitSave && r.quantidadeNum ? unitSave * r.quantidadeNum : null);
       const plat = resolveRowPlataforma(r);
+      const isTceRs = plat === 'tce_rs';
+      const incisoSave = isTceRs ? 'inciso_ii' : (r.incisoClassificacao || null);
       return {
       item_ref_id: r.itemId ?? null,
-      esfera_administrativa: r.esferaAdministrativa || null,
-      inciso_classificacao: r.incisoClassificacao || null,
+      esfera_administrativa: isTceRs ? 'estadual' : (r.esferaAdministrativa || null),
+      inciso_classificacao: incisoSave,
       fonte:
-        r.incisoClassificacao === 'inciso_i'
+        incisoSave === 'inciso_i'
           ? 'governamentais'
-          : r.incisoClassificacao === 'inciso_ii'
+          : incisoSave === 'inciso_ii'
             ? 'entes_publicos'
             : null,
       numero_pncp: r.numeroPncp,
@@ -1911,6 +1913,19 @@ function normalizeKey(v) {
 }
 
 function classificarEsferaAdministrativa(raw) {
+  const plat = normalizeKey(
+    raw?.plataforma || raw?.sourceRaw?.plataforma || '',
+  );
+  if (plat === 'tce_rs' || plat === 'tce-rs' || plat === 'licitacon') {
+    return 'estadual';
+  }
+
+  const inciso = normalizeKey(
+    raw?.inciso_classificacao || raw?.incisoClassificacao || raw?.sourceRaw?.inciso_classificacao || '',
+  );
+  if (inciso.includes('inciso_ii') || inciso === 'inciso-ii') return 'estadual';
+  if (inciso.includes('inciso_i') || inciso === 'inciso-i') return 'federal';
+
   const esferaId = normalizeKey(
     raw?.esfera_id ||
     raw?.esferaId ||
@@ -1932,12 +1947,12 @@ function classificarEsferaAdministrativa(raw) {
     raw?.sourceRaw?.esfera,
     raw?.sourceRaw?.esfera_administrativa,
     raw?.sourceRaw?.poder,
-    raw?.orgao,
   ];
   const joined = candidatos.map((x) => normalizeKey(x)).filter(Boolean).join(' | ');
   if (joined.includes('federal') || joined.includes('uniao') || joined.includes('união')) return 'federal';
   if (joined.includes('estadual') || joined.includes('estado')) return 'estadual';
   if (joined.includes('municipal') || joined.includes('municipio') || joined.includes('município')) return 'municipal';
+  if (joined.includes('distrital')) return 'distrital';
   return 'nao_definida';
 }
 

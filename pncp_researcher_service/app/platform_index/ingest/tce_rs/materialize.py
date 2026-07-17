@@ -298,6 +298,8 @@ def materialize_tce_rs_parsed(
                     fornecedor_nome=excluded.fornecedor_nome,
                     cnpj_fornecedor=excluded.cnpj_fornecedor,
                     data_referencia=excluded.data_referencia,
+                    inciso_classificacao=excluded.inciso_classificacao,
+                    esfera=excluded.esfera,
                     url_origem=excluded.url_origem,
                     numero_pncp=excluded.numero_pncp,
                     numero_processo=excluded.numero_processo,

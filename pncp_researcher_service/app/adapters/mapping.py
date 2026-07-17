@@ -103,10 +103,16 @@ def hit_to_pncp_row(hit: MarketPriceHit) -> Dict[str, Any]:
         row["cnpj_fornecedor"] = hit.fornecedor_cnpj
     if hit.data_referencia:
         row["data_publicacao"] = hit.data_referencia
+    if hit.esfera:
+        row["esfera"] = hit.esfera
+        row["esfera_administrativa"] = hit.esfera
     if hit.inciso_classificacao:
         row["inciso_classificacao"] = hit.inciso_classificacao
-    if hit.esfera:
-        row["esfera_administrativa"] = hit.esfera
+    if hit.plataforma == "tce_rs":
+        row.setdefault("inciso_classificacao", "inciso_ii")
+        row.setdefault("esfera", "estadual")
+        row.setdefault("esfera_administrativa", "estadual")
+        row.setdefault("fonte", "entes_publicos")
     if hit.url_origem:
         row["url_origem"] = hit.url_origem
     if hit.canonical_key:

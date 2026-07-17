@@ -56,6 +56,11 @@ class PlataformaPayloadRegressionTests(SimpleTestCase):
         }
         self.assertEqual(_fonte_bucket_from_source(src), "entesPublicos")
 
+    def test_fonte_bucket_tce_rs_is_entes_publicos(self):
+        src = {"plataforma": "tce_rs"}
+        self.assertEqual(_fonte_bucket_from_source(src), "entesPublicos")
+        self.assertEqual(_resolve_fonte_bucket(src, None), "entesPublicos")
+
     def test_geo_normalize_still_works_after_plataforma(self):
         payload = {
             "plataforma": "pncp",

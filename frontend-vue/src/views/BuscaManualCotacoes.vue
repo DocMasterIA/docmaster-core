@@ -928,8 +928,17 @@ function normalizeText(v) {
 }
 
 function resolveIncisoFromItem(it) {
+  const plat = normalizeText(it?.plataforma || '').toLowerCase();
+  if (plat === 'tce_rs' || plat === 'tce-rs') return 'Inciso II';
+
+  const inciso = normalizeText(it?.inciso_classificacao || it?.incisoClassificacao);
+  if (inciso.includes('inciso_i') || inciso === 'inciso-i' || inciso.includes('governament')) return 'Inciso I';
+  if (inciso.includes('inciso_ii') || inciso === 'inciso-ii' || inciso.includes('entes')) return 'Inciso II';
+
   const esferaId = normalizeText(it?.esfera_id || it?.esferaId).toUpperCase();
-  const esferaAdm = normalizeText(it?.esfera_administrativa || it?.esferaAdministrativa);
+  const esferaAdm = normalizeText(
+    it?.esfera_administrativa || it?.esferaAdministrativa || it?.esfera,
+  );
   if (esferaId === 'F' || esferaAdm === 'federal') return 'Inciso I';
   if (['E', 'M', 'D'].includes(esferaId) || ['estadual', 'municipal', 'distrital'].includes(esferaAdm)) {
     return 'Inciso II';
@@ -1005,6 +1014,15 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
         ? raw.fornecedor_cadastro
         : {};
       const plat = resolveRowPlataforma(r);
+      const incisoSave = plat === 'tce_rs'
+        ? 'inciso_ii'
+        : (raw.inciso_classificacao || raw.incisoClassificacao || null);
+      const esferaSave = plat === 'tce_rs'
+        ? 'estadual'
+        : (raw.esfera_administrativa || raw.esferaAdministrativa || raw.esfera || null);
+      const fonteSave = plat === 'tce_rs'
+        ? 'entes_publicos'
+        : (raw.fonte || null);
       return {
       numero_pncp: toNullableText(r.numeroPncp),
       plataforma: plat,
@@ -1044,9 +1062,17 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
       valor_unitario_estimado: r.sourceRaw?.valor_unitario_estimado ?? null,
       valor_total_estimado: r.sourceRaw?.valor_total_estimado ?? null,
       item_homologado: r.sourceRaw?.item_homologado ?? null,
+      inciso_classificacao: incisoSave,
+      esfera_administrativa: esferaSave,
+      esfera: esferaSave,
+      fonte: fonteSave,
       source: {
         ...raw,
         plataforma: plat,
+        inciso_classificacao: incisoSave || raw.inciso_classificacao || null,
+        esfera: esferaSave || raw.esfera || null,
+        esfera_administrativa: esferaSave || raw.esfera_administrativa || null,
+        fonte: fonteSave || raw.fonte || null,
       },
     };
     })

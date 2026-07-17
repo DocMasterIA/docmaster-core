@@ -907,10 +907,21 @@ def _norm_fonte_text(v: Any) -> str:
 
 
 def _fonte_bucket_from_source(src: Dict[str, Any]) -> Optional[str]:
+    if not isinstance(src, dict):
+        return None
+    plat = _norm_fonte_text(src.get("plataforma") or src.get("platform_id") or src.get("fonte_plataforma"))
+    # TCE-RS / LicitaCon = ente estadual (Inciso II), sem depender de PNCP.
+    if plat in {"tce_rs", "tce-rs", "licitacon"}:
+        return "entesPublicos"
+
     inciso = _norm_fonte_text(src.get("inciso_classificacao") or src.get("incisoClassificacao"))
     fonte = _norm_fonte_text(src.get("fonte") or src.get("tipo_fonte") or src.get("categoria_fonte"))
     esfera_id = _norm_fonte_text(src.get("esfera_id") or src.get("esferaId"))
-    esfera_adm = _norm_fonte_text(src.get("esfera_administrativa") or src.get("esferaAdministrativa"))
+    esfera_adm = _norm_fonte_text(
+        src.get("esfera_administrativa")
+        or src.get("esferaAdministrativa")
+        or src.get("esfera")
+    )
     if inciso in {"inciso_i", "inciso-i", "governamentais", "precos_governamentais", "precos governamentais"}:
         return "governamentais"
     if inciso in {"inciso_ii", "inciso-ii", "entes_publicos", "outros_entes_publicos", "outros entes publicos"}:
@@ -938,7 +949,7 @@ def _fonte_bucket_from_source(src: Dict[str, Any]) -> Optional[str]:
 
 
 def _resolve_fonte_bucket(src: Dict[str, Any], numero_pncp: Any) -> Optional[str]:
-    bucket = _fonte_bucket_from_source(src)
+    bucket = _fonte_bucket_from_source(src if isinstance(src, dict) else {})
     if bucket:
         return bucket
     # Fallback resiliente para legado:

@@ -696,7 +696,23 @@ function normalizeFonte(v) {
   return '';
 }
 
+function normalizePlataforma(v) {
+  return String(v || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
 function classificarFonte(cotacao) {
+  // Não usar normalizeFonte aqui: ele mapeia rótulos de fonte e zera "tce_rs".
+  const plat = normalizePlataforma(
+    cotacao?.plataforma || cotacao?.source?.plataforma || cotacao?.sourceRaw?.plataforma,
+  );
+  if (plat === 'tce_rs' || plat === 'tce-rs' || plat === 'licitacon') {
+    return 'entes_publicos';
+  }
+
   const resolved = normalizeFonte(cotacao?.fonte_resolvida || cotacao?.inciso_resolvido);
   if (resolved === 'governamentais' || resolved === 'inciso_i') return 'governamentais';
   if (resolved === 'entespublicos' || resolved === 'entes_publicos' || resolved === 'inciso_ii') return 'entes_publicos';
@@ -736,7 +752,9 @@ function classificarFonte(cotacao) {
   const esferaAdm = normalizeFonte(
     cotacao?.esfera_administrativa ||
       cotacao?.source?.esfera_administrativa ||
-      cotacao?.source?.esferaAdministrativa,
+      cotacao?.source?.esferaAdministrativa ||
+      cotacao?.source?.esfera ||
+      cotacao?.esfera,
   );
   // Mesma regra do backend para evitar divergência visual:
   // Federal => Inciso I; Estadual/Municipal/Distrital => Inciso II.
@@ -786,13 +804,20 @@ function fontePortalLinkTitle(r) {
 }
 
 function labelIncisoFromCotacao(cotacao) {
-  const inciso = normalizeFonte(
+  const fonte = classificarFonte(cotacao);
+  if (fonte === 'governamentais') return 'Inciso I';
+  if (fonte === 'entes_publicos') return 'Inciso II';
+
+  const inciso = String(
     cotacao?.inciso_classificacao ||
       cotacao?.source?.inciso_classificacao ||
-      cotacao?.source?.incisoClassificacao,
-  );
-  if (inciso === 'inciso_i' || classificarFonte(cotacao) === 'governamentais') return 'Inciso I';
-  if (inciso === 'inciso_ii' || classificarFonte(cotacao) === 'entes_publicos') return 'Inciso II';
+      cotacao?.source?.incisoClassificacao ||
+      '',
+  )
+    .trim()
+    .toLowerCase();
+  if (inciso === 'inciso_i' || inciso === 'inciso-i') return 'Inciso I';
+  if (inciso === 'inciso_ii' || inciso === 'inciso-ii') return 'Inciso II';
   return 'Não classificado';
 }
 </script>

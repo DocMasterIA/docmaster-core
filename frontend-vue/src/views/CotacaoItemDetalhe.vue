@@ -320,6 +320,7 @@ import {
   deleteCotacaoFromItemResearchSession,
   getItemCotacoesFromResearchSession,
   getResearchSession,
+  resolvePlatformPortalUrls,
 } from '../services/pncpResearch';
 import {
   buildFontePortalProcessoUrl,
@@ -327,6 +328,8 @@ import {
   fontePortalFieldLabel,
   fontePortalProcessoDisplayLabel,
   fontePortalTitle,
+  resolveCotacaoPlataforma,
+  tceRsPortalLookupKeys,
 } from '../utils/pncpPortal';
 import {
   displayPnCpTotal,
@@ -442,13 +445,60 @@ const itemCotacoesFiltradas = computed(() => {
 
 onMounted(loadItem);
 
+function patchCotacaoPortalUrl(cotacao, url) {
+  if (!cotacao || !url) return cotacao;
+  const src = cotacao.source && typeof cotacao.source === 'object' ? { ...cotacao.source } : {};
+  src.url_origem = url;
+  return { ...cotacao, url_origem: url, source: src };
+}
+
+async function resolveMissingTcePortalUrls(cotacoes) {
+  const list = Array.isArray(cotacoes) ? cotacoes : [];
+  const missing = list.filter((c) => {
+    const plat = resolveCotacaoPlataforma(c);
+    if (plat !== 'tce_rs' && plat !== 'tce-rs' && plat !== 'licitacon') return false;
+    return !buildFontePortalProcessoUrl(c);
+  });
+  if (!missing.length) return list;
+
+  const keys = [];
+  const seen = new Set();
+  for (const c of missing) {
+    for (const k of tceRsPortalLookupKeys(c)) {
+      if (seen.has(k)) continue;
+      seen.add(k);
+      keys.push(k);
+    }
+  }
+  if (!keys.length) return list;
+
+  try {
+    const res = await resolvePlatformPortalUrls({ plataforma: 'tce_rs', keys });
+    const urls = res?.urls && typeof res.urls === 'object' ? res.urls : {};
+    if (!Object.keys(urls).length) return list;
+    return list.map((c) => {
+      if (buildFontePortalProcessoUrl(c)) return c;
+      const plat = resolveCotacaoPlataforma(c);
+      if (plat !== 'tce_rs' && plat !== 'tce-rs' && plat !== 'licitacon') return c;
+      for (const k of tceRsPortalLookupKeys(c)) {
+        const url = urls[k];
+        if (url) return patchCotacaoPortalUrl(c, url);
+      }
+      return c;
+    });
+  } catch {
+    return list;
+  }
+}
+
 async function refreshCotacoesOnly() {
   const sessionId = Number(cotacaoId.value);
   if (!Number.isFinite(sessionId) || sessionId <= 0 || !Number.isFinite(itemId.value) || itemId.value <= 0) {
     return;
   }
   const cot = await getItemCotacoesFromResearchSession(sessionId, itemId.value);
-  itemCotacoes.value = Array.isArray(cot?.cotacoes) ? cot.cotacoes : [];
+  const rows = Array.isArray(cot?.cotacoes) ? cot.cotacoes : [];
+  itemCotacoes.value = await resolveMissingTcePortalUrls(rows);
 }
 
 async function excluirCotacaoPreco(r) {
@@ -488,7 +538,8 @@ async function loadItem() {
     item.value = itens.find((x) => Number(x?.id) === Number(itemId.value)) || null;
     if (!item.value) loadError.value = 'Item não encontrado nesta cotação.';
     const cot = await getItemCotacoesFromResearchSession(sessionId, itemId.value);
-    itemCotacoes.value = Array.isArray(cot?.cotacoes) ? cot.cotacoes : [];
+    const rows = Array.isArray(cot?.cotacoes) ? cot.cotacoes : [];
+    itemCotacoes.value = await resolveMissingTcePortalUrls(rows);
   } catch (err) {
     loadError.value = `Não foi possível carregar o item (${err?.message || 'erro desconhecido'}).`;
   } finally {

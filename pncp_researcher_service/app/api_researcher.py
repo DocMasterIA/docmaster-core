@@ -195,6 +195,29 @@ async def list_price_platform_indexes_endpoint():
     }
 
 
+@researcher_router.post("/platform/portal-urls")
+async def platform_portal_urls_endpoint(body: dict):
+    """
+    Resolve deep-links de portal (LicitaCon) a partir de processo_id /
+    plataforma_item_id já salvos em cotações antigas sem url_origem.
+    """
+    from .platform_index.registry import get_platform_spec
+    from .platform_index.search import lookup_portal_urls
+
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=422, detail="body inválido")
+    plataforma = str(body.get("plataforma") or "tce_rs").strip().lower() or "tce_rs"
+    keys = body.get("keys") or body.get("processo_ids") or []
+    if not isinstance(keys, list):
+        raise HTTPException(status_code=422, detail="keys deve ser lista")
+    keys = [str(k).strip() for k in keys if str(k or "").strip()][:200]
+    spec = get_platform_spec(plataforma)
+    if spec is None or not spec.db_exists():
+        return {"ok": True, "plataforma": plataforma, "urls": {}, "db_exists": False}
+    urls = lookup_portal_urls(spec, keys=keys)
+    return {"ok": True, "plataforma": plataforma, "urls": urls, "db_exists": True}
+
+
 @researcher_router.get("/local-index/stats")
 async def local_index_stats_read_endpoint():
     """

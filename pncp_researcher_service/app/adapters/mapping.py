@@ -113,8 +113,14 @@ def hit_to_pncp_row(hit: MarketPriceHit) -> Dict[str, Any]:
         row.setdefault("esfera", "estadual")
         row.setdefault("esfera_administrativa", "estadual")
         row.setdefault("fonte", "entes_publicos")
-    if hit.url_origem:
-        row["url_origem"] = hit.url_origem
+    url = (
+        hit.url_origem
+        or str(row.get("url_origem") or row.get("link_licitacon_cidadao") or "").strip()
+        or None
+    )
+    if url:
+        row["url_origem"] = url
+        row.setdefault("link_licitacon_cidadao", url)
     if hit.canonical_key:
         row["canonical_key"] = hit.canonical_key
     if hit.cross_refs:
@@ -134,6 +140,7 @@ def platform_row_to_hit(row: Dict[str, Any], *, plataforma: str, spec_defaults: 
         proc = str(raw.get("processo_id") or raw.get("numero_processo") or "")
         ni = str(raw.get("numero_item") or "")
         ext_id = f"{proc}:{ni}" if proc else ni or str(raw.get("id") or "")
+    url = str(raw.get("url_origem") or raw.get("link_licitacon_cidadao") or "").strip() or None
     return MarketPriceHit(
         plataforma=plataforma,
         plataforma_item_id=ext_id,
@@ -152,7 +159,7 @@ def platform_row_to_hit(row: Dict[str, Any], *, plataforma: str, spec_defaults: 
             raw.get("inciso_classificacao") or spec_defaults.get("inciso_default") or ""
         ).strip() or None,
         esfera=str(raw.get("esfera") or spec_defaults.get("esfera_default") or "").strip() or None,
-        url_origem=str(raw.get("url_origem") or "").strip() or None,
+        url_origem=url,
         raw=raw,
     )
 

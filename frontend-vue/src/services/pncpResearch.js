@@ -186,6 +186,22 @@ async function researchRequest(path, { method = 'GET', body, signal, timeoutMs }
   return payload;
 }
 
+/** Resolve deep-links LicitaCon/PNCP no índice da plataforma (cotações sem url_origem). */
+export async function resolvePlatformPortalUrls({
+  plataforma = 'tce_rs',
+  keys = [],
+  signal,
+} = {}) {
+  const cleaned = [...new Set((keys || []).map((k) => String(k || '').trim()).filter(Boolean))];
+  if (!cleaned.length) return { ok: true, urls: {} };
+  return researchRequest('platform/portal-urls', {
+    method: 'POST',
+    body: { plataforma, keys: cleaned.slice(0, 200) },
+    signal,
+    timeoutMs: 30_000,
+  });
+}
+
 /** Cotações / sessões persistidas no Django (ORM). */
 async function cotacaoRequest(path, { method = 'GET', body, signal, timeoutMs } = {}) {
   const defaultTimeout = method === 'GET' ? 0 : 120_000;

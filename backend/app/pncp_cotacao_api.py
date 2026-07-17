@@ -815,10 +815,43 @@ def _item_dict(row: PncpCotacaoItem) -> Dict[str, Any]:
     }
 
 
+def _dig_portal_url_from_source(src: Dict[str, Any]) -> str:
+    """Extrai deep-link de portal do source (incl. aninhado). Ignora busca genérica TCE (:19:)."""
+    if not isinstance(src, dict):
+        return ""
+    layers: List[Dict[str, Any]] = [src]
+    nested = src.get("source")
+    if isinstance(nested, dict):
+        layers.append(nested)
+    raw = src.get("sourceRaw")
+    if isinstance(raw, dict):
+        layers.append(raw)
+    for layer in layers:
+        for key in (
+            "url_origem",
+            "link_licitacon_cidadao",
+            "linkLicitaconCidadao",
+            "LINK_LICITACON_CIDADAO",
+            "portal_url",
+        ):
+            u = str(layer.get(key) or "").strip()
+            if not u.lower().startswith("http"):
+                continue
+            if re.search(r"f\?p=50500:19:", u, flags=re.I):
+                continue
+            return u
+    return ""
+
+
 def _item_cotacao_dict(row: PncpCotacaoItemCotacao) -> Dict[str, Any]:
     src = row.source or {}
     if not isinstance(src, dict):
         src = {}
+    else:
+        src = dict(src)
+    portal_url = _dig_portal_url_from_source(src)
+    if portal_url and not str(src.get("url_origem") or "").strip():
+        src["url_origem"] = portal_url
     bucket = _resolve_fonte_bucket(src, row.numero_pncp)
     inciso_resolvido = "inciso_i" if bucket == "governamentais" else ("inciso_ii" if bucket == "entesPublicos" else None)
     out: Dict[str, Any] = {
@@ -847,6 +880,8 @@ def _item_cotacao_dict(row: PncpCotacaoItemCotacao) -> Dict[str, Any]:
         "inciso_resolvido": inciso_resolvido,
         "created_at": _iso_z(row.created_at),
     }
+    if portal_url:
+        out["url_origem"] = portal_url
     for key in (
         "valor_unitario_homologado",
         "valor_total_homologado",
@@ -858,6 +893,9 @@ def _item_cotacao_dict(row: PncpCotacaoItemCotacao) -> Dict[str, Any]:
         "situacaoCompraItemNome",
         "temResultado",
         "item_homologado",
+        "plataforma",
+        "processo_id",
+        "plataforma_item_id",
     ):
         if src.get(key) is not None:
             out[key] = src[key]

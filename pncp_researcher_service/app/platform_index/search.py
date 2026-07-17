@@ -12,6 +12,127 @@ def _first_token(term: str) -> str:
     return parts[0] if parts else ""
 
 
+def _is_licitacon_process_url(url: str) -> bool:
+    u = (url or "").strip()
+    if not u.lower().startswith("http"):
+        return False
+    # Página de busca genérica (:19:) não serve como link de processo.
+    if re.search(r"f\?p=50500:19:", u, flags=re.I):
+        return False
+    return "portal.tce.rs.gov.br" in u.lower() or "P10_ID_LICITACAO" in u.upper()
+
+
+def _url_from_processo_raw_blob(raw_blob: Any) -> Optional[str]:
+    if not raw_blob:
+        return None
+    try:
+        import zlib
+        import json
+
+        data = json.loads(zlib.decompress(raw_blob).decode("utf-8"))
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    for key in (
+        "link_licitacon_cidadao",
+        "LINK_LICITACON_CIDADAO",
+        "url_origem",
+        "link",
+    ):
+        cand = str(data.get(key) or "").strip()
+        if _is_licitacon_process_url(cand):
+            return cand
+    return None
+
+
+def lookup_portal_urls(
+    spec: PlatformIndexSpec,
+    *,
+    keys: List[str],
+) -> Dict[str, str]:
+    """
+    Resolve deep-links LicitaCon por processo_id / plataforma_item_id / numero_processo.
+    Usado para cotações antigas salvas sem url_origem no JSON.
+    """
+    if not spec.db_path or not spec.db_exists():
+        return {}
+    cleaned: List[str] = []
+    seen: set[str] = set()
+    for raw in keys or []:
+        k = str(raw or "").strip()
+        if not k or k in seen:
+            continue
+        seen.add(k)
+        cleaned.append(k)
+        # Aceita chave sem prefixo da plataforma.
+        if ":" in k and not k.startswith(f"{spec.id}:"):
+            alt = f"{spec.id}:{k}"
+            if alt not in seen:
+                seen.add(alt)
+                cleaned.append(alt)
+        if k.startswith(f"{spec.id}:"):
+            alt = k[len(spec.id) + 1 :]
+            if alt and alt not in seen:
+                seen.add(alt)
+                cleaned.append(alt)
+    if not cleaned:
+        return {}
+
+    out: Dict[str, str] = {}
+    placeholders = ",".join("?" for _ in cleaned)
+    sql = f"""
+        SELECT processo_id, plataforma_item_id, numero_processo, url_origem
+        FROM platform_itens_leitura
+        WHERE url_origem IS NOT NULL AND trim(url_origem) != ''
+          AND (
+            processo_id IN ({placeholders})
+            OR plataforma_item_id IN ({placeholders})
+            OR numero_processo IN ({placeholders})
+          )
+        LIMIT 500
+    """
+    params = cleaned * 3
+    try:
+        with platform_conn(spec.db_path) as c:
+            rows = c.execute(sql, params).fetchall()
+            missing_proc: List[str] = []
+            for row in rows:
+                url = str(row["url_origem"] or "").strip()
+                if not _is_licitacon_process_url(url):
+                    continue
+                for key in (
+                    row["processo_id"],
+                    row["plataforma_item_id"],
+                    row["numero_processo"],
+                ):
+                    k = str(key or "").strip()
+                    if k:
+                        out[k] = url
+            # Fallback: raw da licitação (bases ingeridas sem url na leitura).
+            for key in cleaned:
+                if key in out:
+                    continue
+                missing_proc.append(key)
+            if missing_proc:
+                ph2 = ",".join("?" for _ in missing_proc)
+                prow = c.execute(
+                    f"""
+                    SELECT id, raw_json_zlib FROM platform_processos
+                    WHERE id IN ({ph2})
+                    LIMIT 200
+                    """,
+                    missing_proc,
+                ).fetchall()
+                for row in prow:
+                    url = _url_from_processo_raw_blob(row["raw_json_zlib"])
+                    if url:
+                        out[str(row["id"])] = url
+    except Exception:
+        return out
+    return out
+
+
 def platform_item_search(
     spec: PlatformIndexSpec,
     *,

@@ -259,11 +259,39 @@ function pncpCompraKeysForEnrich(row) {
   return true;
 }
 
+/** Plataforma de origem (pncp, tce_rs, …). */
+export function resolveRowPlataforma(row) {
+  const src = mergedPnCpSource(row);
+  return String(row?.plataforma || src.plataforma || 'pncp').trim().toLowerCase();
+}
+
+export function isTceRsRow(row) {
+  return resolveRowPlataforma(row) === 'tce_rs';
+}
+
+function tceRsProcessoRef(row) {
+  const src = mergedPnCpSource(row);
+  return String(
+    row?.processoRef
+    || src.processo_id
+    || src.plataforma_item_id
+    || src.numero_processo
+    || '',
+  ).trim();
+}
+
+function tceRsSalvavel(row) {
+  if (hasCnpjFornecedorSalvar(row)) return true;
+  return Boolean(tceRsProcessoRef(row)) && hasValidPnCpFornecedorParaBusca(row);
+}
+
 /**
  * Pode enviar ao backend para gravar: CNPJ já presente ou homologado com chaves PNCP
  * (o Django enriquece fornecedor via /resultados antes de persistir).
+ * TCE-RS: CNPJ ou processo LicitaCon + fornecedor identificável.
  */
 export function canSalvarCotacaoPnCp(row) {
+  if (isTceRsRow(row)) return tceRsSalvavel(row);
   if (hasCnpjFornecedorSalvar(row)) return true;
   return pncpCompraKeysForEnrich(row) && hasValidPnCpFornecedorParaBusca(row);
 }

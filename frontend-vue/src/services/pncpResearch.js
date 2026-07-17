@@ -1,6 +1,41 @@
 // Em desenvolvimento, usa proxy do Vite (/api -> backend local) para evitar bater na API remota.
 const API_BASE = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || 'https://api.docmasteria.com.br');
 
+function flattenErrorDetail(raw) {
+  if (raw == null || raw === '') return '';
+  if (typeof raw === 'string') return raw.trim();
+  if (typeof raw === 'number' || typeof raw === 'boolean') return String(raw);
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) => {
+        if (item == null) return '';
+        if (typeof item === 'string') return item.trim();
+        if (typeof item === 'object') {
+          const loc = Array.isArray(item.loc)
+            ? item.loc.filter((x) => x !== 'body').join('.')
+            : '';
+          const m = String(item.msg || item.message || item.detail || '').trim();
+          if (loc && m) return `${loc}: ${m}`;
+          return m || flattenErrorDetail(item);
+        }
+        return String(item);
+      })
+      .filter(Boolean)
+      .join('; ');
+  }
+  if (typeof raw === 'object') {
+    if (raw.msg || raw.message) return String(raw.msg || raw.message).trim();
+    if (raw.detail != null && raw.detail !== raw) return flattenErrorDetail(raw.detail);
+    if (raw.error != null && raw.error !== raw) return flattenErrorDetail(raw.error);
+    try {
+      return JSON.stringify(raw);
+    } catch {
+      return '';
+    }
+  }
+  return String(raw).trim();
+}
+
 function extractErrorMessage(payload, status) {
   let p = payload;
   if (typeof p === 'string') {
@@ -14,8 +49,8 @@ function extractErrorMessage(payload, status) {
     }
   }
   const raw =
-    typeof p === 'object' && p !== null ? p?.detail || p?.error : p;
-  const msg = String(raw || '').trim();
+    typeof p === 'object' && p !== null ? (p.detail ?? p.error ?? p) : p;
+  const msg = flattenErrorDetail(raw);
   const looksLikeHtml =
     /^<!doctype html/i.test(msg) || /^<html/i.test(msg) || /<body[\s>]/i.test(msg.slice(0, 400));
   // Gateway/Django HTML error page — não há JSON com detalhe.
@@ -31,7 +66,34 @@ function extractErrorMessage(payload, status) {
   if (status >= 500 && !msg) {
     return 'Erro temporário no servidor. Tente novamente em instantes.';
   }
-  return msg || `Erro HTTP ${status}`;
+  if (!msg || msg === '[object Object]') {
+    return `Erro HTTP ${status || 'desconhecido'}`;
+  }
+  return msg;
+}
+
+/** Mensagem legível para UI a partir de Error / resposta API / Abort. */
+export function formatResearchError(err) {
+  if (err == null) return 'erro desconhecido';
+  const name = String(err?.name || '');
+  if (name === 'AbortError' || name === 'TimeoutError') {
+    return 'A busca demorou demais ou foi cancelada. Tente novamente.';
+  }
+  const status = Number(err?.status);
+  if (status === 502 || status === 504) {
+    return 'Serviço de pesquisa temporariamente indisponível (proxy). Tente de novo em instantes.';
+  }
+  if (status === 503) {
+    return 'Serviço de pesquisa sobrecarregado. Tente de novo em instantes.';
+  }
+  const fromMsg = flattenErrorDetail(err?.message);
+  if (fromMsg && fromMsg !== '[object Object]') return fromMsg;
+  const fromDetail = flattenErrorDetail(err?.detail ?? err?.error ?? err);
+  if (fromDetail && fromDetail !== '[object Object]') return fromDetail;
+  if (isNetworkFetchError(err)) {
+    return 'Falha de rede ao consultar a pesquisa. Verifique a conexão e tente novamente.';
+  }
+  return 'erro desconhecido';
 }
 
 /** Proxy FastAPI: índice local, market-search, streams. */
@@ -412,24 +474,48 @@ export function intelligentMarketSearch(payload, signal, options = {}) {
 /** Busca federada multi-fonte (Parte 0). Fallback para intelligent se endpoint indisponível. */
 export function federatedMarketSearch(payload, signal, options = {}) {
   const timeoutMs = options.timeoutMs ?? 120000;
+  const maxAttempts = Math.max(1, Math.min(5, Number(options.maxAttempts) || 3));
   const body = {
     ...payload,
     fontes_habilitadas: payload.fontes_habilitadas?.length
       ? payload.fontes_habilitadas
       : ['pncp'],
   };
-  return researchRequest('market-search/federated', {
-    method: 'POST',
-    body,
-    signal,
-    timeoutMs,
-  }).catch((err) => {
-    const status = Number(err?.status);
-    if (status === 404 || status === 503 || status === 501) {
-      return intelligentMarketSearch(payload, signal, options);
+
+  const attemptOnce = () =>
+    researchRequest('market-search/federated', {
+      method: 'POST',
+      body,
+      signal,
+      timeoutMs,
+    }).catch((err) => {
+      const status = Number(err?.status);
+      if (status === 404 || status === 501) {
+        return intelligentMarketSearch(payload, signal, options);
+      }
+      throw err;
+    });
+
+  return (async () => {
+    let lastErr = null;
+    for (let i = 0; i < maxAttempts; i += 1) {
+      try {
+        return await attemptOnce();
+      } catch (err) {
+        lastErr = err;
+        const aborted = String(err?.name || '') === 'AbortError'
+          || /aborted|abort/i.test(String(err?.message || ''));
+        if (aborted || !isRetryableSearchError(err)) {
+          throw err;
+        }
+        if (i < maxAttempts - 1) {
+          const base = Number(options.retryDelayMs) > 0 ? Number(options.retryDelayMs) : 700;
+          await sleep(base * (i + 1));
+        }
+      }
     }
-    throw err;
-  });
+    throw lastErr || new Error('Falha de rede ao consultar busca federada.');
+  })();
 }
 
 export function listPriceSources() {

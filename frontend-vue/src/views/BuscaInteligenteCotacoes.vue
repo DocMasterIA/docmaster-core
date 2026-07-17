@@ -112,22 +112,11 @@
         </div>
       </section>
 
-      <section class="bia-fontes-panel">
-        <p class="bia-geo-panel__kicker">Fontes de preço</p>
-        <h2 class="bia-geo-panel__title">Plataformas consultadas</h2>
-        <p class="bia-geo-panel__hint">
-          Selecione as fontes para a busca federada. Hoje apenas PNCP está disponível; novas plataformas
-          serão adicionadas sem alterar o fluxo de salvamento.
-        </p>
-        <label class="bia-fontes-item">
-          <input
-            v-model="fontesHabilitadas"
-            type="checkbox"
-            value="pncp"
-          />
-          <span>PNCP (Portal Nacional de Contratações Públicas)</span>
-        </label>
-      </section>
+      <PriceSourcesPanel
+        v-model="fontesHabilitadas"
+        :fontes="fontesCatalog"
+        :loading="isLoadingFontes"
+      />
 
       <p v-if="isLoadingSessionItems" class="bia-meta">
         Carregando itens da cotação{{ sessionItemsLoadHint ? ` (${sessionItemsLoadHint})` : '' }}...
@@ -178,7 +167,7 @@
         <span v-if="itemContext.unidade_medida"> {{ itemContext.unidade_medida }}</span>
       </p>
       <p v-if="searchError" class="bia-meta bia-meta--error">{{ searchError }}</p>
-      <p v-else-if="isSearching" class="bia-meta">Consultando backend PNCP...</p>
+      <p v-else-if="isSearching" class="bia-meta">Consultando índices locais ({{ fontesBuscaLabel }})…</p>
 
       <section class="bia-table-shell">
         <div class="bia-table-head">
@@ -281,6 +270,11 @@
                       <div v-if="row.similaridadeEncontrada" class="bia-sub">
                         <span class="bia-badge bia-badge--warn">Similaridade parcial encontrada</span>
                       </div>
+                      <div class="bia-sub">
+                        <span class="bia-plat-badge" :class="`bia-plat-badge--${row.plataforma}`">
+                          {{ row.plataformaLabel }}
+                        </span>
+                      </div>
                     </td>
                     <td class="bia-cell-center">
                       <span class="bia-badge">{{ labelEsfera(row.esferaAdministrativa) }}</span>
@@ -345,8 +339,18 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   fetchAllItemsForBulkSearch,
   federatedMarketSearch,
+  getLocalIndexStats,
   getResearchSession,
 } from '../services/pncpResearch';
+import PriceSourcesPanel from '../components/PriceSourcesPanel.vue';
+import {
+  federatedItemPlataforma,
+  federatedItemProcessoRef,
+  loadPriceSourcesCatalog,
+  mergeFontesWithLocalStats,
+  pickDefaultFontes,
+  plataformaBadgeShort,
+} from '../utils/pncpPriceSources';
 import {
   formatCotacaoSaveFeedback,
   persistCotacoesToResearchSession,
@@ -378,6 +382,7 @@ import {
   passesPnCpSearchDisplayGate,
   pickFornecedorDisplayName,
   pnCpRowWithinFaixaRegional,
+  resolveRowPlataforma,
 } from '../utils/pncpPricing';
 
 const route = useRoute();
@@ -397,6 +402,14 @@ const filtros = reactive({
 
 /** IDs das fontes de preço habilitadas na busca federada. */
 const fontesHabilitadas = ref(['pncp']);
+const fontesCatalog = ref([]);
+const isLoadingFontes = ref(false);
+const localStats = ref(null);
+
+const fontesBuscaLabel = computed(() => {
+  const ids = fontesHabilitadas.value?.length ? fontesHabilitadas.value : ['pncp'];
+  return ids.map((id) => plataformaBadgeShort(id)).join(' + ');
+});
 
 function newLinhaCidade() {
   return {
@@ -1310,14 +1323,20 @@ async function runSearchWithContext({
           }
           return true;
         })
-        .map((it, idx) => ({
+        .map((it, idx) => {
+          const plat = federatedItemPlataforma(it);
+          const processoRef = federatedItemProcessoRef(it);
+          return {
         esferaAdministrativa: classificarEsferaAdministrativa(it),
         incisoClassificacao: mapEsferaParaInciso(classificarEsferaAdministrativa(it)),
-        id: `backend-${context?.id || 'none'}-${geoKeyPart}-${idx}-${it.numero_pncp || 'x'}-${it.numero_item ?? idx}`,
+        id: `backend-${context?.id || 'none'}-${geoKeyPart}-${idx}-${plat}-${processoRef || it.numero_pncp || 'x'}-${it.numero_item ?? idx}`,
+        plataforma: plat,
+        plataformaLabel: plataformaBadgeShort(plat),
         itemId: context?.id ?? itemId.value ?? null,
         itemRefLabel: context?.descricao_item || '-',
         sourceRaw: it,
         numeroPncp: it.numero_pncp || null,
+        processoRef,
         anoCompra: it.ano_compra ?? null,
         sequencialCompra: it.sequencial_compra ?? null,
         numeroItem: it.numero_item ?? null,
@@ -1329,7 +1348,7 @@ async function runSearchWithContext({
         uf: it.uf || '-',
         municipio: it.municipio || null,
         modalidade: it.modalidade || '-',
-        processo: it.numero_pncp || '-',
+        processo: processoRef || it.numero_pncp || '-',
         data: it.data_publicacao || '-',
         qtd: `${it.quantidade || '-'} ${it.unidade_medida || ''}`.trim(),
         quantidadeNum: it.quantidade ?? null,
@@ -1350,7 +1369,8 @@ async function runSearchWithContext({
           : null,
         selecionado: false,
         backendItensCount: backend.itens.length,
-      }));
+      };
+        });
       aggregated.push(...mapped);
       return mapped.length;
     }
@@ -1536,6 +1556,7 @@ async function adicionarSelecionadosNaCotacao() {
       const homTotal = extractPnCpHomologadoTotal({ sourceRaw: raw, quantidade: r.quantidadeNum });
       const unitSave = homUnit ?? r.valorUnitario ?? parseMoeda(r.valor);
       const totalSave = homTotal ?? r.valorTotal ?? (unitSave && r.quantidadeNum ? unitSave * r.quantidadeNum : null);
+      const plat = resolveRowPlataforma(r);
       return {
       item_ref_id: r.itemId ?? null,
       esfera_administrativa: r.esferaAdministrativa || null,
@@ -1584,13 +1605,15 @@ async function adicionarSelecionadosNaCotacao() {
       quantidade_homologada: r.sourceRaw?.quantidade_homologada ?? null,
       ano_compra: r.anoCompra ?? r.sourceRaw?.ano_compra ?? null,
       sequencial_compra: r.sequencialCompra ?? r.sourceRaw?.sequencial_compra ?? null,
+      plataforma: plat,
+      plataforma_item_id: raw.plataforma_item_id || r.processoRef || null,
+      processo_id: raw.processo_id || r.processoRef || null,
       source: {
         ...raw,
-        plataforma: raw.plataforma || 'pncp',
+        plataforma: plat,
         fornecedor: pickFornecedorDisplayName(r),
         cnpj_fornecedor: extractCnpjFornecedorSalvar(r) || r.cnpjFornecedor || null,
       },
-      plataforma: raw.plataforma || 'pncp',
     };
     });
   if (!selecionados.length) {
@@ -1651,6 +1674,20 @@ async function adicionarSelecionadosNaCotacao() {
 }
 
 onMounted(async () => {
+  isLoadingFontes.value = true;
+  try {
+    try {
+      localStats.value = await getLocalIndexStats();
+    } catch (_) {
+      localStats.value = null;
+    }
+    const catalog = await loadPriceSourcesCatalog();
+    fontesCatalog.value = mergeFontesWithLocalStats(catalog, localStats.value);
+    fontesHabilitadas.value = pickDefaultFontes(fontesCatalog.value);
+  } finally {
+    isLoadingFontes.value = false;
+  }
+
   const sessionId = Number(cotacaoId.value);
   if (!Number.isFinite(sessionId) || sessionId <= 0) return;
   const mountRunId = ++mountRunSeq;
@@ -2009,6 +2046,26 @@ function onVariacaoInput(event) {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+.bia-plat-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid #dbe4f0;
+  background: #f4f8fc;
+  color: #2f557d;
+}
+.bia-plat-badge--tce_rs {
+  background: #eef6ff;
+  border-color: #c5daf5;
+  color: #1e4f8a;
+}
+.bia-plat-badge--pncp {
+  background: #eef8f2;
+  border-color: #c8e6d4;
+  color: #1f6b45;
 }
 .bia-fontes-item {
   display: flex;

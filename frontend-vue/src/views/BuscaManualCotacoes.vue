@@ -114,6 +114,11 @@
             <button type="button" class="manual-geo-remove" title="Remover esta linha" @click="removeLinhaCidade(idx)">×</button>
           </div>
         </div>
+        <PriceSourcesPanel
+          v-model="fontesHabilitadas"
+          :fontes="fontesCatalog"
+          :loading="isLoadingFontes"
+        />
         <div class="manual-local-db-row">
           <p class="manual-meta">
             Base local (`pncp_researcher_service`):
@@ -126,7 +131,7 @@
         </div>
       </section>
       <p v-if="searchError" class="manual-meta manual-meta--error">{{ searchError }}</p>
-      <p v-else-if="isSearching" class="manual-meta">Consultando backend PNCP...</p>
+      <p v-else-if="isSearching" class="manual-meta">Consultando índices locais ({{ fontesBuscaLabel }})…</p>
 
       <section class="manual-controls">
         <div class="manual-controls__left">
@@ -212,6 +217,7 @@
             <thead>
               <tr>
                 <th>Seleção</th>
+                <th>Fonte</th>
                 <th>Cotação</th>
                 <th>Quantidade</th>
                 <th>Inciso</th>
@@ -227,6 +233,11 @@
               <tr v-for="item in resultadosFiltradosOrdenados" :key="item.id">
                 <td class="manual-cell-center">
                   <input type="checkbox" :checked="item.selecionado" @change="toggleSelecionado(item.id)" />
+                </td>
+                <td class="manual-cell-center">
+                  <span class="manual-plat-badge" :class="`manual-plat-badge--${item.plataforma}`">
+                    {{ item.plataformaLabel }}
+                  </span>
                 </td>
                 <td>
                   <div class="manual-cot-main">{{ item.descricao }}</div>
@@ -288,11 +299,20 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   backfillLocalIndex,
+  federatedMarketSearch,
+  formatResearchError,
   getResearchSession,
   getLocalIndexStats,
-  intelligentMarketSearch,
-  searchLocalItems,
 } from '../services/pncpResearch';
+import PriceSourcesPanel from '../components/PriceSourcesPanel.vue';
+import {
+  federatedItemPlataforma,
+  federatedItemProcessoRef,
+  loadPriceSourcesCatalog,
+  mergeFontesWithLocalStats,
+  pickDefaultFontes,
+  plataformaBadgeShort,
+} from '../utils/pncpPriceSources';
 import {
   formatCotacaoSaveFeedback,
   persistCotacoesToResearchSession,
@@ -300,7 +320,7 @@ import {
 } from '../utils/pncpSaveCotacoes';
 import { MUNICIPIOS_POR_UF } from '../data/brasilMunicipiosPorUf';
 import { buildRecortesGeograficosPayload, itemMatchesRecortesGeograficos } from '../utils/recortesGeograficos';
-import { canSalvarCotacaoPnCp, displayPnCpUnitario, extractCnpjFornecedorSalvar, formatFaixaResumo, passesPnCpSearchDisplayGate, computeFaixaRegional, pickFornecedorDisplayName, buildFaixaRegionalItemDisplay } from '../utils/pncpPricing';
+import { canSalvarCotacaoPnCp, displayPnCpUnitario, extractCnpjFornecedorSalvar, formatFaixaResumo, passesPnCpSearchDisplayGate, computeFaixaRegional, pickFornecedorDisplayName, buildFaixaRegionalItemDisplay, resolveRowPlataforma } from '../utils/pncpPricing';
 
 const route = useRoute();
 const router = useRouter();
@@ -319,7 +339,7 @@ const filtros = reactive({
   cidades: [],
   ordenarPor: 'Produto',
   ordem: 'Decrescente',
-  valorBase: '15,00',
+  valorBase: '0,00',
   variacao: '20',
   variacaoSentido: 'ambos',
 });
@@ -471,8 +491,17 @@ function onVariacaoInput(event) {
 const resultados = ref([]);
 const isSearching = ref(false);
 const searchError = ref('');
+let searchGeneration = 0;
 const saveMessage = ref('');
 const localStats = ref(null);
+const fontesCatalog = ref([]);
+const fontesHabilitadas = ref(['pncp']);
+const isLoadingFontes = ref(false);
+
+const fontesBuscaLabel = computed(() => {
+  const ids = fontesHabilitadas.value?.length ? fontesHabilitadas.value : ['pncp'];
+  return ids.map((id) => plataformaBadgeShort(id)).join(' + ');
+});
 const isBackfilling = ref(false);
 const isSavingSelecionados = ref(false);
 const variacaoGlobalDaSessao = ref(null);
@@ -599,9 +628,33 @@ const resultadosFiltradosOrdenados = computed(() => {
   return filtrados;
 });
 
+async function carregarFontesPreco() {
+  isLoadingFontes.value = true;
+  try {
+    const catalog = await loadPriceSourcesCatalog();
+    fontesCatalog.value = mergeFontesWithLocalStats(catalog, localStats.value);
+    const defaults = pickDefaultFontes(fontesCatalog.value);
+    if (!fontesHabilitadas.value?.length) {
+      fontesHabilitadas.value = defaults;
+    } else {
+      fontesHabilitadas.value = fontesHabilitadas.value.filter((id) =>
+        fontesCatalog.value.some((f) => f.id === id && f.search_ready !== false),
+      );
+      if (!fontesHabilitadas.value.length) fontesHabilitadas.value = defaults;
+    }
+  } catch (_err) {
+    fontesCatalog.value = [];
+  } finally {
+    isLoadingFontes.value = false;
+  }
+}
+
 async function carregarStatusBaseLocal() {
   try {
     localStats.value = await getLocalIndexStats();
+    if (fontesCatalog.value.length) {
+      fontesCatalog.value = mergeFontesWithLocalStats(fontesCatalog.value, localStats.value);
+    }
   } catch (_err) {
     localStats.value = null;
   }
@@ -713,8 +766,52 @@ function faixaPayloadForApi() {
   };
 }
 
+function mapFederatedItemToRow(it, idx, { termoBuscaEfetivo, termoFallbackUsado, fallbackPorSimilaridadeIa }) {
+  const plat = federatedItemPlataforma(it);
+  const descricaoLinha = it.descricao_item || it.objeto_resumido || '';
+  const similaridadeBackend = Boolean(it?.similaridade_encontrada);
+  const similaridadeParcial = similaridadeBackend || isSimilaridadeParcialManual(
+    termoBuscaEfetivo,
+    descricaoLinha,
+  ) || fallbackPorSimilaridadeIa;
+  const termoParaConfiabilidade = termoFallbackUsado || termoBuscaEfetivo;
+  const conf = confiabilidadeManual(termoParaConfiabilidade, descricaoLinha);
+  const processoRef = federatedItemProcessoRef(it);
+  return {
+    id: `backend-${plat}-${idx}-${processoRef || it.numero_item || idx}`,
+    plataforma: plat,
+    plataformaLabel: plataformaBadgeShort(plat),
+    sourceRaw: it,
+    numeroPncp: it.numero_pncp || null,
+    processoRef,
+    anoCompra: it.ano_compra ?? null,
+    sequencialCompra: it.sequencial_compra ?? null,
+    numeroItem: it.numero_item ?? null,
+    titulo: it.orgao || (plat === 'tce_rs' ? 'Órgão RS (LicitaCon)' : 'Órgão não informado'),
+    descricao: descricaoLinha || 'Descrição indisponível',
+    municipioUfCompacto: [it.municipio, it.uf].filter(Boolean).join('/') || '-',
+    quantidade: `${it.quantidade || '-'} ${it.unidade_medida || ''}`.trim(),
+    quantidadeNum: it.quantidade ?? null,
+    unidadeMedida: it.unidade_medida || null,
+    inciso: resolveIncisoFromItem(it),
+    uf: it.uf || '-',
+    municipio: it.municipio || null,
+    data: it.data_publicacao || it.data_referencia || '-',
+    valor: formatCurrency(displayPnCpUnitario({ sourceRaw: it })),
+    valorUnitario: displayPnCpUnitario({ sourceRaw: it }),
+    valorTotal: it.valor_total ?? null,
+    statusIa: (similaridadeParcial && conf === 'Alta') || fallbackPorSimilaridadeIa ? 'Média' : conf,
+    observacao: plat === 'tce_rs'
+      ? `TCE-RS · ${it.modalidade || 'LicitaCon'}${processoRef ? ` · proc. ${processoRef}` : ''}`
+      : (it.modalidade || 'PNCP'),
+    similaridadeEncontrada: similaridadeParcial,
+    selecionado: false,
+  };
+}
+
 async function buscarNoBackend() {
   if (!filtros.descricao.trim()) return;
+  const gen = ++searchGeneration;
   isSearching.value = true;
   searchError.value = '';
   try {
@@ -725,44 +822,28 @@ async function buscarNoBackend() {
     const termoBuscaEfetivo = filtros.descricao.trim();
     const geo = geoApiSlice();
     const faixaPayload = faixaPayloadForApi();
-    let data = await searchLocalItems({
+    const fontes = fontesHabilitadas.value?.length ? [...fontesHabilitadas.value] : ['pncp'];
+    const searchBase = {
       termo_busca: termoBuscaEfetivo,
       ...geo,
       ...faixaPayload,
       codigo_modalidade: codigoModalidade,
       somente_homologados: true,
-      // Busca agressiva para varrer o máximo possível (backend limita teto de segurança).
       max_paginas: 500,
       tamanho_pagina: 200,
-    });
-    const localItemsCount = Array.isArray(data?.itens) ? data.itens.length : 0;
+      fontes_habilitadas: fontes,
+    };
+    let data = await federatedMarketSearch(searchBase);
+    if (gen !== searchGeneration) return;
     let fallbackPorSimilaridadeIa = false;
     let termoFallbackUsado = '';
-    if (!data?.ok || !Array.isArray(data?.itens) || localItemsCount === 0) {
-      const iaData = await intelligentMarketSearch({
-        termo_busca: termoBuscaEfetivo,
-        ...geo,
-        ...faixaPayload,
-        codigo_modalidade: codigoModalidade,
-        somente_homologados: true,
-        max_paginas: 500,
-        tamanho_pagina: 200,
-      });
-      if (iaData?.ok && Array.isArray(iaData?.itens) && iaData.itens.length > 0) {
-        data = iaData;
-        fallbackPorSimilaridadeIa = true;
-      }
-    }
-    if (!data?.ok || !Array.isArray(data?.itens) || (Array.isArray(data?.itens) && data.itens.length === 0)) {
+    if (!data?.ok || !Array.isArray(data?.itens) || data.itens.length === 0) {
       const fallbackTerms = buildSimilarityFallbackTerms(termoBuscaEfetivo);
       for (const term of fallbackTerms) {
-        const iaFallback = await intelligentMarketSearch({
+        if (gen !== searchGeneration) return;
+        const iaFallback = await federatedMarketSearch({
+          ...searchBase,
           termo_busca: term,
-          ...geo,
-          ...faixaPayload,
-          codigo_modalidade: codigoModalidade,
-          max_paginas: 500,
-          tamanho_pagina: 200,
         });
         if (iaFallback?.ok && Array.isArray(iaFallback?.itens) && iaFallback.itens.length > 0) {
           data = iaFallback;
@@ -772,49 +853,25 @@ async function buscarNoBackend() {
         }
       }
     }
+    if (gen !== searchGeneration) return;
     if (data?.ok && Array.isArray(data.itens)) {
       resultados.value = data.itens
         .filter((it) => passesPnCpSearchDisplayGate({ sourceRaw: it }))
-        .map((it, idx) => {
-        const descricaoLinha = it.descricao_item || it.objeto_resumido || '';
-        const similaridadeBackend = Boolean(it?.similaridade_encontrada);
-        const similaridadeParcial = similaridadeBackend || isSimilaridadeParcialManual(
+        .map((it, idx) => mapFederatedItemToRow(it, idx, {
           termoBuscaEfetivo,
-          descricaoLinha,
-        ) || fallbackPorSimilaridadeIa;
-        const termoParaConfiabilidade = termoFallbackUsado || termoBuscaEfetivo;
-        const conf = confiabilidadeManual(termoParaConfiabilidade, descricaoLinha);
-        return {
-        id: `backend-${idx}-${it.numero_pncp || ''}`,
-        sourceRaw: it,
-        numeroPncp: it.numero_pncp || null,
-        anoCompra: it.ano_compra ?? null,
-        sequencialCompra: it.sequencial_compra ?? null,
-        numeroItem: it.numero_item ?? null,
-        titulo: it.orgao || 'Órgão não informado',
-        descricao: descricaoLinha || 'Descrição indisponível',
-        municipioUfCompacto: [it.municipio, it.uf].filter(Boolean).join('/') || '-',
-        quantidade: `${it.quantidade || '-'} ${it.unidade_medida || ''}`.trim(),
-        quantidadeNum: it.quantidade ?? null,
-        unidadeMedida: it.unidade_medida || null,
-        inciso: resolveIncisoFromItem(it),
-        uf: it.uf || '-',
-        municipio: it.municipio || null,
-        data: it.data_publicacao || '-',
-        valor: formatCurrency(displayPnCpUnitario({ sourceRaw: it })),
-        valorUnitario: displayPnCpUnitario({ sourceRaw: it }),
-        valorTotal: it.valor_total ?? null,
-        statusIa: (similaridadeParcial && conf === 'Alta') || fallbackPorSimilaridadeIa ? 'Média' : conf,
-        observacao: it.modalidade || 'Importado do backend PNCP',
-        similaridadeEncontrada: similaridadeParcial,
-        selecionado: false,
-      };
-      });
+          termoFallbackUsado,
+          fallbackPorSimilaridadeIa,
+        }));
+    } else {
+      resultados.value = [];
     }
   } catch (err) {
-    searchError.value = `Não foi possível consultar o backend (${err.message || 'erro desconhecido'}).`;
+    if (gen !== searchGeneration) return;
+    searchError.value = `Não foi possível consultar o backend (${formatResearchError(err)}).`;
   } finally {
-    isSearching.value = false;
+    if (gen === searchGeneration) {
+      isSearching.value = false;
+    }
   }
 }
 
@@ -939,8 +996,12 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
       const cad = (raw.fornecedor_cadastro && typeof raw.fornecedor_cadastro === 'object')
         ? raw.fornecedor_cadastro
         : {};
+      const plat = resolveRowPlataforma(r);
       return {
       numero_pncp: toNullableText(r.numeroPncp),
+      plataforma: plat,
+      plataforma_item_id: toNullableText(raw.plataforma_item_id || r.processoRef),
+      processo_id: toNullableText(raw.processo_id || r.processoRef),
       ano_compra: r.anoCompra,
       sequencial_compra: r.sequencialCompra,
       numero_item: toNullableText(r.numeroItem),
@@ -977,10 +1038,17 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
       item_homologado: r.sourceRaw?.item_homologado ?? null,
       source: {
         ...raw,
+        plataforma: plat,
       },
     };
     })
-    .filter((it) => !!it.descricao_item || !!it.numero_pncp || (it.ano_compra != null && it.sequencial_compra != null));
+    .filter((it) =>
+      !!it.descricao_item
+      || !!it.numero_pncp
+      || !!it.plataforma_item_id
+      || !!it.processo_id
+      || (it.ano_compra != null && it.sequencial_compra != null),
+    );
   if (!registros.length) {
     saveMessage.value = semFornecedor > 0
       ? 'Nenhuma fonte com CNPJ de fornecedor homologado. Itens em andamento não entram na cotação.'
@@ -1066,7 +1134,8 @@ function applyFaixaDefaultsFromItem(it) {
 }
 
 onMounted(async () => {
-  carregarStatusBaseLocal();
+  await carregarStatusBaseLocal();
+  await carregarFontesPreco();
   const sessionId = Number(cotacaoId.value);
   if (Number.isFinite(sessionId) && sessionId > 0) {
     try {
@@ -1590,6 +1659,28 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
+.manual-plat-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid #dbe4f0;
+  background: #f4f8fc;
+  color: #2f557d;
+  white-space: nowrap;
+}
+.manual-plat-badge--tce_rs {
+  background: #eef6ff;
+  border-color: #c5daf5;
+  color: #1e4f8a;
+}
+.manual-plat-badge--pncp {
+  background: #eef8f2;
+  border-color: #c8e6d4;
+  color: #1f6b45;
+}
 .manual-ia-dot--high { background: #e7f6ee; border-color: #cfe9da; color: #1f7a53; }
 .manual-ia-dot--mid { background: #fff6e6; border-color: #f0dfb3; color: #9a6a00; }
 .manual-ia-dot--low { background: #fff0f0; border-color: #f0d0d0; color: #b54747; }

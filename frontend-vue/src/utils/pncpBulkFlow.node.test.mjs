@@ -8,6 +8,8 @@ import {
   hasCnpjFornecedorSalvar,
   canSalvarCotacaoPnCp,
   extractCnpjFornecedorSalvar,
+  isTceRsRow,
+  resolveRowPlataforma,
 } from './pncpPricing.js';
 
 test('rejeita fornecedor Não se aplica na busca', () => {
@@ -111,4 +113,36 @@ test('rejeita linha sem preço', () => {
     },
   };
   assert.equal(passesPnCpSearchDisplayGate(row), false);
+});
+
+test('resolve plataforma tce_rs no sourceRaw', () => {
+  const row = { sourceRaw: { plataforma: 'tce_rs', valor_unitario: 10 } };
+  assert.equal(resolveRowPlataforma(row), 'tce_rs');
+  assert.equal(isTceRsRow(row), true);
+});
+
+test('tce_rs salva com CNPJ', () => {
+  const row = {
+    plataforma: 'tce_rs',
+    sourceRaw: {
+      plataforma: 'tce_rs',
+      valor_unitario: 12,
+      cnpj_fornecedor: '12345678000195',
+      fornecedor_nome: 'FORN RS LTDA',
+      processo_id: '2026/12345',
+    },
+  };
+  assert.equal(canSalvarCotacaoPnCp(row), true);
+});
+
+test('tce_rs salva com processo + fornecedor sem CNPJ', () => {
+  const row = {
+    sourceRaw: {
+      plataforma: 'tce_rs',
+      valor_unitario: 12,
+      plataforma_item_id: '2026/12345:7',
+      fornecedor: 'EMPRESA LICITACON LTDA',
+    },
+  };
+  assert.equal(canSalvarCotacaoPnCp(row), true);
 });

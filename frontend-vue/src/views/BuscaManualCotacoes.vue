@@ -322,6 +322,7 @@ import { MUNICIPIOS_POR_UF } from '../data/brasilMunicipiosPorUf';
 import { buildRecortesGeograficosPayload, itemMatchesRecortesGeograficos } from '../utils/recortesGeograficos';
 import { canSalvarCotacaoPnCp, displayPnCpUnitario, extractCnpjFornecedorSalvar, formatFaixaResumo, passesPnCpSearchDisplayGate, computeFaixaRegional, pickFornecedorDisplayName, buildFaixaRegionalItemDisplay, resolveRowPlataforma } from '../utils/pncpPricing';
 import { labelModalidadeFonte } from '../utils/tceModalidade';
+import { formatMunicipioUf, resolveMunicipioUf } from '../utils/tceLocalidade';
 
 const route = useRoute();
 const router = useRouter();
@@ -790,13 +791,17 @@ function mapFederatedItemToRow(it, idx, { termoBuscaEfetivo, termoFallbackUsado,
     numeroItem: it.numero_item ?? null,
     titulo: it.orgao || (plat === 'tce_rs' ? 'Órgão RS (LicitaCon)' : 'Órgão não informado'),
     descricao: descricaoLinha || 'Descrição indisponível',
-    municipioUfCompacto: [it.municipio, it.uf].filter(Boolean).join('/') || '-',
+    municipioUfCompacto: formatMunicipioUf(
+      { municipio: it.municipio, uf: it.uf, orgao: it.orgao },
+      it,
+      '-',
+    ),
     quantidade: `${it.quantidade || '-'} ${it.unidade_medida || ''}`.trim(),
     quantidadeNum: it.quantidade ?? null,
     unidadeMedida: it.unidade_medida || null,
     inciso: resolveIncisoFromItem(it),
     uf: it.uf || '-',
-    municipio: it.municipio || null,
+    municipio: resolveMunicipioUf({ municipio: it.municipio, uf: it.uf, orgao: it.orgao }, it).municipio || null,
     data: it.data_publicacao || it.data_referencia || '-',
     valor: formatCurrency(displayPnCpUnitario({ sourceRaw: it })),
     valorUnitario: displayPnCpUnitario({ sourceRaw: it }),
@@ -1046,7 +1051,17 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
       valor_unitario: r.valorUnitario ?? parseMoeda(r.valor),
       valor_total: r.valorTotal,
       orgao: toNullableText(r.titulo),
-      municipio: toNullableText(r.municipio),
+      municipio: (() => {
+        const resolved = resolveMunicipioUf(
+          {
+            municipio: r.municipio || raw.municipio,
+            uf: r.uf || raw.uf,
+            orgao: r.titulo || raw.orgao,
+          },
+          raw,
+        );
+        return toNullableText(resolved.municipio);
+      })(),
       uf: toNullableText(r.uf),
       modalidade: (() => {
         const resolved = labelModalidadeFonte(

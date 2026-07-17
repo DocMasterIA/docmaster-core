@@ -386,6 +386,7 @@ import {
   resolveRowPlataforma,
 } from '../utils/pncpPricing';
 import { labelModalidadeFonte } from '../utils/tceModalidade';
+import { formatMunicipioUf, resolveMunicipioUf } from '../utils/tceLocalidade';
 
 const route = useRoute();
 const router = useRouter();
@@ -1354,9 +1355,13 @@ async function runSearchWithContext({
         item: it.descricao_item || it.objeto_resumido || '-',
         normalizado: it.material_servico || resolveTipoItem(it) || '-',
         orgao: it.orgao || '-',
-        cidade: `${it.municipio || '-'}${it.uf ? `/${it.uf}` : ''}`,
+        cidade: formatMunicipioUf(
+          { municipio: it.municipio, uf: it.uf, orgao: it.orgao },
+          it,
+          '-',
+        ),
         uf: it.uf || '-',
-        municipio: it.municipio || null,
+        municipio: resolveMunicipioUf({ municipio: it.municipio, uf: it.uf, orgao: it.orgao }, it).municipio || null,
         modalidade: (() => {
           const lab = labelModalidadeFonte(
             { modalidade: it.modalidade, processo_id: processoRef, plataforma_item_id: it.plataforma_item_id },
@@ -1591,7 +1596,13 @@ async function adicionarSelecionadosNaCotacao() {
       numero_item: r.numeroItem,
       descricao_item: r.item,
       orgao: r.orgao,
-      municipio: r.municipio,
+      municipio: (() => {
+        const resolved = resolveMunicipioUf(
+          { municipio: r.municipio || raw.municipio, uf: r.uf || raw.uf, orgao: r.orgao || raw.orgao },
+          raw,
+        );
+        return resolved.municipio || null;
+      })(),
       uf: r.uf,
       quantidade: r.quantidadeNum,
       unidade_medida: r.unidadeMedida,

@@ -341,6 +341,7 @@ import {
   isPnCpHomologadoSemPrecoVencedor,
   totalDeMediaUnitariaExibida,
 } from '../utils/pncpPricing';
+import { formatMunicipioUf } from '../utils/tceLocalidade';
 
 const route = useRoute();
 const cotacaoId = computed(() => String(route.params.cotacaoId || ''));
@@ -591,10 +592,7 @@ function formatDateTimePt(iso) {
 }
 
 function formatCidadeUf(r) {
-  const m = String(r?.municipio || '').trim();
-  const uf = String(r?.uf || '').trim();
-  if (m && uf) return `${m}/${uf}`;
-  return m || uf || '—';
+  return formatMunicipioUf(r, r?.source || r?.sourceRaw || {});
 }
 
 function formatQuantidadeCotacao(r) {

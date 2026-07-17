@@ -286,6 +286,7 @@ import { useRoute } from 'vue-router';
 import { getResearchSession } from '../services/pncpResearch';
 import { totalDeMediaUnitariaExibida } from '../utils/pncpPricing';
 import { labelModalidadeFonte } from '../utils/tceModalidade';
+import { formatMunicipioUf } from '../utils/tceLocalidade';
 
 const DOCUMENTO_TECNICO_LEAD =
   'Documento técnico consolidado com metodologia, análise técnica, rastreabilidade das cotações e conclusão para suporte à contratação.';
@@ -617,14 +618,14 @@ function itemToFonte(it) {
   }
   const vn = valorNum(it);
   const valor = vn != null ? `R$ ${formatarMoedaBr(vn)}` : '—';
-  const mun = String(it.municipio || src.municipio || src.municipioNome || '').trim()
-    || String((src.unidadeOrgao && src.unidadeOrgao.municipioNome) || '').trim();
-  const uf = String(it.uf || src.uf || src.ufSigla || '').trim()
-    || String((src.unidadeOrgao && src.unidadeOrgao.ufSigla) || '').trim();
-  let municipioUf = '—';
-  if (mun && uf) municipioUf = `${mun}/${uf}`;
-  else if (mun) municipioUf = mun;
-  else if (uf) municipioUf = uf;
+  const municipioUf = formatMunicipioUf(
+    {
+      municipio: it.municipio || src.municipio || src.municipioNome,
+      uf: it.uf || src.uf || src.ufSigla,
+      orgao: it.orgao || src.orgao,
+    },
+    src,
+  );
   const orgaoRaw = String(it.orgao || src.orgao || '').trim();
   let orgaoExib = orgaoRaw || '—';
   if (municipioUf !== '—' && orgaoRaw) {

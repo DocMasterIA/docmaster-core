@@ -1028,6 +1028,7 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
       plataforma: plat,
       plataforma_item_id: toNullableText(raw.plataforma_item_id || r.processoRef),
       processo_id: toNullableText(raw.processo_id || r.processoRef),
+      url_origem: toNullableText(raw.url_origem || raw.link_licitacon_cidadao),
       ano_compra: r.anoCompra,
       sequencial_compra: r.sequencialCompra,
       numero_item: toNullableText(r.numeroItem),
@@ -1069,6 +1070,7 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
       source: {
         ...raw,
         plataforma: plat,
+        url_origem: raw.url_origem || raw.link_licitacon_cidadao || null,
         inciso_classificacao: incisoSave || raw.inciso_classificacao || null,
         esfera: esferaSave || raw.esfera || null,
         esfera_administrativa: esferaSave || raw.esfera_administrativa || null,

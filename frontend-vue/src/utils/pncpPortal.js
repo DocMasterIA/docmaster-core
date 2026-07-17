@@ -46,20 +46,42 @@ function cotacaoSource(cotacao) {
   return cotacao?.source && typeof cotacao.source === 'object' ? cotacao.source : {};
 }
 
-export function resolveCotacaoPlataforma(cotacao) {
+/** Camadas onde o payload de busca/save costuma guardar metadados (incl. source aninhado). */
+function cotacaoMetaLayers(cotacao) {
   const src = cotacaoSource(cotacao);
-  return String(cotacao?.plataforma || src.plataforma || 'pncp').trim().toLowerCase();
+  const nested = src.source && typeof src.source === 'object' ? src.source : {};
+  const raw = src.sourceRaw && typeof src.sourceRaw === 'object' ? src.sourceRaw : {};
+  const topRaw =
+    cotacao?.sourceRaw && typeof cotacao.sourceRaw === 'object' ? cotacao.sourceRaw : {};
+  return [cotacao, src, nested, raw, topRaw].filter((x) => x && typeof x === 'object');
 }
 
+export function resolveCotacaoPlataforma(cotacao) {
+  for (const layer of cotacaoMetaLayers(cotacao)) {
+    const plat = String(layer.plataforma || layer.platform_id || '').trim().toLowerCase();
+    if (plat) return plat;
+  }
+  return 'pncp';
+}
+
+const TCE_RS_LICITACON_BUSCA =
+  'https://portal.tce.rs.gov.br/aplicprod/f?p=50500:19:::NO:::';
+
 function buildTceRsPortalUrl(cotacao) {
-  const src = cotacaoSource(cotacao);
-  return pickHttpUrl(
-    src.url_origem,
-    src.link_licitacon_cidadao,
-    src.linkLicitaconCidadao,
-    src.LINK_LICITACON_CIDADAO,
-    cotacao?.url_origem,
+  const layers = cotacaoMetaLayers(cotacao);
+  const direct = pickHttpUrl(
+    ...layers.flatMap((layer) => [
+      layer.url_origem,
+      layer.link_licitacon_cidadao,
+      layer.linkLicitaconCidadao,
+      layer.LINK_LICITACON_CIDADAO,
+      layer.link_portal,
+      layer.link,
+    ]),
   );
+  if (direct) return direct;
+  // Sem deep-link no índice: abre a busca pública do LicitaCon Cidadão.
+  return TCE_RS_LICITACON_BUSCA;
 }
 
 /**
@@ -104,8 +126,23 @@ export function buildPncpPortalProcessoUrl(cotacao) {
 /** Link do portal da fonte (PNCP ou TCE-RS LicitaCon). */
 export function buildFontePortalProcessoUrl(cotacao) {
   const plat = resolveCotacaoPlataforma(cotacao);
-  if (plat === 'tce_rs') return buildTceRsPortalUrl(cotacao);
-  return buildPncpPortalProcessoUrl(cotacao);
+  if (plat === 'tce_rs' || plat === 'tce-rs' || plat === 'licitacon') {
+    return buildTceRsPortalUrl(cotacao);
+  }
+
+  const pncpUrl = buildPncpPortalProcessoUrl(cotacao);
+  if (pncpUrl) return pncpUrl;
+
+  // Itens TCE salvos sem plataforma explícita ainda podem ter o link LicitaCon.
+  const layers = cotacaoMetaLayers(cotacao);
+  return pickHttpUrl(
+    ...layers.flatMap((layer) => [
+      layer.url_origem,
+      layer.link_licitacon_cidadao,
+      layer.linkLicitaconCidadao,
+      layer.LINK_LICITACON_CIDADAO,
+    ]),
+  );
 }
 
 export function pncpProcessoDisplayLabel(cotacao) {
@@ -117,31 +154,44 @@ export function pncpProcessoDisplayLabel(cotacao) {
 
 export function fontePortalProcessoDisplayLabel(cotacao) {
   const plat = resolveCotacaoPlataforma(cotacao);
-  const src = cotacaoSource(cotacao);
   if (plat === 'tce_rs') {
-    return String(
-      src.processo_id
-      || src.plataforma_item_id
-      || src.numero_processo
-      || cotacao?.processo_id
-      || cotacao?.numero_pncp
-      || '',
-    ).trim();
+    for (const layer of cotacaoMetaLayers(cotacao)) {
+      const label = String(
+        layer.processo_id
+        || layer.plataforma_item_id
+        || layer.numero_processo
+        || layer.numero_pncp
+        || '',
+      ).trim();
+      if (label) return label;
+    }
+    return '';
   }
   return pncpProcessoDisplayLabel(cotacao);
 }
 
 /** Texto do CTA: «Ver no PNCP» / «Ver no TCE-RS». */
 export function fontePortalCtaLabel(cotacao) {
-  return resolveCotacaoPlataforma(cotacao) === 'tce_rs' ? 'Ver no TCE-RS' : 'Ver no PNCP';
+  const plat = resolveCotacaoPlataforma(cotacao);
+  if (plat === 'tce_rs' || plat === 'tce-rs' || plat === 'licitacon') return 'Ver no TCE-RS';
+  const url = buildFontePortalProcessoUrl(cotacao);
+  if (/portal\.tce\.rs\.gov\.br/i.test(url)) return 'Ver no TCE-RS';
+  return 'Ver no PNCP';
 }
 
 export function fontePortalFieldLabel(cotacao) {
-  return resolveCotacaoPlataforma(cotacao) === 'tce_rs' ? 'Processo TCE-RS' : 'Processo PNCP';
+  const plat = resolveCotacaoPlataforma(cotacao);
+  if (plat === 'tce_rs' || plat === 'tce-rs' || plat === 'licitacon') return 'Processo TCE-RS';
+  const url = buildFontePortalProcessoUrl(cotacao);
+  if (/portal\.tce\.rs\.gov\.br/i.test(url)) return 'Processo TCE-RS';
+  return 'Processo PNCP';
 }
 
 export function fontePortalTitle(cotacao) {
   const label = fontePortalProcessoDisplayLabel(cotacao);
-  const portal = resolveCotacaoPlataforma(cotacao) === 'tce_rs' ? 'portal TCE-RS (LicitaCon)' : 'portal PNCP';
+  const isTce =
+    ['tce_rs', 'tce-rs', 'licitacon'].includes(resolveCotacaoPlataforma(cotacao))
+    || /portal\.tce\.rs\.gov\.br/i.test(buildFontePortalProcessoUrl(cotacao));
+  const portal = isTce ? 'portal TCE-RS (LicitaCon)' : 'portal PNCP';
   return label ? `Abrir processo ${label} no ${portal}` : `Abrir no ${portal}`;
 }

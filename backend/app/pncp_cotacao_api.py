@@ -193,7 +193,11 @@ _SOURCE_KEEP_KEYS = frozenset(
         "similaridade_encontrada",
         "plataforma",
         "plataforma_item_id",
+        "processo_id",
+        "numero_processo",
         "url_origem",
+        "link_licitacon_cidadao",
+        "linkLicitaconCidadao",
         # Campos de fornecedor (para relatório sem confundir com órgão).
         "fornecedor",
         "fornecedor_nome",
@@ -626,16 +630,44 @@ def _ensure_plataforma_in_payload(it: Dict[str, Any]) -> None:
     if plat:
         it["plataforma"] = plat
         return
+    nested = it.get("source") if isinstance(it.get("source"), dict) else {}
+    nested_plat = str(nested.get("plataforma") or "").strip().lower()
+    if nested_plat:
+        it["plataforma"] = nested_plat
+        return
     if it.get("numero_pncp") or it.get("numeroControlePNCP"):
         it["plataforma"] = "pncp"
         return
     it["plataforma"] = "pncp"
 
 
+def _promote_portal_fields_in_payload(it: Dict[str, Any]) -> None:
+    """Sobe url/processo do source aninhado para o topo (link LicitaCon/PNCP)."""
+    if not isinstance(it, dict):
+        return
+    nested = it.get("source") if isinstance(it.get("source"), dict) else {}
+    if not nested:
+        return
+    for key in (
+        "url_origem",
+        "link_licitacon_cidadao",
+        "linkLicitaconCidadao",
+        "processo_id",
+        "numero_processo",
+        "plataforma_item_id",
+    ):
+        cur = it.get(key)
+        if cur is None or (isinstance(cur, str) and not str(cur).strip()):
+            val = nested.get(key)
+            if val is not None and str(val).strip():
+                it[key] = val
+
+
 def _compact_item_source(it: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(it, dict):
         return {}
     _ensure_plataforma_in_payload(it)
+    _promote_portal_fields_in_payload(it)
     try:
         raw = json.dumps(it, ensure_ascii=False, default=str)
     except Exception:

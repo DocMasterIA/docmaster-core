@@ -1619,9 +1619,11 @@ async function adicionarSelecionadosNaCotacao() {
       plataforma: plat,
       plataforma_item_id: raw.plataforma_item_id || r.processoRef || null,
       processo_id: raw.processo_id || r.processoRef || null,
+      url_origem: raw.url_origem || raw.link_licitacon_cidadao || null,
       source: {
         ...raw,
         plataforma: plat,
+        url_origem: raw.url_origem || raw.link_licitacon_cidadao || null,
         fornecedor: pickFornecedorDisplayName(r),
         cnpj_fornecedor: extractCnpjFornecedorSalvar(r) || r.cnpjFornecedor || null,
       },

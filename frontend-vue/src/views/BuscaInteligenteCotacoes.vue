@@ -385,6 +385,7 @@ import {
   pnCpRowWithinFaixaRegional,
   resolveRowPlataforma,
 } from '../utils/pncpPricing';
+import { labelModalidadeFonte } from '../utils/tceModalidade';
 
 const route = useRoute();
 const router = useRouter();
@@ -1356,7 +1357,13 @@ async function runSearchWithContext({
         cidade: `${it.municipio || '-'}${it.uf ? `/${it.uf}` : ''}`,
         uf: it.uf || '-',
         municipio: it.municipio || null,
-        modalidade: it.modalidade || '-',
+        modalidade: (() => {
+          const lab = labelModalidadeFonte(
+            { modalidade: it.modalidade, processo_id: processoRef, plataforma_item_id: it.plataforma_item_id },
+            it,
+          );
+          return lab !== 'N/D' ? lab : (it.modalidade || '-');
+        })(),
         processo: processoRef || it.numero_pncp || '-',
         data: it.data_publicacao || '-',
         qtd: `${it.quantidade || '-'} ${it.unidade_medida || ''}`.trim(),
@@ -1588,7 +1595,17 @@ async function adicionarSelecionadosNaCotacao() {
       uf: r.uf,
       quantidade: r.quantidadeNum,
       unidade_medida: r.unidadeMedida,
-      modalidade: r.modalidade,
+      modalidade: (() => {
+        const resolved = labelModalidadeFonte(
+          {
+            modalidade: r.modalidade,
+            processo_id: raw.processo_id || r.processoRef,
+            plataforma_item_id: raw.plataforma_item_id,
+          },
+          raw,
+        );
+        return resolved !== 'N/D' ? resolved : (r.modalidade || null);
+      })(),
       valor_unitario: unitSave,
       valor_total: totalSave,
       material_servico: r.normalizado,

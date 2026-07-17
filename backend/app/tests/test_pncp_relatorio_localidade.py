@@ -32,3 +32,15 @@ class RelatorioLocalidadeTests(SimpleTestCase):
             "GO",
         )
         self.assertEqual(out, "Silvânia/GO - FUNDO MUNICIPAL DE SAUDE DE SILVANIA")
+
+    def test_tce_ignora_ibge_fornecedor_e_infere_cidade_do_orgao(self):
+        mun, uf = _resolve_municipio_uf_para_fonte(
+            "4314902",
+            "RS",
+            {"plataforma": "tce_rs", "orgao": "PM DE TIO HUGO"},
+            orgao="PM DE TIO HUGO",
+        )
+        self.assertEqual(mun, "Tio Hugo")
+        self.assertEqual(uf, "RS")
+        out = _format_orgao_com_local("PM DE TIO HUGO", mun, uf)
+        self.assertEqual(out, "Tio Hugo/RS - PM DE TIO HUGO")

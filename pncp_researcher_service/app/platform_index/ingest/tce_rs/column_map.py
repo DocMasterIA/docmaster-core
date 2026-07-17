@@ -320,6 +320,46 @@ def map_pessoa_row(raw: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     }
 
 
+def infer_municipio_from_orgao_nome(orgao: Optional[str]) -> Optional[str]:
+    """
+    LicitaCon não traz município do órgão no CSV; o nome costuma embutir a cidade
+    (ex.: «PM DE TIO HUGO», «CM DE PORTO ALEGRE»).
+    Não usar CD_MUNICIPIO_IBGE do fornecedor — é sede da empresa, não do órgão.
+    """
+    raw = str(orgao or "").strip()
+    if not raw:
+        return None
+    # Remove sufixos tipo « - RS» / CNPJ acidental.
+    head = re.split(r"\s+[—\-–]\s+", raw, maxsplit=1)[0].strip()
+    patterns = (
+        r"(?i)^(?:PM|CM)\s+DE\s+(.+)$",
+        r"(?i)^PREFEITURA(?:\s+MUNICIPAL)?\s+DE\s+(.+)$",
+        r"(?i)^C[ÂA]MARA(?:\s+MUNICIPAL)?\s+DE\s+(.+)$",
+        r"(?i)^FUNDO\s+MUNICIPAL\s+(?:DE\s+\w+\s+)?DE\s+(.+)$",
+    )
+    cidade = None
+    for pat in patterns:
+        m = re.match(pat, head)
+        if m:
+            cidade = str(m.group(1) or "").strip()
+            break
+    if not cidade:
+        return None
+    # Corta lixo após vírgula / barra.
+    cidade = re.split(r"[,/;|]", cidade, maxsplit=1)[0].strip()
+    if not cidade or cidade.isdigit():
+        return None
+    small = {"de", "da", "do", "das", "dos", "e", "a", "o"}
+    parts: list[str] = []
+    for i, w in enumerate(cidade.split()):
+        wl = w.lower()
+        if i > 0 and wl in small:
+            parts.append(wl)
+        else:
+            parts.append(wl[:1].upper() + wl[1:] if wl else w)
+    return " ".join(parts) or None
+
+
 def normalize_csv_row(row: Dict[str, Any]) -> Dict[str, Any]:
     return {normalize_header(k): (v.strip() if isinstance(v, str) else v) for k, v in row.items()}
 

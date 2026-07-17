@@ -166,7 +166,7 @@
                     <div class="rpv-mini-grid rpv-mini-grid--2">
                       <div class="rpv-dcard">
                         <span class="rpv-dcard__label">Modalidade</span>
-                        <span class="rpv-dcard__value">{{ obterModalidade(f.tipo) }}</span>
+                        <span class="rpv-dcard__value">{{ f.modalidade || obterModalidade(f.tipo) }}</span>
                       </div>
                       <div class="rpv-dcard"><span class="rpv-dcard__label">Data</span><span class="rpv-dcard__value">{{ f.data }}</span></div>
                     </div>
@@ -285,6 +285,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { getResearchSession } from '../services/pncpResearch';
 import { totalDeMediaUnitariaExibida } from '../utils/pncpPricing';
+import { labelModalidadeFonte } from '../utils/tceModalidade';
 
 const DOCUMENTO_TECNICO_LEAD =
   'Documento técnico consolidado com metodologia, análise técnica, rastreabilidade das cotações e conclusão para suporte à contratação.';
@@ -582,8 +583,26 @@ function pickContatoFromSource(src) {
 
 function itemToFonte(it) {
   const src = it.source && typeof it.source === 'object' ? it.source : {};
-  let tipo = src.tipo_fonte || src.fonte || src.origem || '';
-  if (!tipo) tipo = String(it.numero_pncp || '').trim() ? 'PNCP' : 'Registro importado';
+  const plat = String(src.plataforma || src.platform_id || it.plataforma || '')
+    .trim()
+    .toLowerCase();
+  let tipo = 'PNCP';
+  if (plat === 'tce_rs' || plat === 'tce-rs' || plat === 'licitacon') {
+    tipo = 'TCE-RS';
+  } else {
+    const blob = [
+      src.tipo_fonte,
+      src.fonte,
+      src.origem,
+      it.modalidade,
+      src.observacao,
+    ]
+      .map((x) => String(x || '').toLowerCase())
+      .join(' ');
+    if (blob.includes('tce_rs') || blob.includes('tce-rs') || blob.includes('licitacon')) {
+      tipo = 'TCE-RS';
+    }
+  }
   const fornecedor = src.fornecedor || src.nomeRazaoSocialFornecedor
     || (src.fornecedor_cadastro && (src.fornecedor_cadastro.razao_social || src.fornecedor_cadastro.nome_fantasia))
     || '—';
@@ -627,6 +646,7 @@ function itemToFonte(it) {
   ).trim() || '—';
   return {
     tipo,
+    modalidade: labelModalidadeFonte(it, src),
     descricao_fonte: descricaoFonte,
     fornecedor,
     cnpj,
@@ -686,20 +706,31 @@ function ufFromMunicipio(g, f) {
 function obterModalidade(tipo) {
   const map = {
     PNCP: 'Pregão Eletrônico',
+    'TCE-RS': 'N/D',
     BBMNET: 'Dispensa',
     CMED: 'Pregão Eletrônico',
     'Cotação Direta': 'Dispensa',
     ComprasGov: 'Pregão',
   };
   const raw = String(tipo || '').trim();
+  if (!raw) return 'N/D';
   return map[raw] || raw || 'N/D';
 }
 
 function obterFonte(tipo) {
-  const fontesConvertidas = new Set(['Cotação Direta', 'BBMNET', 'ComprasGov', 'CMED']);
   const raw = String(tipo || '').trim();
   if (!raw) return 'N/D';
-  return fontesConvertidas.has(raw) ? 'PNCP' : raw;
+  const low = raw.toLowerCase();
+  if (
+    low === 'tce-rs'
+    || low === 'tce_rs'
+    || low.startsWith('tce-rs')
+    || low.includes('licitacon')
+    || low.includes('tce_rs:')
+  ) {
+    return 'TCE-RS';
+  }
+  return 'PNCP';
 }
 
 function aplicarDemo() {

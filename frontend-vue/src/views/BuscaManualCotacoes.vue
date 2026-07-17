@@ -321,6 +321,7 @@ import {
 import { MUNICIPIOS_POR_UF } from '../data/brasilMunicipiosPorUf';
 import { buildRecortesGeograficosPayload, itemMatchesRecortesGeograficos } from '../utils/recortesGeograficos';
 import { canSalvarCotacaoPnCp, displayPnCpUnitario, extractCnpjFornecedorSalvar, formatFaixaResumo, passesPnCpSearchDisplayGate, computeFaixaRegional, pickFornecedorDisplayName, buildFaixaRegionalItemDisplay, resolveRowPlataforma } from '../utils/pncpPricing';
+import { labelModalidadeFonte } from '../utils/tceModalidade';
 
 const route = useRoute();
 const router = useRouter();
@@ -801,8 +802,15 @@ function mapFederatedItemToRow(it, idx, { termoBuscaEfetivo, termoFallbackUsado,
     valorUnitario: displayPnCpUnitario({ sourceRaw: it }),
     valorTotal: it.valor_total ?? null,
     statusIa: (similaridadeParcial && conf === 'Alta') || fallbackPorSimilaridadeIa ? 'Média' : conf,
+    modalidadeLabel: (() => {
+      const lab = labelModalidadeFonte({ modalidade: it.modalidade, processo_id: processoRef }, it);
+      return lab !== 'N/D' ? lab : '';
+    })(),
     observacao: plat === 'tce_rs'
-      ? `TCE-RS · ${it.modalidade || 'LicitaCon'}${processoRef ? ` · proc. ${processoRef}` : ''}`
+      ? `TCE-RS · ${(() => {
+        const lab = labelModalidadeFonte({ modalidade: it.modalidade, processo_id: processoRef }, it);
+        return lab !== 'N/D' ? lab : (it.modalidade || 'LicitaCon');
+      })()}${processoRef ? ` · proc. ${processoRef}` : ''}`
       : (it.modalidade || 'PNCP'),
     similaridadeEncontrada: similaridadeParcial,
     selecionado: false,
@@ -1040,9 +1048,20 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
       orgao: toNullableText(r.titulo),
       municipio: toNullableText(r.municipio),
       uf: toNullableText(r.uf),
-      modalidade: toNullableText(r.observacao),
+      modalidade: (() => {
+        const resolved = labelModalidadeFonte(
+          {
+            modalidade: raw.modalidade || raw.modalidadeNome || raw.modalidade_nome || r.modalidadeLabel,
+            processo_id: raw.processo_id || r.processoRef,
+            plataforma_item_id: raw.plataforma_item_id,
+          },
+          raw,
+        );
+        return toNullableText(resolved !== 'N/D' ? resolved : (raw.modalidade || raw.modalidadeNome || raw.modalidade_nome));
+      })(),
       // Mantém metadados úteis sem inflar demais o JSON.
       origem: 'busca_manual',
+      observacao: toNullableText(r.observacao),
       data_publicacao: toNullableText(r.data),
       material_servico: toNullableText(r.sourceRaw?.material_servico),
       fornecedor: toNullableText(pickFornecedorDisplayName(r)),

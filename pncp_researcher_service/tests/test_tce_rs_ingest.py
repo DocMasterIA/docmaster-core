@@ -151,7 +151,8 @@ def test_waterfall_supplier_uses_second_item_document_pair(tmp_path, tce_db):
     assert row is not None
     assert row["fornecedor_nome"] == "Fornecedor Segundo Documento Ltda"
     assert row["cnpj_fornecedor"] == "12345678000190"
-    assert row["municipio"] == "4305108"
+    # Não usa mais IBGE do fornecedor como município do órgão.
+    assert row["municipio"] in (None, "")
 
 
 def test_waterfall_supplier_uses_licitacao_fornecedor(tmp_path, tce_db):
@@ -193,7 +194,8 @@ def test_waterfall_supplier_uses_licitacao_fornecedor(tmp_path, tce_db):
     assert row is not None
     assert row["fornecedor_nome"] == "Fornecedor da Licitacao Ltda"
     assert row["cnpj_fornecedor"] == "98765432000110"
-    assert row["municipio"] == "4314902"
+    # Não usa mais IBGE do fornecedor (4314902 = Porto Alegre) como município do órgão.
+    assert row["municipio"] in (None, "")
 
 
 def test_ingest_status_after_sample(tce_db):

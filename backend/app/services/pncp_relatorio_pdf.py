@@ -29,7 +29,9 @@ from backend.app.qr import qr_png_data_url
 from backend.app.services.pncp_relatorio_itens import (
     EMAIL_INDISPONIVEL_RF,
     FORMULA_LABELS,
+    _TCE_RS_MODALIDADE_LABELS,
     _formatar_moeda_br,
+    _parece_observacao_tce_como_modalidade,
     agrupar_cotacoes_por_item_relatorio_pesquisa_precos,
     agrupar_itens_relatorio_pesquisa_precos,
     nome_fornecedor_e_util_para_exibicao,
@@ -368,8 +370,14 @@ def _obter_modalidade(tipo: Any) -> str:
     raw = str(tipo or "").strip()
     if not raw:
         return "N/D"
+    if _parece_observacao_tce_como_modalidade(raw):
+        return "N/D"
+    code = raw.upper()
+    if code in _TCE_RS_MODALIDADE_LABELS:
+        return _TCE_RS_MODALIDADE_LABELS[code]
     m = {
         "PNCP": "Pregão Eletrônico",
+        "TCE-RS": "N/D",
         "BBMNET": "Dispensa",
         "CMED": "Pregão Eletrônico",
         "Cotação Direta": "Dispensa",
@@ -382,7 +390,15 @@ def _obter_fonte(tipo: Any) -> str:
     raw = str(tipo or "").strip()
     if not raw:
         return "N/D"
-    return "PNCP" if raw in {"Cotação Direta", "BBMNET", "ComprasGov", "CMED"} else raw
+    low = raw.lower()
+    if low in {"tce_rs", "tce-rs", "licitacon"} or low.startswith("tce-rs") or "licitacon" in low or "tce_rs:" in low:
+        return "TCE-RS"
+    if raw in {"Cotação Direta", "BBMNET", "ComprasGov", "CMED", "PNCP"}:
+        return "PNCP"
+    # Já normalizado por fonte_dict_de_item; qualquer outro legado vira PNCP.
+    if raw == "TCE-RS":
+        return "TCE-RS"
+    return "PNCP"
 
 
 def _obter_uf(municipio_uf: Any) -> str:
@@ -453,7 +469,7 @@ def montar_contexto_relatorio(
         for f in fontes:
             if not isinstance(f, dict):
                 continue
-            f["modalidade_label"] = _obter_modalidade(f.get("tipo"))
+            f["modalidade_label"] = _obter_modalidade(f.get("modalidade") or f.get("tipo"))
             f["fonte_label"] = _obter_fonte(f.get("tipo"))
             f["uf_label"] = _obter_uf(f.get("municipio_uf"))
         try:

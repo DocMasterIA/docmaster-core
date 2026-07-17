@@ -10,6 +10,7 @@ from ...connection import platform_conn
 from ...schema import ensure_platform_index
 from .config import PLATFORM_ID
 from .parser import pick_best_propostas, resolve_item_price
+from .column_map import infer_municipio_from_orgao_nome
 
 
 def _utc_now() -> str:
@@ -317,7 +318,9 @@ def materialize_tce_rs_parsed(
                     item.get("unidade_medida"),
                     item.get("quantidade"),
                     lic.get("orgao"),
-                    lic.get("municipio") or supplier.get("fornecedor_municipio_ibge"),
+                    # Nunca usar IBGE do fornecedor: é sede da empresa (ex. POA), não do órgão.
+                    lic.get("municipio")
+                    or infer_municipio_from_orgao_nome(lic.get("orgao")),
                     "RS",
                     fornecedor,
                     cnpj,

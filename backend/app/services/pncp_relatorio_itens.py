@@ -623,8 +623,53 @@ def _endereco_de_source(src: Dict[str, Any]) -> str:
     return (v or "")[:400]
 
 
+def _parece_codigo_ibge_municipio(municipio: Any) -> bool:
+    """Código IBGE municipal tem 7 dígitos (ex.: 4314902 = Porto Alegre)."""
+    s = str(municipio or "").strip()
+    if not s:
+        return False
+    digits = re.sub(r"\D", "", s)
+    return len(digits) == 7 and digits == re.sub(r"\s", "", s)
+
+
+def _infer_municipio_from_orgao_nome(orgao: Any) -> str:
+    """Espelha a regra TCE/LicitaCon: «PM DE TIO HUGO» → «Tio Hugo»."""
+    raw = str(orgao or "").strip()
+    if not raw:
+        return ""
+    head = re.split(r"\s+[—\-–]\s+", raw, maxsplit=1)[0].strip()
+    patterns = (
+        r"(?i)^(?:PM|CM)\s+DE\s+(.+)$",
+        r"(?i)^PREFEITURA(?:\s+MUNICIPAL)?\s+DE\s+(.+)$",
+        r"(?i)^C[ÂA]MARA(?:\s+MUNICIPAL)?\s+DE\s+(.+)$",
+        r"(?i)^FUNDO\s+MUNICIPAL\s+(?:DE\s+\w+\s+)?DE\s+(.+)$",
+    )
+    cidade = ""
+    for pat in patterns:
+        m = re.match(pat, head)
+        if m:
+            cidade = str(m.group(1) or "").strip()
+            break
+    if not cidade:
+        return ""
+    cidade = re.split(r"[,/;|]", cidade, maxsplit=1)[0].strip()
+    if not cidade or cidade.isdigit():
+        return ""
+    small = {"de", "da", "do", "das", "dos", "e", "a", "o"}
+    parts: List[str] = []
+    for i, w in enumerate(cidade.split()):
+        wl = w.lower()
+        if i > 0 and wl in small:
+            parts.append(wl)
+        else:
+            parts.append(wl[:1].upper() + wl[1:] if wl else w)
+    return " ".join(parts)
+
+
 def _format_municipio_uf(municipio: Any, uf: Any) -> str:
     mun = str(municipio or "").strip()
+    if _parece_codigo_ibge_municipio(mun):
+        mun = ""
     sigla = str(uf or "").strip()
     if mun and sigla:
         return f"{mun}/{sigla}"
@@ -657,7 +702,7 @@ def _pick_localidade_from_source(src: Dict[str, Any]) -> tuple[str, str]:
         kl = str(key or "").lower()
         if not mun and kl in _MUNICIPIO_NOME_KEYS:
             s = str(value or "").strip()
-            if len(s) >= 2 and not s.isdigit():
+            if len(s) >= 2 and not s.isdigit() and not _parece_codigo_ibge_municipio(s):
                 mun = s
         if not uf and kl in _UF_SIGLA_KEYS:
             s = str(value or "").strip().upper()
@@ -665,6 +710,8 @@ def _pick_localidade_from_source(src: Dict[str, Any]) -> tuple[str, str]:
                 uf = s
         if mun and uf:
             break
+    if _parece_codigo_ibge_municipio(mun):
+        mun = ""
     return mun, uf
 
 
@@ -672,14 +719,24 @@ def _resolve_municipio_uf_para_fonte(
     municipio: Any,
     uf: Any,
     src: Dict[str, Any],
+    *,
+    orgao: Any = None,
 ) -> tuple[str, str]:
     """ORM + source PNCP (topo e unidadeOrgao aninhado)."""
     mun = str(municipio or "").strip()
     sigla = str(uf or "").strip().upper()[:2] if str(uf or "").strip() else ""
+    if _parece_codigo_ibge_municipio(mun):
+        mun = ""
     if not mun or not sigla:
         sm, su = _pick_localidade_from_source(src)
         mun = mun or sm
         sigla = sigla or su
+    if _parece_codigo_ibge_municipio(mun):
+        mun = ""
+    if not mun:
+        mun = _infer_municipio_from_orgao_nome(orgao) or _infer_municipio_from_orgao_nome(
+            (src or {}).get("orgao") if isinstance(src, dict) else ""
+        )
     return mun, sigla
 
 
@@ -776,15 +833,149 @@ def _source_efetivo_linha_cotacao(it: Any) -> Dict[str, Any]:
 def _pick_http_url(*candidates: Any) -> str:
     for v in candidates:
         u = str(v or "").strip()
-        if u.lower().startswith(("http://", "https://")):
-            return u
+        if not u.lower().startswith(("http://", "https://")):
+            continue
+        # Busca genérica LicitaCon (:19:) não é link de processo.
+        if re.search(r"f\?p=50500:19:", u, flags=re.I):
+            continue
+        return u
     return ""
 
 
-def build_pncp_portal_processo_url(it: Any, *, src: Optional[Dict[str, Any]] = None) -> str:
-    """Mesma regra do botão «Ver no PNCP» na página do item de cotação (frontend pncpPortal.js)."""
+def _iter_source_layers(src: Dict[str, Any]) -> List[Dict[str, Any]]:
+    layers: List[Dict[str, Any]] = []
+    if isinstance(src, dict):
+        layers.append(src)
+        nested = src.get("source")
+        if isinstance(nested, dict):
+            layers.append(nested)
+        raw = src.get("sourceRaw")
+        if isinstance(raw, dict):
+            layers.append(raw)
+    return layers
+
+
+def _dig_licitacon_portal_url(src: Dict[str, Any]) -> str:
+    for layer in _iter_source_layers(src if isinstance(src, dict) else {}):
+        found = _pick_http_url(
+            layer.get("url_origem"),
+            layer.get("link_licitacon_cidadao"),
+            layer.get("linkLicitaconCidadao"),
+            layer.get("LINK_LICITACON_CIDADAO"),
+            layer.get("portal_url"),
+            layer.get("link_portal"),
+        )
+        if found:
+            return found
+    return ""
+
+
+def _tce_portal_lookup_keys(src: Dict[str, Any]) -> List[str]:
+    keys: List[str] = []
+    seen: set[str] = set()
+    for layer in _iter_source_layers(src if isinstance(src, dict) else {}):
+        for field in ("processo_id", "plataforma_item_id", "numero_processo"):
+            v = str(layer.get(field) or "").strip()
+            if not v or v in seen:
+                continue
+            seen.add(v)
+            keys.append(v)
+    return keys
+
+
+def _is_tce_rs_source(src: Dict[str, Any], *, modalidade: str = "") -> bool:
+    return _label_fonte_plataforma(src, modalidade=modalidade) == "TCE-RS"
+
+
+def _hydrate_tce_portal_urls_on_rows(rows: List[Any]) -> None:
+    """
+    Garante url_origem LicitaCon no source em memória (PDF/relatório).
+    Cotações antigas sem link: resolve no índice TCE via researcher.
+    """
+    if not rows:
+        return
+    pending: List[Tuple[Any, List[str]]] = []
+    all_keys: List[str] = []
+    for row in rows:
+        src = getattr(row, "source", None)
+        if not isinstance(src, dict):
+            src = {}
+        modalidade = str(getattr(row, "modalidade", None) or "").strip()
+        url = _dig_licitacon_portal_url(src)
+        if url:
+            if str(src.get("url_origem") or "").strip() != url:
+                patched = dict(src)
+                patched["url_origem"] = url
+                row.source = patched
+            continue
+        if not _is_tce_rs_source(src, modalidade=modalidade):
+            continue
+        keys = _tce_portal_lookup_keys(src)
+        if not keys:
+            continue
+        pending.append((row, keys))
+        all_keys.extend(keys)
+
+    if not pending:
+        return
+
+    uniq_keys = []
+    seen_k: set[str] = set()
+    for k in all_keys:
+        if k not in seen_k:
+            seen_k.add(k)
+            uniq_keys.append(k)
+    uniq_keys = uniq_keys[:200]
+
+    try:
+        import requests
+
+        base = getattr(settings, "PNCP_RESEARCHER_BASE_URL", "http://127.0.0.1:8012").rstrip("/")
+        resp = requests.post(
+            f"{base}/api/pncp-research/platform/portal-urls",
+            json={"plataforma": "tce_rs", "keys": uniq_keys},
+            timeout=45,
+        )
+        if resp.status_code >= 400:
+            return
+        payload = resp.json() if resp.content else {}
+        urls = payload.get("urls") if isinstance(payload, dict) else None
+        if not isinstance(urls, dict) or not urls:
+            return
+    except Exception:
+        return
+
+    for row, keys in pending:
+        resolved = ""
+        for k in keys:
+            cand = str(urls.get(k) or "").strip()
+            if cand.lower().startswith("http"):
+                resolved = cand
+                break
+        if not resolved:
+            continue
+        src = dict(getattr(row, "source", None) or {})
+        src["url_origem"] = resolved
+        row.source = src
+
+
+def build_fonte_portal_processo_url(it: Any, *, src: Optional[Dict[str, Any]] = None) -> str:
+    """
+    Link público do processo: PNCP ou TCE-RS (LicitaCon).
+    Mesmo texto de CTA do PDF: «Link de acesso do processo».
+    """
     src = src if isinstance(src, dict) else _source_efetivo_linha_cotacao(it)
+    modalidade = str(getattr(it, "modalidade", None) or "").strip()
+
+    # TCE-RS / LicitaCon: deep-link do CSV (url_origem), inclusive em source aninhado.
+    if _is_tce_rs_source(src, modalidade=modalidade):
+        tce_url = _dig_licitacon_portal_url(src)
+        if tce_url:
+            return tce_url
+
     from_source = _pick_http_url(
+        src.get("url_origem"),
+        src.get("link_licitacon_cidadao"),
         src.get("linkSistemaOrigem"),
         src.get("linkProcessoEletronico"),
         src.get("url_pncp"),
@@ -794,6 +985,11 @@ def build_pncp_portal_processo_url(it: Any, *, src: Optional[Dict[str, Any]] = N
     )
     if from_source:
         return from_source
+
+    # Nested source (payload de save com source dentro de source).
+    nested_url = _dig_licitacon_portal_url(src)
+    if nested_url:
+        return nested_url
 
     numero_pncp = str(
         getattr(it, "numero_pncp", None)
@@ -816,6 +1012,165 @@ def build_pncp_portal_processo_url(it: Any, *, src: Optional[Dict[str, Any]] = N
     return f"{_PNCP_PORTAL_BASE}/{cnpj}/{ano}/{seq}"
 
 
+def build_pncp_portal_processo_url(it: Any, *, src: Optional[Dict[str, Any]] = None) -> str:
+    """Compat: alias de build_fonte_portal_processo_url."""
+    return build_fonte_portal_processo_url(it, src=src)
+
+def _label_fonte_plataforma(src: Dict[str, Any], *, modalidade: str = "", tipo_hint: str = "") -> str:
+    """
+    Rótulo curto da coluna Fonte no relatório/PDF: apenas PNCP ou TCE-RS.
+    Não usar modalidade/observação (ex.: «TCE-RS · LicitaCon · proc. …»).
+    """
+    plat = str(
+        (src or {}).get("plataforma")
+        or (src or {}).get("platform_id")
+        or (src or {}).get("fonte_plataforma")
+        or ""
+    ).strip().lower()
+    if plat in {"tce_rs", "tce-rs", "licitacon"}:
+        return "TCE-RS"
+
+    blob = " ".join(
+        str(x or "")
+        for x in (
+            modalidade,
+            tipo_hint,
+            (src or {}).get("tipo"),
+            (src or {}).get("fonte"),
+            (src or {}).get("origem"),
+            (src or {}).get("observacao"),
+        )
+    ).lower()
+    if (
+        "tce_rs" in blob
+        or "tce-rs" in blob
+        or "licitacon" in blob
+        or blob.strip().startswith("tce")
+    ):
+        return "TCE-RS"
+
+    return "PNCP"
+
+
+# Códigos CD_TIPO_MODALIDADE do LicitaCon (TCE-RS) → rótulo legível.
+_TCE_RS_MODALIDADE_LABELS: Dict[str, str] = {
+    "PCE": "Pregão Eletrônico",
+    "PCP": "Pregão Presencial",
+    "PRD": "Processo de Dispensa",
+    "PDE": "Processo de Dispensa Eletrônica",
+    "PRI": "Processo de Inexigibilidade",
+    "CCE": "Concorrência Eletrônica",
+    "CPC": "Concorrência",
+    "CPP": "Concorrência Presencial",
+    "CCP": "Concorrência Presencial",
+    "RPO": "Adesão à Ata de Registro de Preços",
+    "CHP": "Chamamento Público",
+    "LEE": "Leilão Eletrônico",
+    "LEI": "Leilão Presencial",
+    "RDE": "RDC Eletrônico",
+    "RDP": "RDC Presencial",
+    "CNS": "Concurso",
+    "RIN": "Regras Internacionais",
+    "ESE": "Licitação Lei 13.303/16 Eletrônico",
+    "EST": "Licitação Lei 13.303/16 Presencial",
+}
+
+
+def _parece_observacao_tce_como_modalidade(raw: str) -> bool:
+    s = str(raw or "").strip().lower()
+    if not s:
+        return False
+    return (
+        "tce-rs" in s
+        or "tce_rs" in s
+        or "licitacon" in s
+        or s.startswith("tce")
+        or "proc." in s
+    )
+
+
+def _codigo_modalidade_tce_from_keys(*candidates: Any) -> str:
+    """Extrai PCE/PRD/… de processo_id (…:PCE), campo curto ou observação poluída."""
+    for raw in candidates:
+        s = str(raw or "").strip()
+        if not s:
+            continue
+        # Código puro.
+        if re.fullmatch(r"[A-Z]{2,4}", s.upper()):
+            code = s.upper()
+            if code in _TCE_RS_MODALIDADE_LABELS:
+                return code
+        # …:PCE ou …:PCE,lixo (modalidade salva misturada com observação).
+        if ":" in s:
+            tail = s.split(":")[-1].strip().upper()
+            code = re.split(r"[,;\s|/]+", tail, maxsplit=1)[0].strip()
+            if re.fullmatch(r"[A-Z]{2,4}", code) and code in _TCE_RS_MODALIDADE_LABELS:
+                return code
+        # Qualquer trecho …:COD no texto.
+        for m in re.finditer(r":([A-Z]{2,4})(?=[^A-Z]|$)", s.upper()):
+            code = m.group(1)
+            if code in _TCE_RS_MODALIDADE_LABELS:
+                return code
+    return ""
+
+
+def _normalize_modalidade_legivel(s: str) -> str:
+    t = re.sub(r"\s*-\s*", " ", str(s or "").strip())
+    t = re.sub(r"\s+", " ", t)
+    return t[:120]
+
+
+def _label_modalidade_fonte(it: Any, src: Dict[str, Any], *, modalidade_raw: str = "") -> str:
+    """
+    Modalidade da licitação (Pregão Eletrônico, Dispensa, …).
+    Não confundir com «Fonte» (PNCP/TCE-RS) nem com observação «TCE-RS · LicitaCon · proc.…».
+    """
+    src = src if isinstance(src, dict) else {}
+    candidates = [
+        src.get("modalidade_nome"),
+        src.get("modalidadeNome"),
+        src.get("modalidade"),
+        modalidade_raw,
+        getattr(it, "modalidade", None),
+    ]
+    for cand in candidates:
+        s = str(cand or "").strip()
+        if not s:
+            continue
+        if _parece_observacao_tce_como_modalidade(s):
+            # Ex.: «TCE-RS · … · proc. tce_rs:…:PCE,Pregão - Eletrônico»
+            code = _codigo_modalidade_tce_from_keys(s)
+            if code in _TCE_RS_MODALIDADE_LABELS:
+                return _TCE_RS_MODALIDADE_LABELS[code]
+            if "," in s:
+                tail = s.rsplit(",", 1)[-1].strip()
+                if tail and not _parece_observacao_tce_como_modalidade(tail):
+                    return _normalize_modalidade_legivel(tail)
+            continue
+        code = s.upper()
+        if code in _TCE_RS_MODALIDADE_LABELS:
+            return _TCE_RS_MODALIDADE_LABELS[code]
+        # Já é rótulo legível (PNCP / save correto).
+        if len(s) > 3 and not s.isdigit():
+            return _normalize_modalidade_legivel(s)
+
+    code = _codigo_modalidade_tce_from_keys(
+        src.get("cd_tipo_modalidade"),
+        src.get("tipo_modalidade"),
+        src.get("modalidade_codigo"),
+        src.get("processo_id"),
+        src.get("plataforma_item_id"),
+        src.get("numero_processo"),
+        modalidade_raw,
+        getattr(it, "modalidade", None),
+    )
+    if code in _TCE_RS_MODALIDADE_LABELS:
+        return _TCE_RS_MODALIDADE_LABELS[code]
+    if code:
+        return code
+    return "N/D"
+
+
 def fonte_dict_de_item(
     it: Any,
     *,
@@ -830,10 +1185,11 @@ def fonte_dict_de_item(
     flatten_supplier_fields_in_payload(src)
     _promote_supplier_from_deep_walk(src)
 
-    tipo = (getattr(it, "modalidade", None) or "").strip()
-    if not tipo:
-        tipo = _pick_source(src, "tipo", "fonte", "origem", "tipoFonte", default="")
-    tipo = (tipo or "PNCP")[:120]
+    modalidade_raw = (getattr(it, "modalidade", None) or "").strip()
+    tipo_hint = _pick_source(src, "tipo", "fonte", "origem", "tipoFonte", default="")
+    tipo = _label_fonte_plataforma(src, modalidade=modalidade_raw, tipo_hint=tipo_hint)
+    modalidade_label = _label_modalidade_fonte(it, src, modalidade_raw=modalidade_raw)
+
 
     cnpj_fornecedor = _pick_supplier_cnpj_from_source(src)
     fornecedor = _pick_supplier_name_from_source(src)
@@ -884,11 +1240,12 @@ def fonte_dict_de_item(
         getattr(it, "municipio", None),
         getattr(it, "uf", None),
         src,
+        orgao=getattr(it, "orgao", None),
     )
     municipio_uf = _format_municipio_uf(mun, uf) or "—"
     orgao = _format_orgao_com_local(getattr(it, "orgao", None), mun, uf)[:200]
 
-    link_pncp = build_pncp_portal_processo_url(it, src=src)
+    link_pncp = build_fonte_portal_processo_url(it, src=src)
 
     ajuste = _pick_source(src, "ajuste", "observacao_frete", "frete", default="Sem frete")
 
@@ -906,6 +1263,7 @@ def fonte_dict_de_item(
 
     return {
         "tipo": tipo[:120],
+        "modalidade": modalidade_label[:120],
         "descricao_fonte": descricao_fonte,
         "fornecedor": fornecedor[:400],
         "cnpj": cnpj[:32],
@@ -1066,6 +1424,7 @@ def agrupar_itens_relatorio_pesquisa_precos(
     all_members = [m for members in buckets.values() for m in members]
     global_supplier_idx: Optional[Dict[str, str]] = None
     if include_fontes and all_members:
+        _hydrate_tce_portal_urls_on_rows(all_members)
         _prefetch_fornecedor_nomes_brasilapi_para_linhas(all_members, brasilapi_cache)
         global_supplier_idx = _supplier_name_index_com_brasilapi(all_members, brasilapi_cache)
     if receitaws_pdf_state and all_members:
@@ -1189,6 +1548,7 @@ def agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
     cotacoes_list = list(cotacoes or [])
     global_supplier_idx: Optional[Dict[str, str]] = None
     if include_fontes and cotacoes_list:
+        _hydrate_tce_portal_urls_on_rows(cotacoes_list)
         _prefetch_fornecedor_nomes_brasilapi_para_linhas(cotacoes_list, brasilapi_cache)
         global_supplier_idx = _supplier_name_index_com_brasilapi(cotacoes_list, brasilapi_cache)
     if receitaws_pdf_state and cotacoes_list:

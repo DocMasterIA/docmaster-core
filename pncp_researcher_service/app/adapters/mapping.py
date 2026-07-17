@@ -20,6 +20,40 @@ def _cnpj_digits(v: Any) -> str:
     return re.sub(r"\D", "", str(v or ""))
 
 
+_TCE_RS_MODALIDADE_LABELS = {
+    "PCE": "Pregão Eletrônico",
+    "PCP": "Pregão Presencial",
+    "PRD": "Processo de Dispensa",
+    "PDE": "Processo de Dispensa Eletrônica",
+    "PRI": "Processo de Inexigibilidade",
+    "CCE": "Concorrência Eletrônica",
+    "CPC": "Concorrência",
+    "CPP": "Concorrência Presencial",
+    "CCP": "Concorrência Presencial",
+    "RPO": "Adesão à Ata de Registro de Preços",
+    "CHP": "Chamamento Público",
+    "LEE": "Leilão Eletrônico",
+    "LEI": "Leilão Presencial",
+    "RDE": "RDC Eletrônico",
+    "RDP": "RDC Presencial",
+    "CNS": "Concurso",
+    "RIN": "Regras Internacionais",
+    "ESE": "Licitação Lei 13.303/16 Eletrônico",
+    "EST": "Licitação Lei 13.303/16 Presencial",
+}
+
+
+def _modalidade_from_processo_id(processo_id: Any) -> tuple[Optional[str], Optional[str]]:
+    """Retorna (código, rótulo) a partir de processo_id …:PCE."""
+    parts = str(processo_id or "").strip().split(":")
+    if len(parts) < 4:
+        return None, None
+    code = parts[-1].strip().upper()
+    if not re.fullmatch(r"[A-Z]{2,4}", code):
+        return None, None
+    return code, _TCE_RS_MODALIDADE_LABELS.get(code, code)
+
+
 def pncp_row_to_hit(row: Dict[str, Any]) -> MarketPriceHit:
     """Converte linha PNCP (dict do researcher) em MarketPriceHit."""
     raw = dict(row) if isinstance(row, dict) else {}
@@ -113,6 +147,16 @@ def hit_to_pncp_row(hit: MarketPriceHit) -> Dict[str, Any]:
         row.setdefault("esfera", "estadual")
         row.setdefault("esfera_administrativa", "estadual")
         row.setdefault("fonte", "entes_publicos")
+        proc = str(
+            (hit.raw or {}).get("processo_id")
+            or hit.plataforma_item_id
+            or ""
+        )
+        code, label = _modalidade_from_processo_id(proc)
+        if code:
+            row.setdefault("cd_tipo_modalidade", code)
+        if label:
+            row.setdefault("modalidade", label)
     url = (
         hit.url_origem
         or str(row.get("url_origem") or row.get("link_licitacon_cidadao") or "").strip()
@@ -141,6 +185,12 @@ def platform_row_to_hit(row: Dict[str, Any], *, plataforma: str, spec_defaults: 
         ni = str(raw.get("numero_item") or "")
         ext_id = f"{proc}:{ni}" if proc else ni or str(raw.get("id") or "")
     url = str(raw.get("url_origem") or raw.get("link_licitacon_cidadao") or "").strip() or None
+    if plataforma == "tce_rs" and not str(raw.get("modalidade") or "").strip():
+        code, label = _modalidade_from_processo_id(raw.get("processo_id") or ext_id)
+        if code:
+            raw.setdefault("cd_tipo_modalidade", code)
+        if label:
+            raw.setdefault("modalidade", label)
     return MarketPriceHit(
         plataforma=plataforma,
         plataforma_item_id=ext_id,

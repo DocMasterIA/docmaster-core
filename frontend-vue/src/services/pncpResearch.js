@@ -75,9 +75,11 @@ function extractErrorMessage(payload, status) {
 /** Mensagem legível para UI a partir de Error / resposta API / Abort. */
 export function formatResearchError(err) {
   if (err == null) return 'erro desconhecido';
-  const name = String(err?.name || '');
-  if (name === 'AbortError' || name === 'TimeoutError') {
-    return 'A busca demorou demais ou foi cancelada. Tente novamente.';
+  if (isClientTimeoutError(err)) {
+    return 'A busca demorou demais (timeout). Tente de novo; se persistir, desmarque uma fonte ou amplie a faixa.';
+  }
+  if (isUserAbortError(err)) {
+    return 'Busca cancelada.';
   }
   const status = Number(err?.status);
   if (status === 502 || status === 504) {
@@ -86,13 +88,15 @@ export function formatResearchError(err) {
   if (status === 503) {
     return 'Serviço de pesquisa sobrecarregado. Tente de novo em instantes.';
   }
+  if (isNetworkFetchError(err)) {
+    return 'Falha de rede ao consultar a pesquisa (conexão interrompida). Tente novamente em alguns segundos.';
+  }
   const fromMsg = flattenErrorDetail(err?.message);
-  if (fromMsg && fromMsg !== '[object Object]') return fromMsg;
+  if (fromMsg && fromMsg !== '[object Object]' && !/^failed to fetch$/i.test(fromMsg)) {
+    return fromMsg;
+  }
   const fromDetail = flattenErrorDetail(err?.detail ?? err?.error ?? err);
   if (fromDetail && fromDetail !== '[object Object]') return fromDetail;
-  if (isNetworkFetchError(err)) {
-    return 'Falha de rede ao consultar a pesquisa. Verifique a conexão e tente novamente.';
-  }
   return 'erro desconhecido';
 }
 
@@ -109,6 +113,24 @@ function isNetworkFetchError(err) {
     || name === 'TimeoutError'
     || /failed to fetch|networkerror|load failed|network error|err_failed|timed out|timeout/i.test(msg)
   );
+}
+
+function isClientTimeoutError(err) {
+  if (!err) return false;
+  if (String(err?.name || '') === 'TimeoutError') return true;
+  const reason = err?.cause || err?.reason;
+  if (reason && String(reason?.name || '') === 'TimeoutError') return true;
+  const msg = String(err?.message || '');
+  return /timed out|timeout|signal timed out|the operation was aborted due to timeout/i.test(msg);
+}
+
+/** Abort explícito do usuário / navegação — não confundir com timeout do AbortSignal.timeout. */
+function isUserAbortError(err) {
+  if (!err) return false;
+  if (isClientTimeoutError(err)) return false;
+  const name = String(err?.name || '');
+  const msg = String(err?.message || '');
+  return name === 'AbortError' || /aborted|abort|canceled|cancelled/i.test(msg);
 }
 
 function mergeAbortSignals(userSignal, timeoutMs) {
@@ -426,13 +448,14 @@ export function searchLocalItems(payload, signal) {
 }
 
 function isRetryableSearchError(err) {
+  if (isClientTimeoutError(err)) return true;
   if (isNetworkFetchError(err)) return true;
   const status = Number(err?.status);
   return status === 502 || status === 504 || status === 503 || status === 429;
 }
 
 export function intelligentMarketSearch(payload, signal, options = {}) {
-  const timeoutMs = options.timeoutMs ?? 120000;
+  const timeoutMs = options.timeoutMs ?? 180000;
   const maxAttempts = Math.max(1, Math.min(5, Number(options.maxAttempts) || 3));
 
   const attemptOnce = () =>
@@ -456,9 +479,7 @@ export function intelligentMarketSearch(payload, signal, options = {}) {
         return await attemptOnce();
       } catch (err) {
         lastErr = err;
-        const aborted = String(err?.name || '') === 'AbortError'
-          || /aborted|abort/i.test(String(err?.message || ''));
-        if (aborted || !isRetryableSearchError(err)) {
+        if (isUserAbortError(err) || !isRetryableSearchError(err)) {
           throw err;
         }
         if (i < maxAttempts - 1) {
@@ -473,7 +494,9 @@ export function intelligentMarketSearch(payload, signal, options = {}) {
 
 /** Busca federada multi-fonte (Parte 0). Fallback para intelligent se endpoint indisponível. */
 export function federatedMarketSearch(payload, signal, options = {}) {
-  const timeoutMs = options.timeoutMs ?? 120000;
+  const fontesN = Array.isArray(payload?.fontes_habilitadas) ? payload.fontes_habilitadas.length : 1;
+  const defaultTimeout = fontesN > 1 ? 200000 : 180000;
+  const timeoutMs = options.timeoutMs ?? defaultTimeout;
   const maxAttempts = Math.max(1, Math.min(5, Number(options.maxAttempts) || 3));
   const body = {
     ...payload,
@@ -503,13 +526,11 @@ export function federatedMarketSearch(payload, signal, options = {}) {
         return await attemptOnce();
       } catch (err) {
         lastErr = err;
-        const aborted = String(err?.name || '') === 'AbortError'
-          || /aborted|abort/i.test(String(err?.message || ''));
-        if (aborted || !isRetryableSearchError(err)) {
+        if (isUserAbortError(err) || !isRetryableSearchError(err)) {
           throw err;
         }
         if (i < maxAttempts - 1) {
-          const base = Number(options.retryDelayMs) > 0 ? Number(options.retryDelayMs) : 700;
+          const base = Number(options.retryDelayMs) > 0 ? Number(options.retryDelayMs) : 900;
           await sleep(base * (i + 1));
         }
       }

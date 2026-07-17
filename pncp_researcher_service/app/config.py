@@ -388,8 +388,13 @@ PNCP_SEARCH_CODE_REV: str = os.getenv("PNCP_SEARCH_CODE_REV", "2026-06-19-qualit
 
 # Busca federada multi-fonte (Parte 0)
 PNCP_FEDERATED_SEARCH_ENABLED: bool = _env_bool("PNCP_FEDERATED_SEARCH_ENABLED", True)
+# Timeout das fontes leves (TCE-RS FTS, etc.). PNCP usa PNCP_FEDERATED_PNCP_TIMEOUT_SECONDS.
 PNCP_FEDERATED_SOURCE_TIMEOUT_SECONDS: float = float(
     os.getenv("PNCP_FEDERATED_SOURCE_TIMEOUT_SECONDS", "20") or "20"
+)
+# Pipeline inteligente PNCP em multi-fonte (não cabe em 20s com rerank/IA).
+PNCP_FEDERATED_PNCP_TIMEOUT_SECONDS: float = float(
+    os.getenv("PNCP_FEDERATED_PNCP_TIMEOUT_SECONDS", "100") or "100"
 )
 
 # Índices SQLite por plataforma (multi-fonte) — arquivos separados, cruzamento central.

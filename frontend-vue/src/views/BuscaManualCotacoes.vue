@@ -832,8 +832,13 @@ async function buscarNoBackend() {
       max_paginas: 500,
       tamanho_pagina: 200,
       fontes_habilitadas: fontes,
+      // Lista ampla dos índices locais (PNCP + TCE) — sem top-3 / pipeline IA.
+      lista_completa: true,
     };
-    let data = await federatedMarketSearch(searchBase);
+    let data = await federatedMarketSearch(searchBase, undefined, {
+      timeoutMs: 90000,
+      maxAttempts: 2,
+    });
     if (gen !== searchGeneration) return;
     let fallbackPorSimilaridadeIa = false;
     let termoFallbackUsado = '';
@@ -844,6 +849,9 @@ async function buscarNoBackend() {
         const iaFallback = await federatedMarketSearch({
           ...searchBase,
           termo_busca: term,
+        }, undefined, {
+          timeoutMs: 90000,
+          maxAttempts: 2,
         });
         if (iaFallback?.ok && Array.isArray(iaFallback?.itens) && iaFallback.itens.length > 0) {
           data = iaFallback;

@@ -1,4 +1,4 @@
-/** URL pública do processo no portal PNCP (https://pncp.gov.br/app/editais/{cnpj}/{ano}/{seq}). */
+/** URLs públicas de processo: PNCP e plataformas (ex.: TCE-RS LicitaCon). */
 
 const PNCP_PORTAL_BASE = 'https://pncp.gov.br/app/editais';
 
@@ -42,13 +42,33 @@ function pickHttpUrl(...candidates) {
   return '';
 }
 
+function cotacaoSource(cotacao) {
+  return cotacao?.source && typeof cotacao.source === 'object' ? cotacao.source : {};
+}
+
+export function resolveCotacaoPlataforma(cotacao) {
+  const src = cotacaoSource(cotacao);
+  return String(cotacao?.plataforma || src.plataforma || 'pncp').trim().toLowerCase();
+}
+
+function buildTceRsPortalUrl(cotacao) {
+  const src = cotacaoSource(cotacao);
+  return pickHttpUrl(
+    src.url_origem,
+    src.link_licitacon_cidadao,
+    src.linkLicitaconCidadao,
+    src.LINK_LICITACON_CIDADAO,
+    cotacao?.url_origem,
+  );
+}
+
 /**
  * Monta link para o processo no portal PNCP a partir de uma cotação de preço (PncpCotacaoItemCotacao).
  * @param {Record<string, unknown>|null|undefined} cotacao
  * @returns {string}
  */
 export function buildPncpPortalProcessoUrl(cotacao) {
-  const src = cotacao?.source && typeof cotacao.source === 'object' ? cotacao.source : {};
+  const src = cotacaoSource(cotacao);
   const fromSource = pickHttpUrl(
     src.linkSistemaOrigem,
     src.linkProcessoEletronico,
@@ -81,9 +101,47 @@ export function buildPncpPortalProcessoUrl(cotacao) {
   return `${PNCP_PORTAL_BASE}/${cnpj}/${anoN}/${seqN}`;
 }
 
+/** Link do portal da fonte (PNCP ou TCE-RS LicitaCon). */
+export function buildFontePortalProcessoUrl(cotacao) {
+  const plat = resolveCotacaoPlataforma(cotacao);
+  if (plat === 'tce_rs') return buildTceRsPortalUrl(cotacao);
+  return buildPncpPortalProcessoUrl(cotacao);
+}
+
 export function pncpProcessoDisplayLabel(cotacao) {
-  const src = cotacao?.source && typeof cotacao.source === 'object' ? cotacao.source : {};
+  const src = cotacaoSource(cotacao);
   return String(
     cotacao?.numero_pncp || src.numero_pncp || src.numeroControlePNCP || '',
   ).trim();
+}
+
+export function fontePortalProcessoDisplayLabel(cotacao) {
+  const plat = resolveCotacaoPlataforma(cotacao);
+  const src = cotacaoSource(cotacao);
+  if (plat === 'tce_rs') {
+    return String(
+      src.processo_id
+      || src.plataforma_item_id
+      || src.numero_processo
+      || cotacao?.processo_id
+      || cotacao?.numero_pncp
+      || '',
+    ).trim();
+  }
+  return pncpProcessoDisplayLabel(cotacao);
+}
+
+/** Texto do CTA: «Ver no PNCP» / «Ver no TCE-RS». */
+export function fontePortalCtaLabel(cotacao) {
+  return resolveCotacaoPlataforma(cotacao) === 'tce_rs' ? 'Ver no TCE-RS' : 'Ver no PNCP';
+}
+
+export function fontePortalFieldLabel(cotacao) {
+  return resolveCotacaoPlataforma(cotacao) === 'tce_rs' ? 'Processo TCE-RS' : 'Processo PNCP';
+}
+
+export function fontePortalTitle(cotacao) {
+  const label = fontePortalProcessoDisplayLabel(cotacao);
+  const portal = resolveCotacaoPlataforma(cotacao) === 'tce_rs' ? 'portal TCE-RS (LicitaCon)' : 'portal PNCP';
+  return label ? `Abrir processo ${label} no ${portal}` : `Abrir no ${portal}`;
 }

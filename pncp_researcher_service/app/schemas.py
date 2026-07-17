@@ -110,6 +110,13 @@ class MarketSearchRequest(BaseModel):
         None,
         description="IDs das fontes de preço (ex.: pncp). Usado em /market-search/federated.",
     )
+    lista_completa: Optional[bool] = Field(
+        False,
+        description=(
+            "Busca manual: lista ampla do índice local (PNCP FTS + plataformas) "
+            "sem colapsar em top-3 do pipeline inteligente."
+        ),
+    )
 
     @field_validator("fontes_habilitadas", mode="before")
     @classmethod

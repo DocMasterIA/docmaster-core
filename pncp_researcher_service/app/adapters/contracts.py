@@ -54,6 +54,7 @@ class FederatedSearchQuery:
     variacao_sentido_referencia: Optional[str] = None
     somente_homologados: Optional[bool] = None
     busca_lote: bool = False
+    lista_completa: bool = False
     fontes_habilitadas: List[str] = field(default_factory=lambda: ["pncp"])
 
     @classmethod
@@ -84,6 +85,7 @@ class FederatedSearchQuery:
             variacao_sentido_referencia=payload.variacao_sentido_referencia,
             somente_homologados=payload.somente_homologados,
             busca_lote=bool(payload.busca_lote),
+            lista_completa=bool(getattr(payload, "lista_completa", False)),
             fontes_habilitadas=clean_sources or ["pncp"],
         )
 
@@ -107,4 +109,6 @@ class FederatedSearchQuery:
             variacao_sentido_referencia=self.variacao_sentido_referencia,
             somente_homologados=self.somente_homologados,
             busca_lote=self.busca_lote,
+            lista_completa=self.lista_completa,
+            fontes_habilitadas=list(self.fontes_habilitadas or ["pncp"]),
         )

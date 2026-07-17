@@ -118,15 +118,15 @@
                     </span>
                   </div>
                   <a
-                    v-if="pncpProcessoUrl(r)"
-                    :href="pncpProcessoUrl(r)"
+                    v-if="fontePortalUrl(r)"
+                    :href="fontePortalUrl(r)"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="item-cotacao-card__pncp-link"
-                    :title="`Abrir processo ${pncpProcessoLabel(r) || ''} no portal PNCP`"
+                    :title="fontePortalLinkTitle(r)"
                   >
                     <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
-                    Ver no PNCP
+                    {{ fontePortalCta(r) }}
                   </a>
                   <button
                     type="button"
@@ -265,15 +265,15 @@
                   <span>Inciso</span>
                   <strong>{{ labelIncisoFromCotacao(r) }}</strong>
                 </div>
-                <div v-if="pncpProcessoUrl(r)" class="item-cotacao-card__field item-cotacao-card__field--wide">
-                  <span>Processo PNCP</span>
+                <div v-if="fontePortalUrl(r)" class="item-cotacao-card__field item-cotacao-card__field--wide">
+                  <span>{{ fontePortalCampoLabel(r) }}</span>
                   <a
-                    :href="pncpProcessoUrl(r)"
+                    :href="fontePortalUrl(r)"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="item-cotacao-card__link"
                   >
-                    {{ pncpProcessoLabel(r) || 'Abrir no portal PNCP' }}
+                    {{ fontePortalLabel(r) || fontePortalCta(r) }}
                   </a>
                 </div>
                 <div class="item-cotacao-card__field">
@@ -322,8 +322,11 @@ import {
   getResearchSession,
 } from '../services/pncpResearch';
 import {
-  buildPncpPortalProcessoUrl,
-  pncpProcessoDisplayLabel,
+  buildFontePortalProcessoUrl,
+  fontePortalCtaLabel,
+  fontePortalFieldLabel,
+  fontePortalProcessoDisplayLabel,
+  fontePortalTitle,
 } from '../utils/pncpPortal';
 import {
   displayPnCpTotal,
@@ -762,12 +765,24 @@ function labelFonte(code) {
   return 'Não classificada';
 }
 
-function pncpProcessoUrl(r) {
-  return buildPncpPortalProcessoUrl(r);
+function fontePortalUrl(r) {
+  return buildFontePortalProcessoUrl(r);
 }
 
-function pncpProcessoLabel(r) {
-  return pncpProcessoDisplayLabel(r);
+function fontePortalLabel(r) {
+  return fontePortalProcessoDisplayLabel(r);
+}
+
+function fontePortalCta(r) {
+  return fontePortalCtaLabel(r);
+}
+
+function fontePortalCampoLabel(r) {
+  return fontePortalFieldLabel(r);
+}
+
+function fontePortalLinkTitle(r) {
+  return fontePortalTitle(r);
 }
 
 function labelIncisoFromCotacao(cotacao) {

@@ -37,7 +37,7 @@ def platform_item_search(
         where_geo = " AND i.uf = ?"
         params.append(uf.strip().upper()[:2])
 
-    params.append(max(1, min(limit, 200)))
+    params.append(max(1, min(int(limit), 5000)))
 
     sql = f"""
         SELECT
@@ -80,7 +80,7 @@ def platform_item_search(
         like_params: List[Any] = [like]
         if uf:
             like_params.append(uf.strip().upper()[:2])
-        like_params.append(max(1, min(limit, 200)))
+        like_params.append(max(1, min(int(limit), 5000)))
         like_sql = f"""
             SELECT * FROM platform_itens_leitura i
             WHERE i.descricao LIKE ?

@@ -339,6 +339,7 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   fetchAllItemsForBulkSearch,
   federatedMarketSearch,
+  formatResearchError,
   getLocalIndexStats,
   getResearchSession,
 } from '../services/pncpResearch';
@@ -575,6 +576,7 @@ function beginNewSearchSession() {
 }
 
 function isAbortError(err) {
+  if (isTimeoutError(err)) return false;
   const name = String(err?.name || '');
   const msg = String(err?.message || '');
   return name === 'AbortError' || /aborted|abort|canceled|cancelled/i.test(msg);
@@ -583,7 +585,10 @@ function isAbortError(err) {
 function isTimeoutError(err) {
   const name = String(err?.name || '');
   const msg = String(err?.message || '');
-  return name === 'TimeoutError' || /timed out|timeout|time.?out/i.test(msg);
+  if (name === 'TimeoutError') return true;
+  const reason = err?.cause || err?.reason;
+  if (reason && String(reason?.name || '') === 'TimeoutError') return true;
+  return /timed out|timeout|time.?out|signal timed out/i.test(msg);
 }
 
 function bulkSearchFailResult(err, { superseded = false, timeoutSec = 180 } = {}) {
@@ -601,7 +606,7 @@ function bulkSearchFailResult(err, { superseded = false, timeoutSec = 180 } = {}
       ok: false,
       exibidos: 0,
       aborted: false,
-      error: `Tempo esgotado aguardando o PNCP (${timeoutSec}s). O lote continua; use «Pesquisar UF» depois para os que faltarem.`,
+      error: `Tempo esgotado aguardando a pesquisa (${timeoutSec}s). O lote continua; use «Pesquisar UF» depois para os que faltarem.`,
     };
   }
   if (isAbortError(err)) {
@@ -613,11 +618,15 @@ function bulkSearchFailResult(err, { superseded = false, timeoutSec = 180 } = {}
       error: 'Requisição interrompida (remontagem da página).',
     };
   }
-  const msg = String(err?.message || err || 'erro desconhecido').trim();
-  return { ok: false, exibidos: 0, aborted: false, error: msg };
+  return {
+    ok: false,
+    exibidos: 0,
+    aborted: false,
+    error: formatResearchError(err),
+  };
 }
 
-const BULK_SEARCH_TIMEOUT_MS = 185000;
+const BULK_SEARCH_TIMEOUT_MS = 200000;
 const BULK_CONCURRENCY = 1;
 const BULK_ITEM_DELAY_MS = 50;
 
@@ -1497,8 +1506,8 @@ async function runSearchWithContext({
     }
     if (isAbortError(err)) return undefined;
     if (generationStale()) return undefined;
-    searchError.value = `Não foi possível consultar o backend (${err.message || 'erro desconhecido'}).`;
-    return { ok: false, exibidos: 0, error: err.message || 'erro desconhecido' };
+    searchError.value = `Não foi possível consultar o backend (${formatResearchError(err)}).`;
+    return { ok: false, exibidos: 0, error: formatResearchError(err) };
   } finally {
     activeSearchOps.value -= 1;
     if (activeSearchOps.value < 0) activeSearchOps.value = 0;

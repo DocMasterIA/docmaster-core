@@ -22,9 +22,16 @@ Cada fonte tem (ou compartilha o padrão de) um **feed de escrita**; o **researc
 │ :8014                   │           │
 └─────────────────────────┘           │
                                       │
+┌──────────────────────────────┐      │
+│ price_index_feed_compras_gov │────► │  /data/platforms/compras_gov_local.db
+│ SERVICE_MODE=feed            │      │
+│ FEED_PLATFORM=compras_gov    │      │
+│ :8016                        │      │
+└──────────────────────────────┘      │
+                                      │
 ┌─────────────────────────┐           │  /data/crosslink/*.db
 │ price_index_feed_<id>   │────►      │  (escrito sob demanda
-│ (futuro)                │           │   pelo researcher no merge)
+│ (outras plataformas)    │           │   pelo researcher no merge)
 └─────────────────────────┘           ┘
                  escritura
                       │
@@ -32,7 +39,7 @@ Cada fonte tem (ou compartilha o padrão de) um **feed de escrita**; o **researc
 ┌─────────────────────────────────────────────────┐
 │           price_researcher_service :8012          │
 │  SERVICE_MODE=researcher                         │
-│  • adapters (pncp, tce_rs, …)  — só leitura      │
+│  • adapters (pncp, tce_rs, compras_gov, …)       │
 │  • federated merge + Camada B (faixa/score/top3) │
 │  • Django proxy inalterado                       │
 └─────────────────────────────────────────────────┘
@@ -66,7 +73,7 @@ Contrato entre feed e researcher: **arquivo SQLite + schema conhecido**
 | Env | Valores | Efeito |
 |-----|---------|--------|
 | `SERVICE_MODE` | `feed` \| `researcher` \| `all` | Papel do processo |
-| `FEED_PLATFORM` | `pncp` \| `tce_rs` \| *(vazio=legado)* | Qual pipeline de escrita sobe |
+| `FEED_PLATFORM` | `pncp` \| `tce_rs` \| `compras_gov` \| *(vazio=legado)* | Qual pipeline de escrita sobe |
 | `PNCP_INGEST_WORKER_ENABLED` | 0/1 | Só respeitado se `FEED_PLATFORM=pncp` (ou feed monolito) |
 
 Compose alvo:
@@ -75,6 +82,7 @@ Compose alvo:
 |-----------|-------|------|
 | `price_index_feed_pncp` | 8013 | `feed` + `pncp` |
 | `price_index_feed_tce_rs` | 8014 | `feed` + `tce_rs` |
+| `price_index_feed_compras_gov` | 8016 | `feed` + `compras_gov` |
 | `pncp_researcher_service` (researcher) | 8012 | `researcher` |
 
 `price_index_feed_service` (sem `FEED_PLATFORM`) permanece como **legado monolito** só se alguém precisar; produção usa feeds separados.
@@ -87,6 +95,7 @@ Compose alvo:
 |---------|-----------|
 | `/api/pncp-feed/local-index/*` | só feed PNCP (ou monolito) |
 | `/api/pncp-feed/price-platform-indexes/tce_rs/*` | só feed TCE-RS (ou monolito) |
+| `/api/pncp-feed/price-platform-indexes/compras_gov/*` | só feed Compras.gov (ou monolito) |
 | `/api/pncp-feed/health` | qualquer feed (payload indica `feed_platform`) |
 | `/api/pncp-research/*` | só researcher |
 

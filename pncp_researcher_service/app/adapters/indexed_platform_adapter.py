@@ -63,3 +63,15 @@ class TceRsAdapter(IndexedPlatformAdapter):
     label = "TCE-RS (LicitaCon)"
     inciso_default = "inciso_ii"
     esfera_default = "estadual"
+
+
+class ComprasGovAdapter(IndexedPlatformAdapter):
+    """Leitura do índice SQLite alimentado por CSV Dados Abertos Compras.gov.
+
+    Sem ingest (ainda): health=False e search=[]. Mesmo contrato que TCE-RS.
+    """
+
+    id = "compras_gov"
+    label = "Compras.gov (Dados Abertos)"
+    inciso_default = "inciso_i"
+    esfera_default = "federal"

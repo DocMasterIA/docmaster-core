@@ -76,20 +76,20 @@ function extractErrorMessage(payload, status) {
 export function formatResearchError(err) {
   if (err == null) return 'erro desconhecido';
   if (isClientTimeoutError(err)) {
-    return 'A busca demorou demais (timeout). Tente de novo; se persistir, desmarque uma fonte ou amplie a faixa.';
+    return 'A operação demorou demais (timeout). Tente de novo em instantes.';
   }
   if (isUserAbortError(err)) {
-    return 'Busca cancelada.';
+    return 'Operação cancelada.';
   }
   const status = Number(err?.status);
   if (status === 502 || status === 504) {
-    return 'Serviço de pesquisa temporariamente indisponível (proxy). Tente de novo em instantes.';
+    return 'Serviço temporariamente indisponível (proxy). Tente de novo em instantes.';
   }
   if (status === 503) {
-    return 'Serviço de pesquisa sobrecarregado. Tente de novo em instantes.';
+    return 'Serviço sobrecarregado. Tente de novo em instantes.';
   }
   if (isNetworkFetchError(err)) {
-    return 'Falha de rede ao consultar a pesquisa (conexão interrompida). Tente novamente em alguns segundos.';
+    return 'Falha de rede ao contactar o backend (conexão interrompida). Tente novamente em alguns segundos.';
   }
   const fromMsg = flattenErrorDetail(err?.message);
   if (fromMsg && fromMsg !== '[object Object]' && !/^failed to fetch$/i.test(fromMsg)) {
@@ -255,9 +255,35 @@ export function createResearchSession(payload, signal) {
   });
 }
 
-export function getResearchSession(sessaoId, { signal, relatorio = false, timeoutMs = 120_000 } = {}) {
+export function getResearchSession(sessaoId, { signal, relatorio = false, timeoutMs = 180_000 } = {}) {
   const q = relatorio ? '?relatorio=1' : '';
   return cotacaoRequest(`research/sessions/${encodeURIComponent(sessaoId)}${q}`, { signal, timeoutMs });
+}
+
+/**
+ * Carrega sessão com retries em falhas transitórias (502/504/rede/timeout).
+ * Usado na página da cotação, onde o GET às vezes falha sob carga.
+ */
+export async function getResearchSessionResilient(sessaoId, options = {}) {
+  const maxAttempts = Math.max(1, Math.min(4, Number(options.maxAttempts) || 3));
+  const timeoutMs = options.timeoutMs ?? (options.relatorio ? 180_000 : 120_000);
+  let lastErr = null;
+  for (let i = 0; i < maxAttempts; i += 1) {
+    try {
+      return await getResearchSession(sessaoId, {
+        signal: options.signal,
+        relatorio: options.relatorio,
+        timeoutMs,
+      });
+    } catch (err) {
+      lastErr = err;
+      if (isUserAbortError(err) || !isRetryableSearchError(err) || i >= maxAttempts - 1) {
+        throw err;
+      }
+      await sleep(Math.min(2400, 500 * (i + 1)));
+    }
+  }
+  throw lastErr || new Error('Falha ao carregar sessão.');
 }
 
 /** Lista paginada e leve de itens para busca inteligente em lote (centenas de itens). */

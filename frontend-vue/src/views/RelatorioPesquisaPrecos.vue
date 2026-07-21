@@ -590,6 +590,8 @@ function itemToFonte(it) {
   let tipo = 'PNCP';
   if (plat === 'tce_rs' || plat === 'tce-rs' || plat === 'licitacon') {
     tipo = 'TCE-RS';
+  } else if (plat === 'compras_gov' || plat === 'compras-gov' || plat === 'comprasgov') {
+    tipo = 'Compras.gov';
   } else {
     const blob = [
       src.tipo_fonte,
@@ -602,6 +604,8 @@ function itemToFonte(it) {
       .join(' ');
     if (blob.includes('tce_rs') || blob.includes('tce-rs') || blob.includes('licitacon')) {
       tipo = 'TCE-RS';
+    } else if (blob.includes('compras_gov') || blob.includes('compras.gov') || blob.includes('comprasgov')) {
+      tipo = 'Compras.gov';
     }
   }
   const fornecedor = src.fornecedor || src.nomeRazaoSocialFornecedor
@@ -712,6 +716,7 @@ function obterModalidade(tipo) {
     CMED: 'Pregão Eletrônico',
     'Cotação Direta': 'Dispensa',
     ComprasGov: 'Pregão',
+    'Compras.gov': 'Pregão',
   };
   const raw = String(tipo || '').trim();
   if (!raw) return 'N/D';
@@ -730,6 +735,15 @@ function obterFonte(tipo) {
     || low.includes('tce_rs:')
   ) {
     return 'TCE-RS';
+  }
+  if (
+    low === 'compras.gov'
+    || low === 'compras_gov'
+    || low === 'comprasgov'
+    || low.includes('compras.gov')
+    || low.includes('compras_gov')
+  ) {
+    return 'Compras.gov';
   }
   return 'PNCP';
 }

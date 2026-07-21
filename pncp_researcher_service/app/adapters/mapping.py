@@ -157,6 +157,12 @@ def hit_to_pncp_row(hit: MarketPriceHit) -> Dict[str, Any]:
             row.setdefault("cd_tipo_modalidade", code)
         if label:
             row.setdefault("modalidade", label)
+    if hit.plataforma == "compras_gov":
+        row.setdefault("inciso_classificacao", "inciso_i")
+        row.setdefault("esfera", "federal")
+        row.setdefault("esfera_administrativa", "federal")
+        row.setdefault("fonte", "governamentais")
+        row.setdefault("plataforma_label", "Compras.gov")
     url = (
         hit.url_origem
         or str(row.get("url_origem") or row.get("link_licitacon_cidadao") or "").strip()

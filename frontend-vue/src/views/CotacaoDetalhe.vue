@@ -712,7 +712,8 @@ import {
   deleteItemsFromResearchSession,
   downloadCotacaoRelatorioPdf,
   downloadResearchSessionExcel,
-  getResearchSession,
+  formatResearchError,
+  getResearchSessionResilient,
   importItemsSpreadsheetToResearchSession,
   uploadSupplierPdfToResearchSession,
   updateResearchSession,
@@ -1430,7 +1431,7 @@ async function loadSessionFromBackend() {
   loadError.value = '';
   faixaBaseDraft.value = {};
   try {
-    const data = await getResearchSession(sessionId);
+    const data = await getResearchSessionResilient(sessionId, { maxAttempts: 3, timeoutMs: 120_000 });
     if (data?.ok && data.sessao) {
       const s = data.sessao;
       tituloCotacao.value = s.titulo || `Cotação ${cotacaoId.value}`;
@@ -1533,7 +1534,7 @@ async function loadSessionFromBackend() {
       totalItensSessao.value = 0;
     }
   } catch (err) {
-    loadError.value = `Não foi possível carregar a sessão no backend (${err.message || 'erro desconhecido'}).`;
+    loadError.value = `Não foi possível carregar a sessão no backend (${formatResearchError(err)}).`;
     linhasMock.value = [];
     valorTotalItensFmt.value = 'R$ —';
     sessaoCriadoPor.value = '—';

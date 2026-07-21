@@ -128,11 +128,19 @@ export function buildPncpPortalProcessoUrl(cotacao) {
   return `${PNCP_PORTAL_BASE}/${cnpj}/${anoN}/${seqN}`;
 }
 
-/** Link do portal da fonte (PNCP ou TCE-RS LicitaCon). */
+/** Link do portal da fonte (PNCP, TCE-RS LicitaCon ou url_origem Compras.gov). */
 export function buildFontePortalProcessoUrl(cotacao) {
   const plat = resolveCotacaoPlataforma(cotacao);
   if (isTceRsPlataforma(plat)) {
     return buildTceRsPortalUrl(cotacao);
+  }
+
+  // Compras.gov / outras: preferir deep-link gravado no source.
+  if (plat === 'compras_gov' || plat === 'compras-gov' || plat === 'comprasgov') {
+    for (const layer of cotacaoMetaLayers(cotacao)) {
+      const u = String(layer.url_origem || layer.link_origem || '').trim();
+      if (/^https?:\/\//i.test(u)) return u;
+    }
   }
 
   const pncpUrl = buildPncpPortalProcessoUrl(cotacao);

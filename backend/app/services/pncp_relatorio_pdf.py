@@ -382,6 +382,7 @@ def _obter_modalidade(tipo: Any) -> str:
         "CMED": "Pregão Eletrônico",
         "Cotação Direta": "Dispensa",
         "ComprasGov": "Pregão",
+        "Compras.gov": "Pregão",
     }
     return m.get(raw, raw)
 
@@ -393,11 +394,19 @@ def _obter_fonte(tipo: Any) -> str:
     low = raw.lower()
     if low in {"tce_rs", "tce-rs", "licitacon"} or low.startswith("tce-rs") or "licitacon" in low or "tce_rs:" in low:
         return "TCE-RS"
-    if raw in {"Cotação Direta", "BBMNET", "ComprasGov", "CMED", "PNCP"}:
+    if (
+        low in {"compras_gov", "compras-gov", "comprasgov", "compras.gov"}
+        or "compras.gov" in low
+        or "compras_gov" in low
+    ):
+        return "Compras.gov"
+    if raw in {"Cotação Direta", "BBMNET", "CMED", "PNCP"}:
         return "PNCP"
     # Já normalizado por fonte_dict_de_item; qualquer outro legado vira PNCP.
     if raw == "TCE-RS":
         return "TCE-RS"
+    if raw in {"Compras.gov", "ComprasGov"}:
+        return "Compras.gov"
     return "PNCP"
 
 

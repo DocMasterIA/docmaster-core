@@ -54,6 +54,27 @@ class RelatorioDescricaoFonteTests(SimpleTestCase):
         self.assertEqual(row["tipo"], "TCE-RS")
         self.assertEqual(row["modalidade"], "Pregão Eletrônico")
 
+    def test_fonte_dict_compras_gov_label_curto(self):
+        it = SimpleNamespace(
+            descricao_item="PAPEL A4",
+            modalidade="Pregão Eletrônico",
+            orgao="MINISTERIO",
+            municipio="Brasília",
+            uf="DF",
+            quantidade=10.0,
+            numero_pncp="",
+            created_at=None,
+            source={
+                "plataforma": "compras_gov",
+                "descricao": "PAPEL A4 75G",
+                "fornecedor": "FORN LTDA",
+                "cnpj_fornecedor": "12345678000190",
+                "modalidade": "Pregão Eletrônico",
+            },
+        )
+        row = fonte_dict_de_item(it, tz=None)
+        self.assertEqual(row["tipo"], "Compras.gov")
+
     def test_fonte_dict_tce_rs_modalidade_via_processo_id(self):
         it = SimpleNamespace(
             descricao_item="PAPEL A4",

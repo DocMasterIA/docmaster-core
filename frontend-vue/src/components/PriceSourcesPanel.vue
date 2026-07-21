@@ -39,7 +39,7 @@ const props = defineProps({
   hint: {
     type: String,
     default:
-      'Marque PNCP, TCE-RS ou ambos. A busca federada consulta os índices locais em paralelo.',
+      'Marque PNCP, TCE-RS, Compras.gov ou combinações. A busca federada consulta os índices locais em paralelo.',
   },
 });
 

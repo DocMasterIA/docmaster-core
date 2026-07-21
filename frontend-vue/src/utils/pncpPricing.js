@@ -259,17 +259,23 @@ function pncpCompraKeysForEnrich(row) {
   return true;
 }
 
-/** Plataforma de origem (pncp, tce_rs, …). */
+/** Plataforma de origem (pncp, tce_rs, compras_gov, …). */
 export function resolveRowPlataforma(row) {
   const src = mergedPnCpSource(row);
-  return String(row?.plataforma || src.plataforma || 'pncp').trim().toLowerCase();
+  return String(row?.plataforma || src.plataforma || 'pncp').trim().toLowerCase().replace(/-/g, '_');
 }
 
 export function isTceRsRow(row) {
-  return resolveRowPlataforma(row) === 'tce_rs';
+  const p = resolveRowPlataforma(row);
+  return p === 'tce_rs' || p === 'licitacon';
 }
 
-function tceRsProcessoRef(row) {
+export function isComprasGovRow(row) {
+  const p = resolveRowPlataforma(row);
+  return p === 'compras_gov' || p === 'comprasgov';
+}
+
+function indexedPlatformProcessoRef(row) {
   const src = mergedPnCpSource(row);
   return String(
     row?.processoRef
@@ -280,18 +286,18 @@ function tceRsProcessoRef(row) {
   ).trim();
 }
 
-function tceRsSalvavel(row) {
+function indexedPlatformSalvavel(row) {
   if (hasCnpjFornecedorSalvar(row)) return true;
-  return Boolean(tceRsProcessoRef(row)) && hasValidPnCpFornecedorParaBusca(row);
+  return Boolean(indexedPlatformProcessoRef(row)) && hasValidPnCpFornecedorParaBusca(row);
 }
 
 /**
  * Pode enviar ao backend para gravar: CNPJ já presente ou homologado com chaves PNCP
  * (o Django enriquece fornecedor via /resultados antes de persistir).
- * TCE-RS: CNPJ ou processo LicitaCon + fornecedor identificável.
+ * TCE-RS / Compras.gov: CNPJ ou id de processo/item + fornecedor identificável.
  */
 export function canSalvarCotacaoPnCp(row) {
-  if (isTceRsRow(row)) return tceRsSalvavel(row);
+  if (isTceRsRow(row) || isComprasGovRow(row)) return indexedPlatformSalvavel(row);
   if (hasCnpjFornecedorSalvar(row)) return true;
   return pncpCompraKeysForEnrich(row) && hasValidPnCpFornecedorParaBusca(row);
 }

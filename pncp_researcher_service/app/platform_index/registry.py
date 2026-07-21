@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Literal, Optional
 
 from ..config import (
+    COMPRAS_GOV_LOCAL_DB_PATH,
     PNCP_LOCAL_DB_PATH,
     PRICE_CROSSLINK_DB_PATH,
     PRICE_PLATFORM_DATA_ROOT,
@@ -77,6 +78,20 @@ _PLATFORM_SPECS: Dict[str, PlatformIndexSpec] = {
         uf_scope="RS",
         enabled=True,
         search_ready=False,
+    ),
+    # Alimentação prevista via CSV Dados Abertos (VW_FT_PNCP_COMPRA + ITEM).
+    # Sem índice populado → search_ready=False; adapter retorna [].
+    "compras_gov": PlatformIndexSpec(
+        id="compras_gov",
+        label="Compras.gov (Dados Abertos)",
+        db_path=COMPRAS_GOV_LOCAL_DB_PATH,
+        schema_kind="platform_index",
+        inciso_default="inciso_i",
+        esfera_default="federal",
+        uf_scope=None,
+        enabled=True,
+        search_ready=False,
+        index_writer="feed",
     ),
 }
 

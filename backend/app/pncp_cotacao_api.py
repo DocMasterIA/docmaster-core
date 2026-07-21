@@ -983,6 +983,9 @@ def _fonte_bucket_from_source(src: Dict[str, Any]) -> Optional[str]:
     # TCE-RS / LicitaCon = ente estadual (Inciso II), sem depender de PNCP.
     if plat in {"tce_rs", "tce-rs", "licitacon"}:
         return "entesPublicos"
+    # Compras.gov Dados Abertos = camada federal (Inciso I).
+    if plat in {"compras_gov", "compras-gov", "comprasgov"}:
+        return "governamentais"
 
     inciso = _norm_fonte_text(src.get("inciso_classificacao") or src.get("incisoClassificacao"))
     fonte = _norm_fonte_text(src.get("fonte") or src.get("tipo_fonte") or src.get("categoria_fonte"))
@@ -1704,32 +1707,38 @@ def pncp_research_sessions_detail(request, sessao_id: int):
     # Ordem de inserção (planilha / importação) — não reordenar por numero_item numérico.
     itens_asc = list(c.itens.all().order_by("id"))
     itens_visual = itens_asc
-    cotacoes_sessao = list(
-        PncpCotacaoItemCotacao.objects.filter(cotacao_id=c.id).select_related("item").order_by("item_id", "id")
-    )
     relatorio_view = str(request.GET.get("relatorio") or "").strip().lower() in ("1", "true", "yes")
-    if (
-        relatorio_view
-        and cotacoes_sessao
-        and settings.PNCP_RELATORIO_VIEW_ENRICH
-        and not settings.PNCP_RELATORIO_PDF_SKIP_ENRICH
-    ):
-        try:
-            enrich_missing_supplier_fields_for_cotacao(
-                c.id,
-                max_lookups=settings.PNCP_RELATORIO_PDF_MAX_PNCP_LOOKUPS,
-                max_brasilapi_lookups=settings.PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS,
-            )
-            cotacoes_sessao = list(
-                PncpCotacaoItemCotacao.objects.filter(cotacao_id=c.id)
-                .select_related("item")
-                .order_by("item_id", "id")
-            )
-        except Exception:
-            logger.exception(
-                "enrich_missing_supplier_fields_for_cotacao falhou sessao_id=%s (relatorio view)",
-                c.id,
-            )
+    # Detalhe da cotação (sem ?relatorio=1): não carrega todas as fontes nem agrupa
+    # relatório — evita GET lento / timeout em cotações grandes. Fonte contagem +
+    # preços refletidos bastam para a UI de itens.
+    cotacoes_sessao: list = []
+    if relatorio_view:
+        cotacoes_sessao = list(
+            PncpCotacaoItemCotacao.objects.filter(cotacao_id=c.id)
+            .select_related("item")
+            .order_by("item_id", "id")
+        )
+        if (
+            cotacoes_sessao
+            and settings.PNCP_RELATORIO_VIEW_ENRICH
+            and not settings.PNCP_RELATORIO_PDF_SKIP_ENRICH
+        ):
+            try:
+                enrich_missing_supplier_fields_for_cotacao(
+                    c.id,
+                    max_lookups=settings.PNCP_RELATORIO_PDF_MAX_PNCP_LOOKUPS,
+                    max_brasilapi_lookups=settings.PNCP_RELATORIO_PDF_MAX_BRASILAPI_LOOKUPS,
+                )
+                cotacoes_sessao = list(
+                    PncpCotacaoItemCotacao.objects.filter(cotacao_id=c.id)
+                    .select_related("item")
+                    .order_by("item_id", "id")
+                )
+            except Exception:
+                logger.exception(
+                    "enrich_missing_supplier_fields_for_cotacao falhou sessao_id=%s (relatorio view)",
+                    c.id,
+                )
     fontes_counts = _fontes_counts_for_session(c.id)
     formula_id = _resolve_formula_calculo_id(c.filtros or {})
     refletidos = _itens_refletidos_for_session(c.id, formula_id)
@@ -1739,21 +1748,33 @@ def pncp_research_sessions_detail(request, sessao_id: int):
         getattr(settings, "PNCP_RELATORIO_PDF_RECEITAWS_EMAIL", True)
     )
     email_wait = relatorio_view and bool(getattr(settings, "PNCP_RELATORIO_VIEW_EMAIL_WAIT", True))
-    if cotacoes_sessao:
-        grupos_relatorio, total_linhas_cotacao = agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
-            itens_asc,
-            cotacoes_sessao,
-            receitaws_email_fallback=email_fallback,
-            receitaws_allow_wait=email_wait,
-            include_fontes=relatorio_view,
-        )
+    if relatorio_view:
+        if cotacoes_sessao:
+            grupos_relatorio, total_linhas_cotacao = agrupar_cotacoes_por_item_relatorio_pesquisa_precos(
+                itens_asc,
+                cotacoes_sessao,
+                receitaws_email_fallback=email_fallback,
+                receitaws_allow_wait=email_wait,
+                include_fontes=True,
+            )
+        else:
+            grupos_relatorio, total_linhas_cotacao = agrupar_itens_relatorio_pesquisa_precos(
+                itens_asc,
+                receitaws_email_fallback=email_fallback,
+                receitaws_allow_wait=email_wait,
+                include_fontes=True,
+            )
     else:
-        grupos_relatorio, total_linhas_cotacao = agrupar_itens_relatorio_pesquisa_precos(
-            itens_asc,
-            receitaws_email_fallback=email_fallback,
-            receitaws_allow_wait=email_wait,
-            include_fontes=relatorio_view,
-        )
+        grupos_relatorio, total_linhas_cotacao = [], 0
+        if fontes_counts:
+            total_linhas_cotacao = sum(
+                int(v.get("governamentais") or 0)
+                + int(v.get("entesPublicos") or 0)
+                + int(v.get("dominioAmplo") or 0)
+                + int(v.get("cotacaoDireta") or 0)
+                + int(v.get("notasFiscais") or 0)
+                for v in fontes_counts.values()
+            )
     orgao_exibicao = texto_orgao_exibicao_relatorio_pesquisa_precos(c, request.user, grupos_relatorio)
     formula_label = FORMULA_LABELS.get(formula_id, FORMULA_LABELS[DEFAULT_FORMULA_CALCULO])
     valor_total_estimado = somar_valor_total_estimado_itens(itens_asc, refletidos)

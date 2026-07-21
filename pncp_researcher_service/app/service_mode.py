@@ -9,9 +9,10 @@ SERVICE_MODE:
   all        — monolito local (dev); evita em produção
 
 FEED_PLATFORM (só em SERVICE_MODE=feed|all):
-  pncp   — índice legacy PNCP + worker 24/7
-  tce_rs — ingest LicitaCon → platform_index
-  *      — futuro: id registrado no platform_index.registry
+  pncp        — índice legacy PNCP + worker 24/7
+  tce_rs      — ingest LicitaCon → platform_index
+  compras_gov — ingest CSV Dados Abertos → platform_index
+  *           — futuro: id registrado no platform_index.registry
   (vazio / all) — monolito feed: PNCP + rotas de todas as plataformas (legado)
 """
 
@@ -22,7 +23,7 @@ SERVICE_MODE: str = (os.getenv("SERVICE_MODE", "all") or "all").strip().lower()
 FEED_PLATFORM: str = (os.getenv("FEED_PLATFORM", "") or "").strip().lower()
 
 # Plataformas batch cujo feed não usa o worker PNCP.
-_NON_PNCP_FEED_PLATFORMS: FrozenSet[str] = frozenset({"tce_rs"})
+_NON_PNCP_FEED_PLATFORMS: FrozenSet[str] = frozenset({"tce_rs", "compras_gov"})
 
 
 def is_feed_mode() -> bool:
@@ -86,6 +87,8 @@ def service_title() -> str:
             return "Price Index Feed — PNCP"
         if plat == "tce_rs":
             return "Price Index Feed — TCE-RS"
+        if plat == "compras_gov":
+            return "Price Index Feed — Compras.gov"
         if plat:
             return f"Price Index Feed — {plat}"
         return "Price Index Feed Service (legacy all-platforms)"

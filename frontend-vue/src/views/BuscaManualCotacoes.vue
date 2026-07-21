@@ -308,10 +308,13 @@ import PriceSourcesPanel from '../components/PriceSourcesPanel.vue';
 import {
   federatedItemPlataforma,
   federatedItemProcessoRef,
+  isComprasGovPlatform,
+  isTceRsPlatform,
   loadPriceSourcesCatalog,
   mergeFontesWithLocalStats,
   pickDefaultFontes,
   plataformaBadgeShort,
+  platformSaveMeta,
 } from '../utils/pncpPriceSources';
 import {
   formatCotacaoSaveFeedback,
@@ -789,7 +792,13 @@ function mapFederatedItemToRow(it, idx, { termoBuscaEfetivo, termoFallbackUsado,
     anoCompra: it.ano_compra ?? null,
     sequencialCompra: it.sequencial_compra ?? null,
     numeroItem: it.numero_item ?? null,
-    titulo: it.orgao || (plat === 'tce_rs' ? 'Órgão RS (LicitaCon)' : 'Órgão não informado'),
+    titulo: it.orgao || (
+      isTceRsPlatform(plat)
+        ? 'Órgão RS (LicitaCon)'
+        : isComprasGovPlatform(plat)
+          ? 'Órgão (Compras.gov)'
+          : 'Órgão não informado'
+    ),
     descricao: descricaoLinha || 'Descrição indisponível',
     municipioUfCompacto: formatMunicipioUf(
       { municipio: it.municipio, uf: it.uf, orgao: it.orgao },
@@ -811,11 +820,13 @@ function mapFederatedItemToRow(it, idx, { termoBuscaEfetivo, termoFallbackUsado,
       const lab = labelModalidadeFonte({ modalidade: it.modalidade, processo_id: processoRef }, it);
       return lab !== 'N/D' ? lab : '';
     })(),
-    observacao: plat === 'tce_rs'
+    observacao: isTceRsPlatform(plat)
       ? `TCE-RS · ${(() => {
         const lab = labelModalidadeFonte({ modalidade: it.modalidade, processo_id: processoRef }, it);
         return lab !== 'N/D' ? lab : (it.modalidade || 'LicitaCon');
       })()}${processoRef ? ` · proc. ${processoRef}` : ''}`
+      : isComprasGovPlatform(plat)
+        ? `Compras.gov · ${it.modalidade || 'Dados Abertos'}${processoRef ? ` · ${processoRef}` : ''}`
       : (it.modalidade || 'PNCP'),
     similaridadeEncontrada: similaridadeParcial,
     selecionado: false,
@@ -942,7 +953,8 @@ function normalizeText(v) {
 
 function resolveIncisoFromItem(it) {
   const plat = normalizeText(it?.plataforma || '').toLowerCase();
-  if (plat === 'tce_rs' || plat === 'tce-rs') return 'Inciso II';
+  if (isTceRsPlatform(plat)) return 'Inciso II';
+  if (isComprasGovPlatform(plat)) return 'Inciso I';
 
   const inciso = normalizeText(it?.inciso_classificacao || it?.incisoClassificacao);
   if (inciso.includes('inciso_i') || inciso === 'inciso-i' || inciso.includes('governament')) return 'Inciso I';
@@ -1027,15 +1039,14 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
         ? raw.fornecedor_cadastro
         : {};
       const plat = resolveRowPlataforma(r);
-      const incisoSave = plat === 'tce_rs'
-        ? 'inciso_ii'
-        : (raw.inciso_classificacao || raw.incisoClassificacao || null);
-      const esferaSave = plat === 'tce_rs'
-        ? 'estadual'
-        : (raw.esfera_administrativa || raw.esferaAdministrativa || raw.esfera || null);
-      const fonteSave = plat === 'tce_rs'
-        ? 'entes_publicos'
-        : (raw.fonte || null);
+      const saveMeta = platformSaveMeta(plat, {
+        inciso_classificacao: raw.inciso_classificacao || raw.incisoClassificacao || null,
+        esfera_administrativa: raw.esfera_administrativa || raw.esferaAdministrativa || raw.esfera || null,
+        fonte: raw.fonte || null,
+      });
+      const incisoSave = saveMeta.inciso_classificacao;
+      const esferaSave = saveMeta.esfera_administrativa;
+      const fonteSave = saveMeta.fonte;
       return {
       numero_pncp: toNullableText(r.numeroPncp),
       plataforma: plat,
@@ -1745,6 +1756,11 @@ onMounted(async () => {
   background: #eef6ff;
   border-color: #c5daf5;
   color: #1e4f8a;
+}
+.manual-plat-badge--compras_gov {
+  background: #f3f0ff;
+  border-color: #d4c8f5;
+  color: #4c3d8a;
 }
 .manual-plat-badge--pncp {
   background: #eef8f2;

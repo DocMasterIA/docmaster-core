@@ -55,17 +55,19 @@ Cada linha abaixo é **um pacote de trabalho** (pode virar epic/issue). Nem todo
 
 ### 3.1 Compras.gov (Dados Abertos)
 
-**O que conectar:** API REST `dadosabertos.compras.gov.br` — módulo **Pesquisa de Preço** (material/serviço).
+**O que conectar (v1 implementada parcialmente):** índice local alimentado por **CSV** das views `VW_FT_PNCP_COMPRA` + `VW_FT_PNCP_COMPRA_ITEM` (mesmo padrão TCE-RS / `platform_index`), **não** o painel web antigo.
 
-**Não conectar:** painel web antigo (desatualizado desde jul/2025).
+**Status detalhado:** [MODULO-FONTES-PRECOS-04-COMPRAS-GOV.md](./MODULO-FONTES-PRECOS-04-COMPRAS-GOV.md) — adapter, feed `:8016`, UI/save/relatório e testes já no código; **parser/materialize CSV ainda pendente**.
 
-| Subparte | Entrega | Dependência |
-|----------|---------|-------------|
-| **1-CG-HTTP** | Client HTTP + paginação + parse JSON | — |
-| **1-CG-NORM** | Mapear resposta → `MarketPriceHit` (`plataforma: compras_gov`) | 1-CG-HTTP |
-| **1-CG-CAT** | Resolver termo livre → `codigoItemCatalogo` (catálogo SIASG) | catálogo local ou API catálogo Compras.gov |
-| **1-CG-ADAPTER** | `ComprasGovAdapter.search()` | 1-CG-NORM + 1-CG-CAT |
-| **1-CG-UI** | Fonte «Compras.gov» no multi-select | Parte 0 |
+**Alternativa futura (fora desta entrega):** API REST `dadosabertos.compras.gov.br` — módulo Pesquisa de Preço (material/serviço).
+
+| Subparte | Entrega | Status |
+|----------|---------|--------|
+| **1-CG-FEED** | Spec + DB + feed isolado + discover CSV | Feito |
+| **1-CG-ADAPTER** | `ComprasGovAdapter.search()` (leitura índice) | Feito (vazio sem ingest) |
+| **1-CG-UI** | Fonte «Compras.gov» + save/relatório | Feito |
+| **1-CG-NORM / COLUMN** | `column_map` + parser + materialize | Pendente |
+| **1-CG-HTTP** (opcional) | Client API Dados Abertos | Não iniciado |
 
 **Overlap PNCP:** tratar como **dedup** na Camada B, não duplicar lógica.
 

@@ -5,12 +5,13 @@ from typing import Dict, List, Optional
 from ..platform_index.registry import get_platform_spec, list_platform_specs
 from ..platform_index.schema import platform_spec_with_stats
 from .base import PriceSourceAdapter
-from .indexed_platform_adapter import TceRsAdapter
+from .indexed_platform_adapter import ComprasGovAdapter, TceRsAdapter
 from .pncp_adapter import PncpAdapter
 
 _REGISTRY: Dict[str, PriceSourceAdapter] = {
     PncpAdapter.id: PncpAdapter(),
     TceRsAdapter.id: TceRsAdapter(),
+    ComprasGovAdapter.id: ComprasGovAdapter(),
 }
 
 

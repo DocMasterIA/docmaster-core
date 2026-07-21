@@ -50,4 +50,11 @@ docker-compose.pncp.override.yml
 # TCE-RS LicitaCon raw exports (centenas de MB / GB)
 pncp_researcher_service/data/tce_rs/raw/
 
+# Compras.gov Dados Abertos dumps (>>100MB — nunca versionar)
+pncp_researcher_service/data/compras_gov/raw/
+comprasGOV-*.csv
+**/VW_FT_PNCP_COMPRA*.csv
+!pncp_researcher_service/fixtures/compras_gov/fixture-VW_FT_PNCP_COMPRA.csv
+!pncp_researcher_service/fixtures/compras_gov/fixture-VW_FT_PNCP_COMPRA_ITEM.csv
+
 /staticfiles/

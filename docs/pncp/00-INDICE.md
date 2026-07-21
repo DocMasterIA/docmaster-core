@@ -15,8 +15,9 @@ Documentação do módulo **Pesquisador PNCP** (`pncp_researcher_service`), inge
 | [PNCP-BUSCA-INTELIGENTE-REGRESSAO-UI-VS-BACKEND.md](./PNCP-BUSCA-INTELIGENTE-REGRESSAO-UI-VS-BACKEND.md) | Regressão UI vs backend (bisect jun/2026) |
 | [PNCP-PERFIL-OPERACIONAL-JUL2026.md](./PNCP-PERFIL-OPERACIONAL-JUL2026.md) | **Handoff completo** — qualidade, lote, deploy VPS, flags |
 | [PNCP-FAIXA-DIRECIONAL-JUL2026.md](./PNCP-FAIXA-DIRECIONAL-JUL2026.md) | **Faixa `cima`/`baixo`** — causa, fix, testes (validado jul/2026) |
-| [ARQUITETURA-FEEDS-INDEPENDENTES.md](./ARQUITETURA-FEEDS-INDEPENDENTES.md) | Feeds PNCP + TCE-RS independentes → researcher |
+| [ARQUITETURA-FEEDS-INDEPENDENTES.md](./ARQUITETURA-FEEDS-INDEPENDENTES.md) | Feeds PNCP + TCE-RS + Compras.gov independentes → researcher |
 | [ANALISE-COLUNAS-PREMIUM.md](../pncp_researcher_service/data/tce_rs/ANALISE-COLUNAS-PREMIUM.md) | TCE-RS: scan CSV × item premium (sem API externa) |
+| [MODULO-FONTES-PRECOS-04-COMPRAS-GOV.md](./MODULO-FONTES-PRECOS-04-COMPRAS-GOV.md) | **Compras.gov** — o que foi feito (scaffold + produto + testes); CSV pendente |
 
 ---
 
@@ -66,6 +67,7 @@ Pasta [planejamento/](./planejamento/) — documentos numerados `00` a `10`:
 | [MODULO-FONTES-PRECOS-01-CATALOGO-COMERCIAL.md](./MODULO-FONTES-PRECOS-01-CATALOGO-COMERCIAL.md) | Catálogo comercial (complexidade + faixas — opcional) |
 | [MODULO-FONTES-PRECOS-02-PARTICIONAMENTO.md](./MODULO-FONTES-PRECOS-02-PARTICIONAMENTO.md) | **Particionamento** — camadas, épicos, o que conectar |
 | [MODULO-FONTES-PRECOS-03-PORTAL-COMPRAS-PUBLICAS.md](./MODULO-FONTES-PRECOS-03-PORTAL-COMPRAS-PUBLICAS.md) | **PCP (Ecustomize)** — API, fluxo, mapeamento, legal, dedup PNCP |
+| [MODULO-FONTES-PRECOS-04-COMPRAS-GOV.md](./MODULO-FONTES-PRECOS-04-COMPRAS-GOV.md) | **Compras.gov (Dados Abertos / CSV)** — status implementação jul/2026 |
 
 ---
 

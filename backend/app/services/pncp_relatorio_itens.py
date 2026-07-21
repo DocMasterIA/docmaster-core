@@ -1018,7 +1018,7 @@ def build_pncp_portal_processo_url(it: Any, *, src: Optional[Dict[str, Any]] = N
 
 def _label_fonte_plataforma(src: Dict[str, Any], *, modalidade: str = "", tipo_hint: str = "") -> str:
     """
-    Rótulo curto da coluna Fonte no relatório/PDF: apenas PNCP ou TCE-RS.
+    Rótulo curto da coluna Fonte no relatório/PDF: PNCP, TCE-RS ou Compras.gov.
     Não usar modalidade/observação (ex.: «TCE-RS · LicitaCon · proc. …»).
     """
     plat = str(
@@ -1029,6 +1029,8 @@ def _label_fonte_plataforma(src: Dict[str, Any], *, modalidade: str = "", tipo_h
     ).strip().lower()
     if plat in {"tce_rs", "tce-rs", "licitacon"}:
         return "TCE-RS"
+    if plat in {"compras_gov", "compras-gov", "comprasgov"}:
+        return "Compras.gov"
 
     blob = " ".join(
         str(x or "")
@@ -1048,6 +1050,8 @@ def _label_fonte_plataforma(src: Dict[str, Any], *, modalidade: str = "", tipo_h
         or blob.strip().startswith("tce")
     ):
         return "TCE-RS"
+    if "compras_gov" in blob or "compras.gov" in blob or "comprasgov" in blob:
+        return "Compras.gov"
 
     return "PNCP"
 

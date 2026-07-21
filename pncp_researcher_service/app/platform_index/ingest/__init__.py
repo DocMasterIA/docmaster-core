@@ -1,1 +1,2 @@
-"""Jobs de alimentação de índices platform_index (TCE-RS, …)."""
+"""Jobs de alimentação de índices platform_index (TCE-RS, Compras.gov, …)."""
+

@@ -260,6 +260,28 @@ class TceRsIngestRequest(BaseModel):
     )
 
 
+class ComprasGovIngestRequest(BaseModel):
+    """Ingest CSV Dados Abertos Compras.gov (VW_FT_PNCP_COMPRA + COMPRA_ITEM)."""
+
+    data_dir: Optional[str] = Field(
+        None,
+        description=(
+            "Pasta com *VW_FT_PNCP_COMPRA_ITEM*.csv (+ opcional *VW_FT_PNCP_COMPRA*.csv) "
+            "ou raiz raw/ com subpastas."
+        ),
+    )
+    use_sample: bool = Field(
+        False,
+        description="Carrega fixtures internas para dev/teste.",
+    )
+    max_rows: Optional[int] = Field(
+        None,
+        ge=1,
+        le=5000000,
+        description="Limite de linhas de ITEM (debug/amostra).",
+    )
+
+
 class ResearchSessionCreateRequest(BaseModel):
     """Corpo para criar uma ordem de pesquisa (cotação) persistida no serviço PNCP."""
 

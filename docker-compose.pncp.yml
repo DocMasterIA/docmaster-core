@@ -5,9 +5,10 @@
 #   ./scripts/ensure-pncp-researcher.sh
 #
 # Arquitetura:
-#   price_index_feed_pncp      :8013  — só PNCP (worker 24/7)
-#   price_index_feed_tce_rs    :8014  — só TCE-RS / LicitaCon → platform_index
-#   pncp_researcher_service    :8012  — busca federada (Django proxy); só lê .db
+#   price_index_feed_pncp         :8013  — só PNCP (worker 24/7)
+#   price_index_feed_tce_rs       :8014  — só TCE-RS / LicitaCon → platform_index
+#   price_index_feed_compras_gov  :8015  — CSV Dados Abertos Compras.gov → platform_index
+#   pncp_researcher_service       :8012  — busca federada (Django proxy); só lê .db
 #
 # Docs: docs/pncp/ARQUITETURA-FEEDS-INDEPENDENTES.md
 
@@ -29,6 +30,7 @@ x-pncp-db-env: &pncp-db-env
   PRICE_PLATFORM_DATA_ROOT: /data/platforms
   PRICE_CROSSLINK_DB_PATH: /data/crosslink/price_cross_refs.db
   TCE_RS_LOCAL_DB_PATH: /data/platforms/tce_rs_local.db
+  COMPRAS_GOV_LOCAL_DB_PATH: /data/platforms/compras_gov_local.db
 
 services:
   # ── Feed PNCP (escrita exclusiva do índice legacy) ─────────────────────
@@ -88,6 +90,34 @@ services:
     stop_grace_period: 30s
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8014/api/pncp-feed/health', timeout=5)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── Feed Compras.gov (CSV Dados Abertos → compras_gov_local.db; sem parse ainda) ──
+  price_index_feed_compras_gov:
+    <<: *pncp-image
+    container_name: price_index_feed_compras_gov
+    ports:
+      - "127.0.0.1:8016:8016"
+    environment:
+      <<: *pncp-db-env
+      PORT: "8016"
+      SERVICE_MODE: feed
+      FEED_PLATFORM: compras_gov
+      PNCP_INGEST_WORKER_ENABLED: "0"
+      COMPRAS_GOV_INGEST_DATA_DIR: ${COMPRAS_GOV_INGEST_DATA_DIR:-/data/compras_gov/raw}
+    volumes:
+      - price_platform_data:/data/platforms
+      - price_crosslink_data:/data/crosslink
+      - ${COMPRAS_GOV_RAW_HOST_DIR:-./pncp_researcher_service/data/compras_gov/raw}:/data/compras_gov/raw:ro
+    networks:
+      - docmaster_net
+    restart: always
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8016/api/pncp-feed/health', timeout=5)\""]
       interval: 30s
       timeout: 10s
       retries: 3

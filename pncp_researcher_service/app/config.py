@@ -410,6 +410,10 @@ TCE_RS_LOCAL_DB_PATH: str = os.getenv(
     "TCE_RS_LOCAL_DB_PATH",
     os.path.join(PRICE_PLATFORM_DATA_ROOT, "tce_rs_local.db"),
 ).strip()
+COMPRAS_GOV_LOCAL_DB_PATH: str = os.getenv(
+    "COMPRAS_GOV_LOCAL_DB_PATH",
+    os.path.join(PRICE_PLATFORM_DATA_ROOT, "compras_gov_local.db"),
+).strip()
 PRICE_INDEX_FEED_BASE_URL: str = os.getenv(
     "PRICE_INDEX_FEED_BASE_URL",
     "http://127.0.0.1:8013",

@@ -1,5 +1,3 @@
-import { listPriceSources } from '../services/pncpResearch';
-
 const FALLBACK_FONTES = [
   {
     id: 'pncp',
@@ -11,6 +9,11 @@ const FALLBACK_FONTES = [
     label: 'TCE-RS (LicitaCon)',
     search_ready: false,
     uf_scope: 'RS',
+  },
+  {
+    id: 'compras_gov',
+    label: 'Compras.gov (Dados Abertos)',
+    search_ready: false,
   },
 ];
 
@@ -42,36 +45,98 @@ export function pickDefaultFontes(fontes) {
   return out.length ? out : ['pncp'];
 }
 
+export function normalizePlataformaId(id) {
+  return String(id || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, '_');
+}
+
+export function isTceRsPlatform(id) {
+  const key = normalizePlataformaId(id);
+  return key === 'tce_rs' || key === 'licitacon';
+}
+
+export function isComprasGovPlatform(id) {
+  const key = normalizePlataformaId(id);
+  return key === 'compras_gov' || key === 'comprasgov';
+}
+
+/**
+ * Metadados de save por plataforma (inciso / esfera / bucket de fonte).
+ * Fallbacks só entram quando a plataforma não tem regra própria.
+ */
+export function platformSaveMeta(plat, fallbacks = {}) {
+  if (isTceRsPlatform(plat)) {
+    return {
+      inciso_classificacao: 'inciso_ii',
+      esfera_administrativa: 'estadual',
+      fonte: 'entes_publicos',
+    };
+  }
+  if (isComprasGovPlatform(plat)) {
+    return {
+      inciso_classificacao: 'inciso_i',
+      esfera_administrativa: 'federal',
+      fonte: 'governamentais',
+    };
+  }
+  const inciso = fallbacks.inciso_classificacao || fallbacks.inciso || null;
+  let fonte = fallbacks.fonte || null;
+  if (!fonte && inciso === 'inciso_i') fonte = 'governamentais';
+  if (!fonte && inciso === 'inciso_ii') fonte = 'entes_publicos';
+  return {
+    inciso_classificacao: inciso,
+    esfera_administrativa: fallbacks.esfera_administrativa || fallbacks.esfera || null,
+    fonte,
+  };
+}
+
 export function plataformaLabel(id, fontes = []) {
-  const key = String(id || 'pncp').trim().toLowerCase();
-  const hit = (fontes || []).find((f) => f.id === key);
+  const key = normalizePlataformaId(id) || 'pncp';
+  const hit = (fontes || []).find((f) => normalizePlataformaId(f.id) === key);
   if (hit?.label) return hit.label;
-  if (key === 'tce_rs') return 'TCE-RS (LicitaCon)';
+  if (isTceRsPlatform(key)) return 'TCE-RS (LicitaCon)';
+  if (isComprasGovPlatform(key)) return 'Compras.gov (Dados Abertos)';
   if (key === 'pncp') return 'PNCP';
   return key.toUpperCase();
 }
 
 export function plataformaBadgeShort(id) {
-  const key = String(id || 'pncp').trim().toLowerCase();
-  if (key === 'tce_rs') return 'TCE-RS';
+  const key = normalizePlataformaId(id) || 'pncp';
+  if (isTceRsPlatform(key)) return 'TCE-RS';
+  if (isComprasGovPlatform(key)) return 'Compras.gov';
   if (key === 'pncp') return 'PNCP';
   return key.toUpperCase();
 }
 
+/** Rótulo curto da coluna Fonte (relatório / detalhe). */
+export function plataformaFonteCurta(id) {
+  const key = normalizePlataformaId(id) || 'pncp';
+  if (isTceRsPlatform(key)) return 'TCE-RS';
+  if (isComprasGovPlatform(key)) return 'Compras.gov';
+  if (key === 'pncp') return 'PNCP';
+  return plataformaBadgeShort(key);
+}
+
 export async function loadPriceSourcesCatalog() {
   try {
+    // Import dinâmico: evita puxar o client HTTP em testes Node dos helpers puros.
+    const { listPriceSources } = await import('../services/pncpResearch.js');
     const res = await listPriceSources();
     if (res?.ok && Array.isArray(res.fontes) && res.fontes.length) {
       return res.fontes.map((f) => ({ ...f }));
     }
   } catch (_) {
-    /* offline / proxy */
+    /* offline / proxy / ambiente sem bundler */
   }
   return FALLBACK_FONTES.map((f) => ({ ...f }));
 }
 
 export function federatedItemPlataforma(it) {
-  return String(it?.plataforma || 'pncp').trim().toLowerCase();
+  return normalizePlataformaId(it?.plataforma || 'pncp') || 'pncp';
 }
 
 export function federatedItemProcessoRef(it) {

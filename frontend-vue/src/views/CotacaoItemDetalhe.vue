@@ -246,7 +246,7 @@
               </div>
               <div v-else class="item-cotacao-card__grid">
                 <div class="item-cotacao-card__field item-cotacao-card__field--wide">
-                  <span>Nome (PNCP)</span>
+                  <span>{{ nomeItemCampoLabel(r) }}</span>
                   <strong>{{ nomeItemDaCotacao(r) }}</strong>
                 </div>
                 <div class="item-cotacao-card__field item-cotacao-card__field--wide">
@@ -318,8 +318,9 @@ import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   deleteCotacaoFromItemResearchSession,
+  formatResearchError,
   getItemCotacoesFromResearchSession,
-  getResearchSession,
+  getResearchSessionResilient,
   resolvePlatformPortalUrls,
 } from '../services/pncpResearch';
 import {
@@ -530,7 +531,7 @@ async function loadItem() {
   isLoading.value = true;
   loadError.value = '';
   try {
-    const data = await getResearchSession(sessionId);
+    const data = await getResearchSessionResilient(sessionId, { maxAttempts: 3, timeoutMs: 120_000 });
     const filtros = data?.sessao?.filtros && typeof data.sessao.filtros === 'object' ? data.sessao.filtros : {};
     const vg = Number(filtros.variacao_percentual_global);
     variacaoGlobalSessao.value = Number.isFinite(vg) && vg >= 0 ? vg : 20;
@@ -542,7 +543,7 @@ async function loadItem() {
     const rows = Array.isArray(cot?.cotacoes) ? cot.cotacoes : [];
     itemCotacoes.value = await resolveMissingTcePortalUrls(rows);
   } catch (err) {
-    loadError.value = `Não foi possível carregar o item (${err?.message || 'erro desconhecido'}).`;
+    loadError.value = `Não foi possível carregar o item (${formatResearchError(err)}).`;
   } finally {
     isLoading.value = false;
   }
@@ -604,6 +605,17 @@ function formatQuantidadeCotacao(r) {
   }
   if (und) return und;
   return '—';
+}
+
+function nomeItemCampoLabel(r) {
+  const plat = resolveCotacaoPlataforma(r);
+  if (plat === 'tce_rs' || plat === 'tce-rs' || plat === 'licitacon') {
+    return 'Nome (TCE-RS)';
+  }
+  if (plat === 'compras_gov' || plat === 'compras-gov' || plat === 'comprasgov') {
+    return 'Nome (Compras.gov)';
+  }
+  return 'Nome (PNCP)';
 }
 
 function nomeItemDaCotacao(r) {
@@ -760,6 +772,9 @@ function classificarFonte(cotacao) {
   );
   if (plat === 'tce_rs' || plat === 'tce-rs' || plat === 'licitacon') {
     return 'entes_publicos';
+  }
+  if (plat === 'compras_gov' || plat === 'compras-gov' || plat === 'comprasgov') {
+    return 'governamentais';
   }
 
   const resolved = normalizeFonte(cotacao?.fonte_resolvida || cotacao?.inciso_resolvido);

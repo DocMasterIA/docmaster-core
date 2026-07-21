@@ -347,10 +347,13 @@ import PriceSourcesPanel from '../components/PriceSourcesPanel.vue';
 import {
   federatedItemPlataforma,
   federatedItemProcessoRef,
+  isComprasGovPlatform,
+  isTceRsPlatform,
   loadPriceSourcesCatalog,
   mergeFontesWithLocalStats,
   pickDefaultFontes,
   plataformaBadgeShort,
+  platformSaveMeta,
 } from '../utils/pncpPriceSources';
 import {
   formatCotacaoSaveFeedback,
@@ -1578,18 +1581,16 @@ async function adicionarSelecionadosNaCotacao() {
       const unitSave = homUnit ?? r.valorUnitario ?? parseMoeda(r.valor);
       const totalSave = homTotal ?? r.valorTotal ?? (unitSave && r.quantidadeNum ? unitSave * r.quantidadeNum : null);
       const plat = resolveRowPlataforma(r);
-      const isTceRs = plat === 'tce_rs';
-      const incisoSave = isTceRs ? 'inciso_ii' : (r.incisoClassificacao || null);
+      const saveMeta = platformSaveMeta(plat, {
+        inciso_classificacao: r.incisoClassificacao || null,
+        esfera_administrativa: r.esferaAdministrativa || null,
+      });
+      const incisoSave = saveMeta.inciso_classificacao;
       return {
       item_ref_id: r.itemId ?? null,
-      esfera_administrativa: isTceRs ? 'estadual' : (r.esferaAdministrativa || null),
+      esfera_administrativa: saveMeta.esfera_administrativa,
       inciso_classificacao: incisoSave,
-      fonte:
-        incisoSave === 'inciso_i'
-          ? 'governamentais'
-          : incisoSave === 'inciso_ii'
-            ? 'entes_publicos'
-            : null,
+      fonte: saveMeta.fonte,
       numero_pncp: r.numeroPncp,
       ano_compra: r.anoCompra,
       sequencial_compra: r.sequencialCompra,
@@ -1946,8 +1947,11 @@ function classificarEsferaAdministrativa(raw) {
   const plat = normalizeKey(
     raw?.plataforma || raw?.sourceRaw?.plataforma || '',
   );
-  if (plat === 'tce_rs' || plat === 'tce-rs' || plat === 'licitacon') {
+  if (isTceRsPlatform(plat)) {
     return 'estadual';
+  }
+  if (isComprasGovPlatform(plat)) {
+    return 'federal';
   }
 
   const inciso = normalizeKey(
@@ -2115,6 +2119,11 @@ function onVariacaoInput(event) {
   background: #eef6ff;
   border-color: #c5daf5;
   color: #1e4f8a;
+}
+.bia-plat-badge--compras_gov {
+  background: #f3f0ff;
+  border-color: #d4c8f5;
+  color: #4c3d8a;
 }
 .bia-plat-badge--pncp {
   background: #eef8f2;

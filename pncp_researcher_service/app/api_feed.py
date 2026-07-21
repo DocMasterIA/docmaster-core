@@ -20,7 +20,14 @@ from .local_index import (
     sync_catalog_metadata_from_raw_json,
 )
 from .pncp_client import PNCPClientError
-from .schemas import HealthResponse, IngestPlanRequest, LocalBackfillRequest, LocalSyncCatalogRequest, TceRsIngestRequest
+from .schemas import (
+    HealthResponse,
+    IngestPlanRequest,
+    LocalBackfillRequest,
+    LocalSyncCatalogRequest,
+    ComprasGovIngestRequest,
+    TceRsIngestRequest,
+)
 from .service_mode import (
     feed_platform,
     is_platform_feed,
@@ -332,6 +339,86 @@ async def tce_rs_ingest_sample_endpoint():
 
     try:
         return ingest_tce_rs_sample()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)[:500]) from e
+
+
+@feed_router.get("/price-platform-indexes/compras_gov/ingest-status")
+@legacy_feed_router.get("/price-platform-indexes/compras_gov/ingest-status")
+async def compras_gov_ingest_status_endpoint():
+    _require_platform_feed("compras_gov")
+    from .platform_index.ingest.compras_gov import compras_gov_ingest_status
+
+    return compras_gov_ingest_status()
+
+
+@feed_router.post("/price-platform-indexes/compras_gov/validate-structure")
+@legacy_feed_router.post("/price-platform-indexes/compras_gov/validate-structure")
+async def compras_gov_validate_structure_endpoint(body: ComprasGovIngestRequest | None = None):
+    """Valida CSV/cabeçalhos sem gravar itens no índice."""
+    _require_platform_feed("compras_gov")
+    from .platform_index.ingest.compras_gov import validate_compras_gov_structure
+
+    data_dir = (body.data_dir if body else None) or None
+    try:
+        return validate_compras_gov_structure(data_dir)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)[:500]) from e
+
+
+@feed_router.post("/price-platform-indexes/compras_gov/ensure")
+@legacy_feed_router.post("/price-platform-indexes/compras_gov/ensure")
+async def compras_gov_ensure_endpoint():
+    """Cria SQLite/schema vazio (sem alimentar itens)."""
+    _require_platform_feed("compras_gov")
+    from .platform_index.ingest.compras_gov import ensure_compras_gov_db
+
+    try:
+        return ensure_compras_gov_db()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)[:500]) from e
+
+
+@feed_router.post("/price-platform-indexes/compras_gov/ingest")
+@legacy_feed_router.post("/price-platform-indexes/compras_gov/ingest")
+async def compras_gov_ingest_endpoint(body: ComprasGovIngestRequest):
+    _require_platform_feed("compras_gov")
+    from .platform_index.ingest.compras_gov import (
+        ingest_compras_gov_from_directory,
+        ingest_compras_gov_sample,
+    )
+
+    try:
+        if body.use_sample:
+            return ingest_compras_gov_sample()
+        if not body.data_dir:
+            raise HTTPException(
+                status_code=400,
+                detail="Informe data_dir ou use_sample=true",
+            )
+        return ingest_compras_gov_from_directory(body.data_dir, max_rows=body.max_rows)
+    except NotImplementedError as e:
+        raise HTTPException(status_code=501, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)[:500]) from e
+
+
+@feed_router.post("/price-platform-indexes/compras_gov/ingest-sample")
+@legacy_feed_router.post("/price-platform-indexes/compras_gov/ingest-sample")
+async def compras_gov_ingest_sample_endpoint():
+    _require_platform_feed("compras_gov")
+    from .platform_index.ingest.compras_gov import ingest_compras_gov_sample
+
+    try:
+        return ingest_compras_gov_sample()
+    except NotImplementedError as e:
+        raise HTTPException(status_code=501, detail=str(e)) from e
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:

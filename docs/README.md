@@ -2,7 +2,8 @@
 
 Índice central da documentação técnica. A pasta `docs/` está organizada por domínio.
 
-> **Documento mestre:** [SISTEMA-DOCMASTER-VISAO-COMPLETA.md](./SISTEMA-DOCMASTER-VISAO-COMPLETA.md) — visão transversal de todas as funcionalidades, fluxos, fatores operacionais e links para cada `.md` do projeto.
+> **Documento mestre (jul/2026):** [DOCMASTER-SISTEMA-COMPLETO-JUL2026.md](./DOCMASTER-SISTEMA-COMPLETO-JUL2026.md) — visão extensa de funcionalidades, stacks, LLMs, microsserviços, APIs e fluxos até o estado atual (inclui TCE-RS / pesquisa federada).  
+> **Documento mestre (jun/2026):** [SISTEMA-DOCMASTER-VISAO-COMPLETA.md](./SISTEMA-DOCMASTER-VISAO-COMPLETA.md) — visão transversal anterior.
 
 ---
 
@@ -25,7 +26,8 @@ docs/
 
 | Objetivo | Documento |
 |----------|-----------|
-| **Visão completa do sistema (recomendado)** | [SISTEMA-DOCMASTER-VISAO-COMPLETA.md](./SISTEMA-DOCMASTER-VISAO-COMPLETA.md) |
+| **Visão completa atualizada (jul/2026)** | [DOCMASTER-SISTEMA-COMPLETO-JUL2026.md](./DOCMASTER-SISTEMA-COMPLETO-JUL2026.md) |
+| **Visão completa (jun/2026)** | [SISTEMA-DOCMASTER-VISAO-COMPLETA.md](./SISTEMA-DOCMASTER-VISAO-COMPLETA.md) |
 | **Correções recentes TR/DFD (jun/2026)** | [geracao-documentos/CHANGELOG-2026-06.md](./geracao-documentos/CHANGELOG-2026-06.md) |
 | Slots e placeholders TR/DFD/Ofício | [geracao-documentos/01-slots-tr-dfd-oficio.md](./geracao-documentos/01-slots-tr-dfd-oficio.md) |
 | Deploy na VPS | [deploy/README.md](./deploy/README.md) |

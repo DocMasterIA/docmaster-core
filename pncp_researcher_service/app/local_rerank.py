@@ -120,12 +120,13 @@ def apply_local_rerank_top3(
     if not pool:
         return [], False
     if faixa_min is not None and faixa_max is not None:
-        in_band = [
+        # Hard: com faixa ativa o pool do rerank local só tem preços dentro da VAR.
+        pool = [
             x for x in pool
             if _preco_dentro_faixa(x, faixa_min, faixa_max, sentido=faixa_sentido)
         ]
-        if len(in_band) >= 3:
-            pool = in_band
+        if not pool:
+            return [], False
     cap = max(6, min(int(max_candidates), len(pool)))
     raw_term = (termo_raw or termo_busca or "").strip()
     ranked: List[Tuple[float, Dict[str, Any]]] = []

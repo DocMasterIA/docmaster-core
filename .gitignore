@@ -32,6 +32,11 @@ venv/
 */migrations/__pycache__/
 
 **/node_modules
+# Playwright E2E
+frontend-vue/playwright-report/
+frontend-vue/test-results/
+frontend-vue/blob-report/
+frontend-vue/e2e-artifacts/
 # Capacitor / Mobile
 mobile/node_modules/
 mobile/dist/

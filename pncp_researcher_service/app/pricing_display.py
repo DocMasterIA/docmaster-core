@@ -111,28 +111,14 @@ def item_matches_faixa_band(
     sentido: Optional[str] = None,
 ) -> bool:
     """
-    Gate de faixa na busca.
+    Gate de faixa na busca (regra rígida).
 
-    - ``ambos`` (±): aceita se homologado **ou** estimado estiver na banda (recall).
-    - ``cima`` / ``baixo``: usa só o preço canônico de exibição — direção respeitada.
+    Usa **somente** o preço canônico de exibição (homologado > unitário > estimado).
+    Nunca aceita item cujo preço exibido está fora da banda — mesmo que outro
+    campo (ex.: estimado) caia dentro da VAR.
     """
     p = row_unit_price_for_faixa_gate(it, sentido=sentido)
-    if p > 0.0 and lo <= p <= hi:
-        return True
-    # Recall homologado/estimado só com sentido explícito «ambos» (±).
-    # Com None/cima/baixo usa só o preço canônico — evita aceitar estimado na faixa
-    # quando o homologado exibido está fora da direção pedida.
-    if sentido is None:
-        return False
-    if normalize_variacao_sentido(sentido) != "ambos":
-        return False
-    hom = _optional_positive(it.get("valor_unitario_homologado"))
-    est = _optional_positive(it.get("valor_unitario_estimado"))
-    if hom is not None and lo <= hom <= hi:
-        return True
-    if est is not None and lo <= est <= hi:
-        return True
-    return False
+    return p > 0.0 and lo <= p <= hi
 
 
 def row_display_unit_price(it: Dict[str, Any]) -> float:

@@ -2004,12 +2004,15 @@ def _enforce_faixa_no_top3(
     faixa_sentido: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Substitui escolhas fora da faixa regional (valor base ± %) por candidatos dentro da faixa,
-    preservando ordem de preferência por literal_match + score.
+    Hard-enforce: só devolve itens dentro da faixa.
+    Fora da faixa é substituído por candidato in-band; se não houver, é descartado
+    (nunca mantém preço fora da VAR).
     """
-    if not top3 or not pool:
-        return top3
-    in_band = [dict(x) for x in pool if _preco_dentro_faixa(x, lo, hi, sentido=faixa_sentido)]
+    in_band = [
+        dict(x)
+        for x in (pool or [])
+        if _preco_dentro_faixa(x, lo, hi, sentido=faixa_sentido)
+    ]
     in_band.sort(
         key=lambda it: (
             float(it.get("literal_match") or _literal_match_score(termo_busca, it)),
@@ -2019,27 +2022,30 @@ def _enforce_faixa_no_top3(
     )
     used: set[str] = set()
     out: List[Dict[str, Any]] = []
-    for it in top3:
+    for it in top3 or []:
         row = dict(it)
         if _preco_dentro_faixa(row, lo, hi, sentido=faixa_sentido):
             k = _ia_item_key(row) or f"id:{id(row)}"
-            used.add(k)
-            out.append(row)
+            if k not in used:
+                used.add(k)
+                out.append(row)
             continue
-        replaced = False
         for cand in in_band:
             k2 = _ia_item_key(cand) or f"id:{id(cand)}"
             if k2 in used:
                 continue
             out.append(dict(cand))
             used.add(k2)
-            replaced = True
             break
-        if not replaced:
-            k = _ia_item_key(row) or f"id:{id(row)}"
-            if k not in used:
-                used.add(k)
-            out.append(row)
+        # sem replacement in-band → descarta (não append row fora da faixa)
+    for cand in in_band:
+        if len(out) >= 3:
+            break
+        k2 = _ia_item_key(cand) or f"id:{id(cand)}"
+        if k2 in used:
+            continue
+        out.append(dict(cand))
+        used.add(k2)
     return out[:3]
 
 
@@ -2909,7 +2915,9 @@ async def orchestrate_merged_candidate_pool(
         )
         if local_ok and top3_local:
             top3 = top3_local
-            local_rerank_used = True
+            if faixa_min is not None and faixa_max is not None:
+                top3 = _filter_rows_in_faixa(top3, faixa_min, faixa_max, sentido=ref_sentido)
+            local_rerank_used = bool(top3)
 
     skip_qwen_after_local = local_rerank_used and PNCP_IA_RERANK_PREFER_LOCAL and len(top3) >= 1
     if (
@@ -2925,11 +2933,12 @@ async def orchestrate_merged_candidate_pool(
         rerank_timeout = PNCP_IA_BULK_TIMEOUT_SECONDS if busca_lote else PNCP_IA_TIMEOUT_SECONDS
         pool_ia = list(pool_ia_source)
         if faixa_min is not None and faixa_max is not None:
-            in_band_ia = [
+            # Hard: rerank IA só vê candidatos dentro da faixa (mesmo com < 3).
+            pool_ia = [
                 x for x in pool_ia if _preco_dentro_faixa(x, faixa_min, faixa_max, sentido=ref_sentido)
             ]
-            if len(in_band_ia) >= 3:
-                pool_ia = in_band_ia
+            if not pool_ia:
+                pool_ia = []
         candidatos_ia: List[Dict[str, Any]] = []
         for idx, base_item in enumerate(pool_ia[:limite_candidatos]):
             row = dict(base_item)
@@ -2985,8 +2994,14 @@ async def orchestrate_merged_candidate_pool(
                     ),
                     reverse=True,
                 )
-                # Regra de negócio: prioriza esfera federal; se faltar, completa com demais esferas.
-                merged = _merge_unique_items(chosen, selection_pool)
+                # Completa só com pool já filtrado pela faixa (nunca reintroduz fora da VAR).
+                pool_fill = selection_pool
+                if faixa_min is not None and faixa_max is not None:
+                    pool_fill = [
+                        x for x in selection_pool
+                        if _preco_dentro_faixa(x, faixa_min, faixa_max, sentido=ref_sentido)
+                    ]
+                merged = _merge_unique_items(chosen, pool_fill)
                 top3 = _select_top3_prioritize_federal(merged)[:3]
                 ia_used = True
 
@@ -3014,6 +3029,15 @@ async def orchestrate_merged_candidate_pool(
         faixa_max=faixa_max,
         faixa_sentido=faixa_sentido_manual,
     )
+    if faixa_min is not None and faixa_max is not None:
+        top3 = _enforce_faixa_no_top3(
+            top3,
+            scored,
+            lo=faixa_min,
+            hi=faixa_max,
+            termo_busca=termo_efetivo,
+            faixa_sentido=faixa_sentido_manual,
+        )
     if not top3 and itens:
         top3 = _build_manual_parity_top3(
             itens,

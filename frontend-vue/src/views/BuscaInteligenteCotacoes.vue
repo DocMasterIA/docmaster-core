@@ -1569,8 +1569,21 @@ async function adicionarSelecionadosNaCotacao() {
   }
   const brutos = displayedRows.value.filter((r) => selectedRowIds.value.has(r.id));
   const semFornecedor = brutos.filter((r) => !canSalvarCotacaoPnCp(r)).length;
+  const foraFaixa = brutos.filter((r) => {
+    const fr = r.faixaRegionalItem;
+    if (!fr || fr.min == null || fr.max == null) return false;
+    return !pnCpRowWithinFaixaRegional(r, fr.base, fr.variacaoPct, fr.sentido || 'ambos');
+  });
+  if (foraFaixa.length) {
+    saveMessage.value = `${foraFaixa.length} preço(s) fora da faixa (VAR) — não podem ser salvos. Ajuste a busca ou a variação.`;
+  }
   const selecionados = brutos
     .filter((r) => canSalvarCotacaoPnCp(r))
+    .filter((r) => {
+      const fr = r.faixaRegionalItem;
+      if (!fr || fr.min == null || fr.max == null) return true;
+      return pnCpRowWithinFaixaRegional(r, fr.base, fr.variacaoPct, fr.sentido || 'ambos');
+    })
     .map((r) => {
       const raw = (r.sourceRaw && typeof r.sourceRaw === 'object') ? r.sourceRaw : {};
       const cad = (raw.fornecedor_cadastro && typeof raw.fornecedor_cadastro === 'object')

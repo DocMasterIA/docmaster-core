@@ -323,7 +323,7 @@ import {
 } from '../utils/pncpSaveCotacoes';
 import { MUNICIPIOS_POR_UF } from '../data/brasilMunicipiosPorUf';
 import { buildRecortesGeograficosPayload, itemMatchesRecortesGeograficos } from '../utils/recortesGeograficos';
-import { canSalvarCotacaoPnCp, displayPnCpUnitario, extractCnpjFornecedorSalvar, formatFaixaResumo, passesPnCpSearchDisplayGate, computeFaixaRegional, pickFornecedorDisplayName, buildFaixaRegionalItemDisplay, resolveRowPlataforma } from '../utils/pncpPricing';
+import { canSalvarCotacaoPnCp, displayPnCpUnitario, extractCnpjFornecedorSalvar, formatFaixaResumo, passesPnCpSearchDisplayGate, computeFaixaRegional, pickFornecedorDisplayName, buildFaixaRegionalItemDisplay, resolveRowPlataforma, pnCpRowWithinFaixaRegional } from '../utils/pncpPricing';
 import { labelModalidadeFonte } from '../utils/tceModalidade';
 import { formatMunicipioUf, resolveMunicipioUf } from '../utils/tceLocalidade';
 
@@ -1031,8 +1031,26 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
   const faixaBaseSelecionada = parseMoeda(filtros.valorBase);
   const brutos = resultados.value.filter((r) => r.selecionado);
   const semFornecedor = brutos.filter((r) => !rowSalvavelNaCotacao(r)).length;
+  const variacaoSave = Number.parseFloat(String(filtros.variacao || '0'));
+  const sentidoSave = ['baixo', 'cima', 'ambos'].includes(filtros.variacaoSentido)
+    ? filtros.variacaoSentido
+    : 'ambos';
+  const faixaAtivaSave = faixaBaseSelecionada != null
+    && faixaBaseSelecionada > 0
+    && Number.isFinite(variacaoSave)
+    && variacaoSave >= 0;
+  const foraFaixa = faixaAtivaSave
+    ? brutos.filter((r) => !pnCpRowWithinFaixaRegional(r, faixaBaseSelecionada, variacaoSave, sentidoSave))
+    : [];
+  if (foraFaixa.length) {
+    saveMessage.value = `${foraFaixa.length} preço(s) fora da faixa (VAR) — não podem ser salvos.`;
+  }
   const registros = brutos
     .filter((r) => rowSalvavelNaCotacao(r))
+    .filter((r) => (
+      !faixaAtivaSave
+      || pnCpRowWithinFaixaRegional(r, faixaBaseSelecionada, variacaoSave, sentidoSave)
+    ))
     .map((r) => {
       const raw = (r.sourceRaw && typeof r.sourceRaw === 'object') ? r.sourceRaw : {};
       const cad = (raw.fornecedor_cadastro && typeof raw.fornecedor_cadastro === 'object')

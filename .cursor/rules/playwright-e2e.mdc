@@ -1,0 +1,22 @@
+---
+description: E2E Playwright — auditoria Busca IA (preços, faixa, feedback researcher)
+globs: frontend-vue/e2e/**/*
+alwaysApply: false
+---
+
+# Playwright E2E — Auditoria Busca IA
+
+Quando o usuário pedir para testar a plataforma / busca com I.A:
+
+1. Credenciais em `frontend-vue/.env.e2e` (nunca hardcode).
+2. O teste **não** é smoke de UI: ele executa a busca, espera concluir, lê preços/faixas e gera feedback.
+3. Comandos:
+   ```bash
+   cd frontend-vue
+   npm run test:e2e:unit          # parsers/auditoria sem browser
+   npm run test:e2e               # cotação 138 (~52), relatório em e2e-artifacts/
+   PLAYWRIGHT_COTACAO_ID=137 PLAYWRIGHT_BULK_TIMEOUT_MS=7200000 npm run test:e2e
+   ```
+4. Failures críticos: preço fora da BASE±VAR, preço inválido.
+5. Ler o `.md` gerado e usar o bloco Feedback para priorizar fixes no researcher.
+6. Browser MCP serve para exploração pontual; a suíte repetível é o Playwright.

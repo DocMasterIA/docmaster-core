@@ -363,10 +363,15 @@ export function buildFaixaRegionalItemDisplay(valorBase, variacaoPct, sentido = 
   const base = Number(valorBase);
   const pct = Number(variacaoPct);
   if (!Number.isFinite(base) || base <= 0 || !Number.isFinite(pct) || pct < 0) return null;
-  const { min, max } = computeFaixaRegional(base, pct, sentido);
+  const { min, max, sentido: s } = computeFaixaRegional(base, pct, sentido);
   if (min == null || max == null) return null;
   const fmt = (n) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   return {
+    base,
+    variacaoPct: pct,
+    sentido: s,
+    min,
+    max,
     baseFmt: fmt(base),
     variacaoFmt: `${Math.round(pct).toLocaleString('pt-BR')}%`,
     rangeFmt: `${fmt(min)} – ${fmt(max)}`,

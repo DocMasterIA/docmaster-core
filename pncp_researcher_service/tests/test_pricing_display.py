@@ -122,14 +122,33 @@ class PricingDisplayTests(unittest.TestCase):
         }
         self.assertTrue(item_needs_homolog_pricing_lookup(it))
 
-    def test_faixa_band_aceita_estimado_quando_homologado_fora(self):
+    def test_faixa_band_rejeita_homologado_fora_mesmo_com_estimado_na_faixa(self):
+        """Preço exibido (homologado) fora da VAR → rejeita; estimado na faixa não salva."""
         lo, hi = 3.735, 11.205
         it = {
             "valor_unitario_homologado": 12.5,
             "valor_unitario_estimado": 9.0,
             "valor_unitario": 12.5,
         }
-        self.assertTrue(item_matches_faixa_band(it, lo, hi, sentido="ambos"))
+        self.assertFalse(item_matches_faixa_band(it, lo, hi, sentido="ambos"))
+
+    def test_faixa_band_caso_real_base_619_var_25_homolog_192(self):
+        """Base R$ 6,19 ±25% → [4,64; 7,74]; homologado R$ 1,92 nunca passa."""
+        from app.pricing_faixa import compute_faixa_regional
+
+        lo, hi = compute_faixa_regional(6.19, 25.0, sentido="ambos")
+        it = {
+            "valor_unitario_homologado": 1.92,
+            "valor_unitario_estimado": 6.19,
+            "valor_unitario": 1.92,
+        }
+        self.assertFalse(item_matches_faixa_band(it, lo, hi, sentido="ambos"))
+        it_ok = {
+            "valor_unitario_homologado": 6.00,
+            "valor_unitario_estimado": 6.19,
+            "valor_unitario": 6.00,
+        }
+        self.assertTrue(item_matches_faixa_band(it_ok, lo, hi, sentido="ambos"))
 
     def test_faixa_band_cima_rejeita_homologado_abaixo_com_estimado_na_faixa(self):
         lo, hi = 100.0, 120.0

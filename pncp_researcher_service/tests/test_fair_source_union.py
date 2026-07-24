@@ -9,10 +9,9 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from app.adapters.contracts import MarketPriceHit  # noqa: E402
+from app.adapters.contracts import FederatedSearchQuery, MarketPriceHit  # noqa: E402
 from app.adapters.dedup import dedupe_hits  # noqa: E402
 from app.adapters.pncp_adapter import PncpAdapter  # noqa: E402
-from app.adapters.contracts import FederatedSearchQuery  # noqa: E402
 from app.service import _select_top3_prioritize_federal  # noqa: E402
 
 
@@ -85,7 +84,8 @@ class TestFairSourceUnion(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual({h.plataforma for h in out}, {"pncp", "tce_rs"})
 
-    def test_federal_first_reserves_slot_for_estadual(self):
+    def test_federal_strong_does_not_force_weaker_estadual(self):
+        """Sem cota de fonte: 3 federais fortes ≥80 ganham; TCE mais fraco não é empurrado."""
         federais = [
             {
                 "plataforma": "pncp",
@@ -113,10 +113,11 @@ class TestFairSourceUnion(unittest.IsolatedAsyncioTestCase):
         }
         got = _select_top3_prioritize_federal(federais + [tce])
         plats = {str(x.get("plataforma")) for x in got}
-        self.assertIn("tce_rs", plats)
+        self.assertEqual(plats, {"pncp"})
         self.assertEqual(len(got), 3)
 
-    def test_mono_platform_top3_swaps_in_other_source(self):
+    def test_weaker_other_source_not_swapped_into_mono_top3(self):
+        """Sem swap de diversidade: Compras.gov mais fraco não displace PNCP."""
         pncp_only = [
             {
                 "plataforma": "pncp",
@@ -142,7 +143,7 @@ class TestFairSourceUnion(unittest.IsolatedAsyncioTestCase):
         }
         got = _select_top3_prioritize_federal(pncp_only + [cg])
         plats = {str(x.get("plataforma")) for x in got}
-        self.assertIn("compras_gov", plats)
+        self.assertEqual(plats, {"pncp"})
 
 
 if __name__ == "__main__":

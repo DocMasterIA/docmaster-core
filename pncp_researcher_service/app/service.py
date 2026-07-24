@@ -1496,18 +1496,14 @@ def _is_federal_item(it: Dict[str, Any]) -> bool:
 def _select_top3_prioritize_federal(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Regra de negócio:
-    1) Se houver ao menos 3 federais com score >= 80, prioriza federais mas reserva
-       slot para outra esfera/plataforma quando o pool tiver candidato elegível
-       (união justa PNCP/TCE/Compras — não descarta fonte estadual só por federal-first);
+    1) Se houver ao menos 3 federais com score >= 80, seleciona apenas federais;
     2) Caso contrário, seleção geral por qualidade (mescla I/II quando necessário).
     3) Se a regra federal deixar menos de 3, completa com demais esferas (até 3).
-    4) Diversidade de plataforma: se o top-3 ficou mono-fonte e há outra fonte
-       com score >= min_ok, troca o mais fraco pelo melhor da outra fonte.
+
+    Sem cota de plataforma: fontes competem no pool; o ranking decide.
     """
     if not items:
         return []
-
-    min_ok = float(_effective_min_score_aprovacao())
 
     def _complete_to_three(selected: List[Dict[str, Any]], pool: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if len(selected) >= 3:
@@ -1526,74 +1522,17 @@ def _select_top3_prioritize_federal(items: List[Dict[str, Any]]) -> List[Dict[st
                 used.add(k)
         return out[:3]
 
-    def _ensure_platform_diversity(selected: List[Dict[str, Any]], pool: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        if len(selected) < 2:
-            return selected[:3]
-        plats = {
-            str(x.get("plataforma") or "").strip().lower()
-            for x in selected
-            if str(x.get("plataforma") or "").strip()
-        }
-        if len(plats) >= 2:
-            return selected[:3]
-        used = {_ia_item_key(x) for x in selected if _ia_item_key(x)}
-        mono = next(iter(plats), "")
-        outsiders = [
-            x
-            for x in pool
-            if str(x.get("plataforma") or "").strip().lower()
-            and str(x.get("plataforma") or "").strip().lower() != mono
-            and _ia_item_key(x) not in used
-            and _safe_float(x.get("score_aprovacao")) >= min_ok
-        ]
-        if not outsiders:
-            return selected[:3]
-        outsiders.sort(
-            key=lambda it: (
-                float(it.get("literal_match") or 0),
-                float(it.get("score_aprovacao") or 0),
-            ),
-            reverse=True,
-        )
-        weakest_i = min(
-            range(len(selected)),
-            key=lambda i: (
-                float(selected[i].get("literal_match") or 0),
-                float(selected[i].get("score_aprovacao") or 0),
-            ),
-        )
-        # Só troca se o outsider não estiver muito abaixo do mais fraco do trio.
-        if float(outsiders[0].get("score_aprovacao") or 0) + 15 < float(
-            selected[weakest_i].get("score_aprovacao") or 0
-        ):
-            return selected[:3]
-        out = list(selected)
-        out[weakest_i] = outsiders[0]
-        return out[:3]
-
     federais = [it for it in items if _is_federal_item(it)]
     federais_80 = [it for it in federais if _safe_float(it.get("score_aprovacao")) >= 80.0]
-    nao_federais = [it for it in items if not _is_federal_item(it)]
 
-    # Priorização federal: no máximo 2 slots quando há estadual/municipal elegível
-    # no pool — evita sumir com TCE-RS só porque já há 3 federais fortes.
+    # Priorização total de Inciso I só quando há 3 federais "fortes" (>=80).
     if len(federais_80) >= 3:
-        elegiveis_outros = [
-            x for x in nao_federais if _safe_float(x.get("score_aprovacao")) >= min_ok
-        ]
-        if elegiveis_outros:
-            selected_federal = _select_top3_quality_first(federais)[:2]
-            # Reserva o 3º slot (e faltantes) para não-federais antes do pool geral.
-            selected = _complete_to_three(selected_federal, elegiveis_outros)
-            if len(selected) < 3:
-                selected = _complete_to_three(selected, items)
-        else:
-            selected_federal = _select_top3_quality_first(federais)
-            selected = _complete_to_three(selected_federal, items)
-        return _ensure_platform_diversity(selected, items)
+        selected_federal = _select_top3_quality_first(federais)
+        return _complete_to_three(selected_federal, items)
 
+    # Sem 3 federais fortes, usa ranking geral (pode cair em II ou mesclar I/II).
     selected_all = _select_top3_quality_first(items)
-    return _ensure_platform_diversity(selected_all[:3], items)
+    return selected_all[:3]
 
 
 def _merge_unique_items(primary: List[Dict[str, Any]], secondary: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -2735,26 +2674,7 @@ async def orchestrate_merged_candidate_pool(
             if not cnpj_f:
                 homolog_flag = it.get("item_homologado")
                 tem_res = it.get("temResultado")
-                origem_sup = str(it.get("origem") or "")
-                nome_f = str(
-                    it.get("fornecedor")
-                    or it.get("fornecedor_nome")
-                    or it.get("nome_fornecedor")
-                    or ""
-                ).strip()
-                # Índices abertos (TCE/Compras) nem sempre trazem CNPJ — não punir
-                # como PNCP sem fornecedor (união justa de fontes).
-                if origem_sup.startswith("federated_") or str(it.get("plataforma") or "").lower() in {
-                    "tce_rs",
-                    "compras_gov",
-                }:
-                    if nome_f:
-                        supplier_pen = -6.0
-                    elif tem_res is False or homolog_flag is False:
-                        supplier_pen = -18.0
-                    else:
-                        supplier_pen = -10.0
-                elif tem_res is False or homolog_flag is False:
+                if tem_res is False or homolog_flag is False:
                     supplier_pen = -35.0
                 else:
                     supplier_pen = -18.0
@@ -2929,15 +2849,6 @@ async def orchestrate_merged_candidate_pool(
         origem = str(it.get("origem") or "")
         if tier in ("strict", "core") and origem.startswith("base_local"):
             return True
-        # Pool federado (TCE/Compras/PNCP multi-fonte) sem search_tier: literal_match
-        # alto conta como literal para não empurrar fontes secundárias só para similaridade.
-        if origem.startswith("federated_") or str(it.get("plataforma") or "").lower() in {
-            "tce_rs",
-            "compras_gov",
-        }:
-            if bool(it.get("similaridade_encontrada")):
-                return False
-            return float(it.get("literal_match") or 0) >= 5.0
         if bool(it.get("similaridade_encontrada")):
             return False
         return float(it.get("literal_match") or 0) >= 6.0
@@ -3101,13 +3012,7 @@ async def orchestrate_merged_candidate_pool(
         elif pool_mode == "similar_only":
             top3 = _select_top3_prioritize_federal(similar_scored)[:3]
         else:
-            # Quality-first limita similaridade, mas não deixa o top-3 faminto
-            # quando há poucos literais e o pool scored ainda tem candidatos.
-            if PNCP_SEARCH_QUALITY_FIRST:
-                lit_n = min(3, len(literal_scored))
-                max_sim = max(int(PNCP_SEARCH_MAX_SIMILAR_IN_TOP3), 3 - lit_n)
-            else:
-                max_sim = 3
+            max_sim = int(PNCP_SEARCH_MAX_SIMILAR_IN_TOP3) if PNCP_SEARCH_QUALITY_FIRST else 3
             top3 = _select_top3_mixed_literal_similar(
                 literal_scored,
                 similar_scored,

@@ -241,29 +241,15 @@ Isso não é “merge quebrado”; é **merge sobre contribuições desiguais**.
 
 ---
 
-## 6. Patches de união justa (2026-07-24)
+## 6. União isonômica (estado após ajuste)
 
-Objetivo: **pesquisa de preços justa** — nenhuma fonte habilitada some no merge por assimetria estrutural.
+Objetivo: fontes no **mesmo pool**, **mesmo critério de qualidade** — sem cota de plataforma e sem afrouxar match.
 
-| Patch | O que mudou | Efeito |
-|-------|-------------|--------|
-| P1 chave top-3 | `_ia_item_key` com `plataforma` + id | TCE gêmeos não colapsam em 1 |
-| P2 fill similar | Completa top-3 quando literal é escasso | Não fica em 1 cotação com pool rico |
-| P3 cap plataforma | Limit FTS IA 50→**200** (env) | Mais candidatos TCE/Compras |
-| **M1 pool PNCP** | `PncpAdapter.search` usa `local_item_search` (pool), não top-3 intelligent | PNCP compete em igualdade |
-| **M5 dedup** | Dedup **por plataforma**; não apaga TCE vs PNCP no mesmo canon; vence identidade, não preço alto | Fontes permanecem até o scoring |
-| **M6 diversidade** | Federal-first reserva slot estadual; top-3 mono-fonte troca 1 slot | TCE/Compras não somem do trio |
-| **M7 CNPJ** | Penalidade suave em `federated_*` / TCE / Compras | Score justo para índice aberto |
-| **M4 literal** | Federado com `literal_match≥5` conta como literal | Menos empurrão para “similaridade” |
+**Mantido:** pool PNCP local; cap 200; dedup por plataforma; chave top-3 com plataforma+id; faixa hard.
 
-Testes: `test_fair_source_union.py`, `test_safe_federated_top3_patches.py`, adapters/crosslink atualizados.
+**Removido:** reserva/swap de diversidade; literal federado ≥5; CNPJ suave por fonte; fill agressivo de similar para fechar 3.
 
-### Ainda aberto (próxima leva)
-
-| # | Patch | Nota |
-|---|-------|------|
-| M3 | FTS multi-token nas plataformas | Precisão do recall TCE (genéricos 1º token) |
-| — | Family/product filters | Produto errado ≠ união de fontes |
+Testes: `test_fair_source_union.py`, `test_safe_federated_top3_patches.py`.
 
 ---
 

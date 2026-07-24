@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+from ..config import PNCP_FEDERATED_PLATFORM_SEARCH_LIMIT
 from ..platform_index.registry import get_platform_spec
 from ..platform_index.schema import platform_index_stats
 from ..platform_index.search import platform_item_search
@@ -32,11 +33,14 @@ class IndexedPlatformAdapter(PriceSourceAdapter):
         if spec is None or spec.schema_kind != "platform_index":
             return []
         uf = query.uf or spec.uf_scope
+        # Respeita tamanho_pagina do request, com teto configurável (default 200).
+        requested = max(10, int(query.tamanho_pagina or PNCP_FEDERATED_PLATFORM_SEARCH_LIMIT))
+        limit = min(int(PNCP_FEDERATED_PLATFORM_SEARCH_LIMIT), requested)
         rows = platform_item_search(
             spec,
             termo=query.termo_busca,
             uf=uf,
-            limit=min(50, max(10, int(query.tamanho_pagina or 50))),
+            limit=limit,
         )
         defaults = {
             "inciso_default": spec.inciso_default,

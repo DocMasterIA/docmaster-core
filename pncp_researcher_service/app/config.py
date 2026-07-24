@@ -396,6 +396,12 @@ PNCP_FEDERATED_SOURCE_TIMEOUT_SECONDS: float = float(
 PNCP_FEDERATED_PNCP_TIMEOUT_SECONDS: float = float(
     os.getenv("PNCP_FEDERATED_PNCP_TIMEOUT_SECONDS", "100") or "100"
 )
+# Cap de hits FTS por plataforma indexada (TCE-RS, Compras.gov) no caminho IA.
+# Manual (lista_completa) usa até 3000; IA antes era hardcoded em 50.
+PNCP_FEDERATED_PLATFORM_SEARCH_LIMIT: int = max(
+    10,
+    min(1000, _env_int("PNCP_FEDERATED_PLATFORM_SEARCH_LIMIT", 200)),
+)
 
 # Índices SQLite por plataforma (multi-fonte) — arquivos separados, cruzamento central.
 PRICE_PLATFORM_DATA_ROOT: str = os.getenv(

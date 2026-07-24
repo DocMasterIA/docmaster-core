@@ -68,7 +68,8 @@ def test_crosslink_same_pncp_merges_platforms(crosslink_db):
     assert key == "pncp|CNPJ-1-000001/2024|1"
 
 
-def test_dedupe_cross_platform_via_canonical_key():
+def test_dedupe_cross_platform_keeps_both_sources():
+    """União justa: mesmo canonical_key em PNCP + TCE não apaga uma fonte."""
     h_pncp = MarketPriceHit(
         plataforma="pncp",
         plataforma_item_id="CNPJ-1-000001/2024:1",
@@ -88,7 +89,9 @@ def test_dedupe_cross_platform_via_canonical_key():
         canonical_key="pncp|CNPJ-1-000001/2024|1",
     )
     out = dedupe_hits([h_pncp, h_tce])
-    assert len(out) == 1
+    assert len(out) == 2
+    plats = {h.plataforma for h in out}
+    assert plats == {"pncp", "tce_rs"}
 
 
 def test_build_canonical_key_prefers_numero_pncp():

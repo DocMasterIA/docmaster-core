@@ -18,10 +18,14 @@ from .registry import get_adapter, get_adapters
 
 
 def _timeout_for_source(source_id: str) -> float:
-    """PNCP (pipeline inteligente) precisa de bem mais tempo que FTS de plataformas."""
+    """
+    Multi-fonte: PNCP agora usa índice local (pool), timeout alinhado às demais fontes.
+    Só o fast-path search_raw (PNCP isolado) usa o pipeline inteligente completo.
+    """
     sid = str(source_id or "").strip().lower()
     if sid == "pncp":
-        return max(30.0, float(PNCP_FEDERATED_PNCP_TIMEOUT_SECONDS or 100.0))
+        # Pool local costuma ser rápido; mantém piso confortável se o índice estiver grande.
+        return max(20.0, min(float(PNCP_FEDERATED_PNCP_TIMEOUT_SECONDS or 100.0), 60.0))
     return max(5.0, float(PNCP_FEDERATED_SOURCE_TIMEOUT_SECONDS or 20.0))
 
 

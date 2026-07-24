@@ -42,7 +42,29 @@ def test_dedupe_hits_merges_same_item():
     )
     out = dedupe_hits([h1, h2])
     assert len(out) == 1
+    # Homologado vence (qualidade), não o preço maior por si só.
     assert out[0].valor_unitario_homologado == 12.0
+
+
+def test_dedupe_same_platform_prefers_cnpj_not_higher_price():
+    cheap = MarketPriceHit(
+        plataforma="tce_rs",
+        plataforma_item_id="same:1",
+        descricao_item="Fio nylon",
+        valor_unitario=2.0,
+        fornecedor_cnpj="12345678000199",
+        fornecedor_nome="Fornecedor A",
+    )
+    expensive = MarketPriceHit(
+        plataforma="tce_rs",
+        plataforma_item_id="same:1",
+        descricao_item="Fio nylon",
+        valor_unitario=9.0,
+    )
+    out = dedupe_hits([expensive, cheap])
+    assert len(out) == 1
+    assert out[0].fornecedor_cnpj == "12345678000199"
+    assert out[0].valor_unitario == 2.0
 
 
 def test_federated_query_defaults_to_pncp():

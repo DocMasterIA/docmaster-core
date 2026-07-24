@@ -295,13 +295,13 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   backfillLocalIndex,
   federatedMarketSearch,
   formatResearchError,
-  getResearchSession,
+  getResearchSessionResilient,
   getLocalIndexStats,
 } from '../services/pncpResearch';
 import PriceSourcesPanel from '../components/PriceSourcesPanel.vue';
@@ -321,6 +321,7 @@ import {
   persistCotacoesToResearchSession,
   shouldClearSavedSelection,
 } from '../utils/pncpSaveCotacoes';
+import { takeManualSearchPrefill } from '../utils/manualSearchPrefill';
 import { MUNICIPIOS_POR_UF } from '../data/brasilMunicipiosPorUf';
 import { buildRecortesGeograficosPayload, itemMatchesRecortesGeograficos } from '../utils/recortesGeograficos';
 import { canSalvarCotacaoPnCp, displayPnCpUnitario, extractCnpjFornecedorSalvar, formatFaixaResumo, passesPnCpSearchDisplayGate, computeFaixaRegional, pickFornecedorDisplayName, buildFaixaRegionalItemDisplay, resolveRowPlataforma, pnCpRowWithinFaixaRegional } from '../utils/pncpPricing';
@@ -500,7 +501,8 @@ let searchGeneration = 0;
 const saveMessage = ref('');
 const localStats = ref(null);
 const fontesCatalog = ref([]);
-const fontesHabilitadas = ref(['pncp']);
+/** Todas as fontes ready por padrão (PNCP + TCE + Compras.gov…). */
+const fontesHabilitadas = ref([]);
 const isLoadingFontes = ref(false);
 
 const fontesBuscaLabel = computed(() => {
@@ -638,17 +640,11 @@ async function carregarFontesPreco() {
   try {
     const catalog = await loadPriceSourcesCatalog();
     fontesCatalog.value = mergeFontesWithLocalStats(catalog, localStats.value);
-    const defaults = pickDefaultFontes(fontesCatalog.value);
-    if (!fontesHabilitadas.value?.length) {
-      fontesHabilitadas.value = defaults;
-    } else {
-      fontesHabilitadas.value = fontesHabilitadas.value.filter((id) =>
-        fontesCatalog.value.some((f) => f.id === id && f.search_ready !== false),
-      );
-      if (!fontesHabilitadas.value.length) fontesHabilitadas.value = defaults;
-    }
+    // Sempre inicia com todas as fontes ready (união multi-fonte).
+    fontesHabilitadas.value = pickDefaultFontes(fontesCatalog.value);
   } catch (_err) {
     fontesCatalog.value = [];
+    fontesHabilitadas.value = ['pncp'];
   } finally {
     isLoadingFontes.value = false;
   }
@@ -1232,44 +1228,102 @@ function applyFaixaDefaultsFromItem(it) {
   }
 }
 
-onMounted(async () => {
+function applyPrefillPayload(prefill) {
+  if (!prefill || typeof prefill !== 'object') return;
+  const descricao = String(prefill.descricao || '').trim();
+  if (descricao) filtros.descricao = descricao;
+  const base = Number(prefill.valor_base);
+  if (Number.isFinite(base) && base > 0) {
+    const centavos = Math.round(base * 100);
+    filtros.valorBase = (centavos / 100).toFixed(2).replace('.', ',');
+  }
+  const variacao = Number(prefill.variacao_percentual);
+  if (Number.isFinite(variacao) && variacao >= 0) {
+    filtros.variacao = String(Math.round(variacao));
+  }
+  if (prefill.source && typeof prefill.source === 'object') {
+    applyFaixaDefaultsFromItem({ source: prefill.source, valor_base: prefill.valor_base });
+  }
+}
+
+let hydrateGeneration = 0;
+
+async function hydrateManualFromRoute({ autoSearch = true } = {}) {
+  const gen = ++hydrateGeneration;
   await carregarStatusBaseLocal();
   await carregarFontesPreco();
+  if (gen !== hydrateGeneration) return;
+
   const sessionId = Number(cotacaoId.value);
+  const iid = itemId.value;
+
+  // 1) Prefill do detalhe do item (mais confiável que re-buscar a sessão).
+  if (iid) {
+    applyPrefillPayload(takeManualSearchPrefill(cotacaoId.value, iid));
+  }
+  // 2) Query opcional ?descricao=
+  const qDesc = String(route.query.descricao || '').trim();
+  if (qDesc && !filtros.descricao) filtros.descricao = qDesc;
+
   if (Number.isFinite(sessionId) && sessionId > 0) {
     try {
-      const data = await getResearchSession(sessionId);
-      const filtrosSessao = (data?.sessao?.filtros && typeof data.sessao.filtros === 'object') ? data.sessao.filtros : {};
+      const data = await getResearchSessionResilient(sessionId, { maxAttempts: 3, timeoutMs: 120_000 });
+      if (gen !== hydrateGeneration) return;
+      const filtrosSessao = (data?.sessao?.filtros && typeof data.sessao.filtros === 'object')
+        ? data.sessao.filtros
+        : {};
       const variacaoGlobal = Number(
         filtrosSessao.variacao_percentual_global ?? filtrosSessao.variacao_global_percentual ?? null,
       );
-      variacaoGlobalDaSessao.value = Number.isFinite(variacaoGlobal) && variacaoGlobal >= 0 ? variacaoGlobal : null;
+      variacaoGlobalDaSessao.value = Number.isFinite(variacaoGlobal) && variacaoGlobal >= 0
+        ? variacaoGlobal
+        : null;
       if (variacaoGlobalDaSessao.value != null) {
         filtros.variacao = String(Math.round(variacaoGlobalDaSessao.value));
       }
       const sentidoRaw = String(filtrosSessao.variacao_sentido_global || '').trim().toLowerCase();
       filtros.variacaoSentido = ['cima', 'baixo', 'ambos'].includes(sentidoRaw) ? sentidoRaw : 'ambos';
       const itens = Array.isArray(data?.itens) ? data.itens : [];
-      const target = itemId.value
-        ? itens.find((x) => Number(x?.id) === Number(itemId.value))
+      const target = iid
+        ? itens.find((x) => Number(x?.id) === Number(iid))
         : itens.find((x) => {
-            const src = x?.source || {};
-            return Number.isFinite(Number(src?.valor_base ?? src?.valorBase ?? src?.preco_base ?? src?.precoBase))
-              || Number.isFinite(Number(src?.variacao_percentual ?? src?.variacaoPercentual ?? src?.variacao));
-          });
-      if (itemId.value && target) {
-        const descricaoItem = String(target?.descricao_item || '').trim();
-        if (descricaoItem) {
-          filtros.descricao = descricaoItem;
-        }
+          const src = x?.source || {};
+          return Number.isFinite(Number(src?.valor_base ?? src?.valorBase ?? src?.preco_base ?? src?.precoBase))
+            || Number.isFinite(Number(src?.variacao_percentual ?? src?.variacaoPercentual ?? src?.variacao));
+        });
+      if (iid && target) {
+        const descricaoItem = String(target?.descricao_item || target?.descricao || '').trim();
+        if (descricaoItem) filtros.descricao = descricaoItem;
       }
       applyFaixaDefaultsFromItem(target || null);
-    } catch (_) {
-      // Faixa padrão é opcional; mantém valores existentes se falhar.
+    } catch (err) {
+      if (!filtros.descricao.trim()) {
+        searchError.value = `Não foi possível carregar o item da cotação (${formatResearchError(err)}).`;
+      }
     }
   }
-  buscarNoBackend();
+
+  if (iid && !filtros.descricao.trim()) {
+    searchError.value = searchError.value
+      || 'Item sem descrição carregada. Volte ao detalhe do item e abra a busca manual de novo.';
+  }
+
+  if (autoSearch && filtros.descricao.trim()) {
+    await buscarNoBackend();
+  }
+}
+
+onMounted(() => {
+  hydrateManualFromRoute({ autoSearch: true });
 });
+
+watch(
+  () => [String(route.params.cotacaoId || ''), String(route.query.itemId || '')],
+  ([cot, iid], [prevCot, prevIid]) => {
+    if (cot === prevCot && iid === prevIid) return;
+    hydrateManualFromRoute({ autoSearch: true });
+  },
+);
 </script>
 
 <style scoped>

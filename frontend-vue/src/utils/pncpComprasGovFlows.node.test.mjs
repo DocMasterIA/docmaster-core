@@ -21,6 +21,8 @@ import {
   resolveRowPlataforma,
 } from './pncpPricing.js';
 
+import { fontePortalCtaLabel, fontePortalFieldLabel } from './pncpPortal.js';
+
 test('normalize e detecção compras_gov / tce', () => {
   assert.equal(normalizePlataformaId('compras-gov'), 'compras_gov');
   assert.equal(isComprasGovPlatform('compras_gov'), true);
@@ -124,4 +126,19 @@ test('falha: compras_gov sem fornecedor identificável não salva', () => {
     },
   };
   assert.equal(canSalvarCotacaoPnCp(row), false);
+});
+
+test('CTA portal Compras.gov/ComprasNet não diz Ver no PNCP', () => {
+  const cotacao = {
+    plataforma: 'compras_gov',
+    numero_pncp: '46374500000194-1-005070/2026',
+    source: {
+      plataforma: 'compras_gov',
+      numero_pncp: '46374500000194-1-005070/2026',
+      url_origem:
+        'https://cnetmobile.estaleiro.serpro.gov.br/comprasnet-web/public/compras/acompanhamento-compra?compra=09011805900442026',
+    },
+  };
+  assert.equal(fontePortalCtaLabel(cotacao), 'Ver no ComprasNet');
+  assert.equal(fontePortalFieldLabel(cotacao), 'Processo ComprasNet');
 });

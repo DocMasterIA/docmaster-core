@@ -74,6 +74,18 @@ function isTceRsPlataforma(plat) {
   return plat === 'tce_rs' || plat === 'tce-rs' || plat === 'licitacon';
 }
 
+function isComprasGovPlataforma(plat) {
+  return plat === 'compras_gov' || plat === 'compras-gov' || plat === 'comprasgov';
+}
+
+/** URL do acompanhamento ComprasNet (SERPRO), típica em link_sistema_origem. */
+function isComprasNetUrl(url) {
+  const u = String(url || '');
+  return /cnetmobile\.estaleiro\.serpro\.gov\.br/i.test(u)
+    || /comprasnet-web/i.test(u)
+    || /compras\.net\.gov\.br/i.test(u);
+}
+
 /** Deep-link LicitaCon do processo (LINK_LICITACON_CIDADAO). Sem fallback genérico. */
 function buildTceRsPortalUrl(cotacao) {
   const layers = cotacaoMetaLayers(cotacao);
@@ -175,12 +187,13 @@ export function fontePortalProcessoDisplayLabel(cotacao) {
   return pncpProcessoDisplayLabel(cotacao);
 }
 
-/** Texto do CTA: «Ver no PNCP» / «Ver no TCE-RS». */
+/** Texto do CTA: «Ver no PNCP» / «Ver no TCE-RS» / «Ver no ComprasNet». */
 export function fontePortalCtaLabel(cotacao) {
   const plat = resolveCotacaoPlataforma(cotacao);
   if (isTceRsPlataforma(plat)) return 'Ver no TCE-RS';
   const url = buildFontePortalProcessoUrl(cotacao);
   if (/portal\.tce\.rs\.gov\.br/i.test(url)) return 'Ver no TCE-RS';
+  if (isComprasGovPlataforma(plat) || isComprasNetUrl(url)) return 'Ver no ComprasNet';
   return 'Ver no PNCP';
 }
 
@@ -189,16 +202,19 @@ export function fontePortalFieldLabel(cotacao) {
   if (isTceRsPlataforma(plat)) return 'Processo TCE-RS';
   const url = buildFontePortalProcessoUrl(cotacao);
   if (/portal\.tce\.rs\.gov\.br/i.test(url)) return 'Processo TCE-RS';
+  if (isComprasGovPlataforma(plat) || isComprasNetUrl(url)) return 'Processo ComprasNet';
   return 'Processo PNCP';
 }
 
 export function fontePortalTitle(cotacao) {
   const label = fontePortalProcessoDisplayLabel(cotacao);
   const url = buildFontePortalProcessoUrl(cotacao);
-  const isTce =
-    isTceRsPlataforma(resolveCotacaoPlataforma(cotacao))
-    || /portal\.tce\.rs\.gov\.br/i.test(url);
-  const portal = isTce ? 'portal TCE-RS (LicitaCon)' : 'portal PNCP';
+  const plat = resolveCotacaoPlataforma(cotacao);
+  const isTce = isTceRsPlataforma(plat) || /portal\.tce\.rs\.gov\.br/i.test(url);
+  const isComprasNet = !isTce && (isComprasGovPlataforma(plat) || isComprasNetUrl(url));
+  const portal = isTce
+    ? 'portal TCE-RS (LicitaCon)'
+    : (isComprasNet ? 'ComprasNet' : 'portal PNCP');
   return label ? `Abrir processo ${label} no ${portal}` : `Abrir no ${portal}`;
 }
 

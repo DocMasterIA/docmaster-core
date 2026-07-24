@@ -66,13 +66,14 @@
             <i class="fa-solid fa-robot" aria-hidden="true"></i>
             Buscar preços com I.A para este item
           </RouterLink>
-          <RouterLink
+          <button
+            type="button"
             class="item-search-btn item-search-btn--manual"
-            :to="`/pesquisador-pncp/cotacoes/${cotacaoId}/busca-manual?itemId=${itemId}`"
+            @click="abrirBuscaManual"
           >
             <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
             Iniciar busca manual para este item
-          </RouterLink>
+          </button>
           <RouterLink
             class="item-search-btn item-search-btn--direta"
             :to="`/pesquisador-pncp/cotacoes/${cotacaoId}/itens/${itemId}/cotacao-direta`"
@@ -315,7 +316,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import {
   deleteCotacaoFromItemResearchSession,
   formatResearchError,
@@ -342,9 +343,11 @@ import {
   isPnCpHomologadoSemPrecoVencedor,
   totalDeMediaUnitariaExibida,
 } from '../utils/pncpPricing';
+import { stashManualSearchPrefill } from '../utils/manualSearchPrefill';
 import { formatMunicipioUf } from '../utils/tceLocalidade';
 
 const route = useRoute();
+const router = useRouter();
 const cotacaoId = computed(() => String(route.params.cotacaoId || ''));
 const itemId = computed(() => Number(route.params.itemId));
 
@@ -444,6 +447,24 @@ const itemCotacoesFiltradas = computed(() => {
   if (!alvo) return itemCotacoes.value;
   return itemCotacoes.value.filter((c) => classificarFonte(c) === alvo);
 });
+
+function abrirBuscaManual() {
+  const sid = cotacaoId.value;
+  const iid = itemId.value;
+  const it = item.value;
+  if (!sid || !Number.isFinite(iid) || iid <= 0) return;
+  if (it) {
+    stashManualSearchPrefill(sid, iid, {
+      descricao: String(it.descricao_item || '').trim(),
+      source: it.source && typeof it.source === 'object' ? it.source : {},
+      valor_base: faixaValorBase.value,
+      variacao_percentual: Number.isFinite(Number(variacaoGlobalSessao.value))
+        ? Number(variacaoGlobalSessao.value)
+        : null,
+    });
+  }
+  router.push(`/pesquisador-pncp/cotacoes/${sid}/busca-manual?itemId=${iid}`);
+}
 
 onMounted(loadItem);
 
@@ -908,6 +929,8 @@ function labelIncisoFromCotacao(cotacao) {
   color: #fff;
   padding: 8px 12px;
   font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
   text-decoration: none;
   display: inline-flex;
   align-items: center;

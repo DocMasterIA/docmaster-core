@@ -8,6 +8,8 @@
     "preview": "vite preview",
     "test:utils": "node --test src/utils/pncpBulkFlow.node.test.mjs src/utils/pncpComprasGovFlows.node.test.mjs",
     "test:e2e": "playwright test",
+    "test:e2e:ia": "playwright test e2e/busca-ia-cotacao.spec.mjs",
+    "test:e2e:manual": "playwright test e2e/busca-manual-cotacao.spec.mjs",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:unit": "node --test e2e/auditBuscaIa.node.test.mjs",

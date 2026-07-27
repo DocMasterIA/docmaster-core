@@ -90,6 +90,38 @@ def test_map_compra_and_item_sample():
     assert item["uf"] == "DF"
 
 
+def test_validate_and_map_mensal_seges_2025_aliases():
+    """Schema mensal SEGES: numero_item + descricao (sem *_pncp / *_resumida)."""
+    item_headers = [
+        "cod_compra",
+        "numero_item",
+        "numero_item_compra",
+        "descricao_detalhada",
+        "descricao",
+        "unidade_medida",
+        "quantidade",
+        "valor_unitario_estimado",
+        "numero_controle_PNCP_compra",
+    ]
+    assert validate_item_headers(item_headers)["ok"] is True
+
+    item = map_item_row(
+        {
+            "cod_compra": "99",
+            "numero_item": "3",
+            "descricao": "Agulha hipodérmica",
+            "unidade_medida": "UN",
+            "quantidade": "100",
+            "valor_unitario_estimado": "1.5",
+            "numero_controle_PNCP_compra": "00-1-1/2025",
+        }
+    )
+    assert item is not None
+    assert item["numero_item"] == "3"
+    assert item["descricao"] == "Agulha hipodérmica"
+    assert item["plataforma_item_id"] == "compras_gov:99:3"
+
+
 def test_validate_bundle_structure_mini(tmp_path: Path):
     compra = tmp_path / "x-VW_FT_PNCP_COMPRA.csv"
     item = tmp_path / "x-VW_FT_PNCP_COMPRA_ITEM.csv"

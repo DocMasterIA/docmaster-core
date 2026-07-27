@@ -18,6 +18,7 @@ Documentação do módulo **Pesquisador PNCP** (`pncp_researcher_service`), inge
 | [ARQUITETURA-FEEDS-INDEPENDENTES.md](./ARQUITETURA-FEEDS-INDEPENDENTES.md) | Feeds PNCP + TCE-RS + Compras.gov independentes → researcher |
 | [ANALISE-COLUNAS-PREMIUM.md](../pncp_researcher_service/data/tce_rs/ANALISE-COLUNAS-PREMIUM.md) | TCE-RS: scan CSV × item premium (sem API externa) |
 | [MODULO-FONTES-PRECOS-04-COMPRAS-GOV.md](./MODULO-FONTES-PRECOS-04-COMPRAS-GOV.md) | **Compras.gov** — o que foi feito (scaffold + produto + testes); CSV pendente |
+| [ESTUDO-NOTAS-FISCAIS-PORTAL-TRANSPARENCIA.md](./ESTUDO-NOTAS-FISCAIS-PORTAL-TRANSPARENCIA.md) | **Estudo** — NF-e Portal da Transparência → Inciso V (proposta) |
 
 ---
 

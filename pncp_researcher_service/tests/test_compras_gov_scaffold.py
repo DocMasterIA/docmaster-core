@@ -93,6 +93,22 @@ def test_discover_nested_mensal(tmp_path: Path):
     assert found == [nested.resolve()]
 
 
+def test_discover_prefers_yyyy_mm_over_root_latest(tmp_path: Path):
+    """*-latest.csv na raiz não deve impedir ingest dos meses YYYY/MM."""
+    from app.platform_index.ingest.compras_gov.ingest import discover_ingest_dirs
+
+    (tmp_path / "comprasGOV-mensal-VW_FT_PNCP_COMPRA_ITEM-latest.csv").write_text(
+        "a\n", encoding="utf-8"
+    )
+    month = tmp_path / "2025" / "06"
+    month.mkdir(parents=True)
+    (month / "comprasGOV-mensal-VW_FT_PNCP_COMPRA_ITEM-2025-06.csv").write_text(
+        "a\n", encoding="utf-8"
+    )
+    found = discover_ingest_dirs(tmp_path)
+    assert found == [month.resolve()]
+
+
 def test_ingest_sample_from_fixtures_works(tmp_path):
     from app.platform_index.ingest.compras_gov.ingest import ingest_compras_gov_sample
     from app.platform_index.registry import PlatformIndexSpec, register_platform_spec

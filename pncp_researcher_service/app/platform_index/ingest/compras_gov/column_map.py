@@ -16,24 +16,29 @@ import unicodedata
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 # Cabeçalhos obrigatórios (após normalize_header) para validar a estrutura do CSV.
-REQUIRED_COMPRA_HEADERS: Tuple[str, ...] = (
-    "cod_compra",
-    "numero_controle_pncp",
-    "orgao_entidade_razao_social",
-    "unidade_orgao_uf_sigla",
-    "unidade_orgao_municipio_nome",
-    "modalidade_nome",
+# Cada grupo é OR: basta um alias (schema legado vs mensal 2025+ do repositório SEGES).
+REQUIRED_COMPRA_HEADER_GROUPS: Tuple[Tuple[str, ...], ...] = (
+    ("cod_compra",),
+    ("numero_controle_pncp",),
+    ("orgao_entidade_razao_social",),
+    ("unidade_orgao_uf_sigla",),
+    ("unidade_orgao_municipio_nome",),
+    ("modalidade_nome",),
 )
 
-REQUIRED_ITEM_HEADERS: Tuple[str, ...] = (
-    "cod_compra",
-    "numero_item_pncp",
-    "numero_controle_pncp_compra",
-    "descricao_resumida",
-    "unidade_medida",
-    "quantidade",
-    "valor_unitario_estimado",
+REQUIRED_ITEM_HEADER_GROUPS: Tuple[Tuple[str, ...], ...] = (
+    ("cod_compra",),
+    ("numero_item_pncp", "numero_item", "numero_item_compra", "cod_item_compra"),
+    ("numero_controle_pncp_compra", "id_contratacao_pncp"),
+    ("descricao_resumida", "descricao_detalhada", "descricao"),
+    ("unidade_medida",),
+    ("quantidade",),
+    ("valor_unitario_estimado", "valor_unitario_resultado"),
 )
+
+# Nomes canônicos (primeiro de cada grupo) — docs / column_map_spec / testes.
+REQUIRED_COMPRA_HEADERS: Tuple[str, ...] = tuple(g[0] for g in REQUIRED_COMPRA_HEADER_GROUPS)
+REQUIRED_ITEM_HEADERS: Tuple[str, ...] = tuple(g[0] for g in REQUIRED_ITEM_HEADER_GROUPS)
 
 # Opcionais mas usados no map (preço homologado / fornecedor / join).
 OPTIONAL_COMPRA_HEADERS: Tuple[str, ...] = (
@@ -121,12 +126,27 @@ def _cnpj_digits(v: Optional[str]) -> Optional[str]:
 
 
 def missing_required_headers(headers: Sequence[str], required: Sequence[str]) -> List[str]:
+    """Compat: lista plana de nomes canônicos (cada um obrigatório)."""
     have: Set[str] = {normalize_header(h) for h in headers}
     return [h for h in required if h not in have]
 
 
+def missing_required_header_groups(
+    headers: Sequence[str],
+    groups: Sequence[Sequence[str]],
+) -> List[str]:
+    """Retorna o nome canônico (primeiro alias) de cada grupo sem nenhum match."""
+    have: Set[str] = {normalize_header(h) for h in headers}
+    missing: List[str] = []
+    for group in groups:
+        aliases = [normalize_header(a) for a in group]
+        if not any(a in have for a in aliases):
+            missing.append(group[0])
+    return missing
+
+
 def validate_compra_headers(headers: Sequence[str]) -> Dict[str, Any]:
-    missing = missing_required_headers(headers, REQUIRED_COMPRA_HEADERS)
+    missing = missing_required_header_groups(headers, REQUIRED_COMPRA_HEADER_GROUPS)
     return {
         "ok": not missing,
         "view": "VW_FT_PNCP_COMPRA",
@@ -136,7 +156,7 @@ def validate_compra_headers(headers: Sequence[str]) -> Dict[str, Any]:
 
 
 def validate_item_headers(headers: Sequence[str]) -> Dict[str, Any]:
-    missing = missing_required_headers(headers, REQUIRED_ITEM_HEADERS)
+    missing = missing_required_header_groups(headers, REQUIRED_ITEM_HEADER_GROUPS)
     return {
         "ok": not missing,
         "view": "VW_FT_PNCP_COMPRA_ITEM",
@@ -177,8 +197,8 @@ def map_compra_row(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "objeto": _pick(r, ("objeto_compra",)),
         "url_origem": _pick(r, ("link_sistema_origem",)),
         "data_publicacao": _pick(r, ("data_publicacao_pncp",)),
-        "ano_compra": _pick(r, ("ano_compra_pncp",)),
-        "sequencial_compra": _pick(r, ("sequencial_compra_pncp",)),
+        "ano_compra": _pick(r, ("ano_compra_pncp", "ano_compra")),
+        "sequencial_compra": _pick(r, ("sequencial_compra_pncp", "sequencial_compra")),
         "existe_resultado": _truthy(_pick(r, ("existe_resultado",))),
         "inciso_classificacao": "inciso_i",
         "esfera": "federal",
@@ -194,7 +214,11 @@ def map_item_row(row: Dict[str, Any], *, compra: Optional[Dict[str, Any]] = None
     """
     r = normalize_row_keys(row)
     cod = _pick(r, ("cod_compra",))
-    numero_item = _pick(r, ("numero_item_pncp", "numero_item_compra", "cod_item_compra"))
+    # Mensal SEGES 2025+: numero_item / descricao; legado: numero_item_pncp / descricao_resumida.
+    numero_item = _pick(
+        r,
+        ("numero_item_pncp", "numero_item", "numero_item_compra", "cod_item_compra"),
+    )
     if not cod or not numero_item:
         return None
 
@@ -203,7 +227,7 @@ def map_item_row(row: Dict[str, Any], *, compra: Optional[Dict[str, Any]] = None
     est = _pick_float(r, ("valor_unitario_estimado",))
     tem_resultado = _truthy(_pick(r, ("tem_resultado",))) or (hom is not None and hom > 0)
 
-    descricao = _pick(r, ("descricao_resumida", "descricao_detalhada")) or ""
+    descricao = _pick(r, ("descricao_resumida", "descricao_detalhada", "descricao")) or ""
     numero_pncp = (
         _pick(r, ("numero_controle_pncp_compra", "id_contratacao_pncp"))
         or compra.get("numero_pncp")

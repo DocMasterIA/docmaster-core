@@ -57,13 +57,14 @@ def discover_ingest_dirs(root: Path) -> List[Path]:
     """
     Aceita:
     - pasta com CSVs VW_FT_PNCP_COMPRA(_ITEM) direto;
-    - pasta mãe com subpastas (anual/, mensal/YYYY-MM/, …) que tenham o bundle.
+    - pasta mãe com subpastas (anual/, mensal/YYYY/MM/, …) que tenham o bundle.
+
+    Preferência: subpastas YYYY/MM (ou filhas com bundle) antes da raiz.
+    Assim *-latest.csv na raiz não engole os meses.
     """
     root = root.expanduser().resolve()
     if not root.is_dir():
         raise FileNotFoundError(f"Diretório Compras.gov não encontrado: {root}")
-    if is_compras_gov_bundle_dir(root):
-        return [root]
     child_dirs = [
         p
         for p in sorted(root.iterdir())
@@ -79,6 +80,8 @@ def discover_ingest_dirs(root: Path) -> List[Path]:
     found = child_dirs + nested
     if found:
         return found
+    if is_compras_gov_bundle_dir(root):
+        return [root]
     raise FileNotFoundError(
         f"Nenhum CSV Compras.gov em {root} "
         f"(esperado *{COMPRAS_GOV_VIEW_COMPRA_ITEM}*.csv; "

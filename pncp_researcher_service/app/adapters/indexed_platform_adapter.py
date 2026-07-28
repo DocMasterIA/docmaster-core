@@ -79,3 +79,15 @@ class ComprasGovAdapter(IndexedPlatformAdapter):
     label = "Compras.gov (Dados Abertos)"
     inciso_default = "inciso_i"
     esfera_default = "federal"
+
+
+class NotasFiscaisAdapter(IndexedPlatformAdapter):
+    """Leitura do índice SQLite alimentado por CSV Portal da Transparência (NFe).
+
+    Scaffold Fase 1: sem ingest → health=False e search=[]. Inciso V.
+    """
+
+    id = "notas_fiscais"
+    label = "Notas Fiscais (Portal da Transparência)"
+    inciso_default = "inciso_v"
+    esfera_default = "federal"

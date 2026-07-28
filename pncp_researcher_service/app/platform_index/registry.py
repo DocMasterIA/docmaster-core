@@ -6,6 +6,7 @@ from typing import Dict, List, Literal, Optional
 
 from ..config import (
     COMPRAS_GOV_LOCAL_DB_PATH,
+    NOTAS_FISCAIS_LOCAL_DB_PATH,
     PNCP_LOCAL_DB_PATH,
     PRICE_CROSSLINK_DB_PATH,
     PRICE_PLATFORM_DATA_ROOT,
@@ -87,6 +88,19 @@ _PLATFORM_SPECS: Dict[str, PlatformIndexSpec] = {
         db_path=COMPRAS_GOV_LOCAL_DB_PATH,
         schema_kind="platform_index",
         inciso_default="inciso_i",
+        esfera_default="federal",
+        uf_scope=None,
+        enabled=True,
+        search_ready=False,
+        index_writer="feed",
+    ),
+    # Portal da Transparência — Notas Fiscais (Inciso V). Scaffold: sem ingest ainda.
+    "notas_fiscais": PlatformIndexSpec(
+        id="notas_fiscais",
+        label="Notas Fiscais (Portal da Transparência)",
+        db_path=NOTAS_FISCAIS_LOCAL_DB_PATH,
+        schema_kind="platform_index",
+        inciso_default="inciso_v",
         esfera_default="federal",
         uf_scope=None,
         enabled=True,

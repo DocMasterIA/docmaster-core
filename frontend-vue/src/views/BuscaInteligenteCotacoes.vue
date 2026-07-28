@@ -259,13 +259,15 @@
                       <div v-if="row.interpretacaoIa" class="bia-ia-hint" title="Leitura auxiliar gerada por IA">
                         <strong>IA:</strong> {{ row.interpretacaoIa }}
                       </div>
-                      <div class="bia-sub">
-                        <span class="bia-meta-token">{{ row.orgao }}</span>
-                        <span v-if="row.cidade && row.cidade !== '-'" class="bia-meta-sep">·</span>
+                      <div v-if="(row.orgao && row.orgao !== '-') || (row.cidade && row.cidade !== '-')" class="bia-sub">
+                        <span v-if="row.orgao && row.orgao !== '-'" class="bia-meta-token">{{ row.orgao }}</span>
+                        <span v-if="row.orgao && row.orgao !== '-' && row.cidade && row.cidade !== '-'" class="bia-meta-sep">·</span>
                         <span v-if="row.cidade && row.cidade !== '-'">{{ row.cidade }}</span>
                       </div>
-                      <div class="bia-sub">
-                        {{ row.modalidade }} • {{ row.status }} • {{ row.normalizado }}
+                      <div v-if="biaMetaParts(row).length" class="bia-sub">
+                        <template v-for="(part, idx) in biaMetaParts(row)" :key="idx">
+                          <span v-if="idx > 0"> • </span>{{ part }}
+                        </template>
                       </div>
                       <div v-if="row.similaridadeEncontrada" class="bia-sub">
                         <span class="bia-badge bia-badge--warn">Similaridade parcial encontrada</span>
@@ -1939,6 +1941,12 @@ function isWithinPeriodo(itemDate, periodoLabel) {
   return dt >= cutoff;
 }
 
+function biaMetaParts(row) {
+  return [row?.modalidade, row?.status, row?.normalizado]
+    .map((v) => String(v || '').trim())
+    .filter((v) => v && v !== '-');
+}
+
 function resolveTipoItem(item) {
   const materialServico = normalizeText(item?.sourceRaw?.material_servico || item?.material_servico || item?.normalizado || '');
   if (materialServico.includes('servico') || materialServico.includes('serviço')) return 'Servico';
@@ -2137,6 +2145,11 @@ function onVariacaoInput(event) {
   background: #f3f0ff;
   border-color: #d4c8f5;
   color: #4c3d8a;
+}
+.bia-plat-badge--notas_fiscais {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
 }
 .bia-plat-badge--pncp {
   background: #eef8f2;

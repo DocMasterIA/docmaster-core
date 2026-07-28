@@ -28,8 +28,41 @@ def _item_fingerprint(processo_id: str, numero_item: str, descricao: str) -> str
 
 
 def ensure_compras_gov_index(*, db_path: Optional[str] = None) -> Dict[str, Any]:
-    """Cria o SQLite/schema (vazio se ainda sem ingest)."""
+    """Cria o SQLite/schema (vazio se ainda sem ingest) e backfill de meta a partir de processos."""
     path = ensure_platform_index(PLATFORM_ID, db_path=db_path)
+    backfilled = 0
+    with platform_conn(path) as c:
+        cur = c.execute(
+            """
+            UPDATE platform_itens_leitura AS i
+            SET
+              orgao = COALESCE(
+                NULLIF(trim(i.orgao), ''),
+                (SELECT NULLIF(trim(p.orgao), '') FROM platform_processos p WHERE p.id = i.processo_id)
+              ),
+              municipio = COALESCE(
+                NULLIF(trim(i.municipio), ''),
+                (SELECT NULLIF(trim(p.municipio), '') FROM platform_processos p WHERE p.id = i.processo_id)
+              ),
+              uf = COALESCE(
+                NULLIF(trim(i.uf), ''),
+                (SELECT NULLIF(trim(p.uf), '') FROM platform_processos p WHERE p.id = i.processo_id)
+              ),
+              modalidade = COALESCE(
+                NULLIF(trim(i.modalidade), ''),
+                (SELECT NULLIF(trim(p.modalidade), '') FROM platform_processos p WHERE p.id = i.processo_id)
+              )
+            WHERE i.plataforma = ?
+              AND (
+                NULLIF(trim(i.orgao), '') IS NULL
+                OR NULLIF(trim(i.municipio), '') IS NULL
+                OR NULLIF(trim(i.uf), '') IS NULL
+                OR NULLIF(trim(i.modalidade), '') IS NULL
+              )
+            """,
+            (PLATFORM_ID,),
+        )
+        backfilled = int(cur.rowcount or 0)
     stats = platform_index_stats(path)
     return {
         "ok": True,
@@ -37,6 +70,7 @@ def ensure_compras_gov_index(*, db_path: Optional[str] = None) -> Dict[str, Any]
         "db_path": path,
         "index_stats": stats,
         "itens_written": int(stats.get("itens_leitura") or 0),
+        "meta_backfilled_rows": backfilled,
         "item_materialize_enabled": True,
     }
 
@@ -77,8 +111,8 @@ def materialize_compras_gov_parsed(
                 """
                 INSERT INTO platform_processos(
                     id, plataforma, numero_processo, numero_pncp, orgao, municipio, uf,
-                    objeto, data_publicacao, updated_at, raw_json_zlib
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    objeto, modalidade, data_publicacao, updated_at, raw_json_zlib
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     numero_processo=excluded.numero_processo,
                     numero_pncp=excluded.numero_pncp,
@@ -86,6 +120,7 @@ def materialize_compras_gov_parsed(
                     municipio=excluded.municipio,
                     uf=excluded.uf,
                     objeto=excluded.objeto,
+                    modalidade=COALESCE(excluded.modalidade, platform_processos.modalidade),
                     data_publicacao=excluded.data_publicacao,
                     updated_at=excluded.updated_at,
                     raw_json_zlib=excluded.raw_json_zlib
@@ -99,6 +134,7 @@ def materialize_compras_gov_parsed(
                     compra.get("municipio"),
                     compra.get("uf"),
                     compra.get("objeto"),
+                    compra.get("modalidade"),
                     compra.get("data_publicacao"),
                     now,
                     _compress_json(compra),
@@ -119,6 +155,7 @@ def materialize_compras_gov_parsed(
             orgao = item.get("orgao") or compra.get("orgao")
             municipio = item.get("municipio") or compra.get("municipio")
             uf = item.get("uf") or compra.get("uf")
+            modalidade = item.get("modalidade") or compra.get("modalidade")
             url = item.get("url_origem") or compra.get("url_origem")
             data_ref = item.get("data_referencia") or compra.get("data_publicacao")
             numero_pncp = item.get("numero_pncp") or compra.get("numero_pncp")
@@ -189,9 +226,13 @@ def materialize_compras_gov_parsed(
                 """
                 INSERT INTO platform_processos(
                     id, plataforma, numero_processo, numero_pncp, orgao, municipio, uf,
-                    objeto, data_publicacao, updated_at, raw_json_zlib
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO NOTHING
+                    objeto, modalidade, data_publicacao, updated_at, raw_json_zlib
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    orgao=COALESCE(NULLIF(trim(excluded.orgao), ''), platform_processos.orgao),
+                    municipio=COALESCE(NULLIF(trim(excluded.municipio), ''), platform_processos.municipio),
+                    uf=COALESCE(NULLIF(trim(excluded.uf), ''), platform_processos.uf),
+                    modalidade=COALESCE(NULLIF(trim(excluded.modalidade), ''), platform_processos.modalidade)
                 """,
                 (
                     proc_id,
@@ -202,6 +243,7 @@ def materialize_compras_gov_parsed(
                     municipio,
                     uf,
                     None,
+                    modalidade,
                     data_ref,
                     now,
                     _compress_json({"stub": True, "cod_compra": cod}),
@@ -213,20 +255,21 @@ def materialize_compras_gov_parsed(
                 INSERT INTO platform_itens_leitura(
                     plataforma, plataforma_item_id, processo_id, numero_item, descricao,
                     material_servico, valor_unitario, valor_unitario_homologado,
-                    unidade_medida, quantidade, orgao, municipio, uf,
+                    unidade_medida, quantidade, orgao, municipio, uf, modalidade,
                     fornecedor_nome, cnpj_fornecedor, data_referencia,
                     inciso_classificacao, esfera, url_origem, numero_pncp, numero_processo,
                     updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(plataforma, plataforma_item_id) DO UPDATE SET
                     descricao=excluded.descricao,
                     valor_unitario=excluded.valor_unitario,
                     valor_unitario_homologado=excluded.valor_unitario_homologado,
                     unidade_medida=excluded.unidade_medida,
                     quantidade=excluded.quantidade,
-                    orgao=excluded.orgao,
-                    municipio=excluded.municipio,
-                    uf=excluded.uf,
+                    orgao=COALESCE(NULLIF(trim(excluded.orgao), ''), platform_itens_leitura.orgao),
+                    municipio=COALESCE(NULLIF(trim(excluded.municipio), ''), platform_itens_leitura.municipio),
+                    uf=COALESCE(NULLIF(trim(excluded.uf), ''), platform_itens_leitura.uf),
+                    modalidade=COALESCE(NULLIF(trim(excluded.modalidade), ''), platform_itens_leitura.modalidade),
                     fornecedor_nome=excluded.fornecedor_nome,
                     cnpj_fornecedor=excluded.cnpj_fornecedor,
                     data_referencia=excluded.data_referencia,
@@ -251,6 +294,7 @@ def materialize_compras_gov_parsed(
                     orgao,
                     municipio,
                     uf,
+                    modalidade,
                     item.get("fornecedor_nome"),
                     item.get("cnpj_fornecedor"),
                     data_ref,
@@ -263,6 +307,38 @@ def materialize_compras_gov_parsed(
                 ),
             )
             stats["itens_leitura_upserted"] += 1
+
+        # Completa lacunas de geo/modalidade a partir do processo (qualquer item).
+        c.execute(
+            """
+            UPDATE platform_itens_leitura AS i
+            SET
+              orgao = COALESCE(
+                NULLIF(trim(i.orgao), ''),
+                (SELECT NULLIF(trim(p.orgao), '') FROM platform_processos p WHERE p.id = i.processo_id)
+              ),
+              municipio = COALESCE(
+                NULLIF(trim(i.municipio), ''),
+                (SELECT NULLIF(trim(p.municipio), '') FROM platform_processos p WHERE p.id = i.processo_id)
+              ),
+              uf = COALESCE(
+                NULLIF(trim(i.uf), ''),
+                (SELECT NULLIF(trim(p.uf), '') FROM platform_processos p WHERE p.id = i.processo_id)
+              ),
+              modalidade = COALESCE(
+                NULLIF(trim(i.modalidade), ''),
+                (SELECT NULLIF(trim(p.modalidade), '') FROM platform_processos p WHERE p.id = i.processo_id)
+              )
+            WHERE i.plataforma = ?
+              AND (
+                NULLIF(trim(i.orgao), '') IS NULL
+                OR NULLIF(trim(i.municipio), '') IS NULL
+                OR NULLIF(trim(i.uf), '') IS NULL
+                OR NULLIF(trim(i.modalidade), '') IS NULL
+              )
+            """,
+            (PLATFORM_ID,),
+        )
 
         c.execute(
             """

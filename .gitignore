@@ -62,4 +62,8 @@ comprasGOV-*.csv
 !pncp_researcher_service/fixtures/compras_gov/fixture-VW_FT_PNCP_COMPRA.csv
 !pncp_researcher_service/fixtures/compras_gov/fixture-VW_FT_PNCP_COMPRA_ITEM.csv
 
+# Notas Fiscais Portal da Transparência (GB — nunca versionar)
+pncp_researcher_service/data/notas_fiscais/raw/*
+!pncp_researcher_service/data/notas_fiscais/raw/.gitkeep
+
 /staticfiles/

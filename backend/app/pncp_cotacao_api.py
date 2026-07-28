@@ -986,6 +986,9 @@ def _fonte_bucket_from_source(src: Dict[str, Any]) -> Optional[str]:
     # Compras.gov Dados Abertos = camada federal (Inciso I).
     if plat in {"compras_gov", "compras-gov", "comprasgov"}:
         return "governamentais"
+    # Portal da Transparência NFe = Inciso V.
+    if plat in {"notas_fiscais", "notas-fiscais", "notasfiscais", "nfe"}:
+        return "notasFiscais"
 
     inciso = _norm_fonte_text(src.get("inciso_classificacao") or src.get("incisoClassificacao"))
     fonte = _norm_fonte_text(src.get("fonte") or src.get("tipo_fonte") or src.get("categoria_fonte"))
@@ -999,6 +1002,8 @@ def _fonte_bucket_from_source(src: Dict[str, Any]) -> Optional[str]:
         return "governamentais"
     if inciso in {"inciso_ii", "inciso-ii", "entes_publicos", "outros_entes_publicos", "outros entes publicos"}:
         return "entesPublicos"
+    if inciso in {"inciso_v", "inciso-v", "notas_fiscais", "notas fiscais"}:
+        return "notasFiscais"
     # Regra mandatória de esfera: Federal => Inciso I; Estadual/Municipal/Distrital => Inciso II.
     if esfera_id == "f":
         return "governamentais"

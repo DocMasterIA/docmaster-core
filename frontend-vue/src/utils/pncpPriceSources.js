@@ -15,6 +15,11 @@ const FALLBACK_FONTES = [
     label: 'Compras.gov (Dados Abertos)',
     search_ready: false,
   },
+  {
+    id: 'notas_fiscais',
+    label: 'Notas Fiscais (Portal da Transparência)',
+    search_ready: false,
+  },
 ];
 
 /** Mescla catálogo da API com totais/readiness do /local-index/stats. */
@@ -64,6 +69,11 @@ export function isComprasGovPlatform(id) {
   return key === 'compras_gov' || key === 'comprasgov';
 }
 
+export function isNotasFiscaisPlatform(id) {
+  const key = normalizePlataformaId(id);
+  return key === 'notas_fiscais' || key === 'notasfiscais' || key === 'nfe';
+}
+
 /**
  * Metadados de save por plataforma (inciso / esfera / bucket de fonte).
  * Fallbacks só entram quando a plataforma não tem regra própria.
@@ -83,10 +93,18 @@ export function platformSaveMeta(plat, fallbacks = {}) {
       fonte: 'governamentais',
     };
   }
+  if (isNotasFiscaisPlatform(plat)) {
+    return {
+      inciso_classificacao: 'inciso_v',
+      esfera_administrativa: 'federal',
+      fonte: 'notas_fiscais',
+    };
+  }
   const inciso = fallbacks.inciso_classificacao || fallbacks.inciso || null;
   let fonte = fallbacks.fonte || null;
   if (!fonte && inciso === 'inciso_i') fonte = 'governamentais';
   if (!fonte && inciso === 'inciso_ii') fonte = 'entes_publicos';
+  if (!fonte && inciso === 'inciso_v') fonte = 'notas_fiscais';
   return {
     inciso_classificacao: inciso,
     esfera_administrativa: fallbacks.esfera_administrativa || fallbacks.esfera || null,
@@ -100,6 +118,7 @@ export function plataformaLabel(id, fontes = []) {
   if (hit?.label) return hit.label;
   if (isTceRsPlatform(key)) return 'TCE-RS (LicitaCon)';
   if (isComprasGovPlatform(key)) return 'Compras.gov (Dados Abertos)';
+  if (isNotasFiscaisPlatform(key)) return 'Notas Fiscais (Portal da Transparência)';
   if (key === 'pncp') return 'PNCP';
   return key.toUpperCase();
 }
@@ -108,6 +127,7 @@ export function plataformaBadgeShort(id) {
   const key = normalizePlataformaId(id) || 'pncp';
   if (isTceRsPlatform(key)) return 'TCE-RS';
   if (isComprasGovPlatform(key)) return 'Compras.gov';
+  if (isNotasFiscaisPlatform(key)) return 'Notas Fiscais';
   if (key === 'pncp') return 'PNCP';
   return key.toUpperCase();
 }
@@ -117,6 +137,7 @@ export function plataformaFonteCurta(id) {
   const key = normalizePlataformaId(id) || 'pncp';
   if (isTceRsPlatform(key)) return 'TCE-RS';
   if (isComprasGovPlatform(key)) return 'Compras.gov';
+  if (isNotasFiscaisPlatform(key)) return 'Notas Fiscais';
   if (key === 'pncp') return 'PNCP';
   return plataformaBadgeShort(key);
 }

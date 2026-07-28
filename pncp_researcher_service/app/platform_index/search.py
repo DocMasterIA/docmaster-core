@@ -155,7 +155,9 @@ def platform_item_search(
     params: List[Any] = [fts_query]
     where_geo = ""
     if uf:
-        where_geo = " AND i.uf = ?"
+        where_geo = (
+            " AND COALESCE(NULLIF(trim(i.uf), ''), NULLIF(trim(p.uf), '')) = ?"
+        )
         params.append(uf.strip().upper()[:2])
 
     params.append(max(1, min(int(limit), 5000)))
@@ -172,9 +174,10 @@ def platform_item_search(
             i.valor_unitario_homologado,
             i.unidade_medida,
             i.quantidade,
-            i.orgao,
-            i.municipio,
-            i.uf,
+            COALESCE(NULLIF(trim(i.orgao), ''), NULLIF(trim(p.orgao), '')) AS orgao,
+            COALESCE(NULLIF(trim(i.municipio), ''), NULLIF(trim(p.municipio), '')) AS municipio,
+            COALESCE(NULLIF(trim(i.uf), ''), NULLIF(trim(p.uf), '')) AS uf,
+            COALESCE(NULLIF(trim(i.modalidade), ''), NULLIF(trim(p.modalidade), '')) AS modalidade,
             i.fornecedor_nome,
             i.cnpj_fornecedor,
             i.data_referencia,
@@ -186,6 +189,7 @@ def platform_item_search(
             bm25(platform_itens_fts) AS fts_rank
         FROM platform_itens_fts
         JOIN platform_itens_leitura i ON i.id = platform_itens_fts.rowid
+        LEFT JOIN platform_processos p ON p.id = i.processo_id
         WHERE platform_itens_fts MATCH ?
         {where_geo}
         ORDER BY fts_rank
@@ -196,16 +200,22 @@ def platform_item_search(
         with platform_conn(spec.db_path) as c:
             rows = c.execute(sql, params).fetchall()
     except Exception:
-        # Fallback LIKE se FTS vazio ou erro de sintaxe
+        # Fallback LIKE se FTS vazio ou erro de sintaxe / coluna nova ausente
         like = f"%{anchor}%"
         like_params: List[Any] = [like]
         if uf:
             like_params.append(uf.strip().upper()[:2])
         like_params.append(max(1, min(int(limit), 5000)))
         like_sql = f"""
-            SELECT * FROM platform_itens_leitura i
+            SELECT
+              i.*,
+              COALESCE(NULLIF(trim(i.orgao), ''), NULLIF(trim(p.orgao), '')) AS orgao,
+              COALESCE(NULLIF(trim(i.municipio), ''), NULLIF(trim(p.municipio), '')) AS municipio,
+              COALESCE(NULLIF(trim(i.uf), ''), NULLIF(trim(p.uf), '')) AS uf
+            FROM platform_itens_leitura i
+            LEFT JOIN platform_processos p ON p.id = i.processo_id
             WHERE i.descricao LIKE ?
-            {" AND i.uf = ?" if uf else ""}
+            {" AND COALESCE(NULLIF(trim(i.uf), ''), NULLIF(trim(p.uf), '')) = ?" if uf else ""}
             LIMIT ?
         """
         with platform_conn(spec.db_path) as c:

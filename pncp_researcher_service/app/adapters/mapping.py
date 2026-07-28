@@ -163,6 +163,15 @@ def hit_to_pncp_row(hit: MarketPriceHit) -> Dict[str, Any]:
         row.setdefault("esfera_administrativa", "federal")
         row.setdefault("fonte", "governamentais")
         row.setdefault("plataforma_label", "Compras.gov")
+        mod = str((hit.raw or {}).get("modalidade") or "").strip()
+        if mod:
+            row.setdefault("modalidade", mod)
+    if hit.plataforma == "notas_fiscais":
+        row.setdefault("inciso_classificacao", "inciso_v")
+        row.setdefault("esfera", "federal")
+        row.setdefault("esfera_administrativa", "federal")
+        row.setdefault("fonte", "notas_fiscais")
+        row.setdefault("plataforma_label", "Notas Fiscais")
     url = (
         hit.url_origem
         or str(row.get("url_origem") or row.get("link_licitacon_cidadao") or "").strip()

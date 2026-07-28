@@ -156,9 +156,9 @@ SQLite+FTS: planejar volume Docker **≥ 10–20 GB** com folga (índices + upse
 | Fase | Status |
 |------|--------|
 | **0 — Spike** | **Feito** (jan/2026) |
-| 1 — Scaffold | Próximo |
-| 2 — Ingest Item+join NF | — |
-| 3 — Federado + UI Inciso V | — |
+| **1 — Scaffold** | **Feito** (registry + adapter + feed `:8017` + ensure) |
+| **2 — Ingest Item+join NF** | **Feito** (parser cp1252/`;`, materialize, VU→homologado) |
+| 3 — Federado + UI Inciso V | parcial (fonte no catálogo; search_ready após ingest) |
 | 4 — Qualidade lexical isonômica | — |
 
 ---

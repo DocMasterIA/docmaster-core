@@ -26,6 +26,7 @@ from .schemas import (
     LocalBackfillRequest,
     LocalSyncCatalogRequest,
     ComprasGovIngestRequest,
+    NotasFiscaisIngestRequest,
     TceRsIngestRequest,
 )
 from .service_mode import (
@@ -417,6 +418,86 @@ async def compras_gov_ingest_sample_endpoint():
 
     try:
         return ingest_compras_gov_sample()
+    except NotImplementedError as e:
+        raise HTTPException(status_code=501, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)[:500]) from e
+
+
+@feed_router.get("/price-platform-indexes/notas_fiscais/ingest-status")
+@legacy_feed_router.get("/price-platform-indexes/notas_fiscais/ingest-status")
+async def notas_fiscais_ingest_status_endpoint():
+    _require_platform_feed("notas_fiscais")
+    from .platform_index.ingest.notas_fiscais import notas_fiscais_ingest_status
+
+    return notas_fiscais_ingest_status()
+
+
+@feed_router.post("/price-platform-indexes/notas_fiscais/validate-structure")
+@legacy_feed_router.post("/price-platform-indexes/notas_fiscais/validate-structure")
+async def notas_fiscais_validate_structure_endpoint(body: NotasFiscaisIngestRequest | None = None):
+    """Valida CSV/cabeçalhos sem gravar itens no índice."""
+    _require_platform_feed("notas_fiscais")
+    from .platform_index.ingest.notas_fiscais import validate_notas_fiscais_structure
+
+    data_dir = (body.data_dir if body else None) or None
+    try:
+        return validate_notas_fiscais_structure(data_dir)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)[:500]) from e
+
+
+@feed_router.post("/price-platform-indexes/notas_fiscais/ensure")
+@legacy_feed_router.post("/price-platform-indexes/notas_fiscais/ensure")
+async def notas_fiscais_ensure_endpoint():
+    """Cria SQLite/schema vazio (sem alimentar itens)."""
+    _require_platform_feed("notas_fiscais")
+    from .platform_index.ingest.notas_fiscais import ensure_notas_fiscais_db
+
+    try:
+        return ensure_notas_fiscais_db()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)[:500]) from e
+
+
+@feed_router.post("/price-platform-indexes/notas_fiscais/ingest")
+@legacy_feed_router.post("/price-platform-indexes/notas_fiscais/ingest")
+async def notas_fiscais_ingest_endpoint(body: NotasFiscaisIngestRequest):
+    _require_platform_feed("notas_fiscais")
+    from .platform_index.ingest.notas_fiscais import (
+        ingest_notas_fiscais_from_directory,
+        ingest_notas_fiscais_sample,
+    )
+
+    try:
+        if body.use_sample:
+            return ingest_notas_fiscais_sample()
+        if not body.data_dir:
+            raise HTTPException(
+                status_code=400,
+                detail="Informe data_dir ou use_sample=true",
+            )
+        return ingest_notas_fiscais_from_directory(body.data_dir, max_rows=body.max_rows)
+    except NotImplementedError as e:
+        raise HTTPException(status_code=501, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)[:500]) from e
+
+
+@feed_router.post("/price-platform-indexes/notas_fiscais/ingest-sample")
+@legacy_feed_router.post("/price-platform-indexes/notas_fiscais/ingest-sample")
+async def notas_fiscais_ingest_sample_endpoint():
+    _require_platform_feed("notas_fiscais")
+    from .platform_index.ingest.notas_fiscais import ingest_notas_fiscais_sample
+
+    try:
+        return ingest_notas_fiscais_sample()
     except NotImplementedError as e:
         raise HTTPException(status_code=501, detail=str(e)) from e
     except FileNotFoundError as e:

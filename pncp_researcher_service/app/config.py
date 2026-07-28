@@ -420,6 +420,10 @@ COMPRAS_GOV_LOCAL_DB_PATH: str = os.getenv(
     "COMPRAS_GOV_LOCAL_DB_PATH",
     os.path.join(PRICE_PLATFORM_DATA_ROOT, "compras_gov_local.db"),
 ).strip()
+NOTAS_FISCAIS_LOCAL_DB_PATH: str = os.getenv(
+    "NOTAS_FISCAIS_LOCAL_DB_PATH",
+    os.path.join(PRICE_PLATFORM_DATA_ROOT, "notas_fiscais_local.db"),
+).strip()
 PRICE_INDEX_FEED_BASE_URL: str = os.getenv(
     "PRICE_INDEX_FEED_BASE_URL",
     "http://127.0.0.1:8013",

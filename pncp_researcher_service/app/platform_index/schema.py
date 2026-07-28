@@ -13,6 +13,21 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
+def _table_columns(c: sqlite3.Cursor, table: str) -> set[str]:
+    rows = c.execute(f"PRAGMA table_info({table})").fetchall()
+    out: set[str] = set()
+    for row in rows:
+        name = row["name"] if isinstance(row, sqlite3.Row) else row[1]
+        out.add(str(name))
+    return out
+
+
+def _ensure_column(c: sqlite3.Cursor, table: str, column: str, col_type: str = "TEXT") -> None:
+    if column in _table_columns(c, table):
+        return
+    c.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+
+
 def _trigger_exists(c: sqlite3.Cursor, name: str) -> bool:
     row = c.execute(
         "SELECT 1 FROM sqlite_master WHERE type='trigger' AND name=? LIMIT 1",
@@ -169,6 +184,9 @@ def ensure_platform_index(platform_id: str, *, db_path: Optional[str] = None) ->
             "CREATE INDEX IF NOT EXISTS idx_platform_leitura_pncp "
             "ON platform_itens_leitura(numero_pncp, numero_item)"
         )
+        # Meta de compra (Compras.gov modalidade; backfill/geo via processo).
+        _ensure_column(c, "platform_itens_leitura", "modalidade", "TEXT")
+        _ensure_column(c, "platform_processos", "modalidade", "TEXT")
         c.execute(
             """
             CREATE TABLE IF NOT EXISTS platform_ingest_state (

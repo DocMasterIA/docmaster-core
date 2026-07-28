@@ -282,6 +282,28 @@ class ComprasGovIngestRequest(BaseModel):
     )
 
 
+class NotasFiscaisIngestRequest(BaseModel):
+    """Ingest CSV Portal da Transparência — Notas Fiscais (scaffold; Fase 2)."""
+
+    data_dir: Optional[str] = Field(
+        None,
+        description=(
+            "Pasta com *NotaFiscalItem*.csv (+ opcional *NotaFiscal*.csv) "
+            "ou raiz raw/YYYY/MM/."
+        ),
+    )
+    use_sample: bool = Field(
+        False,
+        description="Carrega fixtures internas para dev/teste (Fase 2).",
+    )
+    max_rows: Optional[int] = Field(
+        None,
+        ge=1,
+        le=5000000,
+        description="Limite de linhas de ITEM (debug/amostra).",
+    )
+
+
 class ResearchSessionCreateRequest(BaseModel):
     """Corpo para criar uma ordem de pesquisa (cotação) persistida no serviço PNCP."""
 

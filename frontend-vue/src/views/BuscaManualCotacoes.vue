@@ -1834,6 +1834,11 @@ watch(
   border-color: #d4c8f5;
   color: #4c3d8a;
 }
+.manual-plat-badge--notas_fiscais {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
+}
 .manual-plat-badge--pncp {
   background: #eef8f2;
   border-color: #c8e6d4;

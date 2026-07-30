@@ -67,6 +67,13 @@ export function resolveCotacaoPlataforma(cotacao) {
     const plat = String(layer.plataforma || layer.platform_id || '').trim().toLowerCase();
     if (plat) return plat;
   }
+  // Save antigo / meta só com bucket de fonte.
+  for (const layer of cotacaoMetaLayers(cotacao)) {
+    const fonte = String(layer.fonte || layer.tipo_fonte || '').trim().toLowerCase();
+    if (fonte === 'notas_fiscais' || fonte === 'notas fiscais' || fonte === 'nfe') {
+      return 'notas_fiscais';
+    }
+  }
   return 'pncp';
 }
 
@@ -78,12 +85,42 @@ function isComprasGovPlataforma(plat) {
   return plat === 'compras_gov' || plat === 'compras-gov' || plat === 'comprasgov';
 }
 
+function isNotasFiscaisPlataforma(plat) {
+  const p = String(plat || '').trim().toLowerCase().replace(/-/g, '_');
+  return p === 'notas_fiscais' || p === 'notasfiscais' || p === 'nfe';
+}
+
 /** URL do acompanhamento ComprasNet (SERPRO), típica em link_sistema_origem. */
 function isComprasNetUrl(url) {
   const u = String(url || '');
   return /cnetmobile\.estaleiro\.serpro\.gov\.br/i.test(u)
     || /comprasnet-web/i.test(u)
     || /compras\.net\.gov\.br/i.test(u);
+}
+
+function isPortalTransparenciaUrl(url) {
+  return /portaldatransparencia\.gov\.br/i.test(String(url || ''));
+}
+
+function pickUrlOrigemFromLayers(cotacao) {
+  for (const layer of cotacaoMetaLayers(cotacao)) {
+    const u = String(layer.url_origem || layer.link_origem || '').trim();
+    if (/^https?:\/\//i.test(u)) return u;
+  }
+  return '';
+}
+
+/** Chave NFe / id de processo sem prefixo interno `notas_fiscais:`. */
+function notasFiscaisProcessoDisplayLabel(cotacao) {
+  for (const layer of cotacaoMetaLayers(cotacao)) {
+    for (const k of ['numero_processo', 'processo_id', 'plataforma_item_id', 'chave', 'chave_acesso']) {
+      let label = String(layer[k] || '').trim();
+      if (!label) continue;
+      label = label.replace(/^notas_fiscais:/i, '').split(':')[0].trim() || label;
+      if (label) return label;
+    }
+  }
+  return '';
 }
 
 /** Deep-link LicitaCon do processo (LINK_LICITACON_CIDADAO). Sem fallback genérico. */
@@ -140,23 +177,28 @@ export function buildPncpPortalProcessoUrl(cotacao) {
   return `${PNCP_PORTAL_BASE}/${cnpj}/${anoN}/${seqN}`;
 }
 
-/** Link do portal da fonte (PNCP, TCE-RS LicitaCon ou url_origem Compras.gov). */
+/** Link do portal da fonte (PNCP, TCE-RS, Compras.gov ou Portal da Transparência / NFe). */
 export function buildFontePortalProcessoUrl(cotacao) {
   const plat = resolveCotacaoPlataforma(cotacao);
   if (isTceRsPlataforma(plat)) {
     return buildTceRsPortalUrl(cotacao);
   }
 
-  // Compras.gov / outras: preferir deep-link gravado no source.
-  if (plat === 'compras_gov' || plat === 'compras-gov' || plat === 'comprasgov') {
-    for (const layer of cotacaoMetaLayers(cotacao)) {
-      const u = String(layer.url_origem || layer.link_origem || '').trim();
-      if (/^https?:\/\//i.test(u)) return u;
-    }
+  // Compras.gov / Notas Fiscais: preferir deep-link gravado no source.
+  if (
+    isComprasGovPlataforma(plat)
+    || isNotasFiscaisPlataforma(plat)
+  ) {
+    const origem = pickUrlOrigemFromLayers(cotacao);
+    if (origem) return origem;
   }
 
   const pncpUrl = buildPncpPortalProcessoUrl(cotacao);
   if (pncpUrl) return pncpUrl;
+
+  // Fallback: url_origem de Portal da Transparência sem plataforma explícita.
+  const origem = pickUrlOrigemFromLayers(cotacao);
+  if (isPortalTransparenciaUrl(origem)) return origem;
 
   // TCE salvo sem plataforma explícita, mas com deep-link LicitaCon.
   return buildTceRsPortalUrl(cotacao);
@@ -171,6 +213,13 @@ export function pncpProcessoDisplayLabel(cotacao) {
 
 export function fontePortalProcessoDisplayLabel(cotacao) {
   const plat = resolveCotacaoPlataforma(cotacao);
+  const url = buildFontePortalProcessoUrl(cotacao);
+  if (
+    isNotasFiscaisPlataforma(plat)
+    || isPortalTransparenciaUrl(url)
+  ) {
+    return notasFiscaisProcessoDisplayLabel(cotacao);
+  }
   if (isTceRsPlataforma(plat) || /portal\.tce\.rs\.gov\.br/i.test(buildTceRsPortalUrl(cotacao))) {
     for (const layer of cotacaoMetaLayers(cotacao)) {
       const label = String(
@@ -187,12 +236,14 @@ export function fontePortalProcessoDisplayLabel(cotacao) {
   return pncpProcessoDisplayLabel(cotacao);
 }
 
-/** Texto do CTA: «Ver no PNCP» / «Ver no TCE-RS» / «Ver no ComprasNet». */
+/** Texto do CTA: «Ver no PNCP» / «Ver no TCE-RS» / «Ver no ComprasNet» / «Ver no Portal da Transparência». */
 export function fontePortalCtaLabel(cotacao) {
   const plat = resolveCotacaoPlataforma(cotacao);
   if (isTceRsPlataforma(plat)) return 'Ver no TCE-RS';
+  if (isNotasFiscaisPlataforma(plat)) return 'Ver no Portal da Transparência';
   const url = buildFontePortalProcessoUrl(cotacao);
   if (/portal\.tce\.rs\.gov\.br/i.test(url)) return 'Ver no TCE-RS';
+  if (isPortalTransparenciaUrl(url)) return 'Ver no Portal da Transparência';
   if (isComprasGovPlataforma(plat) || isComprasNetUrl(url)) return 'Ver no ComprasNet';
   return 'Ver no PNCP';
 }
@@ -200,8 +251,10 @@ export function fontePortalCtaLabel(cotacao) {
 export function fontePortalFieldLabel(cotacao) {
   const plat = resolveCotacaoPlataforma(cotacao);
   if (isTceRsPlataforma(plat)) return 'Processo TCE-RS';
+  if (isNotasFiscaisPlataforma(plat)) return 'Processo Portal da Transparência';
   const url = buildFontePortalProcessoUrl(cotacao);
   if (/portal\.tce\.rs\.gov\.br/i.test(url)) return 'Processo TCE-RS';
+  if (isPortalTransparenciaUrl(url)) return 'Processo Portal da Transparência';
   if (isComprasGovPlataforma(plat) || isComprasNetUrl(url)) return 'Processo ComprasNet';
   return 'Processo PNCP';
 }
@@ -211,10 +264,13 @@ export function fontePortalTitle(cotacao) {
   const url = buildFontePortalProcessoUrl(cotacao);
   const plat = resolveCotacaoPlataforma(cotacao);
   const isTce = isTceRsPlataforma(plat) || /portal\.tce\.rs\.gov\.br/i.test(url);
-  const isComprasNet = !isTce && (isComprasGovPlataforma(plat) || isComprasNetUrl(url));
+  const isNf = !isTce && (isNotasFiscaisPlataforma(plat) || isPortalTransparenciaUrl(url));
+  const isComprasNet = !isTce && !isNf && (isComprasGovPlataforma(plat) || isComprasNetUrl(url));
   const portal = isTce
     ? 'portal TCE-RS (LicitaCon)'
-    : (isComprasNet ? 'ComprasNet' : 'portal PNCP');
+    : (isNf
+      ? 'Portal da Transparência'
+      : (isComprasNet ? 'ComprasNet' : 'portal PNCP'));
   return label ? `Abrir processo ${label} no ${portal}` : `Abrir no ${portal}`;
 }
 

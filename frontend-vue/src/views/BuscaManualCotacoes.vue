@@ -309,6 +309,7 @@ import {
   federatedItemPlataforma,
   federatedItemProcessoRef,
   isComprasGovPlatform,
+  isNotasFiscaisPlatform,
   isTceRsPlatform,
   loadPriceSourcesCatalog,
   mergeFontesWithLocalStats,
@@ -823,6 +824,8 @@ function mapFederatedItemToRow(it, idx, { termoBuscaEfetivo, termoFallbackUsado,
       })()}${processoRef ? ` · proc. ${processoRef}` : ''}`
       : isComprasGovPlatform(plat)
         ? `Compras.gov · ${it.modalidade || 'Dados Abertos'}${processoRef ? ` · ${processoRef}` : ''}`
+      : isNotasFiscaisPlatform(plat)
+        ? `Notas Fiscais · Portal da Transparência${processoRef ? ` · ${String(processoRef).replace(/^notas_fiscais:/i, '').split(':')[0]}` : ''}`
       : (it.modalidade || 'PNCP'),
     similaridadeEncontrada: similaridadeParcial,
     selecionado: false,
@@ -1248,59 +1251,73 @@ function applyPrefillPayload(prefill) {
 
 let hydrateGeneration = 0;
 
+function applySessionHydrate(data, iid) {
+  const filtrosSessao = (data?.sessao?.filtros && typeof data.sessao.filtros === 'object')
+    ? data.sessao.filtros
+    : {};
+  const variacaoGlobal = Number(
+    filtrosSessao.variacao_percentual_global ?? filtrosSessao.variacao_global_percentual ?? null,
+  );
+  variacaoGlobalDaSessao.value = Number.isFinite(variacaoGlobal) && variacaoGlobal >= 0
+    ? variacaoGlobal
+    : null;
+  if (variacaoGlobalDaSessao.value != null) {
+    filtros.variacao = String(Math.round(variacaoGlobalDaSessao.value));
+  }
+  const sentidoRaw = String(filtrosSessao.variacao_sentido_global || '').trim().toLowerCase();
+  filtros.variacaoSentido = ['cima', 'baixo', 'ambos'].includes(sentidoRaw) ? sentidoRaw : 'ambos';
+  const itens = Array.isArray(data?.itens) ? data.itens : [];
+  const target = iid
+    ? itens.find((x) => Number(x?.id) === Number(iid))
+    : itens.find((x) => {
+      const src = x?.source || {};
+      return Number.isFinite(Number(src?.valor_base ?? src?.valorBase ?? src?.preco_base ?? src?.precoBase))
+        || Number.isFinite(Number(src?.variacao_percentual ?? src?.variacaoPercentual ?? src?.variacao));
+    });
+  if (iid && target) {
+    const descricaoItem = String(target?.descricao_item || target?.descricao || '').trim();
+    if (descricaoItem) filtros.descricao = descricaoItem;
+  }
+  applyFaixaDefaultsFromItem(target || null);
+}
+
 async function hydrateManualFromRoute({ autoSearch = true } = {}) {
   const gen = ++hydrateGeneration;
-  await carregarStatusBaseLocal();
-  await carregarFontesPreco();
-  if (gen !== hydrateGeneration) return;
-
   const sessionId = Number(cotacaoId.value);
   const iid = itemId.value;
 
-  // 1) Prefill do detalhe do item (mais confiável que re-buscar a sessão).
+  // 1) Prefill síncrono — descrição/faixa na UI antes de qualquer await.
   if (iid) {
     applyPrefillPayload(takeManualSearchPrefill(cotacaoId.value, iid));
   }
-  // 2) Query opcional ?descricao=
   const qDesc = String(route.query.descricao || '').trim();
   if (qDesc && !filtros.descricao) filtros.descricao = qDesc;
+  const hadDescricaoEarly = Boolean(filtros.descricao.trim());
 
-  if (Number.isFinite(sessionId) && sessionId > 0) {
-    try {
-      const data = await getResearchSessionResilient(sessionId, { maxAttempts: 3, timeoutMs: 120_000 });
-      if (gen !== hydrateGeneration) return;
-      const filtrosSessao = (data?.sessao?.filtros && typeof data.sessao.filtros === 'object')
-        ? data.sessao.filtros
-        : {};
-      const variacaoGlobal = Number(
-        filtrosSessao.variacao_percentual_global ?? filtrosSessao.variacao_global_percentual ?? null,
-      );
-      variacaoGlobalDaSessao.value = Number.isFinite(variacaoGlobal) && variacaoGlobal >= 0
-        ? variacaoGlobal
-        : null;
-      if (variacaoGlobalDaSessao.value != null) {
-        filtros.variacao = String(Math.round(variacaoGlobalDaSessao.value));
-      }
-      const sentidoRaw = String(filtrosSessao.variacao_sentido_global || '').trim().toLowerCase();
-      filtros.variacaoSentido = ['cima', 'baixo', 'ambos'].includes(sentidoRaw) ? sentidoRaw : 'ambos';
-      const itens = Array.isArray(data?.itens) ? data.itens : [];
-      const target = iid
-        ? itens.find((x) => Number(x?.id) === Number(iid))
-        : itens.find((x) => {
-          const src = x?.source || {};
-          return Number.isFinite(Number(src?.valor_base ?? src?.valorBase ?? src?.preco_base ?? src?.precoBase))
-            || Number.isFinite(Number(src?.variacao_percentual ?? src?.variacaoPercentual ?? src?.variacao));
-        });
-      if (iid && target) {
-        const descricaoItem = String(target?.descricao_item || target?.descricao || '').trim();
-        if (descricaoItem) filtros.descricao = descricaoItem;
-      }
-      applyFaixaDefaultsFromItem(target || null);
-    } catch (err) {
-      if (!filtros.descricao.trim()) {
-        searchError.value = `Não foi possível carregar o item da cotação (${formatResearchError(err)}).`;
-      }
-    }
+  // 2) Stats + fontes (ainda necessários para fontes_habilitadas no auto-search).
+  await Promise.all([carregarStatusBaseLocal(), carregarFontesPreco()]);
+  if (gen !== hydrateGeneration) return;
+
+  // 3) Sessão: se já há descrição do prefill, não bloqueia a busca.
+  const sessionPromise = (Number.isFinite(sessionId) && sessionId > 0)
+    ? getResearchSessionResilient(sessionId, { maxAttempts: 3, timeoutMs: 120_000 })
+      .then((data) => {
+        if (gen !== hydrateGeneration) return;
+        applySessionHydrate(data, iid);
+      })
+      .catch((err) => {
+        if (gen !== hydrateGeneration) return;
+        if (!filtros.descricao.trim()) {
+          searchError.value = `Não foi possível carregar o item da cotação (${formatResearchError(err)}).`;
+        }
+      })
+    : Promise.resolve();
+
+  if (!hadDescricaoEarly) {
+    await sessionPromise;
+    if (gen !== hydrateGeneration) return;
+  } else {
+    void sessionPromise;
   }
 
   if (iid && !filtros.descricao.trim()) {

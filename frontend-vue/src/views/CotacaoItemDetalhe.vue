@@ -636,6 +636,10 @@ function nomeItemCampoLabel(r) {
   if (plat === 'compras_gov' || plat === 'compras-gov' || plat === 'comprasgov') {
     return 'Nome (Compras.gov)';
   }
+  const platKey = String(plat || '').replace(/-/g, '_');
+  if (platKey === 'notas_fiscais' || platKey === 'notasfiscais' || platKey === 'nfe') {
+    return 'Nome (Notas Fiscais)';
+  }
   return 'Nome (PNCP)';
 }
 
@@ -864,7 +868,7 @@ function labelFonte(code) {
   if (code === 'entes_publicos') return 'Outros Entes Públicos (Inciso II)';
   if (code === 'dominio_amplo') return 'Domínio amplo';
   if (code === 'cotacao_direta') return 'Cotação direta';
-  if (code === 'notas_fiscais') return 'Notas fiscais';
+  if (code === 'notas_fiscais') return 'Notas Fiscais';
   return 'Não classificada';
 }
 
@@ -892,6 +896,7 @@ function labelIncisoFromCotacao(cotacao) {
   const fonte = classificarFonte(cotacao);
   if (fonte === 'governamentais') return 'Inciso I';
   if (fonte === 'entes_publicos') return 'Inciso II';
+  if (fonte === 'notas_fiscais') return 'Inciso V';
 
   const inciso = String(
     cotacao?.inciso_classificacao ||
@@ -903,6 +908,7 @@ function labelIncisoFromCotacao(cotacao) {
     .toLowerCase();
   if (inciso === 'inciso_i' || inciso === 'inciso-i') return 'Inciso I';
   if (inciso === 'inciso_ii' || inciso === 'inciso-ii') return 'Inciso II';
+  if (inciso === 'inciso_v' || inciso === 'inciso-v') return 'Inciso V';
   return 'Não classificado';
 }
 </script>

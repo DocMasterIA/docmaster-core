@@ -350,6 +350,7 @@ import {
   federatedItemPlataforma,
   federatedItemProcessoRef,
   isComprasGovPlatform,
+  isNotasFiscaisPlatform,
   isTceRsPlatform,
   loadPriceSourcesCatalog,
   mergeFontesWithLocalStats,
@@ -1374,7 +1375,14 @@ async function runSearchWithContext({
           );
           return lab !== 'N/D' ? lab : (it.modalidade || '-');
         })(),
-        processo: processoRef || it.numero_pncp || '-',
+        processo: (() => {
+          const raw = processoRef || it.numero_pncp || '';
+          if (!raw) return '-';
+          if (isNotasFiscaisPlatform(plat)) {
+            return String(raw).replace(/^notas_fiscais:/i, '').split(':')[0] || String(raw);
+          }
+          return String(raw);
+        })(),
         data: it.data_publicacao || '-',
         qtd: `${it.quantidade || '-'} ${it.unidade_medida || ''}`.trim(),
         quantidadeNum: it.quantidade ?? null,
@@ -1972,6 +1980,9 @@ function classificarEsferaAdministrativa(raw) {
     return 'estadual';
   }
   if (isComprasGovPlatform(plat)) {
+    return 'federal';
+  }
+  if (isNotasFiscaisPlatform(plat)) {
     return 'federal';
   }
 

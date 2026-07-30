@@ -151,6 +151,17 @@ class ProductSpecMatchTests(unittest.TestCase):
         self.assertLess(product_spec_rerank_adjustment(termo, ped), -40)
         self.assertGreater(product_spec_rerank_adjustment(termo, adult), 20)
 
+    def test_ciprofloxacino_colirio_rejeita_comprimido_500mg(self):
+        termo = "ciprofloxacino colirio 0,3%"
+        bad = {
+            "descricao_item": "CIPROFLOXACINO, CLORIDRATO 500MG CAIXA C/ 14 COMPRIMIDOS",
+        }
+        good = {
+            "descricao_item": "CIPROFLOXACINO COLIRIO 0,3% FRASCO 5ML",
+        }
+        self.assertTrue(product_spec_strict_reject(termo, bad))
+        self.assertFalse(product_spec_strict_reject(termo, good))
+
 
 if __name__ == "__main__":
     unittest.main()

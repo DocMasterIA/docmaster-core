@@ -636,14 +636,108 @@ def _dose_per_presentation_mismatch(term: ProductSpecHints, got: ProductSpecHint
     return not _float_close(term.dose_mg, got.dose_mg, abs_tol=0.1)
 
 
+# Formas farmacêuticas mutuamente exclusivas (pedido vs item).
+_PHARM_FORM_GROUPS: Dict[str, frozenset] = {
+    "ocular": frozenset(
+        {
+            "colirio",
+            "colirios",
+            "oftalmic",
+            "oftalmico",
+            "oftalmica",
+            "oftalmicos",
+            "oftalmicas",
+        }
+    ),
+    "oral_solido": frozenset(
+        {
+            "comprimido",
+            "comprimidos",
+            "capsula",
+            "capsulas",
+            "dragea",
+            "drageas",
+            "comprimidoefervescente",
+        }
+    ),
+    "topico": frozenset({"pomada", "pomadas", "creme", "cremes", "unguento", "unguentos"}),
+    "injetavel": frozenset(
+        {
+            "injetavel",
+            "injetaveis",
+            "ampola",
+            "ampolas",
+            "endovenoso",
+            "endovenosa",
+            "intravenoso",
+            "intravenosa",
+        }
+    ),
+}
+
+
+def _detect_pharm_forms(norm: str) -> frozenset:
+    if not norm:
+        return frozenset()
+    found: set[str] = set()
+    for form_id, tokens in _PHARM_FORM_GROUPS.items():
+        if any(re.search(rf"\b{re.escape(tok)}\b", norm) for tok in tokens):
+            found.add(form_id)
+    return frozenset(found)
+
+
+def product_form_strict_reject(termo_raw: str, item: Dict[str, Any]) -> bool:
+    """True se pedido e item citam formas farmacêuticas incompatíveis (ex.: colírio vs comprimido)."""
+    term_n = _norm_text(termo_raw)
+    item_n = _norm_text(_item_blob(item))
+    term_forms = _detect_pharm_forms(term_n)
+    item_forms = _detect_pharm_forms(item_n)
+    if not term_forms or not item_forms:
+        return False
+    return term_forms.isdisjoint(item_forms)
+
+
+def _percent_vs_oral_solid_mismatch(
+    term: ProductSpecHints,
+    got: ProductSpecHints,
+    *,
+    item_norm: str,
+    term_norm: str,
+) -> bool:
+    """
+    Pedido com concentração % (ex.: colírio 0,3%) vs item oral sólido com dose em mg
+    e sem % compatível (ex.: comprimido 500 mg).
+    """
+    if term.percent is None:
+        return False
+    if got.percent is not None:
+        return False
+    if got.dose_mg is None:
+        return False
+    item_forms = _detect_pharm_forms(item_norm)
+    if "oral_solido" in item_forms:
+        return True
+    term_forms = _detect_pharm_forms(term_norm)
+    # Pedido ocular/tópico em % + item com dose alta em mg sem forma explícita.
+    if term_forms & {"ocular", "topico"} and got.dose_mg >= 50.0:
+        return True
+    return False
+
+
 def product_spec_strict_reject(termo_raw: str, item: Dict[str, Any]) -> bool:
     """True quando o item contradiz specs explícitas do pedido (filtro em modo strict)."""
     if product_line_strict_reject(termo_raw, item):
         return True
     if product_combo_strict_reject(termo_raw, item):
         return True
+    if product_form_strict_reject(termo_raw, item):
+        return True
     term = extract_product_spec_from_term(termo_raw)
     got = extract_product_spec_from_item(item)
+    term_norm = _norm_text(termo_raw)
+    item_norm = _norm_text(_item_blob(item))
+    if _percent_vs_oral_solid_mismatch(term, got, item_norm=item_norm, term_norm=term_norm):
+        return True
     if _dose_per_presentation_mismatch(term, got):
         return True
     if term.calibre is not None and got.calibre is not None:

@@ -2597,7 +2597,18 @@ async def orchestrate_merged_candidate_pool(
             aggressive = mode == "aggressive"
             partial_anchor = _has_partial_anchor_match(it, query_groups)
             origem = str(it.get("origem") or "")
-            from_local_index = origem in ("base_local_itens", "") or origem.startswith("base_local") or origem.startswith("federated_")
+            search_tier_pre = str(it.get("search_tier") or "").strip().lower()
+            # Federado só conta como pré-validado se já passou filtro de tokens/tier.
+            federated_prevalidated = origem.startswith("federated_") and search_tier_pre in (
+                "strict",
+                "core",
+                "flex",
+            )
+            from_local_index = (
+                origem in ("base_local_itens", "")
+                or origem.startswith("base_local")
+                or federated_prevalidated
+            )
             if not relaxed and not _is_strict_candidate_match(it, query_groups):
                 # Índice local já exigiu match AND nos mesmos token groups — não refiltrar por proximidade.
                 if not from_local_index:

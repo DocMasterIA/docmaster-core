@@ -42,6 +42,10 @@ class IndexedPlatformAdapter(PriceSourceAdapter):
             uf=uf,
             limit=limit,
         )
+        from ..federated_candidate_filter import filter_platform_search_rows
+
+        # Mesma qualidade do PNCP local: category/spec + tokens além do 1º do FTS.
+        rows = filter_platform_search_rows(query.termo_busca or "", rows)
         defaults = {
             "inciso_default": spec.inciso_default,
             "esfera_default": spec.esfera_default,

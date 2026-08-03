@@ -1662,7 +1662,8 @@ def _build_manual_parity_top3(
             continue
         tier = str(it.get("search_tier") or "").lower()
         lit = round(_literal_match_score(termo_busca, it), 3)
-        score_base = 78 if tier == "strict" else 72 if tier == "core" else 65 if tier == "flex" else 58
+        # Escala um pouco mais baixa: evita tudo concentrar em 72–78 (≥69%).
+        score_base = 68 if tier == "strict" else 60 if tier == "core" else 52 if tier == "flex" else 45
         row = dict(it)
         row["literal_match"] = lit
         row["score_bruto"] = float(score_base)
@@ -1758,7 +1759,7 @@ def _build_bulk_manual_recall_pool(
             continue
         tier = str(it.get("search_tier") or "").lower()
         lit = round(_literal_match_score(termo_busca, it), 3)
-        score_base = 78 if tier == "strict" else 72 if tier == "core" else 65 if tier == "flex" else 58
+        score_base = 68 if tier == "strict" else 60 if tier == "core" else 52 if tier == "flex" else 45
         spec_adj = 0.0
         spec_strong = False
         try:
@@ -2111,18 +2112,22 @@ def _enforce_faixa_no_top3(
 
 
 def _effective_min_score_aprovacao() -> int:
-    """Score mínimo; modo qualidade exige pelo menos 55."""
-    min_ok = int(PNCP_SEARCH_MIN_SCORE_APROVACAO)
-    if PNCP_SEARCH_QUALITY_FIRST and min_ok < 55:
-        return 55
+    """Score mínimo; modo qualidade exige pelo menos 50 (antes 55 — escala alta demais)."""
+    from . import config as _cfg
+
+    min_ok = int(_cfg.PNCP_SEARCH_MIN_SCORE_APROVACAO)
+    if _cfg.PNCP_SEARCH_QUALITY_FIRST and min_ok < 50:
+        return 50
     return min_ok
 
 
 def _ia_rerank_pool_allowed(pool_mode: str) -> bool:
     """Quando o pool é mix literal+similar, rerank IA ainda pode rodar (modo qualidade + Qwen)."""
+    from . import config as _cfg
+
     if pool_mode in {"literal_only", "similar_only"}:
         return True
-    if pool_mode == "mixed_fallback" and PNCP_IA_RERANK_MIXED_POOL:
+    if pool_mode == "mixed_fallback" and _cfg.PNCP_IA_RERANK_MIXED_POOL:
         return True
     return False
 
@@ -2769,11 +2774,11 @@ async def orchestrate_merged_candidate_pool(
             tier_bonus = 0.0
             search_tier = str(it.get("search_tier") or "").strip().lower()
             if search_tier == "strict":
-                tier_bonus = 10.0
+                tier_bonus = 7.0
             elif search_tier == "core":
-                tier_bonus = 6.0
+                tier_bonus = 4.0
             elif search_tier == "flex":
-                tier_bonus = 2.0
+                tier_bonus = 1.0
             try:
                 from .product_category_match import product_category_strict_reject
                 from .product_spec_match import (

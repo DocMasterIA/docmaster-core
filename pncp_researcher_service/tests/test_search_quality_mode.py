@@ -38,8 +38,8 @@ class SearchQualityModeTests(unittest.TestCase):
         prev_m = config.PNCP_SEARCH_MIN_SCORE_APROVACAO
         try:
             config.PNCP_SEARCH_QUALITY_FIRST = True
-            config.PNCP_SEARCH_MIN_SCORE_APROVACAO = 50
-            self.assertEqual(_effective_min_score_aprovacao(), 55)
+            config.PNCP_SEARCH_MIN_SCORE_APROVACAO = 45
+            self.assertEqual(_effective_min_score_aprovacao(), 50)
             config.PNCP_SEARCH_MIN_SCORE_APROVACAO = 60
             self.assertEqual(_effective_min_score_aprovacao(), 60)
         finally:

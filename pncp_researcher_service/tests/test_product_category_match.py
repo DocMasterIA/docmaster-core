@@ -1,6 +1,5 @@
 """Testes de categoria de produto e calibre N° na busca."""
 
-import asyncio
 import unittest
 
 from app.local_index import build_search_query_tiers, local_item_search, _match_row_search_tiers

@@ -162,6 +162,83 @@ class ProductSpecMatchTests(unittest.TestCase):
         self.assertTrue(product_spec_strict_reject(termo, bad))
         self.assertFalse(product_spec_strict_reject(termo, good))
 
+    def test_manilha_200mm_rejeita_papel_e_bitola_errada(self):
+        """Specs numéricas (mm + comprimento) — mesmo filtro PNCP, não keyword 'manilha'."""
+        termo = "MANILHA DE CONCRETO SIMPLES 200MM, COMPRIMENTO 1,00M."
+        h = extract_product_spec_from_term(termo)
+        self.assertEqual(h.diameter_mm, 200.0)
+        self.assertEqual(h.length_m, 1.0)
+
+        papel = {
+            "descricao_item": (
+                "Papel Embrulho tipo papel: papel manilha, apresentação: bobina, "
+                "largura: 150, comprimento: 100, cor: parda, aplicação: embalagem"
+            ),
+        }
+        bitola300 = {
+            "descricao_item": "MANILHA DE CONCRETO SIMPLES 300MM, COMPRIMENTO 1,00M.",
+        }
+        aco = {
+            "descricao_item": (
+                "MANILHA ACO CARBONO GALVANIZADO COMPRIMENTO UTIL 66 ABERTURA 22 RAIO 20"
+            ),
+        }
+        good = {
+            "descricao_item": "MANILHA DE CONCRETO SIMPLES 200MM COMPRIMENTO 1,00M",
+        }
+        self.assertTrue(product_spec_strict_reject(termo, papel))
+        self.assertTrue(product_spec_strict_reject(termo, bitola300))
+        self.assertTrue(product_spec_strict_reject(termo, aco))
+        self.assertFalse(product_spec_strict_reject(termo, good))
+        self.assertLess(product_spec_rerank_adjustment(termo, papel), -38)
+        # 300mm: diâmetro -50 + comprimento +28 → ainda negativo; reject vem do mismatch Ø.
+        self.assertLess(product_spec_rerank_adjustment(termo, bitola300), 0)
+        self.assertGreater(product_spec_rerank_adjustment(termo, good), 40)
+
+    def test_construction_fck_cimento_areia_sabre(self):
+        self.assertTrue(
+            product_spec_strict_reject(
+                "CONCRETO USINADO, FCK 18 MPA",
+                {"descricao_item": "CONCRETO USINADO FCK 20 MPA CONVENCIONAL"},
+            )
+        )
+        self.assertFalse(
+            product_spec_strict_reject(
+                "CONCRETO USINADO, FCK 20 MPA",
+                {"descricao_item": "CONCRETO USINADO FCK 20 MPA CONVENCIONAL"},
+            )
+        )
+        self.assertTrue(
+            product_spec_strict_reject(
+                "CIMENTO COMUM 50 KG. PORTLAND",
+                {"descricao_item": "Cimento Branco tipo cimento: portland, cor: branca"},
+            )
+        )
+        self.assertFalse(
+            product_spec_strict_reject(
+                "CIMENTO COMUM 50 KG. PORTLAND",
+                {"descricao_item": "Cimento Portland comum 50 kg"},
+            )
+        )
+        self.assertTrue(
+            product_spec_strict_reject(
+                "AREIA FINA, LAVADA, FORNECIDA POR M³",
+                {"descricao_item": "AREIA FINA AREIASIL(20KG) REF: AFG.02 - AREIASIL"},
+            )
+        )
+        self.assertTrue(
+            product_spec_strict_reject(
+                "SABRE PARA MOTOSSERRA, 40 CM",
+                {"descricao_item": "CAPA DO SABRE COMPATÍVEL COM SABRE MOTOSERRA MS 250"},
+            )
+        )
+        self.assertFalse(
+            product_spec_strict_reject(
+                "SABRE PARA MOTOSSERRA, 40 CM",
+                {"descricao_item": "Sabre motosserra 40 cm STIHL MS-260"},
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

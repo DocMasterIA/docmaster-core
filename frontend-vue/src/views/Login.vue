@@ -1,5 +1,5 @@
 <template>
-  <div class="login-page">
+  <div class="login-page" :data-build="LOGIN_CHUNK_BUST">
     <div class="login-page__bg"></div>
     <header class="login-page__header">
       <div class="login-page__brand">
@@ -97,6 +97,8 @@ const remember = ref(false);
 const showPassword = ref(false);
 const loading = ref(false);
 const error = ref('');
+/** Bust Vite chunk hash — PoPs/browsers cachearam 404 immutable do Login-BWz4EVCe.js */
+const LOGIN_CHUNK_BUST = '2026-07-31-purge';
 
 async function onSubmit() {
   error.value = '';

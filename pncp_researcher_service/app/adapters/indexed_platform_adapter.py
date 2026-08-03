@@ -44,8 +44,13 @@ class IndexedPlatformAdapter(PriceSourceAdapter):
         )
         from ..federated_candidate_filter import filter_platform_search_rows
 
-        # Mesma qualidade do PNCP local: category/spec + tokens além do 1º do FTS.
-        rows = filter_platform_search_rows(query.termo_busca or "", rows)
+        # Paridade com local_item_search: anota todos os tiers (incl. flex);
+        # QUALITY_FIRST aplica-se na Camada B / ensure_top3 / bulk.
+        rows = filter_platform_search_rows(
+            query.termo_busca or "",
+            rows,
+            quality_first=False,
+        )
         defaults = {
             "inciso_default": spec.inciso_default,
             "esfera_default": spec.esfera_default,

@@ -1642,6 +1642,24 @@ def _build_manual_parity_top3(
         if faixa_min is not None and faixa_max is not None:
             if not _preco_dentro_faixa(it, faixa_min, faixa_max, sentido=faixa_sentido):
                 continue
+        try:
+            from .federated_candidate_filter import item_title_blob, match_search_title_tier
+            from .product_category_match import product_category_strict_reject
+            from .product_spec_match import product_spec_strict_reject
+
+            title_tier = match_search_title_tier(termo_busca, item_title_blob(it))
+            if not title_tier:
+                continue
+            if product_category_strict_reject(termo_busca, it):
+                continue
+            if product_spec_strict_reject(termo_busca, it):
+                continue
+            if not str(it.get("search_tier") or "").strip():
+                it = dict(it)
+                it["search_tier"] = title_tier
+        except Exception:
+            # Fail-closed: sem gate válido o item não entra no top-3.
+            continue
         tier = str(it.get("search_tier") or "").lower()
         lit = round(_literal_match_score(termo_busca, it), 3)
         score_base = 78 if tier == "strict" else 72 if tier == "core" else 65 if tier == "flex" else 58
@@ -1699,12 +1717,16 @@ def _build_bulk_manual_recall_pool(
     min_ok: int,
 ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
-    Recall de lote: candidatos na faixa (mesma base da busca manual), sem scoring eliminatório.
+    Recall de lote: candidatos na faixa (mesma base da busca manual).
+
+    Aplica o matcher de título PNCP (tiers) + category/spec antes do top-3.
     """
     tier_rank = {"strict": 0, "core": 1, "flex": 2, "anchor": 3}
     pool: List[Dict[str, Any]] = []
     skipped_sem_preco = 0
     skipped_faixa = 0
+    skipped_spec = 0
+    termo_spec = (termo_busca_raw or termo_busca or "").strip()
     for it in itens:
         if _row_price_for_faixa(it) <= 0.0:
             skipped_sem_preco += 1
@@ -1713,6 +1735,27 @@ def _build_bulk_manual_recall_pool(
             if not _preco_dentro_faixa(it, faixa_min, faixa_max, sentido=faixa_sentido):
                 skipped_faixa += 1
                 continue
+        try:
+            from .federated_candidate_filter import item_title_blob, match_search_title_tier
+            from .product_category_match import product_category_strict_reject
+            from .product_spec_match import product_spec_strict_reject
+
+            title_tier = match_search_title_tier(termo_spec, item_title_blob(it)) if termo_spec else None
+            if termo_spec and not title_tier:
+                skipped_spec += 1
+                continue
+            if termo_spec and product_category_strict_reject(termo_spec, it):
+                skipped_spec += 1
+                continue
+            if termo_spec and product_spec_strict_reject(termo_spec, it):
+                skipped_spec += 1
+                continue
+            if title_tier and not str(it.get("search_tier") or "").strip():
+                it = dict(it)
+                it["search_tier"] = title_tier
+        except Exception:
+            skipped_spec += 1
+            continue
         tier = str(it.get("search_tier") or "").lower()
         lit = round(_literal_match_score(termo_busca, it), 3)
         score_base = 78 if tier == "strict" else 72 if tier == "core" else 65 if tier == "flex" else 58
@@ -1748,6 +1791,7 @@ def _build_bulk_manual_recall_pool(
         "recall_pool_bruto": len(pool),
         "eliminados_sem_preco_recall": skipped_sem_preco,
         "eliminados_faixa_preco_recall": skipped_faixa,
+        "eliminados_spec_categoria_recall": skipped_spec,
     }
     return pool, funil
 
@@ -1960,7 +2004,23 @@ def _ensure_top3_from_pool(
         if _row_price_for_faixa(it) <= 0.0:
             return False
         if faixa_min is not None and faixa_max is not None:
-            return _preco_dentro_faixa(it, faixa_min, faixa_max, sentido=faixa_sentido)
+            if not _preco_dentro_faixa(it, faixa_min, faixa_max, sentido=faixa_sentido):
+                return False
+        # Mesmo critério PNCP: título (desc+mat, tiers) + category/spec.
+        if termo_busca:
+            try:
+                from .federated_candidate_filter import item_title_blob, match_search_title_tier
+                from .product_category_match import product_category_strict_reject
+                from .product_spec_match import product_spec_strict_reject
+
+                if not match_search_title_tier(termo_busca, item_title_blob(it)):
+                    return False
+                if product_category_strict_reject(termo_busca, it):
+                    return False
+                if product_spec_strict_reject(termo_busca, it):
+                    return False
+            except Exception:
+                return False
         return True
 
     def rank_key(it: Dict[str, Any]) -> tuple[float, float]:
@@ -2598,11 +2658,12 @@ async def orchestrate_merged_candidate_pool(
             partial_anchor = _has_partial_anchor_match(it, query_groups)
             origem = str(it.get("origem") or "")
             search_tier_pre = str(it.get("search_tier") or "").strip().lower()
-            # Federado só conta como pré-validado se já passou filtro de tokens/tier.
+            # Paridade QUALITY_FIRST: só strict/core federado conta como pré-validado.
+            # flex federado (1º token FTS fraco) NÃO salta os gates — era a regressão
+            # que metia itens nada a ver no top-3 com score inflado.
             federated_prevalidated = origem.startswith("federated_") and search_tier_pre in (
                 "strict",
                 "core",
-                "flex",
             )
             from_local_index = (
                 origem in ("base_local_itens", "")
@@ -2858,7 +2919,10 @@ async def orchestrate_merged_candidate_pool(
             return False
         tier = str(it.get("search_tier") or "").lower()
         origem = str(it.get("origem") or "")
-        if tier in ("strict", "core") and origem.startswith("base_local"):
+        # Paridade PNCP local: federado com tier real strict/core também é literal.
+        if tier in ("strict", "core") and (
+            origem.startswith("base_local") or origem.startswith("federated_")
+        ):
             return True
         if bool(it.get("similaridade_encontrada")):
             return False

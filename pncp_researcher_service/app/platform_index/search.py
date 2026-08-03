@@ -7,8 +7,38 @@ from .connection import platform_conn
 from .registry import PlatformIndexSpec
 
 
-def _first_token(term: str) -> str:
-    parts = re.split(r"\s+", (term or "").strip())
+def _escape_fts_token(token: str) -> str:
+    return re.sub(r'["*]', " ", (token or "")).strip()
+
+
+def resolve_platform_fts_anchor(termo: str) -> str:
+    """
+    Mesma âncora FTS do PNCP local: preprocess + cabeça do tier core/anchor
+    (fallback: 1º token group do termo processado).
+    """
+    from ..local_index import (
+        _build_search_tokens,
+        _token_group_head,
+        build_search_query_tiers,
+    )
+    from ..search_text_clean import preprocess_cotacao_search_term
+
+    raw = (termo or "").strip()
+    if not raw:
+        return ""
+    search_tiers = build_search_query_tiers(raw)
+    for tier in search_tiers:
+        if tier.label in ("anchor", "core") and tier.token_groups:
+            head = _token_group_head(tier.token_groups[0])
+            if head:
+                return head
+    pre = preprocess_cotacao_search_term(raw) or raw
+    groups = _build_search_tokens(pre)
+    if groups:
+        head = _token_group_head(groups[0])
+        if head:
+            return head
+    parts = re.split(r"\s+", pre.strip())
     return parts[0] if parts else ""
 
 
@@ -141,13 +171,14 @@ def platform_item_search(
     limit: int = 50,
 ) -> List[Dict[str, Any]]:
     """
-    Busca FTS5 na camada platform_itens_leitura.
+    Busca FTS5 na camada platform_itens_leitura — mesma âncora do PNCP local.
     Retorna dicts compatíveis com mapeamento para MarketPriceHit.
     """
     if not spec.db_path or not spec.db_exists():
         return []
 
-    anchor = _first_token(termo)
+    anchor = resolve_platform_fts_anchor(termo)
+    anchor = _escape_fts_token(anchor)
     if not anchor or len(anchor) < 2:
         return []
 
@@ -200,9 +231,9 @@ def platform_item_search(
         with platform_conn(spec.db_path) as c:
             rows = c.execute(sql, params).fetchall()
     except Exception:
-        # Fallback LIKE se FTS vazio ou erro de sintaxe / coluna nova ausente
+        # Fallback LIKE (desc + material_servico), mesma âncora PNCP.
         like = f"%{anchor}%"
-        like_params: List[Any] = [like]
+        like_params: List[Any] = [like, like]
         if uf:
             like_params.append(uf.strip().upper()[:2])
         like_params.append(max(1, min(int(limit), 5000)))
@@ -214,7 +245,7 @@ def platform_item_search(
               COALESCE(NULLIF(trim(i.uf), ''), NULLIF(trim(p.uf), '')) AS uf
             FROM platform_itens_leitura i
             LEFT JOIN platform_processos p ON p.id = i.processo_id
-            WHERE i.descricao LIKE ?
+            WHERE (i.descricao LIKE ? OR COALESCE(i.material_servico, '') LIKE ?)
             {" AND COALESCE(NULLIF(trim(i.uf), ''), NULLIF(trim(p.uf), '')) = ?" if uf else ""}
             LIMIT ?
         """

@@ -3,9 +3,14 @@
 # Quando o Django rodar em outro serviço, defina LLM_API_BASE_URL=http://llm_api:8002
 # Para carregar variáveis do .env do host: env_file: - llm_api/.env
 #
-# Layout: este arquivo costuma ficar ao lado da pasta do repo (ex.: ~ com ~/docmaster-core/).
-# Se o compose estiver DENTRO da raiz do git (só docmaster-core/), troque "docmaster-core" por "."
-# em todos os build.context e ajuste volumes ./llm_audit → caminhos relativos ao repo...
+# Layout: este ficheiro vive NA raiz do git (ex.: ~/docmaster-core/docker-compose.yml).
+# build.context usa "." (repo). Se copiares o compose para o pai (~) com pasta docmaster-core/,
+# volta a apontar context para docmaster-core / docmaster-core/frontend-vue.
+#
+# Uso na VPS (recomendado):
+#   cd ~/docmaster-core && ./scripts/deploy-docgen-production.sh
+# Ou:
+#   cd ~/docmaster-core && docker compose build rag_service backend ...
 #
 # Qwen só para ETP: docker compose --profile qwen up -d qwen_llm_service
 # No rag_service: LLM_ETP_GENERATION_BASE_URL=http://qwen_llm_service:8015 (Ollama/llm_api segue em LLM_ORCHESTRATION_BASE_URL).
@@ -50,7 +55,7 @@ services:
 
   llm_api:
     build:
-      context: docmaster-core
+      context: .
       dockerfile: llm_api/Dockerfile
     image: docmaster-llm_api
     container_name: llm_api
@@ -78,7 +83,7 @@ services:
     profiles:
       - qwen
     build:
-      context: docmaster-core
+      context: .
       dockerfile: qwen_llm_service/Dockerfile
     image: docmaster-qwen_llm_service
     container_name: qwen_llm_service
@@ -105,7 +110,7 @@ services:
 
   llm_agent:
     build:
-      context: docmaster-core
+      context: .
       dockerfile: llm_agent/Dockerfile
     image: docmaster-llm_agent
     container_name: llm_agent
@@ -136,7 +141,7 @@ services:
 
   text_corrector_service:
     build:
-      context: docmaster-core
+      context: .
       dockerfile: text_corrector_service/Dockerfile
     image: docmaster-text_corrector_service
     container_name: text_corrector_service
@@ -153,7 +158,7 @@ services:
 
   rag_service:
     build:
-      context: docmaster-core
+      context: .
       dockerfile: rag_service/Dockerfile
     image: docmaster-rag_service
     container_name: rag_service
@@ -190,7 +195,7 @@ services:
 
   backend:
     build:
-      context: docmaster-core
+      context: .
       dockerfile: Dockerfile  # Dockerfile do backend Django na raiz do projeto
     image: docmaster-backend
     container_name: backend
@@ -230,7 +235,7 @@ services:
   # Mesmo prefixo que os outros builds: docmaster-core/... quando o compose roda de ~/ (pai do repo).
   frontend-vue:
     build:
-      context: docmaster-core/frontend-vue
+      context: frontend-vue
       dockerfile: Dockerfile
     image: docmaster-frontend-vue
     container_name: frontend-vue

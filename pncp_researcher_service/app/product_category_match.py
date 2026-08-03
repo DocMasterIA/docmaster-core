@@ -74,4 +74,5 @@ def product_category_strict_reject(termo_busca: str, item: Dict[str, Any]) -> bo
         prefix = normalize_for_search(desc)[:160]
         if not re.search(r"\bfio(s)?\b", prefix):
             return True
+
     return False

@@ -39,6 +39,13 @@ _LENGTH_M_EXPLICIT = re.compile(
     re.IGNORECASE,
 )
 _LENGTH_MT_LOOSE = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:mt|metros?)\b", re.IGNORECASE)
+# Diâmetro / DN / bitola em mm (tubos, manilhas, conexões) — não confundir com mg.
+_DIAMETER_MM_LABELED = re.compile(
+    r"(?:dn|diametro|di[aá]metro|bitola|ø|⌀|se[cç][aã]o\s*(?:nominal)?|abertura)\s*"
+    r":?\s*(\d+(?:[.,]\d+)?)\s*(?:mm\b)?",
+    re.IGNORECASE,
+)
+_DIAMETER_MM_PLAIN = re.compile(r"(\d+(?:[.,]\d+)?)\s*mm\b", re.IGNORECASE)
 _NEEDLE_CM_RE = re.compile(
     r"agulh[ao]s?\s*(\d+(?:[.,]\d+)?)\s*cm\b",
     re.IGNORECASE,
@@ -94,6 +101,7 @@ class ProductSpecHints:
     volumes: Optional[int] = None
     width_cm: Optional[float] = None
     length_m: Optional[float] = None
+    diameter_mm: Optional[float] = None
     calibre: Optional[float] = None
     needle_cm: Optional[float] = None
     units_per_g: Optional[float] = None
@@ -112,6 +120,7 @@ class ProductSpecHints:
                 self.volumes,
                 self.width_cm,
                 self.length_m,
+                self.diameter_mm,
                 self.calibre,
                 self.needle_cm,
                 self.units_per_g,
@@ -188,6 +197,32 @@ def _extract_needle_cm(raw: str, srcs: List[str], *, source: str) -> Optional[fl
         if val is not None:
             srcs.append(f"{source}:needle_cm")
             return val
+    return None
+
+
+def _extract_diameter_mm(raw: str, srcs: List[str], *, source: str) -> Optional[float]:
+    """
+    Extrai diâmetro em mm (DN/Ø/abertura/…mm).
+    Preferência: rótulo explícito; senão primeiro N mm que não seja dose (mg).
+    """
+    for dm in _DIAMETER_MM_LABELED.finditer(raw):
+        val = _parse_num(dm.group(1))
+        if val is None or val <= 0:
+            continue
+        # Abertura/raio sem unidade: tipicamente mm em tubos (ex.: abertura 22).
+        srcs.append(f"{source}:diameter_labeled")
+        return val
+    for dm in _DIAMETER_MM_PLAIN.finditer(raw):
+        start = dm.start()
+        prefix = raw[max(0, start - 3) : start].lower()
+        # Evita capturar "…mg" truncado ou "xmm" de códigos.
+        if prefix.endswith("m") and not prefix.endswith(" "):
+            continue
+        val = _parse_num(dm.group(1))
+        if val is None or val <= 0:
+            continue
+        srcs.append(f"{source}:diameter_mm")
+        return val
     return None
 
 
@@ -443,6 +478,10 @@ def extract_product_spec_from_text(text: str, *, source: str = "text") -> Produc
     if ln is not None:
         hints.length_m = ln
 
+    diam = _extract_diameter_mm(raw, srcs, source=source)
+    if diam is not None:
+        hints.diameter_mm = diam
+
     needle = _extract_needle_cm(raw, srcs, source=source)
     if needle is not None:
         hints.needle_cm = needle
@@ -573,6 +612,18 @@ def product_spec_rerank_adjustment(termo_raw: str, item: Dict[str, Any]) -> floa
         elif got.width_cm is None:
             adj -= 12.0
 
+    if term.diameter_mm is not None:
+        if got.diameter_mm is not None:
+            # Tubos/manilhas: 200mm ≠ 300mm — tolerância absoluta pequena.
+            adj += (
+                30.0
+                if _float_close(term.diameter_mm, got.diameter_mm, rel=0.02, abs_tol=1.0)
+                else -50.0
+            )
+        else:
+            # Pedido com Ø/mm explícito e item sem diâmetro comparável (ex.: papel "manilha").
+            adj -= 42.0
+
     if term.calibre is not None:
         if got.calibre is not None:
             adj += 30.0 if _calibre_close(term.calibre, got.calibre) else -44.0
@@ -697,6 +748,93 @@ def product_form_strict_reject(termo_raw: str, item: Dict[str, Any]) -> bool:
     return term_forms.isdisjoint(item_forms)
 
 
+_FCK_MPA_RE = re.compile(
+    r"\bfck\s*(\d+(?:[.,]\d+)?)\s*(?:mpa|mp)\b|\b(\d+(?:[.,]\d+)?)\s*mpa\b",
+    re.IGNORECASE,
+)
+_SABRE_CM_RE = re.compile(
+    r"\bsabre\b[^.]{0,80}?\b(\d+(?:[.,]\d+)?)\s*cm\b|\b(\d+(?:[.,]\d+)?)\s*cm\b[^.]{0,40}?\bsabre\b",
+    re.IGNORECASE,
+)
+_BULK_AGGREGATE_RE = re.compile(
+    r"\b(areia|arei[aã]o|brita|cascalho|saibro|pedrisco|po\s+de\s+pedra)\b",
+    re.IGNORECASE,
+)
+
+
+def _parse_float_pt(raw: str) -> Optional[float]:
+    return _parse_num(raw)
+
+
+def _extract_fck_mpa(text: str) -> Optional[float]:
+    m = _FCK_MPA_RE.search(text or "")
+    if not m:
+        return None
+    return _parse_float_pt(m.group(1) or m.group(2) or "")
+
+
+def _extract_sabre_cm(text: str) -> Optional[float]:
+    m = _SABRE_CM_RE.search(text or "")
+    if not m:
+        return None
+    return _parse_float_pt(m.group(1) or m.group(2) or "")
+
+
+def product_construction_strict_reject(termo_raw: str, item: Dict[str, Any]) -> bool:
+    """
+    Rejeita mismatches típicos de materiais de construção / jardinagem:
+    FCK/MPA, cimento branco vs comum, areia m³ vs saco kg, capa vs sabre, comprimento do sabre.
+    """
+    term_raw = str(termo_raw or "")
+    item_raw = _item_blob(item)
+    term_n = _norm_text(term_raw)
+    item_n = _norm_text(item_raw)
+    if not term_n or not item_n:
+        return False
+
+    # Concreto: FCK 18 ≠ FCK 20/30
+    term_fck = _extract_fck_mpa(term_raw) or _extract_fck_mpa(term_n)
+    item_fck = _extract_fck_mpa(item_raw) or _extract_fck_mpa(item_n)
+    if term_fck is not None and item_fck is not None:
+        if abs(term_fck - item_fck) > 1.01:
+            return True
+
+    # Cimento comum/cinza ≠ cimento branco
+    if re.search(r"\bcimento\b", term_n) and re.search(r"\bcimento\b", item_n):
+        term_branco = bool(re.search(r"\bbranco\b", term_n))
+        item_branco = bool(re.search(r"\bbranco\b", item_n))
+        if term_branco != item_branco:
+            return True
+
+    # Agregado pedido em m³ ≠ embalagem em kg/saco (normalize_for_search transforma M³ → "m")
+    term_has_m3 = bool(
+        re.search(r"m\s*[³3]|por\s*m\s*[³3]|/m\s*[³3]", term_raw, re.IGNORECASE)
+        or re.search(r"\bpor\s+m\b", term_n)
+    )
+    if _BULK_AGGREGATE_RE.search(term_n) and term_has_m3:
+        item_bag = bool(re.search(r"\b\d+(?:[.,]\d+)?\s*kg\b|\bsaco\b|\bref\s*:", item_n))
+        item_has_m3 = bool(
+            re.search(r"m\s*[³3]|/m\s*[³3]", item_raw, re.IGNORECASE)
+            or re.search(r"\bm3\b", item_n)
+        )
+        if item_bag and not item_has_m3:
+            return True
+
+    # Sabre de motosserra ≠ capa/protetor do sabre
+    if re.search(r"\bsabre\b", term_n) and re.search(r"\bmotos?serra\b", term_n):
+        if re.search(r"\bcapa\b|\bprotetor\b|\bcobertura\b", item_n) and re.search(
+            r"\bsabre\b", item_n
+        ):
+            if not re.search(r"\bcapa\b|\bprotetor\b", term_n):
+                return True
+        term_cm = _extract_sabre_cm(term_raw) or _extract_sabre_cm(term_n)
+        item_cm = _extract_sabre_cm(item_raw) or _extract_sabre_cm(item_n)
+        if term_cm is not None and item_cm is not None and abs(term_cm - item_cm) > 2.01:
+            return True
+
+    return False
+
+
 def _percent_vs_oral_solid_mismatch(
     term: ProductSpecHints,
     got: ProductSpecHints,
@@ -732,6 +870,8 @@ def product_spec_strict_reject(termo_raw: str, item: Dict[str, Any]) -> bool:
         return True
     if product_form_strict_reject(termo_raw, item):
         return True
+    if product_construction_strict_reject(termo_raw, item):
+        return True
     term = extract_product_spec_from_term(termo_raw)
     got = extract_product_spec_from_item(item)
     term_norm = _norm_text(termo_raw)
@@ -742,6 +882,15 @@ def product_spec_strict_reject(termo_raw: str, item: Dict[str, Any]) -> bool:
         return True
     if term.calibre is not None and got.calibre is not None:
         if not _calibre_close(term.calibre, got.calibre):
+            return True
+    # Diâmetro/comprimento explícitos no pedido: mismatch ou ausência = fora (top-3 IA).
+    if term.diameter_mm is not None:
+        if got.diameter_mm is None:
+            return True
+        if not _float_close(term.diameter_mm, got.diameter_mm, rel=0.02, abs_tol=1.0):
+            return True
+    if term.length_m is not None and got.length_m is not None:
+        if not _float_close(term.length_m, got.length_m, abs_tol=0.15):
             return True
     if term.units_per_g is not None and got.units_per_g is not None:
         if not _float_close(term.units_per_g, got.units_per_g, abs_tol=0.05):

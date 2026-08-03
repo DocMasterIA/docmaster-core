@@ -150,6 +150,15 @@ async def _federated_lista_completa(query: FederatedSearchQuery) -> Dict[str, An
                 uf=uf,
                 limit=per_source,
             )
+            # Mesmo matcher PNCP local; quality_first=False para recall da lista manual
+            # (flex anotado), sem aceitar hits que não passam em nenhum tier.
+            from ..federated_candidate_filter import filter_platform_search_rows
+
+            rows = filter_platform_search_rows(
+                query.termo_busca or "",
+                rows,
+                quality_first=False,
+            )
             n = 0
             defaults = {
                 "inciso_default": getattr(spec, "inciso_default", None),

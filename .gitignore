@@ -15,10 +15,12 @@ backend/data/
 *.pot
 *.mo
 
-# Virtualenv
+# Virtualenv (nunca versionar)
 env/
 venv/
 .venv/
+.venv_*/
+.venv_pncp_test/
 
 # IDEs
 .vscode/

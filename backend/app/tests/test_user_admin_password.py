@@ -1,11 +1,13 @@
 """Admin de usuário: senha somente-leitura e criação com hash."""
 from __future__ import annotations
 
+from django.contrib.admin.sites import site
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import ReadOnlyPasswordHashField
 from django.test import TestCase
+from django.urls import reverse
 
-from backend.app.admin import AdminUserCreationForm, UserAdminForm
+from backend.app.admin import AdminUserCreationForm, UserAdmin, UserAdminForm
 
 User = get_user_model()
 
@@ -20,6 +22,19 @@ class UserAdminPasswordFormTests(TestCase):
         )
         form = UserAdminForm(instance=user)
         self.assertIsInstance(form.fields["password"], ReadOnlyPasswordHashField)
+
+    def test_password_change_button_links_to_admin_form(self):
+        user = User.objects.create_user(
+            email="adminbtn@teste.local",
+            password="SenhaAtual123!",
+            first_name="A",
+            last_name="B",
+        )
+        admin = UserAdmin(User, site)
+        html = admin.password_change_button(user)
+        expected = reverse("admin:auth_user_password_change", args=[user.pk])
+        self.assertIn(expected, html)
+        self.assertIn("Alterar / definir senha", html)
 
     def test_change_form_ignores_posted_password_plaintext(self):
         user = User.objects.create_user(

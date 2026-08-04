@@ -41,6 +41,15 @@ def _prefeitura_user_limit_message(prefeitura, *, exclude_user_id=None):
     return None
 
 
+def _user_password_change_url(user) -> str:
+    """URL absoluta do formulário admin de alteração de senha.
+
+    Django UserAdmin fixa o nome como auth_user_password_change mesmo com
+    custom user (path continua /admin/app/user/<id>/password/).
+    """
+    return reverse("admin:auth_user_password_change", args=[user.pk])
+
+
 class UserAdminForm(forms.ModelForm):
     """
     Edição de usuário no admin.
@@ -54,8 +63,7 @@ class UserAdminForm(forms.ModelForm):
         label=_("Senha"),
         help_text=_(
             "Senhas não são armazenadas em texto puro. "
-            'Para definir ou alterar a senha, use o '
-            '<a href="../password/">formulário de alteração de senha</a>.'
+            "Use o botão «Alterar senha» abaixo (não edite o hash)."
         ),
     )
     allowed_modules = forms.MultipleChoiceField(
@@ -98,7 +106,7 @@ class UserAdminForm(forms.ModelForm):
         if password and self.instance and self.instance.pk and not self.instance.has_usable_password():
             password.help_text = _(
                 "Este usuário ainda não tem senha utilizável. "
-                'Defina uma senha no <a href="../password/">formulário de alteração de senha</a>.'
+                "Use o botão «Alterar senha» abaixo para definir uma."
             )
 
     def clean_password(self):
@@ -250,9 +258,10 @@ class UserAdmin(BaseUserAdmin):
     list_display = ("email", "first_name", "last_name", "profile_photo", "prefeitura","secretaria", "is_staff", "is_active", "date_joined")
     list_filter = ("role", "is_staff", "is_active")
     search_fields = ("email", "first_name", "last_name", "prefeitura")
+    readonly_fields = ("password_change_button",)
 
     fieldsets = (
-        (None, {"fields": ("email", "password")}),
+        (None, {"fields": ("email", "password", "password_change_button")}),
         (_("Informações pessoais"), {"fields": ("first_name", "last_name", "prefeitura", "secretaria", "role", "allowed_modules")}),
         (_("Perfil"), {"fields": ("profile_photo",)}),  # tupla de um elemento
         (_("Permissões"), {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
@@ -264,6 +273,15 @@ class UserAdmin(BaseUserAdmin):
             "fields": ("first_name", "last_name", "email", "profile_photo","password1", "password2", "role", "prefeitura", "secretaria", "allowed_modules", "is_staff", "is_active"),
         }),
     )
+
+    @admin.display(description=_("Alterar senha"))
+    def password_change_button(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        return format_html(
+            '<a class="button" href="{}">Alterar / definir senha</a>',
+            _user_password_change_url(obj),
+        )
 
 from django.contrib import admin, messages
 from django.utils.html import format_html, mark_safe

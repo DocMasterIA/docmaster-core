@@ -2113,21 +2113,17 @@ def _enforce_faixa_no_top3(
 
 def _effective_min_score_aprovacao() -> int:
     """Score mínimo; modo qualidade exige pelo menos 50 (antes 55 — escala alta demais)."""
-    from . import config as _cfg
-
-    min_ok = int(_cfg.PNCP_SEARCH_MIN_SCORE_APROVACAO)
-    if _cfg.PNCP_SEARCH_QUALITY_FIRST and min_ok < 50:
+    min_ok = int(PNCP_SEARCH_MIN_SCORE_APROVACAO)
+    if PNCP_SEARCH_QUALITY_FIRST and min_ok < 50:
         return 50
     return min_ok
 
 
 def _ia_rerank_pool_allowed(pool_mode: str) -> bool:
     """Quando o pool é mix literal+similar, rerank IA ainda pode rodar (modo qualidade + Qwen)."""
-    from . import config as _cfg
-
     if pool_mode in {"literal_only", "similar_only"}:
         return True
-    if pool_mode == "mixed_fallback" and _cfg.PNCP_IA_RERANK_MIXED_POOL:
+    if pool_mode == "mixed_fallback" and PNCP_IA_RERANK_MIXED_POOL:
         return True
     return False
 

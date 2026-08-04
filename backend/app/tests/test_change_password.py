@@ -11,6 +11,9 @@ User = get_user_model()
 
 class ChangePasswordApiTests(TestCase):
     def setUp(self):
+        from django.core.cache import cache
+
+        cache.clear()
         self.client = Client()
         self.user = User.objects.create_user(
             email="usuario@teste.local",
@@ -142,3 +145,39 @@ class ChangePasswordApiTests(TestCase):
         self.assertEqual(res.status_code, 400)
         errors = res.json().get("errors") or {}
         self.assertIn("new_password1", errors)
+
+    def test_unusable_password_cannot_self_change(self):
+        self.user.set_unusable_password()
+        self.user.save(update_fields=["password"])
+        self.client.force_login(self.user)
+        res = self.client.post(
+            self.url,
+            data=json.dumps({
+                "current_password": "qualquer",
+                "new_password": "NovaSenha456!",
+                "confirm_password": "NovaSenha456!",
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 400)
+        errors = res.json().get("errors") or {}
+        self.assertIn("current_password", errors)
+        msg = " ".join(str(x) for x in errors["current_password"])
+        self.assertIn("administrador", msg.lower())
+
+    def test_plaintext_corrupted_hash_fails_current_password(self):
+        """Simula admin que salvou senha em texto puro no campo password."""
+        User.objects.filter(pk=self.user.pk).update(password="SenhaEmTextoPuro123!")
+        self.user.refresh_from_db()
+        self.client.force_login(self.user)
+        res = self.client.post(
+            self.url,
+            data=json.dumps({
+                "current_password": "SenhaEmTextoPuro123!",
+                "new_password": "NovaSenha456!",
+                "confirm_password": "NovaSenha456!",
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("current_password", res.json().get("errors") or {})

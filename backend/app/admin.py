@@ -17,6 +17,8 @@ from django.utils.html import format_html
 from django.contrib.auth import get_user_model
 import logging
 from django import forms
+from django.contrib.auth.forms import ReadOnlyPasswordHashField
+from django.contrib.auth.password_validation import validate_password
 from dal import autocomplete
 from backend.app.models.usuario import MODULE_ACCESS_CHOICES
 
@@ -40,6 +42,22 @@ def _prefeitura_user_limit_message(prefeitura, *, exclude_user_id=None):
 
 
 class UserAdminForm(forms.ModelForm):
+    """
+    Edição de usuário no admin.
+
+    O campo password DEVE ser somente-leitura (hash). Editar texto puro aqui
+    corrompe o hash (autofill/salvar vazio) e quebra login + troca de senha
+    no frontend para esses usuários.
+    """
+
+    password = ReadOnlyPasswordHashField(
+        label=_("Senha"),
+        help_text=_(
+            "Senhas não são armazenadas em texto puro. "
+            'Para definir ou alterar a senha, use o '
+            '<a href="../password/">formulário de alteração de senha</a>.'
+        ),
+    )
     allowed_modules = forms.MultipleChoiceField(
         label="Módulos permitidos",
         required=False,
@@ -76,8 +94,16 @@ class UserAdminForm(forms.ModelForm):
         else:
             self.fields["secretaria"].queryset = Secretaria.objects.none()
 
-        if self.instance.pk and "password" in self.fields:
-            self.fields["password"].required = False
+        password = self.fields.get("password")
+        if password and self.instance and self.instance.pk and not self.instance.has_usable_password():
+            password.help_text = _(
+                "Este usuário ainda não tem senha utilizável. "
+                'Defina uma senha no <a href="../password/">formulário de alteração de senha</a>.'
+            )
+
+    def clean_password(self):
+        # Nunca aceitar texto digitado/autofill no formulário de edição.
+        return self.initial.get("password") or getattr(self.instance, "password", "")
 
     def clean(self):
         cleaned_data = super().clean()
@@ -110,10 +136,116 @@ class UserAdminForm(forms.ModelForm):
         normalized = [v for v in vals if v in MODULE_ACCESS_CHOICES]
         return normalized or list(MODULE_ACCESS_CHOICES)
 
+
+class AdminUserCreationForm(forms.ModelForm):
+    """Criação de usuário no admin com password1/password2 (hash via set_password)."""
+
+    password1 = forms.CharField(
+        label=_("Senha"),
+        strip=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+        help_text=_("Mínimo 8 caracteres."),
+    )
+    password2 = forms.CharField(
+        label=_("Confirmação da senha"),
+        strip=False,
+        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+    )
+    allowed_modules = forms.MultipleChoiceField(
+        label="Módulos permitidos",
+        required=False,
+        choices=[(k, k.replace("_", " ").title()) for k in MODULE_ACCESS_CHOICES],
+        widget=forms.CheckboxSelectMultiple,
+        help_text="Selecione os módulos liberados para este usuário.",
+    )
+
+    class Meta:
+        model = User
+        fields = (
+            "email",
+            "first_name",
+            "last_name",
+            "profile_photo",
+            "role",
+            "prefeitura",
+            "secretaria",
+            "allowed_modules",
+            "is_staff",
+            "is_active",
+        )
+        widgets = {
+            "secretaria": autocomplete.ModelSelect2(
+                url="secretaria-autocomplete",
+                forward=["prefeitura"],
+            )
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["allowed_modules"].initial = list(MODULE_ACCESS_CHOICES)
+        prefeitura = None
+        prefeitura_raw = self.data.get("prefeitura") if self.data else None
+        if prefeitura_raw:
+            prefeitura = Prefeitura.objects.filter(pk=prefeitura_raw).first()
+        if prefeitura:
+            self.fields["secretaria"].queryset = Secretaria.objects.filter(prefeitura=prefeitura)
+        else:
+            self.fields["secretaria"].queryset = Secretaria.objects.none()
+
+    def clean_email(self):
+        email = self.cleaned_data.get("email")
+        if email and User.objects.filter(email__iexact=email).exists():
+            raise ValidationError(_("Este e-mail já está cadastrado."))
+        return email
+
+    def clean_password2(self):
+        p1 = self.cleaned_data.get("password1")
+        p2 = self.cleaned_data.get("password2")
+        if p1 and p2 and p1 != p2:
+            raise ValidationError(_("As senhas não conferem."))
+        return p2
+
+    def clean_password1(self):
+        password = self.cleaned_data.get("password1")
+        if password:
+            validate_password(password, user=User(email=self.data.get("email") or ""))
+        return password
+
+    def clean_allowed_modules(self):
+        vals = self.cleaned_data.get("allowed_modules") or []
+        normalized = [v for v in vals if v in MODULE_ACCESS_CHOICES]
+        return normalized or list(MODULE_ACCESS_CHOICES)
+
+    def clean(self):
+        cleaned = super().clean()
+        if self.errors:
+            return cleaned
+        prefeitura = cleaned.get("prefeitura")
+        secretaria = cleaned.get("secretaria")
+        if secretaria and prefeitura and secretaria.prefeitura_id != prefeitura.pk:
+            raise ValidationError({
+                "secretaria": "A secretaria selecionada não pertence à prefeitura escolhida.",
+            })
+        if prefeitura:
+            msg = _prefeitura_user_limit_message(prefeitura)
+            if msg:
+                raise ValidationError({"prefeitura": msg})
+        return cleaned
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.set_password(self.cleaned_data["password1"])
+        if commit:
+            user.save()
+            self.save_m2m()
+        return user
+
+
 # Admin de usuários customizados, com autocomplete de secretaria e inline de leitura.
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     form = UserAdminForm
+    add_form = AdminUserCreationForm
     ordering = ("email",)
     list_display = ("email", "first_name", "last_name", "profile_photo", "prefeitura","secretaria", "is_staff", "is_active", "date_joined")
     list_filter = ("role", "is_staff", "is_active")
@@ -442,6 +574,9 @@ class UsuarioInlineFormSet(BaseInlineFormSet):
         obj = form.save(commit=False)
         if obj.secretaria_id and not obj.prefeitura_id:
             obj.prefeitura = obj.secretaria.prefeitura
+        # Inline não coleta senha: marcar unusable (evita password="" que quebra auth).
+        if not obj.has_usable_password():
+            obj.set_unusable_password()
         if commit:
             obj.save()
             form.save_m2m()
@@ -455,8 +590,12 @@ class UsuarioInline(nested_admin.NestedTabularInline):
     fk_name = "secretaria"
     fields = ("first_name", "last_name", "email", "is_active")
     extra = 0
-    show_change_link = False
+    show_change_link = True
     can_delete = True
+    verbose_name_plural = (
+        "Usuários (sem senha aqui — após criar, abra o usuário e use "
+        "«Alterar senha» / formulário de senha)"
+    )
 
 from dal import autocomplete
 

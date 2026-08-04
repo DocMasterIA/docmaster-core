@@ -14,6 +14,7 @@ from django.contrib.auth.decorators import login_required
 import json, tempfile, traceback
 from django.http import JsonResponse, FileResponse, HttpResponse
 from django.core.files.base import ContentFile
+from django.core.exceptions import ValidationError
 from backend.app.models import Template, TemplateSchema, DocumentInstance, Prefeitura, SubtopicoSecretaria, SlotValueCatalog, SlotFormState
 from backend.app.forms import UserProfileForm, LoginForm, ChangePasswordForm
 from django.views.decorators.csrf import csrf_exempt
@@ -1381,7 +1382,16 @@ def api_me_change_password(request):
         },
     )
     if form.is_valid():
-        saved_user = form.save()
+        try:
+            saved_user = form.save()
+        except ValidationError as exc:
+            record_auth_password_change(result="validation_error", user=user)
+            if hasattr(exc, "message_dict"):
+                return JsonResponse({"ok": False, "errors": exc.message_dict}, status=400)
+            return JsonResponse(
+                {"ok": False, "error": "Não foi possível salvar a nova senha. Contate o administrador."},
+                status=400,
+            )
         update_session_auth_hash(request, saved_user)
         request.session.cycle_key()
         invalidate_other_user_sessions(saved_user, keep_session_key=request.session.session_key)

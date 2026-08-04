@@ -154,6 +154,11 @@ class User(AbstractBaseUser, PermissionsMixin):
         - processa imagem de profile_photo (resize, convert to JPEG)
         - remove arquivo antigo quando necessário
         """
+        update_fields = kwargs.get("update_fields")
+        # Troca de senha: não revalidar o modelo inteiro (dados legados quebravam
+        # update_fields=["password"] com ValidationError → 500 na API).
+        if update_fields is not None and set(update_fields) <= {"password"}:
+            return super().save(*args, **kwargs)
 
         # 1) Validações do modelo (levanta ValidationError se inválido)
         # Nota: se você usar forms/serializers que já fazem full_clean, isso é redundante,

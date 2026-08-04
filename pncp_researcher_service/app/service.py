@@ -2354,7 +2354,7 @@ def _sanitize_ia_interpretacao_item(text: str) -> str:
 
 async def _ia_interpret_item_leve(termo_busca: str, item: Dict[str, Any]) -> str:
     """
-    Uma linha curta identificando o bem/serviço (estilo catálogo), para títulos ambíguos ou descrições agregadas.
+    Uma linha curta identificando o bem/serviço (estilo catálogo), para títulos ambíguos ou descrições agregadas
     """
     desc_full = str(
         item.get("descricao_item_original")

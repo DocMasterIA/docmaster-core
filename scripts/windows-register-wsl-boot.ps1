@@ -1,17 +1,17 @@
 # Regista tarefa no Windows para subir DocMaster ao iniciar sessão (WSL não sobe sozinho).
 #
 # Execute no PowerShell do Windows (como utilizador que faz login no PC):
-#   cd \\wsl$\Debian\home\docmaster\scripts
-#   # ou copie este .ps1 para o Desktop e ajuste $WslDistro / $LinuxDeploy
-#   powershell -ExecutionPolicy Bypass -File .\windows-register-wsl-boot.ps1
+#   cd \\wsl$\Ubuntu\home\docmaster\docmaster-core\scripts
+#   powershell -ExecutionPolicy Bypass -File .\windows-register-wsl-boot.ps1 `
+#     -WslDistro "Ubuntu" -LinuxDeploy "/home/docmaster/docmaster-core" -LinuxUser "docmaster"
 #
-# Requer: WSL com deploy em /home/docmaster, utilizador docmaster, systemd no WSL (opcional).
+# Limite: se o PC desligar, o site CAI (Tailscale não mantém Docker). Para 24/7 real → VPS.
 
 param(
     [string]$TaskName = "DocMaster-WSL-Stack",
-    [string]$WslDistro = "",   # vazio = distro predefinida do wsl
+    [string]$WslDistro = "Ubuntu",
     [string]$LinuxUser = "docmaster",
-    [string]$LinuxDeploy = "/home/docmaster"
+    [string]$LinuxDeploy = "/home/docmaster/docmaster-core"
 )
 
 $ErrorActionPreference = "Stop"

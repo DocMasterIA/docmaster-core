@@ -260,7 +260,7 @@
                 </div>
                 <div class="item-cotacao-card__field">
                   <span>Data</span>
-                  <strong>{{ formatDateTimePt(r.created_at) }}</strong>
+                  <strong>{{ formatDatePt(r.data_publicacao || r.created_at) }}</strong>
                 </div>
                 <div class="item-cotacao-card__field">
                   <span>Inciso</span>
@@ -610,6 +610,22 @@ function formatDateTimePt(iso) {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+  });
+}
+
+/** Data de publicação/referência (YYYY-MM-DD) sem deslocar fuso nem inventar horário. */
+function formatDatePt(value) {
+  if (!value) return '—';
+  const s = String(value).trim();
+  if (!s || s === '-' || s === '—') return '—';
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  const dt = new Date(s);
+  if (!Number.isFinite(dt.getTime())) return s;
+  return dt.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
   });
 }
 

@@ -134,20 +134,43 @@ main_compose_up() {
   fi
 
   # Site + túnel primeiro — observabilidade não pode bloquear cloudflared (porta 9100 no WSL).
+  # Nunca deixar cloudflared apagado se o up do resto falhar (conflito ollama entre
+  # projetos docmaster vs docmaster-core → 1033 com backend Up).
   local core=(
     ollama llm_api llm_agent chromadb languagetool text_corrector_service
     rag_service backend frontend-vue cloudflared-tunnel
   )
   local obs=(node_exporter prometheus grafana)
+  local site=(cloudflared-tunnel backend frontend-vue)
 
   log "Stack principal (site + túnel) em $DEPLOY"
   reset_cloudflared_before_compose
-  docker compose -f "$COMPOSE_FILE" up "${up_flags[@]}" "${core[@]}"
+
+  # 1) Caminho crítico já — --no-deps evita depends_on ollama / name conflict
+  log "A subir túnel + origem (sem dependências)"
+  docker compose -f "$COMPOSE_FILE" up -d --no-deps "${site[@]}"
+
+  # 2) Resto da stack: preferir --no-recreate (contentores já existentes doutro/mesmo project)
+  if [[ "${DOCMASTER_FORCE_RECREATE:-0}" == "1" ]]; then
+    docker compose -f "$COMPOSE_FILE" up "${up_flags[@]}" "${core[@]}" || \
+      log "AVISO: compose up core falhou — site/túnel já tentados com --no-deps"
+  else
+    docker compose -f "$COMPOSE_FILE" up -d --no-recreate "${core[@]}" || \
+      log "AVISO: compose up --no-recreate falhou — a reforçar só site/túnel"
+  fi
+
+  # 3) Garantir túnel outra vez (se o passo 2 falhou a meio ou removeu algo)
+  docker compose -f "$COMPOSE_FILE" up -d --no-deps cloudflared-tunnel
+  if ! docker ps --format '{{.Names}}' | grep -qx 'cloudflared-tunnel'; then
+    log "ERRO: cloudflared-tunnel não ficou Up após ensure"
+    return 1
+  fi
+
   prune_orphan_cloudflared_containers
   prune_orphan_cloudflared_processes
 
   log "Observabilidade (opcional; falha de porta 9100 não derruba o site)"
-  if ! docker compose -f "$COMPOSE_FILE" up -d "${obs[@]}"; then
+  if ! docker compose -f "$COMPOSE_FILE" up -d --no-recreate "${obs[@]}"; then
     log "AVISO: node_exporter/prometheus/grafana não subiram — verifique porta 127.0.0.1:9100"
   fi
 }

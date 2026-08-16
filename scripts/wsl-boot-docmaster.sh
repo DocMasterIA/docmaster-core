@@ -4,9 +4,17 @@
 # do unit de sistema exige polkit/sudo e falha na tarefa agendada.
 set -euo pipefail
 
-DEPLOY="${DOCMASTER_DEPLOY_DIR:-/home/docmaster}"
-LOG="${DOCMASTER_WSL_BOOT_LOG:-$DEPLOY/wsl-boot.log}"
+DEPLOY="${DOCMASTER_DEPLOY_DIR:-/home/docmaster/docmaster-core}"
+LOG="${DOCMASTER_WSL_BOOT_LOG:-$HOME/wsl-boot.log}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Compat: boot antigo apontava para /home/docmaster (pai do repo)
+if [[ ! -f "$DEPLOY/docker-compose.yml" && -f /home/docmaster/docker-compose.yml ]]; then
+  DEPLOY=/home/docmaster
+fi
+if [[ ! -f "$DEPLOY/docker-compose.yml" && -f /home/docmaster/docmaster-core/docker-compose.yml ]]; then
+  DEPLOY=/home/docmaster/docmaster-core
+fi
 
 mkdir -p "$(dirname "$LOG")"
 exec >>"$LOG" 2>&1

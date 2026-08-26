@@ -26,17 +26,30 @@ log "env: ${BACKUP_R2_ENV_LOADED}"
 log "stamp: ${STAMP}"
 log "staging: ${STAMP_DIR}"
 
+ERRORS=0
+ok_or_mark() {
+  if ! "$@"; then
+    log "AVISO: falhou: $*"
+    ERRORS=$((ERRORS + 1))
+    return 1
+  fi
+}
+
 # --- Backend SQLite ---
 if [[ "${BACKUP_BACKEND_DB:-1}" == "1" ]]; then
   log "Backend DB (${VOL_BACKEND_DATA})..."
   if volume_exists "${VOL_BACKEND_DATA}"; then
-    # Paths comuns: db.sqlite3 na raiz do volume montado em /app/backend/data
-    snapshot_sqlite_volume "${VOL_BACKEND_DATA}" "db.sqlite3" \
-      "${STAMP_DIR}/backend/db.sqlite3" \
-      || snapshot_sqlite_volume "${VOL_BACKEND_DATA}" "backend/data/db.sqlite3" \
-        "${STAMP_DIR}/backend/db.sqlite3"
+    if ! snapshot_sqlite_volume "${VOL_BACKEND_DATA}" "db.sqlite3" \
+      "${STAMP_DIR}/backend/db.sqlite3"; then
+      if ! snapshot_sqlite_volume "${VOL_BACKEND_DATA}" "backend/data/db.sqlite3" \
+        "${STAMP_DIR}/backend/db.sqlite3"; then
+        log "AVISO: backend DB não snapshotado"
+        ERRORS=$((ERRORS + 1))
+      fi
+    fi
   else
     log "AVISO: volume ${VOL_BACKEND_DATA} não existe — skip backend DB"
+    ERRORS=$((ERRORS + 1))
   fi
 fi
 
@@ -44,8 +57,8 @@ fi
 if [[ "${BACKUP_BACKEND_MEDIA:-1}" == "1" ]]; then
   log "Backend MEDIA (${VOL_BACKEND_MEDIA})..."
   if volume_exists "${VOL_BACKEND_MEDIA}"; then
-    snapshot_dir_volume "${VOL_BACKEND_MEDIA}" "." \
-      "${STAMP_DIR}/backend/media.tar.gz"
+    ok_or_mark snapshot_dir_volume "${VOL_BACKEND_MEDIA}" "." \
+      "${STAMP_DIR}/backend/media.tar.gz" || true
   else
     log "AVISO: volume ${VOL_BACKEND_MEDIA} não existe — skip media"
   fi
@@ -55,10 +68,11 @@ fi
 if [[ "${BACKUP_PNCP_DB:-1}" == "1" ]]; then
   log "PNCP DB (${VOL_PNCP_DATA})..."
   if volume_exists "${VOL_PNCP_DATA}"; then
-    snapshot_sqlite_volume "${VOL_PNCP_DATA}" "pncp_researcher_local.db" \
-      "${STAMP_DIR}/pncp/pncp_researcher_local.db"
+    ok_or_mark snapshot_sqlite_volume "${VOL_PNCP_DATA}" "pncp_researcher_local.db" \
+      "${STAMP_DIR}/pncp/pncp_researcher_local.db" || true
   else
     log "AVISO: volume ${VOL_PNCP_DATA} não existe — skip PNCP"
+    ERRORS=$((ERRORS + 1))
   fi
 fi
 
@@ -88,6 +102,13 @@ if [[ "${BACKUP_CROSSLINK_DB:-1}" == "1" ]]; then
     log "AVISO: volume ${VOL_PRICE_CROSSLINK} não existe — skip crosslink"
   fi
 fi
+
+# Garante que há pelo menos um artefato além de pastas vazias
+FILE_COUNT="$(find "$STAMP_DIR" -type f ! -name 'manifest.json' | wc -l | tr -d ' ')"
+if [[ "${FILE_COUNT}" -eq 0 ]]; then
+  die "Nenhum ficheiro snapshotado (erros=${ERRORS}). Confira VOL_* no env e: docker volume ls"
+fi
+log "Artefactos snapshotados: ${FILE_COUNT} (avisos=${ERRORS})"
 
 write_manifest "$STAMP_DIR" "$STAMP"
 
@@ -127,3 +148,8 @@ fi
 log "=== Backup OK: ${STAMP} ==="
 echo "STAMP=${STAMP}"
 echo "REMOTE=${REMOTE_DEST}"
+echo "SNAPSHOT_WARNINGS=${ERRORS}"
+if [[ "${ERRORS}" -gt 0 ]]; then
+  log "Concluído com ${ERRORS} aviso(s) — confira o log acima."
+  exit 0
+fi

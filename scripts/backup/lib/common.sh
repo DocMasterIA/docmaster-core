@@ -91,6 +91,9 @@ die() {
 
 # Snapshot SQLite consistente (.backup) de um ficheiro dentro de um volume Docker.
 # Uso: snapshot_sqlite_volume VOL_NAME REL_PATH_IN_VOL DEST_FILE
+#
+# Nota: volumes :ro + WAL falham com "unable to open database file".
+# Estratégia: copiar .db (+ -wal/-shm se existirem) para /out e aí fazer .backup.
 snapshot_sqlite_volume() {
   local vol="$1"
   local rel="$2"
@@ -106,36 +109,72 @@ snapshot_sqlite_volume() {
     -v "${dest_dir}:/out" \
     "${BACKUP_TOOL_IMAGE}" \
     python -c "
-import os, sqlite3, sys
+import os, shutil, sqlite3, sys
+
 src_rel = sys.argv[1]
 out_name = sys.argv[2]
+base = os.path.basename(src_rel)
 candidates = [
     '/v/' + src_rel.lstrip('/'),
     '/v/data/' + src_rel.lstrip('/'),
-    '/v/pncp/' + os.path.basename(src_rel),
-    '/v/' + os.path.basename(src_rel),
+    '/v/pncp/' + base,
+    '/v/platforms/' + base,
+    '/v/crosslink/' + base,
+    '/v/' + base,
 ]
-src = None
-for p in candidates:
-    if os.path.isfile(p):
-        src = p
-        break
-if not src:
+src = next((p for p in candidates if os.path.isfile(p)), None)
+if src is None:
+    # procura por basename até profundidade 3
+    for root, dirs, files in os.walk('/v'):
+        depth = root[len('/v'):].count(os.sep)
+        if depth > 3:
+            dirs.clear()
+            continue
+        if base in files:
+            src = os.path.join(root, base)
+            break
+if src is None:
     print('FICHEIRO NAO ENCONTRADO. Tentados:', candidates, file=sys.stderr)
-    # list top-level for debug
     try:
         print('top /v:', os.listdir('/v')[:40], file=sys.stderr)
     except Exception as e:
         print(e, file=sys.stderr)
     sys.exit(2)
+
+src_size = os.path.getsize(src)
+if src_size < 100:
+    print(
+        f'FICHEIRO INVALIDO/VAZIO: {src} ({src_size} bytes). '
+        'Volume provavelmente errado ou DB corrompido/vazio.',
+        file=sys.stderr,
+    )
+    sys.exit(3)
+
+raw_dir = '/out/.snap_raw_' + out_name.replace('.', '_')
+os.makedirs(raw_dir, exist_ok=True)
+raw_db = os.path.join(raw_dir, base)
+for suf in ('', '-wal', '-shm', '-journal'):
+    p = src + suf
+    if os.path.isfile(p):
+        shutil.copyfile(p, raw_db + suf)
+
 out = '/out/' + out_name
 if os.path.exists(out):
     os.remove(out)
-s = sqlite3.connect(f'file:{src}?mode=ro', uri=True)
+
+# Abre a cópia local (RW em /out) — evita falha WAL em volume :ro
+try:
+    s = sqlite3.connect(f'file:{raw_db}?mode=ro', uri=True)
+except sqlite3.OperationalError:
+    s = sqlite3.connect(f'file:{raw_db}?immutable=1', uri=True)
 d = sqlite3.connect(out)
-s.backup(d)
-d.close()
+with d:
+    s.backup(d)
 s.close()
+d.close()
+
+# limpa cópia bruta (mantém só o .backup final)
+shutil.rmtree(raw_dir, ignore_errors=True)
 print(src, '->', out, 'bytes', os.path.getsize(out))
 " "$rel" "$(basename "$dest")"
 }

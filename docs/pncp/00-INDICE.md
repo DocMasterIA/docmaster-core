@@ -60,6 +60,19 @@ Pasta [planejamento/](./planejamento/) — documentos numerados `00` a `10`:
 
 ---
 
+## Cotação em lote paralela (agenda N itens em voo)
+
+**Status: planejado (não implementado).** Paralelizar a fila do lote mantendo 100% da qualidade da busca atual.
+
+| Documento | Conteúdo |
+|-----------|----------|
+| [MODULO-COTACAO-LOTE-PARALELA-00-INDICE.md](./MODULO-COTACAO-LOTE-PARALELA-00-INDICE.md) | Índice do módulo |
+| [MODULO-COTACAO-LOTE-PARALELA-01-VISAO-DIAGNOSTICO-E-PRODUTO.md](./MODULO-COTACAO-LOTE-PARALELA-01-VISAO-DIAGNOSTICO-E-PRODUTO.md) | Visão, diagnóstico, produto, riscos |
+| [MODULO-COTACAO-LOTE-PARALELA-02-DESENHO-TECNICO.md](./MODULO-COTACAO-LOTE-PARALELA-02-DESENHO-TECNICO.md) | Fluxo atual, ondas, FE/BE/SQLite/CF, flags |
+| [MODULO-COTACAO-LOTE-PARALELA-03-ROADMAP-ACEITE-RUNBOOK.md](./MODULO-COTACAO-LOTE-PARALELA-03-ROADMAP-ACEITE-RUNBOOK.md) | Fases 0–7, aceite, runbook, issues |
+
+---
+
 ## Outros planos
 
 | Documento | Conteúdo |

@@ -20,7 +20,7 @@ Guias operacionais para produção (servidor DESKTOP / `/home/docmaster`, WSL + 
 | Grafana / Prometheus | [OBSERVABILIDADE-VPS.md](./OBSERVABILIDADE-VPS.md) |
 | Estabilidade geral / WSL idle | [ESTABILIDADE-E-CLOUDFLARE.md](./ESTABILIDADE-E-CLOUDFLARE.md) |
 | Entrega de módulos (checklist) | [ENTREGA-MODULOS.md](./ENTREGA-MODULOS.md) |
-| **Backup Cloudflare R2** (DBs + media) | [MODULO-BACKUP-R2.md](./MODULO-BACKUP-R2.md) |
+| **Backup Cloudflare R2** (DBs + media + cron) | [MODULO-BACKUP-R2.md](./MODULO-BACKUP-R2.md) |
 | Alterações recentes (changelog ops) | [CHANGELOG-OPERACOES-2026-06.md](./CHANGELOG-OPERACOES-2026-06.md) |
 
 ## Dois stacks Docker

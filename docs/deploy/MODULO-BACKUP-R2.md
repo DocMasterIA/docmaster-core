@@ -67,7 +67,12 @@ Configurar remote:
 |--------|--------|
 | [`scripts/backup/setup-rclone-r2.sh`](../../scripts/backup/setup-rclone-r2.sh) | Cria remote rclone a partir do env |
 | [`scripts/backup/backup-to-r2.sh`](../../scripts/backup/backup-to-r2.sh) | Snapshot + upload + prune |
+| [`scripts/backup/run-daily-backup.sh`](../../scripts/backup/run-daily-backup.sh) | Wrapper agendado (espera Docker + log) |
+| [`scripts/backup/install-backup-cron.sh`](../../scripts/backup/install-backup-cron.sh) | Instala/remove cron diário no WSL |
+| [`scripts/windows-register-r2-backup.ps1`](../../scripts/windows-register-r2-backup.ps1) | Task Scheduler Windows (acorda WSL) |
+| [`scripts/backup/resume-upload-r2.sh`](../../scripts/backup/resume-upload-r2.sh) | Retoma upload se SSH/rclone caiu (sem re-snapshot) |
 | [`scripts/backup/verify-r2-backup.sh`](../../scripts/backup/verify-r2-backup.sh) | Lista stamps / confere tamanhos |
+| [`scripts/backup/diagnose-volumes.sh`](../../scripts/backup/diagnose-volumes.sh) | Tamanhos dos VOL_* no Docker |
 | [`scripts/backup/restore-from-r2.sh`](../../scripts/backup/restore-from-r2.sh) | Baixa stamp e restaura volumes (com confirmação) |
 | [`config/backup-r2.env.example`](../../config/backup-r2.env.example) | Template de env (copiar para fora do git) |
 
@@ -85,17 +90,66 @@ export BACKUP_R2_ENV=~/docmaster-backups/backup-r2.env
 
 ---
 
-## 5. Agendamento (cron / Task Scheduler)
+## 5. Agendamento automático (cron diário)
 
-Exemplo diário 03:30 (WSL):
+Há **duas camadas** (recomendado usar as duas no PC Windows+WSL):
+
+| Camada | O quê | Quando usar |
+|--------|--------|-------------|
+| **Cron dentro do WSL** | `install-backup-cron.sh` | WSL já acordado (`vmIdleTimeout=-1`) |
+| **Task Scheduler Windows** | `windows-register-r2-backup.ps1` | Garante que o WSL acorda e corre o backup mesmo sem terminal aberto |
+
+### 5.1 Instalar cron no Linux (`docmaster`)
+
+```bash
+cd ~/docmaster-core
+chmod +x scripts/backup/install-backup-cron.sh scripts/backup/run-daily-backup.sh
+
+# Default 03:30
+./scripts/backup/install-backup-cron.sh
+
+# Ou outra hora:
+./scripts/backup/install-backup-cron.sh --hour 4 --minute 0
+
+# Remover:
+./scripts/backup/install-backup-cron.sh --remove
+```
+
+Teste manual do wrapper (mesmo path do cron):
+
+```bash
+./scripts/backup/run-daily-backup.sh
+tail -f ~/docmaster-backups/backup.log
+```
+
+### 5.2 Task Scheduler no Windows (recomendado no DESKTOP)
+
+No **PowerShell do Windows**:
+
+```powershell
+cd \\wsl$\Debian\home\docmaster\docmaster-core\scripts
+# Se a distro não for Debian: wsl -l -v  e use -WslDistro "Ubuntu"
+
+powershell -ExecutionPolicy Bypass -File .\windows-register-r2-backup.ps1
+# Hora default 03:30. Ex.: -Hour 4 -Minute 0
+```
+
+Teste sem esperar o dia seguinte:
+
+```powershell
+Start-ScheduledTask -TaskName "DocMaster-R2-Backup-Daily"
+```
+
+### 5.3 Linha cron (referência)
 
 ```cron
 30 3 * * * BACKUP_R2_ENV=/home/docmaster/docmaster-backups/backup-r2.env \
-  /home/docmaster/docmaster-core/scripts/backup/backup-to-r2.sh \
-  >> /home/docmaster/docmaster-backups/backup.log 2>&1
+  RCLONE_CONFIG=/home/docmaster/docmaster-backups/rclone.conf \
+  BACKUP_LOG=/home/docmaster/docmaster-backups/backup.log \
+  /home/docmaster/docmaster-core/scripts/backup/run-daily-backup.sh
 ```
 
-No Windows: Task Scheduler chamando `wsl.exe -u docmaster -- bash -lc '...'` (mesmo padrão do boot DocMaster).
+Retenção: `BACKUP_KEEP_REMOTE=7` no env (stamps antigos são podados após upload ok).
 
 ---
 

@@ -26,6 +26,9 @@ if [[ ! -f "$BACKUP_R2_ENV" ]]; then
 fi
 
 export BACKUP_R2_ENV RCLONE_CONFIG
+# Diário: críticos sempre; índices só se o .db mudou de tamanho no volume
+export BACKUP_PROFILE="${BACKUP_PROFILE:-auto}"
+export BACKUP_MODE="${BACKUP_MODE:-rolling}"
 
 # PATH típico (cron tem PATH mínimo)
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/bin:${PATH}"

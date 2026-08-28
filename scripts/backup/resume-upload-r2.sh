@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Retoma upload de um stamp já snapshotado em staging (sem refazer .backup).
+# Retoma upload para o destino rolling (current/) ou stamp versionado.
 # Uso:
+#   ./scripts/backup/resume-upload-r2.sh              # staging mais recente → current/
 #   ./scripts/backup/resume-upload-r2.sh 20260826-040808
-#   ./scripts/backup/resume-upload-r2.sh            # usa o staging mais recente
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib/common.sh
@@ -34,35 +34,22 @@ if [[ ! -f "${STAMP_DIR}/manifest.json" ]]; then
   write_manifest "$STAMP_DIR" "$STAMP"
 fi
 
-REMOTE_DEST="$(r2_remote_path "$STAMP")"
-log "Retomar upload ${STAMP_DIR} → ${REMOTE_DEST}"
-log "(rclone retoma partes já enviadas; podes correr em tmux/screen)"
-
-# --ignore-existing: não reenvia objetos já completos no remoto
-# sem isso, rclone copy também costuma saltar iguais por tamanho/modtime
-rclone copy "${STAMP_DIR}" "${REMOTE_DEST}" \
-  --progress \
-  --s3-upload-concurrency 4 \
-  --transfers 4 \
-  --retries 10 \
-  --low-level-retries 20 \
-  --retries-sleep 10s
-
-log "Verificar remoto..."
-rclone size "${REMOTE_DEST}"
-rclone ls "${REMOTE_DEST}"
-
-KEEP="${BACKUP_KEEP_REMOTE}"
-log "Retenção remota: manter ${KEEP} stamps"
-mapfile -t stamps < <(rclone lsf "$(r2_remote_path)" --dirs-only | sed 's|/$||' | sort -r)
-if ((${#stamps[@]} > KEEP)); then
-  for old in "${stamps[@]:KEEP}"; do
-    [[ -z "$old" ]] && continue
-    log "Apagar remoto antigo: ${old}"
-    rclone purge "$(r2_remote_path "$old")"
-  done
+if [[ "${BACKUP_MODE}" == "versioned" ]]; then
+  REMOTE_DEST="$(r2_remote_path "$STAMP")"
+  log "Retomar copy versionado → ${REMOTE_DEST}"
+  rclone copy "${STAMP_DIR}" "${REMOTE_DEST}" \
+    --progress --transfers 4 --retries 10 --retries-sleep 10s
+else
+  REMOTE_DEST="$(r2_remote_path)"
+  log "Retomar sync rolling → ${REMOTE_DEST}"
+  rclone sync "${STAMP_DIR}" "${REMOTE_DEST}" \
+    --progress --transfers 4 --retries 10 --retries-sleep 10s
 fi
 
-log "=== Upload OK: ${STAMP} ==="
+rclone size "${REMOTE_DEST}"
+rclone ls "${REMOTE_DEST}" | head -n 40
+
+log "=== Upload OK ==="
 echo "STAMP=${STAMP}"
 echo "REMOTE=${REMOTE_DEST}"
+echo "BACKUP_MODE=${BACKUP_MODE}"

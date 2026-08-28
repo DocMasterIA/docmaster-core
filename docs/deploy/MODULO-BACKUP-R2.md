@@ -24,19 +24,20 @@ Nomes de volume variam entre projetos Compose (`docmaster` vs `docmaster-core`).
 
 ---
 
-## 2. Arquitetura
+## 2. Arquitetura (o que sobe e quando)
 
-```
-Docker volumes (produção)
-  → snapshot consistente (sqlite3 .backup / tar media)
-  → staging local (~/docmaster-backups/staging/<stamp>/)
-  → rclone copy → Cloudflare R2 (S3-compatible)
-  → prune retenção (ex. 7–14 stamps)
-```
+**Objetivo real:** se alguém apagar 20 users por erro, dá para **repor a partir do R2** — sem encher o bucket todos os dias.
 
-Ferramenta: **rclone** (API S3 do R2). Credenciais só no host (arquivo env + rclone.conf), nunca no git.
+| Dados | Comportamento |
+|--------|----------------|
+| **Users / dados fixos / Django DB** | Se o ficheiro **não mudou de tamanho** → **não sobe** (R2 mantém). Se mudou → **arquiva** a cópia antiga em `history/backend/` (~15 MB × até 14 dias) e atualiza `current/backend/db.sqlite3`. |
+| **Media** | Só sobe quando o DB backend sobe (veio alteração). |
+| **PNCP / platforms** | Só sobe se o `.db` no Docker mudou de tamanho vs R2. |
 
-Custo estimado (Standard R2, ~26 GB × retenção 7): ordem **US$ 1–5/mês** (free tier 10 GB). Ver pricing Cloudflare R2.
+**Porquê o `history/` do DB pequeno?**  
+Com um único `current/`, se o erro já estiver no disco e o backup “atualizar”, sobrescreves a boa cópia. O histórico barato do `db.sqlite3` é o que permite voltar ao estado **antes** da exclusão.
+
+Espaço típico: índices (~26 GB uma vez) + backend atual + ≤14 × ~15 MB de history ≈ **estável**, não +26 GB/dia.
 
 ---
 
@@ -72,7 +73,7 @@ Configurar remote:
 | [`scripts/windows-register-r2-backup.ps1`](../../scripts/windows-register-r2-backup.ps1) | Task Scheduler Windows (acorda WSL) |
 | [`scripts/backup/resume-upload-r2.sh`](../../scripts/backup/resume-upload-r2.sh) | Retoma upload se SSH/rclone caiu (sem re-snapshot) |
 | [`scripts/backup/verify-r2-backup.sh`](../../scripts/backup/verify-r2-backup.sh) | Lista stamps / confere tamanhos |
-| [`scripts/backup/diagnose-volumes.sh`](../../scripts/backup/diagnose-volumes.sh) | Tamanhos dos VOL_* no Docker |
+| [`scripts/backup/purge-legacy-stamps-r2.sh`](../../scripts/backup/purge-legacy-stamps-r2.sh) | Apaga stamps datados legados; mantém current/ |
 | [`scripts/backup/restore-from-r2.sh`](../../scripts/backup/restore-from-r2.sh) | Baixa stamp e restaura volumes (com confirmação) |
 | [`config/backup-r2.env.example`](../../config/backup-r2.env.example) | Template de env (copiar para fora do git) |
 
@@ -153,11 +154,12 @@ Retenção: `BACKUP_KEEP_REMOTE=7` no env (stamps antigos são podados após upl
 
 ---
 
-## 6. Retenção e staging
+## 6. Retenção e espaço no R2
 
-- `BACKUP_KEEP_REMOTE=7` — quantos stamps manter no R2.
-- `BACKUP_KEEP_LOCAL_STAGING=1` — após upload ok, apagar staging antigo (disco do PC é limitado).
-- Snapshots SQLite usam `.backup` (consistente com WAL), não `cp` cru do `.db` aberto.
+- **rolling (default):** ~26 GB estáveis. Cada corrida faz `rclone sync` para `current/`.
+- `BACKUP_PURGE_OLD_STAMPS=1`: apaga pastas datadas legadas (`20260826-…`) após o sync.
+- Limpeza manual agora: `./scripts/backup/purge-legacy-stamps-r2.sh` (pede `PURGE`).
+- Staging local: `BACKUP_KEEP_LOCAL_STAGING=1`.
 
 ---
 

@@ -36,9 +36,21 @@ load_backup_env() {
   R2_BUCKET="${R2_BUCKET:-docmaster-backups}"
   R2_PREFIX="${R2_PREFIX:-docmaster}"
   BACKUP_ROOT="${BACKUP_ROOT:-${HOME}/docmaster-backups}"
-  BACKUP_KEEP_REMOTE="${BACKUP_KEEP_REMOTE:-7}"
+  # rolling (default): um único destino current/ — atualiza no sítio, NÃO empilha GB/dia
+  # versioned: pasta datada por corrida (só se precisares de histórico explícito)
+  BACKUP_MODE="${BACKUP_MODE:-rolling}"
+  BACKUP_REMOTE_SLOT="${BACKUP_REMOTE_SLOT:-current}"
+  # auto (default diário): users/media sempre; índices de preço só se o .db no volume mudou de tamanho
+  # critical: só backend db + media
+  # indexes: só pncp/platforms/crosslink (respeita skip-if-unchanged)
+  # full: força snapshot+upload de tudo
+  BACKUP_PROFILE="${BACKUP_PROFILE:-auto}"
+  # Quantas cópias antigas do db.sqlite3 guardar em history/backend/ (recuperar users apagados)
+  BACKUP_BACKEND_HISTORY_KEEP="${BACKUP_BACKEND_HISTORY_KEEP:-14}"
+  BACKUP_KEEP_REMOTE="${BACKUP_KEEP_REMOTE:-2}"
   BACKUP_KEEP_LOCAL_STAGING="${BACKUP_KEEP_LOCAL_STAGING:-1}"
   BACKUP_TOOL_IMAGE="${BACKUP_TOOL_IMAGE:-python:3.12-slim-bookworm}"
+  BACKUP_PURGE_OLD_STAMPS="${BACKUP_PURGE_OLD_STAMPS:-1}"
 
   if [[ -z "${R2_ENDPOINT:-}" && -n "${R2_ACCOUNT_ID:-}" ]]; then
     R2_ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
@@ -71,13 +83,93 @@ volume_exists() {
   [[ -n "$vol" ]] && docker volume inspect "$vol" >/dev/null 2>&1
 }
 
+# Destino remoto do backup “atual”.
+# rolling → prefix/current  |  versioned → prefix/<stamp>
 r2_remote_path() {
   local stamp="${1:-}"
-  if [[ -n "$stamp" ]]; then
-    echo "${RCLONE_REMOTE}:${R2_BUCKET}/${R2_PREFIX}/${stamp}"
+  if [[ "${BACKUP_MODE}" == "versioned" ]]; then
+    if [[ -n "$stamp" ]]; then
+      echo "${RCLONE_REMOTE}:${R2_BUCKET}/${R2_PREFIX}/${stamp}"
+    else
+      echo "${RCLONE_REMOTE}:${R2_BUCKET}/${R2_PREFIX}"
+    fi
   else
-    echo "${RCLONE_REMOTE}:${R2_BUCKET}/${R2_PREFIX}"
+    echo "${RCLONE_REMOTE}:${R2_BUCKET}/${R2_PREFIX}/${BACKUP_REMOTE_SLOT}"
   fi
+}
+
+r2_prefix_root() {
+  echo "${RCLONE_REMOTE}:${R2_BUCKET}/${R2_PREFIX}"
+}
+
+# Tamanho de um ficheiro dentro de um volume Docker (0 se não existir).
+volume_file_bytes() {
+  local vol="$1"
+  local rel="$2"
+  volume_exists "$vol" || { echo 0; return 0; }
+  docker run --rm -v "${vol}:/v:ro" "${BACKUP_TOOL_IMAGE}" python -c "
+import os, sys
+rel = sys.argv[1].lstrip('/')
+base = os.path.basename(rel)
+cands = [
+    '/v/' + rel,
+    '/v/data/' + rel,
+    '/v/pncp/' + base,
+    '/v/platforms/' + base,
+    '/v/crosslink/' + base,
+    '/v/' + base,
+]
+for p in cands:
+    if os.path.isfile(p):
+        print(os.path.getsize(p))
+        raise SystemExit(0)
+for root, dirs, files in os.walk('/v'):
+    if root[len('/v'):].count(os.sep) > 3:
+        dirs.clear()
+        continue
+    if base in files:
+        print(os.path.getsize(os.path.join(root, base)))
+        raise SystemExit(0)
+print(0)
+" "$rel" 2>/dev/null || echo 0
+}
+
+# Tamanho de um objeto no R2 (0 se não existir). path relativo ao slot current/, ex: pncp/foo.db
+remote_object_bytes() {
+  local rel="$1"
+  local dest
+  dest="$(r2_remote_path)"
+  # rclone lsl: "  12345 2026-01-01 00:00:00.000 path"
+  local line
+  line="$(rclone lsl "${dest}/${rel}" 2>/dev/null | head -n1 || true)"
+  if [[ -z "$line" ]]; then
+    echo 0
+    return 0
+  fi
+  # primeiro campo numérico
+  echo "$line" | awk '{print $1; exit}'
+}
+
+# 0 = igual (skip); 1 = precisa upload
+index_db_needs_upload() {
+  local vol="$1"
+  local rel="$2"
+  local remote_rel="$3"
+  local local_b remote_b
+  local_b="$(volume_file_bytes "$vol" "$rel" | tr -d '[:space:]')"
+  remote_b="$(remote_object_bytes "$remote_rel" | tr -d '[:space:]')"
+  local_b="${local_b:-0}"
+  remote_b="${remote_b:-0}"
+  if [[ "$local_b" -lt 100 ]]; then
+    log "índice local ausente/vazio: ${vol}:${rel} (${local_b} B)"
+    return 1
+  fi
+  if [[ "$remote_b" -eq "$local_b" ]]; then
+    log "skip índice (tamanho igual ${local_b} B): ${remote_rel}"
+    return 1
+  fi
+  log "índice mudou: ${remote_rel} local=${local_b} remote=${remote_b} → upload"
+  return 0
 }
 
 log() {

@@ -3,7 +3,8 @@
 # CUIDADO: sobrescreve dados locais. Pare os writers antes.
 #
 # Uso:
-#   ./scripts/backup/restore-from-r2.sh 20260825-033000
+#   ./scripts/backup/restore-from-r2.sh              # current/ (rolling)
+#   ./scripts/backup/restore-from-r2.sh current
 #   ./scripts/backup/restore-from-r2.sh 20260825-033000 --download-only
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -17,12 +18,16 @@ require_cmd rclone
 RCLONE_CONFIG_FILE="${BACKUP_ROOT}/rclone.conf"
 [[ -f "$RCLONE_CONFIG_FILE" ]] && export RCLONE_CONFIG="$RCLONE_CONFIG_FILE"
 
-STAMP="${1:-}"
+STAMP="${1:-${BACKUP_REMOTE_SLOT}}"
 MODE="${2:-}"
-[[ -n "$STAMP" ]] || die "Uso: $0 <stamp> [--download-only]"
 
-DEST="$(r2_remote_path "$STAMP")"
-RESTORE_DIR="${BACKUP_ROOT}/restore/${STAMP}"
+if [[ "${BACKUP_MODE}" != "versioned" && ( "$STAMP" == "current" || "$STAMP" == "${BACKUP_REMOTE_SLOT}" ) ]]; then
+  DEST="$(r2_remote_path)"
+  RESTORE_DIR="${BACKUP_ROOT}/restore/${BACKUP_REMOTE_SLOT}"
+else
+  DEST="$(r2_prefix_root)/${STAMP}"
+  RESTORE_DIR="${BACKUP_ROOT}/restore/${STAMP}"
+fi
 mkdir -p "$RESTORE_DIR"
 
 log "Download ${DEST} → ${RESTORE_DIR}"

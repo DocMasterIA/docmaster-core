@@ -37,27 +37,30 @@ Docker Desktop → **Settings** → **General** → **Start Docker Desktop when 
 
 ### 3) Tarefa agendada no Windows (acorda WSL + stack)
 
-No **PowerShell do Windows** (não dentro do WSL):
+No **PowerShell do Windows** (não dentro do WSL). Neste PC a distro é **Ubuntu** e o repo está em `docmaster-core`:
 
 ```powershell
-cd \\wsl$\Debian\home\docmaster\scripts
-# Se a distro não for Debian, liste: wsl -l -v
-# e use: -WslDistro "Ubuntu" no comando abaixo
+wsl -l -v
+cd \\wsl$\Ubuntu\home\docmaster\docmaster-core\scripts
 
-powershell -ExecutionPolicy Bypass -File .\windows-register-wsl-boot.ps1 -LinuxDeploy "/home/docmaster" -LinuxUser "docmaster"
+powershell -ExecutionPolicy Bypass -File .\windows-register-wsl-boot.ps1 -WslDistro "Ubuntu" -LinuxDeploy "/home/docmaster/docmaster-core"
 ```
 
 Teste sem reiniciar o PC:
 
 ```powershell
 Start-ScheduledTask -TaskName "DocMaster-WSL-Stack"
+Get-ScheduledTask -TaskName "DocMaster-WSL-Stack" | Get-ScheduledTaskInfo
 ```
 
 No WSL:
 
 ```bash
-tail -20 /home/docmaster/wsl-boot.log
-docker ps | grep -E 'cloudflared|backend|frontend'
+tail -40 /home/docmaster/docmaster-core/wsl-boot.log
+# ou, se o log ainda estiver no home antigo:
+tail -40 /home/docmaster/wsl-boot.log
+
+docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E 'cloudflared|backend|frontend|NAMES'
 ```
 
 ### 4) Confirmar systemd no WSL (se ainda não tiver)

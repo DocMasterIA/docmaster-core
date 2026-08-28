@@ -4,7 +4,7 @@
 # do unit de sistema exige polkit/sudo e falha na tarefa agendada.
 set -euo pipefail
 
-DEPLOY="${DOCMASTER_DEPLOY_DIR:-/home/docmaster}"
+DEPLOY="${DOCMASTER_DEPLOY_DIR:-/home/docmaster/docmaster-core}"
 LOG="${DOCMASTER_WSL_BOOT_LOG:-$DEPLOY/wsl-boot.log}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 

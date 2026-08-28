@@ -14,6 +14,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DEPLOY="${DOCMASTER_DEPLOY_DIR:-$SCRIPT_DIR/..}"
 DEPLOY="$(cd "$DEPLOY" && pwd)"
 COMPOSE_FILE="${DOCMASTER_COMPOSE_FILE:-$DEPLOY/docker-compose.yml}"
+# Nome estável: basename docmaster-core ≠ deploy antigo em /home/docmaster →
+# compose tenta «Creating» e colide com container_name fixos (ollama, backend, …).
+export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-docmaster}"
 
 log() {
   echo "$(date -Is) $*"
@@ -113,6 +116,16 @@ reset_cloudflared_before_compose() {
   sleep 2
 }
 
+# Sempre remove nomes fixos antes do up. Soft-prune por project falha neste host
+# (Docker Desktop deixa Created + portas fantasma; ensure antigo recria em loop).
+force_clear_named_containers() {
+  local name
+  log "A limpar contentores core por nome (COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME)"
+  for name in "$@"; do
+    docker rm -f "$name" 2>/dev/null || true
+  done
+}
+
 main_compose_up() {
   if [[ ! -f "$COMPOSE_FILE" ]]; then
     log "ERRO: compose não encontrado: $COMPOSE_FILE"
@@ -140,8 +153,9 @@ main_compose_up() {
   )
   local obs=(node_exporter prometheus grafana)
 
-  log "Stack principal (site + túnel) em $DEPLOY"
+  log "Stack principal (site + túnel) em $DEPLOY (project=$COMPOSE_PROJECT_NAME)"
   reset_cloudflared_before_compose
+  force_clear_named_containers "${core[@]}"
   docker compose -f "$COMPOSE_FILE" up "${up_flags[@]}" "${core[@]}"
   prune_orphan_cloudflared_containers
   prune_orphan_cloudflared_processes

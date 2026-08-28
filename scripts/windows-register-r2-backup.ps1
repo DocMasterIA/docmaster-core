@@ -18,13 +18,16 @@ param(
 $ErrorActionPreference = "Stop"
 
 $runner = "$LinuxDeploy/scripts/backup/run-daily-backup.sh"
+# Uma única string para bash -lc (env + script)
 $bashCmd = "BACKUP_R2_ENV=`$HOME/docmaster-backups/backup-r2.env RCLONE_CONFIG=`$HOME/docmaster-backups/rclone.conf $runner"
 
-$wslArgs = @()
-if ($WslDistro) { $wslArgs += @("-d", $WslDistro) }
-$wslArgs += @("-u", $LinuxUser, "-e", "bash", "-lc", $bashCmd)
+$argParts = @()
+if ($WslDistro) { $argParts += @("-d", $WslDistro) }
+$argParts += @("-u", $LinuxUser, "-e", "bash", "-lc")
+# Aspas à volta do comando -lc para o Task Scheduler não partir pelos espaços
+$argString = ($argParts -join " ") + " `"$bashCmd`""
 
-$action = New-ScheduledTaskAction -Execute "wsl.exe" -Argument ($wslArgs -join " ")
+$action = New-ScheduledTaskAction -Execute "wsl.exe" -Argument $argString
 
 # Diário à hora local do Windows
 $trigger = New-ScheduledTaskTrigger -Daily -At ("{0:D2}:{1:D2}" -f $Hour, $Minute)
@@ -45,7 +48,7 @@ Register-ScheduledTask `
 
 Write-Host "OK  Tarefa agendada: $TaskName"
 Write-Host "    Hora: ${Hour}:$($Minute.ToString('00')) (hora do Windows)"
-Write-Host "    wsl.exe $($wslArgs -join ' ')"
+Write-Host "    wsl.exe $argString"
 Write-Host ""
 Write-Host "Requisitos:"
 Write-Host "  - ~/docmaster-backups/backup-r2.env e rclone.conf no user $LinuxUser"
@@ -53,5 +56,5 @@ Write-Host "  - Docker Desktop a correr (ou a acordar com o login)"
 Write-Host "  - Preferivel: C:\Users\$env:USERNAME\.wslconfig -> vmIdleTimeout=-1"
 Write-Host ""
 Write-Host "Teste agora: Start-ScheduledTask -TaskName '$TaskName'"
-Write-Host "Log WSL:     tail -f /home/$LinuxUser/docmaster-backups/backup.log"
-Write-Host "Ver R2:      wsl -u $LinuxUser -- bash -lc 'cd $LinuxDeploy && ./scripts/backup/verify-r2-backup.sh'"
+Write-Host "Log WSL:     wsl -d $WslDistro -u $LinuxUser -- tail -20 /home/$LinuxUser/docmaster-backups/backup.log"
+Write-Host "Ver R2:      wsl -d $WslDistro -u $LinuxUser -- bash -lc 'cd $LinuxDeploy && ./scripts/backup/verify-r2-backup.sh'"

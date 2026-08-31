@@ -260,7 +260,7 @@
                 </div>
                 <div class="item-cotacao-card__field">
                   <span>Data</span>
-                  <strong>{{ formatDateTimePt(r.created_at) }}</strong>
+                  <strong>{{ formatDateTimePt(dataFontePreco(r)) }}</strong>
                 </div>
                 <div class="item-cotacao-card__field">
                   <span>Inciso</span>
@@ -600,10 +600,40 @@ function formatCurrency(v) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+/** Data/hora da fonte de preço (PNCP), nunca o instante do save — salvo fallback. */
+function dataFontePreco(r) {
+  const src = r?.source && typeof r.source === 'object' ? r.source : {};
+  const candidates = [
+    r?.data_publicacao,
+    src.data_publicacao,
+    src.data_referencia,
+    src.dataPublicacaoPncp,
+    src.data,
+  ];
+  for (const c of candidates) {
+    const s = String(c ?? '').trim();
+    if (s && s !== '-' && s !== '—' && s !== 'null' && s !== 'None') return s;
+  }
+  return r?.created_at || null;
+}
+
+/**
+ * Formata data/hora da fonte.
+ * ISO naive (2025-04-15T07:36:42) é interpretado como wall-clock, sem shift UTC.
+ * Só data (YYYY-MM-DD) → dd/mm/aaaa sem inventar horário.
+ */
 function formatDateTimePt(iso) {
   if (!iso) return '—';
-  const dt = new Date(iso);
-  if (!Number.isFinite(dt.getTime())) return String(iso);
+  const s = String(iso).trim();
+  if (!s || s === '-' || s === '—') return '—';
+  const dateOnly = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnly) return `${dateOnly[3]}/${dateOnly[2]}/${dateOnly[1]}`;
+  const withTime = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (withTime) {
+    return `${withTime[3]}/${withTime[2]}/${withTime[1]}, ${withTime[4]}:${withTime[5]}`;
+  }
+  const dt = new Date(s);
+  if (!Number.isFinite(dt.getTime())) return s;
   return dt.toLocaleString('pt-BR', {
     day: '2-digit',
     month: '2-digit',

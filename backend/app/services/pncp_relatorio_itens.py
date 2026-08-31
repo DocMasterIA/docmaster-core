@@ -12,6 +12,7 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter, defaultdict
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from django.conf import settings
@@ -1175,6 +1176,65 @@ def _label_modalidade_fonte(it: Any, src: Dict[str, Any], *, modalidade_raw: str
     return "N/D"
 
 
+_DATE_ISO_PREFIX = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
+_DATE_BR = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})\b")
+
+
+def _format_data_fonte_relatorio(it: Any, src: Any, *, tz) -> str:
+    """
+    Data/hora da fonte no PDF: publicação/referência do item, não o created_at do save.
+
+    `data_publicacao` é CharField (ex.: 2025-04-15T07:36:42). Usar created_at
+    aqui fazia o relatório mostrar o instante em que o preço foi salvo na cotação.
+    """
+    src = src if isinstance(src, dict) else {}
+    candidates = (
+        getattr(it, "data_publicacao", None),
+        src.get("data_publicacao"),
+        src.get("data_referencia"),
+        src.get("dataPublicacaoPncp"),
+        src.get("data"),
+    )
+    for raw in candidates:
+        s = str(raw or "").strip()
+        if not s or s in {"-", "—", "None", "null"}:
+            continue
+        # ISO com hora: preservar wall-clock (evitar shift UTC em naive).
+        if "T" in s or (" " in s and ":" in s):
+            try:
+                dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+                if timezone.is_aware(dt):
+                    dt = timezone.localtime(dt, tz) if tz is not None else timezone.localtime(dt)
+                return dt.strftime("%d/%m/%Y %H:%M")
+            except (TypeError, ValueError):
+                pass
+        m = _DATE_ISO_PREFIX.match(s)
+        if m and len(s) <= 10:
+            return f"{m.group(3)}/{m.group(2)}/{m.group(1)}"
+        m = _DATE_BR.match(s)
+        if m:
+            rest = s[m.end() :].strip()
+            if rest and ":" in rest:
+                return f"{int(m.group(1)):02d}/{int(m.group(2)):02d}/{m.group(3)} {rest[:5]}"
+            return f"{int(m.group(1)):02d}/{int(m.group(2)):02d}/{m.group(3)}"
+        if m := _DATE_ISO_PREFIX.match(s):
+            return f"{m.group(3)}/{m.group(2)}/{m.group(1)}"
+        if len(s) >= 8:
+            return s[:32]
+    created = getattr(it, "created_at", None)
+    if created is not None:
+        try:
+            if tz is not None:
+                return timezone.localtime(created, tz).strftime("%d/%m/%Y %H:%M")
+            return timezone.localtime(created).strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            try:
+                return created.strftime("%d/%m/%Y %H:%M")
+            except Exception:
+                return "—"
+    return "—"
+
+
 def fonte_dict_de_item(
     it: Any,
     *,
@@ -1227,10 +1287,7 @@ def fonte_dict_de_item(
     )
     cnpj = _cnpj_exibicao_relatorio(src, cnpj_fornecedor)
 
-    created = getattr(it, "created_at", None)
-    data_str = "—"
-    if created is not None:
-        data_str = timezone.localtime(created, tz).strftime("%d/%m/%Y")
+    data_str = _format_data_fonte_relatorio(it, src, tz=tz)
 
     pu = preco_unitario_cotacao_fonte(it, quantidade_item=quantidade_item_base)
     if pu is not None:

@@ -1649,7 +1649,19 @@ async function adicionarSelecionadosNaCotacao() {
       risco: r.risco,
       status: r.status,
       similaridade_encontrada: Boolean(r.similaridadeEncontrada),
-      data_publicacao: r.data,
+      data_publicacao: (() => {
+        const candidates = [
+          r.data,
+          raw.data_publicacao,
+          raw.data_referencia,
+          raw.dataPublicacaoPncp,
+        ];
+        for (const c of candidates) {
+          const s = String(c ?? '').trim();
+          if (s && s !== '-' && s !== '—' && s !== 'null' && s !== 'None') return s.slice(0, 64);
+        }
+        return null;
+      })(),
       fornecedor: pickFornecedorDisplayName(r),
       cnpj_fornecedor: extractCnpjFornecedorSalvar(r) || r.cnpjFornecedor || null,
       fornecedor_cadastro: Object.keys(cad).length ? cad : null,

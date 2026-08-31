@@ -1105,7 +1105,19 @@ async function adicionarSelecionadosNaCotacao(goToCotacao = false) {
       // Mantém metadados úteis sem inflar demais o JSON.
       origem: 'busca_manual',
       observacao: toNullableText(r.observacao),
-      data_publicacao: toNullableText(r.data),
+      data_publicacao: (() => {
+        const candidates = [
+          r.data,
+          raw.data_publicacao,
+          raw.data_referencia,
+          raw.dataPublicacaoPncp,
+        ];
+        for (const c of candidates) {
+          const t = toNullableText(c);
+          if (t) return t.slice(0, 64);
+        }
+        return null;
+      })(),
       material_servico: toNullableText(r.sourceRaw?.material_servico),
       fornecedor: toNullableText(pickFornecedorDisplayName(r)),
       cnpj_fornecedor: toNullableText(extractCnpjFornecedorSalvar(r) || r.cnpjFornecedor || raw.cnpj_fornecedor),

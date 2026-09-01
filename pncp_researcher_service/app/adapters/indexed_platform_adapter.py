@@ -60,12 +60,15 @@ class IndexedPlatformAdapter(PriceSourceAdapter):
     def capabilities(self) -> Dict[str, Any]:
         spec = get_platform_spec(self.id)
         base = super().capabilities()
+        search_ready = bool(spec.search_ready) if spec else False
+        if spec and spec.schema_kind == "platform_index" and spec.db_exists():
+            search_ready = bool(platform_index_stats(spec.db_path or "").get("search_ready"))
         base.update(
             {
                 "index_kind": "platform_index",
                 "uf_scope": spec.uf_scope if spec else None,
                 "db_path": spec.db_path if spec else None,
-                "search_ready": spec.search_ready if spec else False,
+                "search_ready": search_ready,
             }
         )
         return base

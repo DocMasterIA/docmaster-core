@@ -28,13 +28,43 @@ export function mergeFontesWithLocalStats(fontes, localStats) {
   return (fontes || []).map((f) => {
     const st = por.find((p) => p.id === f.id);
     if (!st) return { ...f };
+    const total = st.total_itens != null ? Number(st.total_itens) : f.total_itens;
+    let searchReady = f.search_ready;
+    if (st.search_ready != null) {
+      searchReady = Boolean(st.search_ready);
+    } else if (Number.isFinite(total) && total > 0) {
+      // PNCP legacy não envia search_ready — índice com itens = consultável.
+      searchReady = true;
+    }
     return {
       ...f,
-      search_ready: st.search_ready != null ? Boolean(st.search_ready) : f.search_ready,
-      total_itens: st.total_itens != null ? Number(st.total_itens) : f.total_itens,
+      search_ready: searchReady,
+      total_itens: total,
       db_exists: st.db_exists != null ? Boolean(st.db_exists) : f.db_exists,
     };
   });
+}
+
+/**
+ * Quando /local-index/stats falha, não desabilitar fontes no catálogo:
+ * a busca federada usa os .db locais e pode funcionar mesmo sem totais na UI.
+ */
+export function applyFontesWhenStatsUnavailable(fontes) {
+  return (fontes || []).map((f) => ({
+    ...f,
+    search_ready: Boolean(f?.id),
+    stats_degraded: true,
+  }));
+}
+
+/** Evita mostrar «0 itens» quando stats ainda não carregou ou falhou. */
+export function formatTotalItensIndexados(localStats, { loading = false, degraded = false } = {}) {
+  if (loading) return '…';
+  if (!localStats) return degraded ? '—' : '…';
+  const todas = Number(localStats.total_itens_todas_fontes);
+  if (Number.isFinite(todas) && todas > 0) return todas.toLocaleString('pt-BR');
+  const pncp = Number(localStats.total_itens || 0);
+  return pncp.toLocaleString('pt-BR');
 }
 
 export function pickDefaultFontes(fontes) {

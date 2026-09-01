@@ -342,11 +342,12 @@ import {
   fetchAllItemsForBulkSearch,
   federatedMarketSearch,
   formatResearchError,
-  getLocalIndexStats,
+  getLocalIndexStatsResilient,
   getResearchSession,
 } from '../services/pncpResearch';
 import PriceSourcesPanel from '../components/PriceSourcesPanel.vue';
 import {
+  applyFontesWhenStatsUnavailable,
   federatedItemPlataforma,
   federatedItemProcessoRef,
   isComprasGovPlatform,
@@ -1754,12 +1755,16 @@ onMounted(async () => {
   isLoadingFontes.value = true;
   try {
     try {
-      localStats.value = await getLocalIndexStats();
+      localStats.value = await getLocalIndexStatsResilient();
     } catch (_) {
       localStats.value = null;
     }
     const catalog = await loadPriceSourcesCatalog();
-    fontesCatalog.value = mergeFontesWithLocalStats(catalog, localStats.value);
+    if (localStats.value) {
+      fontesCatalog.value = mergeFontesWithLocalStats(catalog, localStats.value);
+    } else {
+      fontesCatalog.value = applyFontesWhenStatsUnavailable(catalog);
+    }
     fontesHabilitadas.value = pickDefaultFontes(fontesCatalog.value);
   } finally {
     isLoadingFontes.value = false;

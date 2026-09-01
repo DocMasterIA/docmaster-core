@@ -125,6 +125,9 @@
             <strong>{{ totalItensBaseLocalFmt }}</strong> itens indexados
             <span v-if="detalheBaseLocalPorFonte"> ({{ detalheBaseLocalPorFonte }})</span>.
           </p>
+          <p v-if="localStatsDegraded" class="manual-meta manual-meta--warn">
+            Totais do índice indisponíveis agora — busca multi-fonte mantida. Recarregue se os números não aparecerem.
+          </p>
           <button type="button" class="manual-btn-backfill" :disabled="isBackfilling" @click="atualizarBaseLocalAgora">
             {{ isBackfilling ? 'Atualizando base...' : 'Atualizar base local (.db)' }}
           </button>
@@ -190,8 +193,16 @@
         <div class="manual-summary-card"><span>Valor médio</span><strong>{{ mediaValor }}</strong></div>
         <div class="manual-summary-card"><span>UFs distintas</span><strong>{{ totalUfs }}</strong></div>
       </section>
+      <p v-if="ultimaBuscaApi?.total != null" class="manual-meta">
+        API devolveu <strong>{{ ultimaBuscaApi.total }}</strong> itens
+        <span v-if="resumoPlataformaApi">({{ resumoPlataformaApi }})</span>.
+        <span v-if="ultimaBuscaApi.total > resultadosFiltradosOrdenados.length">
+          Filtros da tela (valor base, geo, período…) reduziram para {{ resultadosFiltradosOrdenados.length }}.
+        </span>
+      </p>
       <p v-if="faixaValorAtiva" class="manual-meta">
         Faixa ativa por Valor Base + Variação: <strong>{{ faixaValorAtiva }}</strong>
+        — zere o valor base para ver o recall completo da API.
       </p>
 
       <section class="manual-results-table-shell">
@@ -302,12 +313,14 @@ import {
   federatedMarketSearch,
   formatResearchError,
   getResearchSessionResilient,
-  getLocalIndexStats,
+  getLocalIndexStatsResilient,
 } from '../services/pncpResearch';
 import PriceSourcesPanel from '../components/PriceSourcesPanel.vue';
 import {
+  applyFontesWhenStatsUnavailable,
   federatedItemPlataforma,
   federatedItemProcessoRef,
+  formatTotalItensIndexados,
   isComprasGovPlatform,
   isNotasFiscaisPlatform,
   isTceRsPlatform,
@@ -325,7 +338,7 @@ import {
 import { takeManualSearchPrefill } from '../utils/manualSearchPrefill';
 import { MUNICIPIOS_POR_UF } from '../data/brasilMunicipiosPorUf';
 import { buildRecortesGeograficosPayload, itemMatchesRecortesGeograficos } from '../utils/recortesGeograficos';
-import { canSalvarCotacaoPnCp, displayPnCpUnitario, extractCnpjFornecedorSalvar, formatFaixaResumo, passesPnCpSearchDisplayGate, computeFaixaRegional, pickFornecedorDisplayName, buildFaixaRegionalItemDisplay, resolveRowPlataforma, pnCpRowWithinFaixaRegional } from '../utils/pncpPricing';
+import { canSalvarCotacaoPnCp, displayPnCpUnitario, extractCnpjFornecedorSalvar, formatFaixaResumo, computeFaixaRegional, pickFornecedorDisplayName, buildFaixaRegionalItemDisplay, resolveRowPlataforma, pnCpRowWithinFaixaRegional } from '../utils/pncpPricing';
 import { labelModalidadeFonte } from '../utils/tceModalidade';
 import { formatMunicipioUf, resolveMunicipioUf } from '../utils/tceLocalidade';
 
@@ -501,6 +514,8 @@ const searchError = ref('');
 let searchGeneration = 0;
 const saveMessage = ref('');
 const localStats = ref(null);
+const localStatsLoading = ref(false);
+const localStatsDegraded = ref(false);
 const fontesCatalog = ref([]);
 /** Todas as fontes ready por padrão (PNCP + TCE + Compras.gov…). */
 const fontesHabilitadas = ref([]);
@@ -520,6 +535,26 @@ const addButtonLabel = computed(() => (
 ));
 const totalSelecionados = computed(() => resultados.value.filter((x) => x.selecionado).length);
 const totalUfs = computed(() => new Set(resultadosFiltradosOrdenados.value.map((x) => x.uf).filter(Boolean)).size);
+const ultimaBuscaApi = ref(null);
+
+function resumoContagemPlataforma(map) {
+  if (!map || typeof map !== 'object') return '';
+  return Object.entries(map)
+    .sort((a, b) => b[1] - a[1])
+    .map(([id, n]) => `${plataformaBadgeShort(id)}: ${n}`)
+    .join(' · ');
+}
+
+const resumoPlataformaApi = computed(() => resumoContagemPlataforma(ultimaBuscaApi.value?.porPlataforma));
+
+function contagemPlataformaRawItens(itens) {
+  const out = {};
+  for (const it of itens || []) {
+    const id = federatedItemPlataforma(it) || 'pncp';
+    out[id] = (out[id] || 0) + 1;
+  }
+  return out;
+}
 const mediaValor = computed(() => {
   const nums = resultados.value
     .filter((x) => x.selecionado)
@@ -528,16 +563,11 @@ const mediaValor = computed(() => {
   if (!nums.length) return 'R$ -';
   return formatCurrency(nums.reduce((a, b) => a + b, 0) / nums.length);
 });
-/** Volume bruto indexado (PNCP + TCE-RS + …), não só o subconjunto homologado na busca. */
-const totalItensBaseLocal = computed(() => {
-  const s = localStats.value;
-  if (!s) return 0;
-  const todas = Number(s.total_itens_todas_fontes);
-  if (Number.isFinite(todas) && todas > 0) return todas;
-  return Number(s.total_itens || 0);
-});
 const totalItensBaseLocalFmt = computed(() =>
-  totalItensBaseLocal.value.toLocaleString('pt-BR'),
+  formatTotalItensIndexados(localStats.value, {
+    loading: localStatsLoading.value,
+    degraded: localStatsDegraded.value,
+  }),
 );
 const detalheBaseLocalPorFonte = computed(() => {
   const rows = Array.isArray(localStats.value?.por_plataforma)
@@ -640,25 +670,42 @@ async function carregarFontesPreco() {
   isLoadingFontes.value = true;
   try {
     const catalog = await loadPriceSourcesCatalog();
-    fontesCatalog.value = mergeFontesWithLocalStats(catalog, localStats.value);
-    // Sempre inicia com todas as fontes ready (união multi-fonte).
+    if (localStats.value) {
+      fontesCatalog.value = mergeFontesWithLocalStats(catalog, localStats.value);
+    } else if (localStatsDegraded.value) {
+      fontesCatalog.value = applyFontesWhenStatsUnavailable(catalog);
+    } else {
+      fontesCatalog.value = catalog;
+    }
     fontesHabilitadas.value = pickDefaultFontes(fontesCatalog.value);
   } catch (_err) {
-    fontesCatalog.value = [];
-    fontesHabilitadas.value = ['pncp'];
+    fontesCatalog.value = applyFontesWhenStatsUnavailable(
+      (await loadPriceSourcesCatalog().catch(() => [])) || [],
+    );
+    fontesHabilitadas.value = pickDefaultFontes(fontesCatalog.value);
   } finally {
     isLoadingFontes.value = false;
   }
 }
 
 async function carregarStatusBaseLocal() {
+  localStatsLoading.value = true;
+  localStatsDegraded.value = false;
   try {
-    localStats.value = await getLocalIndexStats();
+    localStats.value = await getLocalIndexStatsResilient();
     if (fontesCatalog.value.length) {
       fontesCatalog.value = mergeFontesWithLocalStats(fontesCatalog.value, localStats.value);
+      fontesHabilitadas.value = pickDefaultFontes(fontesCatalog.value);
     }
   } catch (_err) {
     localStats.value = null;
+    localStatsDegraded.value = true;
+    if (fontesCatalog.value.length) {
+      fontesCatalog.value = applyFontesWhenStatsUnavailable(fontesCatalog.value);
+      fontesHabilitadas.value = pickDefaultFontes(fontesCatalog.value);
+    }
+  } finally {
+    localStatsLoading.value = false;
   }
 }
 
@@ -754,20 +801,6 @@ function buildSimilarityFallbackTerms(query) {
   return out;
 }
 
-function faixaPayloadForApi() {
-  const valorBase = parseMoeda(filtros.valorBase);
-  const variacao = Number.parseFloat(String(filtros.variacao || '0'));
-  if (valorBase == null || valorBase <= 0 || !Number.isFinite(variacao) || variacao < 0) {
-    return {};
-  }
-  const sentido = ['baixo', 'cima', 'ambos'].includes(filtros.variacaoSentido) ? filtros.variacaoSentido : 'ambos';
-  return {
-    valor_base_referencia: valorBase,
-    variacao_percentual_referencia: variacao,
-    variacao_sentido_referencia: sentido,
-  };
-}
-
 function mapFederatedItemToRow(it, idx, { termoBuscaEfetivo, termoFallbackUsado, fallbackPorSimilaridadeIa }) {
   const plat = federatedItemPlataforma(it);
   const descricaoLinha = it.descricao_item || it.objeto_resumido || '';
@@ -844,12 +877,11 @@ async function buscarNoBackend() {
         : null;
     const termoBuscaEfetivo = filtros.descricao.trim();
     const geo = geoApiSlice();
-    const faixaPayload = faixaPayloadForApi();
     const fontes = fontesHabilitadas.value?.length ? [...fontesHabilitadas.value] : ['pncp'];
     const searchBase = {
       termo_busca: termoBuscaEfetivo,
       ...geo,
-      ...faixaPayload,
+      // lista_completa: recall amplo na API (paridade com curl). Faixa só nos filtros da tela.
       codigo_modalidade: codigoModalidade,
       somente_homologados: true,
       max_paginas: 500,
@@ -886,14 +918,19 @@ async function buscarNoBackend() {
     }
     if (gen !== searchGeneration) return;
     if (data?.ok && Array.isArray(data.itens)) {
-      resultados.value = data.itens
-        .filter((it) => passesPnCpSearchDisplayGate({ sourceRaw: it }))
-        .map((it, idx) => mapFederatedItemToRow(it, idx, {
-          termoBuscaEfetivo,
-          termoFallbackUsado,
-          fallbackPorSimilaridadeIa,
-        }));
+      ultimaBuscaApi.value = {
+        total: data.itens.length,
+        porPlataforma: contagemPlataformaRawItens(data.itens),
+        stats: data.stats || null,
+      };
+      // lista_completa já filtra no researcher (fornecedor + preço); não reaplicar gate no front.
+      resultados.value = data.itens.map((it, idx) => mapFederatedItemToRow(it, idx, {
+        termoBuscaEfetivo,
+        termoFallbackUsado,
+        fallbackPorSimilaridadeIa,
+      }));
     } else {
+      ultimaBuscaApi.value = null;
       resultados.value = [];
     }
   } catch (err) {
@@ -1306,8 +1343,10 @@ async function hydrateManualFromRoute({ autoSearch = true } = {}) {
   if (qDesc && !filtros.descricao) filtros.descricao = qDesc;
   const hadDescricaoEarly = Boolean(filtros.descricao.trim());
 
-  // 2) Stats + fontes (ainda necessários para fontes_habilitadas no auto-search).
-  await Promise.all([carregarStatusBaseLocal(), carregarFontesPreco()]);
+  // 2) Stats antes das fontes — evita race que deixava checkboxes «indisponível».
+  await carregarStatusBaseLocal();
+  if (gen !== hydrateGeneration) return;
+  await carregarFontesPreco();
   if (gen !== hydrateGeneration) return;
 
   // 3) Sessão: se já há descrição do prefill, não bloqueia a busca.
@@ -1604,6 +1643,7 @@ watch(
 .manual-field span { font-size: 10px; text-transform: uppercase; color: #64748b; }
 .manual-meta { margin: 0; font-size: 12px; color: #64748b; }
 .manual-meta--error { color: #b91c1c; }
+.manual-meta--warn { color: #9a6b2e; }
 
 .manual-faixa-cell {
   min-width: 118px;

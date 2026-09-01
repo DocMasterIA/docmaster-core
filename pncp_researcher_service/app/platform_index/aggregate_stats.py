@@ -24,6 +24,8 @@ def attach_federated_item_totals(stats: Dict[str, Any]) -> Dict[str, Any]:
             "label": "PNCP",
             "total_itens": pncp_n,
             "schema_kind": "legacy_pncp",
+            "search_ready": pncp_n > 0,
+            "db_exists": pncp_n > 0,
         }
     ]
     outras = 0

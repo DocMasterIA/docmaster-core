@@ -90,7 +90,6 @@ async def _federated_lista_completa(query: FederatedSearchQuery) -> Dict[str, An
     from ..local_index import local_item_search
     from ..platform_index.registry import get_platform_spec
     from ..platform_index.search import platform_item_search
-    from ..pricing_faixa import compute_faixa_regional
 
     sources = [s for s in (query.fontes_habilitadas or ["pncp"]) if s] or ["pncp"]
     # Paridade com /local-index/search-items: varrer o máximo viável dos filtros (sem top-3).
@@ -192,30 +191,9 @@ async def _federated_lista_completa(query: FederatedSearchQuery) -> Dict[str, An
         seen.add(key)
         deduped.append(row)
 
+    # lista_completa (busca manual): recall amplo — faixa regional fica nos filtros da UI.
     faixa_min = None
     faixa_max = None
-    if (
-        query.valor_base_referencia
-        and float(query.valor_base_referencia) > 0
-        and query.variacao_percentual_referencia is not None
-        and float(query.variacao_percentual_referencia) >= 0
-    ):
-        try:
-            faixa_min, faixa_max = compute_faixa_regional(
-                float(query.valor_base_referencia),
-                float(query.variacao_percentual_referencia),
-                sentido=query.variacao_sentido_referencia or "ambos",
-            )
-        except Exception:
-            faixa_min = faixa_max = None
-
-    if faixa_min is not None and faixa_max is not None:
-        filtered = []
-        for row in deduped:
-            p = _row_unit_price(row)
-            if p > 0 and faixa_min <= p <= faixa_max:
-                filtered.append(row)
-        deduped = filtered
 
     itens = deduped[:limit]
     return {

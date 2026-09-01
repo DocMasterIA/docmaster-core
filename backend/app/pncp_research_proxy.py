@@ -53,7 +53,9 @@ def pncp_research_proxy(request, path: str):
 
     try:
         if request.method == "GET":
-            resp = requests.get(url, timeout=60)
+            # local-index/stats agrega COUNT em vários SQLite (até dezenas de GB).
+            stats_timeout = 120 if path.strip("/").startswith("local-index/stats") else 60
+            resp = requests.get(url, timeout=stats_timeout)
             out = _json_or_raw_response(resp)
             result = "success" if resp.status_code < 400 else "error"
             return out

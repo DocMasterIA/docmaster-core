@@ -585,8 +585,27 @@ export function listPriceSources() {
   return researchRequest('price-sources', { method: 'GET' });
 }
 
-export function getLocalIndexStats(signal) {
-  return researchRequest('local-index/stats', { signal });
+export function getLocalIndexStats(signal, options = {}) {
+  const timeoutMs = options.timeoutMs ?? 120_000;
+  return researchRequest('local-index/stats', { signal, timeoutMs });
+}
+
+/** Stats do índice com retry — evita UI «0 itens» por falha transitória de rede/proxy. */
+export async function getLocalIndexStatsResilient(options = {}) {
+  const maxAttempts = Math.max(1, Math.min(5, Number(options.maxAttempts) || 3));
+  const timeoutMs = options.timeoutMs ?? 120_000;
+  let lastErr = null;
+  for (let i = 0; i < maxAttempts; i += 1) {
+    try {
+      return await getLocalIndexStats(undefined, { timeoutMs });
+    } catch (err) {
+      lastErr = err;
+      if (i < maxAttempts - 1) {
+        await sleep(Math.min(2400, 700 * (i + 1)));
+      }
+    }
+  }
+  throw lastErr || new Error('Falha ao carregar estatísticas do índice local.');
 }
 
 export function backfillLocalIndex(payload, signal) {

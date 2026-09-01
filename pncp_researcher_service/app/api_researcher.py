@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -45,6 +46,9 @@ from .service import market_search, market_search_intelligent, market_search_str
 from .service_mode import service_name
 
 researcher_router = APIRouter(prefix="/pncp-research", tags=["price-researcher"])
+
+_STATS_CACHE: Dict[str, Any] = {"payload": None, "expires_at": 0.0}
+_STATS_CACHE_TTL_SECONDS = 45.0
 
 
 def _researcher_health() -> HealthResponse:
@@ -226,10 +230,19 @@ async def local_index_stats_read_endpoint():
     `total_itens` permanece PNCP-only (compat). O front usa
     `total_itens_todas_fontes` para o volume agregado indexado.
     """
+    import time
+
+    now = time.time()
+    cached = _STATS_CACHE.get("payload")
+    if cached is not None and now < float(_STATS_CACHE.get("expires_at") or 0):
+        return cached
     try:
         from .platform_index.aggregate_stats import attach_federated_item_totals
 
-        return attach_federated_item_totals(local_index_stats())
+        payload = attach_federated_item_totals(local_index_stats())
+        _STATS_CACHE["payload"] = payload
+        _STATS_CACHE["expires_at"] = now + _STATS_CACHE_TTL_SECONDS
+        return payload
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 

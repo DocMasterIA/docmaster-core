@@ -1,11 +1,11 @@
-# Excel — Mapa de Apuração (base)
+# Excel — Price Survey Map (base)
 
-Modelo oficial: **`relatorio_base_excell.xlsm`**
+Official template: **`relatorio_base_excell.xlsm`**
 
-Slots mapeados (aba *Mapa de Apuração*):
+Mapped slots (*Mapa de Apuração* sheet):
 
-| Célula | Chave |
-|--------|--------|
+| Cell | Key |
+|------|-----|
 | A2 | `{PREFEITURA_ESTADO}` |
 | A3 | `{CNPJ}` |
 | A4 | `{TELEFONE}` |
@@ -23,6 +23,6 @@ Slots mapeados (aba *Mapa de Apuração*):
 | A20 | `{PREFEITURA_E_DATA}` |
 | A23 | `{RESPONSAVEL_PESQUISA_PREÇOS}` |
 
-Legado (fallback): `relatorio_saida_excell.xlsx`
+Legacy (fallback): `relatorio_saida_excell.xlsx`
 
-Documentação: `docs/pncp/COTACAO-EXCEL-SLOTS-MAPEAMENTO.md`
+Documentation: `docs/pncp/COTACAO-EXCEL-SLOTS-MAPEAMENTO.md`

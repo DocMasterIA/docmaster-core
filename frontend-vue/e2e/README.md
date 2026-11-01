@@ -1,42 +1,42 @@
-# E2E — Auditoria técnica Busca IA / Manual
+# E2E — Technical audit of AI Search / Manual Search
 
-## Busca IA (bulk cotação)
+## AI Search (bulk quotation)
 
-O teste **executa** a busca, espera concluir e produz análise para engenharia:
+The test **runs** the search, waits for it to finish, and produces an engineering analysis:
 
-1. Compara **termo da cotação × título de cada preço** (tokens, specs %, mg, famílias conflitantes)
-2. Estatística de preço por item: min/mediana/média/max, σ, **CV%**, max/min, Δ% vs BASE, posição na faixa
-3. Catálogo de **mismatches** (produto errado mesmo com preço “dentro da VAR”)
-4. Tabelas por item dos piores casos + anexo de todos os itens
+1. Compares **quotation term × each price title** (tokens, specs %, mg, conflicting families)
+2. Price statistics per item: min/median/mean/max, σ, **CV%**, max/min, Δ% vs BASE, position in the range
+3. Catalog of **mismatches** (wrong product even when the price is “inside the VAR”)
+4. Per-item tables of the worst cases + an appendix of every item
 
 ```bash
 cd frontend-vue
 npm run test:e2e:ia
-# ou: npm run test:e2e -- e2e/busca-ia-cotacao.spec.mjs
+# or: npm run test:e2e -- e2e/busca-ia-cotacao.spec.mjs
 ```
 
-Saída: `e2e-artifacts/busca-ia-audit-<id>-<ts>.md` (+ `.json`).
+Output: `e2e-artifacts/busca-ia-audit-<id>-<ts>.md` (+ `.json`).
 
-**Falha se:** `critical > 0` (fora da faixa **ou** mismatch termo×candidato).
+**Fails if:** `critical > 0` (outside the range **or** term×candidate mismatch).
 
-## Busca Manual (cotação inteira, item a item)
+## Manual Search (whole quotation, item by item)
 
-Percorre **todos** os itens da cotação: para cada um abre  
-`/pesquisador-pncp/cotacoes/{id}/busca-manual?itemId=…`, espera a auto-busca e audita.
+Walks **every** quotation item: for each one it opens  
+`/pesquisador-pncp/cotacoes/{id}/busca-manual?itemId=…`, waits for the auto-search, and audits.
 
-1. Login → lista itens da sessão via API
-2. Loop: um item por vez (mesma UX da manual individual)
-3. Relatório agregado: hits por fonte, plataformas UI, fora da faixa, críticos
+1. Login → session item list via API
+2. Loop: one item at a time (same UX as the individual manual search)
+3. Aggregated report: hits per source, UI platforms, out of range, critical
 
 ```bash
 cd frontend-vue
 # .env.e2e: PLAYWRIGHT_COTACAO_ID=138
-# opcional: PLAYWRIGHT_ITEM_ID=31869          (só um item)
-# opcional: PLAYWRIGHT_MANUAL_MAX_ITEMS=10    (N primeiros)
+# optional: PLAYWRIGHT_ITEM_ID=31869          (a single item)
+# optional: PLAYWRIGHT_MANUAL_MAX_ITEMS=10    (first N)
 npm run test:e2e:manual
 ```
 
-Saída: `e2e-artifacts/busca-manual-cotacao-<id>-<ts>.md` (+ `.json`).
+Output: `e2e-artifacts/busca-manual-cotacao-<id>-<ts>.md` (+ `.json`).
 
-**Falha se:** algum item com 0 resultados, erro de busca, descrição vazia, ou preço fora da faixa.  
-Mismatch lexical na lista ampla = **aviso** (não falha), salvo `PLAYWRIGHT_MANUAL_FAIL_ON_MISMATCH=1`.
+**Fails if:** any item has 0 results, a search error, an empty description, or a price outside the range.  
+A lexical mismatch on the broad list is a **warning** (does not fail), unless `PLAYWRIGHT_MANUAL_FAIL_ON_MISMATCH=1`.

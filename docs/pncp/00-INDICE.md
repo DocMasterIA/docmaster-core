@@ -10,6 +10,8 @@ Documentação do módulo **Pesquisador PNCP** (`pncp_researcher_service`), inge
 |-----------|----------|
 | [PNCP-DECLARATIVO.md](./PNCP-DECLARATIVO.md) | Estado declarativo do sistema |
 | [PNCP-CONTEXTO-IA.md](./PNCP-CONTEXTO-IA.md) | Contexto IA (ingest + fornecedor + ops) |
+| [ANALISE-COBERTURA-TEMPORAL-INDICE-PNCP-SET2026.md](./ANALISE-COBERTURA-TEMPORAL-INDICE-PNCP-SET2026.md) | **Análise set/2026** — índice ~1,2M enviesado (pico abr–mai/2025); alimentação vs API vs UI |
+| [PLANOS-TECNICOS-CONTRATOS-E-ITENS-SET2026.md](./PLANOS-TECNICOS-CONTRATOS-E-ITENS-SET2026.md) | **Planos técnicos** — (A) catálogo/justiça temporal; (B) paginação /itens (teto 10) |
 | [PESQUISADOR_PNCP_FUNCIONAMENTO_ATUAL.md](./PESQUISADOR_PNCP_FUNCIONAMENTO_ATUAL.md) | Funcionamento atual da busca/cotação |
 | [PNCP-NOTAS-PENDENCIAS.md](./PNCP-NOTAS-PENDENCIAS.md) | Pendências conhecidas |
 | [PNCP-BUSCA-INTELIGENTE-REGRESSAO-UI-VS-BACKEND.md](./PNCP-BUSCA-INTELIGENTE-REGRESSAO-UI-VS-BACKEND.md) | Regressão UI vs backend (bisect jun/2026) |

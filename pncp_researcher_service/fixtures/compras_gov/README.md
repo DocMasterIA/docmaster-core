@@ -1,6 +1,6 @@
-# Fixtures mínimas Compras.gov (2 compras + 5 itens) para teste E2E de ingest.
-# Arquivos:
+# Minimal Compras.gov fixtures (2 procurements + 5 items) for ingest E2E tests.
+# Files:
 #   fixture-VW_FT_PNCP_COMPRA.csv
 #   fixture-VW_FT_PNCP_COMPRA_ITEM.csv
 #
-# Uso: ingest_compras_gov_sample() / POST …/ingest-sample
+# Usage: ingest_compras_gov_sample() / POST …/ingest-sample

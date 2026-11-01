@@ -1,12 +1,12 @@
-# Templates por pacote (Lei 14.133)
+# Templates by package (Law 14.133)
 
-Estrutura padrão por pacote:
+Standard structure per package:
 
 - `TR_modelo_base.docx`
 - `DFD_modelo_base.docx`
-- `OFICIO_modelo_base.docx` (quando aplicável)
+- `OFICIO_modelo_base.docx` (when applicable)
 
-Pastas de pacote previstas:
+Expected package folders:
 
 - `dispensa_75_i_manutencao_veiculos`
 - `dispensa_75_i_obras_engenharia`
@@ -16,8 +16,8 @@ Pastas de pacote previstas:
 - `inexigibilidade_74_i_manutencao_de_veiculos` / `inexigibilidade_74_i_fornecedor_exclusivo`
 - `tr_dfd_generico`
 
-Observação:
+Notes:
 
-- O sistema usa `slot_package_key` para resolver o pacote.
-- Chaves `dispensa_rapida_*` (fluxo rápido no frontend) apontam para as mesmas pastas que `dispensa_75_*`.
-- Enquanto um pacote não tiver DOCX próprio, há fallback automático para `template_packages/tr_base/*.docx`.
+- The system uses `slot_package_key` to resolve the package.
+- `dispensa_rapida_*` keys (fast flow in the frontend) point to the same folders as `dispensa_75_*`.
+- Until a package has its own DOCX, there is an automatic fallback to `template_packages/tr_base/*.docx`.

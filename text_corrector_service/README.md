@@ -1,18 +1,18 @@
 # Text Corrector Service (initial composition)
 
-Microserviço FastAPI para correção textual PT-BR com:
+FastAPI microservice for Brazilian Portuguese text correction with:
 
-- normalização básica;
-- dicionário custom de erros recorrentes;
-- integração com LanguageTool (`/v2/check`);
-- regras determinísticas simples de pós-processamento.
+- basic normalization;
+- a custom dictionary of recurring errors;
+- LanguageTool integration (`/v2/check`);
+- simple deterministic post-processing rules.
 
 ## Endpoints
 
 - `GET /health`
 - `POST /correct`
 
-### Exemplo de request
+### Request example
 
 ```json
 {
@@ -22,7 +22,7 @@ Microserviço FastAPI para correção textual PT-BR com:
 }
 ```
 
-### Exemplo de resposta
+### Response example
 
 ```json
 {
@@ -38,7 +38,7 @@ Microserviço FastAPI para correção textual PT-BR com:
 }
 ```
 
-## Run local (standalone)
+## Run locally (standalone)
 
 ```bash
 docker build -t text-corrector -f text_corrector_service/Dockerfile .

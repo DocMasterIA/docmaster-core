@@ -1,39 +1,39 @@
-# DocMaster IA – Serviço RAG
+# DocMaster IA – RAG Service
 
-Módulo de **Retrieval-Augmented Generation** para ingestão, busca vetorial e geração contextualizada. Integra **LangChain** e **ChromaDB**.
+**Retrieval-Augmented Generation** module for ingestion, vector search, and contextual generation. Integrates **LangChain** and **ChromaDB**.
 
-## Requisitos
+## Requirements
 
-- **ChromaDB** instalado e rodando no servidor (ou via Docker)
-- **Ollama** com modelo de embeddings (ex.: `nomic-embed-text`) e modelo de geração
-- **llm_api** para geração de respostas (opcional; pode usar Ollama diretamente)
+- **ChromaDB** installed and running on the server (or via Docker)
+- **Ollama** with an embeddings model (e.g. `nomic-embed-text`) and a generation model
+- **llm_api** for response generation (optional; Ollama can be used directly)
 
 ## Endpoints
 
-| Método | Path | Descrição |
-|--------|------|-----------|
-| GET | `/api/rag/health` | Health check + status ChromaDB |
-| POST | `/api/rag/ingest` | Ingere texto no vector store |
-| POST | `/api/rag/query` | Consulta RAG (retrieval + geração) |
-| GET | `/api/rag/collections` | Lista coleções |
-| DELETE | `/api/rag/collections/{name}` | Remove coleção |
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/rag/health` | Health check + ChromaDB status |
+| POST | `/api/rag/ingest` | Ingests text into the vector store |
+| POST | `/api/rag/query` | RAG query (retrieval + generation) |
+| GET | `/api/rag/collections` | Lists collections |
+| DELETE | `/api/rag/collections/{name}` | Removes a collection |
 
-## Variáveis de ambiente
+## Environment variables
 
-| Variável | Padrão | Descrição |
-|----------|--------|-----------|
-| `CHROMA_HOST` | localhost | Host do ChromaDB |
-| `CHROMA_PORT` | 8000 | Porta do ChromaDB |
-| `CHROMA_COLLECTION` | docmaster_docs | Coleção padrão |
-| `OLLAMA_BASE_URL` | http://localhost:11434 | URL do Ollama (embeddings) |
-| `LLM_ORCHESTRATION_BASE_URL` | http://localhost:8002 | URL do llm_api |
-| `RAG_TOP_K` | 5 | Trechos a recuperar por query |
-| `RAG_TIMEOUT` | 0 | Timeout para chamada LLM (s); 0 = sem limite |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CHROMA_HOST` | localhost | ChromaDB host |
+| `CHROMA_PORT` | 8000 | ChromaDB port |
+| `CHROMA_COLLECTION` | docmaster_docs | Default collection |
+| `OLLAMA_BASE_URL` | http://localhost:11434 | Ollama URL (embeddings) |
+| `LLM_ORCHESTRATION_BASE_URL` | http://localhost:8002 | llm_api URL |
+| `RAG_TOP_K` | 5 | Passages to retrieve per query |
+| `RAG_TIMEOUT` | 0 | Timeout for the LLM call (s); 0 = no limit |
 
-## Uso local
+## Local usage
 
 ```bash
-# Na raiz do projeto
+# From the project root
 uvicorn rag_service.app.main:app --reload --host 0.0.0.0 --port 8004
 ```
 
@@ -43,16 +43,16 @@ uvicorn rag_service.app.main:app --reload --host 0.0.0.0 --port 8004
 docker compose up -d rag_service
 ```
 
-Documentação interativa: http://localhost:8004/docs
+Interactive docs: http://localhost:8004/docs
 
-## Qualidade do texto gerado
+## Generated text quality
 
-A geração de cláusulas usa o modelo configurado no **llm_api** (Ollama). Modelo padrão: `OLLAMA_MODEL=llama3.1:8b` (definido no llm_api).
+Clause generation uses the model configured in **llm_api** (Ollama). Default model: `OLLAMA_MODEL=llama3.1:8b` (set in llm_api).
 
-Para melhorar português, acentuação e reduzir markdown residual:
-- **Prompts** reforçam: sempre pt-BR, sem markdown, acentuação correta.
-- **Pós-processamento** (_postprocess_clause_text): corrige typos claros, remove markdown residual.
-- **Sanitização via LLM** (RAG_LLM_SANITIZE=1): a IA remove meta-comentários (intros, notas, section_key) – não depende de lista manual de regex.
-- Desativar pós-processamento: `RAG_POSTPROCESS=0`. Desativar sanitização LLM: `RAG_LLM_SANITIZE=0`.
+To improve Portuguese, accents, and reduce leftover markdown:
+- **Prompts** reinforce: always pt-BR, no markdown, correct accents.
+- **Post-processing** (_postprocess_clause_text): fixes clear typos and strips leftover markdown.
+- **LLM sanitization** (RAG_LLM_SANITIZE=1): the model removes meta-comments (intros, notes, section_key) — it does not depend on a hand-maintained regex list.
+- Disable post-processing: `RAG_POSTPROCESS=0`. Disable LLM sanitization: `RAG_LLM_SANITIZE=0`.
 
-Para trocar o modelo, defina `OLLAMA_MODEL` no llm_api (ex.: `llama3.2`, `mistral`, `phi3`).
+To switch models, set `OLLAMA_MODEL` in llm_api (e.g. `llama3.2`, `mistral`, `phi3`).

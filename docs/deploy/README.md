@@ -1,52 +1,52 @@
-# Deploy DocMaster — índice da documentação
+# DocMaster Deploy — documentation index
 
-Guias operacionais para produção (servidor DESKTOP / `/home/docmaster`, WSL + Docker).
+Operational guides for production (DESKTOP server / `/home/docmaster`, WSL + Docker).
 
-## Por onde começar
+## Where to start
 
-| Objetivo | Documento |
-|----------|-----------|
-| Site + API no ar, túnel Cloudflare, erro 502/1033 | [STACK-E-CLOUDFLARE-502.md](./STACK-E-CLOUDFLARE-502.md) |
-| Boot após reboot (systemd + WSL Windows) | [BOOT-AUTOMATICO.md](./BOOT-AUTOMATICO.md), [WSL-BOOT-WINDOWS.md](./WSL-BOOT-WINDOWS.md) |
-| PNCP API 24/7 (contentor isolado) | [PNCP-RESEARCHER-24-7.md](./PNCP-RESEARCHER-24-7.md) |
-| **Contexto IA PNCP** (ingest + fornecedor + ops) | [PNCP-CONTEXTO-IA.md](../pncp/PNCP-CONTEXTO-IA.md) |
-| **Estado declarativo PNCP** | [PNCP-DECLARATIVO.md](../pncp/PNCP-DECLARATIVO.md) |
-| **Alimentar índice PNCP** (loop, watermarks, paralelo) | [PNCP-INGESTAO-INDEX-24-7.md](./PNCP-INGESTAO-INDEX-24-7.md) |
-| Scripts PNCP (referência) | [PNCP-SCRIPTS-REFERENCIA.md](./PNCP-SCRIPTS-REFERENCIA.md) |
-| **Comandos operação PNCP** (monitorar, backup, deploy) | [PNCP-COMANDOS-OPERACAO.txt](./PNCP-COMANDOS-OPERACAO.txt) |
-| API índice local + FTS + busca V2 | [PNCP-API-INDICE-LOCAL.md](./PNCP-API-INDICE-LOCAL.md), [PNCP-V2-DEPLOY.md](./PNCP-V2-DEPLOY.md) |
-| **Busca inteligente qualidade + Qwen** | [PNCP-BUSCA-INTELIGENTE-QUALIDADE.md](../pncp/PNCP-BUSCA-INTELIGENTE-QUALIDADE.md) |
-| Integração Qwen (DocMaster) | [QWEN-INTEGRACAO-DOCMASTER.md](../integracao/QWEN-INTEGRACAO-DOCMASTER.md) |
+| Goal | Document |
+|------|----------|
+| Site + API up, Cloudflare tunnel, 502/1033 errors | [STACK-E-CLOUDFLARE-502.md](./STACK-E-CLOUDFLARE-502.md) |
+| Boot after reboot (systemd + Windows WSL) | [BOOT-AUTOMATICO.md](./BOOT-AUTOMATICO.md), [WSL-BOOT-WINDOWS.md](./WSL-BOOT-WINDOWS.md) |
+| PNCP API 24/7 (isolated container) | [PNCP-RESEARCHER-24-7.md](./PNCP-RESEARCHER-24-7.md) |
+| **PNCP AI context** (ingest + supplier + ops) | [PNCP-CONTEXTO-IA.md](../pncp/PNCP-CONTEXTO-IA.md) |
+| **PNCP declarative state** | [PNCP-DECLARATIVO.md](../pncp/PNCP-DECLARATIVO.md) |
+| **Feed the PNCP index** (loop, watermarks, parallel) | [PNCP-INGESTAO-INDEX-24-7.md](./PNCP-INGESTAO-INDEX-24-7.md) |
+| PNCP scripts (reference) | [PNCP-SCRIPTS-REFERENCIA.md](./PNCP-SCRIPTS-REFERENCIA.md) |
+| **PNCP operations commands** (monitor, backup, deploy) | [PNCP-COMANDOS-OPERACAO.txt](./PNCP-COMANDOS-OPERACAO.txt) |
+| Local index API + FTS + V2 search | [PNCP-API-INDICE-LOCAL.md](./PNCP-API-INDICE-LOCAL.md), [PNCP-V2-DEPLOY.md](./PNCP-V2-DEPLOY.md) |
+| **Intelligent search quality + Qwen** | [PNCP-BUSCA-INTELIGENTE-QUALIDADE.md](../pncp/PNCP-BUSCA-INTELIGENTE-QUALIDADE.md) |
+| Qwen integration (DocMaster) | [QWEN-INTEGRACAO-DOCMASTER.md](../integracao/QWEN-INTEGRACAO-DOCMASTER.md) |
 | Grafana / Prometheus | [OBSERVABILIDADE-VPS.md](./OBSERVABILIDADE-VPS.md) |
-| Estabilidade geral / WSL idle | [ESTABILIDADE-E-CLOUDFLARE.md](./ESTABILIDADE-E-CLOUDFLARE.md) |
-| Entrega de módulos (checklist) | [ENTREGA-MODULOS.md](./ENTREGA-MODULOS.md) |
-| **Backup Cloudflare R2** (DBs + media + cron) | [MODULO-BACKUP-R2.md](./MODULO-BACKUP-R2.md) |
-| Alterações recentes (changelog ops) | [CHANGELOG-OPERACOES-2026-06.md](./CHANGELOG-OPERACOES-2026-06.md) |
+| Overall stability / WSL idle | [ESTABILIDADE-E-CLOUDFLARE.md](./ESTABILIDADE-E-CLOUDFLARE.md) |
+| Module delivery (checklist) | [ENTREGA-MODULOS.md](./ENTREGA-MODULOS.md) |
+| **Cloudflare R2 backup** (DBs + media + cron) | [MODULO-BACKUP-R2.md](./MODULO-BACKUP-R2.md) |
+| Recent changes (ops changelog) | [CHANGELOG-OPERACOES-2026-06.md](./CHANGELOG-OPERACOES-2026-06.md) |
 
-## Dois stacks Docker
+## Two Docker stacks
 
-| Stack | Compose | Projeto Compose | Contentores críticos |
-|-------|---------|-----------------|----------------------|
-| Principal | `~/docker-compose.yml` | `docmaster` | `backend`, `frontend-vue`, `cloudflared-tunnel`, LLM, RAG… |
-| PNCP isolado | `~/docker-compose.pncp.yml` + override + noports | `docmaster-pncp` | `pncp_researcher_service` |
+| Stack | Compose | Compose project | Critical containers |
+|-------|---------|-----------------|---------------------|
+| Main | `~/docker-compose.yml` | `docmaster` | `backend`, `frontend-vue`, `cloudflared-tunnel`, LLM, RAG… |
+| Isolated PNCP | `~/docker-compose.pncp.yml` + override + noports | `docmaster-pncp` | `pncp_researcher_service` |
 
-O `docker compose up` do stack **principal** não deve recriar o PNCP (projeto separado).
+`docker compose up` on the **main** stack must not recreate PNCP (separate project).
 
-## Scripts principais (`scripts/`)
+## Main scripts (`scripts/`)
 
-| Script | Função |
-|--------|--------|
-| `ensure-docmaster-stack.sh` | Sobe app + túnel + PNCP API + observabilidade |
-| `ensure-pncp-researcher.sh` | Mantém só o contentor PNCP |
-| `run-pncp-index-ingest-loop.sh` | Loop de ingestão do índice |
-| `ensure-pncp-ingest-loop.sh` | Idempotente: garante um loop (cron/systemd) |
-| `attach-pncp-volume.sh` | Liga volume Docker com `.db` existente |
-| `find-pncp-db-volumes.sh` | Lista volumes com SQLite PNCP |
-| `install-docmaster-boot-service.sh` | Instala systemd no boot |
+| Script | Role |
+|--------|------|
+| `ensure-docmaster-stack.sh` | Brings up the app + tunnel + PNCP API + observability |
+| `ensure-pncp-researcher.sh` | Keeps only the PNCP container running |
+| `run-pncp-index-ingest-loop.sh` | Index ingestion loop |
+| `ensure-pncp-ingest-loop.sh` | Idempotent: ensures one loop (cron/systemd) |
+| `attach-pncp-volume.sh` | Attaches a Docker volume to an existing `.db` |
+| `find-pncp-db-volumes.sh` | Lists volumes that contain the PNCP SQLite database |
+| `install-docmaster-boot-service.sh` | Installs systemd at boot |
 
-## Regra de ouro (produção)
+## Golden rule (production)
 
-1. **Nunca** `docker compose -f docker-compose.pncp.yml down -v`
-2. **Um** loop de ingestão (`nohup` ou `docmaster-pncp-ingest.service`)
-3. Volume PNCP: `docmaster-pncp_pncp_researcher_data` (confirmar com `sqlite3` / stats)
-4. Após reboot WSL: `ensure-docmaster-stack.sh` + relançar ingest se não usar `--with-pncp-ingest`
+1. **Never** run `docker compose -f docker-compose.pncp.yml down -v`
+2. **One** ingestion loop (`nohup` or `docmaster-pncp-ingest.service`)
+3. PNCP volume: `docmaster-pncp_pncp_researcher_data` (confirm with `sqlite3` / stats)
+4. After a WSL reboot: `ensure-docmaster-stack.sh` + relaunch ingest if you are not using `--with-pncp-ingest`

@@ -1,9 +1,9 @@
-# Fixtures Notas Fiscais (Portal da Transparência)
+# Invoice fixtures (Transparency Portal)
 
-Mínimo para E2E de ingest:
-- `fixture-NotaFiscal.csv` — 1 nota autorizada + 1 rejeitada (`Sem informação`)
-- `fixture-NotaFiscalItem.csv` — 2 itens da autorizada + 1 da rejeitada (não deve entrar)
+Minimum set for ingest E2E:
+- `fixture-NotaFiscal.csv` — 1 authorized invoice + 1 rejected (`Sem informação`)
+- `fixture-NotaFiscalItem.csv` — 2 items from the authorized invoice + 1 from the rejected one (must not be ingested)
 
 Encoding: cp1252-compatible ASCII; delimiter `;`.
 
-Uso: `ingest_notas_fiscais_sample()` / `POST …/ingest-sample`
+Usage: `ingest_notas_fiscais_sample()` / `POST …/ingest-sample`

@@ -1,21 +1,21 @@
-# Módulo de Orquestração LLM (FastAPI)
+# LLM Orchestration Module (FastAPI)
 
-Camada intermediária entre o backend da aplicação e o servidor de IA local: integração padronizada, segura e auditável, com cliente HTTP, tratamento de erros (401, 429, 5xx), retries, timeout e registro de respostas brutas. Interface padronizada para chamadas **planner**, **section** e **analysis** (análise de editais). Não há garantia de resultados específicos quanto às respostas do modelo.
+Intermediate layer between the application backend and the local AI server: a standardized, safe, and auditable integration, with an HTTP client, error handling (401, 429, 5xx), retries, timeout, and raw-response logging. Standardized interface for **planner**, **section**, and **analysis** calls (bid-document analysis). There is no guarantee of specific results from the model responses.
 
 ---
 
-## Estrutura
+## Structure
 
 ```
 llm_api/
 ├── app/
 │   ├── __init__.py
-│   ├── main.py           # FastAPI app, CORS, rota raiz
+│   ├── main.py           # FastAPI app, CORS, root route
 │   ├── config.py         # OLLAMA_BASE_URL, timeout, retries, audit dir
 │   ├── exceptions.py     # LLMClientError, 401, 429, 5xx, Timeout
-│   ├── client.py         # Cliente HTTP (httpx), retries, timeout
-│   ├── adapter.py        # planner(), section(), analysis(), auditoria
-│   ├── audit.py          # log_request_response (arquivo + logger)
+│   ├── client.py         # HTTP client (httpx), retries, timeout
+│   ├── adapter.py        # planner(), section(), analysis(), audit
+│   ├── audit.py          # log_request_response (file + logger)
 │   ├── interfaces/
 │   │   ├── __init__.py
 │   │   ├── planner.py    # call_planner
@@ -29,78 +29,78 @@ llm_api/
 
 ---
 
-## Configuração (variáveis de ambiente)
+## Configuration (environment variables)
 
-| Variável | Descrição | Default |
-|----------|-----------|---------|
-| `OLLAMA_BASE_URL` | Base URL do Ollama (servidor de IA local) | `http://localhost:11434` |
-| `LLM_TIMEOUT` | Timeout da requisição (segundos) | `60.0` |
-| `LLM_MAX_RETRIES` | Número máximo de retries | `3` |
-| `LLM_AUDIT_LOG_DIR` | Diretório para logs de auditoria (JSONL) | (vazio = só logger) |
-| `LLM_ENDPOINT_PLANNER` | Path do endpoint planner | `/v1/planner` |
-| `LLM_ENDPOINT_SECTION` | Path do endpoint section | `/v1/section` |
-| `LLM_ENDPOINT_ANALYSIS` | Path do endpoint de análise (ex.: editais) | `/v1/analysis` |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `OLLAMA_BASE_URL` | Base URL of Ollama (local AI server) | `http://localhost:11434` |
+| `LLM_TIMEOUT` | Request timeout (seconds) | `60.0` |
+| `LLM_MAX_RETRIES` | Maximum number of retries | `3` |
+| `LLM_AUDIT_LOG_DIR` | Directory for audit logs (JSONL) | (empty = logger only) |
+| `LLM_ENDPOINT_PLANNER` | Planner endpoint path | `/v1/planner` |
+| `LLM_ENDPOINT_SECTION` | Section endpoint path | `/v1/section` |
+| `LLM_ENDPOINT_ANALYSIS` | Analysis endpoint path (e.g. bid documents) | `/v1/analysis` |
 
 ---
 
 ## Endpoints
 
-- **GET /** – Raiz do serviço.
+- **GET /** – Service root.
 - **GET /api/llm/health** – Health check.
-- **POST /api/llm/planner** – Chamada tipo planner (body: `prompt`, opcional `context`, `options`).
-- **POST /api/llm/section** – Chamada tipo section (body: `prompt`, opcional `section_id`, `context`).
-- **POST /api/llm/analysis** – Análise/avaliação de documento (ex.: editais); body: `document`, opcional `context`, `options`. Não gera nem modifica documento.
+- **POST /api/llm/planner** – Planner-style call (body: `prompt`, optional `context`, `options`).
+- **POST /api/llm/section** – Section-style call (body: `prompt`, optional `section_id`, `context`).
+- **POST /api/llm/analysis** – Document analysis/evaluation (e.g. bid documents); body: `document`, optional `context`, `options`. It does not generate or modify a document.
 
-Respostas de sucesso: `{"ok": true, "data": ...}`. Erros: 401, 429, 4xx/5xx com `detail` em JSON.
+Success responses: `{"ok": true, "data": ...}`. Errors: 401, 429, 4xx/5xx with `detail` as JSON.
 
 ---
 
-## Estrutura de logs de auditoria
+## Audit log structure
 
-Quando `LLM_AUDIT_LOG_DIR` está definido, cada chamada ao servidor de IA gera uma linha em arquivo **JSON Lines** no diretório indicado, com nome `llm_audit_YYYY-MM-DD.jsonl`.
+When `LLM_AUDIT_LOG_DIR` is set, each call to the AI server writes one line to a **JSON Lines** file in that directory, named `llm_audit_YYYY-MM-DD.jsonl`.
 
-Cada linha contém:
+Each line contains:
 
 - `timestamp`: ISO 8601 (UTC)
-- `request_id`: UUID da chamada
-- `call_type`: `"planner"`, `"section"` ou `"analysis"`
-- `request_payload`: payload enviado (serializável)
-- `response_raw`: resposta bruta do servidor (ou `{"error": "..."}` em falha)
-- `duration_ms`: duração em milissegundos
-- `status_code`: (opcional) status HTTP da resposta
+- `request_id`: call UUID
+- `call_type`: `"planner"`, `"section"`, or `"analysis"`
+- `request_payload`: payload sent (serializable)
+- `response_raw`: raw server response (or `{"error": "..."}` on failure)
+- `duration_ms`: duration in milliseconds
+- `status_code`: (optional) HTTP status of the response
 
-O mesmo conteúdo é enviado ao logger Python (`llm.audit`) em nível INFO.
+The same content is sent to the Python logger (`llm.audit`) at INFO level.
 
 ---
 
-## Como rodar
+## How to run
 
-**Opção 1 – dentro de `llm_api`:**
+**Option 1 – inside `llm_api`:**
 ```bash
 cd llm_api
 pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8002
 ```
 
-**Opção 2 – na raiz do repositório (usando o venv do projeto):**
+**Option 2 – from the repository root (using the project venv):**
 ```bash
-pip install fastapi "uvicorn[standard]" httpx  # se ainda não tiver
+pip install fastapi "uvicorn[standard]" httpx  # if not already installed
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8002 --app-dir llm_api
 ```
 
-Documentação interativa: **http://localhost:8002/docs**
+Interactive docs: **http://localhost:8002/docs**
 
 ---
 
 ## Docker
 
-Build (na raiz do repositório):
+Build (from the repository root):
 
 ```bash
 docker build -t llm_api -f llm_api/Dockerfile .
 ```
 
-Executar (Ollama no host; Linux use `host.docker.internal` ou IP do host):
+Run (Ollama on the host; on Linux use `host.docker.internal` or the host IP):
 
 ```bash
 docker run --rm -p 8002:8002 \
@@ -108,22 +108,22 @@ docker run --rm -p 8002:8002 \
   llm_api
 ```
 
-Variáveis úteis em Docker:
+Useful variables in Docker:
 
-- `OLLAMA_BASE_URL` – URL do Ollama (no host: `http://host.docker.internal:11434`; em rede Docker: `http://ollama:11434` se o serviço se chamar `ollama`).
-- `PORT` – Porta interna (default `8002`).
-- `LLM_AUDIT_LOG_DIR` – Ex.: `/app/logs`; monte um volume se quiser persistir logs.
+- `OLLAMA_BASE_URL` – Ollama URL (on the host: `http://host.docker.internal:11434`; on a Docker network: `http://ollama:11434` if the service is named `ollama`).
+- `PORT` – Internal port (default `8002`).
+- `LLM_AUDIT_LOG_DIR` – e.g. `/app/logs`; mount a volume if you want to persist logs.
 
-Em **docker-compose**, o Django deve apontar para este serviço com `LLM_API_BASE_URL=http://llm_api:8002` (nome do serviço = hostname na rede).
+In **docker-compose**, Django should point at this service with `LLM_API_BASE_URL=http://llm_api:8002` (service name = hostname on the network).
 
 ---
 
-## Tratamento de erros
+## Error handling
 
 - **401**: `LLMUnauthorizedError` → HTTP 401
-- **429**: `LLMRateLimitError` → HTTP 429 (com retry automático no client)
-- **5xx**: `LLMServerError` → HTTP 502/503/504 (com retry automático no client)
+- **429**: `LLMRateLimitError` → HTTP 429 (with automatic retry in the client)
+- **5xx**: `LLMServerError` → HTTP 502/503/504 (with automatic retry in the client)
 - **Timeout**: `LLMTimeoutError` → HTTP 504
-- Demais erros de cliente: `LLMClientError` → HTTP 400 ou status recebido
+- Other client errors: `LLMClientError` → HTTP 400 or the status received
 
-Retries são aplicados apenas para 429 e 5xx, com backoff simples entre tentativas.
+Retries apply only to 429 and 5xx, with simple backoff between attempts.

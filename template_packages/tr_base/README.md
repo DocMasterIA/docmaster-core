@@ -1,8 +1,8 @@
-# Template base – Termo de Referência
+# Base template – Terms of Reference
 
-Pasta do **modelo fixo** de Termo de Referência usado pela geração via slots.
+Folder for the **fixed template** of the Terms of Reference used by slot-based generation.
 
-- **Arquivos:** `TR_modelo_base.docx`, `DFD_modelo_base.docx`, `OFICIO_modelo_base.docx`
-- **Uso:** Fallback quando o pacote em `lei_14133/<pacote>/` não tiver cópia própria. O RAG preenche placeholders `( ... )` nos três modelos.
+- **Files:** `TR_modelo_base.docx`, `DFD_modelo_base.docx`, `OFICIO_modelo_base.docx`
+- **Usage:** Fallback when the package under `lei_14133/<package>/` has no copy of its own. RAG fills the `( ... )` placeholders in all three templates.
 
-Mantenha os três DOCX nesta pasta para builds Docker e chaves `dispensa_rapida_*` / pacotes sem pasta dedicada.
+Keep the three DOCX files in this folder for Docker builds and for `dispensa_rapida_*` keys / packages without a dedicated folder.

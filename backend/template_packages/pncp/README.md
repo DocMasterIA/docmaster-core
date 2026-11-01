@@ -1,13 +1,13 @@
-Coloque aqui o **XLSM oficial** da pesquisa de preços.
+Place the **official XLSM** for the price survey here.
 
-Nome esperado (primeiro encontrado):
+Expected name (first match wins):
 
-- `cotacao_pesquisa_precos.xlsm` ← preferencial (preserva macros)
+- `cotacao_pesquisa_precos.xlsm` ← preferred (preserves macros)
 - `cotacao_pesquisa_precos.xlsx`
 
-Documentação dos slots: `docs/pncp/COTACAO-EXCEL-SLOTS-MAPEAMENTO.md`
+Slot documentation: `docs/pncp/COTACAO-EXCEL-SLOTS-MAPEAMENTO.md`
 
-Modelo mínimo de desenvolvimento (gerado localmente):
+Minimal development template (generated locally):
 
 ```bash
 venv/bin/python scripts/build-cotacao-excel-template-dev.py

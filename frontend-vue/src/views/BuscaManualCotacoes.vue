@@ -21,6 +21,7 @@
           <label class="manual-field">
             <span>Período</span>
             <select v-model="filtros.periodo">
+              <option>Todo o período</option>
               <option>Último Mês</option>
               <option>Últimos 3 Meses</option>
               <option>Últimos 6 Meses</option>
@@ -196,8 +197,8 @@
       <p v-if="ultimaBuscaApi?.total != null" class="manual-meta">
         API devolveu <strong>{{ ultimaBuscaApi.total }}</strong> itens
         <span v-if="resumoPlataformaApi">({{ resumoPlataformaApi }})</span>.
-        <span v-if="ultimaBuscaApi.total > resultadosFiltradosOrdenados.length">
-          Filtros da tela (valor base, geo, período…) reduziram para {{ resultadosFiltradosOrdenados.length }}.
+        <span v-if="resumoReducaoFiltrosUi">
+          {{ resumoReducaoFiltrosUi }}
         </span>
       </p>
       <p v-if="faixaValorAtiva" class="manual-meta">
@@ -352,7 +353,7 @@ const itemId = computed(() => {
 
 const filtros = reactive({
   descricao: '',
-  periodo: 'Último Ano',
+  periodo: 'Todo o período',
   tipo: 'Todos',
   modalidade: 'Todas',
   /** @type {Array<{ _id: string, uf: string, municipios: string[], filtroMun: string }>} */
@@ -547,6 +548,32 @@ function resumoContagemPlataforma(map) {
 
 const resumoPlataformaApi = computed(() => resumoContagemPlataforma(ultimaBuscaApi.value?.porPlataforma));
 
+function periodoFiltraResultados(periodoLabel) {
+  const label = normalizeText(periodoLabel);
+  if (!label) return false;
+  return !label.includes('todo o periodo') && !label.includes('todo periodo');
+}
+
+const filtrosUiAtivos = computed(() => {
+  const parts = [];
+  const valorBase = parseMoeda(filtros.valorBase);
+  if (valorBase != null && valorBase > 0) parts.push('valor base');
+  if (recortesGeograficosAtivos.value.length > 0) parts.push('geo');
+  if (periodoFiltraResultados(filtros.periodo)) parts.push(`período (${filtros.periodo})`);
+  if (filtros.tipo && filtros.tipo !== 'Todos') parts.push(`tipo (${filtros.tipo})`);
+  if (filtros.modalidade && filtros.modalidade !== 'Todas') parts.push(`modalidade (${filtros.modalidade})`);
+  return parts;
+});
+
+const resumoReducaoFiltrosUi = computed(() => {
+  const apiN = ultimaBuscaApi.value?.total;
+  const telaN = resultadosFiltradosOrdenados.value.length;
+  if (apiN == null || apiN <= telaN) return '';
+  const ativos = filtrosUiAtivos.value;
+  if (!ativos.length) return '';
+  return `Filtros ativos (${ativos.join(', ')}) reduziram de ${apiN} para ${telaN}.`;
+});
+
 function contagemPlataformaRawItens(itens) {
   const out = {};
   for (const it of itens || []) {
@@ -624,7 +651,7 @@ const resultadosFiltradosOrdenados = computed(() => {
       ),
     );
   }
-  if (filtros.periodo) {
+  if (periodoFiltraResultados(filtros.periodo)) {
     filtrados = filtrados.filter((item) => isWithinPeriodo(item.data, filtros.periodo));
   }
   if (filtros.tipo && filtros.tipo !== 'Todos') {
@@ -1020,6 +1047,7 @@ function parseDateFlexible(v) {
 }
 
 function isWithinPeriodo(itemDate, periodoLabel) {
+  if (!periodoFiltraResultados(periodoLabel)) return true;
   const dt = parseDateFlexible(itemDate);
   if (!dt) return true;
   const now = new Date();
